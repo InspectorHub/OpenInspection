@@ -31,8 +31,13 @@ import type { UserSyncEvent, UserSyncOutbox } from '../lib/integration/user-sync
 // consumer) on the same queue — widened here, NOT in the user-sync seam
 // (replies are not user-lifecycle events).
 // P3 adds the two DSAR replies (`reply.subject.*`) to the same channel.
+//
+// ⚠️ This union and `CmdReplyType` in `cmd-reply.ts` must list the same replies.
+// They are two lists of one fact, and a reply added to only one of them compiles
+// on the emitting side and is unassignable here — which is how the correction
+// reply first failed. If a third list ever appears, make one of them derive.
 type CmdReplyEventType = 'reply.tenant.updated' | 'reply.tenant.export_completed' | 'reply.tenant.purged'
-    | 'reply.subject.exported' | 'reply.subject.erased';
+    | 'reply.subject.exported' | 'reply.subject.erased' | 'reply.report.corrected';
 /** Tenant-lifecycle events that are NOT user events (no user SID involved). */
 type TenantSyncEventType = 'io.inspectorhub.tenant.compliance_status_updated';
 export type OutboxEvent = UserSyncEvent | {

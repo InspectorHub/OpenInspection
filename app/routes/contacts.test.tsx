@@ -16,7 +16,7 @@
  * role vocabulary has always had.
  */
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
 import ContactsPage from "~/routes/contacts";
@@ -88,5 +88,71 @@ describe("/contacts — IA-96", () => {
     // three-contact address book that lost two rows.
     expect(container.textContent).toContain("Showing 1");
     expect(container.textContent).toContain("3 contacts");
+  });
+});
+
+/**
+ * `/contacts` — the same front door `/templates` already uses.
+ *
+ * This page used to own a private importer: a modal you pasted a CSV into (or
+ * dropped a file on), which guessed which column held the name by matching
+ * headers case-insensitively and, failing that, took the FIRST column. A guess
+ * with no way to correct it, on the one question the file cannot answer.
+ *
+ * The wizard asks instead, and it asks on a run that can be reviewed, repaired
+ * and undone. So what is asserted here is the ADDRESS and the ABSENCE:
+ *
+ *   1. every import control on this page resolves to the wizard's contacts
+ *      entry, asserted as a set so a page with two controls pointing two ways
+ *      fails even though both are links;
+ *   2. using that control opens no paste form. Written as a CLICK, because the
+ *      modal mounted its textarea only while open — the static "the document
+ *      contains no textarea" form of this assertion is green against the very
+ *      code it exists to reject.
+ */
+describe("/contacts — one front door", () => {
+  const FRONT_DOOR = "/settings/imports?intent=contacts.import";
+
+  it("sends the import control to the wizard, not to a modal", async () => {
+    renderContacts([AGENT, CLIENT]);
+    await screen.findByRole("heading", { name: "Contacts" });
+
+    const links = screen.getAllByRole("link", { name: /import/i });
+    expect(links.length).toBeGreaterThan(0);
+    expect(new Set(links.map((a) => a.getAttribute("href")))).toEqual(
+      new Set([FRONT_DOOR]),
+    );
+  });
+
+  it("opens no paste form when the import control is used", async () => {
+    renderContacts([AGENT, CLIENT]);
+
+    // POSITIVE CONTROL: the page rendered, and there is an import control to
+    // use. A document that rendered nothing opens no paste form either, so
+    // without this the assertion below passes for the wrong reason.
+    expect(await screen.findByRole("heading", { name: "Contacts" })).toBeTruthy();
+    expect(screen.getByText("Rosa Lindqvist")).toBeTruthy();
+    const controls = [
+      ...screen.queryAllByRole("button", { name: /import/i }),
+      ...screen.queryAllByRole("link", { name: /import/i }),
+    ];
+    expect(controls.length).toBeGreaterThan(0);
+
+    fireEvent.click(controls[0]);
+
+    // Queried off the document rather than the render container: a modal goes
+    // through a portal, and a container-scoped query cannot see it.
+    expect(document.querySelectorAll("textarea")).toHaveLength(0);
+    expect(screen.queryByText(/paste/i)).toBeNull();
+  });
+
+  it("still opens ADD as a button — the control that must NOT have become a link", async () => {
+    // "Everything on this header is a link" would satisfy the first assertion
+    // while having converted the wrong control.
+    renderContacts([AGENT]);
+
+    const add = await screen.findByRole("button", { name: /add contact/i });
+    expect(add.tagName).toBe("BUTTON");
+    expect(screen.queryByRole("link", { name: /add contact/i })).toBeNull();
   });
 });

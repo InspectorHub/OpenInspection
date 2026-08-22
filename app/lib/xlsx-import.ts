@@ -1,15 +1,23 @@
 /**
- * .xlsx → CSV conversion for the contacts import modal.
+ * Workbook → CSV conversion. NO PRODUCTION CALLER — read the next paragraph
+ * before building on this.
  *
- * Parsing happens entirely CLIENT-side: the vendored ExcelJS browser build
- * (`public/vendor/exceljs.min.js`, copied by scripts/vendor-copy.js) is
- * script-injected on first use — it is ~940KB and must never enter the worker
- * bundle or the initial client chunk. The first worksheet is converted to CSV
- * text and fed into the existing paste-box → validate → atomic-import
- * pipeline, so the server import path needs zero changes.
+ * It served the contacts import modal, which parsed the workbook CLIENT-side
+ * through a vendored ExcelJS browser build and fed the resulting CSV text into
+ * the paste box. That modal is gone: bringing contacts over is one run in the
+ * import wizard, which uploads the file itself and reads it on the server.
  *
- * Legacy `.xls` (the 2003 binary format) is intentionally unsupported —
- * ExcelJS does not read it; users save as .xlsx or CSV.
+ * What is left is the pure conversion layer, and the only thing that calls it
+ * is its own test. It is kept rather than deleted because the ExcelJS
+ * dependency it is written against is reachable from nowhere else, so retiring
+ * this file means retiring a dependency and the `scripts/vendor-copy.js` entry
+ * that ships it — a change with its own blast radius, not a line in an import
+ * task.
+ *
+ * ⚠️ It is NOT the spreadsheet reader the intake path uses. That one is
+ * hand-written, dependency-free and server-side, under
+ * `server/lib/migration-intake/`. Two readers, and this is the one nothing
+ * runs.
  */
 
 /** The slice of the ExcelJS API this module consumes (browser and node
@@ -21,10 +29,6 @@ export interface WorkbookLike {
             cb: (row: { values: unknown }, rowNumber: number) => void,
         ) => void;
     }>;
-}
-
-interface ExcelJsGlobal {
-    Workbook: new () => WorkbookLike & { xlsx: { load: (buf: ArrayBuffer) => Promise<unknown> } };
 }
 
 /** Normalize one ExcelJS cell value to display text. Covers the value union
@@ -73,34 +77,8 @@ export function workbookFirstSheetToCsv(workbook: WorkbookLike): string {
     return rowsToCsv(rows);
 }
 
-const VENDOR_SRC = '/vendor/exceljs.min.js';
-let excelJsLoading: Promise<ExcelJsGlobal> | null = null;
-
-/** Inject the vendored ExcelJS browser build once and resolve its global. */
-function loadExcelJs(): Promise<ExcelJsGlobal> {
-    excelJsLoading ??= new Promise((resolve, reject) => {
-        const existing = (window as unknown as { ExcelJS?: ExcelJsGlobal }).ExcelJS;
-        if (existing) { resolve(existing); return; }
-        const s = document.createElement('script');
-        s.src = VENDOR_SRC;
-        s.onload = () => {
-            const g = (window as unknown as { ExcelJS?: ExcelJsGlobal }).ExcelJS;
-            if (g) resolve(g);
-            else reject(new Error('ExcelJS failed to initialize.'));
-        };
-        s.onerror = () => {
-            excelJsLoading = null; // allow a retry on transient load failure
-            reject(new Error('Could not load the spreadsheet parser.'));
-        };
-        document.head.appendChild(s);
-    });
-    return excelJsLoading;
-}
-
-/** Browser entry point: File (.xlsx) → CSV text for the import pipeline. */
-export async function parseXlsxFile(file: File): Promise<string> {
-    const ExcelJS = await loadExcelJs();
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(await file.arrayBuffer());
-    return workbookFirstSheetToCsv(wb);
-}
+// A `parseXlsxFile(file)` stood here: it script-injected `/vendor/exceljs.min.js`
+// into the page on first use, loaded the workbook from the File, and returned
+// CSV text. Its one caller was the contacts import modal. It went with it —
+// a browser entry point nothing enters is not a capability, it is 940KB of
+// vendored parser that only a stale import could reach.

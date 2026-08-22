@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AUTHORITY_BASES } from '../auth/authority-basis';
+import { CORRECTABLE_FIELDS } from '../validations/correction.schema';
 
 /**
  * Consumer-side contract for the portal -> core COMMAND seam (A-21 batch 1).
@@ -31,6 +32,11 @@ const KNOWN_CMD_TYPES: Record<string, readonly string[]> = {
     // reply correlated by `replyto: dsar:<requestId>`.
     'io.inspectorhub.cmd.subject.export': ['cmd-subject-export/v1'],
     'io.inspectorhub.cmd.subject.erase': ['cmd-subject-erase/v1'],
+    // The third right in the same family: correct a record that has already
+    // been delivered. Like the two above it is an operation on behalf of a
+    // natural person and awaits a reply (`replyto: dsar:<requestId>`), and
+    // unlike them it is not idempotent — see the consumer's stale-guard note.
+    'io.inspectorhub.cmd.report.correct': ['cmd-report-correct/v1'],
 };
 
 const cmdEnvelopeSchema = z.object({
@@ -231,6 +237,47 @@ export const cmdSubjectExportDataSchema = z.object({
 export const cmdSubjectEraseDataSchema = z.object({
     tenantId: z.string(),
     subjectEmail: z.string(),
+}).strict();
+
+/**
+ * Correct a field of a report that has already been delivered.
+ *
+ * `.strict()`, and for the reason the two schemas above are: this payload names
+ * a natural person's data, so an unexpected field means the sender believes
+ * something happens here that does not. Accepted-and-dropped would be recorded
+ * on the other side as a correction covering a field nothing ever wrote.
+ *
+ * ── The field list is READ, not restated ───────────────────────────────────
+ * `CORRECTABLE_FIELDS` is the correction service's own enum. A second
+ * hand-written copy here is how a boundary starts accepting a name the service
+ * cannot act on: the command would validate, ride the queue, and throw at the
+ * applier — where it looks like a fault and is retried forever. The list is
+ * short because only fields FROZEN INTO THE SIGNED SNAPSHOT need an amendment
+ * at all; everything resolved live at read time corrects itself.
+ *
+ * ── Two fields that are deliberately absent ────────────────────────────────
+ * There is NO `deferKeys`. The service accepts one so that asking to hold an
+ * artefact back can be REFUSED rather than quietly honoured; over this seam the
+ * request cannot be expressed at all, which is the stronger position.
+ *
+ * There is NO `correctedBy`. Who authorised the correction is the command's
+ * `replyto` handle, not a value the sender may choose: the amendment records it,
+ * and a sender-supplied identifier would be written into a column that otherwise
+ * holds a LOCAL user id — resolvable by nothing, and indistinguishable from one
+ * that is.
+ *
+ * MIRRORED BY HAND on the producing side, dataschema string included. The two
+ * repositories deploy independently: deploy THIS side first, because a sender
+ * emitting a command this build does not know parks it.
+ */
+export const cmdReportCorrectDataSchema = z.object({
+    tenantId: z.string().min(1),
+    inspectionId: z.string().min(1),
+    field: z.enum(CORRECTABLE_FIELDS),
+    /** The replacement value. The service refuses an empty one where the record requires a value. */
+    to: z.string().max(320),
+    /** Published on the amendment and shown to whoever reads the report's trail. */
+    reason: z.string().min(1).max(500),
 }).strict();
 
 export function parseCmdEnvelope(json: unknown): CmdEnvelope | null {

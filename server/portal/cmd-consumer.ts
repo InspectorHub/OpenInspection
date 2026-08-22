@@ -6,6 +6,7 @@ import {
     parseCmdEnvelope, isKnownCmd, cmdTenantUpdateDataSchema, cmdSyncQuotaDataSchema,
     cmdSeedStarterContentDataSchema, cmdDataExportDataSchema, cmdPurgeDataSchema,
     cmdTenantAiCapsDataSchema, cmdTenantRenameDataSchema, cmdSubjectExportDataSchema, cmdSubjectEraseDataSchema,
+    cmdReportCorrectDataSchema,
     type CmdEnvelope,
 } from '../lib/sync-events/cmd-envelope';
 import type { SyncEnvelope } from '../lib/sync-events/envelope';
@@ -68,6 +69,7 @@ export async function applyCmdEnvelope(
     buckets?: CmdConsumerBuckets,
     dos?: PurgeDurableObjects,
     emailEnv?: EmailServiceEnv,
+    encryptionSecret?: string,
 ): Promise<CmdApplyResult> {
     const db = drizzle(dbBinding);
     const env = parseCmdEnvelope(raw);
@@ -173,7 +175,7 @@ export async function applyCmdEnvelope(
     }
 
     try {
-        const replyExtra = await applyKnownCmd(dbBinding, kv, env, buckets, dos, emailEnv);
+        const replyExtra = await applyKnownCmd(dbBinding, kv, env, buckets, dos, emailEnv, encryptionSecret);
         // Advance the high-water mark (guarded so a concurrent higher write wins).
         if (tenantId) {
             await db.update(tenants)
@@ -194,11 +196,20 @@ export async function applyCmdEnvelope(
     }
 }
 
-/** The DSAR pair — operations on behalf of a person, not tenant state. Used by
- *  the stale-guard exemption above; see the reasoning there. */
+/** The DSAR commands — operations on behalf of a person, not tenant state. Used
+ *  by the stale-guard exemption above; see the reasoning there.
+ *
+ *  ⚠️ `report.correct` is on this list for the exemption's stated reason (a
+ *  rectification request is not superseded by a seat-count change) but NOT for
+ *  the safety argument the two subject commands rest on: it is NOT idempotent.
+ *  Re-running one publishes a SECOND amendment. What bounds it to at-most-once
+ *  is `processed_cmd_events` above, which is why the dedup insert comes first
+ *  and why the rollback below is limited to the case where the apply threw —
+ *  by which point `correctReport` has either published nothing or returned. */
 function isSubjectCmd(cmdType: string): boolean {
     return cmdType === 'io.inspectorhub.cmd.subject.export'
-        || cmdType === 'io.inspectorhub.cmd.subject.erase';
+        || cmdType === 'io.inspectorhub.cmd.subject.erase'
+        || cmdType === 'io.inspectorhub.cmd.report.correct';
 }
 
 /** Apply a known command. Returns the reply-payload EXTRAS for commands whose
@@ -211,6 +222,7 @@ async function applyKnownCmd(
     buckets?: CmdConsumerBuckets,
     dos?: PurgeDurableObjects,
     emailEnv?: EmailServiceEnv,
+    encryptionSecret?: string,
 ): Promise<Record<string, unknown> | undefined> {
     switch (env.type) {
         case 'io.inspectorhub.cmd.tenant.update': {
@@ -322,6 +334,24 @@ async function applyKnownCmd(
             const { applySubjectErase } = await import('./apply-subject-commands');
             return applySubjectErase(drizzle(dbBinding), data,
                 env.replyto !== undefined ? { requestedBy: env.replyto } : {});
+        }
+        case 'io.inspectorhub.cmd.report.correct': {
+            // Correct a field of a report that has already been delivered.
+            // Strict parse, like the two subject commands: this payload names a
+            // natural person's data, so a field this build does not recognise is
+            // a sender that believes something happens here that does not.
+            const data = cmdReportCorrectDataSchema.parse(env.data);
+            if (!encryptionSecret) {
+                // Publishing an amendment needs the tenant's signing key, which
+                // is sealed with this secret. Retryable by design: a genuinely
+                // misconfigured deploy exhausts the retries and surfaces as a
+                // dead command, which is visible. Replying "refused" would be a
+                // final answer to a person, on a fact about our configuration.
+                throw new Error('report.correct: no encryption secret bound — cannot publish an amendment');
+            }
+            const { applyReportCorrection } = await import('./apply-report-correction');
+            return applyReportCorrection(dbBinding, encryptionSecret, data,
+                env.replyto !== undefined ? { correctedBy: env.replyto } : {});
         }
         case 'io.inspectorhub.cmd.tenant.sync_quota': {
             const data = cmdSyncQuotaDataSchema.parse(env.data);

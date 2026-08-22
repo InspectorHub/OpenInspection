@@ -1,0 +1,17 @@
+{
+  "specversion": "1.0",
+  "id": "aa3f6f1e-6a2b-4d21-9b6e-2d1c8f5a7c31",
+  "type": "io.inspectorhub.cmd.report.correct",
+  "source": "portal",
+  "time": "2026-06-05T00:00:00.000Z",
+  "dataschema": "cmd-report-correct/v1",
+  "tenantseq": 12,
+  "replyto": "dsar:req-1",
+  "data": {
+    "tenantId": "fixture-tenant-4",
+    "inspectionId": "fixture-inspection-1",
+    "field": "propertyAddress",
+    "to": "1 Main Street",
+    "reason": "The address on the delivered report is not the property inspected."
+  }
+}

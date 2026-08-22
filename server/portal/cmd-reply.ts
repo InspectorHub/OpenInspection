@@ -18,7 +18,7 @@ import { OutboxService, type OutboxRow } from './outbox.service';
  * @declarationEmit Exported so the emitted `.d.ts` can NAME it: it is
  * `replyTypeFor`'s return type, and nothing imports it. */
 export type CmdReplyType = 'reply.tenant.updated' | 'reply.tenant.export_completed' | 'reply.tenant.purged'
-    | 'reply.subject.exported' | 'reply.subject.erased';
+    | 'reply.subject.exported' | 'reply.subject.erased' | 'reply.report.corrected';
 
 export function replyTypeFor(cmdType: string): CmdReplyType | null {
     switch (cmdType) {
@@ -32,6 +32,11 @@ export function replyTypeFor(cmdType: string): CmdReplyType | null {
         // publish inline, cron sweeper republishes stragglers).
         case 'io.inspectorhub.cmd.subject.export': return 'reply.subject.exported';
         case 'io.inspectorhub.cmd.subject.erase': return 'reply.subject.erased';
+        // The correction reply is the ONLY thing that tells the sender which of
+        // the three endings happened. Unlike the pair above, whose absence would
+        // merely leave a request waiting, an absent reply here is also the
+        // signal for the third ending — see `apply-report-correction.ts`.
+        case 'io.inspectorhub.cmd.report.correct': return 'reply.report.corrected';
         default: return null;
     }
 }

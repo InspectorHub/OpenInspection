@@ -1,6 +1,26 @@
 import { z } from 'zod';
 
 /**
+ * A correction that will not be carried out, and would not be carried out on a
+ * second attempt either.
+ *
+ * A DISTINCT TYPE RATHER THAN A MESSAGE. Whoever asked for the correction has
+ * to tell three endings apart — carried out, refused, and failed — and only the
+ * first may ever be recorded as done. A caller that sorted them by matching on
+ * the text of an error would start reclassifying refusals as failures the day
+ * somebody reworded a sentence, silently, with every test still green. So the
+ * refusals carry a type, and everything else that can be thrown stays what it
+ * is: a fault, which may well succeed on the next attempt and must be retried
+ * rather than answered.
+ */
+export class CorrectionRefusedError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'CorrectionRefusedError';
+    }
+}
+
+/**
  * A request to correct a field of a record that has already been delivered.
  *
  * ── Why the list is this short, and why the client's NAME is not on it ──────
@@ -21,10 +41,12 @@ import { z } from 'zod';
  * decision: a field belongs here when, and only when, it is inside the
  * snapshot.
  */
-// Not exported: `CorrectableField` below is the type callers need, and the
-// literal list is only meaningful together with the schema that validates
-// against it. Export it when an endpoint has to render the choices.
-const CORRECTABLE_FIELDS = [
+// Exported because a SECOND validator now has to agree with it: the command
+// envelope that carries a correction in from outside this process validates the
+// field name at the boundary, before any of this module runs. Two hand-written
+// copies of a five-member list is exactly how a boundary starts accepting a
+// field the service cannot act on, so both read this one.
+export const CORRECTABLE_FIELDS = [
     'propertyAddress',
     'addressStreet',
     'addressCity',

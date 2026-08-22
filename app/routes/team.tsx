@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData, useFetcher } from "react-router";
+import { Link, useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/team";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -8,6 +8,7 @@ import { InviteSeatDrawer } from "~/components/modals/InviteSeatDrawer";
 import { EditMemberDrawer, type EditableMember } from "~/components/modals/EditMemberDrawer";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useSessionContext } from "~/hooks/useSessionContext";
+import { importEntryHref } from "~/lib/import-entry-points";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table, Banner } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
@@ -186,9 +187,22 @@ export default function TeamPage() {
         title={m.settings_team_heading()}
         meta={`${members.length} ${members.length === 1 ? m.settings_team_member_singular() : m.settings_team_member_plural()}`}
         actions={
-          <Button variant="primary" icon={<PlusIcon />} onClick={() => setInviteOpen(true)}>
-            {m.settings_team_invite_button()}
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Secondary first, primary second — the order /contacts and
+                /templates already use. The bulk entrance does NOT pre-judge
+                seats: a greyed-out link here could not say "this file needs 12
+                and 3 are free", and that sentence is the Import step's to say,
+                once the file has been read and counted. */}
+            <Link
+              to={importEntryHref("members.invite")}
+              className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted inline-flex items-center"
+            >
+              {m.settings_team_import_button()}
+            </Link>
+            <Button variant="primary" icon={<PlusIcon />} onClick={() => setInviteOpen(true)}>
+              {m.settings_team_invite_button()}
+            </Button>
+          </div>
         }
       />
 

@@ -224,6 +224,7 @@
   "settings_team_heading": "Workspace Team",
   "settings_team_member_singular": "member",
   "settings_team_member_plural": "members",
+  "settings_team_import_button": "Import members",
   "settings_team_invite_button": "Invite Member",
   "settings_team_tab_active": "Active",
   "settings_team_tab_pending": "Pending Invites",

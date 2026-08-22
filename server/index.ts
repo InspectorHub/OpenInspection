@@ -705,10 +705,10 @@ export default {
         }
         if (batch.queue.includes('-cmd-') && !batch.queue.includes('cmd-dlq')) {
             const { handleCmdBatch } = await import('./portal/cmd-batch');
-            // SYNC_QUEUE carries replies to portal (A-21 batch 2); PHOTOS/EXPORTS
-            // serve offboarding (batch 3); the DO namespaces let purge empty them.
-            await handleCmdBatch(env.DB, env.TENANT_CACHE, batch, env.SYNC_QUEUE,
-                { photos: env.PHOTOS, exports: env.EXPORTS_BUCKET }, { INSPECTION_DOC: env.INSPECTION_DOC, TENANT_PRESENCE: env.TENANT_PRESENCE }, env);
+            // SYNC_QUEUE carries replies (A-21 batch 2); PHOTOS/EXPORTS serve
+            // offboarding (batch 3) and the DOs let purge empty them; the last
+            // argument is the secret a report amendment is signed with (cmd-batch.ts).
+            await handleCmdBatch(env.DB, env.TENANT_CACHE, batch, env.SYNC_QUEUE, { photos: env.PHOTOS, exports: env.EXPORTS_BUCKET }, { INSPECTION_DOC: env.INSPECTION_DOC, TENANT_PRESENCE: env.TENANT_PRESENCE }, env, env.KEY_ENCRYPTION_SECRET || env.JWT_SECRET);
             return;
         }
         await handleSyncDlqBatch(env.DB, batch);

@@ -22,6 +22,7 @@ import { inspections, reportVersions } from '../lib/db/schema';
 import { assertNothingDeferred } from '../lib/artifact-status';
 import {
     CorrectReportSchema,
+    CorrectionRefusedError,
     correctionRequiresValue,
     type CorrectReportInput,
 } from '../lib/validations/correction.schema';
@@ -46,9 +47,12 @@ export async function correctReport(
     // of itself and then refuses is worse than one that never started.
     assertNothingDeferred(parsed.deferKeys ?? []);
 
+    // The two conditions below are REFUSALS, not faults: neither changes on a
+    // second attempt, so a caller that cannot see this code still has to be able
+    // to tell them from a transient failure. See `CorrectionRefusedError`.
     const value = parsed.to.trim();
     if (!value && correctionRequiresValue(parsed.field)) {
-        throw new Error(`A correction may not leave ${parsed.field} empty.`);
+        throw new CorrectionRefusedError(`A correction may not leave ${parsed.field} empty.`);
     }
 
     const db = drizzle(d1);
@@ -59,7 +63,7 @@ export async function correctReport(
             eq(inspections.tenantId, parsed.tenantId),
         ))
         .get();
-    if (!row) throw new Error('Inspection not found');
+    if (!row) throw new CorrectionRefusedError('Inspection not found');
 
     const versions = new ReportVersionService(d1, encryptionSecret);
 

@@ -32,7 +32,8 @@ export type SyncEventType =
     | 'reply.tenant.export_completed'
     | 'reply.tenant.purged'
     | 'reply.subject.exported'
-    | 'reply.subject.erased';
+    | 'reply.subject.erased'
+    | 'reply.report.corrected';
 
 /** CloudEvents 1.0 envelope (subset profile used by this seam). */
 export interface SyncEnvelope {
@@ -182,6 +183,47 @@ const replySubjectErasedDataSchema = z.object({
     coverage: coverageDisclosureSchema,
 });
 
+/**
+ * A correction command was answered. TWO SHAPES, discriminated by `outcome`,
+ * and the discrimination is the whole point of the schema.
+ *
+ * The receiver writes an answer against a request that carries a statutory
+ * deadline, and only one of these two endings may be recorded as done. So the
+ * numbers that make a completion — the version published and the version it
+ * supersedes — exist on the `corrected` branch and NOWHERE ELSE, and the
+ * sentence a person is owed exists on the `refused` branch and is required
+ * there. A refusal therefore cannot be misread as a completion by a consumer
+ * reading the payload: it does not contain the thing a completion is made of.
+ *
+ * There is no third member and there must not be one. A run that neither
+ * corrected nor refused — a transient fault — emits no reply at all; it retries
+ * and, on exhaustion, becomes a visible dead command. Any value here would be
+ * read as one of the two answers above.
+ */
+const replyReportCorrectedDataSchema = z.discriminatedUnion('outcome', [
+    z.object({
+        tenantId: z.string(),
+        correlationId: z.string(),
+        replyto: z.string(),
+        inspectionId: z.string(),
+        field: z.string(),
+        outcome: z.literal('corrected'),
+        versionNumber: z.number(),
+        supersedes: z.number(),
+    }),
+    z.object({
+        tenantId: z.string(),
+        correlationId: z.string(),
+        replyto: z.string(),
+        inspectionId: z.string(),
+        field: z.string(),
+        outcome: z.literal('refused'),
+        /** The refusal in its own words. Required — a refusal with no stated
+         *  ground is indistinguishable from a request nobody looked at. */
+        reason: z.string().min(1),
+    }),
+]);
+
 /** Registry mapping each event type to its supported dataschema versions.
  *  Portal's `isKnown(type, dataschema)` consults the equivalent registry; a
  *  version absent here parks rather than 400s on the consumer side. */
@@ -194,6 +236,7 @@ export const SCHEMAS: Record<SyncEventType, readonly string[]> = {
     'reply.tenant.purged': ['v1'],
     'reply.subject.exported': ['v1'],
     'reply.subject.erased': ['v1'],
+    'reply.report.corrected': ['v1'],
 };
 
 /** Zod validator per event type, for tests and producer-side assertions. */
@@ -206,6 +249,7 @@ export const DATA_SCHEMAS: Record<SyncEventType, z.ZodTypeAny> = {
     'reply.tenant.purged': replyTenantPurgedDataSchema,
     'reply.subject.exported': replySubjectExportedDataSchema,
     'reply.subject.erased': replySubjectErasedDataSchema,
+    'reply.report.corrected': replyReportCorrectedDataSchema,
 };
 
 /** `user.invited` -> `user-invited`, `user.password_changed` ->

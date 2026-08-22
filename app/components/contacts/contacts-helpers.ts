@@ -1,25 +1,14 @@
 /**
- * Best-effort column mapping for the simple "paste CSV → import" flow:
- * matches column headers case-insensitively against the canonical field
- * names. If the CSV uses non-standard headers, falls back to the first
- * column as `name` so the import still succeeds for the common case.
+ * Shapes the contacts screens share.
+ *
+ * A `inferMappingFromCsv` used to sit at the top of this file: it matched CSV
+ * headers case-insensitively against `name`/`email`/`phone`/`agency` and, when
+ * no header matched, took the FIRST column as the name. That last clause is
+ * the reason it is gone — it answered the one question the file cannot answer,
+ * silently, with no screen on which to correct it. The import wizard asks
+ * instead (`/settings/imports?intent=contacts.import`), and the answer travels
+ * with a run that can be reviewed and undone.
  */
-export function inferMappingFromCsv(csv: string): { name: string; email?: string; phone?: string; agency?: string } {
-  const firstLine = csv.split(/\r?\n/, 1)[0] ?? "";
-  const cols = firstLine.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
-  const find = (...needles: string[]) =>
-    cols.find((c) => needles.some((n) => c.toLowerCase() === n));
-  const nameCol = find("name", "full name", "contact") ?? cols[0] ?? "name";
-  const emailCol = find("email", "e-mail");
-  const phoneCol = find("phone", "tel", "mobile");
-  const agencyCol = find("agency", "company", "organization");
-  const m: { name: string; email?: string; phone?: string; agency?: string } = { name: nameCol };
-  if (emailCol) m.email = emailCol;
-  if (phoneCol) m.phone = phoneCol;
-  if (agencyCol) m.agency = agencyCol;
-  return m;
-}
-
 export interface Contact {
   id: string;
   name: string;

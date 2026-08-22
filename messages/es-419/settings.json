@@ -224,6 +224,7 @@
   "settings_team_heading": "Equipo del espacio de trabajo",
   "settings_team_member_singular": "miembro",
   "settings_team_member_plural": "miembros",
+  "settings_team_import_button": "Importar miembros",
   "settings_team_invite_button": "Invitar miembro",
   "settings_team_tab_active": "Activo",
   "settings_team_tab_pending": "Invitaciones pendientes",

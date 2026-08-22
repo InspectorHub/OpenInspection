@@ -34,10 +34,14 @@ export async function handleCmdBatch(
     buckets?: CmdConsumerBuckets,
     dos?: PurgeDurableObjects,
     emailEnv?: EmailServiceEnv,
+    /** Seals the tenant signing keys an amendment needs; `cmd.report.correct`
+     *  is the only command that reads it. Optional so standalone (which
+     *  receives no commands at all) type-checks unchanged. */
+    encryptionSecret?: string,
 ): Promise<void> {
     for (const msg of batch.messages) {
         try {
-            const result = await applyCmdEnvelope(dbBinding, kv, msg.body, syncQueue, buckets, dos, emailEnv);
+            const result = await applyCmdEnvelope(dbBinding, kv, msg.body, syncQueue, buckets, dos, emailEnv, encryptionSecret);
             logger.info('[cmd] queue message handled', { id: msg.id, attempts: msg.attempts, result });
             msg.ack();
         } catch (err) {

@@ -25,6 +25,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, desc, eq } from 'drizzle-orm';
 import { reportVersions } from './db/schema';
 import { r2Keys } from './r2-keys';
+import { CorrectionRefusedError } from './validations/correction.schema';
 
 /**
  * The files an envelope's signing workflow leaves behind and the product
@@ -104,16 +105,21 @@ export function artifactClass(key: string): ArtifactClass {
  * Both branches throw, and the messages differ because the reasons do: a live
  * deliverable may not be deferred because it is not an archive, and anything
  * else may not be deferred because this module cannot say what it is.
+ *
+ * Both throw `CorrectionRefusedError`, which is what makes the refusal legible
+ * to a caller that did not ask for it directly: a deferral is refused on the
+ * facts of this deployment and would be refused identically on every retry, so
+ * a caller must report it as an answer rather than keep asking.
  */
 export function assertNothingDeferred(deferKeys: readonly string[]): void {
     for (const key of deferKeys) {
         if (artifactClass(key) === 'live') {
-            throw new Error(
+            throw new CorrectionRefusedError(
                 `Refusing to defer ${key}: a live deliverable is not an archived or backup ` +
                 'system, so a correction may not be delayed for it.',
             );
         }
-        throw new Error(
+        throw new CorrectionRefusedError(
             `Refusing to defer ${key}: this deployment classifies no stored object as an ` +
             'archive or a backup, so there is nothing a correction may be deferred for.',
         );

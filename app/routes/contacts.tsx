@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
-import { useLoaderData, useFetcher, useSearchParams } from "react-router";
+import { Link, useLoaderData, useFetcher, useSearchParams } from "react-router";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/contacts";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeAddContactSchema } from "~/lib/forms/contacts.schema";
+import { importEntryHref } from "~/lib/import-entry-points";
 import { PageHeader, Button, Select } from "@core/shared-ui";
-import { inferMappingFromCsv, type Contact } from "~/components/contacts/contacts-helpers";
+import type { Contact } from "~/components/contacts/contacts-helpers";
 import { ContactModal } from "~/components/contacts/ContactModal";
-import { CsvImportModal } from "~/components/contacts/CsvImportModal";
 import { ContactsTable } from "~/components/contacts/ContactsTable";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
@@ -108,34 +108,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { ok: res.ok };
   }
 
-  if (intent === "csv-import") {
-    const csvText = form.get("csvText") as string;
-    // The preview endpoint surfaces detected columns; the UI currently
-    // auto-maps by case-insensitive header name (name/email/phone/agency).
-    // Customers picking custom column names can be supported by a future
-    // mapping picker — the typed backend already accepts arbitrary mappings.
-    const mapping = inferMappingFromCsv(csvText);
-    const res = await api.contactsImport.import.$post({ json: { csv: csvText, mapping } });
-    // Unwrap the { success, data } envelope — the modal reads the result
-    // fields directly (this used to pass the whole envelope, so the done
-    // step's count always rendered 0).
-    const data = res.ok ? await res.json() : null;
-    return { ok: res.ok, result: (data as { data?: unknown } | null)?.data ?? {} };
-  }
-
-  if (intent === "csv-preview") {
-    const csvText = form.get("csvText") as string;
-    // TODO(C-10): hono/client leaf+branch collision — `/import` (endpoint) and
-    // `/import/preview` share a prefix, so `.preview` drops off the intersected
-    // ClientRequest type. Localized assertion keeps the API_WORKER binding; revisit
-    // if the import sub-router is restructured to avoid the prefix collision.
-    const importClient = api.contactsImport.import as unknown as {
-      preview: { $post: (a: { json: { csv: string } }) => Promise<Response> };
-    };
-    const res = await importClient.preview.$post({ json: { csv: csvText } });
-    const data = res.ok ? await res.json() : null;
-    return { ok: res.ok, preview: (data as { data?: unknown } | null)?.data ?? {} };
-  }
+  // The `csv-import` and `csv-preview` intents are gone with the modal that
+  // was their only caller. Bringing a contact list over is one run at
+  // `/settings/imports?intent=contacts.import`: the operator says which column
+  // holds what instead of a header match guessing it, and the run can be
+  // reviewed, repaired and undone. The mapping helper this page used to call
+  // went with them.
 
   // The `role-*` intents moved to routes/settings-inspection-roles.tsx with
   // the table itself (IA-96). They are gone from here rather than kept as
@@ -149,7 +127,6 @@ export default function ContactsPage() {
   const { contacts, filterType, archivedView } = useLoaderData<typeof loader>();
   const contactList = contacts as Contact[];
   const [modalOpen, setModalOpen] = useState(false);
-  const [csvModalOpen, setCsvModalOpen] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
   const [typeFilter, setTypeFilter] = useState(filterType || "");
   const [pendingArchive, setPendingArchive] = useState<Contact | null>(null);
@@ -240,9 +217,17 @@ export default function ContactsPage() {
                 ]}
               />
             </div>
-            <Button variant="secondary" size="sm" onClick={() => setCsvModalOpen(true)}>
-              {m.contacts_action_import_csv()}
-            </Button>
+            {/* One front door, addressed through `importEntryHref` so this
+                control and every other entrance to the wizard cannot drift
+                into two spellings of the same query string. It is a LINK, not
+                a button: what it opens is a page with its own address that
+                survives a reload, which the modal it replaced did not. */}
+            <Link
+              to={importEntryHref("contacts.import")}
+              className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted inline-flex items-center"
+            >
+              {m.contacts_action_import()}
+            </Link>
             <Button variant="primary" onClick={() => { setEditContact(null); setModalOpen(true); }} icon={<PlusIcon />}>
               {m.contacts_action_add()}
             </Button>
@@ -259,7 +244,6 @@ export default function ContactsPage() {
       />
 
       <ContactModal open={modalOpen} onClose={() => setModalOpen(false)} contact={editContact} />
-      <CsvImportModal open={csvModalOpen} onClose={() => setCsvModalOpen(false)} />
 
       {/* IA-100 — say what archiving does and does not withdraw. A report link
           is a per-inspection token that works with no account, so archiving
