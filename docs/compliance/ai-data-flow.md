@@ -13,7 +13,18 @@ renderers — which is what was done here.
 
 **Verified 2026-08-11; section 2 rewritten 2026-08-22** when the single
 hard-wired vendor endpoint was replaced by one configurable OpenAI-compatible
-adapter. Every claim carries an evidence level:
+adapter.
+
+**Section 3 completed 2026-08-23.** It had claimed four prompts and there were
+five: `translate-report-segments.v1` shipped and was never listed here, so for
+that feature this page — and the sentence in `CLAUDE.md` pointing at it — were
+false. It is listed below, along with `template-inference.v1`, which is not
+released. **The gap is worth stating rather than quietly closing**: nothing
+fails when a prompt is added without a row here, so the only thing keeping this
+list true is somebody checking it against `server/lib/ai/prompts.ts`, and that
+had not happened for one release.
+
+Every claim carries an evidence level:
 
 | level | means |
 |---|---|
@@ -140,7 +151,7 @@ deployment funds is never confused with the volume a workspace funds.
 
 ## 3. What is in the text, prompt by prompt
 
-Four prompts exist (`server/lib/ai/prompts.ts`). **E2 for every row.** "Free
+Six prompts exist (`server/lib/ai/prompts.ts`). **E2 for every row.** "Free
 text" means an inspector typed it and it may therefore contain anything the
 inspector chose to type, including names and addresses. Everything else is
 structured data drawn from a template or a numeric property fact.
@@ -196,10 +207,80 @@ the right outcome resting entirely on a comment. The field was deleted rather
 than guarded, and `tests/unit/ai/prompt-address-boundary.spec.ts` fails if an
 identifier of the property or the client is added back. **E2.**
 
+### `translate-report-segments.v1` — the courtesy translation of a report
+
+| field | source | free text? |
+|---|---|---|
+| `segments` | report prose, in report order — the inspector's notes and comments, and anything a client or agent typed that the report renders | **yes** |
+| `targetLocale` | BCP-47 target language tag | no |
+| `glossary` | building-terminology map, English term to the approved target term | no |
+| `context` | which part of the report the segments came from, e.g. a section title | no |
+
+**What is NOT in this prompt is the point of it, and it is enforced by the
+argument type rather than by review.** `TranslateSegmentsPromptArgs` has no
+field for the property address, the client, the inspector, a signature, or any
+agreement text — so the prompt cannot ask for them and no route can supply
+them. Widening that interface is what would re-open it. **E2.**
+
+`segments` is the largest free-text field on this page: it is whatever the
+inspector wrote. The count is load-bearing rather than incidental — translated
+segments are re-inserted positionally into the English structure, so a response
+of the wrong length is rejected rather than mapped
+(`server/lib/ai/translate-response.ts`). **E2.**
+
+### `template-inference.v1` — deriving a template's outline from a document
+
+⚠️ **NOT RELEASED. No call is made on any credentials today.**
+`server/lib/ai/output-classification.ts` refuses the `template_inference` class
+on both credential sources, and the chokepoint asks that table before anything
+leaves the process — so this row describes what WOULD be sent, and nothing has
+been. Releasing it is an edit to that table, reviewed as a product decision.
+**E2.**
+
+| field | source | free text? |
+|---|---|---|
+| `pages` | text extracted from a PDF the workspace uploaded, one string per page | **yes** |
+
+Three facts about that single field, because it is the whole prompt:
+
+1. **It is text this repository produced, never the file.**
+   `server/lib/migration-intake/pdf-text.ts` reads the document's content
+   streams and returns strings. It has no branch that emits image data, no
+   parameter through which a caller could ask for any, and it returns `null`
+   rather than a guess when a font's encoding is not one it can read. The
+   document itself is never sent anywhere. **E2.**
+2. **A document carrying personal information is refused before this point.**
+   `server/lib/migration-intake/pii-scan.ts` runs over the same extracted text
+   and blocks the upload on a match. It refuses; it does not remove anything,
+   so nothing here rests on a cleaning step having worked. ⚠️ **A clean scan is
+   a pattern match, not a verdict** — the interface says so where the operator
+   reads it, and this page says so here. **E2.**
+3. **The pages reach the prompt unfiltered.** Nothing between the scan and the
+   prompt drops lines, and that is deliberate: a renderer that quietly removed
+   what it disliked would make the refusal in (2) look as though it had worked
+   while sending the rest.
+
 ### Photographs
 
 No AI feature in this repository sends an image. Every prompt above renders to a
 single text part; the adapter has no multimodal path. **E2.**
+
+**Re-checked 2026-08-23, when a feature that starts from a PDF was added.** That
+is the change most likely to have broken this sentence, and it did not:
+
+- `AiRequest` (`server/lib/ai/provider.ts`) still carries `prompt: string` and
+  four sampling numbers. No binary field, no parts array, no attachment. **E2.**
+- The PDF feature's argument type carries `pages: readonly string[]` and nothing
+  else — there is no field on it through which a file could travel, so the
+  prompt cannot render one. **E2.**
+- The extractor those strings come from cannot produce image data: it reads only
+  the text-showing operators of a page's content stream, skips the operator that
+  paints an image, and skips an inline image block whole rather than tokenising
+  through its bytes. **E2.**
+
+If a future change adds a binary or multimodal field to `AiRequest`, this
+paragraph stops being true and must change with it. That is a change to what
+this software discloses, not an interface tidy-up.
 
 ## 4. What is recorded on this side
 

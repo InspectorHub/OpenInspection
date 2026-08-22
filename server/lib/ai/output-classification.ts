@@ -51,7 +51,21 @@ export type AiOutputClassification =
     /** Contract, agreement, disclosure or any other operative legal wording. */
     | 'legal_text'
     /** What a repair would cost, or how long it should last. */
-    | 'repair_pricing';
+    | 'repair_pricing'
+    /**
+     * The SHAPE of a template — section and item headings — read back out of a
+     * document the workspace supplied.
+     *
+     * Its own class rather than a `summary`, because what it asserts is
+     * different in kind. The other classes restate content that exists in a
+     * report; this one produces a STRUCTURE that later inspections are
+     * recorded against, so a heading the model invented becomes a field
+     * somebody fills in and a section of a report nobody wrote. That is not a
+     * statement about a property yet, which is what makes it neither a finding
+     * nor a summary — it is a statement about what future findings will be
+     * shaped like.
+     */
+    | 'template_inference';
 
 /** Why a classification is not available on a given credential source.
  *  Not exported: `capability-policy.ts` switches on the VALUES and translates
@@ -177,6 +191,36 @@ const POSTURE: Record<
     repair_pricing: {
         byo: { allowed: false, denial: 'prohibited', requiresReview: true },
         managed: { allowed: false, denial: 'prohibited', requiresReview: true },
+    },
+    template_inference: {
+        // NOT RELEASED on either source today, and the two refusals say
+        // different things because the answers have different causes.
+        //
+        // On a workspace's own key it is `not_released`: the code exists, it is
+        // classified, it is metered by the same chokepoint as everything else,
+        // and nothing about the credentials is the obstacle. What is missing is
+        // the product decision to ship it, and this line is where that decision
+        // gets made — an edit here, reviewed like any other, rather than an
+        // environment flag that would let one deployment ship a capability no
+        // other deployment has.
+        byo: {
+            allowed: false,
+            denial: 'not_released',
+            requiresReview: true,
+            conditions: [
+                'must produce section and item headings only: no comment text, no ratings, no severities',
+                'must introduce no section or item the supplied document does not contain',
+                'must not be treated as a template until a person has reviewed it',
+            ],
+        },
+        // On a platform key it is `source_not_offered`, the same answer every
+        // other class gives there and for the same reason: a platform key may
+        // only carry output classes whose provider record is complete for the
+        // provider that would actually serve the call, and that record is kept
+        // with the deployment rather than in this table. Releasing the class
+        // above does NOT release it here — these are two entries, and they are
+        // separate so that turning one on cannot turn the other on by accident.
+        managed: { allowed: false, denial: 'source_not_offered', requiresReview: true },
     },
 };
 

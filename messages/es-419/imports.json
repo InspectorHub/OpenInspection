@@ -141,5 +141,22 @@
   "imports_preview_aftercare_ratings": "Abra un elemento en el editor y confirme que sus calificaciones se leen como usted espera.",
   "imports_preview_aftercare_comments": "Los comentarios importados quedan en Información, salvo que el archivo indicara a qué pestaña pertenecen.",
   "imports_preview_aftercare_order": "Las secciones conservan el orden que tenían en el archivo. Reordénelas en el editor.",
-  "imports_wizard_step_preview": "Vista previa"
+  "imports_wizard_step_preview": "Vista previa",
+  "imports_pdf_blank_title": "Comience con una plantilla en blanco",
+  "imports_pdf_blank_body": "Envíe una plantilla sin ninguna inspección. Un informe terminado incluye un cliente, una dirección y una firma, y esta carga lo rechazará.",
+  "imports_pdf_blank_how": "El paso es el mismo en todos los productos: abra la plantilla en su software actual y luego imprímala o expórtela a PDF antes de ingresar cualquier inspección.",
+  "imports_pdf_statement": "Estoy subiendo una plantilla sin ninguna inspección y he eliminado de ella toda información personal.",
+  "imports_pdf_upload_hint": "Un PDF, impreso desde una plantilla que no ha completado.",
+  "imports_pdf_scan_clean_headline": "Nuestras verificaciones no detectaron información personal.",
+  "imports_pdf_scan_clean_limit": "Esta verificación no garantiza que el archivo no contenga información personal. Usted es responsable de eliminar la información personal antes de subirlo.",
+  "imports_pdf_scan_found_headline": "Este archivo no fue aceptado.",
+  "imports_pdf_scan_found_intro": "Algo en estas páginas parece información personal. Elimínelo y suba el archivo de nuevo.",
+  "imports_pdf_scan_hit": "La página {page} contiene {kind}.",
+  "imports_pdf_scan_withheld": "Solo se informan la página y el tipo. El texto que coincidió no se muestra aquí ni se escribe en ningún registro.",
+  "imports_pdf_kind_name": "un nombre",
+  "imports_pdf_kind_email": "una dirección de correo electrónico",
+  "imports_pdf_kind_phone": "un número de teléfono",
+  "imports_pdf_kind_address": "una dirección",
+  "imports_pdf_kind_signature": "una firma",
+  "imports_pdf_kind_licence": "un número de licencia"
 }

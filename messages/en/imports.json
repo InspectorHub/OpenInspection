@@ -141,5 +141,22 @@
   "imports_preview_aftercare_ratings": "Open one item in the editor and check its ratings read the way you expect.",
   "imports_preview_aftercare_comments": "Imported comments land under Information unless the file said which tab they belong to.",
   "imports_preview_aftercare_order": "Sections keep the order they had in the file. Reorder them in the editor.",
-  "imports_wizard_step_preview": "Preview"
+  "imports_wizard_step_preview": "Preview",
+  "imports_pdf_blank_title": "Start with a blank template",
+  "imports_pdf_blank_body": "Send a template with no inspection in it. A finished report carries a client, an address and a signature, and this upload will refuse it.",
+  "imports_pdf_blank_how": "The step is the same in every product: open the template in your current software, then print or export it to PDF before entering any inspection.",
+  "imports_pdf_statement": "I am uploading a template with no inspection in it, and I have removed any personal information from it.",
+  "imports_pdf_upload_hint": "A PDF, printed from a template you have not filled in.",
+  "imports_pdf_scan_clean_headline": "No personal information was detected by our checks.",
+  "imports_pdf_scan_clean_limit": "This check is not a guarantee that the file contains no personal information. You are responsible for removing personal information before upload.",
+  "imports_pdf_scan_found_headline": "This file has not been accepted.",
+  "imports_pdf_scan_found_intro": "Something on these pages reads as personal information. Remove it and upload the file again.",
+  "imports_pdf_scan_hit": "Page {page} contains {kind}.",
+  "imports_pdf_scan_withheld": "The page and the kind are all that is reported. The text that matched is not shown here and is not written to any log.",
+  "imports_pdf_kind_name": "a name",
+  "imports_pdf_kind_email": "an email address",
+  "imports_pdf_kind_phone": "a telephone number",
+  "imports_pdf_kind_address": "an address",
+  "imports_pdf_kind_signature": "a signature",
+  "imports_pdf_kind_licence": "a licence number"
 }

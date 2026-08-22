@@ -111,6 +111,10 @@ const LABEL: Record<AiOutputClassification, string> = {
     maintenance_suggestion: 'AI maintenance suggestions',
     legal_text: 'AI-written legal or agreement text',
     repair_pricing: 'AI repair cost or lifespan estimates',
+    // Named for the button the operator pressed — "build a template from my
+    // PDF" — not for the mechanism. Someone reading a refusal has to recognise
+    // the thing they just tried to do.
+    template_inference: 'building a template from a document',
 };
 
 export function checkAiCapability(
