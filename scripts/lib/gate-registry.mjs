@@ -196,6 +196,13 @@ export const SCRIPT_GATES = [
     // release-time manual rung and is in UNREGISTERED below with its reason.
     { key: 'convcapability', label: 'lint:converter-capability', script: 'check-converter-capability.mjs', fix: 'npm run lint:converter-capability', rung: PUSH },
     { key: 'convliterals', label: 'lint:converter-literals', script: 'check-converter-literals.mjs', fix: 'npm run lint:converter-literals', rung: PUSH },
+    // PUSH rather than PRECOMMIT: a statutory form revision is published by
+    // hand, weeks or months apart, so there is no stream of commits for a
+    // pre-commit rung to watch. It reads one directory and a handful of files
+    // and costs milliseconds; what it protects is a document somebody files
+    // with a government agency, and its own output states the one thing it
+    // cannot check (that a person read the form).
+    { key: 'statutoryfidelity', label: 'lint:statutory-fidelity', script: 'check-statutory-fidelity.mjs', fix: 'npm run lint:statutory-fidelity', rung: PUSH },
 ];
 
 export const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup', rung: PRECOMMIT };

@@ -116,3 +116,9 @@ export type {
     MigrationConflictPolicy,
     MigrationRowResolution,
 } from './migration-intake';
+
+// Statutory form versions — the authority's own published PDFs, recorded
+// append-only and selected by inspection date. Platform-published, tenant
+// read-only; nothing here is ever deleted (see the file for why).
+export { statutoryFormVersions } from './statutory-forms';
+export type { StatutoryFormVersionRow, NewStatutoryFormVersionRow } from './statutory-forms';

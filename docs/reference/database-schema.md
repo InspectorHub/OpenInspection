@@ -9,22 +9,22 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 102 |
-| Columns | 1216 |
-| Indexes (excluding primary keys) | 172 |
+| Tables | 103 |
+| Columns | 1227 |
+| Indexes (excluding primary keys) | 174 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 580 (48%) |
+| Columns carrying a source comment | 589 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
 a tenant, which is the only reason to be missing it:
 
-`agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `sync_outbox` · `tenants`
+`agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_versions` · `sync_outbox` · `tenants`
 
-That is 11 of 102. If a table you just added appears here,
+That is 12 of 103. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 192 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 196 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -2334,6 +2334,33 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `text` | text | NN |  |  |  |
 | `published_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `content_hash` | text |  |  |  | SHA-256 of `text` at publication, lowercase hex. The consent row copies it, so a consent proves WHAT was shown rather than which row number was current at the time. **[more]** |
+
+---
+
+## `statutory_form_versions`
+
+<sub>server/lib/db/schema/statutory-forms.ts · 11 columns · primary key `id`</sub>
+
+> Published revisions of statutory inspection forms — APPEND-ONLY. A statutory form is an authority's own PDF, not a template of ours.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `form_id` | text | NN UQ IX |  |  | The FORM, never one of its revisions — e.g. `tx_trec_rei`. |
+| `version` | text | NN UQ |  |  | The authority's own revision label, verbatim: `7-6`, `Rev. 04/26`. |
+| `effective_from` | integer | NN IX |  |  | First date this revision may be used. |
+| `mandatory_from` | integer |  |  |  | First date this revision is REQUIRED, or NULL for one that was published and never mandated. |
+| `effective_until` | integer |  |  |  | First date this revision may NO LONGER be used — exclusive. NULL means still usable; it does NOT mean "the latest revision", because an authority may run two revisions in overlap. |
+| `source_url` | text | NN |  |  | Where the authority publishes it. Provenance for a human; never fetched at render time. |
+| `source_hash` | text | NN |  |  | sha256 (lowercase hex) of the exact bytes published. This is the join between a row, the stored object, and the field map authored against it — a map whose hash does not match these bytes is refused rather than used. |
+| `object_key` | text | NN |  |  | Object-storage key holding those exact bytes. Never a path in this repository. |
+| `published_by` | text | NN |  |  | users.id of the operator who published it. Soft reference. |
+| `published_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+
+**Indexes**
+
+- **UNIQUE** `uq_statutory_form_versions_form_version` (form_id, version)
+- `idx_statutory_form_versions_form` (form_id, effective_from)
 
 ---
 

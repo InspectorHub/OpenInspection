@@ -169,16 +169,21 @@ export interface RetentionPolicyHeader {
  * every production store is covered.
  */
 export const RETENTION_POLICY: RetentionPolicyHeader = {
-    version: '2026-08-19.5',
+    version: '2026-08-19.6',
     status: 'approved_with_conditions',
     effectiveAt: '2026-08-08',
     // review remains what approved the seventeen rules it saw. It does NOT
     // cover `migration_batches` — see condition 6 above. `approvedAt` is left at
     // the round-34 date rather than moved forward with this version, because
     // moving it would date an approval to a day nobody approved anything, and
-    // `.5` changed only the unreviewed rule.
+    // `.5` changed only the unreviewed rule, and `.6` adds no rule at all: it
+    // records `statutory_form_versions` as OUT OF SCOPE. Nothing production
+    // deletes has changed — the digest moved because it covers the exclusions
+    // too, which is the point of covering them. Moving `approvedBy` for an
+    // exclusion would claim review had approved a deletion period they were
+    // never shown.
     approvedBy: '[redacted]',
     approvedAt: '2026-08-19',
     supersedes: '2026-08-19.4',
-    rulesDigest: 'b09824f19e586cf759c0bc53637c0a3562aefc49a30757b3c5339d596e9837fc',
+    rulesDigest: 'e8777bba4323007d42ba6b0e2aac0a12bde29798ebdd0604e4ae4b70e6a118a6',
 };
