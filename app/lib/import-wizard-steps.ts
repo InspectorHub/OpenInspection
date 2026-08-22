@@ -18,7 +18,7 @@
  * without a DOM.
  */
 
-export type ImportStepId = 'upload' | 'mapping' | 'repair' | 'import';
+export type ImportStepId = 'upload' | 'mapping' | 'preview' | 'repair' | 'import';
 
 /**
  * The order, written down once.
@@ -28,25 +28,51 @@ export type ImportStepId = 'upload' | 'mapping' | 'repair' | 'import';
  * adding it here plus one arm of `stepHasSomethingToDecide` — not remembering
  * where in a sequence of pushes it belonged.
  */
-export const IMPORT_STEP_ORDER: readonly ImportStepId[] = ['upload', 'mapping', 'repair', 'import'];
+export const IMPORT_STEP_ORDER: readonly ImportStepId[] =
+    ['upload', 'mapping', 'preview', 'repair', 'import'];
 
 /** Everything the step rules need, and nothing else. */
 export interface ImportRunView {
     /** The run's lifecycle state, as the server reports it. */
     status: string;
     /**
-     * Whether the source has columns to point at. False for a vendor export.
+     * Whether this run has a mapping QUESTION to put to somebody.
      *
-     * Read from whether the run's adapter reported an inspection at all
-     * (`report.inspection !== null`), which is a fact about the ADAPTER'S
-     * SHAPE — an adapter that implements no `inspect()` reads a format with no
-     * columns, so there is no mapping question to ask. Deriving it from the
-     * vendor instead would mean this wizard held its own list of which
-     * products are special, and would go stale the day an adapter grows an
-     * `inspect()`. It would also keep the step on screen after the stored file
-     * has been swept, where the mapping can no longer be changed by anybody.
+     * Not "is this a spreadsheet". The question differs by what was uploaded —
+     * a tabular source is asked which column holds what, a template is asked
+     * what its own rating words mean — and either can have nothing to ask: a
+     * source with no columns, a template whose words are already settled, a
+     * template with no words at all. All of those arrive here as false.
+     *
+     * Derived by the screen from the run's own report rather than from the
+     * vendor. A rule that named vendors would mean this wizard held its own
+     * list of which products are special, would go stale the day an adapter
+     * changed, and would keep the step on screen after the stored file has
+     * been swept — where the mapping can no longer be changed by anybody.
      */
     hasMapping: boolean;
+    /**
+     * Whether this run carries something whose SHAPE can be judged.
+     *
+     * It exists because the import step's four numbers add up and still cannot
+     * tell a good conversion from a useless one: a template whose 76 items all
+     * became plain text boxes counts identically to one that converted
+     * perfectly, and both report zero problems.
+     *
+     * Derived from whether the run's report carries a structure at all,
+     * exactly as `hasMapping` is derived from whether it still poses a mapping
+     * question. Neither is a list of which intents are special — a rule that
+     * named intents would go stale the day a fourth entity grew a shape.
+     */
+    hasStructurePreview: boolean;
+    /**
+     * What this run is bringing in. Null for a run whose file nothing could
+     * read, which has no entities yet.
+     *
+     * It exists because the repair gate differs by kind, and the difference is
+     * about CONSEQUENCE rather than tidiness — see `importNextBlockedReason`.
+     */
+    entityKind: 'template' | 'contact' | 'member' | null;
     /** How many entries cannot be imported as they stand. */
     problemCount: number;
     /** Why apply is unavailable, computed by the server, or null. */
@@ -72,6 +98,8 @@ function stepHasSomethingToDecide(step: ImportStepId, run: ImportRunView): boole
             return true;
         case 'mapping':
             return !isWaiting(run) && run.hasMapping;
+        case 'preview':
+            return !isWaiting(run) && run.hasStructurePreview;
         case 'repair':
             return !isWaiting(run) && run.problemCount > 0;
         case 'import':
@@ -99,6 +127,12 @@ export function importStepsFor(run: ImportRunView): ImportStepId[] {
  */
 export function currentImportStep(run: ImportRunView): ImportStepId {
     if (isWaiting(run)) return 'upload';
+    // Preview comes first where there is one, INCLUDING for a run with problem
+    // rows. A template's bad rows do not stand in the way (see below), so
+    // opening on the repair table would land somebody on the one screen this
+    // run does not need them on — while the screen that can tell them whether
+    // the conversion worked at all sits behind it.
+    if (run.hasStructurePreview) return 'preview';
     if (run.problemCount > 0) return 'repair';
     return 'import';
 }
@@ -141,7 +175,23 @@ export function importNextBlockedReason(
     if (step === 'mapping') {
         return null;
     }
+    if (step === 'preview') {
+        // A look, not a gate. Everything it reports is either already counted
+        // on the import step or advisory, and a preview that could block would
+        // be a second opinion about a run the server has already judged.
+        return null;
+    }
     if (step === 'repair') {
+        // A template's bad rows do NOT block. Measured against a real export:
+        // 65 of 1872 comments carry no type, and requiring all 65 to be fixed
+        // first turns a five-minute import into an afternoon.
+        //
+        // Contacts and team members still block, and the difference is
+        // consequence rather than consistency: a contact with no email address
+        // becomes a record that can never be notified, whereas a comment with
+        // no type is one comment fewer. The step itself is still OFFERED for a
+        // template — advisory is not hidden — it simply lets the run past.
+        if (run.entityKind === 'template') return null;
         return run.problemCount > 0 ? copy.fixProblemsFirst(run.problemCount) : null;
     }
     return run.blockedReason;

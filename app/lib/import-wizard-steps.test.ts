@@ -31,7 +31,15 @@ const copy = {
 };
 
 function run(over: Partial<ImportRunView> = {}): ImportRunView {
-    return { status: 'staged', hasMapping: true, problemCount: 0, blockedReason: null, ...over };
+    return {
+        status: 'staged',
+        hasMapping: true,
+        hasStructurePreview: false,
+        entityKind: 'contact',
+        problemCount: 0,
+        blockedReason: null,
+        ...over,
+    };
 }
 
 /** Every shape of run the rules distinguish, for the invariants that hold over all of them. */
@@ -39,8 +47,14 @@ function everyRun(): ImportRunView[] {
     const runs: ImportRunView[] = [];
     for (const status of ['staged', 'applied', 'partially_applied', 'needs_assistance', 'expired']) {
         for (const hasMapping of [true, false]) {
-            for (const problemCount of [0, 1, 5]) {
-                runs.push(run({ status, hasMapping, problemCount }));
+            for (const hasStructurePreview of [true, false]) {
+                for (const entityKind of ['template', 'contact', 'member', null] as const) {
+                    for (const problemCount of [0, 1, 5]) {
+                        runs.push(run({
+                            status, hasMapping, hasStructurePreview, entityKind, problemCount,
+                        }));
+                    }
+                }
             }
         }
     }
@@ -49,7 +63,8 @@ function everyRun(): ImportRunView[] {
 
 describe('IMPORT_STEP_ORDER', () => {
     it('is the only place the order of the steps is written down', () => {
-        expect([...IMPORT_STEP_ORDER]).toEqual(['upload', 'mapping', 'repair', 'import']);
+        expect([...IMPORT_STEP_ORDER])
+            .toEqual(['upload', 'mapping', 'preview', 'repair', 'import']);
     });
 });
 
@@ -232,5 +247,92 @@ describe('importNextBlockedReason', () => {
 
     it('returns null when nothing is in the way', () => {
         expect(importNextBlockedReason('import', run(), copy)).toBeNull();
+    });
+});
+
+describe('the preview step', () => {
+    it('offers preview for a run carrying a structure', () => {
+        // The import step's four numbers add up and STILL cannot tell a good
+        // conversion from a useless one: a template whose 76 items all became
+        // plain text boxes counts identically to one that converted perfectly.
+        expect(importStepsFor(run({ hasStructurePreview: true }))).toContain('preview');
+    });
+
+    it('does NOT offer it for a run carrying none — the positive control', () => {
+        // Without this, `preview` could be unconditional and the case above
+        // would still pass, putting an empty screen in front of every contacts
+        // import. Contacts need no preview: the repair table IS a row-by-row
+        // one.
+        expect(importStepsFor(run({ hasStructurePreview: false }))).not.toContain('preview');
+    });
+
+    it('keeps preview before repair', () => {
+        const steps = importStepsFor(run({ hasStructurePreview: true, problemCount: 3 }));
+        expect(steps).toContain('preview');
+        expect(steps).toContain('repair');
+        expect(steps.indexOf('preview')).toBeLessThan(steps.indexOf('repair'));
+    });
+
+    it('has none of it while the run is waiting on a person', () => {
+        expect(importStepsFor(run({ status: 'needs_assistance', hasStructurePreview: true })))
+            .toEqual(['upload']);
+    });
+
+    it('lands on preview rather than repair when there is one', () => {
+        // A template's bad rows do not block, so sending somebody to the repair
+        // table first would open the one screen this run does not need them on.
+        expect(currentImportStep(run({
+            entityKind: 'template', hasStructurePreview: true, problemCount: 65,
+        }))).toBe('preview');
+    });
+
+    it('still lands on repair for a run with no preview — the control', () => {
+        expect(currentImportStep(run({
+            entityKind: 'contact', hasStructurePreview: false, problemCount: 3,
+        }))).toBe('repair');
+    });
+
+    it('says nothing is in the way of moving on from preview', () => {
+        // Preview is a look, not a gate. Everything it reports is either
+        // already counted on the import step or advisory.
+        expect(importNextBlockedReason('preview', run({
+            hasStructurePreview: true, problemCount: 12,
+        }), copy)).toBeNull();
+    });
+});
+
+describe('repair blocks by CONSEQUENCE, not by tidiness', () => {
+    it('does not block a TEMPLATE run on its problem rows', () => {
+        // A real export carries 65 comments with no type out of 1872. Requiring
+        // all 65 to be fixed first turns a five-minute import into an
+        // afternoon, in front of somebody who wants to start working.
+        expect(importNextBlockedReason('repair', run({
+            entityKind: 'template', problemCount: 65,
+        }), copy)).toBeNull();
+    });
+
+    it('DOES block a CONTACTS run on its problem rows — the positive control', () => {
+        // Different consequence, different gate: a contact with no email is a
+        // record that can never be notified, while a comment with no type is
+        // one comment fewer.
+        expect(importNextBlockedReason('repair', run({
+            entityKind: 'contact', problemCount: 3,
+        }), copy)).toBe('3 entries still need fixing.');
+    });
+
+    it('blocks a TEAM run too — the second control', () => {
+        // Contacts are not a special case; templates are. An invitation with no
+        // address is an invitation that goes nowhere.
+        expect(importNextBlockedReason('repair', run({
+            entityKind: 'member', problemCount: 2,
+        }), copy)).toBe('2 entries still need fixing.');
+    });
+
+    it('still keeps the repair STEP for a template run that has problems', () => {
+        // Advisory is not hidden. Sixty-five entries the operator may want to
+        // fix are sixty-five things to decide about, so the step is offered —
+        // what changed is that it does not stand in the way.
+        expect(importStepsFor(run({ entityKind: 'template', problemCount: 65 })))
+            .toContain('repair');
     });
 });

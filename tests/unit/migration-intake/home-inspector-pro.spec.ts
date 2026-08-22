@@ -137,7 +137,7 @@ describe('homeInspectorProAdapter.inspect', () => {
 
 describe('homeInspectorProAdapter.convert', () => {
     it('produces a bundle that passes the format validator', async () => {
-        const result = await homeInspectorProAdapter.convert(await template(), { name: 'Imported' });
+        const result = await homeInspectorProAdapter.convert(await template(), { name: 'Imported', ratingKind: 'severity' });
         expect(result.ok).toBe(true);
         if (!result.ok) throw new Error('unreachable');
         const parsed = parseMigrationBundle(result.bundle);
@@ -145,7 +145,7 @@ describe('homeInspectorProAdapter.convert', () => {
     });
 
     it('keeps the file\'s sections and items, in the file\'s order', async () => {
-        const result = await homeInspectorProAdapter.convert(await template(), { name: 'Imported' });
+        const result = await homeInspectorProAdapter.convert(await template(), { name: 'Imported', ratingKind: 'severity' });
         if (!result.ok) throw new Error('unreachable');
         const schema = result.bundle.templates[0]!.schema;
         expect(schema.sections.map((s) => s.title)).toEqual(['First Area', 'Second Area']);
@@ -156,7 +156,7 @@ describe('homeInspectorProAdapter.convert', () => {
         // Not ours. The file supplies a vocabulary, and replacing it with a
         // default would throw away the one thing the mapping step is there to
         // ask about.
-        const result = await homeInspectorProAdapter.convert(await template(), { name: 'Imported' });
+        const result = await homeInspectorProAdapter.convert(await template(), { name: 'Imported', ratingKind: 'severity' });
         if (!result.ok) throw new Error('unreachable');
         expect(result.bundle.templates[0]!.schema.sections[0]!.items[0]!.ratingOptions)
             .toEqual([' Yes', 'No', 'N/A']);
@@ -167,7 +167,7 @@ describe('homeInspectorProAdapter.convert', () => {
         // needs options, so it gets ours — and this is the only case where it
         // does.
         const noRatings = TPL.replace(/ *<void property="ratingNames">[\s\S]*?<\/void>\n/, '');
-        const result = await homeInspectorProAdapter.convert(await template(noRatings), { name: 'X' });
+        const result = await homeInspectorProAdapter.convert(await template(noRatings), { name: 'X', ratingKind: 'severity' });
         if (!result.ok) throw new Error('unreachable');
         const options = result.bundle.templates[0]!.schema.sections[0]!.items[0]!.ratingOptions ?? [];
         expect(options.length).toBeGreaterThan(0);
@@ -180,7 +180,7 @@ describe('homeInspectorProAdapter.convert', () => {
         // with a sentence saying the operator's own file is wrong.
         const empty = `<?xml version="1.0"?><java class="java.beans.XMLDecoder">
           <object class="example.TemplateInfo"></object></java>`;
-        const result = await homeInspectorProAdapter.convert(await template(empty), { name: 'Blank' });
+        const result = await homeInspectorProAdapter.convert(await template(empty), { name: 'Blank', ratingKind: 'severity' });
         expect(result.ok).toBe(true);
         if (!result.ok) throw new Error('unreachable');
         expect(result.bundle.templates[0]!.schema.sections).toEqual([]);
@@ -188,14 +188,14 @@ describe('homeInspectorProAdapter.convert', () => {
 
     it('is PURE — the same bytes convert to the same bundle', async () => {
         const bytes = await template();
-        const first = await homeInspectorProAdapter.convert(bytes, { name: 'X' });
-        const second = await homeInspectorProAdapter.convert(bytes, { name: 'X' });
+        const first = await homeInspectorProAdapter.convert(bytes, { name: 'X', ratingKind: 'severity' });
+        const second = await homeInspectorProAdapter.convert(bytes, { name: 'X', ratingKind: 'severity' });
         expect(JSON.stringify(first)).toBe(JSON.stringify(second));
     });
 
     it('refuses a file that is not one of these templates, as a value', async () => {
         const result = await homeInspectorProAdapter.convert(
-            await zipOf({ 'xl/worksheets/sheet1.xml': '<worksheet/>' }), { name: 'X' },
+            await zipOf({ 'xl/worksheets/sheet1.xml': '<worksheet/>' }), { name: 'X', ratingKind: 'severity' },
         );
         expect(result.ok).toBe(false);
         if (result.ok) throw new Error('unreachable');

@@ -95,6 +95,9 @@ describe('an upload with three bad rows shows three rows, each with its own reas
     async function upload(intent: string, text: string): Promise<string> {
         const fd = new FormData();
         fd.append('intent', intent);
+        // The declaration the picker sends. Every spreadsheet import is the one
+        // tabular source, whichever product exported it.
+        fd.append('vendor', 'csv_generic');
         fd.append('uploadAuthorized', 'true');
         fd.append('file', new File([text], 'export.csv', { type: 'text/csv' }));
         const res = await intakeRequest(opts, '/api/imports', { method: 'POST', body: fd });

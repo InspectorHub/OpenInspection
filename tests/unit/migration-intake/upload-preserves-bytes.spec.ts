@@ -89,6 +89,7 @@ describe('POST /api/imports — the uploaded file reaches storage intact', () =>
     it('stores bytes whose sha256 equals the upload', async () => {
         const form = new FormData();
         form.set('intent', 'templates.create');
+        form.set('vendor', 'home_inspector_pro');
         form.set('uploadAuthorized', 'true');
         form.set('staffAccessAuthorized', 'true');
         form.set('file', new File([TPZ_BYTES], 'AHIT Master.tpz'));
@@ -112,6 +113,7 @@ describe('POST /api/imports — the uploaded file reaches storage intact', () =>
     it('refuses an empty file by size, not by trimmed text', async () => {
         const form = new FormData();
         form.set('intent', 'contacts.import');
+        form.set('vendor', 'csv_generic');
         form.set('uploadAuthorized', 'true');
         form.set('file', new File([new Uint8Array(0)], 'empty.csv'));
         const res = await appFor(store)(form);
@@ -127,6 +129,7 @@ describe('POST /api/imports — the uploaded file reaches storage intact', () =>
         // whose decode happens to trim away would have read as empty too.
         const form = new FormData();
         form.set('intent', 'templates.create');
+        form.set('vendor', 'home_inspector_pro');
         form.set('uploadAuthorized', 'true');
         form.set('staffAccessAuthorized', 'true');
         form.set('file', new File([new Uint8Array([0x20, 0x09, 0x0a])], 'blank.tpz'));

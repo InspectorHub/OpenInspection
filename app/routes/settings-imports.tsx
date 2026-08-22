@@ -16,6 +16,7 @@ import {
     importEntryPointsFor,
     type ImportEntryIntent,
 } from "~/lib/import-entry-points";
+import { asImportSource } from "~/lib/import-sources";
 import { importIntentLabel, importStatusLabel, importStatusTone } from "~/lib/import-run-labels";
 import { m } from "~/paraglide/messages";
 
@@ -63,6 +64,15 @@ export async function action({ context, request }: Route.ActionArgs) {
     const intent = asImportEntryIntent(form.get("intent"));
     if (!intent) return { error: m.imports_start_unknown_intent() };
 
+    // Narrowed against what this entry point offers, for the same reason the
+    // intent is: the declaration decides which reader runs, so one this entry
+    // does not accept is refused here rather than forwarded. Absent is a real
+    // answer for the entry that offers nothing to declare, and it travels as
+    // an absent field rather than as an empty string — the server reads the
+    // absence as "the operator could not name the product", which is a
+    // different thing from naming one that is not on the list.
+    const vendor = asImportSource(intent, form.get("vendor"));
+
     const file = form.get("file");
     if (!(file instanceof File) || file.size === 0) {
         return { error: m.imports_upload_needs_file() };
@@ -72,6 +82,7 @@ export async function action({ context, request }: Route.ActionArgs) {
     const res = await api.imports.index.$post({
         form: {
             intent,
+            ...(vendor ? { vendor } : {}),
             uploadAuthorized: String(form.get("uploadAuthorized") ?? ""),
             staffAccessAuthorized: String(form.get("staffAccessAuthorized") ?? ""),
             file,
@@ -192,6 +203,7 @@ export default function SettingsImports() {
                             key={chosen.intent}
                             entry={chosen}
                             label={entryLabel(chosen.intent)}
+                            hasAssistedMigration={hasAssistedMigration}
                             busy={navigation.state !== "idle"}
                             error={actionData?.error ?? null}
                         />

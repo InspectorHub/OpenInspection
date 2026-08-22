@@ -21,7 +21,7 @@
  *      deployment has anybody to hand the file to.
  */
 import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/react";
 import { createRoutesStub, Outlet } from "react-router";
 
 import SettingsImportsBatch from "~/routes/settings-imports-batch";
@@ -47,6 +47,8 @@ interface ReportFixture {
     blockedReason: string | null;
     inspection: unknown;
     mapping: unknown;
+    entityKind: string | null;
+    structure: unknown;
     undoUntil: string | null;
 }
 
@@ -66,14 +68,59 @@ function report(over: Partial<ReportFixture> = {}): ReportFixture {
         page: 1,
         pageSize: 25,
         blockedReason: null,
-        inspection: { columns: ["Full Name", "Email"], sampleRows: [] },
+        inspection: { kind: "columns", columns: ["Full Name", "Email"], sampleRows: [] },
         // `type` is part of what the server actually sends: a contact's type is
         // never in the file, so the guess answers it with one value for
         // everybody and the step asks whether that is right.
         mapping: { kind: "contacts", mapping: { name: "Full Name", type: { fixed: "client" } } },
+        entityKind: "contact",
+        // Contacts carry no structure to judge — their repair table already is
+        // a row-by-row preview of them.
+        structure: null,
         undoUntil: "2026-09-13",
         ...over,
     };
+}
+
+/**
+ * A template run, whose mapping question is what its own rating words MEAN.
+ *
+ * The overrides go on the inspection rather than on the report, because the
+ * three cases these tests separate — words that rate items, words that file
+ * comments, and no words at all — differ in exactly one property of it.
+ */
+function templateReport(
+    over: Partial<ReportFixture> & {
+        ratings?: string[];
+        ratingsDescribe?: "items" | "comments";
+    } = {},
+): ReportFixture {
+    return report({
+        batch: {
+            id: "batch-t", intent: "templates.create", vendor: "home_inspector_pro",
+            status: "staged", createdAt: "2026-08-14T10:00:00.000Z",
+        },
+        inspection: {
+            kind: "template",
+            name: "AHIT Master",
+            sections: 6,
+            items: 41,
+            ratings: over.ratings ?? ["Satisfactory", "Marginal", "Poor"],
+            ratingsDescribe: over.ratingsDescribe ?? "items",
+            ratingsShown: null,
+        },
+        mapping: { kind: "template", name: "AHIT Master", ratingKind: "severity" },
+        entityKind: "template",
+        structure: {
+            name: "AHIT Master",
+            sections: [
+                { title: "Roof", items: [{ label: "Covering", landedAs: "rated" }] },
+                { title: "Executive Summary", items: [] },
+            ],
+            dropped: [],
+        },
+        ...over,
+    });
 }
 
 /** One entry the server says cannot be written as it stands. */
@@ -360,17 +407,42 @@ describe("an import run: the three stages sit on their own steps", () => {
         });
     });
 
-    it("drops the mapping step for a template run, whose mapping has no columns in it", async () => {
-        // A template mapping carries a NAME rather than a column choice. It
-        // cannot arrive with an inspection today; a step that rendered for it
-        // would show a form with nothing on it.
-        renderPage({
-            report: report({
-                batch: { id: "b", intent: "templates.create", vendor: "spectora", status: "staged", createdAt: "2026-08-14T10:00:00.000Z" },
-                mapping: { kind: "template", name: "Roof" },
-            }),
+    it("drops the mapping step for a template whose words file COMMENTS", async () => {
+        // Those words are already this product's three comment tabs, so the
+        // mapping is the identity: there is nothing to decide, and a step that
+        // rendered anyway would ask an inspector to re-derive a fact about his
+        // own file.
+        renderPage({ report: templateReport({ ratingsDescribe: "comments", ratings: ["info", "limit", "defect"] }) });
+        // Preview stays: the run still carries a structure worth looking at.
+        // What went is the question with no answer to give.
+        expect(await railSteps()).toEqual(["1Upload", "2Preview", "3Import"]);
+    });
+
+    it("drops it for a template that carries no words at all", async () => {
+        // Eight of twenty-two real templates carry none.
+        renderPage({ report: templateReport({ ratings: [] }) });
+        expect(await railSteps()).toEqual(["1Upload", "2Preview", "3Import"]);
+    });
+
+    it("KEEPS it for a template whose words rate its items — the control", async () => {
+        // One property different from each case above. Without this, the two
+        // would be satisfied by a wizard that never offered the step at all.
+        renderPage({ report: templateReport() });
+        expect(await railSteps()).toEqual(["1Upload", "2Columns", "3Preview", "4Import"]);
+    });
+
+    it("posts the reading the operator chose for the template", async () => {
+        const posted: FormData[] = [];
+        renderPage({ report: templateReport(), onAction: (f) => posted.push(f) });
+        await railSteps();
+        fireEvent.click(screen.getByTestId("import-step-mapping"));
+        fireEvent.click(screen.getByRole("radio", { name: /what you found/i }));
+        fireEvent.click(screen.getByRole("button", { name: "Use this template" }));
+        await waitFor(() => expect(posted).toHaveLength(1));
+        expect(posted[0].get("op")).toBe("mapping");
+        expect(JSON.parse(String(posted[0].get("mapping")))).toEqual({
+            kind: "template", name: "AHIT Master", ratingKind: "choices",
         });
-        expect(await railSteps()).toEqual(["1Upload", "2Import"]);
     });
 
     it("posts one entry's whole payload from the fix step, with the edited field replaced", async () => {
@@ -472,5 +544,77 @@ describe("an import run that cannot be shown", () => {
         expect(await screen.findByText(/This import could not be found/)).toBeTruthy();
         expect(screen.getByRole("link", { name: "Past imports" }).getAttribute("href"))
             .toBe("/settings/imports");
+    });
+});
+
+describe("an import run: the preview step", () => {
+    it("offers preview for a run carrying a structure, before the fix step", async () => {
+        // The four counts add up for a conversion that produced nothing usable
+        // exactly as readily as for a perfect one. Preview is where that
+        // difference is visible, so it comes before the table of bad rows.
+        renderPage({
+            report: templateReport({
+                counts: { total: 4, ok: 3, conflicts: 0, problems: 1 },
+                problemRows: [problem({ entity: "template" })],
+                problemRowsTotal: 1,
+            }),
+        });
+        expect(await railSteps())
+            .toEqual(["1Upload", "2Columns", "3Preview", "4Fix", "5Import"]);
+    });
+
+    it("does NOT offer it for a contacts run — the positive control", async () => {
+        renderPage({ report: report() });
+        expect(await railSteps()).toEqual(["1Upload", "2Columns", "3Import"]);
+    });
+
+    it("opens on preview rather than on the table of bad rows", async () => {
+        // A template's bad rows do not block, so landing on the fix table would
+        // open the one screen this run does not need somebody on — while the
+        // screen that says whether the conversion worked sits behind it.
+        renderPage({
+            report: templateReport({
+                counts: { total: 4, ok: 3, conflicts: 0, problems: 1 },
+                problemRows: [problem({ entity: "template" })],
+                problemRowsTotal: 1,
+            }),
+        });
+        await railSteps();
+        expect(screen.getByTestId("preview-anomalies")).toBeTruthy();
+    });
+
+    it("names the empty section its report carried", async () => {
+        renderPage({ report: templateReport() });
+        await railSteps();
+        expect(screen.getByTestId("preview-anomalies").textContent ?? "")
+            .toMatch(/Executive Summary/);
+    });
+
+    it("lets a template run past the fix step, and holds a contacts run at it", async () => {
+        // Same number of bad rows, different consequence. A comment with no
+        // type is one comment fewer; a contact with no email address is a
+        // record that can never be notified.
+        renderPage({
+            report: templateReport({
+                counts: { total: 4, ok: 3, conflicts: 0, problems: 1 },
+                problemRows: [problem({ entity: "template" })],
+                problemRowsTotal: 1,
+            }),
+        });
+        await railSteps();
+        fireEvent.click(screen.getByTestId("import-step-repair"));
+        expect(screen.queryByTestId("import-step-blocked")).toBeNull();
+
+        cleanup();
+        renderPage({
+            report: report({
+                counts: { total: 4, ok: 3, conflicts: 0, problems: 1 },
+                problemRows: [problem()],
+                problemRowsTotal: 1,
+            }),
+        });
+        await railSteps();
+        expect(screen.getByTestId("import-step-blocked").textContent)
+            .toBe("Entries that still cannot be imported: 1.");
     });
 });

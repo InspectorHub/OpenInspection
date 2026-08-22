@@ -146,15 +146,16 @@ const migrationIntakeRoutes = createApiRouter()
         // the inference every other entry point is built to avoid.
         if (intent === 'assisted.full') return openWaitingRun();
 
-        // ⚠️ TEMPORARY. The source picker is not built yet, so a caller that
-        // sends no vendor gets the rule the registry used to apply internally —
-        // which is the deleted rule wearing a different coat. It has to go when
-        // the picker lands, or the wizard will silently ignore what the
-        // operator chose.
-        const declaredVendor: VendorId = form.vendor
-            ?? (intent === 'templates.create' || intent === 'templates.overwrite'
-                ? 'spectora'
-                : 'csv_generic');
+        // The operator's own declaration, never derived. A default here was
+        // the deleted "the intent decides the vendor" rule in another coat: it
+        // made `templates.create` mean one product, so the wizard's picker
+        // could be answered and silently ignored. Refused rather than guessed,
+        // because the guess is wrong exactly when it matters — for the person
+        // whose file came from the other product.
+        if (!form.vendor) {
+            throw Errors.BadRequest('Say which product this export came from, so the right reader is used.');
+        }
+        const declaredVendor: VendorId = form.vendor;
 
         const match = await matchAdapter(intent, declaredVendor, source);
         if (!match) return openWaitingRun();

@@ -177,7 +177,7 @@ describe('POST /api/imports', () => {
     it('stages a readable spreadsheet and stores the file it came from', async () => {
         const res = await post(
             { role: 'owner', store },
-            { intent: 'contacts.import', uploadAuthorized: 'true' },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true' },
             { name: 'c.csv', text: CONTACTS_CSV },
         );
         expect(res.status).toBe(201);
@@ -197,7 +197,7 @@ describe('POST /api/imports', () => {
     it('records the storage authorisation and the staged run\'s own expiry', async () => {
         const res = await post(
             { role: 'owner', store },
-            { intent: 'contacts.import', uploadAuthorized: 'true' },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true' },
             { name: 'c.csv', text: CONTACTS_CSV },
         );
         const { data } = await res.json() as { data: { batchId: string } };
@@ -218,7 +218,7 @@ describe('POST /api/imports', () => {
     it('refuses an upload that does not carry the storage authorisation, by name', async () => {
         const res = await post(
             { role: 'owner', store },
-            { intent: 'contacts.import' },
+            { intent: 'contacts.import', vendor: 'csv_generic' },
             { name: 'c.csv', text: CONTACTS_CSV },
         );
         expect(res.status).toBe(400);
@@ -235,7 +235,7 @@ describe('POST /api/imports', () => {
         // Positive control for the refusal above: one field is the difference.
         const res = await post(
             { role: 'owner', store },
-            { intent: 'contacts.import', uploadAuthorized: 'true' },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true' },
             { name: 'c.csv', text: CONTACTS_CSV },
         );
         expect(res.status).toBe(201);
@@ -245,7 +245,7 @@ describe('POST /api/imports', () => {
     it('parks an unreadable file for a person, on a platform that has one', async () => {
         const res = await post(
             { role: 'owner', store },
-            { intent: 'contacts.import', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
             { name: 'weird.json', text: UNREADABLE },
         );
         expect(res.status).toBe(201);
@@ -268,7 +268,7 @@ describe('POST /api/imports', () => {
     it('refuses an unreadable file BEFORE storing it where there is nobody to hand it to', async () => {
         const res = await post(
             { role: 'owner', profile: STANDALONE_PROFILE, store },
-            { intent: 'contacts.import', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
             { name: 'weird.json', text: UNREADABLE },
         );
         expect(res.status).toBe(422);
@@ -285,7 +285,7 @@ describe('POST /api/imports', () => {
     it('refuses an unreadable file where a person could read it but was not authorised to', async () => {
         const res = await post(
             { role: 'owner', store },
-            { intent: 'contacts.import', uploadAuthorized: 'true' },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true' },
             { name: 'weird.json', text: UNREADABLE },
         );
         expect(res.status).toBe(422);
@@ -308,7 +308,7 @@ describe('POST /api/imports', () => {
         // batch through different branches.
         const fallback = await post(
             { role: 'owner', store },
-            { intent: 'contacts.import', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
             { name: 'weird.json', text: UNREADABLE },
         );
         expect(fallback.status).toBe(201);
@@ -369,7 +369,7 @@ describe('POST /api/imports', () => {
         // fallback is chosen afterwards by whether an adapter matched.
         const res = await post(
             { role: 'manager', store },
-            { intent: 'contacts.import', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
             { name: 'weird.json', text: UNREADABLE },
         );
         expect(res.status).toBe(403);
@@ -390,7 +390,7 @@ describe('POST /api/imports', () => {
         // intent, or the authorisation rather than by the role.
         const res = await post(
             { role: 'owner', store },
-            { intent: 'contacts.import', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
             { name: 'weird.json', text: UNREADABLE },
         );
         expect(res.status).toBe(201);
@@ -405,7 +405,7 @@ describe('POST /api/imports', () => {
         // readable spreadsheet decides nothing about staff access.
         const res = await post(
             { role: 'manager', store },
-            { intent: 'contacts.import', uploadAuthorized: 'true' },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true' },
             { name: 'c.csv', text: CONTACTS_CSV },
         );
         expect(res.status).toBe(201);
@@ -416,7 +416,7 @@ describe('POST /api/imports', () => {
     it('keeps an inspector out of the route entirely', async () => {
         const res = await post(
             { role: 'inspector', store },
-            { intent: 'contacts.import', uploadAuthorized: 'true' },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true' },
             { name: 'c.csv', text: CONTACTS_CSV },
         );
         expect(res.status).toBe(403);
@@ -428,7 +428,7 @@ describe('POST /api/imports', () => {
     it('refuses a template import from somebody the Templates page hides it from', async () => {
         const res = await post(
             { role: 'manager', store, overrides: { templateImport: false } },
-            { intent: 'templates.create', uploadAuthorized: 'true' },
+            { intent: 'templates.create', vendor: 'spectora', uploadAuthorized: 'true' },
             { name: 't.json', text: '{"id":"x","name":"R","sections":[]}' },
         );
         expect(res.status).toBe(403);
@@ -440,7 +440,7 @@ describe('POST /api/imports', () => {
         // Positive control: identical request, one override flipped.
         const res = await post(
             { role: 'manager', store, overrides: { templateImport: true } },
-            { intent: 'templates.create', uploadAuthorized: 'true' },
+            { intent: 'templates.create', vendor: 'spectora', uploadAuthorized: 'true' },
             { name: 'Residential.xlsx', text: await templateExport() },
         );
         expect(res.status).toBe(201);
@@ -451,7 +451,7 @@ describe('POST /api/imports', () => {
     it('refuses a file over the deployment cap without storing it', async () => {
         const res = await post(
             { role: 'owner', profile: { ...SAAS_PROFILE, importMaxCsvBytes: 10 }, store },
-            { intent: 'contacts.import', uploadAuthorized: 'true' },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true' },
             { name: 'c.csv', text: CONTACTS_CSV },
         );
         expect(res.status).toBe(400);
@@ -476,6 +476,62 @@ describe('POST /api/imports', () => {
         expect(store.size).toBe(0);
     });
 
+    it('refuses an upload that never says which product the file came from', async () => {
+        // The rule this replaces was deleted twice. It lived in the registry as
+        // "the intent decides the vendor" and was then reinstated in this route
+        // as a default, so that callers with no picker kept working. With the
+        // picker built, a request carrying no declaration must be REFUSED and
+        // not guessed at: a guess here silently ignores what the operator chose
+        // on the screen, which is the exact failure the picker was built for.
+        const res = await post(
+            { role: 'owner', store },
+            { intent: 'contacts.import', uploadAuthorized: 'true' },
+            { name: 'c.csv', text: CONTACTS_CSV },
+        );
+        expect(res.status).toBe(400);
+        expect(await message(res)).toMatch(/which product/i);
+        expect(store.size).toBe(0);
+    });
+
+    it('reads that same upload once it says — the positive control', async () => {
+        // One field different. Without this, the refusal above would also be
+        // satisfied by a route that refused every upload.
+        const res = await post(
+            { role: 'owner', store },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true' },
+            { name: 'c.csv', text: CONTACTS_CSV },
+        );
+        expect(res.status).toBe(201);
+    });
+
+    it('does not ask the entry point whose owner could not name the product', async () => {
+        // `assisted.full` exists for exactly that case, so demanding a
+        // declaration there would close the one door built for not having one.
+        const res = await post(
+            { role: 'owner', store },
+            { intent: 'assisted.full', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { name: 'mystery.bin', text: new Uint8Array([1, 2, 3]) },
+        );
+        expect(res.status).toBe(201);
+        const body = await res.json() as { data: { needsAssistance: boolean } };
+        expect(body.data.needsAssistance).toBe(true);
+    });
+
+    it('reads the declared product, not the one the intent used to imply', async () => {
+        // The deleted rule made `templates.create` mean Spectora. A Home
+        // Inspector Pro template is a different container entirely, and the
+        // only thing that can tell this route which reader to run is the
+        // declaration on the request.
+        const res = await post(
+            { role: 'owner', store },
+            { intent: 'templates.create', vendor: 'home_inspector_pro', uploadAuthorized: 'true' },
+            { name: 't.xlsx', text: await templateExport() },
+        );
+        // The file IS a Spectora workbook, so the declared reader must refuse
+        // it. A route still deriving `spectora` from the intent would stage it.
+        expect(res.status).not.toBe(201);
+    });
+
     it('takes the stored file back out when staging refuses the bundle', async () => {
         // A CSV with a header and no data rows is readable and stages nothing.
         // The object is written BEFORE staging runs — the batch has to carry a
@@ -483,7 +539,7 @@ describe('POST /api/imports', () => {
         // file is retained under an authorisation for a run that never existed.
         const res = await post(
             { role: 'owner', store },
-            { intent: 'contacts.import', uploadAuthorized: 'true' },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true' },
             { name: 'c.csv', text: 'Full Name,Email\n' },
         );
         expect(res.status).toBe(400);

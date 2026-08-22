@@ -18,16 +18,36 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 
 import { asSelect } from "../../../tests/helpers/dom";
 import { MappingStage } from "./MappingStage";
-import type { ColumnMapping } from "~/lib/imports-types";
+import type { AdapterInspection, ColumnMapping, TemplateMapping } from "~/lib/imports-types";
 
 afterEach(cleanup);
 
-const INSPECTION = {
+const INSPECTION: AdapterInspection = {
+    kind: "columns",
     columns: ["Alpha", "Beta", "Gamma"],
     sampleRows: [
         { Alpha: "a1", Beta: "b1", Gamma: "c1" },
         { Alpha: "a2", Beta: "b2", Gamma: "c2" },
     ],
+};
+
+/**
+ * A template whose own words rate its items — the one shape that has a
+ * question to ask. Two of the five entries carry the whitespace real files
+ * carry, because rendering them trimmed is the failure this arm has to avoid.
+ */
+// Typed as the template ARM, not the union: the helper below spreads a
+// Partial of that arm over it, and a union-typed base widens `kind` back to
+// the union — so the fixture would stop being a template halfway through a
+// test whose whole subject is the template question.
+const TEMPLATE_INSPECTION: Extract<AdapterInspection, { kind: "template" }> = {
+    kind: "template",
+    name: "Commercial Inspection - Full",
+    sections: 6,
+    items: 41,
+    ratings: ["Satisfactory", " Marginal", "Poor", "Acceptable ", "None-N/A"],
+    ratingsDescribe: "items",
+    ratingsShown: null,
 };
 
 function renderStage(mapping: ColumnMapping, busy = false) {
@@ -36,6 +56,22 @@ function renderStage(mapping: ColumnMapping, busy = false) {
         <MappingStage inspection={INSPECTION} mapping={mapping} busy={busy} onApply={onApply} />,
     );
     return { onApply };
+}
+
+function renderTemplate(
+    over: Partial<Extract<AdapterInspection, { kind: "template" }>> = {},
+    mapping: TemplateMapping = { kind: "template", name: "Imported", ratingKind: "severity" },
+) {
+    const onApply = vi.fn();
+    const { container } = render(
+        <MappingStage
+            inspection={{ ...TEMPLATE_INSPECTION, ...over }}
+            mapping={mapping}
+            busy={false}
+            onApply={onApply}
+        />,
+    );
+    return { onApply, container };
 }
 
 /** A contact mapping whose name column was guessed and whose type was not. */
@@ -199,5 +235,90 @@ describe("MappingStage: while a submit is in flight", () => {
         renderStage(contacts(), true);
         expect(save().disabled).toBe(true);
         expect(asSelect(screen.getByLabelText("Name")).disabled).toBe(true);
+    });
+});
+
+describe("MappingStage: the template question, in the operator's own words", () => {
+    it("shows the operator THEIR OWN words, verbatim", () => {
+        // Real entries carry leading and trailing spaces — ` Marginal`,
+        // `Acceptable `. Trimming them for display hides from the person
+        // classifying them exactly the thing he is classifying.
+        renderTemplate();
+        expect(screen.getByText("Satisfactory")).toBeTruthy();
+        expect(screen.getByText((_t, node) => node?.textContent === " Marginal")).toBeTruthy();
+        expect(screen.getByText((_t, node) => node?.textContent === "Acceptable ")).toBeTruthy();
+    });
+
+    it("asks what the words MEAN, not what we would store them as", () => {
+        renderTemplate();
+        expect(screen.getByText(/how serious/i)).toBeTruthy();
+        expect(screen.getByText(/what you found/i)).toBeTruthy();
+    });
+
+    it("NEVER names our item types on screen", () => {
+        // The one assertion this arm exists for. Those names are how the answer
+        // is STORED; making an inspector learn them to finish an import moves
+        // our modelling into his job, and this is the only place in the wizard
+        // that would ask him to.
+        const { container } = renderTemplate();
+        expect(container.textContent ?? "").not.toMatch(/\brich\b|\bselect\b|\btextarea\b/i);
+    });
+
+    it("hands back the answer that was chosen", () => {
+        const { onApply } = renderTemplate();
+        fireEvent.click(screen.getByRole("radio", { name: /what you found/i }));
+        fireEvent.click(screen.getByRole("button", { name: "Use this template" }));
+        expect(onApply).toHaveBeenCalledWith({
+            kind: "template", name: "Imported", ratingKind: "choices",
+        });
+    });
+
+    it("hands back a DIFFERENT answer for a different choice — the comparison", () => {
+        // Each assertion above would pass against a form that always sent one
+        // answer. Two runs of the same form cannot both.
+        const { onApply } = renderTemplate();
+        fireEvent.click(screen.getByRole("radio", { name: /not ratings/i }));
+        fireEvent.click(screen.getByRole("button", { name: "Use this template" }));
+        expect(onApply).toHaveBeenCalledWith({
+            kind: "template", name: "Imported", ratingKind: "none",
+        });
+    });
+
+    it("does not ask at all when the template has no words to classify", () => {
+        // Eight of twenty-two real templates carry none. The wizard's rule is
+        // that a step with nothing to decide is not shown; this proves the arm
+        // obeys it rather than rendering an empty question.
+        renderTemplate({ ratings: [] });
+        expect(screen.queryByText(/how serious/i)).toBeNull();
+    });
+
+    it("does not ask when the words file COMMENTS rather than rate items", () => {
+        // One real export marks every comment info / limit / defect, which are
+        // already the three comment tabs. Asking about them would make an
+        // inspector re-derive a fact about his own file.
+        renderTemplate({ ratings: ["info", "limit", "defect"], ratingsDescribe: "comments" });
+        expect(screen.queryByText(/how serious/i)).toBeNull();
+    });
+
+    it("lets the template be renamed, and the label points at the field", () => {
+        // The shared input renders `<label htmlFor={id}>`, so a label with no
+        // id points at nothing — invisible to a screen reader and to this
+        // query. Asserted here because a browser is the only other place it
+        // shows.
+        const { onApply } = renderTemplate();
+        fireEvent.change(screen.getByLabelText(/name/i), { target: { value: "Master" } });
+        fireEvent.click(screen.getByRole("button", { name: "Use this template" }));
+        expect(onApply).toHaveBeenCalledWith({
+            kind: "template", name: "Master", ratingKind: "severity",
+        });
+    });
+
+    it("refuses to send a template with no name, and says so", () => {
+        const { onApply } = renderTemplate();
+        fireEvent.change(screen.getByLabelText(/name/i), { target: { value: "  " } });
+        const save = screen.getByRole("button", { name: "Use this template" }) as HTMLButtonElement;
+        expect(save.disabled).toBe(true);
+        fireEvent.click(save);
+        expect(onApply).not.toHaveBeenCalled();
     });
 });

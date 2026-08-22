@@ -218,6 +218,13 @@
       "when": 1787376522845,
       "tag": "0030_ai_endpoint_attestation",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1787400155198,
+      "tag": "0031_report_translations",
+      "breakpoints": true
     }
   ]
 }

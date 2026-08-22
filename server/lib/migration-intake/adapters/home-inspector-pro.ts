@@ -32,7 +32,11 @@
 import type {
     TemplateSchemaV2, TemplateSection, TemplateItem,
 } from '../../../types/template-schema';
-import { DEFAULT_IMPORTED_RATING_OPTIONS, type ConvertStats } from '../bundle';
+import {
+    DEFAULT_IMPORTED_RATING_OPTIONS,
+    type ConvertStats,
+    type TemplateRatingKind,
+} from '../bundle';
 import {
     objectsOfClass, propertyBoolean, propertyStrings,
 } from '../formats/java-xml-encoder';
@@ -122,20 +126,73 @@ function readTemplate(xml: string): Structure {
 export interface HomeInspectorProOptions {
     /** The name the imported template gets. The file's own name is a suggestion. */
     name: string;
+    /**
+     * What the operator said this template's rating words mean.
+     *
+     * REQUIRED, and it has no default here. The file's vocabulary is
+     * user-defined and unknowable from the bytes, so an adapter that picked
+     * one would be answering the mapping step's only question on the
+     * operator's behalf — quietly, and wrongly for whichever kind of template
+     * it did not pick.
+     */
+    ratingKind: TemplateRatingKind;
 }
 
-function toSchema(structure: Structure): { schema: TemplateSchemaV2; stats: ConvertStats } {
+/**
+ * The part of an item that the operator's answer decides.
+ *
+ * One function, so the three readings live together and a fourth cannot be
+ * added to one adapter and forgotten in the next. The shapes are what each
+ * answer MEANS in this schema: a severity scale is what a rated item's options
+ * are; a record of what was found is a list of choices; and words that are not
+ * ratings leave an item with nothing to pick from, so it takes prose.
+ *
+ * ⚠️ The three shapes are mutually exclusive by the template schema's own
+ * rules — its item schemas are strict, and only a rated item may carry `tabs`
+ * or `ratingOptions`. So an item cannot come out of here carrying two answers.
+ */
+function itemShapeFor(
+    words: readonly string[],
+    ratingKind: TemplateRatingKind,
+): Pick<TemplateItem, 'type' | 'ratingOptions' | 'options' | 'tabs'> {
+    // ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED — our own reading of
+    // a vocabulary, one of `TEMPLATE_RATING_KINDS`. Nothing here is matched
+    // against anything a file says; it is matched against an answer we asked for.
+    if (ratingKind === 'choices') {
+        // The operator's own words, verbatim. An empty vocabulary produces a
+        // list with nothing in it rather than ours — "these record what you
+        // found" said of a file with no words is a choice about a list that
+        // does not exist, and inventing five is not what he asked for.
+        return words.length > 0
+            ? { type: 'select', options: { choices: [...words] } }
+            : { type: 'select' };
+    }
+    // ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED — as above.
+    if (ratingKind === 'none') return { type: 'textarea' };
+    // The operator's OWN words where the file has them. Replacing them with a
+    // default would throw away the one thing the mapping step exists to ask
+    // about; ours are the fallback for the eight-in-twenty-two that have none,
+    // and a rated item must carry at least one option to be valid at all.
+    return {
+        type: 'rich',
+        ratingOptions: words.length > 0
+            ? [...words]
+            : [...DEFAULT_IMPORTED_RATING_OPTIONS],
+        // This format carries no canned comments in the structure file, so the
+        // tabs start empty rather than being invented.
+        tabs: { information: [], limitations: [], defects: [] },
+    };
+}
+
+function toSchema(
+    structure: Structure,
+    ratingKind: TemplateRatingKind,
+): { schema: TemplateSchemaV2; stats: ConvertStats } {
     const stats: ConvertStats = {
         sections: 0, items: 0,
         information: 0, limitations: 0, defects: 0,
         unknownCommentTypes: [],
     };
-    // The operator's OWN words where the file has them. Replacing them with a
-    // default would throw away the one thing the mapping step exists to ask
-    // about; ours are the fallback for the eight-in-twenty-two that have none.
-    const ratingOptions = structure.ratings.length > 0
-        ? [...structure.ratings]
-        : [...DEFAULT_IMPORTED_RATING_OPTIONS];
 
     const sections: TemplateSection[] = structure.sections.map((source, sectionIndex) => {
         stats.sections++;
@@ -144,11 +201,7 @@ function toSchema(structure: Structure): { schema: TemplateSchemaV2; stats: Conv
             return {
                 id: `item_${sectionIndex + 1}_${itemIndex + 1}`,
                 label: (label || 'Untitled item').slice(0, 100),
-                type: 'rich',
-                ratingOptions: [...ratingOptions],
-                // This format carries no canned comments in the structure file,
-                // so the tabs start empty rather than being invented.
-                tabs: { information: [], limitations: [], defects: [] },
+                ...itemShapeFor(structure.ratings, ratingKind),
             };
         });
         return {
@@ -179,6 +232,10 @@ export const homeInspectorProAdapter: MigrationAdapter<HomeInspectorProOptions> 
             sections: structure.sections.length,
             items: structure.sections.reduce((n, s) => n + s.items.length, 0),
             ratings: structure.ratings,
+            // These words rate ITEMS: an inspector picks one per item as he
+            // works. What they mean is genuinely unknown here, which is why
+            // the wizard asks rather than guessing.
+            ratingsDescribe: 'items',
             ratingsShown: structure.ratingsShown,
         };
     },
@@ -197,7 +254,7 @@ export const homeInspectorProAdapter: MigrationAdapter<HomeInspectorProOptions> 
         // An EMPTY template is converted, not refused. One real template in
         // twenty-two is empty, and refusing it would tell an operator his own
         // file is wrong. It stages as a row the repair step calls out instead.
-        const { schema, stats } = toSchema(readTemplate(xml));
+        const { schema, stats } = toSchema(readTemplate(xml), options.ratingKind);
         return {
             ok: true,
             bundle: {

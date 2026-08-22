@@ -72,6 +72,59 @@ function membersBundle(list: BundleMember[]): MigrationBundleV1 {
     };
 }
 
+/**
+ * A converted template with one rated item, one that landed as plain text, an
+ * empty section, and one entry the conversion could not carry.
+ *
+ * Every one of those is a fact the preview step reports and the four counts
+ * cannot.
+ */
+function templateBundle(): MigrationBundleV1 {
+    return {
+        formatVersion: 1,
+        manifest: {
+            source: { vendor: 'home_inspector_pro' },
+            adapter: { name: 'home-inspector-pro', version: '1' },
+            counts: {
+                template: {
+                    readFromSource: 2,
+                    emitted: 1,
+                    dropped: [{ at: 'row 42', reason: 'Executive Summary has no item' }],
+                },
+                contact: EMPTY,
+                member: EMPTY,
+            },
+            warnings: [],
+        },
+        templates: [{
+            name: 'AHIT Master',
+            schema: {
+                schemaVersion: 2,
+                sections: [
+                    {
+                        id: 's1',
+                        title: 'Roof',
+                        items: [
+                            {
+                                id: 'i1', label: 'Covering', type: 'rich',
+                                ratingOptions: ['Satisfactory'],
+                                tabs: { information: [], limitations: [], defects: [] },
+                            },
+                            { id: 'i2', label: 'Flashing', type: 'textarea' },
+                        ],
+                    },
+                    { id: 's2', title: 'Attic', items: [] },
+                ],
+            },
+            stats: {
+                sections: 2, items: 2,
+                information: 0, limitations: 0, defects: 0, unknownCommentTypes: [],
+            },
+        }],
+        contacts: [], members: [],
+    };
+}
+
 describe('MigrationReportService', () => {
     let db: BetterSQLite3Database<typeof schema>;
     let sqlite: SqliteDatabase;
@@ -289,6 +342,37 @@ describe('MigrationReportService', () => {
         });
         expect(r.counts).toEqual({ total: 2, ok: 2, conflicts: 0, problems: 0 });
         expect(r.blockedReason).toMatch(/needs 2 seats and 1 are available/);
+    });
+
+    it('carries the STRUCTURE of a template run, drops and all', async () => {
+        // The four counts add up for a conversion that produced nothing usable
+        // as readily as for a perfect one, which is why the report has to carry
+        // more than counts. The dropped entries come off the MANIFEST: a
+        // dropped entry has no staged row, so rows alone would report a clean
+        // import of a file that lost two comments.
+        const staged = await stage.stage({
+            tenantId: TENANT, createdBy: USER, intent: 'templates.create', limits: LIMITS,
+            bundle: templateBundle(),
+        });
+        const r = await report.build({
+            tenantId: TENANT, batchId: staged.batchId, seatQuotaEnforced: false,
+        });
+        expect(r.entityKind).toBe('template');
+        expect(r.structure?.name).toBe('AHIT Master');
+        expect(r.structure?.sections.map((sec) => sec.title)).toEqual(['Roof', 'Attic']);
+        expect(r.structure?.sections[0]?.items.map((i) => i.landedAs))
+            .toEqual(['rated', 'plain']);
+        expect(r.structure?.dropped.map((d) => d.reason)).toEqual(['Executive Summary has no item']);
+    });
+
+    it('carries NO structure for a run of contacts — the positive control', async () => {
+        // Their repair table already is a row-by-row preview, so a second
+        // screen would show the same rows with less on them. Without this, the
+        // case above would be satisfied by a report that always built one.
+        const batchId = await stageContacts([{ name: 'Alice', type: 'client' }]);
+        const r = await report.build({ tenantId: TENANT, batchId, seatQuotaEnforced: false });
+        expect(r.structure).toBeNull();
+        expect(r.entityKind).toBe('contact');
     });
 
     it('refuses to build a report for another tenant batch', async () => {

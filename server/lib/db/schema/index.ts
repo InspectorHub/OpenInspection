@@ -48,6 +48,10 @@ export { inspectionMessages } from './message';
 export type { MessageAttachment } from './message';
 export { reportPdfs } from './report-pdf';
 export type { ReportPdf, NewReportPdf } from './report-pdf';
+// Courtesy translations — one per (report, language), keyed to the English it
+// was made from so a translation of a superseded document is withheld.
+export { reportTranslations } from './report-translation';
+export type { ReportTranslation, NewReportTranslation } from './report-translation';
 export { signingKeys, esignAuditLogs } from './esign';
 export type { SigningKey, NewSigningKey, EsignAuditLog, NewEsignAuditLog } from './esign';
 export { qboConnections, qboEntityMap, qboSyncErrors } from './qbo';

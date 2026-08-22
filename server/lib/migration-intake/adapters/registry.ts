@@ -1,5 +1,5 @@
 import { ROLE } from '../../auth/roles';
-import type { VendorId } from '../bundle';
+import type { TemplateRatingKind, VendorId } from '../bundle';
 import type { AdapterInspection, BundleResult, MigrationAdapter } from './types';
 import { csvGenericAdapter, type CsvContactMapping, type CsvMemberMapping } from './csv-generic';
 import { homeInspectorProAdapter } from './home-inspector-pro';
@@ -75,14 +75,25 @@ export interface AdapterMatch {
  * registry of differently-parameterised adapters can only be typed by widening
  * the parameter away — and a widened parameter is the same as no parameter.
  *
+ * `ratingKind` is what the operator said the template's own rating words mean.
+ * It is read by the adapters whose vocabulary describes ITEMS; an export whose
+ * words file comments has nothing to answer, so the wizard never asks it and
+ * `defaultMappingFor` supplies the reading that changes nothing.
+ *
+ * ⚠️ ONE LINE PER ARM, and the template arm LAST. The converter-literal gate
+ * reads a declaration by accumulating lines until one ends in a semicolon, so a
+ * field written on its own line inside an earlier arm ends the declaration
+ * there — and every literal after it silently stops being classified while the
+ * gate still reports green.
+ *
  * ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED. `template`, `contacts`
  * and `members` are OUR entity vocabulary, decided by the entry point the
  * operator chose rather than read out of a file.
  */
 export type IntakeMapping =
-    | { kind: 'template'; name: string }
     | { kind: 'contacts'; mapping: CsvContactMapping }
-    | { kind: 'members'; mapping: CsvMemberMapping };
+    | { kind: 'members'; mapping: CsvMemberMapping }
+    | { kind: 'template'; name: string; ratingKind: TemplateRatingKind };
 
 /**
  * What the registry reads off an adapter: who it is, and whether it can report
@@ -278,7 +289,16 @@ export function defaultMappingFor(
         // itself something meaningful while its file is named for whoever saved
         // it. The filename is the fallback, not the answer.
         const own = inspection?.kind === 'template' ? inspection.name : null;
-        return { kind: 'template', name: own ?? source.fileName.replace(/\.[^.]+$/, '') };
+        return {
+            kind: 'template',
+            name: own ?? source.fileName.replace(/\.[^.]+$/, ''),
+            // The reading that preserves what the file already says: its words
+            // become the item's rating options, verbatim. Any other default
+            // would silently restructure a template for an operator who never
+            // opened the step — and this is the ONE answer that is not a guess
+            // about meaning, because it changes nothing.
+            ratingKind: 'severity',
+        };
     }
 
     // ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED — the name of one
@@ -340,8 +360,15 @@ export async function buildBundle(
         // own sentence rather than with a second one written here that could
         // disagree with it.
         if (vendor === 'home_inspector_pro') {
-            return homeInspectorProAdapter.convert(source.bytes, { name: mapping.name });
+            return homeInspectorProAdapter.convert(source.bytes, {
+                name: mapping.name,
+                ratingKind: mapping.ratingKind,
+            });
         }
+        // The Spectora adapter takes no rating answer, and that is a statement
+        // rather than an omission: its vocabulary files comments into the three
+        // tabs, so there is no question to pass on. Its options type says so,
+        // which is what stops an answer being handed over and quietly dropped.
         return spectoraAdapter.convert(source.bytes, { name: mapping.name });
     }
 

@@ -10,6 +10,7 @@ import { AssistanceStage } from "~/components/imports/AssistanceStage";
 import { ImportStage } from "~/components/imports/ImportStage";
 import { ImportWizardShell } from "~/components/imports/ImportWizardShell";
 import { MappingStage } from "~/components/imports/MappingStage";
+import { PreviewStage } from "~/components/imports/PreviewStage";
 import { RepairStage } from "~/components/imports/RepairStage";
 import { SourcePanel } from "~/components/imports/SourcePanel";
 import { useDisplayLocale, useDisplayTimeZone, useSessionContext } from "~/hooks/useSessionContext";
@@ -18,12 +19,7 @@ import { requireAdminLoader } from "~/lib/access.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatDate } from "~/lib/format";
 import { importIntentLabel, importStatusLabel, importStatusTone } from "~/lib/import-run-labels";
-import type {
-    AdapterInspection,
-    ColumnMapping,
-    ProblemRow,
-    StageMapping,
-} from "~/lib/imports-types";
+import type { BatchReport, StageMapping } from "~/lib/imports-types";
 import {
     currentImportStep,
     importNextBlockedReason,
@@ -32,36 +28,6 @@ import {
     type ImportStepId,
 } from "~/lib/import-wizard-steps";
 import { m } from "~/paraglide/messages";
-
-/**
- * What `GET /api/imports/:batchId` answers with, as it arrives HERE.
- *
- * Declared rather than imported from the report service, because the two shapes
- * genuinely differ: `createdAt` is a `Date` on the server and a string by the
- * time JSON has been through the wire.
- */
-interface BatchReport {
-    batch: {
-        id: string;
-        intent: string;
-        vendor: string;
-        status: string;
-        createdAt: string;
-    };
-    counts: { total: number; ok: number; conflicts: number; problems: number };
-    /** Only the entries needing a person, and only this page of them. */
-    problemRows: ProblemRow[];
-    /** How many there are behind the page. Without it a page of three is unreadable. */
-    problemRowsTotal: number;
-    page: number;
-    pageSize: number;
-    blockedReason: string | null;
-    /** The source file's columns, and the mapping to start from. Both null together. */
-    inspection: AdapterInspection | null;
-    mapping: StageMapping | null;
-    /** The day this run's entries are cleared, as `YYYY-MM-DD`, or null. */
-    undoUntil: string | null;
-}
 
 export function meta() {
     return [{ title: m.imports_page_title() }];
@@ -156,23 +122,38 @@ export async function action({ context, request, params }: Route.ActionArgs) {
 const STEP_LABEL: Record<ImportStepId, () => string> = {
     upload: m.imports_wizard_step_upload,
     mapping: m.imports_wizard_step_mapping,
+    preview: m.imports_wizard_step_preview,
     repair: m.imports_wizard_step_repair,
     import: m.imports_wizard_step_import,
 };
 
 /**
- * A mapping with columns to point at, or null.
+ * The mapping this run has a QUESTION about, or null when it has none.
  *
- * A TEMPLATE mapping carries a name rather than a column choice, so it has no
- * columns to put on this screen. The narrowing on `mapping.kind` is what keeps
- * it out — NOT the presence of an inspection: a template run now reports one
- * too, describing its rating vocabulary rather than its columns. Narrowing
- * rather than asserting keeps that a fact the compiler holds, and keeps the
- * mapping step out of the rail for a run that would open an empty form.
+ * Null is the wizard's "nothing to decide" rule applied to a step whose
+ * question differs by what was uploaded, and the two arms are unlike enough
+ * that one condition could not cover both:
+ *
+ *  · A tabular source is asked which column holds what, and has a question
+ *    whenever the report carries columns at all.
+ *  · A TEMPLATE is asked what its own rating words mean — and only when those
+ *    words rate its ITEMS. An export whose words file its comments has them
+ *    already settled as the three comment tabs, so there is nothing to ask,
+ *    and one with no words has nothing to ask about. Both would open a form
+ *    with an empty question on it.
+ *
+ * Narrowing rather than asserting, so a mapping and an inspection that
+ * disagree cannot reach a form built for the other one.
  */
-function columnMapping(report: BatchReport): ColumnMapping | null {
-    if (!report.inspection || !report.mapping) return null;
-    return report.mapping.kind === "template" ? null : report.mapping;
+function questionedMapping(report: BatchReport): StageMapping | null {
+    const { inspection, mapping } = report;
+    if (!inspection || !mapping) return null;
+    if (mapping.kind === "template") {
+        if (inspection.kind !== "template") return null;
+        const asks = inspection.ratingsDescribe === "items" && inspection.ratings.length > 0;
+        return asks ? mapping : null;
+    }
+    return inspection.kind === "columns" ? mapping : null;
 }
 
 export default function SettingsImportsBatch() {
@@ -220,15 +201,22 @@ export default function SettingsImportsBatch() {
         );
     }
 
-    const mapping = columnMapping(report);
+    const mapping = questionedMapping(report);
     const run: ImportRunView = {
         status: report.batch.status,
-        // A run with columns to map is one whose REPORT carries them. Deriving
-        // it from the vendor instead would keep the step on screen after the
-        // stored file has been swept, where the mapping can no longer be
-        // changed by anybody — and would put this screen in charge of a list of
-        // which products are special.
+        // A run with a mapping question is one whose REPORT still poses one.
+        // Deriving it from the vendor instead would keep the step on screen
+        // after the stored file has been swept, where the mapping can no longer
+        // be changed by anybody — and would put this screen in charge of a list
+        // of which products are special.
         hasMapping: mapping !== null,
+        // A run with a shape to judge is one whose REPORT carries one. Same
+        // rule as the mapping step, and for the same reason: a list of which
+        // intents are special would go stale the day a fourth entity grew a
+        // shape, and would keep the step on screen for a run whose rows are
+        // gone.
+        hasStructurePreview: report.structure !== null,
+        entityKind: report.entityKind,
         problemCount: report.counts.problems,
         blockedReason: report.blockedReason,
     };
@@ -329,6 +317,10 @@ export default function SettingsImportsBatch() {
                                 { method: "post" },
                             )}
                         />
+                    )}
+
+                    {current === "preview" && report.structure && (
+                        <PreviewStage structure={report.structure} />
                     )}
 
                     {current === "repair" && (

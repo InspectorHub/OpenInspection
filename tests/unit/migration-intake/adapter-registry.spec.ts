@@ -233,7 +233,11 @@ describe('defaultMappingFor', () => {
         const mapping = defaultMappingFor(
             'templates.create', null, spectoraSource('Residential Export.xlsx'),
         );
-        expect(mapping).toEqual({ kind: 'template', name: 'Residential Export' });
+        // The rating answer is part of the starting mapping, and it starts at
+        // the reading that changes nothing — see `defaultMappingFor`.
+        expect(mapping).toEqual({
+            kind: 'template', name: 'Residential Export', ratingKind: 'severity',
+        });
     });
 
     it('maps a staff list to an email column and a role everyone shares', async () => {
@@ -265,7 +269,7 @@ describe('buildBundle', () => {
 
     it('produces a validating bundle from a vendor export and a name', async () => {
         const result = await buildBundle('spectora', spectoraSource(), {
-            kind: 'template', name: 'Imported residential',
+            kind: 'template', name: 'Imported residential', ratingKind: 'severity',
         });
         expect(result.ok).toBe(true);
         if (!result.ok) return;
@@ -275,7 +279,7 @@ describe('buildBundle', () => {
     it('reports an unreadable file as a value rather than throwing', async () => {
         const result = await buildBundle(
             'spectora', intakeSourceFromText('export.xlsx', 'not a workbook'),
-            { kind: 'template', name: 'X' },
+            { kind: 'template', name: 'X', ratingKind: 'severity' },
         );
         expect(result.ok).toBe(false);
         expect(!result.ok && result.error.code).toBe('NOT_AN_EXPORT');
@@ -293,7 +297,7 @@ describe('buildBundle', () => {
     it('refuses a template name handed to the spreadsheet adapter', async () => {
         const result = await buildBundle(
             'csv_generic', intakeSourceFromText('contacts.csv', CONTACTS_CSV),
-            { kind: 'template', name: 'X' },
+            { kind: 'template', name: 'X', ratingKind: 'severity' },
         );
         expect(result.ok).toBe(false);
         expect(!result.ok && result.error.code).toBe('MAPPING_MISMATCH');

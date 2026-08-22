@@ -4,7 +4,11 @@ import {
     MIGRATION_INTENTS,
     MIGRATION_ROW_RESOLUTIONS,
 } from '../db/schema';
-import { BUNDLE_CONTACT_TYPES, VENDOR_IDS } from '../migration-intake/bundle';
+import {
+    BUNDLE_CONTACT_TYPES,
+    TEMPLATE_RATING_KINDS,
+    VENDOR_IDS,
+} from '../migration-intake/bundle';
 
 /**
  * Request shapes for the import-run routes.
@@ -25,9 +29,13 @@ export const IntakeUploadFormSchema = z.object({
     // able to act on, and it belongs to the handler that knows what was being
     // agreed to — a schema rejection here would answer the same status code
     // with zod's wording and no way to tell the two guards apart.
-    // OPTIONAL, and it has to stay optional until the source picker exists.
-    // Making it required now would refuse every caller that has no picker to
-    // answer it with; until then the route derives a default.
+    // OPTIONAL in the SCHEMA and required by the HANDLER, which is not a
+    // contradiction: one entry point — the one for a file whose owner could
+    // not name the product — has nothing to declare, and refusing it here
+    // would close the only door built for not knowing. Every other intent is
+    // refused by the handler with a sentence naming what is missing, which is
+    // the distinction zod cannot express and the operator has to be able to
+    // act on. What is gone is the DEFAULT: nothing derives a vendor any more.
     vendor: z.enum(VENDOR_IDS).optional()
         .describe('Which product the file was exported from, as the operator declared it'),
     uploadAuthorized: z.string().optional()
@@ -88,6 +96,8 @@ export const RemapRequestSchema = z.object({
         z.object({
             kind: z.literal('template'),
             name: z.string().min(1).describe('Name the imported template is saved under'),
+            ratingKind: z.enum(TEMPLATE_RATING_KINDS)
+                .describe('What the template\'s own rating words mean, as the operator read them'),
         }).strict(),
         z.object({
             kind: z.literal('contacts'),

@@ -8,8 +8,10 @@ import {
     type ColumnMapping,
     type ContactMapping,
     type MemberMapping,
+    type StageMapping,
     type ValueSource,
 } from "~/lib/imports-types";
+import { TemplateMappingForm } from "./TemplateMappingForm";
 import { m } from "~/paraglide/messages";
 
 /** "Not in this file" — the answer for an optional field the export does not carry. */
@@ -85,6 +87,50 @@ export function MappingStage({
     onApply,
 }: {
     inspection: AdapterInspection;
+    mapping: StageMapping;
+    busy: boolean;
+    onApply: (mapping: StageMapping) => void;
+}) {
+    // Two forms, dispatched here and holding NO state of their own at this
+    // level. A single component branching inside itself would run its hooks
+    // conditionally, and the two arms genuinely share nothing: one is about
+    // which column holds what, the other about what a set of words means.
+    if (mapping.kind === "template") {
+        // Both halves narrowed together. A template mapping beside a columns
+        // inspection is a report whose two halves disagree — it cannot be
+        // produced by the server, and rendering the column form against it
+        // would print an empty table instead of saying so.
+        if (inspection.kind !== "template") return null;
+        return (
+            <TemplateMappingForm
+                inspection={inspection}
+                mapping={mapping}
+                busy={busy}
+                onApply={onApply}
+            />
+        );
+    }
+    if (inspection.kind !== "columns") return null;
+    return (
+        <ColumnMappingForm
+            inspection={inspection}
+            mapping={mapping}
+            busy={busy}
+            onApply={onApply}
+        />
+    );
+}
+
+/** The uploaded file's columns and a sample of its rows. */
+type ColumnsInspection = Extract<AdapterInspection, { kind: "columns" }>;
+
+function ColumnMappingForm({
+    inspection,
+    mapping,
+    busy,
+    onApply,
+}: {
+    inspection: ColumnsInspection;
     mapping: ColumnMapping;
     busy: boolean;
     onApply: (mapping: ColumnMapping) => void;

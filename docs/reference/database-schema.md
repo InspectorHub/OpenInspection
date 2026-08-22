@@ -9,11 +9,11 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 100 |
-| Columns | 1195 |
-| Indexes (excluding primary keys) | 170 |
+| Tables | 101 |
+| Columns | 1206 |
+| Indexes (excluding primary keys) | 171 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 565 (47%) |
+| Columns carrying a source comment | 573 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `sync_outbox` · `tenants`
 
-That is 10 of 100. If a table you just added appears here,
+That is 10 of 101. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 190 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 191 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -2038,6 +2038,30 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_report_signoff_inspection` (tenant_id, inspection_id)
 - **UNIQUE** `uq_report_signoff_role` (inspection_id, role)
+
+---
+
+## `report_translations`
+
+<sub>server/lib/db/schema/report-translation.ts · 11 columns · primary key `id`</sub>
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `report_id` | text | NN UQ |  |  | `reports.id` — the deliverable, not the order. Not a foreign key. |
+| `locale` | text | NN UQ |  |  | BCP-47 tag of the language produced, e.g. `es-419`. |
+| `content` | text | NN |  |  | The translated segments, as a JSON array of strings in the order they were sent. Callers re-insert them POSITIONALLY, so the array's length is part of its meaning and a shorter one is never a partial success to salvage (`server/lib/ai/translate-response.ts` refuses one at the seam). **[more]** |
+| `source` | text | NN |  |  | Which backend produced it and on whose credentials, as `<provider id>:<credential source>` (e.g. |
+| `english_hash` | text | NN |  |  | The render-input hash of the English this was made FROM. Read the header of this file before relying on a match or a mismatch — the two are not symmetric. |
+| `translated_hash` | text | NN |  |  | SHA-256 of `content` as stored. Paired with `english_hash` and `notice_version` so a copy of a document presented later can be matched to the exact text that was shown alongside that exact notice; one of the three on its own answers none of that. **[more]** |
+| `notice_version` | integer | NN |  |  | Version of the courtesy-translation notice in force when this was produced (`server/lib/legal/courtesy-translation-notice.ts`). |
+| `ai_call_id` | text | NN |  |  | `ai_call_provenance.id` for the call that produced these segments. The model and the prompt version are reached THROUGH this id and are deliberately not copied here: two homes for one fact is two numbers that have to agree. |
+| `generated_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+
+**Indexes**
+
+- **UNIQUE** `uq_report_translations_report_locale` (tenant_id, report_id, locale)
 
 ---
 

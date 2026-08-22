@@ -16,6 +16,7 @@
  * from the caller, the same way `import-wizard-steps.ts` takes its copy, so
  * both rules can be asserted without a DOM and stay translatable.
  */
+import { importSourcesFor } from './import-sources';
 
 /** The intents a person can start a run from. `templates.overwrite` is absent
  *  on purpose: it needs a template to replace, so it can only be started from
@@ -95,6 +96,15 @@ export function importEntryHref(intent: ImportEntryIntent): string {
 /** What the person has answered so far. Not the stored run — this form has no
  *  run yet; creating one is what it does. */
 export interface ImportStartDraft {
+    /**
+     * Which product the operator said this export came from, or null.
+     *
+     * Null is not "unknown": it is "not answered yet", and the two are told
+     * apart by whether the entry point offers a choice at all. An entry with
+     * one source answers itself; the entry for a file whose owner could not
+     * name the product has nothing to answer.
+     */
+    vendor: string | null;
     hasFile: boolean;
     uploadAuthorized: boolean;
     staffAccessAuthorized: boolean;
@@ -102,6 +112,7 @@ export interface ImportStartDraft {
 
 /** The sentences, supplied by the caller so they stay translatable. */
 export interface ImportStartCopy {
+    needsSource: string;
     needsFile: string;
     needsUploadAuthorized: string;
     needsStaffAccessAuthorized: string;
@@ -121,6 +132,10 @@ export function importStartBlockedReason(
     draft: ImportStartDraft,
     copy: ImportStartCopy,
 ): string | null {
+    // First, because it is what decides which reader runs. Asked after the file
+    // it would be asked of somebody who has stopped reading the form — and the
+    // rule it replaced was the server quietly answering it for them.
+    if (importSourcesFor(entry.intent).length > 1 && !draft.vendor) return copy.needsSource;
     if (!draft.hasFile) return copy.needsFile;
     if (!draft.uploadAuthorized) return copy.needsUploadAuthorized;
     if (entry.readByPerson && !draft.staffAccessAuthorized) return copy.needsStaffAccessAuthorized;

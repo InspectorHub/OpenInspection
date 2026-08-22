@@ -7,6 +7,8 @@ import {
     importStartBlockedReason,
     type ImportEntryPoint,
 } from "~/lib/import-entry-points";
+import { defaultImportSourceFor, importSourcesFor } from "~/lib/import-sources";
+import { SourcePicker } from "./SourcePicker";
 
 /**
  * The form that turns a file into an import run.
@@ -32,24 +34,32 @@ import {
 export function StartImportPanel({
     entry,
     label,
+    hasAssistedMigration,
     busy,
     error,
 }: {
     entry: ImportEntryPoint;
     /** What this entry brings over, already translated. */
     label: string;
+    /** Whether this deployment has anybody to hand an unreadable file to. */
+    hasAssistedMigration: boolean;
     busy: boolean;
     /** What the server said when the last attempt was refused, or null. */
     error: string | null;
 }) {
+    // Pre-answered ONLY where the entry accepts one kind of file; null wherever
+    // there is a real choice, because a default there would be the rule this
+    // picker exists to delete — the intent silently deciding the vendor.
+    const [vendor, setVendor] = useState<string | null>(() => defaultImportSourceFor(entry.intent));
     const [fileName, setFileName] = useState<string | null>(null);
     const [uploadAuthorized, setUploadAuthorized] = useState(false);
     const [staffAccessAuthorized, setStaffAccessAuthorized] = useState(false);
 
     const blockedReason = importStartBlockedReason(
         entry,
-        { hasFile: fileName !== null, uploadAuthorized, staffAccessAuthorized },
+        { vendor, hasFile: fileName !== null, uploadAuthorized, staffAccessAuthorized },
         {
+            needsSource: m.imports_start_needs_source(),
             needsFile: m.imports_upload_needs_file(),
             needsUploadAuthorized: m.imports_upload_needs_authorize(),
             needsStaffAccessAuthorized: m.imports_upload_needs_staff_authorize(),
@@ -68,6 +78,22 @@ export function StartImportPanel({
             >
                 {label}
             </h3>
+
+            {/* Which product, before which file. It decides which reader runs,
+                and the sentence under the submit control names it first. */}
+            <SourcePicker
+                intent={entry.intent}
+                value={vendor}
+                hasAssistedMigration={hasAssistedMigration}
+                onPick={setVendor}
+            />
+            {/* The picker renders nothing where the entry accepts one kind of
+                file, so the settled declaration still has to reach the request
+                — a form that sent no vendor would put the server back in the
+                business of guessing one. */}
+            {importSourcesFor(entry.intent).length < 2 && vendor && (
+                <input type="hidden" name="vendor" value={vendor} />
+            )}
 
             <label className="block">
                 <span className="inline-flex items-center gap-3">

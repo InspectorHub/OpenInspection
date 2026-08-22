@@ -9,7 +9,13 @@ import {
 import { MIGRATION_ROW_STATUS } from '../../lib/status/migration-row-status';
 import type { MigrationBatchStatus } from '../../lib/status/migration-batch-status';
 import { describeRowProblem } from '../../lib/migration-intake/row-problems';
-import type { EntityKind } from '../../lib/migration-intake/bundle';
+import type {
+    BundleTemplate,
+    EntityCounts,
+    EntityKind,
+} from '../../lib/migration-intake/bundle';
+import { ENTITY_FOR_INTENT } from '../../lib/migration-intake/staging-rows';
+import { buildBatchStructure, type BatchStructure } from './structure';
 import { getSeatUsage } from '../../features/seat-quota/usage';
 import { computeSeatsNeeded } from '../../features/seat-quota/batch';
 import { Errors } from '../../lib/errors';
@@ -75,16 +81,35 @@ export interface BatchReport {
      */
     blockedReason: string | null;
     /**
-     * The source file's columns and a few sample rows, or null.
+     * What the adapter could say about the file before converting it: its
+     * columns and a sample of its rows, or a template's own vocabulary. Null
+     * when nothing here could read it, or when its file is no longer stored.
      *
-     * Null has two causes and the screen treats them the same: this source has
-     * no columns to point at (a vendor export), or its file is no longer
-     * stored. Either way there is no mapping question to ask — the same rule
-     * the adapter's missing `inspect` expresses on the server side.
+     * Whether that amounts to a QUESTION is the wizard's call, not this
+     * service's: a template whose words are already settled reports a full
+     * inspection and still has nothing to ask.
      */
     inspection: AdapterInspection | null;
     /** The mapping the step starts from, or null when there is no question. */
     mapping: IntakeMapping | null;
+    /**
+     * What this run brings in, so a screen can ask questions of the kind
+     * rather than of the intent.
+     *
+     * Null only for the one entry point that names no entity family — the run
+     * opened for a file whose owner could not say what it was.
+     */
+    entityKind: EntityKind | null;
+    /**
+     * What the conversion produced, for a run carrying something whose SHAPE
+     * can be judged. Null for contacts and team members, whose repair table
+     * already is a row-by-row preview.
+     *
+     * Read from the STAGED ROWS rather than re-converted: those rows are what
+     * would actually be written, so a preview built from anything else would
+     * be a preview of a different import.
+     */
+    structure: BatchStructure | null;
     /** When this run's entries are cleared, which is when its undo stops working. */
     undoUntil: string | null;
 }
@@ -99,6 +124,9 @@ export interface BuildReportParams {
 }
 
 type StagedRow = typeof migrationRows.$inferSelect;
+
+/** The accounting for a run whose manifest says nothing about templates. */
+const EMPTY_COUNTS: EntityCounts = { readFromSource: 0, emitted: 0, dropped: [] };
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -166,9 +194,52 @@ export class MigrationReportService {
             page,
             pageSize,
             blockedReason: await this.blockedReason(params, batch, rows, counts),
+            entityKind: ENTITY_FOR_INTENT[batch.intent],
+            structure: this.structureOf(batch, rows),
             ...(await this.readSource(batch)),
             undoUntil: batch.expiresAt ? batch.expiresAt.toISOString().slice(0, 10) : null,
         };
+    }
+
+    /**
+     * The shape of what was staged, for a run that carries one.
+     *
+     * The manifest is the ONLY record of what the conversion could not carry:
+     * a dropped entry has no staged row, by definition, so a preview that read
+     * the rows alone would report a clean import of a file that lost sixty-five
+     * comments. It is `JSON.parse`d straight back from the bytes the producing
+     * run wrote, never re-serialised, so what a preview shows is what that run
+     * made.
+     *
+     * A manifest that cannot be read leaves the structure null rather than
+     * throwing: the report is how somebody finds out what happened to their
+     * run, and it failing outright over a preview is a worse answer than not
+     * offering the preview.
+     */
+    private structureOf(
+        batch: typeof migrationBatches.$inferSelect,
+        rows: StagedRow[],
+    ): BatchStructure | null {
+        const templates: BundleTemplate[] = [];
+        for (const row of rows) {
+            if (row.entity !== 'template') continue;
+            templates.push(JSON.parse(row.payload) as BundleTemplate);
+        }
+        if (templates.length === 0) return null;
+        const dropped = this.droppedTemplates(batch.manifest);
+        return buildBatchStructure(templates, dropped);
+    }
+
+    /** The template accounting off the stored manifest, or an empty one. */
+    private droppedTemplates(manifest: string): EntityCounts {
+        try {
+            const parsed = JSON.parse(manifest) as {
+                counts?: Partial<Record<EntityKind, EntityCounts>>;
+            };
+            return parsed.counts?.template ?? EMPTY_COUNTS;
+        } catch {
+            return EMPTY_COUNTS;
+        }
     }
 
     /**

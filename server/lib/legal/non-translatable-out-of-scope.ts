@@ -50,6 +50,12 @@ export const NON_TRANSLATABLE_OUT_OF_SCOPE: NonTranslatableOutOfScopeEntry[] = [
         reason: 'The neutral disclosure shown alongside an agreement. review positioned it as a neutral platform disclosure on 2026-08-02: it states a fact and decides nothing, with no governs / prevails / controls language anywhere in it. It is versioned platform copy rather than a catalogue string, but for VERSION-INTEGRITY reasons — its version is signature evidence on agreement_signers.language_disclosure_version — and not because the eight-category ruling reaches it. Recorded here so the two justifications are never merged into one.',
     },
 
+    {
+        id: 'oos-courtesy-translation-notice',
+        source: 'server/lib/legal/courtesy-translation-notice.ts',
+        reason: 'The notice that travels with a courtesy translation. A platform notice ABOUT the translated document, not a term OF the inspection agreement: it states which document is the inspection record and what the reader is holding, and it says nothing about who governs, prevails or controls. It is a versioned constant for the same VERSION-INTEGRITY reason as the agreement-language disclosure — every stored translation records the version in force when it was produced — and not because the eight-category rule reaches it. ⚠️ The English wording is fixed, but a rendering of it in the reader language is expected and correct: a notice explaining that a translation is unofficial is worth nothing to the only reader who needs it if it arrives in the language they could not read. What it must never do is pass through the machine translation it is describing.',
+    },
+
     // ── The content #23 exists to translate. Listing it is the point: the
     // registry must not read as though everything in the report is frozen.
     {

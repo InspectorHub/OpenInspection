@@ -1,6 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { createApiRouter } from '../lib/openapi-router';
+import { getDrizzle } from '../lib/route-helpers';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { requireRole } from '../lib/middleware/rbac';
 import { AiConfigBodySchema, AiConnectionTestBodySchema, AiConnectionTestResultSchema } from '../lib/validations/integrations.schema';
@@ -95,7 +95,7 @@ const integrationsAiRoutes = createApiRouter()
         const chosen = keyForProbe(body.apiKey, stored);
         if ('refuse' in chosen) {
             const result = { ok: false as const, field: 'apiKey' as const, message: m_ai_key_missing };
-            await recordIntegrationTest(drizzle(c.env.DB), { tenantId, testedByUserId: uid, target: 'gemini', ok: false, detail: result.message });
+            await recordIntegrationTest(getDrizzle(c), { tenantId, testedByUserId: uid, target: 'gemini', ok: false, detail: result.message });
             return c.json({ success: true as const, data: result }, 200);
         }
         const result = await testAiConnection({ ...body, apiKey: chosen.key });
@@ -107,7 +107,7 @@ const integrationsAiRoutes = createApiRouter()
         //
         // `detail` carries the FIELD that failed — never the message shown to
         // the workspace, and never the provider's own words.
-        await recordIntegrationTest(drizzle(c.env.DB), {
+        await recordIntegrationTest(getDrizzle(c), {
             tenantId, testedByUserId: uid, target: 'gemini', ok: result.ok,
             detail: result.ok
                 ? 'AI endpoint accepted a test completion.'
@@ -117,11 +117,11 @@ const integrationsAiRoutes = createApiRouter()
     })
     .openapi(aiConfigRoute, async (c) => {
         const body = c.req.valid('json');
-        await saveAiConfig(drizzle(c.env.DB), c.get('tenantId'), body);
+        await saveAiConfig(getDrizzle(c), c.get('tenantId'), body);
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
     })
     .openapi(aiConfigGetRoute, async (c) => {
-        const data = await readAiConfig(drizzle(c.env.DB), c.get('tenantId'));
+        const data = await readAiConfig(getDrizzle(c), c.get('tenantId'));
         return c.json({ success: true as const, data }, 200);
     })
 ;

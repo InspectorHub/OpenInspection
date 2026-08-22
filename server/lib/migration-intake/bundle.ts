@@ -51,6 +51,33 @@ export const BUNDLE_MEMBER_ROLES: readonly BundleMemberRole[] =
     ROLES.filter((r): r is BundleMemberRole => r !== ROLE.AGENT);
 
 /**
+ * What an operator says his template's own rating words MEAN.
+ *
+ * The one question the template mapping step asks, and it is asked because no
+ * code can answer it: twenty-two real templates carried vocabularies of three,
+ * four and five entries sharing no words — severity scales, yes/no checklists,
+ * statutory codes, non-English sets — and eight carried none at all.
+ *
+ * The values are named for the ANSWER, not for the storage. An inspector
+ * thinks "I have Satisfactory / Marginal / Poor"; asking him which of our item
+ * types that is would move our modelling into his job. What each answer turns
+ * into is decided by the adapters, in one place, and is the only thing that
+ * would change if the item model did.
+ *
+ * ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED. Our own vocabulary
+ * for our own question; none of it is read out of anybody's file.
+ */
+export const TEMPLATE_RATING_KINDS = [
+    /** They say how serious a problem is — the item keeps them as its ratings. */
+    'severity',
+    /** They record what was found — the item becomes a list of choices. */
+    'choices',
+    /** They are not ratings — the item becomes plain text. */
+    'none',
+] as const;
+export type TemplateRatingKind = typeof TEMPLATE_RATING_KINDS[number];
+
+/**
  * The rating options an imported item gets when its source supplies none.
  *
  * ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED. This is OUR

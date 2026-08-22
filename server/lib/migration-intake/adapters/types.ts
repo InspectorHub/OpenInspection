@@ -55,6 +55,29 @@ export type AdapterInspection =
          */
         ratings: string[];
         /**
+         * Which of the file's two possible vocabularies `ratings` is.
+         *
+         * `'items'` — the words an inspector picks between when he rates an
+         * item. Their meaning is genuinely unknown to us: real templates show
+         * severity scales, yes/no checklists and statutory codes sharing no
+         * words, so the wizard asks.
+         *
+         * `'comments'` — the words the file files its canned comments under.
+         * One real export marks every comment `info`, `limit` or `defect`,
+         * which are already our three comment tabs, so the mapping is the
+         * identity and there is nothing to ask. Asking anyway would make an
+         * inspector re-derive a fact about his own file.
+         *
+         * A field rather than a second arm of this union: everything else
+         * about the two is the same, and a fourth arm would make every reader
+         * of `sections`, `items` and `name` handle one more case for a
+         * distinction that changes exactly one question.
+         *
+         * ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED. Both values
+         * name parts of OUR model; neither is read out of anybody's file.
+         */
+        ratingsDescribe: 'items' | 'comments';
+        /**
          * Whether the format says ratings are shown.
          *
          * `null` means THE PROPERTY WAS ABSENT, which is not the same as false

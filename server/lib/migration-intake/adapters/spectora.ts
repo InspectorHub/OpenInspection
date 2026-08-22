@@ -314,6 +314,12 @@ export const spectoraAdapter: MigrationAdapter<SpectoraAdapterOptions> = {
             sections: sections.size,
             items: items.size,
             ratings: [...COMMENT_TYPES],
+            // These words file COMMENTS, not items. They are already this
+            // product's three comment tabs, so the mapping is the identity and
+            // there is nothing to ask — the wizard reads this and skips the
+            // question rather than making an inspector re-derive a fact about
+            // his own file.
+            ratingsDescribe: 'comments',
             // The format has no such property, and saying `false` would assert
             // something it did not say.
             ratingsShown: null,

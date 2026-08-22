@@ -283,3 +283,63 @@ describe("settings → imports: starting a run", () => {
         expect(screen.queryByTestId("import-start-staff-authorize")).toBeNull();
     });
 });
+
+describe("settings → imports: declaring which product the file came from", () => {
+    it("asks for the source FIRST on an entry point with more than one", async () => {
+        // The declaration replaced a rule the server used to apply on its own —
+        // `templates.create` meaning Spectora, always. Asking for it before the
+        // file is deliberate: it is what decides which reader runs, and a
+        // person who has already chosen a file has stopped reading the form.
+        renderPage({ entry: "/settings/imports?intent=templates.create" });
+
+        await screen.findByRole("button", { name: "Upload" });
+        expect(screen.getByTestId("import-start-blocked").textContent)
+            .toBe("Say which product this export came from.");
+
+        fireEvent.click(screen.getByRole("radio", { name: /Home Inspector Pro/i }));
+
+        // The sentence must MOVE ON rather than clear: the run still cannot
+        // start, and the reason is now the file.
+        expect(screen.getByTestId("import-start-blocked").textContent)
+            .toBe("Choose the file you exported.");
+    });
+
+    it("carries the declared source into the request", async () => {
+        // A picker whose value never reaches the server is the deleted rule
+        // wearing a picker — the route would fall back to guessing, and the
+        // wizard would silently ignore what was chosen.
+        renderPage({ entry: "/settings/imports?intent=templates.create" });
+        await screen.findByRole("button", { name: "Upload" });
+
+        const chosen = screen.getByRole<HTMLInputElement>("radio", { name: /HomeGauge/i });
+        fireEvent.click(chosen);
+        expect(chosen.getAttribute("name")).toBe("vendor");
+        expect(chosen.checked).toBe(true);
+        expect(chosen.closest("form")).toBe(
+            screen.getByRole("button", { name: "Upload" }).closest("form"),
+        );
+    });
+
+    it("does NOT ask on an entry point that accepts one kind of file — the control", async () => {
+        // A radio group of one is not a question. Contacts arrive as a table
+        // whoever exported them, so the entry point has already answered, and
+        // the first thing outstanding is the file.
+        renderPage({ entry: "/settings/imports?intent=contacts.import" });
+        await screen.findByRole("button", { name: "Upload" });
+
+        expect(screen.queryByRole("radiogroup")).toBeNull();
+        expect(screen.getByTestId("import-start-blocked").textContent)
+            .toBe("Choose the file you exported.");
+    });
+
+    it("does not ask the entry point whose whole point is not knowing", async () => {
+        renderPage({
+            hasAssistedMigration: true,
+            entry: "/settings/imports?intent=assisted.full",
+        });
+        await screen.findByRole("button", { name: "Upload" });
+        expect(screen.queryByRole("radiogroup")).toBeNull();
+        expect(screen.getByTestId("import-start-blocked").textContent)
+            .toBe("Choose the file you exported.");
+    });
+});
