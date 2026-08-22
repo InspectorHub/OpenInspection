@@ -13,10 +13,16 @@
   "assets": { "directory": "./build/client", "binding": "ASSETS" },
   "observability": { "enabled": true },
   "upload_source_maps": true,
-  // Drives the scheduled() handler: automation flush + inspection.reminder
-  // enqueue (Track J) + agreement expiry + GDPR retention sweep. SaaS uses its
-  // own wrangler.saas.jsonc schedule; this is the standalone/OSS default.
-  "triggers": { "crons": ["*/5 * * * *"] },
+  // Drives the scheduled() handler. Three expressions, not one:
+  //   */5 * * * *  the main tick — probes each job and enqueues the ones with
+  //                work onto CRON_QUEUE. It runs no job body itself.
+  //   0 3 * * *    daily R2 usage measurement.
+  //   0 4 * * *    daily log-retention sweep + intake expiry reminders.
+  // The two daily jobs used to ride the */5 tick behind a `getUTCHours()`
+  // guard, at the end of a thirteen-job serial chain — one qualifying tick a
+  // day, in the position an overrun cuts off first. Their own expressions give
+  // them their own invocations. SaaS mirrors this in wrangler.saas.jsonc.
+  "triggers": { "crons": ["*/5 * * * *", "0 3 * * *", "0 4 * * *"] },
   "vars": {
     "ENVIRONMENT": "production",
     "APP_MODE": "standalone",
@@ -47,12 +53,21 @@
   // export is a standalone + one-click feature, so its producer AND consumer
   // are committed here. A SaaS deploy adds a second `*-saas`-named
   // producer/consumer pair to wrangler.saas.jsonc (not committed).
+  //
+  // The cron queue is committed here for the same reason: background jobs are
+  // not a SaaS feature, and a standalone deployment with no consumer would run
+  // no background work at all.
   "queues": {
     "producers": [
-      { "queue": "openinspection-word-export", "binding": "WORD_EXPORT_QUEUE" }
+      { "queue": "openinspection-word-export", "binding": "WORD_EXPORT_QUEUE" },
+      { "queue": "openinspection-cron", "binding": "CRON_QUEUE" }
     ],
     "consumers": [
-      { "queue": "openinspection-word-export", "max_batch_size": 1, "max_retries": 3 }
+      { "queue": "openinspection-word-export", "max_batch_size": 1, "max_retries": 3 },
+      // One message per invocation, deliberately: batching would hand several
+      // jobs a single shared CPU budget, which is precisely what this queue
+      // exists to avoid.
+      { "queue": "openinspection-cron", "max_batch_size": 1, "max_retries": 3 }
     ]
   },
   "browser": { "binding": "BROWSER" },

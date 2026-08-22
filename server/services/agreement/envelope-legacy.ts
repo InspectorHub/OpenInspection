@@ -299,10 +299,18 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
 
         /**
          * Cron handler — marks all non-terminal rows with sentAt older than N days
-         * as expired. Returns the count of newly-expired rows.
-         * Idempotent — re-running picks up nothing once all old rows are expired.
+         * as expired. Idempotent — re-running picks up nothing once all old rows
+         * are expired.
+         *
+         * Returns nothing, deliberately. It used to return a count, produced by a
+         * third query that selected rows ALREADY in `expired` state inside the
+         * window — so it reported the same number on every run and never once
+         * reported what the run had changed. An idle deployment logged
+         * `[cron] expired agreements {count: 4}` every five minutes on the
+         * strength of it. D1 exposes no rowsAffected through Drizzle, so there is
+         * no honest count to give; none beats a misleading one.
          */
-        async expireOlderThan(days: number): Promise<number> {
+        async expireOlderThan(days: number): Promise<void> {
             const db = this.getDrizzle();
             // Compare via lt() with a Date so Drizzle encodes the cutoff through the
             // sent_at column's mode mapper. (The previous raw-sql comparison bound a
@@ -324,15 +332,6 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                     inArray(agreementSigners.status, ['pending', 'sent', 'viewed']),
                     sql`${agreementSigners.requestId} IN (SELECT id FROM ${agreementRequests} WHERE ${agreementRequests.status} = 'expired')`,
                 ));
-            // D1/Drizzle does not expose rowsAffected; count expired rows within the cutoff window
-            const expiredRows = await db.select().from(agreementRequests)
-                .where(and(
-                    eq(agreementRequests.status, 'expired'),
-                    lt(agreementRequests.sentAt, cutoff),
-                ));
-            const count = expiredRows.length;
-            logger.info('AgreementService.expireOlderThan', { days, count });
-            return count;
         }
 
         /**

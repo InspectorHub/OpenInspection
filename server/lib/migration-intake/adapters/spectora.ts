@@ -1,303 +1,288 @@
 /**
- * Spectora → OpenInspection v2 schema converter.
+ * The Spectora export button's file, converted to the v2 schema.
  *
- * Best-effort translation of a Spectora template export into the strict
- * v2 schema. Spectora's per-item canned-comment model has four buckets
- * (INFORMATIONAL / SATISFACTORY / MONITOR / DEFECT) which we map onto
- * OpenInspection's three (information / limitations / defects):
+ * ── What the export actually is ─────────────────────────────────────────────
+ * A spreadsheet. One row per canned comment, 42 columns wide, with the section
+ * and the item repeated on every row — so the structure is implied by repeated
+ * values rather than nested. A real export measured 1873 rows: one header and
+ * 1872 comments, resolving to 16 sections and 76 items.
  *
- * | Spectora        | v2 tab          | Defect category    |
- * |-----------------|-----------------|--------------------|
- * | INFORMATIONAL   | information     | —                  |
- * | SATISFACTORY    | information     | — (prefixed)       |
- * | MONITOR         | defects         | recommendation     |
- * | DEFECT          | defects         | safety             |
+ * This adapter used to read a JSON object with a `sections` array and describe
+ * a four-bucket comment model. That representation exists, but it is not what
+ * the export button produces, and the four buckets are not what the file marks:
+ * every row carries `info`, `limit` or `defect`, which are already our three
+ * comment tabs. The mapping that was made complicated is the identity. The JSON
+ * reader lives on in `spectora-json.ts` for the one older endpoint that takes a
+ * pasted document, and is re-exported here so that endpoint's import still
+ * resolves while it exists.
  *
- * Unknown comment kinds fall through to information so no data is
- * silently lost. Spectora identifiers are preserved on every level via
- * the v2 `source` field so re-imports can detect already-mapped rows.
+ * ── Purity ──────────────────────────────────────────────────────────────────
+ * Ids are derived from a row's POSITION in the file, never minted. The same
+ * bytes therefore convert to the same bundle, which is what lets a re-map
+ * re-read a stored file and compare the result against what was staged.
  */
 
-import type { TemplateSchemaV2, TemplateSection, TemplateItem, RatingLevel, CannedInfoComment, CannedDefect } from '../../../types/template-schema';
-import type { ConvertStats } from '../bundle';
+import type {
+    TemplateSchemaV2, TemplateSection, TemplateItem,
+    CannedInfoComment, CannedDefect,
+} from '../../../types/template-schema';
+import {
+    DEFAULT_IMPORTED_DEFECT_CATEGORY,
+    DEFAULT_IMPORTED_RATING_OPTIONS,
+    type ConvertStats,
+} from '../bundle';
+import { readXlsxSheet } from '../formats/xlsx-sheet';
 import type { AdapterInspection, BundleResult, MigrationAdapter } from './types';
 import { emptyEntityCounts } from './types';
 
-const SPECTORA_PLATFORM = 'spectora';
+export { convertSpectoraTemplate, type SpectoraTemplate } from './spectora-json';
 
-/** Subset of the Spectora export we actually consume. */
-export interface SpectoraTemplate {
-    id?: string;
-    name?: string;
-    sections?: SpectoraSection[];
-    /** Custom rating levels defined at template level. */
-    rating_levels?: SpectoraRatingLevel[];
-    ratingLevels?: SpectoraRatingLevel[];
+/** ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED. Our own adapter's version. */
+const SPECTORA_ADAPTER_VERSION = '2';
+
+/**
+ * The column headings that identify this file as this product's export.
+ *
+ * ⚠️ LITERAL-USE CLASSIFICATION: FORMAT DISCRIMINATOR. These are the strings a
+ * reader must match to recognise the format at all. Minimum necessary literal
+ * use — the list stops at what identifies the format and does not continue into
+ * the product's own section, item or comment vocabulary, which is theirs.
+ * Matched case-insensitively on the PREFIX, because several headings continue
+ * into a parenthesised note.
+ */
+const REQUIRED_HEADERS = ['section name', 'item name', 'comment name', 'comment text'];
+
+/**
+ * ⚠️ LITERAL-USE CLASSIFICATION: FORMAT DISCRIMINATOR. The heading of the
+ * column holding the value below; a prefix, because the real heading continues
+ * into a parenthesised list of its own values.
+ */
+const COMMENT_TYPE_HEADER = 'comment type';
+
+/**
+ * The comment-type column's values.
+ *
+ * ⚠️ LITERAL-USE CLASSIFICATION: REQUIRED ENUM. Three short functional tokens
+ * the parser must match to do anything at all. They happen to be our own three
+ * tabs, so the mapping below is the identity — a coincidence of the format,
+ * not a taxonomy taken from it.
+ */
+const COMMENT_TYPES = ['info', 'limit', 'defect'] as const;
+type CommentType = typeof COMMENT_TYPES[number];
+
+/**
+ * Which of our tabs each of those values names. The identity, spelled out.
+ *
+ * ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED on the right-hand side
+ * — `information`, `limitations` and `defects` are OUR tab names. That they
+ * line up one-to-one with the column's values is a coincidence of the format.
+ */
+const TAB_FOR_COMMENT_TYPE: Record<CommentType, 'information' | 'limitations' | 'defects'> = {
+    info: 'information',
+    limit: 'limitations',
+    defect: 'defects',
+};
+
+/** Where each thing this reader needs sits in the header row. */
+interface SheetColumns {
+    section: number;
+    item: number;
+    commentName: number;
+    commentText: number;
+    /** -1 when the export omits the column entirely — every row then reads untyped. */
+    commentType: number;
 }
 
-interface SpectoraRatingLevel {
-    id?: string;
-    name?: string;
-    label?: string;
-    abbreviation?: string;
-    color?: string;
-    is_defect?: boolean;
-    isDefect?: boolean;
-    default?: boolean;
-    description?: string;
+/**
+ * The workbook as this reader understands it, or why it does not.
+ *
+ * ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED — our own refusal
+ * codes, which the operator never sees; the sentences they map to are below.
+ */
+type SpectoraSheet =
+    | { ok: true; rows: string[][]; columns: SheetColumns }
+    | { ok: false; code: 'NOT_AN_EXPORT' | 'NO_SECTIONS' };
+
+/** The index of the first heading starting with `prefix`, or -1. */
+function headerIndex(header: string[], prefix: string): number {
+    return header.findIndex((cell) => cell.startsWith(prefix));
 }
 
-interface SpectoraSection {
-    id?: string;
-    name?: string;
-    title?: string;
-    identifier?: string;
-    items?: SpectoraItem[];
-    /** Legal text rendered at the bottom of the section in the published report. */
-    disclaimer?: string;
-    disclaimer_text?: string;
+/**
+ * The bytes as this export, or why they are not it.
+ *
+ * ONE shape test, shared by `inspect` and `convert`. `inspect` throws the
+ * reason away and answers null; `convert` turns it into the sentence the
+ * operator reads. A second copy of this test is how the two come to disagree
+ * about what this product's file is — silently, because each has its own tests.
+ */
+async function readSpectoraWorkbook(input: unknown): Promise<SpectoraSheet> {
+    if (!(input instanceof Uint8Array)) return { ok: false, code: 'NOT_AN_EXPORT' };
+    const rows = await readXlsxSheet(input);
+    if (rows === null || rows.length === 0) return { ok: false, code: 'NOT_AN_EXPORT' };
+    const header = rows[0]!.map((cell) => cell.trim().toLowerCase());
+    if (!REQUIRED_HEADERS.every((h) => header.some((cell) => cell.startsWith(h)))) {
+        return { ok: false, code: 'NOT_AN_EXPORT' };
+    }
+    const body = rows.slice(1).filter((row) => row.some((cell) => cell.trim() !== ''));
+    if (body.length === 0) return { ok: false, code: 'NO_SECTIONS' };
+    return {
+        ok: true,
+        rows: body,
+        columns: {
+            section: headerIndex(header, REQUIRED_HEADERS[0]!),
+            item: headerIndex(header, REQUIRED_HEADERS[1]!),
+            commentName: headerIndex(header, REQUIRED_HEADERS[2]!),
+            commentText: headerIndex(header, REQUIRED_HEADERS[3]!),
+            commentType: headerIndex(header, COMMENT_TYPE_HEADER),
+        },
+    };
 }
 
-interface SpectoraItem {
-    id?: string;
-    name?: string;
-    label?: string;
-    /** Free-text description shown under the item label. */
-    description?: string;
-    comments?: SpectoraComment[];
+function at(row: string[], column: number): string {
+    return column < 0 ? '' : (row[column] ?? '').trim();
 }
 
-type SpectoraCommentType = 'INFORMATIONAL' | 'SATISFACTORY' | 'MONITOR' | 'DEFECT' | string;
-
-interface SpectoraComment {
-    id?: string;
-    type?: SpectoraCommentType;
-    title?: string;
-    text?: string;
-    body?: string;
-    default?: boolean;
-    location?: string;
+/** A comment whose type column said nothing this reader knows. */
+interface UntypedComment {
+    /** Where in the file, so the operator can find it. */
+    at: string;
+    name: string;
+    /** What the cell held, verbatim. Empty when it held nothing. */
+    said: string;
 }
 
-export interface ConvertResult {
+interface BuiltTemplate {
     template: TemplateSchemaV2;
-    /** Counts of source comments mapped into each v2 tab. Useful for surfacing import diffs. */
     stats: ConvertStats;
+    untyped: UntypedComment[];
 }
 
-function freshId(prefix: string, externalId: string | undefined): string {
-    if (externalId && externalId.trim()) return `${prefix}_${externalId.trim()}`;
-    const random = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    return `${prefix}_${random}`;
-}
-
-function pickText(c: SpectoraComment): string {
-    return (c.text ?? c.body ?? '').toString();
-}
-
-function pickTitle(c: SpectoraComment, fallback: string): string {
-    const t = (c.title ?? '').toString().trim();
-    return t.length > 0 ? t : fallback;
-}
-
-function bucketComment(c: SpectoraComment, stats: ConvertResult['stats']):
-    | { tab: 'information'; entry: CannedInfoComment }
-    | { tab: 'limitations'; entry: CannedInfoComment }
-    | { tab: 'defects'; entry: CannedDefect } {
-    const externalId = c.id;
-    const kind = (c.type ?? 'INFORMATIONAL').toString().toUpperCase();
-    const def = !!c.default;
-    const body = pickText(c);
-    if (kind === 'INFORMATIONAL') {
-        stats.information++;
-        return { tab: 'information', entry: { id: freshId('ri', externalId), title: pickTitle(c, 'Information'), comment: body, default: def } };
-    }
-    if (kind === 'SATISFACTORY') {
-        stats.information++;
-        const title = pickTitle(c, 'Satisfactory');
-        return { tab: 'information', entry: { id: freshId('ri', externalId), title: `Satisfactory · ${title}`, comment: body, default: def } };
-    }
-    if (kind === 'MONITOR') {
-        stats.defects++;
-        return {
-            tab: 'defects',
-            entry: {
-                id: freshId('rd', externalId),
-                title: pickTitle(c, 'Monitor'),
-                category: 'recommendation',
-                location: (c.location ?? '').toString(),
-                comment: body,
-                photos: [],
-                default: def,
-            },
-        };
-    }
-    if (kind === 'DEFECT') {
-        stats.defects++;
-        return {
-            tab: 'defects',
-            entry: {
-                id: freshId('rd', externalId),
-                title: pickTitle(c, 'Defect'),
-                category: 'safety',
-                location: (c.location ?? '').toString(),
-                comment: body,
-                photos: [],
-                default: def,
-            },
-        };
-    }
-    // Unknown comment kind — preserve it under information so the inspector
-    // can still see and re-categorise the content.
-    if (!stats.unknownCommentTypes.includes(kind)) stats.unknownCommentTypes.push(kind);
-    stats.information++;
-    return { tab: 'information', entry: { id: freshId('ri', externalId), title: `${kind} · ${pickTitle(c, '')}`.trim(), comment: body, default: def } };
-}
-
-export function convertSpectoraTemplate(input: SpectoraTemplate): ConvertResult {
-    const stats: ConvertResult['stats'] = {
+/**
+ * Rows to sections and items, in the file's own order.
+ *
+ * Order is the file's because the export repeats the section and item on every
+ * row, so first appearance is the only ordering the file expresses — and an
+ * inspector recognises his own template by its running order.
+ */
+function buildTemplate(sheet: Extract<SpectoraSheet, { ok: true }>): BuiltTemplate {
+    const stats: ConvertStats = {
         sections: 0, items: 0,
         information: 0, limitations: 0, defects: 0,
         unknownCommentTypes: [],
     };
+    const untyped: UntypedComment[] = [];
+    const sections: TemplateSection[] = [];
+    const sectionByTitle = new Map<string, TemplateSection>();
+    const itemByKey = new Map<string, TemplateItem>();
 
-    const sections: TemplateSection[] = (input.sections ?? []).map((s) => {
-        stats.sections++;
-        const sectionTitle = (s.title ?? s.name ?? 'Untitled section').toString().slice(0, 50);
-        const sectionId = freshId('sec', s.id);
-        const items: TemplateItem[] = (s.items ?? []).map((it) => {
+    sheet.rows.forEach((row, index) => {
+        // `+2` puts the number back in the operator's frame: the header is row
+        // one and this list starts after it. A location that does not match
+        // what the spreadsheet shows is worse than no location.
+        const where = `row ${index + 2}`;
+        const sectionTitle = at(row, sheet.columns.section);
+        const itemLabel = at(row, sheet.columns.item);
+        if (!sectionTitle || !itemLabel) return;
+
+        let section = sectionByTitle.get(sectionTitle);
+        if (!section) {
+            stats.sections++;
+            section = { id: `sec_${stats.sections}`, title: sectionTitle.slice(0, 50), items: [] };
+            sectionByTitle.set(sectionTitle, section);
+            sections.push(section);
+        }
+
+        const itemKey = `${sectionTitle}\u0000${itemLabel}`;
+        let item = itemByKey.get(itemKey);
+        if (!item) {
             stats.items++;
-            const itemLabel = (it.label ?? it.name ?? 'Untitled item').toString().slice(0, 100);
-            const itemId = freshId('item', it.id);
-            const tabs = { information: [] as CannedInfoComment[], limitations: [] as CannedInfoComment[], defects: [] as CannedDefect[] };
-            for (const c of (it.comments ?? [])) {
-                const bucketed = bucketComment(c, stats);
-                if (bucketed.tab === 'defects') tabs.defects.push(bucketed.entry);
-                else if (bucketed.tab === 'limitations') tabs.limitations.push(bucketed.entry);
-                else tabs.information.push(bucketed.entry);
-            }
-            const item: TemplateItem = {
-                id: itemId,
-                label: itemLabel,
+            item = {
+                id: `item_${stats.items}`,
+                label: itemLabel.slice(0, 100),
                 type: 'rich',
-                ratingOptions: ['Satisfactory', 'Monitor', 'Defect', 'Not Inspected', 'Not Present'],
-                tabs,
+                ratingOptions: [...DEFAULT_IMPORTED_RATING_OPTIONS],
+                tabs: { information: [], limitations: [], defects: [] },
             };
-            const description = (it.description ?? '').toString().trim();
-            if (description) item.description = description;
-            if (it.id) item.source = { platform: SPECTORA_PLATFORM, externalId: String(it.id) };
-            return item;
-        });
-        const section: TemplateSection = { id: sectionId, title: sectionTitle, items };
-        if (s.identifier) section.identifier = String(s.identifier);
-        const disclaimer = (s.disclaimer ?? s.disclaimer_text ?? '').toString().trim();
-        if (disclaimer) section.disclaimerText = disclaimer.slice(0, 4000);
-        if (s.id) section.source = { platform: SPECTORA_PLATFORM, externalId: String(s.id) };
-        return section;
+            itemByKey.set(itemKey, item);
+            section.items.push(item);
+        }
+
+        const name = at(row, sheet.columns.commentName);
+        const text = at(row, sheet.columns.commentText);
+        if (!name && !text) return;
+
+        const said = at(row, sheet.columns.commentType).toLowerCase();
+        const type = (COMMENT_TYPES as readonly string[]).includes(said)
+            ? (said as CommentType)
+            : null;
+        if (type === null) {
+            untyped.push({ at: where, name: name || text.slice(0, 40), said });
+            if (said && !stats.unknownCommentTypes.includes(said)) {
+                stats.unknownCommentTypes.push(said);
+            }
+        }
+
+        // An untyped comment is KEPT, under information, because a dropped row
+        // cannot be repaired and nothing left would say which one went. It is
+        // named in the manifest's warnings instead.
+        const tab = TAB_FOR_COMMENT_TYPE[type ?? 'info'];
+        const tabs = item.tabs!;
+        const id = `${tab === 'defects' ? 'rd' : 'ri'}_${index + 1}`;
+        if (tab === 'defects') {
+            stats.defects++;
+            const defect: CannedDefect = {
+                id, title: name || 'Defect', category: DEFAULT_IMPORTED_DEFECT_CATEGORY,
+                location: '', comment: text, photos: [], default: false,
+            };
+            tabs.defects.push(defect);
+        } else {
+            const entry: CannedInfoComment = {
+                id, title: name || 'Comment', comment: text, default: false,
+            };
+            if (tab === 'limitations') {
+                stats.limitations++;
+                tabs.limitations.push(entry);
+            } else {
+                stats.information++;
+                tabs.information.push(entry);
+            }
+        }
     });
 
-    const template: TemplateSchemaV2 = {
-        schemaVersion: 2,
-        sections,
-    };
-
-    // Custom rating levels from Spectora (top-level), if present. Map onto
-    // v2 RatingSystem.levels with the Spectora `is_defect` flag preserved
-    // and severity inferred from the `is_defect` bit (Spectora doesn't
-    // distinguish marginal vs significant — assume significant when
-    // is_defect, marginal otherwise; inspector can refine in the editor).
-    const rawLevels = input.rating_levels ?? input.ratingLevels;
-    if (Array.isArray(rawLevels) && rawLevels.length > 0) {
-        const levels: RatingLevel[] = rawLevels.map((rl, i) => {
-            const id = (rl.id ?? `L${i + 1}`).toString();
-            const label = (rl.label ?? rl.name ?? id).toString();
-            const isDefect = !!(rl.is_defect ?? rl.isDefect);
-            const lvl: RatingLevel = { id, label };
-            if (rl.abbreviation) lvl.abbreviation = rl.abbreviation;
-            if (rl.color)        lvl.color = rl.color;
-            lvl.severity = isDefect ? 'significant' : 'marginal';
-            lvl.isDefect = isDefect;
-            lvl.pausesAdvance = isDefect;
-            if (rl.default)      lvl.default = true;
-            if (rl.description)  lvl.description = rl.description;
-            return lvl;
-        });
-        const defaultLevel = levels.find(l => l.default);
-        template.ratingSystem = {
-            levels,
-            ...(defaultLevel ? { defaultLevelId: defaultLevel.id } : {}),
-        };
-    }
-    return { template, stats };
+    return { template: { schemaVersion: 2, sections }, stats, untyped };
 }
 
-/** What the caller must supply that the vendor file does not contain. */
+/** What the caller must supply that the file does not contain. */
 export interface SpectoraAdapterOptions {
-    /** The name the imported template gets. The export's own name is a suggestion, not an answer. */
+    /** The name the imported template gets. The file carries none of its own. */
     name: string;
 }
 
-const SPECTORA_ADAPTER_VERSION = '1';
-
 /**
- * The comment vocabulary this format has.
- *
- * Fixed rather than read, because this export marks every comment as one of
- * these three and they are already our three tabs. A format whose vocabulary is
- * user-defined reports what it found in the file instead — which is the whole
- * reason the template arm carries a list rather than a flag.
+ * ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED. Prose written here
+ * for the operator to read, and our own refusal codes. Nothing in it is
+ * reproduced from any product's own text.
  */
-const SPECTORA_RATINGS = ['info', 'limit', 'defect'];
-
-/** A value that is not a Spectora export, and the reason it is not one. */
-type SpectoraShape =
-    | { ok: true; doc: SpectoraTemplate }
-    | { ok: false; code: 'NOT_AN_EXPORT' | 'NO_SECTIONS' };
-
-/**
- * The value as a Spectora export, or why it is not one.
- *
- * ONE shape test, shared by `inspect` and `convert`. `inspect` throws the reason
- * away and answers null; `convert` turns it into the sentence the operator
- * reads. A second copy of this test is how the two come to disagree about what
- * a Spectora file is — and they would disagree silently, because each has its
- * own tests.
- */
-function readSpectoraDocument(value: unknown): SpectoraShape {
-    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-        return { ok: false, code: 'NOT_AN_EXPORT' };
-    }
-    const doc = value as SpectoraTemplate;
-    if (!Array.isArray(doc.sections)) return { ok: false, code: 'NO_SECTIONS' };
-    return { ok: true, doc };
-}
-
-/**
- * The uploaded file as a value, whichever form the caller holds it in.
- *
- * `inspect` is handed the file as TEXT by the registry, while `convert` is
- * handed the already-parsed document. The parse therefore lives on this side of
- * the boundary rather than being required of every caller.
- */
-function valueOf(input: unknown): unknown {
-    if (typeof input !== 'string') return input;
-    try {
-        return JSON.parse(input) as unknown;
-    } catch {
-        return null;
-    }
-}
+const REFUSALS: Record<'NOT_AN_EXPORT' | 'NO_SECTIONS', string> = {
+    NOT_AN_EXPORT:
+        'This file is not a Spectora template export. In Spectora, open the template and use its '
+        + 'export button, then upload the spreadsheet it downloads.',
+    NO_SECTIONS:
+        'This export has its column headings and no comment rows, so there is no template '
+        + 'structure to import. Export the template itself rather than an empty one.',
+};
 
 /**
  * The Spectora entry into the normalised format.
  *
- * A thin shell over `convertSpectoraTemplate` on purpose: the four-bucket to
- * three-tab mapping is the part that is specific to this vendor, and it should
- * not also have to know what a bundle is. What the shell adds is the
- * accounting — one template read, one emitted, nothing dropped — which the
- * format requires before it will validate.
+ * Both halves are async because reading the file means decompressing it, and
+ * decompression on this platform is a stream. That is why the adapter contract
+ * allows a promise on either method.
+ *
+ * ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED. Every string in this
+ * object is ours — the adapter's own name, the vendor key this deployment files
+ * these files under, and prose written here for the operator to read.
  */
 export const spectoraAdapter: MigrationAdapter<SpectoraAdapterOptions> = {
     name: 'spectora',
@@ -306,45 +291,40 @@ export const spectoraAdapter: MigrationAdapter<SpectoraAdapterOptions> = {
     /**
      * What this export says about itself, before converting it.
      *
-     * Its ABSENCE used to mean "a vendor export has no columns, so the wizard
-     * has no question" — which was true of columns and false of the file. A
-     * template's question is what its comment vocabulary means, and this is
-     * what carries it.
+     * The vocabulary it reports is the comment-type column's, which is the only
+     * vocabulary the file has. The wizard offers the identity mapping from it
+     * rather than asking the operator to re-derive a fact about his own file.
      */
-    inspect(input: unknown): AdapterInspection | null {
-        const read = readSpectoraDocument(valueOf(input));
+    async inspect(input: unknown): Promise<AdapterInspection | null> {
+        const read = await readSpectoraWorkbook(input);
         if (!read.ok) return null;
-        const { doc } = read;
+        const sections = new Set<string>();
+        const items = new Set<string>();
+        for (const row of read.rows) {
+            const section = at(row, read.columns.section);
+            const item = at(row, read.columns.item);
+            if (section) sections.add(section);
+            if (section && item) items.add(`${section}\u0000${item}`);
+        }
         return {
             kind: 'template',
-            name: typeof doc.name === 'string' && doc.name.trim() !== '' ? doc.name : null,
-            sections: doc.sections?.length ?? 0,
-            items: (doc.sections ?? []).reduce((n, s) => n + (s.items?.length ?? 0), 0),
-            ratings: [...SPECTORA_RATINGS],
+            // This export carries no template name of its own — the caller's
+            // filename is the fallback, and that decision is the caller's.
+            name: null,
+            sections: sections.size,
+            items: items.size,
+            ratings: [...COMMENT_TYPES],
             // The format has no such property, and saying `false` would assert
             // something it did not say.
             ratingsShown: null,
         };
     },
-    convert(input: unknown, options: SpectoraAdapterOptions): BundleResult {
-        const read = readSpectoraDocument(input);
+    async convert(input: unknown, options: SpectoraAdapterOptions): Promise<BundleResult> {
+        const read = await readSpectoraWorkbook(input);
         if (!read.ok) {
-            return {
-                ok: false,
-                error: read.code === 'NOT_AN_EXPORT'
-                    ? {
-                        code: 'NOT_AN_EXPORT',
-                        message: 'This file is not a Spectora template export. Export a single template as JSON and upload that file.',
-                    }
-                    : {
-                        code: 'NO_SECTIONS',
-                        message: 'This Spectora export contains no sections, so there is no template structure to import.',
-                    },
-            };
+            return { ok: false, error: { code: read.code, message: REFUSALS[read.code] } };
         }
-
-        const { template, stats } = convertSpectoraTemplate(read.doc);
-
+        const { template, stats, untyped } = buildTemplate(read);
         return {
             ok: true,
             bundle: {
@@ -357,9 +337,17 @@ export const spectoraAdapter: MigrationAdapter<SpectoraAdapterOptions> = {
                         contact: emptyEntityCounts(),
                         member: emptyEntityCounts(),
                     },
-                    warnings: stats.unknownCommentTypes.map((kind) => ({
-                        code: 'UNKNOWN_COMMENT_TYPE',
-                        message: `Comments of type "${kind}" were kept under Information so nothing was lost; recategorise them in the editor.`,
+                    // Each untyped comment is NAMED. A count would tell the
+                    // operator that 65 of 1872 comments need attention without
+                    // telling them which 65, and the file is too long to find
+                    // them by reading.
+                    warnings: untyped.map((comment) => ({
+                        code: 'COMMENT_TYPE_NOT_READ',
+                        message: comment.said
+                            ? `"${comment.name}" (${comment.at}) is marked "${comment.said}", which this reader `
+                                + 'does not know. It was kept under Information — move it in the editor.'
+                            : `"${comment.name}" (${comment.at}) has no comment type. It was kept under `
+                                + 'Information — move it in the editor.',
                     })),
                 },
                 templates: [{ name: options.name, schema: template, stats }],

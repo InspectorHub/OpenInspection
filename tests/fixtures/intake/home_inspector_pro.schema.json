@@ -1,0 +1,54 @@
+{
+  "vendor": "home_inspector_pro",
+  "container": "zip",
+  "authored": "This file declares the SHAPE of a format and the surprises a reader has to survive. It contains nothing taken from anybody's file. Sample files are generated from it by scripts/generate-intake-fixture.mjs, and their content is invented.",
+  "literalUse": "FORMAT DISCRIMINATOR. The entry name, class names and property names below are the tokens a reader must match to locate anything in a serialised object graph; they are the same ones the adapter carries. No template name, section name, item name or rating word from any real file appears in this repository.",
+  "structure": {
+    "entry": "TabbedPanes.tpl",
+    "document": "java.beans.XMLDecoder",
+    "sectionClass": "SavedTabbedPane",
+    "itemClass": "SavedPanel",
+    "sectionNameProperty": "tabbedPaneName",
+    "itemNameProperty": "panelName",
+    "templateNameProperty": "templateName",
+    "ratingsProperty": "ratingNames",
+    "ratingsShownProperty": "showRatings"
+  },
+  "quirks": [
+    {
+      "id": "user-defined-vocabulary",
+      "kind": "data",
+      "statement": "The rating vocabulary is defined by whoever authored the template. Vocabularies of three, four and five entries were observed, sharing no words."
+    },
+    {
+      "id": "absent-vocabulary",
+      "kind": "data",
+      "statement": "The rating vocabulary may be absent entirely, and that is common rather than exceptional."
+    },
+    {
+      "id": "padded-vocabulary-entries",
+      "kind": "encoding",
+      "statement": "A vocabulary entry may carry leading or trailing whitespace that is part of the value."
+    },
+    {
+      "id": "absent-boolean-property",
+      "kind": "data",
+      "statement": "A boolean property may be absent rather than false, and absence is the common case."
+    },
+    {
+      "id": "absent-version",
+      "kind": "container",
+      "statement": "The document may carry no version, and the versions carried by those that do span many years."
+    },
+    {
+      "id": "unrelated-entries",
+      "kind": "container",
+      "statement": "The archive may hold anything alongside the structure entry; entry counts from single digits to dozens were observed."
+    },
+    {
+      "id": "empty-template",
+      "kind": "structure",
+      "statement": "A template may declare no sections and no items at all, and such a file is legitimate."
+    }
+  ]
+}

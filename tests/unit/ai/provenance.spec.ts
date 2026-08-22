@@ -25,6 +25,18 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { buildAiProvenanceSink, type AiProvenanceSink } from '../../../server/lib/ai/provenance';
 import { AIService } from '../../../server/services/ai.service';
+import { OpenAiCompatibleProvider } from '../../../server/lib/ai/providers/openai-compatible';
+
+/**
+ * A real adapter over the mocked `fetch`, supplied wherever a case is meant to
+ * REACH a backend. The service no longer builds one for itself — credential,
+ * endpoint and model selection is `resolve-provider.ts`'s — so a construction
+ * that omits this is a construction that refuses to run, which is exactly what
+ * the fail-closed cases below rely on.
+ */
+const ADAPTER = () => new OpenAiCompatibleProvider({
+    apiKey: 'a-key', model: 'a-model', baseUrl: 'https://api.example.test/v1',
+});
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
@@ -58,9 +70,9 @@ describe('the provenance sink writes one fully-populated row', () => {
     it('records tenant, capability, provider, mode, model, prompt version and time', async () => {
         const before = Date.now();
         const sink = buildAiProvenanceSink({
-            db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'gemini-3.1-flash-lite',
+            db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'a-configured-model',
         });
-        const returnedId = await sink!.record({ capability: 'assist', promptVersion: 'professional-comment.v1', provider: 'gemini' });
+        const returnedId = await sink!.record({ capability: 'assist', promptVersion: 'professional-comment.v1', provider: 'api.example.test' });
 
         const all = rows();
         expect(all).toHaveLength(1);
@@ -75,9 +87,9 @@ describe('the provenance sink writes one fully-populated row', () => {
         expect(returnedId).toBe(row.id);
         expect(row.tenantId).toBe(TENANT);
         expect(row.capability).toBe('assist');
-        expect(row.provider).toBe('gemini');
+        expect(row.provider).toBe('api.example.test');
         expect(row.mode).toBe('byo');
-        expect(row.model).toBe('gemini-3.1-flash-lite');
+        expect(row.model).toBe('a-configured-model');
         expect(row.promptVersion).toBe('professional-comment.v1');
         expect(row.createdAt).toBeInstanceOf(Date);
         expect(row.createdAt.getTime()).toBeGreaterThanOrEqual(before);
@@ -88,7 +100,7 @@ describe('the provenance sink writes one fully-populated row', () => {
         const sink = buildAiProvenanceSink({
             db: {} as D1Database, tenantId: TENANT, source: 'managed', model: 'm',
         });
-        await sink!.record({ capability: 'translate', promptVersion: 'x.v1', provider: 'gemini' });
+        await sink!.record({ capability: 'translate', promptVersion: 'x.v1', provider: 'api.example.test' });
         expect(rows()[0]!.mode).toBe('managed');
         expect(rows()[0]!.capability).toBe('translate');
     });
@@ -112,10 +124,9 @@ describe('the chokepoint records every AI call', () => {
         originalFetch = globalThis.fetch;
         globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
         fetchMock.mockReset();
-        fetchMock.mockResolvedValue({
-            ok: true,
-            json: async () => ({ candidates: [{ content: { parts: [{ text: '["a","b","c"]' }] } }] }),
-        } as Response);
+        fetchMock.mockResolvedValue(new Response(
+            JSON.stringify({ choices: [{ message: { content: '["a","b","c"]' } }] }), { status: 200 },
+        ));
         record = vi.fn(async () => AI_CALL_ROW_ID);
         sink = { record } as unknown as AiProvenanceSink;
     });
@@ -123,13 +134,14 @@ describe('the chokepoint records every AI call', () => {
 
     const service = (provenance?: AiProvenanceSink) => new AIService(
         {} as D1Database, 'a-key', 'saas', 'a-model', undefined, OWN_CONFIRMED_KEY, provenance,
+        undefined, ADAPTER(),
     );
 
     it('names the professional-comment prompt version', async () => {
         await service(sink).generateProfessionalComment('rough note');
         expect(record).toHaveBeenCalledTimes(1);
         expect(record).toHaveBeenCalledWith({
-            capability: 'assist', promptVersion: 'professional-comment.v1', provider: 'gemini',
+            capability: 'assist', promptVersion: 'professional-comment.v1', provider: 'api.example.test',
         });
     });
 
@@ -140,7 +152,7 @@ describe('the chokepoint records every AI call', () => {
         });
         expect(record).toHaveBeenCalledTimes(1);
         expect(record).toHaveBeenCalledWith({
-            capability: 'assist', promptVersion: 'rewrite-comment.v1', provider: 'gemini',
+            capability: 'assist', promptVersion: 'rewrite-comment.v1', provider: 'api.example.test',
         });
     });
 
@@ -148,7 +160,7 @@ describe('the chokepoint records every AI call', () => {
         await service(sink).suggestComment({ itemName: 'Roof', sectionName: 'Roof' });
         expect(record).toHaveBeenCalledTimes(1);
         expect(record).toHaveBeenCalledWith({
-            capability: 'assist', promptVersion: 'suggest-comment.v1', provider: 'gemini',
+            capability: 'assist', promptVersion: 'suggest-comment.v1', provider: 'api.example.test',
         });
     });
 
@@ -206,10 +218,9 @@ describe('the chokepoint hands the provenance row id to its caller', () => {
         originalFetch = globalThis.fetch;
         globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
         fetchMock.mockReset();
-        fetchMock.mockResolvedValue({
-            ok: true,
-            json: async () => ({ candidates: [{ content: { parts: [{ text: '["a","b","c"]' }] } }] }),
-        } as Response);
+        fetchMock.mockResolvedValue(new Response(
+            JSON.stringify({ choices: [{ message: { content: '["a","b","c"]' } }] }), { status: 200 },
+        ));
         record = vi.fn(async () => AI_CALL_ROW_ID);
         sink = { record } as unknown as AiProvenanceSink;
     });
@@ -217,6 +228,7 @@ describe('the chokepoint hands the provenance row id to its caller', () => {
 
     const service = (mode: 'standalone' | 'saas' = 'saas', apiKey = 'a-key') => new AIService(
         {} as D1Database, apiKey, mode, 'a-model', undefined, OWN_CONFIRMED_KEY, sink,
+        undefined, ADAPTER(),
     );
 
     /** The summary path reads the inspection before it reaches the chokepoint,
@@ -260,9 +272,9 @@ describe('the chokepoint hands the provenance row id to its caller', () => {
             data: { 'item-1': { status: 'Defect', notes: 'cracked flashing' } },
             lastSyncedAt: new Date(),
         });
-        fetchMock.mockResolvedValue({
-            ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'a summary' }] } }] }),
-        } as Response);
+        fetchMock.mockResolvedValue(new Response(
+            JSON.stringify({ choices: [{ message: { content: 'a summary' } }] }), { status: 200 },
+        ));
 
         const out = await service().generateInspectionSummary(TENANT, INSPECTION);
         expect(out.summary).toBe('a summary');
@@ -305,9 +317,9 @@ describe('the chokepoint hands the provenance row id to its caller', () => {
         // by a method that never reached the provider. The provenance write and
         // the outbound call are asserted to have happened, so the null is about
         // the completion being unusable and nothing else.
-        fetchMock.mockResolvedValue({
-            ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'no array here' }] } }] }),
-        } as Response);
+        fetchMock.mockResolvedValue(new Response(
+            JSON.stringify({ choices: [{ message: { content: 'no array here' } }] }), { status: 200 },
+        ));
         const out = await service().suggestComment({ itemName: 'Roof', sectionName: 'Roof' });
         expect(out.suggestions).toEqual([]);
         expect(out.aiCallId).toBeNull();
@@ -325,9 +337,9 @@ describe('no prompt text is ever stored', () => {
         originalFetch = globalThis.fetch;
         globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
         fetchMock.mockReset();
-        fetchMock.mockResolvedValue({
-            ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] }),
-        } as Response);
+        fetchMock.mockResolvedValue(new Response(
+            JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 },
+        ));
     });
     afterEach(() => { globalThis.fetch = originalFetch; });
 
@@ -338,7 +350,7 @@ describe('no prompt text is ever stored', () => {
         const sink = buildAiProvenanceSink({
             db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'a-model',
         });
-        const svc = new AIService({} as D1Database, 'a-key', 'saas', 'a-model', undefined, OWN_CONFIRMED_KEY, sink);
+        const svc = new AIService({} as D1Database, 'a-key', 'saas', 'a-model', undefined, OWN_CONFIRMED_KEY, sink, undefined, ADAPTER());
         await svc.generateProfessionalComment('Jane Q. Client at 123 Oak St: cracked flashing');
 
         const all = rows();

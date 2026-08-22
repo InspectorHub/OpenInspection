@@ -1,13 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AIService } from '../../../server/services/ai.service';
+import { OpenAiCompatibleProvider } from '../../../server/lib/ai/providers/openai-compatible';
 
 /**
  * The AI model is configuration, not a source-code constant.
  *
- * The request URL used to hardcode `gemini-1.5-flash`, so every AI feature was
+ * The request used to hardcode `gemini-1.5-flash`, so every AI feature was
  * quality-capped at one model with no way to change it. The model now arrives
  * as configuration, and — like every other credential/endpoint in this repo —
  * there is NO baked-in fallback: an unconfigured model fails closed.
+ *
+ * The model now travels in the request BODY rather than the URL, because the
+ * OpenAI-compatible schema puts it there. That is the only thing about these
+ * cases that changed; what they assert did not.
  *
  * The fail-closed cases are the load-bearing ones. A suite that only exercises
  * the configured path passes just as happily against a hardcoded default, which
@@ -29,34 +34,44 @@ describe('AIService — model configuration', () => {
         originalFetch = globalThis.fetch;
         globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
         fetchMock.mockReset();
-        fetchMock.mockResolvedValue({
-            ok: true,
-            json: async () => ({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] }),
-        } as Response);
+        fetchMock.mockResolvedValue(new Response(
+            JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 },
+        ));
     });
 
     afterEach(() => {
         globalThis.fetch = originalFetch;
     });
 
+    /** A real adapter over the mocked fetch, so these cases still assert what
+     *  actually goes on the wire rather than what a stub was told to record. */
+    const adapter = (model: string) => new OpenAiCompatibleProvider({
+        apiKey: 'test-key', model, baseUrl: 'https://api.example.test/v1',
+    });
+
+    /** The JSON body of the first request the adapter sent. */
+    const sentBody = () =>
+        JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string) as { model: string };
+
     const REWRITE_INPUT = {
         itemLabel: 'Roof', sectionTitle: 'Roof', tab: 'defects' as const,
         originalComment: 'foo', instruction: 'shorten',
     };
 
-    it('sends the configured model in the request URL', async () => {
-        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'gemini-3.1-flash-lite', undefined, OWN_CONFIRMED_KEY, PROVENANCE);
+    it('sends the configured model in the request body', async () => {
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'a-configured-model', undefined, OWN_CONFIRMED_KEY, PROVENANCE, undefined, adapter('a-configured-model'));
         await svc.rewriteComment(REWRITE_INPUT);
-        expect(String(fetchMock.mock.calls[0]![0])).toContain('gemini-3.1-flash-lite');
+        expect(sentBody().model).toBe('a-configured-model');
     });
 
     it('carries no trace of the retired hardcoded pin', async () => {
         // Asserting the ABSENCE of the stale pin rather than the presence of a
         // specific model: pinning this to today's choice would make this test
         // the thing that has to be edited on every model upgrade.
-        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'some-other-model', undefined, OWN_CONFIRMED_KEY, PROVENANCE);
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'some-other-model', undefined, OWN_CONFIRMED_KEY, PROVENANCE, undefined, adapter('some-other-model'));
         await svc.rewriteComment(REWRITE_INPUT);
-        expect(String(fetchMock.mock.calls[0]![0])).not.toContain('gemini-1.5-flash');
+        const req = JSON.stringify([fetchMock.mock.calls[0]![0], (fetchMock.mock.calls[0]![1] as RequestInit).body]);
+        expect(req).not.toContain('gemini-1.5-flash');
     });
 
     it('fails closed — rewriteComment throws when no model is configured', async () => {
@@ -89,7 +104,7 @@ describe('AIService — model configuration', () => {
         // validates the model — leaving the credential picture unconfirmed here
         // would make the case pass on the attestation refusal and stop saying
         // anything about a missing model.
-        const svc = new AIService({} as D1Database, 'test-key', 'saas', '', undefined, OWN_CONFIRMED_KEY, PROVENANCE);
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', '', undefined, OWN_CONFIRMED_KEY, PROVENANCE, undefined, adapter(''));
         await expect(svc.generateProfessionalComment('rough note'))
             .rejects.toThrow(/no AI model is configured/i);
         expect(fetchMock).not.toHaveBeenCalled();

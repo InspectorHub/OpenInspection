@@ -1,4 +1,5 @@
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import type { AiRefusalReason } from './ai/refusal-reason';
 
 /**
  * Standard error codes for consistent API responses.
@@ -89,8 +90,14 @@ export const Errors = {
         ),
     Internal: (msg: string = 'Internal server error') => new AppError(500, ErrorCode.INTERNAL_ERROR, msg),
     ServiceUnavailable: (msg: string, details?: unknown) => new AppError(503, ErrorCode.SERVICE_UNAVAILABLE, msg, details),
-    AINotConfigured: (msg: string = 'AI is not configured. Set GEMINI_API_KEY in Settings.') =>
-        new AppError(503, ErrorCode.AI_NOT_CONFIGURED, msg),
+    /**
+     * The one shape for "this AI call cannot run" — 503 + AI_NOT_CONFIGURED,
+     * unchanged. `reason` is optional and rides in `details` so a client can
+     * pick the right message and the right action without a second code.
+     * See `lib/ai/refusal-reason.ts` for why seven situations share one shape.
+     */
+    AINotConfigured: (msg: string = 'AI is not configured. Set an API key in Settings.', reason?: AiRefusalReason) =>
+        new AppError(503, ErrorCode.AI_NOT_CONFIGURED, msg, reason ? { reason } : undefined),
     TenantSuspended: (msg: string = 'This workspace has been suspended. Existing content remains accessible in read-only mode. Contact your administrator to restore full access.') =>
         new AppError(403, ErrorCode.TENANT_SUSPENDED, msg),
     QuotaExhausted: (details: { metric: string; used: number; cap: number; billingPortalUrl: string | null }) =>

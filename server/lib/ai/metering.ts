@@ -24,7 +24,7 @@
  */
 import { MeteringService } from '../../services/metering.service';
 import { aiUsageMetric, currentPeriodKey, managedAiMetric, type AiUsageKind } from '../usage/period';
-import { resolveAi, type AiCredentialSource } from './resolve-provider';
+import { resolveAi, isRefusal, type AiCredentialSource } from './resolve-provider';
 import { isPaidPlan, type TenantPlan } from '../../features/plan-quota/policy';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 import type { DeploymentProfile } from '../deployment-profile';
@@ -69,9 +69,25 @@ export function resolveRuntimeAiSource(args: {
     /** The tenant's commercial standing, or null when it could not be read.
      *  Null is not an entitlement — see `isPaidPlan`. */
     plan: TenantPlan | null;
+    /**
+     * `tenant_configs.is_ai_enabled`, when the caller has read it.
+     *
+     * Optional, and TRUE when omitted, because this function answers a
+     * PROVISIONING question — "whose credentials WOULD fund a call for this
+     * workspace" — and the provisioning console asks it about every workspace
+     * without reading their settings row. A workspace that switched AI off is
+     * still a workspace with its own key configured, and bucketing it as
+     * `unconfigured` would misreport what is provisioned.
+     *
+     * The off switch is a RUNTIME-PERMISSION question, refused by `resolveAi`
+     * at the point a provider is actually built. The caller that builds one
+     * passes the real value.
+     */
+    aiEnabled?: boolean;
 }): AiCredentialSource | null {
     const resolved = resolveAi({
         profile: args.profile,
+        aiEnabled: args.aiEnabled ?? true,
         tenantKey: args.tenantKey,
         managedKey: args.managedKey,
         // Entitlement is a property of the PLAN, answered here and nowhere
@@ -81,7 +97,10 @@ export function resolveRuntimeAiSource(args: {
         underCap: true,
         model: args.model,
     });
-    return resolved?.source ?? null;
+    // A refusal has no credential source to tag. Callers keep the `null` they
+    // always had here — the REASON is for the person the refusal is shown to,
+    // and a usage metric has nobody to show it to.
+    return isRefusal(resolved) ? null : resolved.source;
 }
 
 export function buildAiMeter(args: {

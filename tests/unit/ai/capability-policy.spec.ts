@@ -6,6 +6,18 @@ import {
 } from '../../../server/lib/ai/capability-policy';
 import { posture } from '../../../server/lib/ai/output-classification';
 import { AIService } from '../../../server/services/ai.service';
+import { OpenAiCompatibleProvider } from '../../../server/lib/ai/providers/openai-compatible';
+
+/**
+ * A real adapter over the mocked `fetch`. The service builds none of its own —
+ * credential, endpoint and model selection belongs to `resolve-provider.ts` —
+ * so a construction that omits this refuses to run, which is what the
+ * fail-closed cases rely on.
+ */
+const ADAPTER = () => new OpenAiCompatibleProvider({
+    apiKey: 'a-key', model: 'a-model', baseUrl: 'https://api.example.test/v1',
+});
+
 
 /**
  * The capability gate: whether the product OFFERS a given AI capability on a
@@ -199,9 +211,9 @@ describe('the gate at the AI chokepoint', () => {
         fetchMock.mockReset();
         // Every case below arms a SUCCESSFUL model response, so nothing passes
         // because the call would have failed anyway.
-        fetchMock.mockResolvedValue({
-            ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'x' }] } }] }),
-        } as Response);
+        fetchMock.mockResolvedValue(new Response(
+            JSON.stringify({ choices: [{ message: { content: 'x' } }] }), { status: 200 },
+        ));
     });
     afterEach(() => { globalThis.fetch = originalFetch; });
 
@@ -215,7 +227,7 @@ describe('the gate at the AI chokepoint', () => {
         credentials: { source: 'byo' | 'managed'; tenantKeyAttested: boolean },
         record: () => Promise<void>,
     ) {
-        return new AIService({} as D1Database, 'a-key', 'saas', 'a-model', { record }, credentials, provenance);
+        return new AIService({} as D1Database, 'a-key', 'saas', 'a-model', { record }, credentials, provenance, undefined, ADAPTER());
     }
 
     it('a refused call records NO usage and sends nothing', async () => {
@@ -269,12 +281,10 @@ describe('the gate at the AI chokepoint', () => {
         // to: `callGemini`'s third parameter defaults to 'assist', so a
         // translation sent with two arguments would run, succeed, and be
         // counted against the wrong metric with no type error and nothing red.
-        fetchMock.mockResolvedValue({
-            ok: true,
-            json: async () => ({
-                candidates: [{ content: { parts: [{ text: '["El techo esta al final de su vida util."]' }] } }],
-            }),
-        } as Response);
+        fetchMock.mockResolvedValue(new Response(
+            JSON.stringify({ choices: [{ message: { content: '["El techo esta al final de su vida util."]' } }] }),
+            { status: 200 },
+        ));
         const record = vi.fn(async () => {});
 
         await expect(service(OWN_CONFIRMED_KEY, record).translateSegments(TRANSLATE_INPUT))

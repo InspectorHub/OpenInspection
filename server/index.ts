@@ -674,7 +674,8 @@ export default {
         await baseScheduled(event, env, ctx);
     },
     // Queue consumers: the Word export queue (`openinspection-word-export`,
-    // Commercial PCA Phase W — async .docx build), the cmd queue
+    // Commercial PCA Phase W — async .docx build), the cron queue
+    // (`openinspection-cron`, one background job per message), the cmd queue
     // (`inspectorhub-cmd-saas`, portal→core commands — A-21), and the sync DLQ
     // (`inspectorhub-sync-dlq-saas`, dead core→portal envelopes → outbox
     // `failed` writeback). Never throws.
@@ -687,6 +688,14 @@ export default {
                 KEY_ENCRYPTION_SECRET: env.KEY_ENCRYPTION_SECRET, JWT_SECRET: env.JWT_SECRET,
                 ...(images ? { IMAGES: images } : {}),
             }, batch);
+            return;
+        }
+        // The cron queue. One message = one job = one Worker invocation with its
+        // own CPU budget; that split is what keeps the scheduled path inside the
+        // Workers Free 10 ms per-invocation ceiling.
+        if (batch.queue.includes('-cron')) {
+            const { handleCronBatch } = await import('./cron/consumer');
+            await handleCronBatch(env as never, batch as never);
             return;
         }
         if (batch.queue.includes('-cmd-') && !batch.queue.includes('cmd-dlq')) {

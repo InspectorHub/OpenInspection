@@ -1,23 +1,50 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, gt } from 'drizzle-orm';
 import { inspections, inspectionResults, inspectionMediaPool, orphanedMedia } from '../db/schema/inspection';
 import { collectAttachedPhotos } from './collect-attached';
 import { computeOrphans, ORPHAN_GRACE_MS } from './orphan-gc';
 import { logger } from '../logger';
 
+export interface OrphanSweepOptions {
+  /** Inspections examined in this batch. */
+  limit: number;
+  /** Resume point: the last inspection id of the previous batch, or null to start. */
+  afterInspectionId: string | null;
+}
+
+export interface OrphanSweepResult {
+  /** R2 objects deleted this batch. */
+  reaped: number;
+  /** Where to resume, or null when the whole table has been walked. */
+  nextCursor: string | null;
+}
+
 /**
  * Background GC of orphaned inspection R2 blobs (Q8).
  *
- * For each inspection, list its R2 prefix and compute the live key set from the
- * attached photos, cover image, and media pool. Keys present in R2 but no longer
- * referenced are recorded the first time they are seen unreferenced, then deleted
- * once they have aged past the grace window. Idempotent: safe to run every tick.
+ * For each inspection in the batch, list its R2 prefix and compute the live key
+ * set from the attached photos, cover image, and media pool. Keys present in R2
+ * but no longer referenced are recorded the first time they are seen
+ * unreferenced, then deleted once they have aged past the grace window.
+ * Idempotent: safe to run again, and safe to run twice over the same batch.
  *
- * @returns the number of R2 objects deleted this run.
+ * BOUNDED, and that is not a detail. This used to read every inspection row on
+ * every tick and parse every report blob, so its cost was the size of the whole
+ * table on a schedule — which is how a background job that fits its CPU budget
+ * on the day it ships stops fitting it later without anyone changing a line.
+ * Keyset paging on the primary key: stable under concurrent inserts, and it
+ * needs no cursor column and therefore no migration in either deployment mode.
  */
-export async function sweepOrphanedMedia(d1: D1Database, r2: R2Bucket, now: number): Promise<number> {
+export async function sweepOrphanedMedia(
+  d1: D1Database,
+  r2: R2Bucket,
+  now: number,
+  opts: OrphanSweepOptions,
+): Promise<OrphanSweepResult> {
   const db = drizzle(d1);
   let reaped = 0;
+  // One row beyond the batch, purely to answer "is there more?" without a
+  // second COUNT query.
   const rows = await db
     .select({
       id: inspections.id,
@@ -26,33 +53,21 @@ export async function sweepOrphanedMedia(d1: D1Database, r2: R2Bucket, now: numb
       coverPhotoId: inspections.coverPhotoId,
     })
     .from(inspections)
+    .where(opts.afterInspectionId ? gt(inspections.id, opts.afterInspectionId) : undefined)
+    .orderBy(asc(inspections.id))
+    .limit(opts.limit + 1)
     .all();
-  for (const insp of rows) {
-    const prefix = `${insp.tenantId}/${insp.id}/`;
-    const resultRow = await db
-      .select()
-      .from(inspectionResults)
-      .where(and(eq(inspectionResults.inspectionId, insp.id), eq(inspectionResults.tenantId, insp.tenantId)))
-      .get();
-    const data = resultRow?.data
-      ? typeof resultRow.data === 'string'
-        ? JSON.parse(resultRow.data)
-        : resultRow.data
-      : {};
-    const live = new Set<string>();
-    for (const p of collectAttachedPhotos(data, new Map(), (k) => k)) {
-      live.add(p.key);
-      live.add(p.originalKey);
-    }
-    if (insp.coverImageKey) live.add(insp.coverImageKey);
-    if (insp.coverPhotoId) live.add(insp.coverPhotoId);
-    const pool = await db
-      .select({ r2Key: inspectionMediaPool.r2Key })
-      .from(inspectionMediaPool)
-      .where(and(eq(inspectionMediaPool.inspectionId, insp.id), eq(inspectionMediaPool.tenantId, insp.tenantId)))
-      .all();
-    for (const r of pool) live.add(r.r2Key);
+  const hasMore = rows.length > opts.limit;
+  const page = hasMore ? rows.slice(0, opts.limit) : rows;
 
+  for (const insp of page) {
+    const prefix = `${insp.tenantId}/${insp.id}/`;
+
+    // R2 FIRST, and the order is load-bearing. When the prefix holds nothing,
+    // `computeOrphans` cannot record or delete anything whatever the live set
+    // contains — so the report blob need not be read or parsed at all. That
+    // parse was the most expensive single operation in the scheduled path, and
+    // this skips it for every inspection nobody has attached a photo to.
     const r2Keys: string[] = [];
     let cursor: string | undefined = undefined;
     do {
@@ -60,6 +75,32 @@ export async function sweepOrphanedMedia(d1: D1Database, r2: R2Bucket, now: numb
       for (const o of list.objects) r2Keys.push(o.key);
       cursor = list.truncated ? list.cursor : undefined;
     } while (cursor);
+
+    const live = new Set<string>();
+    if (r2Keys.length > 0) {
+      const resultRow = await db
+        .select()
+        .from(inspectionResults)
+        .where(and(eq(inspectionResults.inspectionId, insp.id), eq(inspectionResults.tenantId, insp.tenantId)))
+        .get();
+      const data = resultRow?.data
+        ? typeof resultRow.data === 'string'
+          ? JSON.parse(resultRow.data)
+          : resultRow.data
+        : {};
+      for (const p of collectAttachedPhotos(data, new Map(), (k) => k)) {
+        live.add(p.key);
+        live.add(p.originalKey);
+      }
+      if (insp.coverImageKey) live.add(insp.coverImageKey);
+      if (insp.coverPhotoId) live.add(insp.coverPhotoId);
+      const pool = await db
+        .select({ r2Key: inspectionMediaPool.r2Key })
+        .from(inspectionMediaPool)
+        .where(and(eq(inspectionMediaPool.inspectionId, insp.id), eq(inspectionMediaPool.tenantId, insp.tenantId)))
+        .all();
+      for (const r of pool) live.add(r.r2Key);
+    }
 
     const seenRows = await db
       .select()
@@ -89,5 +130,6 @@ export async function sweepOrphanedMedia(d1: D1Database, r2: R2Bucket, now: numb
       reaped++;
     }
   }
-  return reaped;
+
+  return { reaped, nextCursor: hasMore && page.length > 0 ? page[page.length - 1]!.id : null };
 }

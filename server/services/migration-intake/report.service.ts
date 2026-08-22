@@ -16,7 +16,7 @@ import { Errors } from '../../lib/errors';
 import { MigrationSourceFileService } from './source-file.service';
 import {
     defaultMappingFor,
-    intakeSourceFromText,
+    intakeSourceFromBytes,
     matchAdapter,
     type IntakeMapping,
 } from '../../lib/migration-intake/adapters/registry';
@@ -195,11 +195,15 @@ export class MigrationReportService {
         // already carries. A run with none was never read by an adapter — it is
         // waiting for a person — so there is no question to re-ask either.
         if (!batch.vendor) return { inspection: null, mapping: null };
-        const text = await new MigrationSourceFileService(this.bucket).readText(batch.sourceKey);
-        if (text === null) return { inspection: null, mapping: null };
+        // BYTES. Every vendor template export measured so far is a binary
+        // container, and a UTF-8 decode of one is not reversible — a re-read
+        // through text would hand the adapter a destroyed file and report "no
+        // question to ask" about a run whose file is perfectly readable.
+        const bytes = await new MigrationSourceFileService(this.bucket).readBytes(batch.sourceKey);
+        if (bytes === null) return { inspection: null, mapping: null };
 
-        const source = intakeSourceFromText(batch.sourceKey, text);
-        const match = matchAdapter(batch.intent, batch.vendor as VendorId, source);
+        const source = intakeSourceFromBytes(batch.sourceKey, bytes);
+        const match = await matchAdapter(batch.intent, batch.vendor as VendorId, source);
         if (!match?.inspection) return { inspection: null, mapping: null };
         return { inspection: match.inspection, mapping: defaultMappingFor(batch.intent, match.inspection, source) };
     }

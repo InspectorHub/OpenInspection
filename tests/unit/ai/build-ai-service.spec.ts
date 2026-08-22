@@ -49,6 +49,14 @@ function build(over: Partial<Parameters<typeof buildTenantAiService>[0]> = {}) {
         plan: PAID,
         tenantKeyAttested: false,
         quotaGuard: guard as unknown as PlanQuotaGuard,
+        // The workspace's AI backend choice. On by default here because these
+        // cases are about the QUOTA seam; the off switch has its own cases in
+        // `resolve-provider.spec.ts`, and a workspace that switched AI off
+        // resolves no provider at all, which would refuse before any of this.
+        aiEnabled: true,
+        tenantBaseUrl: null,
+        tenantModel: null,
+        baseUrl: 'https://api.example.test/v1',
         ...over,
     });
     return { svc, guard };

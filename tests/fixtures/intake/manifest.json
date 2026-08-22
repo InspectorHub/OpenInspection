@@ -1,0 +1,94 @@
+{
+  "purpose": "Says that each quirk a schema declares was OBSERVED IN A REAL FILE, and when. Without this a schema is indistinguishable from a hand-written guess, and a hand-written guess is how a reader comes to be tested only against the answers its author already believed.",
+  "rules": [
+    "An observation names a HASH, never a path and never a filename. A filename is metadata about somebody's file; a hash is a fact that lets a later reader confirm the same file was seen.",
+    "fileSha256 is null until the private corpus gate records it. A null is a GAP, and `npm run verify:real-corpus` fails on one rather than passing over it.",
+    "Nothing derived from a real file belongs in this repository, this manifest included. It records that a file was seen, not what it said."
+  ],
+  "observations": [
+    {
+      "quirk": "empty-shared-strings",
+      "vendor": "spectora",
+      "observedOn": "2026-08-21",
+      "fileSha256": null,
+      "note": "Observed in one real template export held in the private corpus."
+    },
+    {
+      "quirk": "double-escaped-ampersand",
+      "vendor": "spectora",
+      "observedOn": "2026-08-21",
+      "fileSha256": null,
+      "note": "Observed in one real template export held in the private corpus."
+    },
+    {
+      "quirk": "empty-discriminator-cell",
+      "vendor": "spectora",
+      "observedOn": "2026-08-21",
+      "fileSha256": null,
+      "note": "Observed on 65 of 1872 rows of one real template export."
+    },
+    {
+      "quirk": "repeated-parent-values",
+      "vendor": "spectora",
+      "observedOn": "2026-08-21",
+      "fileSha256": null,
+      "note": "The whole of one real export's structure, 1872 rows resolving to 16 parents and 76 children."
+    },
+    {
+      "quirk": "sparse-columns",
+      "vendor": "spectora",
+      "observedOn": "2026-08-21",
+      "fileSha256": null,
+      "note": "Observed in one real template export held in the private corpus."
+    },
+    {
+      "quirk": "user-defined-vocabulary",
+      "vendor": "home_inspector_pro",
+      "observedOn": "2026-08-21",
+      "fileSha256": null,
+      "note": "Vocabularies of three, four and five entries across 22 real templates, sharing no words."
+    },
+    {
+      "quirk": "absent-vocabulary",
+      "vendor": "home_inspector_pro",
+      "observedOn": "2026-08-21",
+      "fileSha256": null,
+      "note": "8 of 22 real templates carry none."
+    },
+    {
+      "quirk": "padded-vocabulary-entries",
+      "vendor": "home_inspector_pro",
+      "observedOn": "2026-08-21",
+      "fileSha256": null,
+      "note": "Leading and trailing whitespace on entries in the real corpus."
+    },
+    {
+      "quirk": "absent-boolean-property",
+      "vendor": "home_inspector_pro",
+      "observedOn": "2026-08-21",
+      "fileSha256": null,
+      "note": "Absent far more often than present across 22 real templates."
+    },
+    {
+      "quirk": "absent-version",
+      "vendor": "home_inspector_pro",
+      "observedOn": "2026-08-21",
+      "fileSha256": null,
+      "note": "21 of 22 real templates carry no version; the versions of the rest span 2009 to 2024."
+    },
+    {
+      "quirk": "unrelated-entries",
+      "vendor": "home_inspector_pro",
+      "observedOn": "2026-08-21",
+      "fileSha256": null,
+      "note": "Entry counts from 3 to 54 across 22 real templates."
+    },
+    {
+      "quirk": "empty-template",
+      "vendor": "home_inspector_pro",
+      "observedOn": "2026-08-21",
+      "fileSha256": null,
+      "note": "1 of 22 real templates declares no sections and no items."
+    }
+  ]
+}

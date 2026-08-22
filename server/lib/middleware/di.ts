@@ -179,6 +179,15 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         plan: tenantPlan,
                         tenantKeyAttested: emailCfg.aiKeyAttested === true, // unloaded config → NOT confirmed
                         quotaGuard: buildPlanQuota(),
+                        // The workspace's own AI backend choice, off the SAME
+                        // config row as the attestation above. An unloaded row
+                        // means "nothing switched off", which is why this one
+                        // defaults TRUE while the attestation defaults false.
+                        aiEnabled: emailCfg.aiEnabled !== false,
+                        tenantBaseUrl: emailCfg.aiBaseUrl ?? null,
+                        tenantModel: emailCfg.aiModel ?? null,
+                        // No default: an unset AI_BASE_URL fails closed at the adapter.
+                        baseUrl: c.env.AI_BASE_URL ?? '',
                     });
                     break;
                 case 'auth':

@@ -11,7 +11,9 @@ tenant's own question ("does my client's address go to Google?") all need the
 field list, and the field list is only true if it was read off the prompt
 renderers — which is what was done here.
 
-**Verified 2026-08-11.** Every claim carries an evidence level:
+**Verified 2026-08-11; section 2 rewritten 2026-08-22** when the single
+hard-wired vendor endpoint was replaced by one configurable OpenAI-compatible
+adapter. Every claim carries an evidence level:
 
 | level | means |
 |---|---|
@@ -40,32 +42,85 @@ Before anything leaves, in this order (**E2**):
    compiled-in default.
 3. **The allowance pre-flight** — read-only, and only for platform-funded calls.
 4. **The provenance write** — a row in `ai_call_provenance` recording provider,
-   credential source, model and prompt version. It is awaited, so a sink that
-   cannot write stops the send rather than letting content leave untracked.
+   credential source, model, prompt version and the workspace's AI configuration
+   version. It is awaited, so a sink that cannot write stops the send rather
+   than letting content leave untracked. `provider` is read off the adapter
+   instance that is about to run, so the row names the backend that actually
+   served the call rather than the one configuration suggests.
 
 Only then does the adapter run. The usage counter moves *after* a successful
 response, never before.
 
 ## 2. The endpoint
 
-`server/lib/ai/providers/gemini.ts` is the only file that knows the wire shape.
-**E2.**
+⚠️ **THE DESTINATION IS NOW CONFIGURABLE, AND THIS SECTION NO LONGER NAMES ONE
+VENDOR.** It used to describe a single hard-wired endpoint. It cannot any more:
+the operator sets `AI_BASE_URL`, and a workspace may override it for itself.
+Answering "where does our inspection text go" therefore requires reading this
+deployment's configuration — the code alone cannot tell you.
+
+`server/lib/ai/providers/openai-compatible.ts` is the only file that knows the
+wire shape, and there is only one. **E2.**
 
 ```
-POST https://generativelanguage.googleapis.com/v1/models/{AI_MODEL}:generateContent?key={apiKey}
+POST {base}/chat/completions
 Content-Type: application/json
+Authorization: Bearer {apiKey}
 ```
 
-That is the **Gemini Developer API** with a bare API key — *not* Vertex AI, and
-not a Google Cloud service account. The request body is exactly:
+`{base}` is, in precedence order (`server/lib/ai/resolve-provider.ts`, **E2**):
 
-- `contents[0].parts[0].text` — the rendered prompt (section 3).
-- `generationConfig` — `temperature`, `topP`, `topK`, `maxOutputTokens`.
+1. `tenant_configs.ai_base_url` — the workspace's own endpoint, read **only**
+   on the workspace's own key. A workspace with no key of its own cannot
+   redirect a platform-funded call.
+2. `AI_BASE_URL` — the deployment default.
 
-**No other field is sent.** There is no tenant identifier, no user identifier,
-no inspection identifier, no request id and no custom header. The API key
-travels in the query string, which is Google's documented shape for this API and
-is the reason the key must never be logged with the URL.
+The request body is exactly:
+
+- `model` — the configured model id (section 2a).
+- `messages[0]` — `{ role: 'user', content: <the rendered prompt> }` (section 3).
+- `temperature`, `top_p`, `max_tokens`.
+
+**No other field is sent.** There is no inspection identifier, no user
+identifier and no request id in the body. `topK` is **not** sent: the OpenAI
+chat-completions schema has no such field, and it is dropped rather than
+translated into a guess.
+
+The API key travels in the `Authorization` header rather than the query string,
+which is a change for the better: a URL reaches logs, proxies and error
+reporters far more readily than a header does.
+
+### 2a. Two headers, on the managed path only
+
+When — and only when — the configured host is Cloudflare AI Gateway, two
+headers are added (**E2**):
+
+- `cf-aig-collect-log-payload: false`. That gateway stores request and response
+  bodies **by default**, and these bodies carry client names and addresses. It
+  is set in code on every request rather than in the gateway dashboard,
+  because a dashboard toggle can be changed back by anyone and nothing would
+  report it. Metadata, token counts, cost and duration survive; the payload
+  does not.
+- `cf-aig-metadata: {"tenant_id": …}`. A workspace identifier, so gateway cost
+  is attributable. **This is the one place a workspace identifier leaves the
+  process**, it goes only to that gateway, and it never accompanies a request
+  to a workspace's own provider.
+
+The host test is anchored on the parsed hostname, so a look-alike domain does
+not receive either header. A direct connection — a workspace's own provider, or
+a self-hosted deployment's endpoint — carries neither, and does not involve any
+gateway at all.
+
+### 2b. What a self-hosted operator controls
+
+When OpenInspection is self-hosted and configured to use an AI endpoint running
+within the operator's own network, inspection data sent to that AI endpoint does
+not need to leave that network. Actual data flows depend on the operator's
+configuration and any third-party services they enable.
+
+This is a statement about what the software makes possible, not a guarantee
+about any particular deployment: this repository ships the client, and it cannot
+observe where an operator pointed it.
 
 ### Which key it is
 
@@ -190,6 +245,28 @@ The tier is a property of the key's billing project. **The software cannot
 detect it.** There is no field in the request, no field in the response, and no
 API this repository calls that reports which tier a key is on. `AI_MODEL` does
 not imply it and neither does the model's behaviour.
+
+### What the stored attestation is, and is not
+
+`tenant_configs.ai_key_attestation_*` records what the workspace **stated**
+when it saved its own key: the provider, the endpoint, the model, the service
+tier, the intended use, and the `ai_config_version` those statements were made
+about.
+
+It proves that those representations were made, at that configuration version.
+It does **not** prove that the endpoint was reachable, that it was the endpoint
+that served any particular call, that the tier is what the provider's own
+records say, or that the stated use is the use it was put to. Nothing in this
+codebase verifies any of them, and no endpoint it calls would report them.
+
+The one thing that speaks to what actually ran is `ai_call_provenance`, and it
+speaks by observation: `provider` is read off the adapter instance that was
+about to be called, never off configuration. `config_version` joins the two, so
+a stored claim and the calls it was supposed to cover can be **compared** — an
+attestation whose `ai_key_attestation_config_version` trails
+`ai_config_version` is a workspace that changed its destination after
+attesting. Reading a row in either table as evidence of the other is the misuse
+to avoid.
 
 Three consequences, stated plainly because each one has been assumed away
 before:

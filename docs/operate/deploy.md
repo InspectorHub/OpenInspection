@@ -59,7 +59,8 @@ For the manual flow, see the **Quick start** section in the [README](../../READM
 | `RESEND_API_KEY`  | Optional, only if you want outbound email.          |
 | `SENDER_EMAIL`    | Required when `RESEND_API_KEY` is set.              |
 | `GEMINI_API_KEY`  | Optional — read by the Advanced-settings "Test connection" diagnostic. AI features themselves run on the tenant's own key stored via Settings → Advanced → AI (or, in `saas` mode only, `AI_MANAGED_API_KEY`). |
-| `AI_MODEL`        | Required for any AI feature — the model id every AI call uses. There is no compiled-in default; unset means AI fails closed with a 503. |
+| `AI_MODEL`        | Required for any AI feature — the model id every AI call uses, in the chosen backend's own naming. Through an AI gateway that is `{provider}/{model}`. There is no compiled-in default; unset means AI fails closed with a 503. A company may override it per workspace. |
+| `AI_BASE_URL`     | Required for any AI feature — the root of the OpenAI-compatible API every AI call posts to. Point it at a hosted provider, at an AI gateway, or at an address on your own network running Ollama or vLLM. No compiled-in default; unset fails closed. A company may override it per workspace. See [AI](../integrations/ai.md). |
 | `AI_MANAGED_API_KEY` | Optional, `saas` only — a deployment-provided AI key for tenants the deployment grants managed access to. A standalone deploy has no managed path and ignores it. |
 | `TURNSTILE_SECRET_KEY` | Optional but recommended for the public booking page. |
 

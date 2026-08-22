@@ -120,6 +120,19 @@ export const SCRIPT_GATES = [
     { key: 'naming', label: 'lint:naming', script: 'check-naming.mjs', fix: 'npm run lint:naming', rung: PUSH },
     { key: 'agentroutes', label: 'lint:agent-routes', script: 'check-agent-routes.mjs', fix: 'npm run lint:agent-routes', rung: PUSH },
     { key: 'doclinks', label: 'lint:doclinks', script: 'check-doc-links.mjs', fix: 'npm run lint:doclinks', rung: PUSH },
+    // The Workers Free CPU ceiling is 10 ms PER INVOCATION and this repo
+    // promises the free tier in README.md, but only the free tier's SCRIPT-SIZE
+    // limit was ever gated -- the CPU limit was gated nowhere, which is how a
+    // thirteen-job scheduled() handler measured at 13.8x the ceiling shipped and
+    // stayed. This gate cannot measure CPU from source; it gates the SHAPE that
+    // made the overrun possible (every job bounded, no job body on the cron
+    // invocation, no unbounded table read in a cron path).
+    //
+    // PUSH and not PRECOMMIT: the files it reads are five, and they change
+    // rarely -- a new cron job is not a thing anyone adds by accident between
+    // commits, and the note above is explicit that a new pre-commit row is a
+    // cost decision for every commit in the repo and belongs in its own change.
+    { key: 'cronbudget', label: 'lint:cron-budget', script: 'check-cron-budget.mjs', fix: 'npm run lint:cron-budget', rung: PUSH },
     // NOTE: there is no `docsmarkers` row any more. The user-guide prose is
     // published from the hosted docs site and its marker gate went with it.
     // `tests/docs-shots/` here still PRODUCES the captures, but no markdown in
@@ -155,6 +168,17 @@ export const SCRIPT_GATES = [
     // list. PUSH sees the whole change; that is the rung where the answer is
     // complete.
     { key: 'auditregistry', label: 'lint:audit-registry', script: 'check-audit-registry.mjs', fix: 'npm run lint:audit-registry', rung: PUSH },
+    // PUSH rather than pre-commit, and the two converter gates sit together
+    // because they answer halves of one question. `converter-capability` asks
+    // whether a converter is registered, tested and has a declared format;
+    // `converter-literals` asks whether every string it embeds is classified.
+    // Both read a handful of files and cost almost nothing, but neither catches
+    // a keystroke — they catch a converter ARRIVING, and a converter arrives in
+    // one change rather than one line. ⚠️ Neither says anything about whether a
+    // reader has ever seen a real file: that is `verify:real-corpus`, which is a
+    // release-time manual rung and is in UNREGISTERED below with its reason.
+    { key: 'convcapability', label: 'lint:converter-capability', script: 'check-converter-capability.mjs', fix: 'npm run lint:converter-capability', rung: PUSH },
+    { key: 'convliterals', label: 'lint:converter-literals', script: 'check-converter-literals.mjs', fix: 'npm run lint:converter-literals', rung: PUSH },
 ];
 
 export const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup', rung: PRECOMMIT };
@@ -175,4 +199,5 @@ export const UNREGISTERED = new Map([
     ['lint:fix', 'eslint --fix; a mutation, not a check'],
     ['lint:eslint', 'eslint keeps its own process — it needs the type-aware program and a 12 GB heap, which is not something to import into a shared runner'],
     ['lint:advisories', 'queries the network (npm audit), so it cannot run at a rung that must work offline'],
+    ['verify:real-corpus', 'reads real vendor exports that are NOT in this repository and must never be. A release-time manual rung run by somebody holding the private corpus: CI here runs on a public repository and cannot hold credentials for private material. Listed rather than omitted so that its absence from every rung is a recorded decision instead of an oversight'],
 ]);

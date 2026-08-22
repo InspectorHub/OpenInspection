@@ -12,7 +12,14 @@ import { FREE_TIER_CAPS, type AiTierCaps } from '../../../server/features/plan-q
 import { buildAiQuotaPreflight } from '../../../server/lib/ai/metering';
 import { MeteringService } from '../../../server/services/metering.service';
 import { aiUsageMetric } from '../../../server/lib/usage/period';
-import { resolveAi } from '../../../server/lib/ai/resolve-provider';
+import { resolveAi, isRefusal } from '../../../server/lib/ai/resolve-provider';
+import { OpenAiCompatibleProvider } from '../../../server/lib/ai/providers/openai-compatible';
+
+/** A real adapter over the mocked `fetch`. The service builds none of its own;
+ *  a construction that omits this refuses to run rather than reaching out. */
+const ADAPTER = () => new OpenAiCompatibleProvider({
+    apiKey: 'a-key', model: 'a-model', baseUrl: 'https://api.example.test/v1',
+});
 import { SAAS_PROFILE } from '../../../server/lib/deployment-profile';
 import { Errors } from '../../../server/lib/errors';
 
@@ -60,8 +67,9 @@ describe('AI quota + metering', () => {
         it('tags the metric from the same resolver the runtime runs on', () => {
             // Not a second "is this managed?" test that could disagree with the
             // credential actually used.
-            const r = resolveAi({ profile: SAAS_PROFILE, tenantKey: 'own-key', managedKey: 'plat', managedEntitled: true, underCap: true, model: 'm' });
-            expect(aiUsageMetric('assist', r!.source)).toBe('ai_assist_byo');
+            const r = resolveAi({ profile: SAAS_PROFILE, aiEnabled: true, tenantKey: 'own-key', managedKey: 'plat', managedEntitled: true, underCap: true, model: 'm' });
+            if (isRefusal(r)) throw new Error('unexpected refusal');
+            expect(aiUsageMetric('assist', r.source)).toBe('ai_assist_byo');
         });
     });
 
@@ -195,13 +203,15 @@ describe('AI quota + metering', () => {
                 {} as D1Database, 'a-key', 'saas', 'a-model', meter,
                 { source: 'byo', tenantKeyAttested: true },
                 { record: async () => 'ai-call-row' },
+                undefined,
+                ADAPTER(),
             );
         }
 
         it('records exactly once per successful call, tagged by workload', async () => {
-            fetchMock.mockResolvedValue({
-                ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'x' }] } }] }),
-            } as Response);
+            fetchMock.mockResolvedValue(new Response(
+                JSON.stringify({ choices: [{ message: { content: 'x' } }] }), { status: 200 },
+            ));
             const record = vi.fn(async () => {});
             await service({ record }).generateProfessionalComment('note');
             expect(record).toHaveBeenCalledTimes(1);
@@ -219,9 +229,9 @@ describe('AI quota + metering', () => {
         });
 
         it('a metering failure never fails the inspector operation', async () => {
-            fetchMock.mockResolvedValue({
-                ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'kept' }] } }] }),
-            } as Response);
+            fetchMock.mockResolvedValue(new Response(
+                JSON.stringify({ choices: [{ message: { content: 'kept' } }] }), { status: 200 },
+            ));
             const record = vi.fn(async () => { throw new Error('d1 down'); });
             await expect(service({ record }).generateProfessionalComment('note'))
                 .resolves.toMatchObject({ text: 'kept' });
@@ -245,9 +255,9 @@ describe('AI quota + metering', () => {
             originalFetch = globalThis.fetch;
             globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
             fetchMock.mockReset();
-            fetchMock.mockResolvedValue({
-                ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'x' }] } }] }),
-            } as Response);
+            fetchMock.mockResolvedValue(new Response(
+                JSON.stringify({ choices: [{ message: { content: 'x' } }] }), { status: 200 },
+            ));
         });
         afterEach(() => { globalThis.fetch = originalFetch; });
 
@@ -261,6 +271,7 @@ describe('AI quota + metering', () => {
                 { source: 'byo', tenantKeyAttested: true },
                 { record: async () => 'ai-call-row' },
                 quota,
+                ADAPTER(),
             );
         }
 
@@ -360,10 +371,14 @@ describe('AI quota + metering', () => {
             // The free tier's boundary, expressed where it is actually enforced:
             // no entitlement, hence no managed credential, hence no platform
             // cost and no quota machinery.
-            expect(resolveAi({
-                profile: SAAS_PROFILE, tenantKey: null, managedKey: 'plat',
+            const r = resolveAi({
+                profile: SAAS_PROFILE, aiEnabled: true, tenantKey: null, managedKey: 'plat',
                 managedEntitled: false, underCap: true, model: 'm',
-            })).toBeNull();
+            });
+            // The refusal NAMES itself now. `unavailable_here` rather than a
+            // cap reason is the point: there is no allowance to be over,
+            // because the free tier is never offered the managed path at all.
+            expect(isRefusal(r) && r.refused).toBe('unavailable_here');
         });
 
         it('carries no ai_* entry in FREE_TIER_CAPS', () => {

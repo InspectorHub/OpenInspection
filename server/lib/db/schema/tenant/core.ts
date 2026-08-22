@@ -399,7 +399,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // the key was cleared, which withdraws the attestation with it.
     // Appended at END of the table per the D1 add-column-at-end rule
     // (tenant_configs is FK-referenced).
-    aiKeyAttestationProvider: text('ai_key_attestation_provider', { enum: ['gemini'] }),
+    // Widened from a single vendor because a destination the WORKSPACE chose
+    // is not one this codebase gets to enumerate. Type-layer only in Drizzle —
+    // no DDL is emitted for an enum change, and none is needed.
+    aiKeyAttestationProvider: text('ai_key_attestation_provider', { enum: ['gemini', 'openai_compatible'] }),
     // The arrangement attested: the tenant's OWN key, not a managed one. All six
     // are written in the same statement as `secrets_enc` by the secrets save, and
     // every one must be non-null before a BYO AI call is allowed.
@@ -483,6 +486,101 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
      */
     reportViewCountingEnabled: integer('is_report_view_counting_enabled', { mode: 'boolean' })
         .notNull().default(false),
+    /**
+     * Whether AI features may RUN for this workspace — which is a different
+     * question from whether AI is SET UP, and until this column existed the two
+     * were the same answer.
+     *
+     * Turning it off leaves the key, base URL and model in place, so turning it
+     * back on needs no re-entry: a workspace pausing AI while it reviews a
+     * provider arrangement should not have to find its API key again. It is NOT
+     * a way to remove a credential; deleting the key stays its own action, and
+     * the two are deliberately not collapsed because one is reversible and the
+     * other is not.
+     *
+     * Defaults to true, so the column arriving changes nothing for a workspace
+     * that already had a key saved.
+     * Appended at END per the D1 add-column-at-end rule (tenant_configs is
+     * FK-referenced).
+     */
+    aiEnabled: integer('is_ai_enabled', { mode: 'boolean' }).notNull().default(true),
+    /**
+     * Which wire protocol the configured endpoint speaks. NULL means "use the
+     * deployment default".
+     *
+     * One member today, because every backend this engine talks to is reached
+     * over the OpenAI chat-completions schema. It is an enum rather than free
+     * text so a second protocol cannot arrive as an unvalidated string that
+     * some call site then compares against a literal.
+     */
+    aiProviderKind: text('ai_provider_kind', { enum: ['openai_compatible'] }),
+    /**
+     * Root of an OpenAI-compatible API. NULL means the deployment default
+     * (`AI_BASE_URL`). A self-hosted operator may point this at an address on
+     * their own network.
+     */
+    aiBaseUrl: text('ai_base_url'),
+    /** Model id as the chosen backend names it. NULL means the deployment
+     *  default (`AI_MODEL`). No value is compiled in at either level. */
+    aiModel: text('ai_model'),
+    /**
+     * Monotonic version of this workspace's AI configuration. Bumped on every
+     * saved change to provider, endpoint, model or key.
+     *
+     * It exists to answer one question: a workspace configures one endpoint
+     * today and a private proxy tomorrow — which destination was in force when
+     * a given piece of inspection data was processed?
+     * `ai_call_provenance.provider` already answers WHICH BACKEND, observed off
+     * the adapter that ran. This answers UNDER WHICH CONFIGURATION, and is what
+     * links a call to the attestation below.
+     *
+     * Starts at 0 so an untouched workspace still has a version to cite; a
+     * call recorded against no version is recorded as NULL, which is a
+     * different statement from "version 0".
+     * Appended at END per the D1 add-column-at-end rule.
+     */
+    aiConfigVersion: integer('ai_config_version').notNull().default(0),
+    /**
+     * WHAT THESE FIVE CAN AND CANNOT PROVE. They are a STATEMENT BY THE
+     * WORKSPACE, recorded verbatim — not a measurement, and nothing here
+     * verifies any of them.
+     *
+     *   - They prove that, at a stated configuration version, the workspace
+     *     asserted this endpoint, this model, this service tier and this
+     *     purpose. That is a record of what was represented, and its evidential
+     *     value is exactly that.
+     *   - They do NOT prove the endpoint was reachable, that it was the
+     *     endpoint that actually served any call, that the tier is what the
+     *     provider's records say, or that the stated use is the use it was put
+     *     to. Only `ai_call_provenance` speaks to what actually ran, and it
+     *     speaks by observation, off the adapter instance.
+     *
+     * Reading a row here as evidence of what happened, rather than of what was
+     * claimed, is the one misuse it must not be put to.
+     */
+    aiKeyAttestationEndpoint: text('ai_key_attestation_endpoint'),
+    aiKeyAttestationModel: text('ai_key_attestation_model'),
+    /**
+     * Which of the provider's terms the workspace says govern this account. A
+     * free tier and a paid tier are different contracts at most vendors, and no
+     * endpoint this client calls reports which one a key belongs to — so the
+     * workspace's statement is the only signal that exists. Free text, because
+     * enumerating another company's commercial tiers would go stale silently.
+     */
+    aiKeyAttestationServiceTier: text('ai_key_attestation_service_tier'),
+    /** What the workspace says they are sending it for, in their own words. */
+    aiKeyAttestationIntendedUse: text('ai_key_attestation_intended_use'),
+    /**
+     * The `ai_config_version` this attestation was made about.
+     *
+     * Without it the attestation floats free: a workspace could attest to one
+     * destination, change the endpoint, and the stored statement would still
+     * read as though it covered every call. A statement that does not name the
+     * configuration it was made about cannot be checked against the calls it
+     * was supposed to cover, and a gap between this and `ai_config_version` is
+     * precisely the drift worth being able to see.
+     */
+    aiKeyAttestationConfigVersion: integer('ai_key_attestation_config_version'),
 });
 
 /**

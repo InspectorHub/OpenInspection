@@ -59,6 +59,24 @@ export const aiCallProvenance = sqliteTable('ai_call_provenance', {
      *  old output distinguishable from a new one after a rewording. */
     promptVersion: text('prompt_version').notNull(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    /**
+     * `tenant_configs.ai_config_version` at the moment of the call.
+     *
+     * NULL for rows written before this column existed, and for the managed
+     * path, whose destination belongs to the deployment and does not move per
+     * workspace. NULL rather than 0 on purpose: 0 is a real version a workspace
+     * can be on, so using it for "not recorded" would make the two
+     * indistinguishable.
+     *
+     * This is still METADATA ABOUT A CALL and carries no part of the prompt —
+     * it is a small integer naming a configuration row, not a copy of anything
+     * that was said. The table's no-prompt-text rule is unaffected.
+     *
+     * It is also the one column here that is NOT observed: `provider` is read
+     * off the adapter that ran, whereas this is a value the caller supplies. It
+     * describes configuration, which is exactly what it claims to describe.
+     */
+    configVersion: integer('config_version'),
 }, (t) => ({
     byTenantTime: index('idx_ai_call_provenance_tenant_created').on(t.tenantId, t.createdAt),
 }));

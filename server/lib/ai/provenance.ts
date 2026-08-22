@@ -22,6 +22,15 @@
  * WHAT IS NOT HERE: the prompt. Not truncated, not hashed, not "just the first
  * line". See the schema comment on `ai_call_provenance` — the entry type below
  * has no field that could carry it, which is the enforcement.
+ *
+ * WHAT A ROW PROVES, AND WHAT IT DOES NOT. Everything written here except
+ * `configVersion` is OBSERVED at the chokepoint: the workload that ran, the
+ * prompt version that was rendered, the id of the adapter instance about to be
+ * called. So a row is evidence that a call was made and which backend it was
+ * made to. It is NOT evidence that the workspace's stored ATTESTATION about
+ * that backend was accurate — an attestation is a statement someone made, and
+ * the two are joined by `configVersion` so they can be compared rather than
+ * confused.
  */
 import { drizzle } from 'drizzle-orm/d1';
 import { aiCallProvenance } from '../db/schema';
@@ -36,6 +45,21 @@ interface AiProvenanceEntry {
     promptVersion: string;
     /** `AiProvider.id` of the adapter that is about to be called. */
     provider: string;
+    /**
+     * `tenant_configs.ai_config_version` in force for this call, or null.
+     *
+     * The ONE field here that is not observed. `provider` is read off the
+     * adapter instance precisely so the row names the backend that actually
+     * ran; this is a value the caller supplies, and it may be, because it
+     * describes CONFIGURATION rather than what happened — which is exactly
+     * what it claims to describe.
+     *
+     * Null is a real answer, not a missing one: the managed path's destination
+     * belongs to the deployment and does not move per workspace, so there is
+     * no per-workspace version to cite. Writing 0 instead would assert that
+     * version 0 was in force.
+     */
+    configVersion?: number | null;
 }
 
 export interface AiProvenanceSink {
@@ -88,6 +112,7 @@ export function buildAiProvenanceSink(args: {
                 mode: source,
                 model,
                 promptVersion: entry.promptVersion,
+                configVersion: entry.configVersion ?? null,
                 createdAt: new Date(),
             });
             return id;

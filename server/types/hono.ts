@@ -63,6 +63,20 @@ export interface AppEnv {
     /** AI model id (e.g. a Gemini model name). No default is compiled in —
      *  when unset, AI features fail closed rather than picking a model. */
     AI_MODEL?: string;
+    /**
+     * Root of the OpenAI-compatible API every AI call posts to.
+     *
+     * No default is compiled in, for the same reason `AI_MODEL` has none: a
+     * destination baked into the binary is a destination nobody can change
+     * without a release, and a fallback would hide that the deployment never
+     * configured one. Unset fails closed at the adapter.
+     *
+     * A self-hosted deployment may point this at an address inside its own
+     * network. What actually leaves that network then depends on the rest of
+     * that operator's configuration and on any third-party services they
+     * enable.
+     */
+    AI_BASE_URL?: string;
     /** Optional deployment-provided AI key, used only for tenants the
      *  deployment grants managed access to. Absent in standalone, where a
      *  tenant's own key is the only credential source. */

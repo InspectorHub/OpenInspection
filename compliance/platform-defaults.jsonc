@@ -240,6 +240,28 @@
       "note": "Decides whether archiving a contact also cuts that person's live links to their own report. A data subject's continued access to a record about them is not a question any round has reached; false (access survives archiving) is the default that takes nothing away."
     },
     {
+      "column": "is_ai_enabled",
+      "property": "aiEnabled",
+      "default_value": "true",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "Preserves the behaviour the column was carved out of. The switch is new; what it governs is not — a workspace that had configured AI credentials before this column existed was already able to run AI, and a default of false would have switched that off for every one of them at migration, silently. The privacy question a default answers is 'what happens to somebody who touches nothing', and for somebody who touches nothing this default changes nothing at all: with no credentials configured, every AI call still refuses at the resolver.",
+      "controller_override": "none",
+      "override_surface": null,
+      "note": "⚠ TODAY NOTHING IN THE PRODUCT CAN CHANGE THIS. The column ships defaulting on and the settings control that would turn it off was not built with it, so 'none' is the factual answer rather than the intended one. The change that adds the AI provider controls must move this to 'available' and name the surface — and until it does, the only thing standing between a workspace and an AI call is the absence of credentials. Read as a PROVISIONING answer (may this workspace be offered AI) and not as a permission — the runtime permission is decided in resolveAi, where a provider is actually built. The two are separate on purpose: resolveRuntimeAiSource repaints another repository's console from this value with no deploy, so a value that meant 'permitted' would let a console edit grant a capability."
+    },
+    {
+      "column": "ai_config_version",
+      "property": "aiConfigVersion",
+      "default_value": "0",
+      "default_owner": "engine",
+      "decision_type": "technical",
+      "basis": "A counter, starting where no configuration has been saved. A non-zero default would claim a revision that never happened.",
+      "controller_override": "none",
+      "override_surface": null,
+      "note": "Bumped when the AI provider configuration is saved, so a cached client can tell its resolved endpoint is stale. Carries no subject data and answers no question about a person."
+    },
+    {
       "column": "is_customer_repair_export_enabled",
       "property": "enableCustomerRepairExport",
       "default_value": "false",

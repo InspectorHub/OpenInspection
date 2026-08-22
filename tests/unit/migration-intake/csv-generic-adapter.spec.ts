@@ -38,8 +38,8 @@ describe('csvGenericAdapter — contacts', () => {
         },
     };
 
-    it('emits one contact per line that holds anything, and validates as a bundle', () => {
-        const result = csvGenericAdapter.convert(csv, options);
+    it('emits one contact per line that holds anything, and validates as a bundle', async () => {
+        const result = await csvGenericAdapter.convert(csv, options);
         expect(result.ok).toBe(true);
         if (!result.ok) return;
         expect(result.bundle.contacts).toEqual([
@@ -53,8 +53,8 @@ describe('csvGenericAdapter — contacts', () => {
         expect(parsed.ok === false ? parsed.issues : []).toEqual([]);
     });
 
-    it('stages the nameless line as a problem, and leaves the good ones good', () => {
-        const result = csvGenericAdapter.convert(csv, options);
+    it('stages the nameless line as a problem, and leaves the good ones good', async () => {
+        const result = await csvGenericAdapter.convert(csv, options);
         expect(result.ok).toBe(true);
         if (!result.ok) return;
         const problems = result.bundle.contacts.map((c) => describeRowProblem('contact', c));
@@ -63,8 +63,8 @@ describe('csvGenericAdapter — contacts', () => {
         expect(problems[2]).toMatchObject({ field: 'name' });
     });
 
-    it('names the one dropped line instead of counting it', () => {
-        const result = csvGenericAdapter.convert(csv, options);
+    it('names the one dropped line instead of counting it', async () => {
+        const result = await csvGenericAdapter.convert(csv, options);
         expect(result.ok && result.bundle.manifest.counts.contact).toEqual({
             readFromSource: 4,
             emitted: 3,
@@ -74,22 +74,22 @@ describe('csvGenericAdapter — contacts', () => {
         });
     });
 
-    it('takes the contact type from a column when the mapping names one', () => {
+    it('takes the contact type from a column when the mapping names one', async () => {
         const typed = [
             'Full Name,Kind',
             'Alice,agent',
             'Bob,client',
         ].join('\n');
-        const result = csvGenericAdapter.convert(typed, {
+        const result = await csvGenericAdapter.convert(typed, {
             entity: 'contact',
             mapping: { name: 'Full Name', type: { column: 'Kind' } },
         });
         expect(result.ok && result.bundle.contacts.map((c) => c.type)).toEqual(['agent', 'client']);
     });
 
-    it('carries a type outside the vocabulary AS THE FILE SPELLS IT, and stages it', () => {
+    it('carries a type outside the vocabulary AS THE FILE SPELLS IT, and stages it', async () => {
         const typed = ['Full Name,Kind', 'Alice,client', 'Bob,Vendor'].join('\n');
-        const result = csvGenericAdapter.convert(typed, {
+        const result = await csvGenericAdapter.convert(typed, {
             entity: 'contact',
             mapping: { name: 'Full Name', type: { column: 'Kind' } },
         });
@@ -104,9 +104,9 @@ describe('csvGenericAdapter — contacts', () => {
         });
     });
 
-    it('still folds the case of a type it recognises, so "Client" imports untouched', () => {
+    it('still folds the case of a type it recognises, so "Client" imports untouched', async () => {
         const typed = ['Full Name,Kind', 'Alice,Client'].join('\n');
-        const result = csvGenericAdapter.convert(typed, {
+        const result = await csvGenericAdapter.convert(typed, {
             entity: 'contact',
             mapping: { name: 'Full Name', type: { column: 'Kind' } },
         });
@@ -114,15 +114,15 @@ describe('csvGenericAdapter — contacts', () => {
         expect(result.ok && describeRowProblem('contact', result.bundle.contacts[0])).toBeNull();
     });
 
-    it('refuses a file whose header does not carry the mapped column', () => {
-        const result = csvGenericAdapter.convert('A,B\n1,2', options);
+    it('refuses a file whose header does not carry the mapped column', async () => {
+        const result = await csvGenericAdapter.convert('A,B\n1,2', options);
         expect(result.ok).toBe(false);
         expect(!result.ok && result.error.code).toBe('MISSING_COLUMN');
         expect(!result.ok && result.error.message).toMatch(/Full Name/);
     });
 
-    it('refuses an empty file', () => {
-        const result = csvGenericAdapter.convert('', options);
+    it('refuses an empty file', async () => {
+        const result = await csvGenericAdapter.convert('', options);
         expect(result.ok).toBe(false);
         expect(!result.ok && result.error.code).toBe('EMPTY_FILE');
     });
@@ -142,8 +142,8 @@ describe('csvGenericAdapter — members', () => {
         mapping: { email: 'Email', name: 'Name', role: { column: 'Role' } },
     };
 
-    it('emits every line and validates as a bundle', () => {
-        const result = csvGenericAdapter.convert(csv, options);
+    it('emits every line and validates as a bundle', async () => {
+        const result = await csvGenericAdapter.convert(csv, options);
         expect(result.ok).toBe(true);
         if (!result.ok) return;
         expect(result.bundle.members).toEqual([
@@ -159,8 +159,8 @@ describe('csvGenericAdapter — members', () => {
         expect(parsed.ok === false ? parsed.issues : []).toEqual([]);
     });
 
-    it('stages the agent row and the address-less one, each with its own sentence', () => {
-        const result = csvGenericAdapter.convert(csv, options);
+    it('stages the agent row and the address-less one, each with its own sentence', async () => {
+        const result = await csvGenericAdapter.convert(csv, options);
         expect(result.ok).toBe(true);
         if (!result.ok) return;
         const problems = result.bundle.members.map((m) => describeRowProblem('member', m));
@@ -175,17 +175,17 @@ describe('csvGenericAdapter — members', () => {
         expect(result.bundle.manifest.counts.member.dropped).toEqual([]);
     });
 
-    it('drops a member line with nothing in any mapped column, and names it', () => {
+    it('drops a member line with nothing in any mapped column, and names it', async () => {
         const blank = ['Email,Name,Role', 'ins@example.test,Ins Pector,inspector', ',,'].join('\n');
-        const result = csvGenericAdapter.convert(blank, options);
+        const result = await csvGenericAdapter.convert(blank, options);
         expect(result.ok && result.bundle.members).toHaveLength(1);
         expect(result.ok && result.bundle.manifest.counts.member.dropped).toEqual([
             { at: 'line 3', reason: 'every mapped column is empty on this line' },
         ]);
     });
 
-    it('applies a fixed role when the mapping gives one instead of a column', () => {
-        const result = csvGenericAdapter.convert('Email\nx@example.test', {
+    it('applies a fixed role when the mapping gives one instead of a column', async () => {
+        const result = await csvGenericAdapter.convert('Email\nx@example.test', {
             entity: 'member',
             mapping: { email: 'Email', role: { fixed: 'inspector' } },
         });

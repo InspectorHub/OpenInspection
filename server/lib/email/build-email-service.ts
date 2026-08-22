@@ -86,6 +86,17 @@ export interface LoadedEmailConfig {
      * pass, not something to fold into a behavior change.
      */
     aiKeyAttested?: boolean;
+    /**
+     * The workspace's AI backend choice, read from the SAME `tenant_configs`
+     * row as the attestation above because it is the same round trip.
+     *
+     * `aiEnabled` is optional and its absence must be read as TRUE by callers:
+     * a config row that does not exist yet is a workspace that has not turned
+     * anything off. Only a stored `false` is an off switch.
+     */
+    aiEnabled?: boolean;
+    aiBaseUrl?: string | null;
+    aiModel?: string | null;
 }
 
 /**
@@ -304,6 +315,9 @@ export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: stri
                     termsVersion: tenantConfigs.aiKeyAttestationTermsVersion,
                     attestedAt: tenantConfigs.aiKeyAttestationAttestedAt,
                     policyVersion: tenantConfigs.aiKeyAttestationPolicyVersion,
+                    aiEnabled: tenantConfigs.aiEnabled,
+                    aiBaseUrl: tenantConfigs.aiBaseUrl,
+                    aiModel: tenantConfigs.aiModel,
                 })
                 .from(tenantConfigs)
                 .where(eq(tenantConfigs.tenantId, tenantId))
@@ -329,7 +343,16 @@ export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: stri
     // "never confirmed" — the AI gate stays closed rather than opening on an
     // error it could not read.
     const aiKeyAttested = isAiKeyAttestationOnFile(configRow);
-    return { emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider, aiKeyAttested };
+    return {
+        emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider, aiKeyAttested,
+        // A missing row is a workspace that has not switched anything off, not
+        // one that switched AI off — `?? true` rather than `?? false`, and the
+        // opposite reading of the attestation above on purpose: one is a
+        // permission that must be established, this is one that must be revoked.
+        aiEnabled: configRow?.aiEnabled ?? true,
+        aiBaseUrl: configRow?.aiBaseUrl ?? null,
+        aiModel: configRow?.aiModel ?? null,
+    };
 }
 
 /**

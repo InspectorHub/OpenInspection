@@ -54,21 +54,21 @@ const ENTITY_FOR: Record<'contacts.import' | 'members.invite', EntityKind> = {
  * the type column in particular, which `defaultMappingFor` never picks because
  * the type vocabulary is ours rather than the exporting product's.
  */
-function runPipeline(
+async function runPipeline(
     intent: 'contacts.import' | 'members.invite',
     csv: string,
     remap?: (m: IntakeMapping) => IntakeMapping,
-): PipelineResult {
+): Promise<PipelineResult> {
     const source = intakeSourceFromText('export.csv', csv);
     // Both entry points here carry spreadsheets, so that is what the operator
     // would have declared.
-    const match = matchAdapter(intent as MigrationIntent, 'csv_generic', source);
+    const match = await matchAdapter(intent as MigrationIntent, 'csv_generic', source);
     if (!match) return { refusedWith: 'no adapter matched', dropped: [], readFromSource: 0, staged: [] };
 
     const base = defaultMappingFor(intent, match.inspection, source);
     const mapping = remap ? remap(base) : base;
 
-    const built = buildBundle(match.vendor, source, mapping);
+    const built = await buildBundle(match.vendor, source, mapping);
     if (!built.ok) {
         return { refusedWith: built.error.message, dropped: [], readFromSource: 0, staged: [] };
     }
@@ -126,8 +126,8 @@ function expectAccounting(result: PipelineResult, readFromSource: number, proble
 }
 
 describe('a bad row fails the row, not the upload', () => {
-    it('stages a contact whose address is malformed, and keeps the good one good', () => {
-        const result = runPipeline(
+    it('stages a contact whose address is malformed, and keeps the good one good', async () => {
+        const result = await runPipeline(
             'contacts.import',
             'Full Name,Email\nAlice Ng,alice@example.test\nBob Ray,not-an-address\n',
         );
@@ -141,8 +141,8 @@ describe('a bad row fails the row, not the upload', () => {
         expect(result.staged[1].problem?.reason).toMatch(/does not look like an email address/);
     });
 
-    it('stages a contact with no name rather than dropping it', () => {
-        const result = runPipeline(
+    it('stages a contact with no name rather than dropping it', async () => {
+        const result = await runPipeline(
             'contacts.import',
             'Full Name,Email\nAlice Ng,alice@example.test\n,bob@example.test\n',
         );
@@ -151,8 +151,8 @@ describe('a bad row fails the row, not the upload', () => {
         expect(result.staged[1].problem).toMatchObject({ field: 'name' });
     });
 
-    it('stages a contact whose type is not one of ours, and offers a suggestion', () => {
-        const result = runPipeline(
+    it('stages a contact whose type is not one of ours, and offers a suggestion', async () => {
+        const result = await runPipeline(
             'contacts.import',
             'Full Name,Email,Kind\nAlice Ng,alice@example.test,client\nBob Ray,bob@example.test,Buyer\n',
             typeFromColumn('Kind'),
@@ -166,8 +166,8 @@ describe('a bad row fails the row, not the upload', () => {
         });
     });
 
-    it('stages a member whose address is malformed', () => {
-        const result = runPipeline(
+    it('stages a member whose address is malformed', async () => {
+        const result = await runPipeline(
             'members.invite',
             'Email,Role\nalice@example.test,inspector\nnope,inspector\n',
         );
@@ -176,8 +176,8 @@ describe('a bad row fails the row, not the upload', () => {
         expect(result.staged[1].problem).toMatchObject({ field: 'email', value: 'nope' });
     });
 
-    it('stages a member row with no address at all', () => {
-        const result = runPipeline(
+    it('stages a member row with no address at all', async () => {
+        const result = await runPipeline(
             'members.invite',
             'Email,Role\nalice@example.test,inspector\n,manager\n',
         );
@@ -186,8 +186,8 @@ describe('a bad row fails the row, not the upload', () => {
         expect(result.staged[1].problem?.reason).toMatch(/no email address/);
     });
 
-    it('stages a member row asking for the agent role, with its own sentence', () => {
-        const result = runPipeline(
+    it('stages a member row asking for the agent role, with its own sentence', async () => {
+        const result = await runPipeline(
             'members.invite',
             'Email,Role\nalice@example.test,inspector\nbob@example.test,agent\n',
         );
@@ -201,8 +201,8 @@ describe('a bad row fails the row, not the upload', () => {
         expect(result.staged[1].problem?.reason).toMatch(/per inspection/);
     });
 
-    it('stages a member row whose role is not one we grant', () => {
-        const result = runPipeline(
+    it('stages a member row whose role is not one we grant', async () => {
+        const result = await runPipeline(
             'members.invite',
             'Email,Role\nalice@example.test,inspector\nbob@example.test,supervisor\n',
         );
@@ -211,8 +211,8 @@ describe('a bad row fails the row, not the upload', () => {
         expect(result.staged[1].problem).toMatchObject({ field: 'role', value: 'supervisor' });
     });
 
-    it('leaves a clean file entirely clean — the positive control for all seven', () => {
-        const result = runPipeline(
+    it('leaves a clean file entirely clean — the positive control for all seven', async () => {
+        const result = await runPipeline(
             'contacts.import',
             'Full Name,Email\nAlice Ng,alice@example.test\nBob Ray,bob@example.test\n',
         );
@@ -220,8 +220,8 @@ describe('a bad row fails the row, not the upload', () => {
         expect(result.dropped).toEqual([]);
     });
 
-    it('still DROPS a row with nothing in any mapped column, and says so', () => {
-        const result = runPipeline(
+    it('still DROPS a row with nothing in any mapped column, and says so', async () => {
+        const result = await runPipeline(
             'contacts.import',
             'Full Name,Email\nAlice Ng,alice@example.test\n,\n',
         );

@@ -156,10 +156,10 @@ const migrationIntakeRoutes = createApiRouter()
                 ? 'spectora'
                 : 'csv_generic');
 
-        const match = matchAdapter(intent, declaredVendor, source);
+        const match = await matchAdapter(intent, declaredVendor, source);
         if (!match) return openWaitingRun();
 
-        const built = buildBundle(match.vendor, source, defaultMappingFor(intent, match.inspection, source));
+        const built = await buildBundle(match.vendor, source, defaultMappingFor(intent, match.inspection, source));
         if (!built.ok) throw Errors.UnprocessableEntity(built.error.message);
 
         const staged = await withStoredFile((sourceKey) => stage.stage({

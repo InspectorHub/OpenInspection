@@ -261,6 +261,28 @@
     // ── Queues ──────────────────────────────────────────────────────────────
     {
       "store_type": "queue",
+      "binding": "CRON_QUEUE",
+      "queues": ["openinspection-cron", "openinspection-cron-saas"],
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — scheduled maintenance the tenant's own configuration asks for", "determined_at": "2026-08-22", "source": "engineering" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "platform",
+      "data_categories": ["job_reference"],
+      "subjects": ["staff"],
+      "purpose": "One message per scheduled job, so the cron tick enqueues instead of running the work inline.",
+      "retention_rule": "queue-managed",
+      "deletion_mechanism": "not-applicable",
+      "export_mechanism": "not-applicable",
+      "tenant_scope": "cross-tenant",
+      "evidence_level": "E2",
+      "note": "The message body is a job name and a cursor — never a subject's data. It is listed anyway because a queue nobody registered is a queue compliance cannot see, and because the jobs it dispatches DO reach subject data: what they touch is governed by the D1 and R2 entries above, not here. Cross-tenant by nature: one tick sweeps every tenant, which is why each job carries its own per-tenant scoping rather than inheriting one from the message."
+    },
+    {
+      "store_type": "queue",
       "binding": "WORD_EXPORT_QUEUE",
       "queues": ["openinspection-word-export", "openinspection-word-export-saas"],
       "modes": ["standalone", "saas"],
@@ -548,7 +570,7 @@
     {
       "store_type": "external_processor",
       "binding": null,
-      "external_processor": "server/lib/ai/providers/gemini.ts",
+      "external_processor": "server/lib/ai/providers/openai-compatible.ts",
       "modes": ["standalone", "saas"],
       "env_vars": ["AI_MODEL"],
       "role": {
@@ -560,13 +582,13 @@
       "lifecycle_owner": "vendor",
       "data_categories": ["inspection_content", "inspector_prose"],
       "subjects": ["end_client", "staff"],
-      "purpose": "AI translation and drafting. Two credential paths: a tenant's own key, or the deployment's managed key for entitled tenants.",
+      "purpose": "AI translation and drafting. Two credential paths: a tenant's own key, or the deployment's managed key for entitled tenants. The single Google adapter was replaced by an OpenAI-compatible one, so the DESTINATION is no longer a fixed vendor: on a tenant key it is the endpoint that tenant configured, which the deployment does not choose and cannot enumerate in advance.",
       "retention_rule": "vendor-managed",
       "deletion_mechanism": "vendor-contract",
       "export_mechanism": "none",
       "tenant_scope": "per-tenant",
       "evidence_level": "E2",
-      "note": "The one external processor whose EU coordinate is left UNCLASSIFIED rather than asserted as processor, and deliberately: the framework's own roles-by-product-area table calls BYO-key AI 'complicated' — the tenant chooses the account while we choose the provider, model, prompts, ledger and posture — and managed AI puts Art. 28(10) live. Writing 'processor' here would be exactly the self-labelling §3 forbids. What leaves the process on either key is enumerated in docs/compliance/ai-data-flow.md."
+      "note": "The one external processor whose EU coordinate is left UNCLASSIFIED rather than asserted as processor, and deliberately: the framework's own roles-by-product-area table calls BYO-key AI 'complicated' — the tenant chooses the account while we choose the provider, model, prompts, ledger and posture — and managed AI puts Art. 28(10) live. Writing 'processor' here would be exactly the self-labelling §3 forbids. What leaves the process on either key is enumerated in docs/compliance/ai-data-flow.md. Since the adapter became endpoint-agnostic this entry can no longer name the recipient, which is why the attestation records the endpoint alongside the key: a record naming only WHOSE key was used does not say WHERE the data went, and those became different questions the moment the destination stopped being fixed."
     }
   ]
 }

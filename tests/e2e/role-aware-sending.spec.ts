@@ -357,9 +357,21 @@ test.describe.serial('Role-aware report sending (Spec 2 Task 8)', () => {
     const flushRes = await request.get(`${BASE_URL}/cdn-cgi/handler/scheduled`);
     expect(flushRes.ok(), 'the local scheduled-trigger endpoint must respond').toBeTruthy();
 
-    const sink = await request.get(
+    // The tick is ASYNCHRONOUS as of the free-tier cron refactor: scheduled()
+    // probes and enqueues, and the flush runs on a queue message in its own
+    // Worker invocation (the Workers Free CPU ceiling is per invocation, so the
+    // jobs cannot share one). The handler therefore returns BEFORE any mail is
+    // sent, and reading the sink once is a race the test loses more often than
+    // not. Poll instead, with a ceiling so a job that never runs still fails.
+    let sink = await request.get(
       `${BASE_URL}/api/__test__/last-email?to=${encodeURIComponent(BUYER_AGENT.email)}`,
     );
+    for (let attempt = 0; attempt < 20 && sink.status() !== 200; attempt++) {
+      await new Promise((r) => setTimeout(r, 250));
+      sink = await request.get(
+        `${BASE_URL}/api/__test__/last-email?to=${encodeURIComponent(BUYER_AGENT.email)}`,
+      );
+    }
     expect(sink.status(), 'sink must have captured the AUTO report.published email to the buyer agent').toBe(200);
     const { data } = await sink.json();
     expect(String(data.html)).toContain('token=');

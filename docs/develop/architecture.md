@@ -61,6 +61,13 @@ The web layer uses a **Token Relay BFF** pattern: the React Router v8 server hol
 - **hono/client**: Hono exports `AppType`, React Router v8 uses `hono/client` for compile-time type-safe API calls — zero handwritten API client
 - **CF Free Tier safe**: React Router v8 SSR adds ~1-3ms CPU per request, well within 10ms limit
 
+> **The same arithmetic has to be done for the scheduled path, and for a long time it was not.**
+> The Workers Free CPU ceiling is 10 ms **per invocation**, and it applies to a cron
+> invocation exactly as it applies to a request. The line above was written about `fetch`
+> and nothing ever wrote the equivalent for `scheduled`, which ran thirteen background jobs
+> serially in one invocation — measured at 138 ms, 13.8x the ceiling, with ticks being
+> killed outright. See [Background work](#background-work) for the shape that replaced it.
+
 ## Module map
 
 ```
@@ -351,7 +358,53 @@ responsive web is the field surface.
 ## Background work
 
 - **Sign-completion workflow** (`server/workflows/`): renders the signed PDF + Certificate of Completion, assembles the evidence pack, and emails the client — see [E-signature](#e-signature-spec-5h). Cloudflare Workflow guarantees retries and persistence across Worker restarts.
-- **Cron triggers**: notification reminder sweeps (hourly), report-ready automations.
+- **Cron triggers**: three expressions, declared identically in `wrangler.jsonc` (standalone)
+  and `wrangler.saas.jsonc`.
+
+  | Expression | Carries |
+  |---|---|
+  | `*/5 * * * *` | The main tick. It **probes and enqueues only** — see below. |
+  | `0 3 * * *` | Daily R2 usage measurement (`r2-usage`). |
+  | `0 4 * * *` | Daily log-table retention sweep and intake expiry reminders (`retention-logs`). |
+
+  Cron Triggers are limited to **5 per account** on the Free plan, which is the budget these
+  three are spent from.
+
+### The scheduled path and the 10 ms ceiling
+
+The Workers Free CPU ceiling is **10 ms per invocation**, for cron invocations as much as for
+requests. Thirteen background jobs therefore cannot share one `scheduled()` call however fast
+each of them is — the only fix is more invocations, not faster jobs.
+
+So the tick does not run jobs. `server/cron/registry.ts` declares each job with a cheap
+`probe()` (is there work? — at most a `LIMIT 1` on the job's own due-predicate) and a bounded
+`run(cursor)`. `server/cron/dispatch.ts` probes the jobs belonging to the expression that
+fired and enqueues one message per job that has work; `server/cron/consumer.ts` runs exactly
+one job per queue message, so **each job gets its own invocation with its own budget**. A job
+with more work than one batch re-enqueues itself with a cursor rather than looping, because a
+loop would put the whole sweep back inside a single invocation and undo the split.
+
+Three properties are load-bearing, and each is held by something executable rather than by
+this paragraph:
+
+- **No job body may run on the cron invocation.** `tests/unit/tooling/cron-dispatch.spec.ts`
+  asserts it; `npm run lint:cron-budget` gates it.
+- **Every job carries a `maxBatch`, and no cron path holds an unbounded table read.** Gated by
+  the same script, which prints what it checked next to what it found on every run and treats
+  "checked nothing" as a failure.
+- **Probe-then-enqueue, not enqueue-always.** The other Free ceiling is Queues at 10,000
+  operations/day, shared with the Word-export queue; enqueueing thirteen jobs unconditionally
+  would spend 7,488 of them a day on jobs with nothing to do. A single-inspector deployment's
+  ticks are almost all empty, so probing first sends almost nothing.
+
+Cursors live in Workers KV (`cron:cursor:<job>`), not in a column — they are bookkeeping, every
+paged job is idempotent, and a column would mean a migration in both deployment modes.
+
+⚠️ **The post-refactor CPU numbers have not been measured.** The 138 ms figure above is a real
+production reading; the batch sizes in the registry are reasoned starting points, not tuned
+ones. Measure a real deployment and tune `maxBatch` down until every invocation sits at or
+under **5 ms** — half the ceiling, so growth does not immediately re-break it — before treating
+the free-tier claim as re-established.
 
 ## Cost model (Cloudflare Free tier)
 

@@ -18416,6 +18416,24 @@
     "description": "Pulls upcoming busy time blocks from the inspector's connected calendar and merges them into availability overrides."
   },
   {
+    "operationId": "testAiConnection",
+    "method": "POST",
+    "pathTemplate": "/api/integrations/ai/test",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "integrations",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/AiConnectionTestBody"
+      }
+    },
+    "summary": "Probe a submitted AI endpoint, model and key",
+    "description": "Sends a one-token chat completion to the SUBMITTED base URL, model and key — not to a stored credential and not to a deployment default. That is the whole point: after the destination became something a workspace chooses, a probe of anything else would go green while every real call failed. Always 200; the outcome is in the body, with `field` naming which input to blame. The provider's own response body is never returned or logged."
+  },
+  {
     "operationId": "testGeminiConnection",
     "method": "POST",
     "pathTemplate": "/api/integrations/gemini/test",

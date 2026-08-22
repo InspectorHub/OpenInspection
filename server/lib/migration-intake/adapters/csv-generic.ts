@@ -11,6 +11,7 @@ import {
 import type { AdapterInspection, BundleResult, MigrationAdapter } from './types';
 import { emptyEntityCounts } from './types';
 
+/** ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED. Our own adapter's version. */
 const CSV_GENERIC_ADAPTER_VERSION = '1';
 
 /**
@@ -53,6 +54,13 @@ export interface CsvMemberMapping {
     role: CsvValueSource<BundleMemberRole>;
 }
 
+/**
+ * What this adapter is being asked to produce.
+ *
+ * ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED. `contact` and
+ * `member` are OUR entity vocabulary, decided by the entry point the
+ * operator used. Neither word is read out of anybody's file.
+ */
 export type CsvGenericOptions =
     | { entity: 'contact'; mapping: CsvContactMapping }
     | { entity: 'member'; mapping: CsvMemberMapping };
@@ -87,6 +95,10 @@ function cell(row: Record<string, string>, column?: string | undefined): string 
  * through `options`, so the adapter never has to guess. A guess has a case it
  * gets wrong, and the wrong case here is silent: a header it cannot match
  * becomes a column assignment nobody asked for.
+ *
+ * ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED. Every string in this
+ * object is ours — the adapter's own name, the vendor key this deployment files
+ * generic spreadsheets under, and prose written here for the operator to read.
  */
 export const csvGenericAdapter: MigrationAdapter<CsvGenericOptions> = {
     name: 'csv-generic',

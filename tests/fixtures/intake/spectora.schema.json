@@ -1,0 +1,44 @@
+{
+  "vendor": "spectora",
+  "container": "xlsx",
+  "authored": "This file declares the SHAPE of a format and the surprises a reader has to survive. It contains nothing taken from anybody's file. Sample files are generated from it by scripts/generate-intake-fixture.mjs, and their content is invented.",
+  "literalUse": "FORMAT DISCRIMINATOR. The headings below are the strings a reader must match to recognise this format at all; they are the same ones the adapter carries. No section name, item name, comment text or rating word from any real export appears in this repository.",
+  "sheet": {
+    "headerRow": 1,
+    "headings": [
+      "Section Name",
+      "Item Name",
+      "Comment Name",
+      "Comment Text",
+      "Comment Type (info, limit, defect)"
+    ],
+    "columnsAtLeast": 42
+  },
+  "quirks": [
+    {
+      "id": "empty-shared-strings",
+      "kind": "container",
+      "statement": "The shared-string table may be empty, with every value written inline in the worksheet."
+    },
+    {
+      "id": "double-escaped-ampersand",
+      "kind": "encoding",
+      "statement": "A value's text may be escaped twice, so one decode leaves an entity where a character belongs."
+    },
+    {
+      "id": "empty-discriminator-cell",
+      "kind": "data",
+      "statement": "The column that classifies a row may be empty on some rows, and those rows are otherwise complete."
+    },
+    {
+      "id": "repeated-parent-values",
+      "kind": "structure",
+      "statement": "Parent names repeat on every row: the nesting is implied by repetition rather than expressed."
+    },
+    {
+      "id": "sparse-columns",
+      "kind": "container",
+      "statement": "A row may omit a cell entirely rather than writing an empty one, so position in the row does not give a column."
+    }
+  ]
+}

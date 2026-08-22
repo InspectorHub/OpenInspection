@@ -2,7 +2,9 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { inspections, inspectionResults } from '../lib/db/schema';
 import { AppError, ErrorCode, Errors } from '../lib/errors';
-import { GeminiProvider } from '../lib/ai/providers/gemini';
+import { AI_REFUSAL_REASON } from '../lib/ai/refusal-reason';
+import { devRewrittenComment, devSuggestedComments } from '../lib/ai/dev-mock';
+import type { AiProvider } from '../lib/ai/provider';
 import { checkAiCapability, type AiCredentialPicture } from '../lib/ai/capability-policy';
 import {
     AI_PROMPTS,
@@ -12,63 +14,45 @@ import {
     type VersionedPrompt,
 } from '../lib/ai/prompts';
 import { parseTranslatedSegments } from '../lib/ai/translate-response';
+import { defectDigest, NO_DEFECTS_SUMMARY } from '../lib/ai/defect-digest';
 import type { AiProvenanceSink } from '../lib/ai/provenance';
 import type { AiQuotaPreflight } from '../lib/ai/metering';
 import type { AiUsageKind } from '../lib/usage/period';
 
 /**
- * Service to handle AI-powered features using Google Gemini.
+ * The AI-powered features, over whichever backend was resolved for the request.
  *
- * CREDENTIALS COME FROM ONE OF TWO SOURCES, not one. A tenant's own stored key
- * (Settings → Advanced → AI) always wins and is unchanged by anything below.
- * Where the deployment profile permits it (`hasManagedAi` — saas only), a
- * deployment-provided key may serve tenants granted managed access instead;
- * that grant is a boolean this service is handed, never a decision it makes.
- * In standalone the managed path does not exist at all, so it remains the
- * tenant's key or nothing, exactly as before. Selection lives in
- * `lib/ai/resolve-provider.ts` — this class does not re-derive it.
- *
- * This paragraph replaces a "strictly bring-your-own-key" statement that the
- * managed path contradicts; without the correction the next reader treats that
- * path as a regression and deletes it.
+ * IT NO LONGER KNOWS WHICH BACKEND THAT IS. The adapter arrives already built
+ * from `lib/ai/resolve-provider.ts`, which is the single place that decides
+ * credentials, endpoint and model. A workspace's own stored key always wins
+ * there; where the deployment profile permits it (`hasManagedAi`) a
+ * deployment-provided key may serve workspaces granted managed access instead.
+ * This class re-derives none of that, and constructs no adapter of its own —
+ * doing so would be a second answer to a question one module owns.
  *
  * HAVING credentials is not the same as the product OFFERING the capability
  * they would fund. `lib/ai/capability-policy.ts` holds that second answer and
- * `callGemini` asks it on every call. Until it existed, the managed path was
- * merely starved — no deployment had provisioned a platform key — and one
- * `wrangler secret put` by whoever provisions infrastructure would have turned
- * it on without anyone deciding to ship it. The gate changes nothing today and
- * that is the point: an accident becomes a stated refusal that survives the
- * key being configured.
+ * `callGemini` asks it on every call, so a platform key appearing in the
+ * environment cannot by itself release a capability nobody decided to ship.
  *
  * The PROMPTS live in `lib/ai/prompts.ts`, each under a stable version token,
  * so the largest input to a model's output is nameable rather than an inline
- * literal that can be reworded in passing. Those tokens are now WRITTEN DOWN:
- * `callGemini` records provider / mode / model / prompt version / timestamp to
- * `ai_call_provenance` before anything leaves the process. Until it did, the
- * versioning was a naming convention that produced no evidence for any output
- * this product has ever generated.
+ * literal that can be reworded in passing. `callGemini` records provider /
+ * mode / model / prompt version / timestamp to `ai_call_provenance` before
+ * anything leaves the process; without that the version tokens were a naming
+ * convention producing no evidence about any output ever generated.
  *
- * Sprint 1 A-4: when running in `standalone` mode without a Gemini API key,
- * `suggestComment` returns dev-mock suggestions so local development can
- * exercise the UI flow end-to-end. Production deploys (`saas` mode or
- * unspecified) throw `Errors.AINotConfigured` (503) so the client can
- * route the inspector to AI settings instead of showing a silent failure.
+ * On a deployment that offers it (`aiDevMockFallback`), a missing key yields
+ * the `[DEV]` placeholders in `lib/ai/dev-mock.ts` so the UI flow can be
+ * exercised end to end. Everywhere else a missing key throws
+ * `Errors.AINotConfigured` (503) so the client can route the inspector to AI
+ * settings instead of showing a silent failure.
  *
  * The MODEL is configuration, never a source constant. There is deliberately
- * no baked-in default: a model id compiled into the binary is how the request
- * URL ended up pinned to one model for two years with no way to change it, and
- * a fallback would hide the same mistake next time. Unconfigured fails closed.
+ * no baked-in default: a model id compiled into the binary is how a request
+ * URL ends up pinned to one model with no way to change it, and a fallback
+ * would hide the same mistake next time. Unconfigured fails closed.
  */
-/**
- * The summary the system states when there is nothing for a model to summarise.
- *
- * A constant because it is returned from two arms that must say the same thing,
- * and because it is the one summary in this file that no model wrote — the
- * reason both arms return a null `aiCallId`.
- */
-const NO_DEFECTS_SUMMARY = 'No significant defects observed during this inspection.';
-
 export class AIService {
     constructor(
         private db: D1Database,
@@ -110,6 +94,16 @@ export class AIService {
          *  with no delivered allowance — which is why enforcement is absent in
          *  those cases rather than switched off by a flag here. */
         private quota?: AiQuotaPreflight,
+        /** The adapter this request's call runs on, already built by
+         *  `lib/ai/resolve-provider.ts` from the resolved credentials,
+         *  endpoint and model.
+         *
+         *  Optional in the TYPE, refused at RUNTIME, for the same fail-closed
+         *  reason as the provenance sink above: a construction that names no
+         *  provider has had no credential decision made for it, and a service
+         *  that answered by building one would be a second opinion about which
+         *  backend an inspector's text is sent to. */
+        private provider?: AiProvider,
     ) {}
 
     private isDevMode(): boolean {
@@ -223,7 +217,15 @@ export class AIService {
             );
         }
 
-        const provider = new GeminiProvider({ apiKey: this.apiKey, model: this.model });
+        // The adapter the resolver built. NOT one constructed here — see the
+        // constructor note; this is the whole point of the seam.
+        const provider = this.provider;
+        if (!provider) {
+            throw Errors.AINotConfigured(
+                'AI is unavailable: no AI provider was resolved for this request.',
+                AI_REFUSAL_REASON.NOT_CONFIGURED,
+            );
+        }
         // BEFORE the send, and awaited. The meter runs after success because a
         // failed call consumed no allowance; provenance is the opposite
         // question — the prompt leaves the process either way, so the record of
@@ -296,11 +298,9 @@ export class AIService {
         const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId))).get();
         if (!results) return { summary: NO_DEFECTS_SUMMARY, aiCallId: null };
 
-        const data = results.data as Record<string, { status: string; notes?: string }>;
-        const defects = Object.entries(data)
-            .filter(([_, val]) => val.status === 'Defect')
-            .map(([_, val]) => `- ${val.notes || 'No description provided'}`)
-            .join('\n');
+        // WHICH FIELDS LEAVE THE PROCESS is decided in `lib/ai/defect-digest.ts`,
+        // not inline here — see that module for why the boundary is named.
+        const defects = defectDigest(results.data as Record<string, { status: string; notes?: string }>);
 
         if (!defects) return { summary: NO_DEFECTS_SUMMARY, aiCallId: null };
 
@@ -322,15 +322,13 @@ export class AIService {
         input: RewriteCommentPromptArgs,
     ): Promise<{ rewritten: string; aiCallId: string | null }> {
         if (!this.hasApiKey()) {
-            // Sprint 1 A-4: dev-mock instead of throwing in standalone mode.
+            // Dev-mock instead of throwing on a deployment that offers it.
             if (this.isDevMode()) {
-                return {
-                    rewritten: `[DEV] ${input.originalComment} (rewritten: ${input.instruction})`.trim(),
-                    aiCallId: null,
-                };
+                return { rewritten: devRewrittenComment(input.originalComment, input.instruction), aiCallId: null };
             }
             throw Errors.AINotConfigured(
-                'AI is not configured. Set GEMINI_API_KEY in Settings → Advanced → AI.'
+                'AI is not configured. Set an API key in Settings → Advanced → AI.',
+                AI_REFUSAL_REASON.NOT_CONFIGURED,
             );
         }
         this.assertModelConfigured();
@@ -350,21 +348,14 @@ export class AIService {
         params: SuggestCommentPromptArgs,
     ): Promise<{ suggestions: string[]; aiCallId: string | null }> {
         if (!this.hasApiKey()) {
-            // Sprint 1 A-4: dev-mode mock so local development can exercise
-            // the full Suggest flow without burning Gemini quota.
+            // Dev-mode mock so local development can exercise the full Suggest
+            // flow without spending anyone's provider allowance.
             if (this.isDevMode()) {
-                const item = params.itemName || 'Item';
-                return {
-                    suggestions: [
-                        `[DEV] ${item} appears serviceable with no defects observed at the time of inspection.`,
-                        `[DEV] ${item} requires routine maintenance attention; recommend periodic inspection.`,
-                        `[DEV] ${item} shows signs of wear; monitor over the next inspection cycle.`,
-                    ],
-                    aiCallId: null,
-                };
+                return { suggestions: devSuggestedComments(params.itemName), aiCallId: null };
             }
             throw Errors.AINotConfigured(
-                'AI is not configured. Set GEMINI_API_KEY in Settings → Advanced → AI.'
+                'AI is not configured. Set an API key in Settings → Advanced → AI.',
+                AI_REFUSAL_REASON.NOT_CONFIGURED,
             );
         }
         // Outside the try/catch below on purpose: that catch turns RUNTIME
@@ -391,6 +382,12 @@ export class AIService {
             // looks like the model had nothing to say. Matched on CODE, so a
             // third refusal added at the chokepoint has to be listed here
             // rather than silently inheriting the degrade.
+            // The adapter now raises AI_NOT_CONFIGURED for 401/402/403/429 as
+            // well, which lands here already listed. That is deliberate: a
+            // provider refusing the credentials, or the account behind them, is
+            // not "the model had nothing to say" — and on a workspace's own key
+            // the person who can fix it is the workspace, who sees nothing at
+            // all if this degrades.
             if (err instanceof AppError
                 && (err.code === ErrorCode.AI_NOT_CONFIGURED || err.code === ErrorCode.QUOTA_EXHAUSTED)) throw err;
             return { suggestions: [], aiCallId: null };

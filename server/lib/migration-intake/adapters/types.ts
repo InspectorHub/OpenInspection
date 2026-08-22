@@ -27,6 +27,10 @@ export type BundleResult =
  * `null` still means "this adapter cannot read this file" and is NOT a third
  * arm: the wizard reads null as "no question" and an empty arm as "a question
  * with no answers", and those are different screens.
+ *
+ * ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED. `columns` and
+ * `template` are OUR arm names, chosen for the question each one lets the
+ * wizard ask. Neither is read out of anybody's file.
  */
 export type AdapterInspection =
     | {
@@ -73,7 +77,12 @@ export interface MigrationAdapter<TOptions> {
     readonly vendor: VendorId;
     /**
      * Report what the wizard has to ask about this file, without converting it.
-     * Receives the uploaded file as text.
+     *
+     * Receives the uploaded file in whatever form the adapter reads — the
+     * registry hands text to a text format and bytes to a container one, and
+     * the adapter refuses anything else. Widening this to a single form would
+     * mean decoding a container as UTF-8, which does not merely fail to parse
+     * it but destroys it.
      *
      * OPTIONAL, and its ABSENCE carries meaning: an adapter that does not
      * implement this has nothing for the wizard to ask about, so that step is
@@ -82,8 +91,8 @@ export interface MigrationAdapter<TOptions> {
      *
      * Returns null when the adapter cannot read the input at all.
      */
-    inspect?(input: unknown): AdapterInspection | null;
-    convert(input: unknown, options: TOptions): BundleResult;
+    inspect?(input: unknown): AdapterInspection | null | Promise<AdapterInspection | null>;
+    convert(input: unknown, options: TOptions): BundleResult | Promise<BundleResult>;
 }
 
 /** The accounting for an entity kind this adapter emits nothing of. */

@@ -50,6 +50,30 @@ export type BundleMemberRole = Exclude<Role, 'agent'>;
 export const BUNDLE_MEMBER_ROLES: readonly BundleMemberRole[] =
     ROLES.filter((r): r is BundleMemberRole => r !== ROLE.AGENT);
 
+/**
+ * The rating options an imported item gets when its source supplies none.
+ *
+ * ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED. This is OUR
+ * vocabulary — the same one this deployment's own seed templates carry — and it
+ * lives here rather than in an adapter so the two adapters cannot come to spell
+ * it differently. Where a source DOES supply a vocabulary it is used verbatim
+ * instead, because it is the operator's own and the mapping step is where its
+ * meaning gets decided.
+ */
+export const DEFAULT_IMPORTED_RATING_OPTIONS: readonly string[] = [
+    'Inspected', 'Not Inspected', 'Not Present', 'Repair', 'Safety Hazard',
+];
+
+/**
+ * The category an imported defect lands in.
+ *
+ * ⚠️ LITERAL-USE CLASSIFICATION: INDEPENDENTLY AUTHORED — one of this
+ * deployment's own seed category names. Inferring a harsher one from a source's
+ * severity column would put a claim in a report that the file did not make; the
+ * operator re-categorises in the editor, where the claim is theirs.
+ */
+export const DEFAULT_IMPORTED_DEFECT_CATEGORY = 'recommendation';
+
 /** Deliberately loose. This is a "did somebody type an address here" check, not an RFC. */
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

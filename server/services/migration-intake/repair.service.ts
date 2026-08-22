@@ -5,7 +5,7 @@ import { migrationBatches, migrationRows } from '../../lib/db/schema';
 import { MIGRATION_BATCH_STATUS } from '../../lib/status/migration-batch-status';
 import { MIGRATION_ROW_STATUS } from '../../lib/status/migration-row-status';
 import { describeRowProblem, type RowProblem } from '../../lib/migration-intake/row-problems';
-import { buildBundle, intakeSourceFromText, type IntakeMapping } from '../../lib/migration-intake/adapters/registry';
+import { buildBundle, intakeSourceFromBytes, type IntakeMapping } from '../../lib/migration-intake/adapters/registry';
 import { assertRowCountWithin, type IntakeLimits } from '../../lib/migration-intake/limits';
 import { resolveConflicts, type IntakeDb } from '../../lib/migration-intake/conflicts';
 import {
@@ -169,16 +169,19 @@ export class MigrationRepairService {
             throw Errors.Conflict('This import did not keep its file, so the mapping cannot be changed.');
         }
         const files = new MigrationSourceFileService(this.bucket);
-        const text = await files.readText(batch.sourceKey);
-        if (text === null) {
+        // BYTES. A vendor template export is a binary container, and a UTF-8
+        // decode of one is not reversible — re-mapping through text would hand
+        // the adapter a destroyed file and refuse the run for being unreadable.
+        const bytes = await files.readBytes(batch.sourceKey);
+        if (bytes === null) {
             throw Errors.Conflict(
                 'This import\'s file is no longer stored, so the mapping cannot be changed. Start the import again.',
             );
         }
 
-        const built = buildBundle(
+        const built = await buildBundle(
             batch.vendor as VendorId,
-            intakeSourceFromText(batch.sourceKey, text),
+            intakeSourceFromBytes(batch.sourceKey, bytes),
             params.mapping,
         );
         if (!built.ok) throw Errors.BadRequest(built.error.message);

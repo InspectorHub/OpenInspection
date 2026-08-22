@@ -204,6 +204,20 @@
       "when": 1787106162890,
       "tag": "0028_contractor_type_trade_slug_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1787374676201,
+      "tag": "0029_tenant_ai_provider_config",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1787376522845,
+      "tag": "0030_ai_endpoint_attestation",
+      "breakpoints": true
     }
   ]
 }

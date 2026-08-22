@@ -21,6 +21,7 @@ import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import { withBatch } from '../helpers/d1-binding';
+import { zipOf } from '../helpers/zip-fixture';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { Database as SqliteDatabase } from 'better-sqlite3';
@@ -93,14 +94,50 @@ function appFor(opts: AppOpts) {
     return app;
 }
 
-function upload(fields: Record<string, string>, file: { name: string; text: string }): FormData {
+/**
+ * The uploaded file, as text OR as bytes.
+ *
+ * Both arms, because every real vendor template export is a binary container
+ * and a spec that could only send text could only ever exercise the tabular
+ * half of this route.
+ */
+interface UploadedFile {
+    name: string;
+    text: string | Uint8Array;
+}
+
+function upload(fields: Record<string, string>, file: UploadedFile): FormData {
     const fd = new FormData();
     for (const [k, v] of Object.entries(fields)) fd.append(k, v);
-    fd.append('file', new File([file.text], file.name, { type: 'text/csv' }));
+    const binary = typeof file.text !== 'string';
+    fd.append('file', new File(
+        [file.text as BlobPart], file.name,
+        { type: binary ? 'application/octet-stream' : 'text/csv' },
+    ));
     return fd;
 }
 
-function post(opts: AppOpts, fields: Record<string, string>, file: { name: string; text: string }) {
+/**
+ * A template export as the export button produces it: a workbook, one row per
+ * canned comment. Built rather than checked in, so nothing derived from a real
+ * file enters this repository.
+ */
+async function templateExport(): Promise<Uint8Array> {
+    const rows = [
+        ['Section Name', 'Item Name', 'Comment Name', 'Comment Text', 'Comment Type (info, limit, defect)'],
+        ['Roof', 'Covering', 'Worn', 'The covering is worn.', 'defect'],
+    ];
+    const cell = (v: string, col: number, row: number) =>
+        `<c r="${String.fromCharCode(65 + col)}${row}" t="str"><v>${v}</v></c>`;
+    const body = rows.map((r, i) =>
+        `<row r="${i + 1}">${r.map((v, c) => cell(v, c, i + 1)).join('')}</row>`).join('');
+    return zipOf({
+        'xl/worksheets/sheet1.xml':
+            `<?xml version="1.0"?><worksheet><sheetData>${body}</sheetData></worksheet>`,
+    });
+}
+
+function post(opts: AppOpts, fields: Record<string, string>, file: UploadedFile) {
     return appFor(opts).request(
         '/api/imports',
         { method: 'POST', body: upload(fields, file) },
@@ -404,18 +441,7 @@ describe('POST /api/imports', () => {
         const res = await post(
             { role: 'manager', store, overrides: { templateImport: true } },
             { intent: 'templates.create', uploadAuthorized: 'true' },
-            {
-                name: 'Residential.json',
-                text: JSON.stringify({
-                    id: 'sp-1',
-                    name: 'Residential',
-                    sections: [{
-                        id: 's1',
-                        name: 'Roof',
-                        items: [{ id: 'i1', name: 'Covering', comments: [] }],
-                    }],
-                }),
-            },
+            { name: 'Residential.xlsx', text: await templateExport() },
         );
         expect(res.status).toBe(201);
         const body = await res.json() as { data: { status: string } };

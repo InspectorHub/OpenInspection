@@ -1,6 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AI_PROMPTS } from '../../../server/lib/ai/prompts';
 import { AIService } from '../../../server/services/ai.service';
+import { OpenAiCompatibleProvider } from '../../../server/lib/ai/providers/openai-compatible';
+
+/**
+ * A real adapter over the mocked `fetch`. The service builds none of its own —
+ * credential, endpoint and model selection belongs to `resolve-provider.ts` —
+ * so a construction that omits this refuses to run, which is what the
+ * fail-closed cases rely on.
+ */
+const ADAPTER = () => new OpenAiCompatibleProvider({
+    apiKey: 'a-key', model: 'a-model', baseUrl: 'https://api.example.test/v1',
+});
+
 
 /**
  * The courtesy-translation entry point: what it sends, and what it refuses to
@@ -35,10 +47,9 @@ describe('AIService.translateSegments', () => {
 
     /** Arms the provider with one completion body. */
     function armModel(text: string) {
-        fetchMock.mockResolvedValue({
-            ok: true,
-            json: async () => ({ candidates: [{ content: { parts: [{ text }] } }] }),
-        } as Response);
+        fetchMock.mockResolvedValue(new Response(
+            JSON.stringify({ choices: [{ message: { content: text } }] }), { status: 200 },
+        ));
     }
 
     beforeEach(() => {
@@ -54,6 +65,8 @@ describe('AIService.translateSegments', () => {
             { record: async () => {} },
             TENANT_OWN_CONFIRMED_KEY,
             { record: async () => 'ai-call-row' },
+            undefined,
+            ADAPTER(),
         );
     }
 
