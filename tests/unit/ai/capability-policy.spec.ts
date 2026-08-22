@@ -34,6 +34,15 @@ const OWN_UNCONFIRMED_KEY = { source: 'byo', tenantKeyAttested: false } as const
  *  does not secretly depend on it. */
 const MANAGED = { source: 'managed', tenantKeyAttested: false } as const;
 
+/** One report segment, the shape the translate prompt takes. Deliberately a
+ *  sentence a report would actually contain, so a case that reaches a provider
+ *  is sending the kind of text this capability is judged on. */
+const TRANSLATE_INPUT = {
+    segments: ['The roof covering is at the end of its service life.'],
+    targetLocale: 'es-419',
+    glossary: {},
+} as const;
+
 describe('AI capability policy', () => {
     it('offers writing assistance on the tenant OWN key', () => {
         expect(checkAiCapability('finding_explanation', OWN_CONFIRMED_KEY)).toEqual({ allowed: true });
@@ -47,14 +56,22 @@ describe('AI capability policy', () => {
         expect(denialReason(d)).toBe('source_not_offered');
     });
 
-    it('does NOT offer translation on ANY credentials — including the tenant own key', () => {
-        // Asserted on BYO first: if this only covered 'managed' it would pass
-        // against a policy that refuses nothing but managed, which is a
-        // different rule with the same green.
-        const byo = checkAiCapability('translation', OWN_CONFIRMED_KEY);
-        expect(byo).toMatchObject({ allowed: false, source: 'byo' });
-        expect(denialReason(byo)).toBe('capability_not_released');
-        expect(denialReason(checkAiCapability('translation', MANAGED))).toBe('capability_not_released');
+    it('offers translation on the tenant OWN key, and not on platform credentials', () => {
+        // Both halves in one case on purpose. Asserting only the managed
+        // refusal would pass against a policy that refuses nothing but
+        // managed; asserting only the BYO allow would pass against one that
+        // allows everything. The split IS the rule, so both sides are the
+        // assertion.
+        expect(checkAiCapability('translation', OWN_CONFIRMED_KEY)).toEqual({ allowed: true });
+
+        const managed = checkAiCapability('translation', MANAGED);
+        expect(managed).toMatchObject({
+            allowed: false, classification: 'translation', source: 'managed',
+        });
+        // `source_not_offered`, NOT `capability_not_released`: the capability
+        // ships, and the refusal names the credentials rather than the
+        // feature. A tenant can act on the first and cannot act on the second.
+        expect(denialReason(managed)).toBe('source_not_offered');
     });
 
     it('summaries are offered separately from writing assistance', () => {
@@ -101,13 +118,23 @@ describe('AI capability policy', () => {
         expect(d.message).toMatch(/confirm/i);
     });
 
-    it('keeps the unconfirmed refusal distinct from the not-released one', () => {
+    it('keeps the unconfirmed-key refusal distinct from a refusal about the OUTPUT', () => {
         // Same credentials, two different reasons depending on what the output
-        // would be. If translation reported `tenant_key_not_attested`,
-        // confirming would look like it should unlock a feature that does not
-        // exist.
+        // would be — and which reason belongs to which class MOVED when
+        // translation was released, so this is a change of meaning rather than
+        // a renamed constant.
+        //
+        // Translation is released on an own key, so the confirmation really is
+        // the remaining obstacle and the refusal must say so: confirming the
+        // key unlocks it.
         expect(denialReason(checkAiCapability('translation', OWN_UNCONFIRMED_KEY)))
-            .toBe('capability_not_released');
+            .toBe('tenant_key_not_attested');
+        // The control, and the half that keeps the distinction meaningful. A
+        // class the product refuses OUTRIGHT must not report the same reason —
+        // otherwise confirming a key would look like it should unlock
+        // something that has no version of itself that ships.
+        expect(denialReason(checkAiCapability('legal_text', OWN_UNCONFIRMED_KEY)))
+            .toBe('capability_prohibited');
     });
 
     it('names the feature the inspector used, not the internal class', () => {
@@ -234,6 +261,57 @@ describe('the gate at the AI chokepoint', () => {
         await expect(svc.generateProfessionalComment('note'))
             .rejects.toMatchObject({ code: 'ai_not_configured' });
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('translation on a confirmed own key runs, sends, and meters as a TRANSLATION', async () => {
+        // The positive control for the two refusals below, and the only thing
+        // that can catch the metering defect this capability was most exposed
+        // to: `callGemini`'s third parameter defaults to 'assist', so a
+        // translation sent with two arguments would run, succeed, and be
+        // counted against the wrong metric with no type error and nothing red.
+        fetchMock.mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                candidates: [{ content: { parts: [{ text: '["El techo esta al final de su vida util."]' }] } }],
+            }),
+        } as Response);
+        const record = vi.fn(async () => {});
+
+        await expect(service(OWN_CONFIRMED_KEY, record).translateSegments(TRANSLATE_INPUT))
+            .resolves.toMatchObject({
+                segments: ['El techo esta al final de su vida util.'],
+                aiCallId: 'ai-call-row',
+            });
+        expect(fetchMock).toHaveBeenCalledOnce();
+        expect(record).toHaveBeenCalledWith('translate');
+    });
+
+    it('translation on platform credentials sends nothing and meters nothing', async () => {
+        // Asserted on the MESSAGE as well as the code. The capability gate and
+        // the unconfigured-model check both throw 503 / 'ai_not_configured',
+        // and this service IS handed a model, so a code-only assertion would
+        // pass on the wrong throw and prove nothing about the posture.
+        const record = vi.fn(async () => {});
+        await expect(service(MANAGED, record).translateSegments(TRANSLATE_INPUT))
+            .rejects.toMatchObject({
+                status: 503,
+                code: 'ai_not_configured',
+                message: 'AI translation runs on your own provider key. Add one in Settings → Advanced → AI.',
+            });
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(record).not.toHaveBeenCalled();
+    });
+
+    it('translation on an UNCONFIRMED own key sends nothing, even though the key would work', async () => {
+        // The credential is present and valid; the release does not reach a key
+        // nobody has confirmed anything about. Asserted on the absence of the
+        // outbound call, not on the throw alone — an implementation that sent
+        // the report and discarded the answer would satisfy a rejects-only case.
+        const record = vi.fn(async () => {});
+        await expect(service(OWN_UNCONFIRMED_KEY, record).translateSegments(TRANSLATE_INPUT))
+            .rejects.toMatchObject({ status: 503, code: 'ai_not_configured' });
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(record).not.toHaveBeenCalled();
     });
 
     it('a refusal reaches suggestComment callers instead of degrading to no suggestions', async () => {

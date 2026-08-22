@@ -98,6 +98,26 @@ const NO_NEW_ASSERTIONS = [
 ] as const;
 
 /**
+ * What a courtesy translation may ask a model for, on top of the restatement
+ * floor every class in this group carries.
+ *
+ * The first two are the reason translation is a class of its own rather than
+ * another kind of restatement: it produces a SECOND DOCUMENT that a reader may
+ * take for the report, so the constraints are about the standing of the output
+ * and not only about its contents. The third is the boundary the
+ * non-translatable content registry draws — legal instruments stay in the
+ * language they were agreed in, and `legal_text` is refused outright on both
+ * sources so no prompt may reach for them a second way either.
+ */
+const COURTESY_TRANSLATION = [
+    ...NO_NEW_ASSERTIONS,
+    'must render the English source and nothing else: no gloss, no clarification, no footnote, no reordering',
+    'must be labelled a courtesy translation, stating that the English report is the inspection record',
+    'must never be asked to render reliance clauses, limitation of liability, arbitration, warranty disclaimers, governing law, contract terms, signatures or acknowledgements',
+    'must reproduce addresses, personal names, dates, measurements and currency amounts verbatim, so a reader can match them against the English document',
+] as const;
+
+/**
  * The posture table. Two entries per class, because whose key paid changes the
  * answer for everything except the two that are refused outright.
  *
@@ -111,10 +131,24 @@ const POSTURE: Record<
     Record<AiCredentialSource, ClassificationPosture>
 > = {
     translation: {
-        // A reserved slot must not double as an unlocked door: the capability
-        // has a usage metric and no released surface on either source.
-        byo: { allowed: false, denial: 'not_released', requiresReview: true },
-        managed: { allowed: false, denial: 'not_released', requiresReview: true },
+        // Released on a workspace's OWN provider key. The deployment that
+        // supplies the key selects the provider, holds the account and owns
+        // the vendor relationship, so the arrangement behind a translated
+        // document is one the workspace chose and can describe.
+        //
+        // "Allowed" here means RELEASED, not unconditional: `capability-policy`
+        // still refuses an own key with no confirmation on file, after this
+        // lookup. Both answers are needed — this table says what the product
+        // ships, that check says what these credentials may run.
+        byo: { allowed: true, requiresReview: true, conditions: COURTESY_TRANSLATION },
+        // The platform key stays refused, and `source_not_offered` rather than
+        // `not_released` is the deliberate half of that: the capability ships,
+        // so the refusal names the credentials, which is the part a workspace
+        // can act on. It is refused per PROVIDER, not per feature — a platform
+        // key may only carry output classes whose provider record is complete
+        // for the provider that would actually serve the call, and that record
+        // is kept with the deployment rather than in this table.
+        managed: { allowed: false, denial: 'source_not_offered', requiresReview: true },
     },
     summary: {
         byo: { allowed: true, requiresReview: true, conditions: NO_NEW_ASSERTIONS },

@@ -7,9 +7,11 @@
  * `non-translatable-out-of-scope.ts`) and HARD-FAILS when an entry has decayed
  * into a string that points at nothing.
  *
- * ── What this gate is FOR, given it guards a feature that does not exist ────
- * Report courtesy translation (#23) is `not_released`. The registry has no
- * runtime consumer today and will not have one until that ships. So the failure
+ * ── What this gate is FOR, given it guards a feature not yet wired up ───────
+ * The `translation` output class is now RELEASED on a workspace's own provider
+ * key (`server/lib/ai/output-classification.ts`), but nothing assembles a
+ * report into segments yet, so the registry still has no runtime consumer and
+ * will not have one until #23's pipeline ships. So the failure
  * mode it defends against is not a bad translation — it is the registry quietly
  * becoming untrue in the months before anything reads it. A `source` gets
  * renamed, a `locator` gets refactored away, someone adds a ninth category to

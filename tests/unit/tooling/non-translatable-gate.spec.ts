@@ -10,7 +10,8 @@
  *
  * ## Why this spec is the whole enforcement today
  *
- * Report courtesy translation (#23) is `not_released`. Nothing reads the
+ * The `translation` output class is released on a workspace's own provider key,
+ * but no pipeline segments a report yet. Nothing reads the
  * registry at runtime and nothing will until that ships, so the registry's only
  * enemy for now is decay: a renamed constant, a moved file, a ninth category
  * added to the type and not the list. Every assertion below is about the gate

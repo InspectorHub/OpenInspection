@@ -8,8 +8,10 @@ import {
     AI_PROMPTS,
     type RewriteCommentPromptArgs,
     type SuggestCommentPromptArgs,
+    type TranslateSegmentsPromptArgs,
     type VersionedPrompt,
 } from '../lib/ai/prompts';
+import { parseTranslatedSegments } from '../lib/ai/translate-response';
 import type { AiProvenanceSink } from '../lib/ai/provenance';
 import type { AiQuotaPreflight } from '../lib/ai/metering';
 import type { AiUsageKind } from '../lib/usage/period';
@@ -263,6 +265,16 @@ export class AIService {
      */
     async generateProfessionalComment(text: string, context?: string) {
         return this.callGemini(AI_PROMPTS.professionalComment, { text, context });
+    }
+
+    /**
+     * Renders report segments into another language, as a courtesy copy. THE THIRD ARGUMENT IS NOT OPTIONAL: `kind` defaults to
+     * 'assist', and a translation counted there makes both metrics wrong at once — with no type error. The capability gate reads the
+     * PROMPT's classification inside `callGemini`; response shape and segment-count invariance live in `lib/ai/translate-response.ts`.
+     */
+    async translateSegments(input: TranslateSegmentsPromptArgs): Promise<{ segments: string[]; aiCallId: string }> {
+        const { text, aiCallId } = await this.callGemini(AI_PROMPTS.translate, input, 'translate');
+        return { segments: parseTranslatedSegments(text, input.segments.length), aiCallId };
     }
 
     /**

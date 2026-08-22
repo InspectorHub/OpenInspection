@@ -15,13 +15,19 @@
  *
  * ## This registry has NO runtime effect today, and that is the point
  *
- * Report courtesy translation (#23) is `not_released`
- * (`server/lib/ai/output-classification.ts`: `translation` is denied on both
- * credential sources, `legal_text` is `prohibited` on both). There is no
- * translation pipeline for this list to be consulted by. It is a PRECONDITION
- * of #23 rather than a feature of it: the register has to exist, and be
- * enforced, before the pipeline that would otherwise have to remember all eight
- * categories at review time.
+ * The `translation` output class is now RELEASED on a workspace's own provider
+ * key and still refused on a platform key
+ * (`server/lib/ai/output-classification.ts`; `legal_text` stays `prohibited` on
+ * both). What does NOT exist is a pipeline: nothing segments a report and
+ * nothing calls for a translation of one, so there is still no consumer for
+ * this list. It remains a PRECONDITION of #23 rather than a feature of it: the
+ * register has to exist, and be enforced, before the pipeline that would
+ * otherwise have to remember all eight categories at review time.
+ *
+ * ⚠️ The release is why this file matters more than it did, not less. While the
+ * capability was refused outright, an omission here could not reach a client;
+ * now the only thing between the eight categories and a model is that no
+ * caller has been written yet.
  *
  * ⚠️ Read the direction of the rule correctly. This is NOT an exemption list
  * carved out of a permission — today nothing may be machine-translated at all.
