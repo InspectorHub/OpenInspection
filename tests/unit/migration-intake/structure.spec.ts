@@ -51,14 +51,14 @@ describe('buildBatchStructure', () => {
     it('is null for a run carrying no template at all', () => {
         // Contacts have no shape to judge — the repair table IS a row-by-row
         // preview of them — so the step has to be absent rather than empty.
-        expect(buildBatchStructure([], NO_DROPS)).toBeNull();
+        expect(buildBatchStructure([], NO_DROPS, [])).toBeNull();
     });
 
     it('carries the template\'s own sections and items, in order', () => {
         const got = buildBatchStructure([template([
             { title: 'Roof', items: [item({ label: 'Covering' }), item({ label: 'Flashing' })] },
             { title: 'Attic', items: [] },
-        ])], NO_DROPS);
+        ])], NO_DROPS, []);
         expect(got?.name).toBe('AHIT Master');
         expect(got?.sections.map((s) => s.title)).toEqual(['Roof', 'Attic']);
         expect(got?.sections[0]?.items.map((i) => i.label)).toEqual(['Covering', 'Flashing']);
@@ -73,7 +73,7 @@ describe('buildBatchStructure', () => {
                 item({ label: 'Typed', type: 'textarea', ratingOptions: undefined, tabs: undefined }),
                 item({ label: 'Also typed', type: 'text', ratingOptions: undefined, tabs: undefined }),
             ],
-        }])], NO_DROPS);
+        }])], NO_DROPS, []);
         expect(got?.sections[0]?.items.map((i) => i.landedAs))
             .toEqual(['rated', 'choices', 'plain', 'plain']);
     });
@@ -88,7 +88,7 @@ describe('buildBatchStructure', () => {
                 item({ type: 'select', ratingOptions: undefined, tabs: undefined }),
                 item({ type: 'photo_only', ratingOptions: undefined, tabs: undefined }),
             ],
-        }])], NO_DROPS);
+        }])], NO_DROPS, []);
         expect(new Set(got?.sections[0]?.items.map((i) => i.landedAs)).size).toBe(3);
     });
 
@@ -103,7 +103,7 @@ describe('buildBatchStructure', () => {
                 { at: 'row 42', reason: 'Executive Summary has no item' },
                 { at: 'row 91', reason: 'Blank row' },
             ],
-        });
+        }, []);
         expect(got?.dropped.map((d) => d.reason))
             .toEqual(['Executive Summary has no item', 'Blank row']);
         expect(got?.dropped.map((d) => d.at)).toEqual(['row 42', 'row 91']);
@@ -112,8 +112,35 @@ describe('buildBatchStructure', () => {
     it('reports an empty list of drops rather than omitting it', () => {
         // An absent list and an empty one look identical on a screen, and the
         // empty one is the information: nothing was skipped.
-        const got = buildBatchStructure([template([{ title: 'Roof', items: [item()] }])], NO_DROPS);
+        const got = buildBatchStructure([template([{ title: 'Roof', items: [item()] }])], NO_DROPS, []);
         expect(got?.dropped).toEqual([]);
+    });
+
+    it('carries the manifest WARNINGS, which are the only per-comment record', () => {
+        // `counts.template` accounts in whole templates — one read, one
+        // emitted — so an untyped comment filed under Information can never
+        // appear in `dropped` however many there were. The warnings are the
+        // only place that decision is written down, and a preview that read
+        // `dropped` alone would report a clean conversion of a file whose
+        // comments were all filed under a heading nobody chose.
+        const got = buildBatchStructure(
+            [template([{ title: 'Roof', items: [item()] }])],
+            NO_DROPS,
+            [{ code: 'UNTYPED_COMMENTS', message: '3 comments said "summary"' }],
+        );
+        expect(got?.warnings).toEqual([
+            { code: 'UNTYPED_COMMENTS', message: '3 comments said "summary"' },
+        ]);
+        // And they are NOT folded into the losses: one came across, the other
+        // did not, and a single list would have to describe both wrongly.
+        expect(got?.dropped).toEqual([]);
+    });
+
+    it('reports an empty list of warnings rather than omitting it', () => {
+        const got = buildBatchStructure(
+            [template([{ title: 'Roof', items: [item()] }])], NO_DROPS, [],
+        );
+        expect(got?.warnings).toEqual([]);
     });
 
     it('reads the FIRST template when a run somehow carries several', () => {
@@ -123,6 +150,7 @@ describe('buildBatchStructure', () => {
         const got = buildBatchStructure(
             [template([{ title: 'One', items: [] }]), template([{ title: 'Two', items: [] }])],
             NO_DROPS,
+            [],
         );
         expect(got?.sections.map((s) => s.title)).toEqual(['One']);
     });

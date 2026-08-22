@@ -30,6 +30,7 @@ function structure(over: Partial<BatchStructure> = {}): BatchStructure {
         name: "AHIT Master",
         sections: [{ title: "Roof", items: items(3, "rated") }],
         dropped: [],
+        warnings: [],
         ...over,
     };
 }
@@ -57,6 +58,34 @@ describe("PreviewStage: it leads with what went wrong", () => {
             sections: [{ title: "Roof", items: items(76, "plain") }],
         })} />);
         expect(anomalies()).toMatch(/most of|all of/i);
+    });
+
+    it("does not call an even split a wholesale downgrade", () => {
+        // The design says the wholesale-downgrade sentence is for MORE than
+        // half. Exactly half is the boundary, and it is the one value that a
+        // `>=` reads as a disaster — a template where every second item kept
+        // its ratings would be announced as the failure this step exists for.
+        render(<PreviewStage structure={structure({
+            sections: [
+                { title: "Roof", items: items(38, "plain") },
+                { title: "Interior", items: items(38, "rated") },
+            ],
+        })} />);
+        expect(anomalies()).not.toMatch(/most of|all of/i);
+        expect(anomalies()).toMatch(/38 items/);
+    });
+
+    it("calls one item past half a wholesale downgrade — the control", () => {
+        // The other side of the boundary, from the same fixture size. Without
+        // it the assertion above would also pass for a screen that never says
+        // "most of" at all.
+        render(<PreviewStage structure={structure({
+            sections: [
+                { title: "Roof", items: items(39, "plain") },
+                { title: "Interior", items: items(38, "rated") },
+            ],
+        })} />);
+        expect(anomalies()).toMatch(/most of/i);
     });
 
     it("does NOT call a deliberate list of choices a downgrade", () => {
@@ -88,6 +117,34 @@ describe("PreviewStage: it leads with what went wrong", () => {
         })} />);
         expect(screen.getByText(/Executive Summary has no item/)).toBeTruthy();
         expect(screen.getByText(/row 42/)).toBeTruthy();
+    });
+
+    it("does not say 'no problems' directly above a list of dropped entries", () => {
+        // The two halves of this region were computed from different things:
+        // the banner from the item landings, the list from `dropped`. A file
+        // that converted cleanly but lost entries therefore rendered a green
+        // "no problems found" immediately above the entries it lost — the
+        // screen contradicting itself, in the one place built to be believed.
+        render(<PreviewStage structure={structure({
+            dropped: [{ at: "row 42", reason: "Executive Summary has no item" }],
+        })} />);
+        expect(anomalies()).not.toMatch(/no problems found/i);
+        expect(anomalies()).toMatch(/Executive Summary has no item/);
+    });
+
+    it("names what the conversion had to decide, and does not call it a loss", () => {
+        // The information exists and the screen was blind to it: a Spectora
+        // export whose comment types this software does not recognise has them
+        // filed under Information, and until now the only place that was said
+        // was a generic sentence in the aftercare list that appears whether or
+        // not it happened.
+        render(<PreviewStage structure={structure({
+            warnings: [{ code: "UNTYPED_COMMENTS", message: '3 comments said "summary"' }],
+        })} />);
+        expect(anomalies()).toMatch(/3 comments said "summary"/);
+        expect(anomalies()).not.toMatch(/no problems found/i);
+        // Not filed under losses: it came across, under a reading nobody chose.
+        expect(anomalies()).not.toMatch(/could not bring over/i);
     });
 
     it("says so plainly when there are none — the positive control", () => {

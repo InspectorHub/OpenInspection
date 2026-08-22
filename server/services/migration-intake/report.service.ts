@@ -226,19 +226,34 @@ export class MigrationReportService {
             templates.push(JSON.parse(row.payload) as BundleTemplate);
         }
         if (templates.length === 0) return null;
-        const dropped = this.droppedTemplates(batch.manifest);
-        return buildBatchStructure(templates, dropped);
+        const { counts, warnings } = this.templateAccounting(batch.manifest);
+        return buildBatchStructure(templates, counts, warnings);
     }
 
-    /** The template accounting off the stored manifest, or an empty one. */
-    private droppedTemplates(manifest: string): EntityCounts {
+    /**
+     * The template accounting off the stored manifest, or an empty one.
+     *
+     * The warnings come from the same parse as the counts, because they answer
+     * halves of one question and reading them separately is how a screen ends
+     * up showing accounting from one manifest and notes from another. They are
+     * also the ONLY place a per-comment decision is recorded: `counts.template`
+     * accounts in whole templates, so an untyped comment filed under
+     * Information can never appear in `dropped` however many there were.
+     */
+    private templateAccounting(
+        manifest: string,
+    ): { counts: EntityCounts; warnings: { code: string; message: string }[] } {
         try {
             const parsed = JSON.parse(manifest) as {
                 counts?: Partial<Record<EntityKind, EntityCounts>>;
+                warnings?: { code: string; message: string }[];
             };
-            return parsed.counts?.template ?? EMPTY_COUNTS;
+            return {
+                counts: parsed.counts?.template ?? EMPTY_COUNTS,
+                warnings: parsed.warnings ?? [],
+            };
         } catch {
-            return EMPTY_COUNTS;
+            return { counts: EMPTY_COUNTS, warnings: [] };
         }
     }
 

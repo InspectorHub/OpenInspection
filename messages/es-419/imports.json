@@ -133,6 +133,7 @@
   "imports_preview_some_plain": "{count} elementos llegaron como cuadros de texto, mientras que el resto conservó algo para elegir.",
   "imports_preview_empty_sections": "Secciones que llegaron sin nada dentro: {names}",
   "imports_preview_dropped_lead": "Entradas que la conversión no pudo traer:",
+  "imports_preview_warnings_lead": "Lo que la conversión tuvo que decidir por usted:",
   "imports_preview_dropped_entry": "{reason} ({at})",
   "imports_preview_show_structure": "Ver la estructura completa",
   "imports_preview_hide_structure": "Ocultar la estructura completa",

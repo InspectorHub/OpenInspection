@@ -133,6 +133,7 @@
   "imports_preview_some_plain": "{count} items came through as plain text boxes while the rest kept something to pick from.",
   "imports_preview_empty_sections": "Sections that came through with nothing in them: {names}",
   "imports_preview_dropped_lead": "Entries the conversion could not bring over:",
+  "imports_preview_warnings_lead": "What the conversion had to decide for you:",
   "imports_preview_dropped_entry": "{reason} ({at})",
   "imports_preview_show_structure": "Show the full structure",
   "imports_preview_hide_structure": "Hide the full structure",

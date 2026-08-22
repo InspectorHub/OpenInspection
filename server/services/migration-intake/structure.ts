@@ -47,6 +47,19 @@ export interface BatchStructure {
      * identical on a screen, and the empty one is the information.
      */
     dropped: { at: string; reason: string }[];
+    /**
+     * What the conversion had to DECIDE, named by the adapter that decided it.
+     *
+     * A different thing from `dropped`, and kept in its own list for that
+     * reason: a dropped entry did not come across, while a warning came across
+     * under a reading the file did not state — a comment whose type this
+     * software does not recognise, filed under Information. Both need a
+     * person's eye and only one of them is a loss, so a screen that merged them
+     * would have to describe both in whichever of the two wordings was wrong.
+     *
+     * Always present, empty included, for the same reason as `dropped`.
+     */
+    warnings: { code: string; message: string }[];
 }
 
 /**
@@ -82,6 +95,7 @@ const LANDING_FOR_ITEM_TYPE: Record<ItemType, ItemLanding> = {
 export function buildBatchStructure(
     templates: BundleTemplate[],
     counts: EntityCounts,
+    warnings: readonly { code: string; message: string }[],
 ): BatchStructure | null {
     const template = templates[0];
     if (!template) return null;
@@ -95,5 +109,6 @@ export function buildBatchStructure(
             })),
         })),
         dropped: counts.dropped.map((d) => ({ at: d.at, reason: d.reason })),
+        warnings: warnings.map((w) => ({ code: w.code, message: w.message })),
     };
 }

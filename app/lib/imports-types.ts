@@ -183,6 +183,12 @@ export interface BatchStructure {
      * on a screen, and the empty one is the information.
      */
     dropped: { at: string; reason: string }[];
+    /**
+     * What the conversion had to DECIDE — a comment whose type the file did not
+     * state, filed under Information. Not a loss, which is why it is not folded
+     * into `dropped`; also not nothing, which is why it is not left out.
+     */
+    warnings: { code: string; message: string }[];
 }
 
 /** One entry that needs a person before the run can go ahead. */

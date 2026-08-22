@@ -118,6 +118,7 @@ function templateReport(
                 { title: "Executive Summary", items: [] },
             ],
             dropped: [],
+            warnings: [],
         },
         ...over,
     });

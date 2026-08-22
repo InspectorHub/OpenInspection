@@ -31,6 +31,12 @@ export function PreviewStage({ structure }: { structure: BatchStructure }) {
     const [showTree, setShowTree] = useState(false);
 
     const found = anomaliesIn(structure);
+    // "Nothing is wrong" is a claim about the WHOLE region, and it used to be
+    // computed from the item landings alone — so a template that converted
+    // cleanly but lost entries rendered a green banner immediately above the
+    // list of what it lost. The banner now answers for everything under it.
+    const nothingToLookAt =
+        found.length === 0 && structure.dropped.length === 0 && structure.warnings.length === 0;
 
     return (
         <Card className="p-5 space-y-4">
@@ -42,13 +48,10 @@ export function PreviewStage({ structure }: { structure: BatchStructure }) {
             {/* One region, always present. An empty anomaly area and a missing
                 one look identical, and "nothing is wrong" is the information. */}
             <div data-testid="preview-anomalies" className="space-y-2">
-                {found.length === 0 ? (
-                    <Banner tone="success">{m.imports_preview_none()}</Banner>
-                ) : (
-                    found.map((sentence, i) => (
-                        <Banner key={i} tone="warn">{sentence}</Banner>
-                    ))
-                )}
+                {nothingToLookAt && <Banner tone="success">{m.imports_preview_none()}</Banner>}
+                {found.map((sentence, i) => (
+                    <Banner key={i} tone="warn">{sentence}</Banner>
+                ))}
                 {/* Named, never counted. A count tells the operator something is
                     missing without telling them what, and the name is how they
                     find it in their own file. */}
@@ -63,6 +66,25 @@ export function PreviewStage({ structure }: { structure: BatchStructure }) {
                                     {m.imports_preview_dropped_entry({
                                         reason: entry.reason, at: entry.at,
                                     })}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+                {/* Separate from the list above, because these are not losses.
+                    A comment whose type the file did not state came across —
+                    under Information, which is a reading nobody asked for. The
+                    aftercare list says that happens; this says it happened to
+                    THIS file, and names what the file actually said. */}
+                {structure.warnings.length > 0 && (
+                    <div className="rounded-ih-card border border-ih-border p-3 space-y-1">
+                        <p className="text-[12px] font-bold text-ih-fg-2">
+                            {m.imports_preview_warnings_lead()}
+                        </p>
+                        <ul className="space-y-0.5">
+                            {structure.warnings.map((entry, i) => (
+                                <li key={`${entry.code}-${i}`} className="text-[12px] text-ih-fg-3">
+                                    {entry.message}
                                 </li>
                             ))}
                         </ul>
