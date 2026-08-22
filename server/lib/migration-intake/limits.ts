@@ -1,5 +1,6 @@
 import { Errors } from '../errors';
 import type { DeploymentProfile } from '../deployment-profile';
+import type { SourceExt } from '../../services/migration-intake/source-file.service';
 
 /**
  * The caps in force for this deployment.
@@ -29,16 +30,23 @@ function megabytes(bytes: number): number {
 /**
  * Refuses a source file that is over the cap for its kind.
  *
+ * `byteLength` is the LENGTH OF THE FILE, never of a re-encoding of it. The two
+ * used to differ: the caller decoded the upload as text and measured the result,
+ * so a binary export was inflated by every byte the decode replaced, and could
+ * be refused as oversized while being well inside the cap.
+ *
  * The message carries BOTH numbers. "File too large" leaves the operator
  * guessing how much they have to cut, which for a spreadsheet means splitting
  * it blind and uploading twice.
  */
 export function assertSourceSizeWithin(
     limits: IntakeLimits,
-    ext: 'csv' | 'json',
+    ext: SourceExt,
     byteLength: number,
 ): void {
-    const cap = ext === 'json' ? limits.maxVendorExportBytes : limits.maxCsvBytes;
+    // A vendor export is a vendor export whether it arrived as JSON or as a
+    // container format; only a spreadsheet flattened to text takes the CSV cap.
+    const cap = ext === 'csv' ? limits.maxCsvBytes : limits.maxVendorExportBytes;
     if (byteLength <= cap) return;
     throw Errors.BadRequest(
         `This file is ${megabytes(byteLength)} MB and the limit is ${megabytes(cap)} MB. `

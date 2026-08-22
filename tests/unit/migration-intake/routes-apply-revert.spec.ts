@@ -47,7 +47,7 @@ interface ApplyBody {
 
 describe('applying and undoing an import run over HTTP', () => {
     let db: BetterSQLite3Database<typeof schema>;
-    let store: Map<string, string>;
+    let store: Map<string, Uint8Array>;
     let run: StagedFixture;
 
     async function batchStatus(): Promise<string | undefined> {

@@ -38,7 +38,7 @@ import { r2Keys } from '../../../server/lib/r2-keys';
 
 describe('abandoning a run', () => {
     let db: BetterSQLite3Database<typeof schema>;
-    let store: Map<string, string>;
+    let store: Map<string, Uint8Array>;
     let run: StagedFixture;
 
     async function batchRow() {
@@ -130,7 +130,7 @@ describe('abandoning a run', () => {
 
 describe('the per-intent gate is re-applied on every route, not only on the upload', () => {
     let db: BetterSQLite3Database<typeof schema>;
-    let store: Map<string, string>;
+    let store: Map<string, Uint8Array>;
     let batchId: string;
 
     beforeEach(async () => {
@@ -142,7 +142,7 @@ describe('the per-intent gate is re-applied on every route, not only on the uplo
         store = new Map();
         await seedIntakeTenant(db);
         const sourceKey = r2Keys.migrationSource(TENANT, 'waiting', 'csv');
-        store.set(sourceKey, 'PK binary rubbish');
+        store.set(sourceKey, new TextEncoder().encode('PK binary rubbish'));
         const created = await new MigrationStageService({} as D1Database).createAssistanceBatch({
             tenantId: TENANT,
             createdBy: USER,

@@ -30,6 +30,7 @@ import type {
     MigrationBundleV1,
 } from '../../../server/lib/migration-intake/bundle';
 import type { IntakeMapping } from '../../../server/lib/migration-intake/adapters/registry';
+import { intakeBucket } from '../helpers/migration-intake-routes-harness';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
@@ -80,15 +81,19 @@ const BROKERAGE_AS_NAME: IntakeMapping = {
     mapping: { name: 'Brokerage', email: 'Email', type: { fixed: 'agent' } },
 };
 
+/**
+ * The shared R2 double, seeded from text.
+ *
+ * The shared one rather than a local copy: the store holds BYTES, and a per-file
+ * double is exactly the drift the harness exists to prevent — this file used to
+ * carry one whose `get` exposed only `text()`, which nothing reading bytes could
+ * be tested through.
+ */
 function bucketWith(entries: Record<string, string>) {
-    const store = new Map(Object.entries(entries));
-    return {
-        put: vi.fn(async () => ({}) as R2Object),
-        get: vi.fn(async (k: string) => (store.has(k)
-            ? ({ text: async () => store.get(k) as string } as unknown as R2ObjectBody)
-            : null)),
-        delete: vi.fn(async () => undefined),
-    };
+    const store = new Map<string, Uint8Array>(
+        Object.entries(entries).map(([k, v]) => [k, new TextEncoder().encode(v)]),
+    );
+    return intakeBucket(store);
 }
 
 /**

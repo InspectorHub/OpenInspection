@@ -14,8 +14,14 @@ import { getSeatUsage } from '../../features/seat-quota/usage';
 import { computeSeatsNeeded } from '../../features/seat-quota/batch';
 import { Errors } from '../../lib/errors';
 import { MigrationSourceFileService } from './source-file.service';
-import { defaultMappingFor, matchAdapter, type IntakeMapping } from '../../lib/migration-intake/adapters/registry';
+import {
+    defaultMappingFor,
+    intakeSourceFromText,
+    matchAdapter,
+    type IntakeMapping,
+} from '../../lib/migration-intake/adapters/registry';
 import type { AdapterInspection } from '../../lib/migration-intake/adapters/types';
+import type { VendorId } from '../../lib/migration-intake/bundle';
 
 /** One entry that needs a person before the run can go ahead. */
 export interface BatchReportProblemRow {
@@ -185,11 +191,15 @@ export class MigrationReportService {
         // never matches it and why `defaultMappingFor` does not accept it.
         if (batch.intent === 'assisted.full') return { inspection: null, mapping: null };
         if (!batch.sourceKey) return { inspection: null, mapping: null };
+        // The vendor the RUN was read as, which is the declaration this file
+        // already carries. A run with none was never read by an adapter — it is
+        // waiting for a person — so there is no question to re-ask either.
+        if (!batch.vendor) return { inspection: null, mapping: null };
         const text = await new MigrationSourceFileService(this.bucket).readText(batch.sourceKey);
         if (text === null) return { inspection: null, mapping: null };
 
-        const source = { fileName: batch.sourceKey, text };
-        const match = matchAdapter(batch.intent, source);
+        const source = intakeSourceFromText(batch.sourceKey, text);
+        const match = matchAdapter(batch.intent, batch.vendor as VendorId, source);
         if (!match?.inspection) return { inspection: null, mapping: null };
         return { inspection: match.inspection, mapping: defaultMappingFor(batch.intent, match.inspection, source) };
     }

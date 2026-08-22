@@ -163,11 +163,12 @@ const STEP_LABEL: Record<ImportStepId, () => string> = {
 /**
  * A mapping with columns to point at, or null.
  *
- * A TEMPLATE mapping carries a name rather than a column choice, and it cannot
- * arrive here: the adapter that reads template exports implements no
- * `inspect()`, so the report carries no columns for it. Narrowing rather than
- * asserting keeps that a fact the compiler holds — and keeps the mapping step
- * out of the rail for a run that would open an empty form.
+ * A TEMPLATE mapping carries a name rather than a column choice, so it has no
+ * columns to put on this screen. The narrowing on `mapping.kind` is what keeps
+ * it out — NOT the presence of an inspection: a template run now reports one
+ * too, describing its rating vocabulary rather than its columns. Narrowing
+ * rather than asserting keeps that a fact the compiler holds, and keeps the
+ * mapping step out of the rail for a run that would open an empty form.
  */
 function columnMapping(report: BatchReport): ColumnMapping | null {
     if (!report.inspection || !report.mapping) return null;

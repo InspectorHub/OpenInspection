@@ -104,7 +104,7 @@ export const csvGenericAdapter: MigrationAdapter<CsvGenericOptions> = {
         if (typeof input !== 'string') return null;
         const table = parseCsvTable(input);
         if (table.columns.length === 0) return null;
-        return { columns: table.columns, sampleRows: table.rows.slice(0, 5) };
+        return { kind: 'columns', columns: table.columns, sampleRows: table.rows.slice(0, 5) };
     },
     convert(input: unknown, options: CsvGenericOptions): BundleResult {
         if (typeof input !== 'string') {

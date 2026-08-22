@@ -5,9 +5,15 @@ import { getDrizzle } from '../lib/route-helpers';
 import { auditFromContext } from '../lib/audit';
 import { Errors } from '../lib/errors';
 import { migrationBatches, migrationRows } from '../lib/db/schema';
+import type { VendorId } from '../lib/migration-intake/bundle';
 import { MIGRATION_BATCH_STATUS } from '../lib/status/migration-batch-status';
 import { assertSourceSizeWithin, limitsFor } from '../lib/migration-intake/limits';
-import { buildBundle, defaultMappingFor, matchAdapter } from '../lib/migration-intake/adapters/registry';
+import {
+    buildBundle,
+    defaultMappingFor,
+    intakeSourceFromBytes,
+    matchAdapter,
+} from '../lib/migration-intake/adapters/registry';
 import { assertConversionByPersonAvailable } from '../lib/migration-intake/unreadable-file';
 import { assertStaffAccessDecisionIsOwners } from '../services/migration-intake/staff-access';
 import { MigrationStageService } from '../services/migration-intake/stage.service';
@@ -50,13 +56,17 @@ const migrationIntakeRoutes = createApiRouter()
 
         const file = (await c.req.formData()).get('file');
         if (!(file instanceof File)) throw Errors.BadRequest('Attach the file you exported.');
-        const text = await file.text();
-        if (!text.trim()) throw Errors.BadRequest('That file is empty.');
+        // By SIZE, not by a trimmed decode. A container format whose bytes
+        // happen to decode to whitespace is a file, not an empty upload.
+        if (file.size === 0) throw Errors.BadRequest('That file is empty.');
 
+        const bytes = new Uint8Array(await file.arrayBuffer());
         const ext = extForFileName(file.name);
-        assertSourceSizeWithin(limits, ext, new TextEncoder().encode(text).length);
+        // The file's own length. Measuring a re-encoding of a decode inflates a
+        // binary by every byte the decode replaced.
+        assertSourceSizeWithin(limits, ext, bytes.byteLength);
 
-        const source = { fileName: file.name, text };
+        const source = intakeSourceFromBytes(file.name, bytes);
         const stage = new MigrationStageService(c.env.DB);
         const files = new MigrationSourceFileService(c.env.PHOTOS);
         const now = new Date();
@@ -82,7 +92,7 @@ const migrationIntakeRoutes = createApiRouter()
          * under an authorisation given for a run that does not exist.
          */
         const withStoredFile = async <T>(write: (sourceKey: string) => Promise<T>): Promise<T> => {
-            const sourceKey = await files.put(tenantId, sourceId, ext, text);
+            const sourceKey = await files.put(tenantId, sourceId, ext, bytes);
             try {
                 return await write(sourceKey);
             } catch (err) {
@@ -136,7 +146,17 @@ const migrationIntakeRoutes = createApiRouter()
         // the inference every other entry point is built to avoid.
         if (intent === 'assisted.full') return openWaitingRun();
 
-        const match = matchAdapter(intent, source);
+        // ⚠️ TEMPORARY. The source picker is not built yet, so a caller that
+        // sends no vendor gets the rule the registry used to apply internally —
+        // which is the deleted rule wearing a different coat. It has to go when
+        // the picker lands, or the wizard will silently ignore what the
+        // operator chose.
+        const declaredVendor: VendorId = form.vendor
+            ?? (intent === 'templates.create' || intent === 'templates.overwrite'
+                ? 'spectora'
+                : 'csv_generic');
+
+        const match = matchAdapter(intent, declaredVendor, source);
         if (!match) return openWaitingRun();
 
         const built = buildBundle(match.vendor, source, defaultMappingFor(intent, match.inspection, source));

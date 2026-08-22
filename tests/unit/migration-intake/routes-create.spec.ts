@@ -39,6 +39,9 @@ import {
     MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS,
     MIGRATION_INTAKE_STAGED_RETENTION_DAYS,
 } from '../../../server/lib/compliance/retention-windows';
+// The shared R2 double rather than a copy of it: the store holds bytes, and a
+// per-file copy is the drift the harness exists to prevent.
+import { intakeBucket, storedText } from '../helpers/migration-intake-routes-harness';
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
 const USER = '22222222-2222-2222-2222-2222222222b2';
@@ -56,22 +59,10 @@ const CONTACTS_CSV = 'Full Name,Email\nAlice Ng,alice@example.test\n';
  */
 const UNREADABLE = JSON.stringify({ exportedFrom: 'SomeOtherApp', records: [{ a: 1 }] });
 
-function bucket(store: Map<string, string>) {
-    return {
-        put: vi.fn(async (key: string, value: string) => { store.set(key, value); return {} as R2Object; }),
-        get: vi.fn(async (key: string) => (store.has(key)
-            ? ({ text: async () => store.get(key) as string } as unknown as R2ObjectBody)
-            : null)),
-        delete: vi.fn(async (keys: string | string[]) => {
-            for (const k of Array.isArray(keys) ? keys : [keys]) store.delete(k);
-        }),
-    };
-}
-
 interface AppOpts {
     role: string;
     profile?: DeploymentProfile;
-    store: Map<string, string>;
+    store: Map<string, Uint8Array>;
     /** `permission_overrides` the capability resolver should read off the user row. */
     overrides?: Record<string, boolean>;
 }
@@ -113,7 +104,7 @@ function post(opts: AppOpts, fields: Record<string, string>, file: { name: strin
     return appFor(opts).request(
         '/api/imports',
         { method: 'POST', body: upload(fields, file) },
-        { DB: {}, PHOTOS: bucket(opts.store) },
+        { DB: {}, PHOTOS: intakeBucket(opts.store) },
     );
 }
 
@@ -125,7 +116,7 @@ async function message(res: Response): Promise<string> {
 describe('POST /api/imports', () => {
     let db: BetterSQLite3Database<typeof schema>;
     let sqlite: SqliteDatabase;
-    let store: Map<string, string>;
+    let store: Map<string, Uint8Array>;
 
     beforeEach(async () => {
         const fix = createTestDb();
@@ -163,7 +154,7 @@ describe('POST /api/imports', () => {
         const row = await db.select().from(schema.migrationBatches)
             .where(eq(schema.migrationBatches.id, body.data.batchId)).get();
         expect(row?.sourceKey).toMatch(new RegExp(`^${TENANT}/migrations/[^/]+/source\\.csv$`));
-        expect(store.get(row?.sourceKey as string)).toBe(CONTACTS_CSV);
+        expect(storedText(store, row?.sourceKey as string)).toBe(CONTACTS_CSV);
     });
 
     it('records the storage authorisation and the staged run\'s own expiry', async () => {

@@ -5,7 +5,7 @@ import { migrationBatches, migrationRows } from '../../lib/db/schema';
 import { MIGRATION_BATCH_STATUS } from '../../lib/status/migration-batch-status';
 import { MIGRATION_ROW_STATUS } from '../../lib/status/migration-row-status';
 import { describeRowProblem, type RowProblem } from '../../lib/migration-intake/row-problems';
-import { buildBundle, type IntakeMapping } from '../../lib/migration-intake/adapters/registry';
+import { buildBundle, intakeSourceFromText, type IntakeMapping } from '../../lib/migration-intake/adapters/registry';
 import { assertRowCountWithin, type IntakeLimits } from '../../lib/migration-intake/limits';
 import { resolveConflicts, type IntakeDb } from '../../lib/migration-intake/conflicts';
 import {
@@ -176,7 +176,11 @@ export class MigrationRepairService {
             );
         }
 
-        const built = buildBundle(batch.vendor as VendorId, { fileName: batch.sourceKey, text }, params.mapping);
+        const built = buildBundle(
+            batch.vendor as VendorId,
+            intakeSourceFromText(batch.sourceKey, text),
+            params.mapping,
+        );
         if (!built.ok) throw Errors.BadRequest(built.error.message);
 
         const parsed = parseMigrationBundle(built.bundle);

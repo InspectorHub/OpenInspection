@@ -29,10 +29,47 @@ type IntakeIntent = typeof INTAKE_INTENTS[number];
  */
 type MappableIntent = Exclude<IntakeIntent, 'assisted.full'>;
 
-/** The uploaded file, as text plus the name the operator's machine gave it. */
+/**
+ * The uploaded file, as bytes plus the name the operator's machine gave it.
+ *
+ * BYTES, not text. Every real vendor export measured so far is a binary
+ * container — a Spectora template export is XLSX, a Home Inspector Pro template
+ * is a zip — and decoding one as UTF-8 to carry it through this layer destroys
+ * it. `text()` is a method rather than a field so the decode happens only for
+ * the adapters that want text, and never on the way in.
+ */
 export interface IntakeSource {
-    fileName: string;
-    text: string;
+    readonly fileName: string;
+    readonly bytes: Uint8Array;
+    text(): string;
+}
+
+/** Build a source from the uploaded bytes. The production path. */
+export function intakeSourceFromBytes(fileName: string, bytes: Uint8Array): IntakeSource {
+    let decoded: string | null = null;
+    return {
+        fileName,
+        bytes,
+        text() {
+            // Decoded at most once: `recognises`, `matchAdapter` and
+            // `buildBundle` each ask, and a large CSV should not be decoded
+            // three times on one request.
+            if (decoded === null) decoded = new TextDecoder().decode(bytes);
+            return decoded;
+        },
+    };
+}
+
+/**
+ * Build a source from text.
+ *
+ * For callers that genuinely hold a string — a re-map reading a stored CSV back
+ * — and for tests. It exists so no caller constructs the object literally:
+ * `bytes` and `text()` have to agree, and an object literal is where they would
+ * stop agreeing.
+ */
+export function intakeSourceFromText(fileName: string, text: string): IntakeSource {
+    return intakeSourceFromBytes(fileName, new TextEncoder().encode(text));
 }
 
 /**
@@ -79,17 +116,12 @@ export const ADAPTER_VENDORS: Readonly<Partial<Record<VendorId, AdapterIdentity>
     csv_generic: csvGenericAdapter,
 };
 
-/**
- * Which vendor's adapter an entry point routes to, decided before the file is
- * read. The entry point already states what was asked for; reading the file to
- * find out would be the inference this design refuses everywhere else.
- */
-const VENDOR_FOR_INTENT: Readonly<Record<MappableIntent, VendorId>> = {
-    'templates.create': 'spectora',
-    'templates.overwrite': 'spectora',
-    'contacts.import': 'csv_generic',
-    'members.invite': 'csv_generic',
-};
+/** A file that is not what the operator said it was, and what it looks like instead. */
+export interface VendorMismatch {
+    declared: VendorId;
+    /** null when nothing here recognises it either — the assisted path, not a correction. */
+    looksLike: VendorId | null;
+}
 
 /** Header spellings that mean a given field. Matched case-insensitively, whole-cell. */
 const NAME_HEADERS = ['name', 'full name', 'fullname', 'contact', 'contact name'];
@@ -128,7 +160,7 @@ function asJsonDocument(text: string): { value: unknown } | null {
 /** Whether the vendor's adapter reads this kind of file at all. */
 function recognises(vendor: VendorId, source: IntakeSource): boolean {
     if (vendor === 'spectora') {
-        const doc = asJsonDocument(source.text);
+        const doc = asJsonDocument(source.text());
         if (!doc) return false;
         const value = doc.value;
         return typeof value === 'object'
@@ -136,37 +168,44 @@ function recognises(vendor: VendorId, source: IntakeSource): boolean {
             && !Array.isArray(value)
             && Array.isArray((value as { sections?: unknown }).sections);
     }
-    if (vendor === 'csv_generic') return asJsonDocument(source.text) === null;
+    if (vendor === 'csv_generic') return asJsonDocument(source.text()) === null;
     return false;
 }
 
 /**
- * Which adapter, if any, can read this file for what the operator asked for.
+ * Which adapter reads this file, given what the operator said it is.
  *
- * Intent-aware on purpose. The same spreadsheet is readable for a contact
- * import and unreadable for a template import, and answering "which vendor is
- * this" without knowing what was asked would produce a match the write path
- * cannot use.
+ * ── Why the caller names the vendor ─────────────────────────────────────────
+ * This used to derive the vendor from the intent: `templates.create` meant
+ * Spectora, always. So the product could read exactly one vendor's templates
+ * and the code could not say so — a file from any other product got "nothing
+ * could read that", which is true and useless.
  *
- * `assisted.full` NEVER matches. That entry exists for a file whose owner could
- * not say what it was; having it guess between a contact list and a staff list
- * is exactly the inference every other entry point is designed to avoid.
+ * With the declaration in hand the question changes from "can I read this" to
+ * "is this what you said it was", and THAT has a specific answer. See
+ * `describeVendorMismatch`.
+ *
+ * `assisted.full` NEVER matches, whatever is declared. That entry exists for a
+ * file whose owner could not say what it was; having it guess is exactly the
+ * inference every other entry point is designed to avoid.
  */
-export function matchAdapter(intent: IntakeIntent, source: IntakeSource): AdapterMatch | null {
+export function matchAdapter(
+    intent: IntakeIntent,
+    vendor: VendorId,
+    source: IntakeSource,
+): AdapterMatch | null {
     if (intent === 'assisted.full') return null;
-    if (source.text.trim().length === 0) return null;
+    if (source.bytes.byteLength === 0) return null;
 
-    const vendor = VENDOR_FOR_INTENT[intent];
     const adapter = ADAPTER_VENDORS[vendor];
+    // A vendor with no adapter is a normal answer, not an error: `VendorId`
+    // names every vendor the stored format can record, and only some have a
+    // reader here. The wizard routes the rest to the assisted path.
     if (!adapter) return null;
     if (!recognises(vendor, source)) return null;
 
-    // The skip rule itself, derived rather than written down per vendor: an
-    // adapter with no `inspect` has no columns to offer, so the mapping step
-    // has no question to ask. An adapter that grows an `inspect` starts being
-    // asked about on the day it does, with no edit here.
-    const inspection = adapter.inspect?.(source.text) ?? null;
-    // An adapter that CAN report columns and reports none was handed a file it
+    const inspection = adapter.inspect?.(source.text()) ?? null;
+    // An adapter that CAN report and reports nothing was handed a file it
     // cannot read. One that reports nothing by design says nothing here.
     if (adapter.inspect && !inspection) return null;
 
@@ -176,6 +215,32 @@ export function matchAdapter(intent: IntakeIntent, source: IntakeSource): Adapte
         adapterVersion: adapter.version,
         inspection,
     };
+}
+
+/**
+ * What the file looks like, when it is not what the operator declared.
+ *
+ * Returns null when the declaration was right — so a caller can ask this
+ * unconditionally and only render a sentence when there is one.
+ *
+ * `looksLike` is null when nothing here recognises the file either. That is a
+ * different sentence from "this looks like another vendor's file": one offers a
+ * correction, the other offers the assisted path, and conflating them sends
+ * people down the wrong one.
+ */
+export function describeVendorMismatch(
+    intent: IntakeIntent,
+    declared: VendorId,
+    source: IntakeSource,
+): VendorMismatch | null {
+    if (matchAdapter(intent, declared, source) !== null) return null;
+    for (const vendor of Object.keys(ADAPTER_VENDORS) as VendorId[]) {
+        if (vendor === declared) continue;
+        if (matchAdapter(intent, vendor, source) !== null) {
+            return { declared, looksLike: vendor };
+        }
+    }
+    return { declared, looksLike: null };
 }
 
 /**
@@ -192,10 +257,14 @@ export function defaultMappingFor(
     source: IntakeSource,
 ): IntakeMapping {
     if (intent === 'templates.create' || intent === 'templates.overwrite') {
-        return { kind: 'template', name: source.fileName.replace(/\.[^.]+$/, '') };
+        // The file's own name beats the filename: a real vendor template calls
+        // itself something meaningful while its file is named for whoever saved
+        // it. The filename is the fallback, not the answer.
+        const own = inspection?.kind === 'template' ? inspection.name : null;
+        return { kind: 'template', name: own ?? source.fileName.replace(/\.[^.]+$/, '') };
     }
 
-    const columns = inspection?.columns ?? [];
+    const columns = inspection?.kind === 'columns' ? inspection.columns : [];
 
     if (intent === 'members.invite') {
         const mapping: CsvMemberMapping = {
@@ -247,7 +316,7 @@ export function buildBundle(
                 },
             };
         }
-        const doc = asJsonDocument(source.text);
+        const doc = asJsonDocument(source.text());
         if (!doc) {
             return {
                 ok: false,
@@ -262,10 +331,10 @@ export function buildBundle(
 
     if (vendor === 'csv_generic') {
         if (mapping.kind === 'contacts') {
-            return csvGenericAdapter.convert(source.text, { entity: 'contact', mapping: mapping.mapping });
+            return csvGenericAdapter.convert(source.text(), { entity: 'contact', mapping: mapping.mapping });
         }
         if (mapping.kind === 'members') {
-            return csvGenericAdapter.convert(source.text, { entity: 'member', mapping: mapping.mapping });
+            return csvGenericAdapter.convert(source.text(), { entity: 'member', mapping: mapping.mapping });
         }
         return {
             ok: false,

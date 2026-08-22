@@ -20,6 +20,7 @@ import { describe, it, expect } from 'vitest';
 import {
     buildBundle,
     defaultMappingFor,
+    intakeSourceFromText,
     matchAdapter,
     type IntakeMapping,
 } from '../../../server/lib/migration-intake/adapters/registry';
@@ -58,8 +59,10 @@ function runPipeline(
     csv: string,
     remap?: (m: IntakeMapping) => IntakeMapping,
 ): PipelineResult {
-    const source = { fileName: 'export.csv', text: csv };
-    const match = matchAdapter(intent as MigrationIntent, source);
+    const source = intakeSourceFromText('export.csv', csv);
+    // Both entry points here carry spreadsheets, so that is what the operator
+    // would have declared.
+    const match = matchAdapter(intent as MigrationIntent, 'csv_generic', source);
     if (!match) return { refusedWith: 'no adapter matched', dropped: [], readFromSource: 0, staged: [] };
 
     const base = defaultMappingFor(intent, match.inspection, source);

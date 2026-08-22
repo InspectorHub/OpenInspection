@@ -20,7 +20,7 @@
 
 import type { TemplateSchemaV2, TemplateSection, TemplateItem, RatingLevel, CannedInfoComment, CannedDefect } from '../../../types/template-schema';
 import type { ConvertStats } from '../bundle';
-import type { BundleResult, MigrationAdapter } from './types';
+import type { AdapterInspection, BundleResult, MigrationAdapter } from './types';
 import { emptyEntityCounts } from './types';
 
 const SPECTORA_PLATFORM = 'spectora';
@@ -242,6 +242,55 @@ export interface SpectoraAdapterOptions {
 const SPECTORA_ADAPTER_VERSION = '1';
 
 /**
+ * The comment vocabulary this format has.
+ *
+ * Fixed rather than read, because this export marks every comment as one of
+ * these three and they are already our three tabs. A format whose vocabulary is
+ * user-defined reports what it found in the file instead — which is the whole
+ * reason the template arm carries a list rather than a flag.
+ */
+const SPECTORA_RATINGS = ['info', 'limit', 'defect'];
+
+/** A value that is not a Spectora export, and the reason it is not one. */
+type SpectoraShape =
+    | { ok: true; doc: SpectoraTemplate }
+    | { ok: false; code: 'NOT_AN_EXPORT' | 'NO_SECTIONS' };
+
+/**
+ * The value as a Spectora export, or why it is not one.
+ *
+ * ONE shape test, shared by `inspect` and `convert`. `inspect` throws the reason
+ * away and answers null; `convert` turns it into the sentence the operator
+ * reads. A second copy of this test is how the two come to disagree about what
+ * a Spectora file is — and they would disagree silently, because each has its
+ * own tests.
+ */
+function readSpectoraDocument(value: unknown): SpectoraShape {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+        return { ok: false, code: 'NOT_AN_EXPORT' };
+    }
+    const doc = value as SpectoraTemplate;
+    if (!Array.isArray(doc.sections)) return { ok: false, code: 'NO_SECTIONS' };
+    return { ok: true, doc };
+}
+
+/**
+ * The uploaded file as a value, whichever form the caller holds it in.
+ *
+ * `inspect` is handed the file as TEXT by the registry, while `convert` is
+ * handed the already-parsed document. The parse therefore lives on this side of
+ * the boundary rather than being required of every caller.
+ */
+function valueOf(input: unknown): unknown {
+    if (typeof input !== 'string') return input;
+    try {
+        return JSON.parse(input) as unknown;
+    } catch {
+        return null;
+    }
+}
+
+/**
  * The Spectora entry into the normalised format.
  *
  * A thin shell over `convertSpectoraTemplate` on purpose: the four-bucket to
@@ -254,28 +303,47 @@ export const spectoraAdapter: MigrationAdapter<SpectoraAdapterOptions> = {
     name: 'spectora',
     version: SPECTORA_ADAPTER_VERSION,
     vendor: 'spectora',
+    /**
+     * What this export says about itself, before converting it.
+     *
+     * Its ABSENCE used to mean "a vendor export has no columns, so the wizard
+     * has no question" — which was true of columns and false of the file. A
+     * template's question is what its comment vocabulary means, and this is
+     * what carries it.
+     */
+    inspect(input: unknown): AdapterInspection | null {
+        const read = readSpectoraDocument(valueOf(input));
+        if (!read.ok) return null;
+        const { doc } = read;
+        return {
+            kind: 'template',
+            name: typeof doc.name === 'string' && doc.name.trim() !== '' ? doc.name : null,
+            sections: doc.sections?.length ?? 0,
+            items: (doc.sections ?? []).reduce((n, s) => n + (s.items?.length ?? 0), 0),
+            ratings: [...SPECTORA_RATINGS],
+            // The format has no such property, and saying `false` would assert
+            // something it did not say.
+            ratingsShown: null,
+        };
+    },
     convert(input: unknown, options: SpectoraAdapterOptions): BundleResult {
-        if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+        const read = readSpectoraDocument(input);
+        if (!read.ok) {
             return {
                 ok: false,
-                error: {
-                    code: 'NOT_AN_EXPORT',
-                    message: 'This file is not a Spectora template export. Export a single template as JSON and upload that file.',
-                },
-            };
-        }
-        const source = input as SpectoraTemplate;
-        if (!Array.isArray(source.sections)) {
-            return {
-                ok: false,
-                error: {
-                    code: 'NO_SECTIONS',
-                    message: 'This Spectora export contains no sections, so there is no template structure to import.',
-                },
+                error: read.code === 'NOT_AN_EXPORT'
+                    ? {
+                        code: 'NOT_AN_EXPORT',
+                        message: 'This file is not a Spectora template export. Export a single template as JSON and upload that file.',
+                    }
+                    : {
+                        code: 'NO_SECTIONS',
+                        message: 'This Spectora export contains no sections, so there is no template structure to import.',
+                    },
             };
         }
 
-        const { template, stats } = convertSpectoraTemplate(source);
+        const { template, stats } = convertSpectoraTemplate(read.doc);
 
         return {
             ok: true,

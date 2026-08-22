@@ -66,14 +66,23 @@ function contactsBundle(list: unknown[]): MigrationBundleV1 {
  */
 function fakeBucket(text: string | null) {
     const reads: string[] = [];
+    // The object is held as BYTES and exposes `arrayBuffer()` as well as
+    // `text()`, because that is what the real one does — a double that offered
+    // only text could not be read at all by a service that reads bytes.
+    const bytes = text === null ? null : new TextEncoder().encode(text);
     return {
         reads,
         put: vi.fn(),
         delete: vi.fn(),
         get: vi.fn(async (key: string) => {
             reads.push(key);
-            if (text === null) return null;
-            return { text: async () => text } as unknown as R2ObjectBody;
+            if (bytes === null) return null;
+            return {
+                arrayBuffer: async () => bytes.buffer.slice(
+                    bytes.byteOffset, bytes.byteOffset + bytes.byteLength,
+                ),
+                text: async () => text,
+            } as unknown as R2ObjectBody;
         }),
     };
 }
@@ -125,8 +134,10 @@ describe('the report carries what the later steps have to ask about', () => {
         const r = await reportOver(bucket).build({ tenantId: TENANT, batchId, seatQuotaEnforced: false });
 
         expect(bucket.reads).toEqual([KEY]);
-        expect(r.inspection?.columns).toEqual(['Full Name', 'Email']);
-        expect(r.inspection?.sampleRows).toEqual([{ 'Full Name': 'Alice Ng', Email: 'alice@example.test' }]);
+        expect(r.inspection?.kind).toBe('columns');
+        if (r.inspection?.kind !== 'columns') throw new Error('unreachable');
+        expect(r.inspection.columns).toEqual(['Full Name', 'Email']);
+        expect(r.inspection.sampleRows).toEqual([{ 'Full Name': 'Alice Ng', Email: 'alice@example.test' }]);
         // The CONTENT, field by field. `mapping` merely being non-null would
         // also be satisfied by an empty object, which is the one answer the
         // mapping step cannot start from.

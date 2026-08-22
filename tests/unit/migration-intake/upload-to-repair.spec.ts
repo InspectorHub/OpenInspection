@@ -77,7 +77,7 @@ interface Report {
 describe('an upload with three bad rows shows three rows, each with its own reason', () => {
     let db: BetterSQLite3Database<typeof schema>;
     let sqlite: SqliteDatabase;
-    let store: Map<string, string>;
+    let store: Map<string, Uint8Array>;
     let opts: IntakeAppOpts;
 
     beforeEach(async () => {

@@ -4,7 +4,7 @@ import {
     MIGRATION_INTENTS,
     MIGRATION_ROW_RESOLUTIONS,
 } from '../db/schema';
-import { BUNDLE_CONTACT_TYPES } from '../migration-intake/bundle';
+import { BUNDLE_CONTACT_TYPES, VENDOR_IDS } from '../migration-intake/bundle';
 
 /**
  * Request shapes for the import-run routes.
@@ -25,6 +25,11 @@ export const IntakeUploadFormSchema = z.object({
     // able to act on, and it belongs to the handler that knows what was being
     // agreed to — a schema rejection here would answer the same status code
     // with zod's wording and no way to tell the two guards apart.
+    // OPTIONAL, and it has to stay optional until the source picker exists.
+    // Making it required now would refuse every caller that has no picker to
+    // answer it with; until then the route derives a default.
+    vendor: z.enum(VENDOR_IDS).optional()
+        .describe('Which product the file was exported from, as the operator declared it'),
     uploadAuthorized: z.string().optional()
         .describe('Set to "true" to confirm the uploaded file may be kept so the run can be resumed'),
     staffAccessAuthorized: z.string().optional()

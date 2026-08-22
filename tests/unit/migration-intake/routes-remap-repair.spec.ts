@@ -39,7 +39,7 @@ const MEMBER_MAPPING = { kind: 'members', mapping: { email: 'Email', role: { fix
 
 describe('editing an import run over HTTP', () => {
     let db: BetterSQLite3Database<typeof schema>;
-    let store: Map<string, string>;
+    let store: Map<string, Uint8Array>;
     let run: StagedFixture;
 
     /** The names as they stand in the run right now — the only proof a re-map ran. */
@@ -200,7 +200,7 @@ describe('the tenant that owns the run reaches it', () => {
         await setupSchema(fix.sqlite);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(withBatch(fix.db, fix.sqlite));
-        const store = new Map<string, string>();
+        const store = new Map<string, Uint8Array>();
         await seedIntakeTenant(fix.db);
         const run = await stageIntakeRun(fix.db, store, {
             intent: 'contacts.import',

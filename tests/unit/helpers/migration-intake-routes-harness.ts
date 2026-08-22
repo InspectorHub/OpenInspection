@@ -34,16 +34,45 @@ export const CONTACTS_CSV = 'Full Name,Email\nAlice Ng,alice@example.test\nBob R
 export const INTAKE_LIMITS = limitsFor(SAAS_PROFILE);
 
 /** An R2 double over a plain Map, so a spec can read what was stored and what went. */
-export function intakeBucket(store: Map<string, string>) {
+export function intakeBucket(store: Map<string, Uint8Array>) {
     return {
-        put: vi.fn(async (key: string, value: string) => { store.set(key, value); return {} as R2Object; }),
-        get: vi.fn(async (key: string) => (store.has(key)
-            ? ({ text: async () => store.get(key) as string } as unknown as R2ObjectBody)
-            : null)),
+        put: vi.fn(async (key: string, value: ArrayBuffer | ArrayBufferView | string) => {
+            store.set(key, toBytes(value));
+            return {} as R2Object;
+        }),
+        get: vi.fn(async (key: string) => {
+            const bytes = store.get(key);
+            if (bytes === undefined) return null;
+            return {
+                arrayBuffer: async () =>
+                    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+                text: async () => new TextDecoder().decode(bytes),
+            } as unknown as R2ObjectBody;
+        }),
         delete: vi.fn(async (keys: string | string[]) => {
             for (const k of Array.isArray(keys) ? keys : [keys]) store.delete(k);
         }),
     };
+}
+
+/**
+ * Whatever a caller handed the bucket, as bytes.
+ *
+ * The string arm is not politeness: a spec that seeds a fixture reads better
+ * writing the CSV out than encoding it, and the production path never takes it.
+ */
+function toBytes(value: ArrayBuffer | ArrayBufferView | string): Uint8Array {
+    if (typeof value === 'string') return new TextEncoder().encode(value);
+    if (ArrayBuffer.isView(value)) {
+        return new Uint8Array(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength));
+    }
+    return new Uint8Array(value);
+}
+
+/** Read a stored object back as text — what most specs want to assert on. */
+export function storedText(store: Map<string, Uint8Array>, key: string): string | undefined {
+    const bytes = store.get(key);
+    return bytes === undefined ? undefined : new TextDecoder().decode(bytes);
 }
 
 export interface IntakeAppOpts {
@@ -52,7 +81,7 @@ export interface IntakeAppOpts {
     /** Tenant on the context. Defaults to the tenant that owns the fixtures. */
     tenantId?: string;
     profile?: DeploymentProfile;
-    store: Map<string, string>;
+    store: Map<string, Uint8Array>;
     /** Stand-in for the shared email provider. Throw from it to model a delivery failure. */
     sendInvitation?: (to: string, inviteLink: string) => Promise<void>;
 }
@@ -174,7 +203,7 @@ export interface StagedFixture {
  */
 export async function stageIntakeRun(
     db: TestDb,
-    store: Map<string, string>,
+    store: Map<string, Uint8Array>,
     params: {
         intent: MigrationIntent;
         bundle: unknown;
@@ -184,7 +213,7 @@ export async function stageIntakeRun(
 ): Promise<StagedFixture> {
     const tenantId = params.tenantId ?? TENANT;
     const sourceKey = r2Keys.migrationSource(tenantId, 'seed', 'csv');
-    store.set(sourceKey, params.sourceText ?? CONTACTS_CSV);
+    store.set(sourceKey, new TextEncoder().encode(params.sourceText ?? CONTACTS_CSV));
     const staged = await new MigrationStageService({} as D1Database).stage({
         tenantId,
         createdBy: USER,
