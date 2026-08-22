@@ -170,18 +170,56 @@ const replySubjectExportedDataSchema = z.object({
     }),
 });
 
-/** P3 — subject erasure finished. `coverage` is REQUIRED (see above); `decisions`
- *  is the orchestrator's per-step record, stored verbatim by portal. */
-const replySubjectErasedDataSchema = z.object({
-    tenantId: z.string(),
-    correlationId: z.string(),
-    replyto: z.string(),
-    anonymizedCount: z.number(),
-    deletedCount: z.number(),
-    retainedCount: z.number(),
-    decisions: z.array(z.unknown()),
-    coverage: coverageDisclosureSchema,
-});
+/**
+ * P3 — a subject erasure was answered. TWO SHAPES, discriminated by `outcome`.
+ *
+ * This is the wire declaration of `SubjectErasedReply`
+ * (`server/portal/apply-subject-commands.ts`), and it must not say less than
+ * that type does. It once did: the applier gained a second ending — a run that
+ * executed and PRESERVED the data because a preservation order covers it — and
+ * this schema went on describing only the first. Nothing validates a payload
+ * against this registry at emit time, so the producer outgrew its own published
+ * contract in silence, and the only party that noticed was the consumer, by
+ * refusing every held reply that reached it.
+ *
+ * `coverage` is what a completion is MADE OF, so it lives on the `erased`
+ * branch and nowhere else: a preserved run cannot be misread as a completed one
+ * by a consumer that reads the payload, because the payload does not contain
+ * it. `reason` is required on `held` for the mirror-image reason — it is the
+ * sentence the data subject is given, and a held answer without one says "your
+ * data was kept" and stops there.
+ *
+ * There is no third member, and the omission is load-bearing. A run that could
+ * not complete — a step that threw, an unreadable holds table — emits NO reply
+ * at all: it retries, and an exhausted retry becomes a dead command the console
+ * shows. A member here for that ending would give it a shape a reader could
+ * mistake for one of the two real answers.
+ */
+const replySubjectErasedDataSchema = z.discriminatedUnion('outcome', [
+    z.object({
+        tenantId: z.string(),
+        correlationId: z.string(),
+        replyto: z.string(),
+        outcome: z.literal('erased'),
+        anonymizedCount: z.number(),
+        deletedCount: z.number(),
+        retainedCount: z.number(),
+        decisions: z.array(z.unknown()),
+        coverage: coverageDisclosureSchema,
+    }),
+    z.object({
+        tenantId: z.string(),
+        correlationId: z.string(),
+        replyto: z.string(),
+        outcome: z.literal('held'),
+        /** How many scopes were preserved. Tenant-wide today, so 1 or 0. */
+        preserved: z.number(),
+        /** The sentence the subject receives, not an internal code. */
+        reason: z.string().min(1),
+        /** The exception record: what was kept, and on what grounds. */
+        decisions: z.array(z.unknown()),
+    }),
+]);
 
 /**
  * A correction command was answered. TWO SHAPES, discriminated by `outcome`,

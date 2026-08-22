@@ -30,6 +30,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { holdDisposition, type ActiveHolds } from '../../../server/lib/compliance/legal-hold';
 import { runErasure } from '../../../server/lib/compliance/erasure-orchestrator';
 import { applySubjectErase } from '../../../server/portal/apply-subject-commands';
+import { DATA_SCHEMAS } from '../../../server/lib/sync-events/envelope';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
 import { asAnyDb, asD1Db } from '../helpers/test-db';
@@ -288,5 +289,83 @@ describe('applySubjectErase under a legal hold', () => {
         await expect(applySubjectErase(db, {
             tenantId: FREE_TENANT, subjectEmail: SUBJECT,
         }, {})).rejects.toThrow(/subject\.erase/);
+    });
+});
+
+/**
+ * The reply has to survive the wire it is sent on.
+ *
+ * `applySubjectErase` returns a discriminated union and `emitReply` merges it
+ * with the `{tenantId, correlationId, replyto}` base before it goes onto the
+ * queue. `DATA_SCHEMAS['reply.subject.erased']` is the declared shape of that
+ * payload — the contract portal mirrors — and nothing validates against it at
+ * emit time, so a producer that outgrew its own contract does so silently and
+ * is only discovered by a consumer that rejects the message.
+ *
+ * These specs close that by parsing what the applier ACTUALLY returned rather
+ * than a hand-written literal. A fixture cannot outgrow a schema; only real
+ * output can.
+ */
+describe('the held reply against its declared wire contract', () => {
+    const wire = () => DATA_SCHEMAS['reply.subject.erased'];
+
+    /** What `emitReply` puts on the queue: the base fields plus the reply. */
+    const onTheWire = (reply: object) => ({
+        tenantId: HELD_TENANT, correlationId: 'cmd-1', replyto: 'dsar:req-42', ...reply,
+    });
+
+    beforeEach(async () => {
+        const fixture = createTestDb();
+        db = fixture.db;
+        await setupSchema(fixture.sqlite);
+        await seedTenant(HELD_TENANT, true);
+        await seedTenant(FREE_TENANT, false);
+    });
+
+    it('a real held reply validates against the schema it is published under', async () => {
+        const reply = await applySubjectErase(db, { tenantId: HELD_TENANT, subjectEmail: SUBJECT }, {});
+        expect(reply.outcome).toBe('held');
+        const parsed = wire().safeParse(onTheWire(reply));
+        // Named, because "success: false" alone would not say which field the
+        // contract and the producer disagree about.
+        expect(parsed.success ? [] : parsed.error.issues.map((i) => i.path.join('.')))
+            .toEqual([]);
+        expect(parsed.success).toBe(true);
+    });
+
+    it('POSITIVE CONTROL — a real erased reply validates too', async () => {
+        // Without this, the spec above is equally satisfied by a schema that
+        // accepts anything at all.
+        const reply = await applySubjectErase(db, { tenantId: FREE_TENANT, subjectEmail: SUBJECT }, {});
+        expect(reply.outcome).toBe('erased');
+        expect(wire().safeParse(onTheWire(reply)).success).toBe(true);
+    });
+
+    it('REJECTS an erased reply with no coverage — paired with the acceptance above', async () => {
+        // The rejection and its acceptance are asserted together on purpose: a
+        // schema that had been deleted, or an import that resolved to
+        // `undefined`, would make every rejection here pass for the wrong
+        // reason. The line above proves the subject exists and says yes.
+        const reply = await applySubjectErase(db, { tenantId: FREE_TENANT, subjectEmail: SUBJECT }, {});
+        if (reply.outcome !== 'erased') throw new Error('unreachable');
+        const { coverage: _dropped, ...withoutCoverage } = reply;
+        expect(wire().safeParse(onTheWire(withoutCoverage)).success).toBe(false);
+    });
+
+    it('REJECTS a held reply that names no preservation ground', async () => {
+        // The sentence the subject is given is the whole content of a held
+        // answer. A held reply without it says "we kept your data" and stops.
+        const reply = await applySubjectErase(db, { tenantId: HELD_TENANT, subjectEmail: SUBJECT }, {});
+        if (reply.outcome !== 'held') throw new Error('unreachable');
+        const { reason: _dropped, ...withoutReason } = reply;
+        expect(wire().safeParse(onTheWire(withoutReason)).success).toBe(false);
+        // …and the same payload WITH the ground is accepted, so the rejection
+        // is about the missing field and not about the branch as a whole.
+        expect(wire().safeParse(onTheWire(reply)).success).toBe(true);
+    });
+
+    it('REJECTS an unknown outcome rather than falling through to a branch', async () => {
+        const reply = await applySubjectErase(db, { tenantId: HELD_TENANT, subjectEmail: SUBJECT }, {});
+        expect(wire().safeParse(onTheWire({ ...reply, outcome: 'maybe' })).success).toBe(false);
     });
 });

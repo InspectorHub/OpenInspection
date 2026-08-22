@@ -35,6 +35,14 @@ const CASES: { file: string; eventType: SyncEventType }[] = [
     // `pendingEnforcementCount`, the one invariant portal refuses a reply over.
     { file: 'reply-subject-exported.v1.json', eventType: 'reply.subject.exported' },
     { file: 'reply-subject-erased.v1.json', eventType: 'reply.subject.erased' },
+    // Two fixtures for ONE event type, which is the only entry here that has
+    // them. `reply.subject.erased` is a union with two endings, and the second
+    // one — the erasure a preservation order stopped — carries no coverage
+    // block and is the branch that reaches a person who asked for their data to
+    // be deleted and did not get that. A single fixture pinned only the ending
+    // that already worked, which is how the held branch shipped against a
+    // contract that had no room for it.
+    { file: 'reply-subject-erased-held.v1.json', eventType: 'reply.subject.erased' },
 ];
 
 describe('sync envelope contract (golden fixtures)', () => {

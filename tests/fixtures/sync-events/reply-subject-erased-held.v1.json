@@ -1,0 +1,19 @@
+{
+  "specversion": "1.0",
+  "id": "00000000-0000-4000-8000-0000000rep03",
+  "type": "io.inspectorhub.reply.subject.erased",
+  "source": "core",
+  "time": "2026-08-10T01:00:07.000Z",
+  "dataschema": "reply-subject-erased/v1",
+  "data": {
+    "tenantId": "fixture-tenant-5",
+    "correlationId": "cmd-subject-erase-fixture-2",
+    "replyto": "dsar:dsar-fixture-3",
+    "outcome": "held",
+    "preserved": 1,
+    "reason": "An active legal hold covers this workspace (matter CASE-2026-001).",
+    "decisions": [
+      { "table": "*", "action": "preserve", "count": 1, "holdReason": "An active legal hold covers this workspace (matter CASE-2026-001)." }
+    ]
+  }
+}

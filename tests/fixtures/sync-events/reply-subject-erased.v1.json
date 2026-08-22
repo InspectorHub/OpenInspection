@@ -9,6 +9,7 @@
     "tenantId": "fixture-tenant-4",
     "correlationId": "cmd-subject-erase-fixture-1",
     "replyto": "dsar:dsar-fixture-2",
+    "outcome": "erased",
     "anonymizedCount": 2,
     "deletedCount": 3,
     "retainedCount": 2,
