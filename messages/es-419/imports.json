@@ -26,6 +26,7 @@
   "imports_status_reverted": "Deshecho",
   "imports_status_partially_reverted": "Deshecho en parte",
   "imports_status_abandoned": "Descartado",
+  "imports_status_declined": "No pudimos convertirla",
   "imports_status_needs_assistance": "En espera de nosotros",
   "imports_status_expired": "Vencido",
   "imports_run_not_found": "No se encontró esta importación. Es posible que se haya descartado.",

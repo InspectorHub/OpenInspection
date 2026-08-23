@@ -31,8 +31,16 @@ const INTENT_LABEL: Record<string, () => string> = {
     "assisted.full": m.imports_intent_assisted_full,
 };
 
-/** Every state on the batch lifecycle axis that a person can be looking at. */
-const STATUS_LABEL: Record<string, () => string> = {
+/**
+ * Every state on the batch lifecycle axis that a person can be looking at.
+ *
+ * Exported so a test can hold it against the axis itself. The lookups below
+ * fall back rather than throw, which means a state missing from this table
+ * renders as some OTHER state's name instead of failing — the one shape of
+ * breakage that never reaches a stack trace, and the reason the table is
+ * checked structurally rather than by rendering each state and looking.
+ */
+export const STATUS_LABEL: Record<string, () => string> = {
     staged: m.imports_status_staged,
     applying: m.imports_status_applying,
     applied: m.imports_status_applied,
@@ -40,13 +48,23 @@ const STATUS_LABEL: Record<string, () => string> = {
     reverted: m.imports_status_reverted,
     partially_reverted: m.imports_status_partially_reverted,
     abandoned: m.imports_status_abandoned,
+    declined: m.imports_status_declined,
     needs_assistance: m.imports_status_needs_assistance,
     expired: m.imports_status_expired,
 };
 
 /**
  * The chip's colour per state. `monitor` is the one that means "this is waiting
- * for you"; `defect` means part of it did not land.
+ * for you"; `defect` means something the operator handed over did not come
+ * through.
+ *
+ * `declined` takes `defect` rather than joining the settled states below, and
+ * the line between them is who stopped and whether anything is left to do.
+ * `abandoned` and `expired` are outcomes nobody needs told about — the operator
+ * walked away, or a clock ran out. `declined` is a refusal by this deployment
+ * on a file its owner is still waiting on: none of it landed, and they have to
+ * do something else with it. That is the same news `partially_applied` carries,
+ * more of it, so it is not the state to paint quieter than the partial ones.
  *
  * These are Pill's tone names, which are NOT the DS token names — Pill maps
  * `sat`→ok, `monitor`→watch, `defect`→bad internally. A tone spelled with the
@@ -60,7 +78,7 @@ const STATUS_LABEL: Record<string, () => string> = {
  * distinction between "Undone", "Abandoned" and "Expired" is carried by the
  * word, which is the part that actually says what happened.
  */
-const STATUS_TONE: Record<string, PillTone> = {
+export const STATUS_TONE: Record<string, PillTone> = {
     staged: "monitor",
     applying: "info",
     applied: "sat",
@@ -68,6 +86,7 @@ const STATUS_TONE: Record<string, PillTone> = {
     reverted: "info",
     partially_reverted: "defect",
     abandoned: "info",
+    declined: "defect",
     needs_assistance: "monitor",
     expired: "info",
 };

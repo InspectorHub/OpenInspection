@@ -26,6 +26,7 @@
   "imports_status_reverted": "Undone",
   "imports_status_partially_reverted": "Partly undone",
   "imports_status_abandoned": "Abandoned",
+  "imports_status_declined": "We could not convert it",
   "imports_status_needs_assistance": "Waiting for us",
   "imports_status_expired": "Expired",
   "imports_run_not_found": "This import could not be found. It may have been discarded.",
