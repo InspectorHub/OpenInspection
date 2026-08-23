@@ -29,15 +29,23 @@ name: CI
 # emit phantom failures. Separate CI jobs are separate runners, so this is safe
 # here and is not a licence to background them side by side in a terminal.
 #
-# This workflow runs ONLY on pull_request, not on push-to-main. Re-running the
-# full suite on the merge commit is redundant: branch protection requires
-# "branches up to date before merging" (strict), so a PR's tested tree equals
-# the post-squash main tree. Default-branch security scanning still runs via
-# codeql.yml (push + PR + schedule); release automation runs via
-# release-please.yml (push).
+# This workflow runs on pull_request, and on demand. Re-running the full suite
+# on every merge commit is redundant: branch protection requires "branches up
+# to date before merging" (strict), so a PR's tested tree equals the resulting
+# main tree. Default-branch security scanning still runs via codeql.yml
+# (push + PR + schedule); release automation runs via release-please.yml (push).
+#
+# `workflow_dispatch` exists because that equality has one hole, and it is not
+# hypothetical: a FORCE-PUSH to main never passes through a pull request, so
+# nothing runs `verify` on what landed — and `verify` is the only required
+# status check this branch has. A history rewrite on 2026-08-23 put 27 commits
+# onto main that way. Without a manual trigger the only way to check them after
+# the fact is to open a throwaway PR, which means adding a commit to main in
+# order to test main.
 on:
   pull_request:
     branches: [master, main]
+  workflow_dispatch:
 
 # Cancel superseded runs on the same ref to save CI minutes.
 concurrency:
