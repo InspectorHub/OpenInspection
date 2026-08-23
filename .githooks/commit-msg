@@ -1,0 +1,37 @@
+#!/usr/bin/env sh
+# .githooks/commit-msg — openinspection
+#
+# One gate: a commit that changes what a person sees must say that a person
+# looked. See scripts/check-chrome-record.mjs for the grammar, the rule for
+# "user-visible", the escape hatch, and — read this part — a plain statement of
+# what this gate CANNOT do. It cannot tell whether anyone opened a browser.
+#
+# Why commit-msg and not pre-commit: the message does not exist yet at
+# pre-commit time. This is the earliest rung that can read it.
+#
+# Activated by the same mechanism as pre-commit and pre-push — the "prepare"
+# npm script runs `git config core.hooksPath .githooks`, and core.hooksPath
+# covers EVERY hook name in that directory, not just the ones that were there
+# when it was set. Nothing had to change in package.json's prepare for this file
+# to start running; verified with `git config --get core.hooksPath` -> .githooks
+# in this repo and in portal.
+#
+# Bypass (discouraged): git commit --no-verify. Prefer the in-message hatch —
+# `chrome-allow: <reason>` — which leaves a reason behind instead of a hole.
+
+# Never run in CI / non-interactive contexts.
+[ -n "$CI" ] && exit 0
+
+MSG_FILE="$1"
+[ -z "$MSG_FILE" ] && { echo "commit-msg: no message file argument. Failing closed."; exit 1; }
+
+# `fixup!` / `squash!` / `amend!` commits carry a generated subject and no body
+# a person can add lines to; the record belongs in the commit they fold into.
+# Skipped, and the skip is printed rather than silent.
+if head -n 1 "$MSG_FILE" | grep -qE '^(fixup|squash|amend)! '; then
+    echo "chrome-record: skipped 1 (fixup/squash commit — the record belongs in the commit it folds into)"
+    exit 0
+fi
+
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || REPO_ROOT="."
+node "$REPO_ROOT/scripts/check-chrome-record.mjs" "$MSG_FILE"

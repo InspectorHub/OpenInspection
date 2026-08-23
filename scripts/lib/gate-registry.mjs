@@ -23,6 +23,17 @@ export const SCRIPT_GATES = [
     { key: 'contrast', label: 'Small-text WCAG AA contrast', script: 'check-contrast.mjs', fix: 'npm run lint:contrast', rung: PRECOMMIT },
     { key: 'svg', label: 'SVG dimensions', script: 'check-svg-dimensions.mjs', fix: 'npm run lint:svg', rung: PRECOMMIT },
     { key: 'migrefs', label: 'Migration-reference hygiene', script: 'check-migration-refs.mjs', fix: 'npm run lint:migrefs', rung: PRECOMMIT },
+    // Not the chrome-record gate itself -- that one runs at the commit-msg rung,
+    // which this ladder does not model, because the thing it reads (the commit
+    // message) does not exist until after pre-commit has finished. What runs
+    // here is that gate's SELF-TEST, and it is registered for one reason: if the
+    // judge inside check-chrome-record.mjs breaks, the commit-msg hook goes
+    // green on every commit and nothing anywhere says so. That is this repo's
+    // oldest failure shape -- an empty result reading as a pass -- and the only
+    // defence against it is a positive control that runs on a rung somebody
+    // watches. Pure functions over literal fixtures, no fs walk, no git: single
+    // -digit milliseconds, the cheapest entry in this list.
+    { key: 'chromerecord', label: 'Chrome-record judge self-test', script: 'check-chrome-record.mjs', fix: 'npm run lint:chrome-record', rung: PRECOMMIT, args: ['--self-test'] },
     { key: 'filesize', label: 'Large-file ratchet', script: 'check-file-size.mjs', fix: 'npm run lint:filesize', rung: PRECOMMIT },
     { key: 'tz', label: 'Calendar timezone-safety', script: 'check-tz-safety.mjs', fix: 'npm run lint:tz', rung: PRECOMMIT },
     { key: 'idempotency', label: 'Mutating-route retry safety', script: 'check-idempotency-coverage.mjs', fix: 'npm run lint:idempotency', rung: PRECOMMIT },
