@@ -78,7 +78,13 @@ const accountDeleteRoute = createRoute(withMcpMetadata({
         },
         400: { description: 'confirmEmail mismatch' },
     },
-}, { scopes: ['write'], tier: 'extended' }));
+    // `excluded` for the same reason as the export above, and with less room
+    // for argument: this route destroys an account. A tool surface whose
+    // callers are language models is not where an irreversible identity action
+    // belongs — the confirmation it asks for is the caller retyping their own
+    // email, which a model holding that account's data can satisfy without a
+    // person ever seeing the request.
+}, { scopes: ['write'], tier: 'excluded' }));
 
 const identityRoutes = createApiRouter()
     .openapi(accountExportRoute, async (c) => {
