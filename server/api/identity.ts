@@ -45,7 +45,21 @@ const accountExportRoute = createRoute(withMcpMetadata({
             description: 'Account export blob',
         },
     },
-}, { scopes: ['read'], tier: 'extended' }));
+    // ⚠️ `excluded`, not `extended`, and deliberately: an `excluded` tier is
+    // NEVER exposed as an MCP tool whatever `MCP_EXTENDED_TOOLS` says
+    // (`server/lib/mcp/tools.ts` — "`excluded` is NEVER exposed").
+    //
+    // A subject-access export exists so a PERSON can obtain their own data.
+    // Routing it through a tool surface whose callers are language models adds
+    // egress paths and gains that person nothing they cannot do from a page:
+    // the whole profile, every membership and every inspection they ran land in
+    // a model context in one call. That was true before this route stopped
+    // returning credential secrets and stays true after.
+    //
+    // The account-DELETE route below is still `extended`. Same question applies
+    // to it and has not been answered; it is left alone rather than changed in
+    // passing.
+}, { scopes: ['read'], tier: 'excluded' }));
 
 const accountDeleteRoute = createRoute(withMcpMetadata({
     method:  'post',

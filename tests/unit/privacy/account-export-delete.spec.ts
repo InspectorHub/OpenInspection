@@ -23,6 +23,14 @@ const TENANT_B = '00000000-0000-0000-0000-000000000002';
 const USER_ID = '00000000-0000-0000-0000-0000000000a1';
 const AGENT_ID = '00000000-0000-0000-0000-0000000000a2';
 
+// Distinctive sentinels: the negative assertions below search the SERIALIZED
+// bundle for these literals, not just for a key name. A secret that survives
+// nested inside some other field is still an exported secret, and a key-only
+// assertion would call that green.
+const PASSWORD_HASH = 'pbkdf2-sha256$100000$SENTINEL-PWHASH-DO-NOT-EXPORT';
+const TOTP_SECRET = 'SENTINELTOTPSECRETJBSWY3DPEHPK3PXP';
+const TOTP_RECOVERY_CODES = '["SENTINEL-RECOVERY-CODE-HASH-1","SENTINEL-RECOVERY-CODE-HASH-2"]';
+
 describe('exportAccount', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
 
@@ -35,7 +43,9 @@ describe('exportAccount', () => {
             { id: TENANT_B, slug: 't2', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await testDb.insert(schema.users).values({
-            id: USER_ID, tenantId: TENANT, email: 'a@x.com', passwordHash: 'x', role: 'owner', createdAt: new Date(),
+            id: USER_ID, tenantId: TENANT, email: 'a@x.com', passwordHash: PASSWORD_HASH,
+            name: 'Ada Lovelace', phone: '+15550100', role: 'owner', createdAt: new Date(),
+            totpSecret: TOTP_SECRET, totpEnabled: true, totpRecoveryCodes: TOTP_RECOVERY_CODES,
         });
     });
 
@@ -45,6 +55,61 @@ describe('exportAccount', () => {
         expect(result.memberships).toEqual([]);
         expect(result.inspections).toEqual([]);
         expect(result.exportedAt).toMatch(/\d{4}-\d{2}-\d{2}T/);
+    });
+
+    // The defect this pair was written for: `exportAccount` opened with a star
+    // select on `users` and handed the whole row back, so the caller's own
+    // download carried their password hash, their TOTP seed and their recovery
+    // code hashes. Own-data, so not a cross-user leak — but a TOTP seed is a
+    // LIVE second factor, and these blobs travel (Downloads, cloud sync,
+    // support tickets).
+    it('never exports the caller password hash, TOTP secret or TOTP recovery codes', async () => {
+        const result = await exportAccount(testDb as any, USER_ID);
+        const identity = result.identity as Record<string, unknown>;
+
+        expect(identity).not.toHaveProperty('passwordHash');
+        expect(identity).not.toHaveProperty('totpSecret');
+        expect(identity).not.toHaveProperty('totpRecoveryCodes');
+
+        // Whole-bundle sweep: the value must not have escaped through any other
+        // field, at any depth.
+        const serialized = JSON.stringify(result);
+        expect(serialized).not.toContain(PASSWORD_HASH);
+        expect(serialized).not.toContain(TOTP_SECRET);
+        expect(serialized).not.toContain('SENTINEL-RECOVERY-CODE-HASH-1');
+    });
+
+    // Binds the behaviour to the classification: the three fields are not merely
+    // absent, the export SAYS it withheld them and why. Absence alone is also
+    // what a bug that dropped the whole row would produce.
+    it('names the withheld credentials and the reason for each', () => {
+        return exportAccount(testDb as any, USER_ID).then((result) => {
+            const fields = result.identityWithheld.map((w) => w.field).sort();
+            expect(fields).toEqual(['passwordHash', 'totpRecoveryCodes', 'totpSecret']);
+            for (const w of result.identityWithheld) {
+                expect(w.reason).toMatch(/credential/i);
+            }
+        });
+    });
+
+    // The positive control for the assertion above. Returning `{}` would satisfy
+    // every `not.toContain` on the planet while UNDER-DISCLOSING on a
+    // subject-access request, which is its own compliance failure — so the same
+    // export has to be shown still carrying the ordinary personal fields, read
+    // off what `exportAccount` actually returned rather than off a fixture.
+    it('still exports the ordinary personal fields (positive control)', async () => {
+        const result = await exportAccount(testDb as any, USER_ID);
+        const identity = result.identity as Record<string, unknown>;
+
+        expect(identity.id).toBe(USER_ID);
+        expect(identity.email).toBe('a@x.com');
+        expect(identity.name).toBe('Ada Lovelace');
+        expect(identity.phone).toBe('+15550100');
+        expect(identity.role).toBe('owner');
+        expect(identity.tenantId).toBe(TENANT);
+        expect(identity.createdAt).toBeTruthy();
+        // The FACT of 2FA is the subject's own data and stays; only the seed goes.
+        expect(identity.totpEnabled).toBe(true);
     });
 
     it('returns bound-contact memberships scoped to this user', async () => {

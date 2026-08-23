@@ -11,6 +11,11 @@ export const AccountExportResponseSchema = z.object({
     data: z.object({
         exportedAt: z.string(),
         identity: z.record(z.string(), z.any()),
+        // The user columns deliberately held back, each with its reason. Part
+        // of the response rather than an internal detail: an export that is
+        // silently incomplete is the under-disclosure failure the account-export
+        // classification exists to prevent (server/lib/compliance/account-export-manifest.ts).
+        identityWithheld: z.array(z.object({ field: z.string(), reason: z.string() })),
         memberships: z.array(z.record(z.string(), z.any())),
         inspections: z.array(z.record(z.string(), z.any())),
     }),
