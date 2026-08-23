@@ -266,7 +266,7 @@ if (args.includes('--update')) {
     }
     writeFileSync(POLICY, policySrc.replace(/(rulesDigest\s*:\s*')[^']*(')/, `$1${digest}$2`));
     console.log(`retention policy: rulesDigest updated to ${digest.slice(0, 16)}…`);
-    console.log('  Now bump `version`, and record WHY in [redacted] — a digest that moved with no');
+    console.log('  Now bump `version`, and record WHY beside the rule — a digest that moved with no');
     console.log('  reasoning attached is the state this gate exists to prevent.');
     process.exit(0);
 }

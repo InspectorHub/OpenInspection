@@ -111,7 +111,7 @@ const marketplaceRoutes = createApiRouter()
     const data = await c.var.services.marketplace.listLibraries(q.kind ? { kind: q.kind } : {});
     return c.json({ success: true, data });
 })
-// review — Update an already-imported template to the latest marketplace
+// Round 37 — Update an already-imported template to the latest marketplace
 // semver. Scheme 2: creates a NEW local copy with a "(vX.Y.Z)" suffix and
 // re-points the import marker; the old local row is preserved so existing
 // inspections do not break.
@@ -204,7 +204,7 @@ const marketplaceRoutes = createApiRouter()
         return c.json({ success: false, error: { code: 'import_failed', message: msg, stack } }, 500) as any;
     }
 })
-// review — Update an already-imported library to the latest marketplace
+// Round 37 — Update an already-imported library to the latest marketplace
 // semver. Scheme 2: appends new rows; does NOT delete previous import.
     .openapi(createRoute(withMcpMetadata({
     method: 'post', path: '/libraries/{id}/update',

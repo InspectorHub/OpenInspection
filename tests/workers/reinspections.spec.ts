@@ -1,7 +1,7 @@
 // #119 Task 7 — end-to-end re-inspection scenario under REAL workerd
 // (vitest-pool-workers). Proves the carry-forward chain across re-inspection
-// rounds: a published baseline → review (carry 5 defects, resolve 3) →
-// review (pre-checks the 2 still-open items) → the public report renders only
+// rounds: a published baseline → round 1 (carry 5 defects, resolve 3) →
+// round 2 (pre-checks the 2 still-open items) → the public report renders only
 // the carried items, each tracing its `original` to the ROOT original defect.
 //
 // Harness note: copied verbatim from tests/workers/report-amendments.spec.ts
@@ -218,7 +218,7 @@ describe('#119 re-inspections — end-to-end (real workerd)', () => {
 
         const svc = inspectionService();
 
-        // 2) createReinspection over all 5 → review.
+        // 2) createReinspection over all 5 → round 1.
         const r1 = await svc.createReinspection(TENANT, ORIGINAL, { selectedItemIds: itemIds, inspectorId: INSPECTOR });
         expect(r1.reinspectionRound).toBe(1);
         expect(r1.rootInspectionId).toBe(ORIGINAL);
@@ -250,7 +250,7 @@ describe('#119 re-inspections — end-to-end (real workerd)', () => {
         expect(openIds).toEqual(['d4', 'd5']);
         expect(closedIds).toEqual(['d1', 'd2', 'd3']);
 
-        // 5) createReinspection over the 2 open → review, same root.
+        // 5) createReinspection over the 2 open → round 2, same root.
         const r2 = await svc.createReinspection(TENANT, r1.id, { selectedItemIds: ['d4', 'd5'], inspectorId: INSPECTOR });
         expect(r2.reinspectionRound).toBe(2);
         expect(r2.rootInspectionId).toBe(ORIGINAL);
@@ -286,7 +286,7 @@ describe('#119 re-inspections — end-to-end (real workerd)', () => {
             };
         };
         expect(body.success).toBe(true);
-        // reinspection block present, review, root = the original.
+        // reinspection block present, round 2, root = the original.
         expect(body.data.reinspection).toBeTruthy();
         expect(body.data.reinspection!.round).toBe(2);
         expect(body.data.reinspection!.rootInspectionId).toBe(ORIGINAL);

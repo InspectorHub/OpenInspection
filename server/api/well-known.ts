@@ -10,7 +10,7 @@ const wellKnownRoutes = new Hono<HonoConfig>();
 /**
  * Public discovery endpoint for a tenant's Ed25519 verification key.
  *
- * Lets a third party (court, opposing review) independently confirm that
+ * Lets a third party (court, opposing counsel) independently confirm that
  * a given public-key.pem from an evidence pack actually belongs to the
  * issuing tenant. Cached publicly for 1 hour.
  */

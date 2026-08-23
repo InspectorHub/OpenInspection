@@ -10,11 +10,10 @@ noticed by nobody is the case that gate exists to remove.
 This file is the other half: every period has to be answerable with one page
 saying why this number and not another, and a digest cannot say that.
 
-> **Where this file lives.** The gate's failure message points at `[redacted]`,
-> a directory this repository does not have. The record lives here instead,
-> beside [`destruction-evidence.md`](destruction-evidence.md). Nothing in this
-> file is privileged; it states which periods apply and the public basis for
-> each.
+> **Where this file lives.** The reasoning behind each window is recorded here,
+> beside [`destruction-evidence.md`](destruction-evidence.md), and nowhere else
+> that this repository can reach. Nothing in this file is privileged; it states
+> which periods apply and the public basis for each.
 
 ## Status
 

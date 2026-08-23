@@ -7,9 +7,9 @@
  * the code by naming who required it, or by pointing at a tracker that only
  * exists somewhere else:
  *
- *     // review review requires the chain to show the signer was presented
- *     // ... a distinction the reader is entitled to (review decision).
- *     // see [redacted]
+ *     // Counsel round 26 requires the chain to show the signer was presented
+ *     // ... a distinction the reader is entitled to (counsel ruling 17c).
+ *     // see docs/superpowers/specs/2026-07-30-sms-consent-isv-strategy.md
  *
  * Each of those is two separate problems. It discloses that a private review
  * happened and roughly what it said, and it points a reader at a document they
@@ -55,20 +55,20 @@ const SKIP_DIRS = new Set([
  */
 const RULES = [
     {
-        id: 'review',
+        id: 'counsel',
         // The bare word, in any casing, as a whole word. `counselling` and
         // `counselor` are not this project's legal review, so the boundary
-        // matters; `review` and `review-ready` are, so the trailing
+        // matters; `counsel's` and `counsel-ready` are, so the trailing
         // boundary allows an apostrophe or a hyphen.
         re: /\bcounsel(?:'s|s)?\b/gi,
         why: 'State the requirement instead of naming who required it: '
-            + '"review review requires X" becomes "X must hold, because ...".',
+            + '"Counsel round 26 requires X" becomes "X must hold, because ...".',
     },
     {
         id: 'review-round',
-        // "review", "review decision", "decision", "decision".
+        // "round 26", "round 24 ruling 24D", "ruling 17c", "ruling B4".
         re: /\b(?:round\s+\d+[a-z]?(?:\s*[·,-]\s*)?|ruling\s+)(?:\d+[a-z]?|[A-Z]\d+)\b/gi,
-        // "review" in the marketplace code is a PRODUCT iteration and always
+        // "Round 37" in the marketplace code is a PRODUCT iteration and always
         // was; so is a reinspection round, which is a domain term customers use.
         // A gate that cannot tell a sprint from a legal review gets argued with
         // until somebody deletes it, so it has to be able to tell them apart.
@@ -78,9 +78,14 @@ const RULES = [
     },
     {
         id: 'private-planning-path',
-        // The superproject's planning tree. No such directory exists here, so
-        // every one of these is a dangling link as well as a disclosure.
-        re: /docs\/superpowers\/[^\s)'"`]*/g,
+        // Two trees in the private repository: the planning one and the legal
+        // archive. Neither exists here, so every mention is a dangling link as
+        // well as a disclosure — and `docs/legal/` is the worse of the two,
+        // because naming the archive is naming the index this gate exists to
+        // keep out. The trailing slash is NOT required: the first version of
+        // this rule demanded one and therefore missed `docs/legal,` and
+        // `docs/superpowers,` written mid-sentence.
+        re: /docs\/(?:superpowers|legal)[^\s)'"`,\]]*/g,
         why: 'That path does not resolve in this repository. Inline what the '
             + 'document said, or cite an issue number instead.',
     },
@@ -96,7 +101,7 @@ const RULES = [
 const ALLOW = [
     {
         file: 'tests/unit/agreements/language-disclosure.spec.ts',
-        contains: 'for (const forbidden of [/review/i',
+        contains: 'for (const forbidden of [/counsel/i',
         why: 'A NEGATIVE guard. That spec asserts the disclosure module contains '
             + 'no private legal material, so the word is the thing it searches '
             + 'for. Removing it would delete the test that enforces this rule at '
@@ -104,7 +109,7 @@ const ALLOW = [
     },
     {
         file: 'server/api/well-known.ts',
-        contains: 'court, opposing review',
+        contains: 'court, opposing counsel',
         why: 'Names who in the WORLD might verify a signature — a court, the '
             + 'other side\'s lawyer. It describes the audience for a public '
             + 'verification endpoint, not a review of this project.',

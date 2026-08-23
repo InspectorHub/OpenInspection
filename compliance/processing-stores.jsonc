@@ -67,7 +67,7 @@
       "binding": "DB",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — the tenant determines purposes and means for end-client data", "determined_at": "2026-08-15", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — the tenant determines purposes and means for end-client data", "determined_at": "2026-08-15", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -90,7 +90,7 @@
       "binding": "TENANT_CACHE",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — a cache of the tenant's own configuration, held on their instruction", "determined_at": "2026-08-15", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — a cache of the tenant's own configuration, held on their instruction", "determined_at": "2026-08-15", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -111,7 +111,7 @@
       "binding": "OAUTH_KV",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — OAuth state for integrations the tenant chose to connect", "determined_at": "2026-08-15", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — OAuth state for integrations the tenant chose to connect", "determined_at": "2026-08-15", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -134,7 +134,7 @@
       "binding": "PHOTOS",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — the tenant determines purposes and means for inspection media and deliverables", "determined_at": "2026-08-15", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — the tenant determines purposes and means for inspection media and deliverables", "determined_at": "2026-08-15", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -155,7 +155,7 @@
       "binding": "EXPORTS_BUCKET",
       "modes": ["saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — an export assembled on the tenant's or their data subject's instruction", "determined_at": "2026-08-15", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — an export assembled on the tenant's or their data subject's instruction", "determined_at": "2026-08-15", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -178,7 +178,7 @@
       "binding": "INSPECTION_DOC",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — the tenant determines purposes and means for the report content edited here", "determined_at": "2026-08-15", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — the tenant determines purposes and means for the report content edited here", "determined_at": "2026-08-15", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -199,7 +199,7 @@
       "binding": "TENANT_PRESENCE",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — presence is generated on the tenant's instruction while their staff work", "determined_at": "2026-08-15", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — presence is generated on the tenant's instruction while their staff work", "determined_at": "2026-08-15", "source": "contract + round 14" },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -220,7 +220,7 @@
       "binding": "INSPECTION_PRESENCE",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — presence is generated on the tenant's instruction while their staff work", "determined_at": "2026-08-15", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — presence is generated on the tenant's instruction while their staff work", "determined_at": "2026-08-15", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -241,7 +241,7 @@
       "binding": "INSPECTOR_MCP",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — an MCP session acts on the tenant's own data at their instruction", "determined_at": "2026-08-15", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — an MCP session acts on the tenant's own data at their instruction", "determined_at": "2026-08-15", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -287,7 +287,7 @@
       "queues": ["openinspection-word-export", "openinspection-word-export-saas"],
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — an export job the tenant's staff started", "determined_at": "2026-08-15", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — an export job the tenant's staff started", "determined_at": "2026-08-15", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -309,7 +309,7 @@
       "queues": ["inspectorhub-sync-dlq-saas"],
       "modes": ["saas"],
       "role": {
-        "EU":    { "legal_role": "controller",   "basis": "The account record synchronised here is our own customer relationship, not the tenant's end-client data — framework §3 'roles by product area', account/billing row", "determined_at": "2026-08-17", "source": "framework §3 + review §12" },
+        "EU":    { "legal_role": "controller",   "basis": "The account record synchronised here is our own customer relationship, not the tenant's end-client data — framework §3 'roles by product area', account/billing row", "determined_at": "2026-08-17", "source": "framework §3 + round 25 §12" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -331,7 +331,7 @@
       "queues": ["inspectorhub-cmd-saas"],
       "modes": ["saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — commands apply changes to the tenant's own workspace on portal's instruction", "determined_at": "2026-08-17", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — commands apply changes to the tenant's own workspace on portal's instruction", "determined_at": "2026-08-17", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -354,7 +354,7 @@
       "binding": "SIGN_COMPLETION_WORKFLOW",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — post-signature effects run on the tenant's instruction", "determined_at": "2026-08-17", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — post-signature effects run on the tenant's instruction", "determined_at": "2026-08-17", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -375,7 +375,7 @@
       "binding": "BROWSER",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — rendering the tenant's own report to PDF", "determined_at": "2026-08-17", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — rendering the tenant's own report to PDF", "determined_at": "2026-08-17", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -396,7 +396,7 @@
       "binding": "IMAGES",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — transforming the tenant's own inspection media", "determined_at": "2026-08-17", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — transforming the tenant's own inspection media", "determined_at": "2026-08-17", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -418,7 +418,7 @@
       "modes": ["standalone", "saas"],
       "env_vars": ["STREAM_CUSTOMER_SUBDOMAIN"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — inspection video the tenant's staff recorded", "determined_at": "2026-08-17", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — inspection video the tenant's staff recorded", "determined_at": "2026-08-17", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -488,7 +488,7 @@
       "modes": ["standalone", "saas"],
       "env_vars": ["SENDER_EMAIL"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — mail sent on the tenant's instruction to their own contacts; the tenant may supply their own Resend key and sender", "determined_at": "2026-08-17", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — mail sent on the tenant's instruction to their own contacts; the tenant may supply their own Resend key and sender", "determined_at": "2026-08-17", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -510,7 +510,7 @@
       "external_processor": "server/lib/email/providers/sendgrid.ts",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — mail sent on the tenant's instruction to their own contacts", "determined_at": "2026-08-17", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — mail sent on the tenant's instruction to their own contacts", "determined_at": "2026-08-17", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -531,7 +531,7 @@
       "external_processor": "server/lib/email/providers/mailgun.ts",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — mail sent on the tenant's instruction to their own contacts", "determined_at": "2026-08-17", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — mail sent on the tenant's instruction to their own contacts", "determined_at": "2026-08-17", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
@@ -552,7 +552,7 @@
       "external_processor": "server/lib/email/providers/postmark.ts",
       "modes": ["standalone", "saas"],
       "role": {
-        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — mail sent on the tenant's instruction to their own contacts", "determined_at": "2026-08-17", "source": "contract + review" },
+        "EU":    { "legal_role": "processor",    "basis": "tos.json §5 — mail sent on the tenant's instruction to their own contacts", "determined_at": "2026-08-17", "source": "contract + round 14" },
         "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }

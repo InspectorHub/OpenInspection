@@ -31,7 +31,7 @@ function parseSnapshotData(snapshotJson: string): { data?: Record<string, Record
  * compiling because the declaration was reached through a cast. The column is
  * nullable (NULL on originals), but a row created HERE always carries the round
  * this method just computed, which is why it is non-nullable on the way out: the
- * API route must not need a `?? 1` fallback that would silently report review
+ * API route must not need a `?? 1` fallback that would silently report round 1
  * for a third or fourth round.
  */
 export type CreatedReinspection = typeof inspections.$inferSelect & { reinspectionRound: number };

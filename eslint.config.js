@@ -177,7 +177,7 @@ export default tseslint.config(
             // T-hooks Tier 3 — architecture/hygiene, warn (no --fix sweep; huge diff).
             '@typescript-eslint/consistent-type-imports': 'warn',
             '@typescript-eslint/no-import-type-side-effects': 'warn',
-            // review lesson — Alpine v3 only auto-removes x-cloak from the x-data root.
+            // Round 5 lesson — Alpine v3 only auto-removes x-cloak from the x-data root.
             // x-cloak on a NESTED element combined with the
             // [x-cloak]{display:none!important} rule in main-layout permanently hides
             // the element even when x-show=true. Two prod bugs landed because of this:

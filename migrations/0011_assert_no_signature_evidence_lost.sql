@@ -29,7 +29,7 @@
 -- and the operator has their data plus a reason to look. Do NOT resolve a
 -- failure by writing a signature onto a signer row to satisfy the check — that
 -- manufactures the evidence the check exists to find missing, and review
--- prohibited exactly that in review.
+-- prohibited exactly that in round 18.
 --
 -- Verified against production before this was committed: 1 signed envelope,
 -- 0 purged, 1 signature held, 0 unexplained.

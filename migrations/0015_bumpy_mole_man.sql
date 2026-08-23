@@ -1,6 +1,6 @@
 -- The destruction record learns whether the controller was told.
 --
--- review requires a controller to be notified without undue delay after an
+-- Round 22 requires a controller to be notified without undue delay after an
 -- incomplete destruction is KNOWN — not after it is remediated. This column is
 -- the evidence that happened.
 --

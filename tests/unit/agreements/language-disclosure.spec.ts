@@ -81,15 +81,15 @@ describe('agreement language disclosure — the module stays publishable', () =>
 
     it('cites no path outside this repository', () => {
         // A private path in a public file is either a leak or a dead link, and
-        // both are found by the same check. `[redacted]` lives in the
-        // superproject; nothing here may reach for it.
+        // both are found by the same check. The archive this looks for lives in
+        // another repository; nothing here may reach for it.
         expect(src()).not.toMatch(/docs\/legal\//);
         // Prove the read is of the module and not an empty string.
         expect(src()).toContain('DISCLOSURE_VERSION');
     });
 
     it('carries no private legal review, jurisdiction analysis, or platform legal posture', () => {
-        for (const forbidden of [/review/i, /\b1632\b/, /Civil Code/i, /not a party/i]) {
+        for (const forbidden of [/counsel/i, /\b1632\b/, /Civil Code/i, /not a party/i]) {
             expect(src(), `${forbidden} reads as private legal material in a public repo`)
                 .not.toMatch(forbidden);
         }

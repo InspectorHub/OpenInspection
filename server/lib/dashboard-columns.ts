@@ -41,7 +41,7 @@ interface DashboardColumn {
 /**
  * Canonical column list. Order here drives the modal order. Visual order on
  * the inspection row is fixed in dashboard.tsx (the registry only governs
- * presence, not ordering — re-ordering is out of scope for review).
+ * presence, not ordering — re-ordering is out of scope for round 2).
  */
 const DASHBOARD_COLUMNS: ReadonlyArray<DashboardColumn> = [
     {

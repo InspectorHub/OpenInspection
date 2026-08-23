@@ -62,7 +62,7 @@
 //    answer for every row, so it is stated once here rather than repeated 42
 //    times: in SaaS the platform answers for an `engine` default; in standalone
 //    the OPERATOR does. "Platform default" is the operator's default on a
-//    self-hosted instance (review, deployment-mode split).
+//    self-hosted instance (round 20, deployment-mode split).
 // 6. `override_surface` is a POINTER to where a controller can actually change
 //    the value; the gate checks the file exists and mentions the column or the
 //    property. An `unreviewed` entry may keep its surface — whether a settings

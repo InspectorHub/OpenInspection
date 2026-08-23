@@ -292,7 +292,7 @@ export class MarketplaceService {
   }
 
   /**
-   * review — "Update available" flow. Scheme 2: keep the old local
+   * Round 37 — "Update available" flow. Scheme 2: keep the old local
    * template untouched (preserves any inspector edits / live inspections
    * that reference it) and create a NEW local copy at the new semver,
    * then re-point the import marker. The inspector can then compare
