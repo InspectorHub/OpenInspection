@@ -68,6 +68,7 @@
     "lint:dup": "jscpd server app packages",
     "lint:gates": "node scripts/run-gates.mjs --rung precommit",
     "lint:gate-registry": "node scripts/check-gate-registry.mjs",
+    "lint:private-review": "node scripts/check-no-private-review-refs.mjs",
     "lint:tenant-scope": "node scripts/check-tenant-scoping.mjs",
     "lint:status-literals": "node scripts/check-status-literals.mjs",
     "lint:capability-decl": "node scripts/check-capability-declarations.mjs",

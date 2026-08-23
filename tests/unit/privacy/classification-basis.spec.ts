@@ -2,19 +2,19 @@
  * CA-10 and CA-11 — the two classifications that were absences, and the reason
  * each one has to travel with the classification rather than in a memory.
  *
- * review review:
+ * The two entries:
  *  - CA-10 (`inspections.address_lat` / `address_lng`): a typed address geocoded
  *    by a places API is NOT statutory precise geolocation, because
- *    §1798.140(w) requires data "derived from a device". review words:
+ *    §1798.140(w) requires data "derived from a device". The recorded reading:
  *    "this is a statutory exclusion, not merely an architectural accident", and
  *    "the reason is the statutory definition, not simply 'we don't currently use
  *    GPS'". The standing architecture rule that comes with it is a trip-wire:
  *    "Do not treat device-derived location as equivalent to address geocoding."
  *  - CA-11 (`inspection_messages.body`): the SPI exclusion in
  *    §1798.140(ae)(1)(E) turns on the business being the intended recipient, so
- *    the answer is directional. review refused the one-word form
- *    (`inspection_messages = not SPI`) and prescribed the vocabulary recorded
- *    here: `conditional_by_direction`, reason `statutory intended-recipient
+ *    the answer is directional. The one-word form
+ *    (`inspection_messages = not SPI`) was refused; the vocabulary recorded
+ *    here is the prescribed one: `conditional_by_direction`, reason `statutory intended-recipient
  *    test`.
  *
  * The point of the register these tests read is that a classification carries
@@ -23,7 +23,7 @@
  * this file exists at all:
  *
  *  1. An entry nobody has actually judged must be DISTINGUISHABLE from one
- *     review ruled on, and the mix must be counted out loud. A census is
+ *     that was formally reviewed, and the mix must be counted out loud. A census is
  *     checked in here; adding an entry without updating it fails, and the
  *     failure prints both numbers.
  *  2. Every invariant is paired with a fabricated positive control, because a
@@ -46,7 +46,7 @@ import {
 const CLASSIFICATIONS = STATUTORY_CLASSIFICATIONS;
 
 const BASIS_KINDS = ['statutory_exclusion', 'architecture_dependent', 'conditional'];
-const REVIEW_STATES = ['counsel_ruled', 'engineering_provisional', 'not_assessed'];
+const REVIEW_STATES = ['externally_reviewed', 'engineering_provisional', 'not_assessed'];
 
 /**
  * The census, checked in. It is not a style preference: `engineering_provisional`
@@ -54,7 +54,7 @@ const REVIEW_STATES = ['counsel_ruled', 'engineering_provisional', 'not_assessed
  * determination, and a register that grows one of them silently is the failure
  * the whole file is about. Moving these numbers is allowed and visible.
  */
-const EXPECTED_CENSUS = { counsel_ruled: 3, engineering_provisional: 1, not_assessed: 0 };
+const EXPECTED_CENSUS = { externally_reviewed: 3, engineering_provisional: 1, not_assessed: 0 };
 
 /**
  * The columns whose consumer-erasure coverage is a recorded GAP rather than a
@@ -75,7 +75,7 @@ const OUT_OF_SCOPE_KEYS = new Set(ERASURE_OUT_OF_SCOPE.map(key));
  * The rules that matter are the last four: an entry may not name a statute
  * without saying what kind of answer it is; a conditional answer must name the
  * axis it turns on in a machine-readable field rather than only in prose; a
- * ruling id is required when we say review ruled; and an unjudged entry may
+ * ruling id is required whenever the register claims a formal review; and an unjudged entry may
  * carry NO statutory basis and NO basis kind, because a half-filled entry is the
  * one that reads as a decision.
  */
@@ -100,11 +100,11 @@ function problems(e: StatutoryClassification): string[] {
     if (e.basis_kind === 'conditional' && !e.spi_classification) {
         out.push(`${id}: a conditional answer must name its axis in a field, not only in prose`);
     }
-    if (e.review_status === 'counsel_ruled' && !e.ruling) {
-        out.push(`${id}: says review ruled but names no ruling`);
+    if (e.review_status === 'externally_reviewed' && !e.ruling) {
+        out.push(`${id}: claims a formal review but names no ruling`);
     }
-    if (e.review_status !== 'counsel_ruled' && !e.open_question) {
-        out.push(`${id}: is not a review ruling and states no open question, so nobody can tell it apart from one`);
+    if (e.review_status !== 'externally_reviewed' && !e.open_question) {
+        out.push(`${id}: is not a formal ruling and states no open question, so nobody can tell it apart from one`);
     }
     if (e.review_status === 'not_assessed' && (e.statutory_basis || e.basis_kind)) {
         out.push(`${id}: is marked not_assessed yet carries a statutory classification`);
@@ -120,7 +120,7 @@ const fixture = (over: Partial<StatutoryClassification> = {}): StatutoryClassifi
     table: 'fixture_table',
     column: 'fixture_column',
     reason: 'a fabricated entry that exists only to prove the validator can fail',
-    review_status: 'counsel_ruled',
+    review_status: 'externally_reviewed',
     ruling: 'CA-00',
     erasure_coverage: 'gap',
     reached_by: 'nothing — this row is not real',
@@ -158,11 +158,11 @@ describe('the register itself', () => {
 
 describe('an unjudged classification cannot look judged', () => {
     it('the census is checked in, and prints both numbers either way', () => {
-        const census = { counsel_ruled: 0, engineering_provisional: 0, not_assessed: 0 };
+        const census = { externally_reviewed: 0, engineering_provisional: 0, not_assessed: 0 };
         for (const e of CLASSIFICATIONS) census[e.review_status] += 1;
         console.info(
             `[classification-basis] ${CLASSIFICATIONS.length} entries: ` +
-            `counsel_ruled=${census.counsel_ruled}, ` +
+            `externally_reviewed=${census.externally_reviewed}, ` +
             `engineering_provisional=${census.engineering_provisional}, ` +
             `not_assessed=${census.not_assessed}`,
         );
@@ -173,11 +173,11 @@ describe('an unjudged classification cannot look judged', () => {
         expect(summed, 'census total vs register length').toBe(CLASSIFICATIONS.length);
     });
 
-    it('names every entry review has not ruled on, rather than counting them', () => {
+    it('names every entry not formally ruled on, rather than counting them', () => {
         const open = CLASSIFICATIONS
-            .filter((e) => e.review_status !== 'counsel_ruled')
+            .filter((e) => e.review_status !== 'externally_reviewed')
             .map((e) => `${key(e)} (${e.review_status}) — ${e.open_question ?? 'NO OPEN QUESTION'}`);
-        console.info(`[classification-basis] not review-ruled: ${open.join(' | ') || '(none)'}`);
+        console.info(`[classification-basis] not formally ruled: ${open.join(' | ') || '(none)'}`);
         expect(open).toHaveLength(
             EXPECTED_CENSUS.engineering_provisional + EXPECTED_CENSUS.not_assessed,
         );
@@ -239,14 +239,14 @@ describe('CA-10 — the address geocode', () => {
 describe('CA-11 — message bodies are classified by direction, not by one verdict', () => {
     const entry = () => CLASSIFICATIONS.find((c) => c.table === 'inspection_messages');
 
-    it('carries the conditional vocabulary review prescribed', () => {
+    it('carries the prescribed conditional vocabulary', () => {
         expect(entry()?.spi_classification).toBe('conditional_by_direction');
         expect(entry()?.reason).toMatch(/intended.recipient/i);
         expect(entry()?.statutory_basis).toMatch(/1798\.140\(ae\)\(1\)\(E\)/);
         expect(entry()?.ruling).toBe('CA-11');
     });
 
-    it('does NOT assert the exclusion outright, which is the one-word answer review refused', () => {
+    it('does NOT assert the exclusion outright, which is the one-word answer that was refused', () => {
         expect(entry()?.basis_kind).toBe('conditional');
         expect(entry()?.basis_kind).not.toBe('statutory_exclusion');
     });
@@ -272,7 +272,7 @@ describe('inspection_media_pool.exif_data — the counter-case', () => {
         // borrow the address family's protection for a column that has none.
         expect(entry()?.basis_kind).toBe('architecture_dependent');
         expect(entry()?.review_status).toBe('engineering_provisional');
-        expect(entry()?.open_question, 'the question review has not been asked').toBeTruthy();
+        expect(entry()?.open_question, 'the question that has not been answered').toBeTruthy();
     });
 
     it('says which code fact it depends on', () => {

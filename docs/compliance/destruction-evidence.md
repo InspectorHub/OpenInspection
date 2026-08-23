@@ -17,9 +17,9 @@ happen. Four instruments say so in different words:
 
 ISO/IEC 27001:2022 A.8.10 (information deletion) and NIST SP 800-88 Rev. 1
 (which templates a Certificate of Sanitization) are the usual supporting
-citations. Nothing here is legal advice; review signs off on the posture, and
-this document records what the system actually does so that sign-off is about
-facts rather than intentions.
+citations. Nothing here is legal advice. This document records what the system
+actually does, so that any sign-off on the posture is about facts rather than
+intentions.
 
 ## What the evidence is
 
@@ -68,9 +68,9 @@ Destruction records are kept for **3 years** from `destroyed_at`.
 
 GDPR sets no figure; the driver is how long someone can still ask. Three years
 covers the ordinary contractual limitation period in which a former customer or
-their review may request certification, and spans at least two annual SOC 2
-audit periods, so any sampled purge remains evidenced for the report that covers
-it and the one after.
+their representative may request certification, and spans at least two annual
+SOC 2 audit periods, so any sampled purge remains evidenced for the report that
+covers it and the one after.
 
 The records are non-personal, so retaining them is not itself a processing risk
 — which is why the number is set by when the evidence stops being *useful*

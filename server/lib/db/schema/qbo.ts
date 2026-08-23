@@ -92,8 +92,8 @@ export const qboSyncErrors = sqliteTable('qbo_sync_errors', {
      * WHEN the operational obligation ended — the retention anchor, and the reason
      * this column exists at all.
      *
-     * review review ruled a resolved row expires 90 days after RESOLUTION and
-     * that "the retention clock should not be based on created_at": a sync failure
+     * A resolved row expires 90 days after RESOLUTION, and the retention clock
+     * is deliberately NOT based on created_at: a sync failure
      * left unfixed for a year must not disappear merely because it is old.
      *
      * `updated_at` is not a substitute. It moves on re-detection too — the row is

@@ -140,7 +140,8 @@ describe('flush() — SMS branch (Track L)', () => {
     });
 
     it('a sent row records WHO sent it and ON WHOSE BEHALF', async () => {
-        // review 26-5. Written in the same statement as the outcome, so a row
+        // The sender and the party it went out on behalf of are both part of
+        // the record. Written in the same statement as the outcome, so a row
         // that says 'sent' can never lack it — and snapshotted, because
         // sms_mode and company_name both change and this row is evidence about
         // one transmission at one moment.

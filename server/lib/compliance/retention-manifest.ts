@@ -31,7 +31,7 @@
  * exactly that reason (see `retention-logs.ts`).
  *
  * The verb is deliberately NOT called `anonymize`, here or in the erasure
- * manifest. review (review, CA-08) ruled the old name out: writing a
+ * manifest. The old name was retired because writing a
  * sentinel over identifier columns in a surviving row is not CCPA
  * deidentification and not GDPR anonymisation, and the name invited a future
  * reader to cite it as proof that it was.
@@ -163,7 +163,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
     {
         // REFERENCE-PRESERVING, and the executor has always been. It deletes only
         // a version that is superseded AND cited by no `sms_consent_log` row.
-        // review review §7 asked for exactly this behaviour; we reported it as
+        // That is exactly the required behaviour; we reported it as
         // missing because we read the manifest (a table and a number) and not the
         // executor (what the number does). The window is real, its scope is not
         // what the number alone suggests.
@@ -176,7 +176,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         legalHoldNote: 'Protected transitively and unconditionally, which is stronger than a hold filter would be. The executor deletes a version only when NO sms_consent_log row cites it, and sms_consent_log is out of scope for retention entirely — never swept, hold or no hold. So a version cited by a held tenant’s consent record cannot be deleted, and neither can one cited by anybody else’s.',
     },
     {
-        // REFERENCE-PRESERVING as of review. The executor checked only that a
+        // REFERENCE-PRESERVING. The executor checked only that a
         // newer version existed, which was correct until this session added
         // `account_acceptances` — a ledger that is never swept and that names the
         // version and content hash a person was shown. It now also requires that
@@ -185,11 +185,11 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         timestampColumn: 'published_at',
         window: { unit: 'months', value: TENANT_LEGAL_VERSION_RETENTION_MONTHS },
         action: 'delete',
-        purpose: 'Superseded tenant Privacy/Terms bodies. Retained while any account acceptance cites the version, and the live version per (tenant, doc) is never expired because the hosted legal pages render it. review review §8 was explicit that this is retain-while-referenced, NOT keep-forever.',
+        purpose: 'Superseded tenant Privacy/Terms bodies. Retained while any account acceptance cites the version, and the live version per (tenant, doc) is never expired because the hosted legal pages render it. This is retain-while-referenced, NOT keep-forever.',
         legalHold: 'tenant_scoped',
     },
     {
-        // review review §3. The inbox, not the record that a communication
+        // The inbox, not the record that a communication
         // happened — `automation_logs` answers that and is retained by design, and
         // the same event writes a row in both. `inspection_id` is a soft reference
         // with no cascade, so a notice legitimately outlives its inspection, which
@@ -198,11 +198,11 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         timestampColumn: 'created_at',
         window: { unit: 'months', value: NOTIFICATION_RETENTION_MONTHS },
         action: 'delete',
-        purpose: 'In-app notice header: a per-recipient title and body composed about an inspection. Anchored on creation rather than on read_at/archived_at — review declined that alternative because an unread notice would become immortal, turning a UI-state field into a retention control.',
+        purpose: 'In-app notice header: a per-recipient title and body composed about an inspection. Anchored on creation rather than on read_at/archived_at — that alternative was rejected because an unread notice would become immortal, turning a UI-state field into a retention control.',
         legalHold: 'tenant_scoped',
     },
     {
-        // review review §4. Anchored on RESOLUTION, which is why `resolved_at`
+        // Anchored on RESOLUTION, which is why `resolved_at`
         // exists: `updated_at` also moves on re-detection, so it says when the row
         // was last touched rather than when it stopped being outstanding.
         // Unresolved rows have a NULL anchor and are therefore never swept —
@@ -211,7 +211,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         timestampColumn: 'resolved_at',
         window: { unit: 'days', value: QBO_SYNC_ERROR_RESOLVED_RETENTION_DAYS },
         action: 'delete',
-        purpose: 'Resolved QuickBooks sync failures. Ninety days covers the whole row including the copied Intuit error text, which may quote a customer name — review refused a longer window for that text on data-minimisation grounds: a billing dispute is explained from the accounting records, not from an ephemeral rejection message.',
+        purpose: 'Resolved QuickBooks sync failures. Ninety days covers the whole row including the copied Intuit error text, which may quote a customer name — a longer window for that text is refused on data-minimisation grounds: a billing dispute is explained from the accounting records, not from an ephemeral rejection message.',
         legalHold: 'tenant_scoped',
     },
     {
@@ -233,7 +233,7 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         window: { unit: 'months', value: REPORT_PDF_DEFAULT_RETENTION_MONTHS },
         action: 'delete',
         tenantWindowColumnYears: 'report_pdf_retention_years',
-        purpose: 'A rendered PDF of a property: the address, the photographs and the defects found there. Nothing expired one while the tenant lived, so a report was kept for as long as the company existed with no decision behind it. Seven years is a PLATFORM-SELECTED DEFAULT for the tenant-silent case — not a statutory retention period, and not a representation that seven years is the maximum legally required period (review review, decision, which struck the earlier five-plus-two derivation). It is informed primarily by legal-claim defence and secondarily by regulatory record retention. Each tenant may set their own period, and 0 means indefinite: an explicit controller instruction the platform executes. See lib/compliance/report-pdf-retention.ts for the disclosure wording and the jurisdiction facts with their as-of dates.',
+        purpose: 'A rendered PDF of a property: the address, the photographs and the defects found there. Nothing expired one while the tenant lived, so a report was kept for as long as the company existed with no decision behind it. Seven years is a PLATFORM-SELECTED DEFAULT for the tenant-silent case — not a statutory retention period, and not a representation that seven years is the maximum legally required period (an earlier five-plus-two derivation was struck, because it read a longest-statutory-period claim into a number that is not one). It is informed primarily by legal-claim defence and secondarily by regulatory record retention. Each tenant may set their own period, and 0 means indefinite: an explicit controller instruction the platform executes. See lib/compliance/report-pdf-retention.ts for the disclosure wording and the jurisdiction facts with their as-of dates.',
         legalHold: 'tenant_scoped',
     },
     {
@@ -257,10 +257,10 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         // the key last — any other order leaves an object no code path can ever
         // name again.
         //
-        // NOT YET REVIEWED BY review. Rounds 33 and 34 covered the fifteen
-        // rules above it; this one was added afterwards and has had no external
-        // review. Recorded in the policy header's condition list rather than
-        // left to be inferred from a date.
+        // ADDED LATER, AND NOT REVIEWED WITH THE OTHERS. The fifteen rules
+        // above it were decided together; this one came afterwards and has not
+        // had the same scrutiny. Recorded in the policy header's condition list
+        // rather than left to be inferred from a date.
         table: 'migration_batches',
         timestampColumn: 'expires_at',
         window: { unit: 'days', value: MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS },
@@ -276,7 +276,7 @@ export const RETENTION_OUT_OF_SCOPE: RetentionOutOfScopeEntry[] = [
     // ── Legally-required evidence ────────────────────────────────────────────
     {
         table: 'deployment_legal_versions',
-        reason: 'The only copy of the text an acceptance points at. `users.terms_accepted` stores a version and a content hash, not the body — so deleting a row here does not shrink a record, it makes an existing one unverifiable, and the signer can no longer be shown what they agreed to. review review endorsed the version+hash design specifically because the accepted version can be reconstructed later; a retention sweep over this table is the one thing that would make that false. Growth is bounded by publications, not by usage: a handful of rows over the life of a deployment.',
+        reason: 'The only copy of the text an acceptance points at. `users.terms_accepted` stores a version and a content hash, not the body — so deleting a row here does not shrink a record, it makes an existing one unverifiable, and the signer can no longer be shown what they agreed to. The version+hash design holds only because the accepted version can be reconstructed later; a retention sweep over this table is the one thing that would make that false. Growth is bounded by publications, not by usage: a handful of rows over the life of a deployment.',
     },
     {
         table: 'statutory_form_versions',
@@ -284,7 +284,7 @@ export const RETENTION_OUT_OF_SCOPE: RetentionOutOfScopeEntry[] = [
     },
     {
         table: 'account_acceptances',
-        reason: 'The evidence that an account was VALIDLY CREATED, written in the same db.batch() as the users row it belongs to (review A2, review decision). Expiring a row here does not shrink a record — it destroys one, and it destroys it in a specific direction: the account survives while the proof that its holder accepted anything does not, which is the state account = EXISTS, acceptance_ledger = ABSENT that the table exists to make unreachable. A retention sweep would reach that state deliberately, on a timer, for every account old enough. The natural clock for this row is the ACCOUNT, not the calendar: it should die when the users row it belongs to does, which is the tenant purge and the staff offboarding lifecycle, and both already destroy it. Growth is bounded by accounts times published document versions, not by usage. Declared here although the gate never asked: the LEDGER_NAME pattern matches no part of account_acceptances, so this table could have shipped with lint:retention green — the same silence that let tenant_destruction_records go a year without a decision.',
+        reason: 'The evidence that an account was VALIDLY CREATED, written in the same db.batch() as the users row it belongs to — one write, never two. Expiring a row here does not shrink a record — it destroys one, and it destroys it in a specific direction: the account survives while the proof that its holder accepted anything does not, which is the state account = EXISTS, acceptance_ledger = ABSENT that the table exists to make unreachable. A retention sweep would reach that state deliberately, on a timer, for every account old enough. The natural clock for this row is the ACCOUNT, not the calendar: it should die when the users row it belongs to does, which is the tenant purge and the staff offboarding lifecycle, and both already destroy it. Growth is bounded by accounts times published document versions, not by usage. Declared here although the gate never asked: the LEDGER_NAME pattern matches no part of account_acceptances, so this table could have shipped with lint:retention green — the same silence that let tenant_destruction_records go a year without a decision.',
     },
     {
         table: 'legal_holds',
@@ -317,7 +317,7 @@ export const RETENTION_OUT_OF_SCOPE: RetentionOutOfScopeEntry[] = [
 
     // ── Bounded by construction, so a clock would add nothing ────────────────
     {
-        // CORRECTED 2026-08-07 (external review P1). The previous reason said
+        // CORRECTED 2026-08-07. The previous reason said
         // `detail` is "documented and ENFORCED as a non-sensitive summary" and
         // that the table "cannot grow with time". Both halves were checked
         // against the code and both overstated it:

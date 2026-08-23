@@ -152,8 +152,9 @@ export const aiContentReviews = sqliteTable('ai_content_reviews', {
     /** The STAFF user who reviewed the text (`users.id`), never a contact.
      *  Named `reviewed_by` and not `accepted_by` on purpose — the control that
      *  writes this row says "Review AI-assisted content before publication",
-     *  and a column called "accepted" would quietly restate the claim review
-     *  refused. Registered in `erasure-out-of-scope.ts`: a staff identity is
+     *  and a column called "accepted" would quietly restate the absolution
+     *  claim this product does not make. Registered in
+     *  `erasure-out-of-scope.ts`: a staff identity is
      *  not a consumer data subject, and the PII heuristic matches nothing in
      *  this name. */
     reviewedBy: text('reviewed_by').notNull(),

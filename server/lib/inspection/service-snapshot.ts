@@ -39,8 +39,7 @@ export type InspectionServiceRow = typeof inspectionServices.$inferInsert;
  *
  * CALLERS. `InspectionCoreService.createInspection` (the dashboard wizard) is
  * the only one today. The PUBLIC BOOKING PATH DOES NOT CALL THIS YET and so
- * still produces orders with no tier-2 authority: see
- * `[redacted]`, Decision 3.
+ * still produces orders with no tier-2 authority.
  * The two candidate call sites are `BookingService.fulfillBooking`'s
  * direct-insert branch and `InspectionRequestService.create` (which owns the
  * multi-service branch's inspections); wiring exactly one of them — not both,

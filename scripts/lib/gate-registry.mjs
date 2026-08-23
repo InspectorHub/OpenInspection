@@ -95,6 +95,12 @@ export const SCRIPT_GATES = [
     // `lint:*` script ARRIVING with no rung — cheapest to answer while the line
     // is being typed, and the check is two file reads and a set difference.
     { key: 'gateregistry', label: 'Gate-registry coverage', script: 'check-gate-registry.mjs', fix: 'npm run lint:gate-registry', rung: PRECOMMIT },
+    // PRECOMMIT rather than PUSH, and the rung is the whole point. What this
+    // catches ends up in a PUBLIC repository's permanent history, so the only
+    // moment the fix is cheap is before the commit exists — after that it is a
+    // rebase, and after a push it is not fixable at all. Measured at 0.67s over
+    // 3,605 files.
+    { key: 'privatereview', label: 'No private-review references', script: 'check-no-private-review-refs.mjs', fix: 'npm run lint:private-review', rung: PRECOMMIT },
 
     // ---- PUSH rung -------------------------------------------------------
     // The 33 gates `npm run lint` used to chain with `&&`. Generated from

@@ -28,8 +28,8 @@
  * that, the part of an audit row still worth keeping is the structured event —
  * who-did-what-to-which-entity minus the who.
  */
-// 24 → 36, review review §2. Two years was justified as "a dispute cycle plus
-// the audit that follows it" and review found that reasoning does not reach it:
+// 24 → 36. Two years was justified as "a dispute cycle plus
+// the audit that follows it", and that reasoning does not reach it:
 // with reports and acceptances retained for 3–7 years, a 2-year audit log creates
 // an evidence discontinuity where the report still exists, the acceptance still
 // exists, and the proof of WHO DID WHAT to them has gone. Audit logs sit with
@@ -110,7 +110,8 @@ export const IDEMPOTENCY_REPLAY_RETENTION_DAYS = 7;
  * Three years, and the driver is how long someone can still ASK rather than how
  * long the data is sensitive. The row is non-personal (a tenant id snapshot, a
  * slug, counts), so storage limitation is not pressing on it; what sets the
- * number is the window in which a former customer or their review can request
+ * number is the window in which a former customer, or someone acting for them,
+ * can request
  * the deletion certification an SCC Clause 8.5 obligation promises them. Three
  * years covers the ordinary contractual limitation period and spans at least
  * two annual SOC 2 audit periods, so a purge sampled by an auditor is still
@@ -152,7 +153,7 @@ export const AI_ASSURANCE_RETENTION_MONTHS = 36;
  * drafts and amendments behind it. Three years covers the window in which an
  * amendment is still likely to be questioned.
  */
-// 36 → 84, review review §6. These are hash-chained report snapshots — part of
+// 36 → 84. These are hash-chained report snapshots — part of
 // the report's evidence chain, not telemetry about it — so keeping the PDF for
 // seven years while the version chain expires at three leaves seven years of PDF
 // backed by three years of provenance. The two now share one evidence horizon.
@@ -194,7 +195,7 @@ export const TENANT_LEGAL_VERSION_RETENTION_MONTHS = 36;
  * is a different table (`tenant_library_imports`), so expiring a history row
  * shortens a list and cannot change what an import does next.
  */
-// 36 → 12, review review §9. "Which tenant imported what" is operational
+// 36 → 12. "Which tenant imported what" is operational
 // history. Three years would need a purpose this table does not have — financial
 // reconciliation, dispute investigation, contractual evidence or regulatory audit —
 // and it serves none of them.
@@ -209,7 +210,7 @@ export const MARKETPLACE_IMPORT_HISTORY_RETENTION_MONTHS = 12;
  * predates a rename, and three years is comfortably past the one-year block —
  * the window can never expire a row still holding a slug out of circulation.
  */
-// 36 → 12, review review §11. The purpose is stopping a retired slug being
+// 36 → 12. The purpose is stopping a retired slug being
 // reissued, and that risk does not run for three years. A slug caught up in an
 // ongoing dispute is handled by legal hold, not by making every slug wait.
 export const SLUG_HISTORY_RETENTION_MONTHS = 12;
@@ -224,37 +225,37 @@ export const SLUG_HISTORY_RETENTION_MONTHS = 12;
  * calendar and the number published in the disclosure.
  *
  * Seven years is NOT a statutory period and must never be described as one —
- * review struck the "five plus two" derivation this number used to carry
- * (review, decision). The wording a customer sees, and the machine-readable
+ * the "five plus two" derivation this number used to carry was struck, because
+ * it read a longest-statutory-period claim into a number that is not one.
+ * The wording a customer sees, and the machine-readable
  * taxonomy that keeps the distinction from resting on prose, live in
  * `report-pdf-retention.ts`.
  */
 export const REPORT_PDF_DEFAULT_RETENTION_MONTHS = 84;
 
 /**
- * review review §3. The in-app inbox — a notice header addressed to a person,
+ * The in-app inbox — a notice header addressed to a person,
  * composed about an inspection. NOT the record that the communication happened;
  * `automation_logs` answers that and is retained by design.
  *
- * Anchored on `created_at`, and review explicitly declined the alternative of
- * anchoring on `read_at`/`archived_at`: an unread notice would then be immortal,
- * which turns a UI-state field into a retention control. "Nor do I think an unread
- * notification deserves indefinite retention merely because the user never opened
- * it."
+ * Anchored on `created_at`. Anchoring on `read_at`/`archived_at` was rejected:
+ * an unread notice would then be immortal, which turns a UI-state field into a
+ * retention control. An unread notification does not earn indefinite retention
+ * merely because the user never opened it.
  */
 export const NOTIFICATION_RETENTION_MONTHS = 24;
 
 /**
- * review review §4. Days after a QuickBooks sync error is RESOLVED, not after
- * it was created — "a sync failure that remains unresolved for a year should not
- * disappear merely because it is old". An unresolved row is outstanding work and
+ * Days after a QuickBooks sync error is RESOLVED, not after
+ * it was created — a sync failure that remains unresolved for a year must not
+ * disappear merely because it is old. An unresolved row is outstanding work and
  * never ages out, the same distinction that keeps `pending` rows out of the
  * `sync_outbox` sweep.
  *
  * The 90 days cover the whole row INCLUDING the copied Intuit error text, which
- * may quote a customer name. review refused to grant that text a longer window
- * for possibly being useful later: "Do not retain potentially identifying
- * diagnostic text longer merely because it might someday be useful." A billing
+ * may quote a customer name. That text gets no longer window for possibly being
+ * useful later: potentially identifying diagnostic text is not retained longer
+ * merely because it might someday be useful. A billing
  * dispute is explained from the accounting records, not from an ephemeral
  * rejection message.
  */

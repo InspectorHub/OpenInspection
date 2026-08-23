@@ -3,7 +3,7 @@ import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 /**
  * A preservation obligation that outranks every scheduled deletion.
  *
- * review review made this a global invariant rather than a per-table note:
+ * This is a GLOBAL invariant rather than a per-table note:
  * a record within the scope of a legal hold, dispute, regulatory investigation
  * or DSAR/complaint preservation must not be removed by an ordinary retention
  * sweep until the hold is released. Without it, every window in

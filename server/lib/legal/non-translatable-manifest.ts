@@ -1,12 +1,11 @@
 /**
  * OI #58 — the non-translatable content registry.
  *
- * review review (`[redacted]`) ruled on
- * eight categories of content that ride inside the inspection report and the
+ * EIGHT CATEGORIES of content ride inside the inspection report and the
  * inspection agreement: reliance clauses, limitation of liability, arbitration,
  * warranty disclaimer, governing law, contract terms, signatures and
- * acknowledgements. The ruling is one sentence long and it is the reason this
- * file exists: *"These are not 'content'. These are a legal instrument."*
+ * acknowledgements. The rule is one sentence long and it is the reason this
+ * file exists: these are not *content*, they are a legal instrument.
  *
  * English is authoritative for every entry below. None of it is eligible for
  * machine translation, and none of it is eligible for the message catalogue
@@ -40,8 +39,8 @@
  *
  * `server/lib/legal/report-view-disclosure.ts` (the Art. 13 report-view notice)
  * and `server/lib/legal/agreement-language-disclosure.ts` (the neutral
- * disclosure shown alongside an agreement) are platform notices. review
- * positioned the second as a *"neutral platform disclosure"* on 2026-08-02, and
+ * disclosure shown alongside an agreement) are platform notices. The second is
+ * a *neutral platform disclosure*:
  * it states a fact while deciding nothing. A notice ABOUT the instrument is not
  * a term OF the instrument, and conflating the two would either freeze copy that
  * benefits from being read in the recipient's language or license translating
@@ -72,7 +71,7 @@
  */
 
 /**
- * The eight categories review named. A CLOSED set.
+ * The eight categories. A CLOSED set.
  *
  * The gate carries its own copy of this list and compares the two in both
  * directions, because a gate whose scope is a private constant is a gate that
@@ -113,7 +112,7 @@ export type NonTranslatableCategory = (typeof NON_TRANSLATABLE_CATEGORIES)[numbe
 export interface NonTranslatableEntry {
     /** Stable slug. Never reused, and never shared with an out-of-scope entry. */
     id: string;
-    /** Which of review eight categories this is. */
+    /** Which of the eight categories this is. */
     category: NonTranslatableCategory;
     /** Repo-relative path to the file that HOLDS the text or declares the column. */
     source: string;

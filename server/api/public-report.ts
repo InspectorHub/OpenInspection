@@ -339,7 +339,7 @@ const publicReportRoutes = createApiRouter()
         // here; only `x-oi-client-method` is relayed. Never throws.
         //
         // `countingEnabled` is the tenant's own decision and defaults to false
-        // (review B4 — a legitimate interest may not be a mask for processing
+        // (a legitimate interest may not be a mask for processing
         // its supposed beneficiary cannot decline). A missing config row reads
         // as OFF, which is the same direction as the column default: a tenant
         // who has never opened the settings page has not opted in.

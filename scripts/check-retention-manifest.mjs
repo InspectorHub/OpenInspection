@@ -120,12 +120,12 @@ const EXPLICIT_LEDGER_TABLES = [
     "sync_outbox",
 ];
 
-// See check-erasure-manifest.mjs — `erase_in_place` replaced `anonymize`
-// (CA-08). Source has one vocabulary; the wire keeps both.
+// See check-erasure-manifest.mjs — `erase_in_place` replaced `anonymize`.
+// Source has one vocabulary; the wire keeps both.
 const VALID_ACTIONS = new Set(["delete", "erase_in_place"]);
 
 /**
- * How a rule obeys the legal-hold invariant (review review).
+ * How a rule obeys the legal-hold invariant.
  *
  * `not_applicable` is the only value that needs an argument attached, and that
  * asymmetry is deliberate: it is the only one that opts a table OUT of

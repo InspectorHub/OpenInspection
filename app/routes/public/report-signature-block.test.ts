@@ -17,7 +17,7 @@ import {
 /* ------------------------------------------------------------------ */
 
 describe('signatureBlockModel', () => {
-  // review decision (2026-08-15). The previous version of this spec asserted
+  // The previous version of this spec asserted
   // that a published report with NO signature image renders variant "typed" —
   // the inspector's name set as a signature, captioned "Electronically signed
   // by". It pinned the defect as a feature, with a test name that read like one,

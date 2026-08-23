@@ -459,8 +459,8 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
      * absence of a setting.
      *
      * The default of 7 is a disclosed PLATFORM default and is never presented
-     * as a statutory requirement — review struck the "longest statutory
-     * period" framing this number used to carry. The wording a customer sees,
+     * as a statutory requirement — the "longest statutory period" framing this
+     * number used to carry was struck. The wording a customer sees,
      * and the machine-readable taxonomy that keeps the distinction from resting
      * on prose, live in `lib/compliance/report-pdf-retention.ts`.
      *
@@ -470,7 +470,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     /**
      * Whether this workspace counts report opens. Default FALSE.
      *
-     * review B4: the legitimate-interests assessment for report-view counting
+     * The legitimate-interests assessment for report-view counting
      * assigned the interest to the inspection company — a company that could
      * not enable the processing, could not disable it, and could not see that
      * it was happening. A legitimate interest may not be a mask for processing

@@ -300,7 +300,7 @@ Two design notes that were bought with a mutation proof rather than reasoning:
 ### Related: the claims the product may not make about any of this
 
 `npm run lint:verification-copy` (`scripts/check-verification-copy.mjs`) is the
-copy-side companion, and after review it is a **Global Core control —
+copy-side companion, and it is a **Global Core control —
 Verification Claim Integrity**, not a regional overlay: it is load-bearing under
 FTC Act §5, state UDAP statutes, contract expectation and evidentiary integrity
 at once. It scans every message catalogue, in every locale, for copy that

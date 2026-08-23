@@ -37,7 +37,7 @@ export async function signup(
     const email = normalizeEmail(input.email);
 
     // FAIL CLOSED, and BEFORE the insert. An agent is a third party who has
-    // agreed to a document written for them (review A3), and an account that
+    // agreed to a document written for them, and an account that
     // exists without a recorded acceptance is the state this removes.
     //
     // Refusing before the insert rather than after is not tidiness: a caller who

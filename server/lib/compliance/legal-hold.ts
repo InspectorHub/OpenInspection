@@ -1,7 +1,7 @@
 /**
  * Active legal holds, read once per sweep.
  *
- * review review's global invariant: `legal_hold` overrides every scheduled
+ * A GLOBAL INVARIANT: `legal_hold` overrides every scheduled
  * deletion rule. This module is the only place that decides what "active" means,
  * so no executor can disagree with the driver about whether a tenant is held.
  *

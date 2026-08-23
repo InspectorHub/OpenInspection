@@ -272,7 +272,7 @@ how this one hid: `envelope` and `reason` look like nothing".
 (Line numbers are deliberately absent here. The earlier drafts of this page
 carried them and every one went stale the first time a rule was added above.)
 
-**That is the discipline the heuristic cannot produce.** Ruling on a column
+**That is the discipline the heuristic cannot produce.** Deciding on a column
 the gate did not flag is the only thing that closes the categories above, and
 it depends entirely on somebody deciding to do it.
 
@@ -288,7 +288,7 @@ Widening the regex is not a neutral first step, and doing it last is the part
 worth copying.
 
 Adding `address` to `PII_HEURISTIC` turns the gate red on **twelve** columns
-(measured 2026-08-07, before the ruling existed):
+(measured 2026-08-07, before the decision existed):
 
 ```
 inspections.property_address        inspections.address_county
@@ -302,7 +302,7 @@ inspections.address_zip             tenant_configs.company_address
 A red gate on twelve columns invites the cheapest way back to green, which is
 twelve out-of-scope entries. An out-of-scope entry without a real reason is
 worse than a missing rule: it converts an open question into a recorded
-decision nobody will revisit. So the ruling came first and the widening came
+decision nobody will revisit. So the decision came first and the widening came
 second, in the same commit as the twelve declarations — a widening that lands
 without them turns the gate red for everyone else in flight.
 

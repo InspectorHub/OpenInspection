@@ -23,9 +23,7 @@
  * is a per-tenant property (tenants.deploymentMode) that signals
  * which D1 backend to query — not a deployment-wide topology.
  *
- * See `[redacted]`
- * (historical), `[redacted]`,
- * and `[redacted]`.
+ * See `docs/reference/deployment-modes.md`.
  */
 
 /**

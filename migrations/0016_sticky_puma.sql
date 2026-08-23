@@ -6,7 +6,7 @@
 -- the company existed, with no decision behind it.
 --
 -- Default 7 years, and the reason is NOT what this repository used to say. The
--- "five plus two" derivation was put to review and rejected (review, ruling
+-- "five plus two" derivation was reviewed and rejected (ruling
 -- 24A): Illinois is five years OR two years past final disposition of a
 -- qualifying proceeding, WHICHEVER IS LONGER, so the second figure is an
 -- event-dependent tail rather than a cap and a proceeding ending in year six

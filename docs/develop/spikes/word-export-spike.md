@@ -1,8 +1,7 @@
 # Commercial PCA Phase W — Task 1 spike decision (`docx`-on-Workers GO/FALLBACK gate)
 
-Plan: `2026-06-26-commercial-pca-phase-w-plan.md`, Task 1 (lived in the
-superproject's `[redacted]`, one level up from this submodule —
-not a resolvable link from here).
+Plan: `2026-06-26-commercial-pca-phase-w-plan.md`, Task 1 (not tracked in this
+repository, so not a resolvable link from here).
 Issue: `#186`.
 Date: 2026-07-12.
 `docx` version installed: `9.7.1`.

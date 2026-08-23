@@ -26,9 +26,8 @@
  * only thing "suppressible" could mean there is the operator switch — which
  * would make a send button report success and do nothing.
  *
- * The authority for each value is the inventory in
- * `[redacted]` §2.
- * `classes.test.ts` makes that authority executable: every class must be placed
+ * `classes.test.ts` is where the authority for each value lives, and it makes
+ * that authority executable: every class must be placed
  * in one of two explicit lists, so a new notification cannot be added without
  * someone deciding which it is.
  */
@@ -120,7 +119,7 @@ export const NOTIFICATION_CLASSES: NotificationClass[] = [
     // and muting it hides money the recipient has paid.
     { id: 'payment-receipt',      label: 'Your payment receipt',    category: 'transactional', required: true,  channels: ['email'], audience: ['client'] },
 
-    // ─── statutory rights (review B2)
+    // ─── statutory rights
     // Two messages the engine did not have. The erasure orchestrator and the
     // subject-export service are API-only: they do the work, write the
     // accountability record, and tell nobody — so a data subject who asked to

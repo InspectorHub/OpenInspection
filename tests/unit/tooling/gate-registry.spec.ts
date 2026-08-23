@@ -91,6 +91,18 @@ describe('gate registry', () => {
             // and the gate reads as green on the day it stopped working.
             // Cost is one node start and 30 string matches, no file walk.
             'chromerecord',
+            // Added 2026-08-23 with the private-review gate, and this is the
+            // third time the lock has done its job in one day.
+            //
+            // It earns pre-commit on an argument none of the others can make:
+            // what it catches goes into a PUBLIC repository's permanent
+            // history. Every other gate here protects something a later commit
+            // can still fix. This one protects something that, once pushed,
+            // cannot be fixed at all — a force-push does not reach a clone, a
+            // fork, or anyone who already read it. The window in which the
+            // repair is a one-line edit closes when the commit is created.
+            // Measured at 0.67s over 3,605 files, so the rung costs nothing.
+            'privatereview',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);

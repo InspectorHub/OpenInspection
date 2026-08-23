@@ -79,8 +79,8 @@ export function itemDrivesSummary(item: {
  *                provenance, and the document has to say which.
  *   draft        not published.
  *
- * review decision (2026-08-15): "Never synthesize a signature from a
- * person's name." That is the invariant this type exists to hold.
+ * Never synthesize a signature from a person's name (2026-08-15). That is the
+ * invariant this type exists to hold.
  */
 export interface SignatureBlockResult {
   variant: "image" | "auto" | "attribution" | "none" | "draft";

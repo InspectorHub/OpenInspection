@@ -12,8 +12,6 @@ import { Button } from "./Button";
  * Controlled display: the CALLER owns parsing/validation and feeds back
  * `fileName`/`busy`/`error`. No drag-time MIME sniffing — type errors
  * surface after drop through the caller's error prop.
- *
- * Design: [redacted] (superproject) 2026-06-07-shared-ui-filedropzone-design.md
  */
 export interface FileDropzoneProps {
   accept?: string;

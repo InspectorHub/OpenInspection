@@ -10,7 +10,7 @@
  * invented would point at text nobody can produce.
  *
  * Like `buildAcceptanceStatement`, this returns STATEMENTS and executes
- * nothing. review review decision: the acceptance rows go into the same
+ * nothing. The acceptance rows go into the same
  * `db.batch()` as the `users` row, because an acceptance that lands afterwards
  * leaves the state `account = EXISTS, acceptance_ledger = ABSENT` in between,
  * however briefly and whatever the intent.

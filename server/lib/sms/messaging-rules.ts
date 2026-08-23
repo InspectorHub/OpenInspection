@@ -41,7 +41,7 @@ export interface Jurisdiction {
     region: string | null;
 }
 
-/** What a message owes in a jurisdiction. The four questions review ruling asks. */
+/** What a message owes in a jurisdiction. The four questions the rules ask. */
 export interface MessagingRule {
     /**
      * `express` — prior express consent · `express_written` — a signed

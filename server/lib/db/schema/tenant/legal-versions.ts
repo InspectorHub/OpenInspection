@@ -47,7 +47,7 @@ export const tenantLegalVersions = sqliteTable('tenant_legal_versions', {
      * Two values, and `agent_terms` is deliberately NOT one of them any more.
      *
      * It was, on the reasoning that in standalone the operator IS the single
-     * tenant. review review settled the question the other way: one Agent
+     * tenant. That was settled the other way: one Agent
      * acceptance covers the whole deployment, so the ledger is
      * `agent × terms version` and never `agent × company × terms version`. An
      * agent is a `users` row with `tenant_id IS NULL` and its counterparty is

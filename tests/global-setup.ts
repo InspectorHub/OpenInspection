@@ -148,12 +148,12 @@ export default function globalSetup() {
         //
         // The row has no tenant: an agent account is global, so the counterparty
         // is whoever operates the deployment. `deployment_legal_versions` is that
-        // table, and review review is the authority for the shape — one
+        // table, and the shape follows from that — one
         // acceptance covers the whole deployment, so the ledger is
         // `agent × terms version` rather than `agent × company × terms version`.
         //
         // Deliberately NOT the real document. `app/content/legal/agent-terms.md`
-        // is a review-ready draft that `agent-terms:publish` refuses to publish
+        // is an unapproved draft that `agent-terms:publish` refuses to publish
         // while it still carries placeholders, and that refusal is a shipped
         // safeguard the tests must not route around. A short fixture body keeps
         // the e2e testing the MECHANISM (a published version opens signup) instead

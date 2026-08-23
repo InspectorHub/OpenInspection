@@ -72,7 +72,7 @@ export const retentionAgreementsJob: CronJob = {
         const { runRetentionSweep } = await import('../../lib/compliance/retention-sweep');
         // PHOTOS was already in scope here and simply never passed. The sweep
         // now destroys signed.pdf, certificate.pdf and evidence.zip in the same
-        // pass that nulls the signature column — review review: nulling the
+        // pass that nulls the signature column — nulling the
         // column while the PDF still embeds the same image is database
         // retention wearing the name of retention.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

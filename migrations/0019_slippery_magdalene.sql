@@ -1,6 +1,6 @@
 -- Who sent an SMS, and on whose behalf.
 --
--- review review: the owner of the number is not automatically the legal
+-- The owner of the number is not automatically the legal
 -- sender. In the default mode a message leaves the platform's shared number
 -- carrying the tenant's brand, so "who initiated this transmission" and "on
 -- whose behalf was it sent" are two questions with two answers.

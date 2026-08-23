@@ -48,7 +48,7 @@ describe('account-email exemption list', () => {
 });
 
 /**
- * review B2. The 24-hour hold survives review as an ABUSE control, on the
+ * The 24-hour hold is an ABUSE control, and holds only on the
  * condition that it never impedes a statutory right. A person exercising access
  * or erasure has a deadline that runs against the controller, and an outbound
  * queue is not a lawful reason to spend a day of it — least of all in the first
@@ -58,7 +58,7 @@ describe('account-email exemption list', () => {
  * These two are NOT on the list for the reason the other four are. The others
  * are account mechanics — mail that hands someone the keys to a product they
  * just paid for. These carry a right that exists whether or not the product
- * does, and review drew that line explicitly.
+ * does, and that is where the line falls.
  */
 describe('statutory-rights messages are never held', () => {
     const STATUTORY_RIGHTS = ['subject-export-ready', 'subject-erasure-confirmed'] as const;

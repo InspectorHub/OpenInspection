@@ -1,10 +1,10 @@
 /**
  * `audit_logs.metadata` is free-form JSON, and callers do put subject
  * identifiers in it (a recipient email on a report delivery, a phone on an SMS
- * send, a property address on an inspection update). Portal's review ruled on
- * the identical column (`audit_logs.details`) that carrying such a column
- * through an erasure is an incomplete DSAR. Portal then closed it in two
- * halves — redact at write, scrub on erasure. OI had neither (#276).
+ * send, a property address on an inspection update). Carrying such a column
+ * through an erasure is an incomplete DSAR — the identical column
+ * (`audit_logs.details`) was closed in two
+ * halves on the portal side: redact at write, scrub on erasure. OI had neither (#276).
  *
  * These specs pin both halves, plus the thing redaction must not cost: the
  * structured event (action / entity) is why the row exists.

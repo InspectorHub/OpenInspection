@@ -148,7 +148,7 @@ export interface ReportSignature {
    * lives. NOT derivable from the fields below: a report nobody signed and a
    * report signed without a stored image once arrived here identically, and the
    * renderer settled the ambiguity by drawing the inspector's name as their
-   * signature (review decision, 2026-08-15).
+   * signature (2026-08-15).
    *
    *   none             nobody signed. Attribute authorship, use no signing verb.
    *   manual           the inspector signed.

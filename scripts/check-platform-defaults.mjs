@@ -2,9 +2,9 @@
 /**
  * lint:platform-defaults — the defaults we ship, and the ones we admit we cannot see.
  *
- * `compliance/platform-defaults.jsonc` records review round-20 B5 fields for
- * every default this engine ships to a fresh workspace: who owns the value, what
- * kind of decision it is, and whether the controller must be able to override it.
+ * `compliance/platform-defaults.jsonc` records, for every default this engine
+ * ships to a fresh workspace: who owns the value, what kind of decision it is,
+ * and whether the controller must be able to override it.
  *
  * ── Why this is a SEPARATE, WEAKER gate than lint:processing-stores ──────────
  * The store registry has a complete input: both wrangler configs declare every
@@ -29,13 +29,13 @@
  *     failure mode a register of static prose cannot catch.
  *  3. The entry's `property` still matches the Drizzle property for that column,
  *     so a rename on either side is visible.
- *  4. `decision_type` is on review taxonomy, and anything not yet classified
+ *  4. `decision_type` is on the taxonomy below, and anything not yet classified
  *     is `unreviewed` with a null basis — COUNTED and printed every run, never
  *     silently absent. An unreviewed default that reads as reviewed is worse
  *     than one openly marked open.
  *  5. A retention-shaped column is `controller_choice` with
- *     `controller_override: required`. review was explicit that how long client
- *     data is kept is not ours to decide quietly, so that rule is executable
+ *     `controller_override: required`. How long client data is kept is not ours
+ *     to decide quietly, so that rule is executable
  *     here rather than prose in a header nobody re-reads.
  *  6. Where an override is claimed, `override_surface` names a file that exists
  *     and mentions the column or property. A claimed override pointing at a
@@ -62,7 +62,7 @@ const REQUIRED_FIELDS = [
     'column', 'property', 'default_value', 'default_owner', 'decision_type',
     'basis', 'controller_override',
 ];
-/** review three values, plus the honest fourth. `unreviewed` is counted. */
+/** The three classified values, plus the honest fourth. `unreviewed` is counted. */
 const DECISION_TYPES = ['technical', 'service_safeguard', 'controller_choice', 'unreviewed'];
 /**
  * Who can change the value a fresh workspace receives WITHOUT a code change to
@@ -311,7 +311,7 @@ function fieldProblems(entry) {
         if (!(f in entry)) problems.push(`${id}: '${f}' is absent — say it, do not omit it`);
     }
     if (!DECISION_TYPES.includes(entry.decision_type)) {
-        problems.push(`${id}: decision_type '${entry.decision_type}' is not on review taxonomy (${DECISION_TYPES.join(' · ')})`);
+        problems.push(`${id}: decision_type '${entry.decision_type}' is not on the taxonomy (${DECISION_TYPES.join(' · ')})`);
     }
     if (!DEFAULT_OWNERS.includes(entry.default_owner)) {
         problems.push(`${id}: default_owner '${entry.default_owner}' is not in the vocabulary (${DEFAULT_OWNERS.join(' · ')})`);
@@ -328,7 +328,7 @@ function fieldProblems(entry) {
         problems.push(`${id}: decision_type '${entry.decision_type}' asserted with no basis`);
     }
     if (RETENTION_SHAPED.test(id) && (entry.decision_type !== 'controller_choice' || entry.controller_override !== 'required')) {
-        problems.push(`${id}: retention-shaped defaults are controller_choice with controller_override 'required' (review B5) — this says '${entry.decision_type}' / '${entry.controller_override}'`);
+        problems.push(`${id}: retention-shaped defaults are controller_choice with controller_override 'required' — this says '${entry.decision_type}' / '${entry.controller_override}'`);
     }
     return problems;
 }
@@ -475,7 +475,7 @@ function selfTest() {
     // The retention rule, on the real column names.
     t('a retention default classified technical is refused', fieldProblems(baseEntry({
         column: 'report_pdf_retention_years', decision_type: 'technical', controller_override: 'available',
-    })).some((p) => p.includes('review B5')));
+    })).some((p) => p.includes('retention-shaped defaults are controller_choice')));
     t('a retention default as controller_choice with a required override passes', fieldProblems(baseEntry({
         column: 'agreement_retention_years', decision_type: 'controller_choice', controller_override: 'required',
     })).length === 0);

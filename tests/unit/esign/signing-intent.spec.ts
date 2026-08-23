@@ -1,9 +1,9 @@
 /**
  * Intent comes from an act, not from an artefact.
  *
- * review review (§26d-2): *"intent must come from a recorded user action, not
- * inferred back from the fact that the user has a signature image."* The chain
- * they asked to see recorded is three steps — the user was PRESENTED agreement X
+ * The rule: intent must come from a recorded user action, not inferred back
+ * from the fact that the user has a signature image. The chain that has to be
+ * recorded is three steps — the user was PRESENTED agreement X
  * at version/hash Y, the user TOOK an explicit signing action, the system
  * RECORDED a signature.
  *
@@ -19,8 +19,8 @@
  * with no record of the signer ever having been shown it.
  *
  * ── Why this is the shape rather than a new table ────────────────────────────
- * review offered two acceptable forms — a dedicated `signing_intent_event`, OR
- * *"at least ensure the existing signing event explicitly records"* the three
+ * Two forms satisfy the rule — a dedicated `signing_intent_event`, OR the
+ * existing signing event explicitly recording the three
  * facts. The second is chosen deliberately. `esign_audit_logs` is already
  * hash-chained and signed per append, which is precisely the property an intent
  * record needs; a parallel table would have to earn that property again, and

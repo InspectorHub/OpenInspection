@@ -1,7 +1,7 @@
 /**
  * Report-view counting becomes a decision the tenant can actually make.
  *
- * review B4: the legitimate-interests assessment assigned the interest to the
+ * The legitimate-interests assessment assigned the interest to the
  * inspection company — a company that could not enable it, could not disable
  * it, and could not see that it was happening. A tenant's legitimate interest
  * may not be a mask for processing they cannot decline. The assessment does not
@@ -13,7 +13,7 @@
  * a header happened to look like a prefetch.
  *
  * Default OFF. Production holds zero `report_views` rows, so nothing is lost by
- * starting from the position review says we have to be able to defend.
+ * starting from the position that has to be defensible.
  */
 import { describe, it, expect } from 'vitest';
 import { shouldCountReportView } from '../../../server/lib/report-views';

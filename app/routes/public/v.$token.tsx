@@ -49,7 +49,7 @@ export function verifyResultModel(v: VerifyInput): VerifyModel {
     return { state: "verified", ...base };
   // Before "failed": when the signing key this version names is not on file, no
   // check ran, so the page must not offer "the content may have been altered"
-  // as the explanation. review decision — report what the check established
+  // as the explanation. The rule — report what the check established
   // and no more. Ordinarily unreachable, since retired keys are kept forever.
   if (v.keyMissing) return { state: "key_missing", ...base };
   return { state: "failed", ...base };

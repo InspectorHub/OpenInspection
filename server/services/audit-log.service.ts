@@ -125,8 +125,8 @@ export class AuditLogService {
      * academic: this result reaches the public verifier page. Reporting
      * `signature` would tell a reader that a real signer's real signature failed
      * to check out, when what actually happened is that we cannot produce the
-     * key — a statement against the signer's interest, which review decision
-     * forbids.
+     * key — a statement against the signer's interest, which this API must
+     * never make.
      */
     async verifyChain(tenantId: string, requestId: string): Promise<
         | { valid: true; events: number }

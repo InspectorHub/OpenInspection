@@ -31,7 +31,8 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     // ⚠️ Do NOT turn on `clearMocks` / `mockReset` / `restoreMocks` here without
-    // re-reading [redacted]
+    // re-reading the measurement recorded below. It is the whole reason this
+    // setting looks wrong and is not.
     // `clearMocks: true` was tried on 2026-08-08 as the first step toward
     // relaxing isolation and MEASURED WORSE: the isolated suite stayed green,
     // but under `--no-isolate` the failure count went 1218 -> 1235 and

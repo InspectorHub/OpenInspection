@@ -17,7 +17,7 @@ export type AiReviewArtifactType = typeof aiContentReviews.$inferInsert['artifac
  * WHAT THIS IS EVIDENCE OF, precisely: a named staff user looked at the output
  * of one AI call, attached to one artifact, at one time. It is NOT a claim that
  * the output was correct, and it is not an absolution — review is necessary, not
- * sufficient. review was explicit that "the user clicked confirm, therefore the
+ * sufficient. "The user clicked confirm, therefore the
  * platform is absolved" is not a position this product may take, which is why
  * the column is `reviewed_by` and the control says *review*, never *accept*.
  *

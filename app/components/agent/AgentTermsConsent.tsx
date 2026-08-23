@@ -13,7 +13,7 @@ import { m } from "~/paraglide/messages";
  * The tick says "I have read and accept the Agent Terms" and the account records
  * the version and content hash of the text shown. For a while the page displayed
  * nothing and linked nowhere, so the acceptance asserted a presentation that had
- * never happened — the same defect review review §26d-2 closed for e-signature,
+ * never happened — the same defect closed for e-signature,
  * where intent must come from a recorded act rather than be inferred from an
  * artefact existing. So the body is rendered in full, in the page, above the tick.
  *
@@ -39,8 +39,8 @@ interface Props {
 
 export function AgentTermsConsent({ terms, checkboxId, checkboxName, error }: Props) {
     if (!terms) {
-        // Nothing published, so there is nothing to accept and signup is closed
-        // (review). No tick is offered: a checkbox against an absent document is
+        // Nothing published, so there is nothing to accept and signup is closed.
+        // No tick is offered: a checkbox against an absent document is
         // exactly the acceptance the gate refuses to record. The server refuses
         // too — this only stops the form pretending otherwise.
         return (

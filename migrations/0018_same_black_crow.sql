@@ -2,7 +2,7 @@
 --
 -- The legitimate-interests assessment for this counter assigned the interest to
 -- the inspection company — a company that could not enable the processing,
--- could not disable it, and could not see that it was happening. review (round
+-- could not disable it, and could not see that it was happening. Review (item
 -- 20, B4) ruled that a tenant's legitimate interest may not be a mask for
 -- processing they cannot decline: the assessment does not hold until the
 -- decline exists. This column is the decline.

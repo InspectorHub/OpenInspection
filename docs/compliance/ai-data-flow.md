@@ -367,9 +367,9 @@ before:
 ## 7. Open items
 
 - **Sections 5 and 6 are E2-by-citation only.** Nobody has re-read Google's
-  pages as part of this write-up; the statements come from the review review
-  that commissioned it. Re-checking them, with the date, is worth doing before
-  any disclosure quotes this page.
+  pages as part of this write-up; the statements are carried over from the
+  review that commissioned it. Re-checking them, with the date, is worth
+  doing before any disclosure quotes this page.
 - **No production observation.** Whether any AI call has ever been made on this
   deployment, and on which credential source, is an E3/E4 question about
   `ai_call_provenance` and `usage_counters` that this document does not answer.

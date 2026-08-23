@@ -1,7 +1,7 @@
 -- The destruction record gains its measurement universe.
 --
 -- A record that says `completed` answers "did the purge finish?", and nothing
--- in this table answered "finish WHAT?". review (review) requires a
+-- in this table answered "finish WHAT?". A reviewed requirement: a
 -- certification to cite the generation of the record it reads, because a
 -- record written before Durable Objects were purgeable cannot support a
 -- certification whose scope includes them.

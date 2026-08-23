@@ -119,7 +119,7 @@ describe('runLogRetentionSweep', () => {
         // window stopped being 36 months, ±1 day would stop meaning
         // "outside/inside" and the rest of this file would go quietly useless.
         //
-        // It did its job. The window moved 24 → 36 (review review §2) and this
+        // It did its job. The window moved 24 → 36 and this
         // failed immediately, which is the whole reason it is here.
         expect(AUDIT_LOG_ANONYMIZE_MONTHS).toBe(36);
         expect(AUDIT_WINDOW_DAYS).toBeGreaterThan(AUDIT_LOG_ANONYMIZE_MONTHS * 30);
@@ -138,7 +138,7 @@ describe('runLogRetentionSweep', () => {
         expect(row!.entityType).toBe('inspection');
         expect(row!.entityId).toBe('i1');
         // The assertions that keep the `anonymize` label honest: prose left
-        // behind is exactly what portal review called an incomplete DSAR, and
+        // behind is exactly what makes a DSAR incomplete, and
         // an actor identifier left behind is not an anonymized row.
         expect(JSON.stringify(row!.metadata ?? null)).not.toContain('example.com');
         expect(row!.metadata).toBeNull();

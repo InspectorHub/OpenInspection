@@ -15,8 +15,6 @@
  *   - relative paths only. External URLs are not fetched (a gate that needs
  *     the network is a gate that fails on a plane), and `#anchor`-only links
  *     are left alone.
- *   - `[redacted]` is excluded: those are working notes that reference
- *     plans and specs which get archived and deleted by design.
  */
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -29,7 +27,7 @@ const root = process.cwd();
 // Windows shell, and git exits non-zero when a pathspec matches nothing.
 function trackedMarkdown() {
     const out = execFileSync('git', ['ls-files', '*.md'], { cwd: root, encoding: 'utf8' });
-    return out.split('\n').filter(Boolean).filter((f) => !f.startsWith('[redacted]'));
+    return out.split('\n').filter(Boolean);
 }
 
 // [text](target) and ![alt](target). The target stops at the first whitespace

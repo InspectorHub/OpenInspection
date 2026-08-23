@@ -76,7 +76,7 @@ export interface DestructionNotifier {
  *
  * Mechanical on purpose. A deletion that did not finish is not a security
  * incident, and wording it as one would misinform the reader about both what
- * happened and what they have to do about it (review).
+ * happened and what they have to do about it.
  */
 function destructionIncompleteBody(destroyedAt: Date, stores: string[]): string {
     const date = destroyedAt.toISOString().slice(0, 10);
@@ -331,7 +331,7 @@ export class TenantPurgeService {
 
         // 8. Tell the controller, if there is anything to tell them.
         //
-        //    review: without undue delay after the failure is KNOWN, not after
+        //    Without undue delay after the failure is KNOWN, not after
         //    remediation completes. So it is sent here, at the moment the
         //    incomplete list is final, and not deferred to whoever fixes it.
         //

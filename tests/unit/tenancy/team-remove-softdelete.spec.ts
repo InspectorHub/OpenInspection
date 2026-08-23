@@ -51,7 +51,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         sqlite = fix.sqlite;
         await setupSchema(sqlite);
         // `joinTeam` writes the member row and their acceptance in ONE
-        // `db.batch()` (review review decision), and the better-sqlite3
+        // `db.batch()`, and the better-sqlite3
         // handle this mock returns has no such method.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(withBatch(testDb, sqlite));

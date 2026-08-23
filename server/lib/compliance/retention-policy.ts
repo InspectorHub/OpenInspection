@@ -30,13 +30,13 @@
  * versions. Rewritten rather than deleted, because the reasoning still governs
  * anything added from here.
  *
- * review reviewed the portal's six windows on 2026-08-14 and approved NONE as
- * final — not because a period was unlawful, but because none carried a
- * purpose-based derivation. The engine's own windows were not put to review
- * at all until rounds 33 and 34, which is what moved this header off `interim`
- * and set `approvedBy` to a round document.
+ * A review of the portal's six windows on 2026-08-14 approved NONE as final —
+ * not because a period was unlawful, but because none carried a purpose-based
+ * derivation. The engine's own windows were not reviewed at all until later,
+ * which is what moved this header off `interim` and gave `approvedBy` a
+ * document to point at.
  *
- * A rule added AFTER that ruling does not inherit it. The status does NOT
+ * A rule added AFTER that review does not inherit it. The status does NOT
  * regress to `interim` when one arrives — that would misdescribe the seventeen
  * that were reviewed — it gains a numbered condition naming the new rule and
  * what about it still needs review. See condition 6.
@@ -58,12 +58,12 @@
 
 /**
  * `interim` = running in production, not approved.
- * `approved_with_conditions` = review ruled on the windows, and named conditions
- *   that are NOT yet met. Deliberately its own value rather than `approved`,
- *   because a ruling handed straight to an engineering team has to carry its
- *   own unmet conditions, and a reader who sees `approved` stops asking what is
- *   left.
- * `approved` = review signed off on THIS version and every condition is met.
+ * `approved_with_conditions` = the windows were reviewed, and conditions were
+ *   named that are NOT yet met. Deliberately its own value rather than
+ *   `approved`, because an approval handed straight to an engineering team has
+ *   to carry its own unmet conditions, and a reader who sees `approved` stops
+ *   asking what is left.
+ * `approved` = THIS version is signed off and every condition is met.
  */
 export type RetentionPolicyStatus = 'interim' | 'approved_with_conditions' | 'approved';
 
@@ -74,8 +74,8 @@ export interface RetentionPolicyHeader {
     /** ISO date these rules began deleting production data. */
     effectiveAt: string;
     /**
-     * What approved this version — a review round document under
-     * `[redacted]` in the superproject, not a person's name. A named approver
+     * What approved this version — a review document rather than a person's
+     * name. A named approver
      * goes stale when they leave; the document keeps the reasoning attached to
      * the decision and can be read years later by someone who never met them.
      */
@@ -104,13 +104,13 @@ export interface RetentionPolicyHeader {
 }
 
 /**
- * ⚠️ APPROVED WITH CONDITIONS — rounds 33 and 34. Conditions still unmet:
+ * ⚠️ APPROVED WITH CONDITIONS. Conditions still unmet:
  *
  *   1. ✅ the manifest matches the rulings (4 windows changed, 2 pending closed)
- *   2. ✅ reference-preserving retention — review WITHDREW the review
- *         instruction to remove the legal-version tables from the sweep, and
- *         confirmed the reference-aware executors we had built instead. The rule
- *         it left behind is narrower and stronger than "legal documents are
+ *   2. ✅ reference-preserving retention — an earlier instruction to remove the
+ *         legal-version tables from the sweep was WITHDRAWN, and the
+ *         reference-aware executors we had built instead were confirmed. The
+ *         rule left behind is narrower and stronger than "legal documents are
  *         exempt": they are protected only while a surviving record needs the
  *         version to remain reproducible
  *   3. ✅ `legal_hold` overrides every scheduled deletion. Every rule now carries
@@ -124,8 +124,8 @@ export interface RetentionPolicyHeader {
  *   4. ❌ the customer ToS re-accept flow names the liability cap in its change
  *         summary (portal — built, pending the ToS publish)
  *   5. ❌ approval/version registration completed before the new ToS publishes
- *   6. ❌ `migration_batches` — added 2026-08-19, NOT put to review. Rounds 33
- *         and 34 ruled on the seventeen rules that existed then; this one came
+ *   6. ❌ `migration_batches` — added 2026-08-19, NOT REVIEWED. The review
+ *         covered the seventeen rules that existed then; this one came
  *         after and has had no external review. It is named here rather than
  *         left to be inferred from a date, because `approved_with_conditions`
  *         at the top of this header would otherwise read as covering it. What
@@ -139,8 +139,8 @@ export interface RetentionPolicyHeader {
  *         ids, timestamps, a vendor name and two authorisations given by the
  *         operator's own people; the reasoning for keeping it is that a cleared
  *         run must be distinguishable from one that never happened, and that
- *         the record itself carries no third-party data. review has not been
- *         asked whether an indefinitely-retained record of a data subject's
+ *         the record itself carries no third-party data. It remains an OPEN
+ *         QUESTION whether an indefinitely-retained record of a data subject's
  *         file having been uploaded is itself in scope. `.5` changed no window
  *         and no other rule.
  *
@@ -149,21 +149,21 @@ export interface RetentionPolicyHeader {
  * destroy the provenance in `approvedBy`; but "approved with conditions" is only
  * honest here because one of the conditions now says which rule is not.
  *
- * ⚠️ AND A METHOD RULE from review, which cost a wasted ruling to learn:
+ * ⚠️ AND A METHOD RULE, which cost a wasted review cycle to learn:
  * do not classify retention behaviour from the manifest or the table name. The
  * EXECUTOR is authoritative evidence of what the sweep actually does. We reported
  * a defect in `sms_disclosure_versions` that its executor had always prevented.
  *
  * ⚠️ AND ONE QUESTION THIS DELIBERATELY DID NOT ANSWER: a hold suspends
- * SCHEDULED deletion, which is what review invariant covers. It does not
+ * SCHEDULED deletion, which is what the legal-hold invariant covers. It does not
  * touch the DSAR erasure path, where a preservation obligation and an erasure
  * request point in opposite directions and the resolution is a legal judgement
  * (GDPR Art. 17(3)(e)) with notification duties attached, not a filter. Wiring
  * it silently either way would have decided that question in a WHERE clause.
  *
- * ⚠️ AND A SCOPE LIMIT review asked to be written here rather than filed: this
+ * ⚠️ AND A SCOPE LIMIT, written here rather than filed away: this
  * covers DATABASE retention only. Object storage, Durable Objects, KV and queues
- * were never in the compliance register (review). A green retention gate does
+ * were never in the compliance register. A green retention gate does
  * NOT mean the data lifecycle has been reviewed — without that sentence here,
  * it is very easy for the next reader to see the gate pass and conclude that
  * every production store is covered.
@@ -172,17 +172,16 @@ export const RETENTION_POLICY: RetentionPolicyHeader = {
     version: '2026-08-19.6',
     status: 'approved_with_conditions',
     effectiveAt: '2026-08-08',
-    // review remains what approved the seventeen rules it saw. It does NOT
-    // cover `migration_batches` — see condition 6 above. `approvedAt` is left at
-    // the round-34 date rather than moved forward with this version, because
+    // The document named below remains what approved the seventeen rules it
+    // saw. It does NOT cover `migration_batches` — see condition 6 above.
+    // `approvedAt` is left at its own date rather than moved forward, because
     // moving it would date an approval to a day nobody approved anything, and
     // `.5` changed only the unreviewed rule, and `.6` adds no rule at all: it
     // records `statutory_form_versions` as OUT OF SCOPE. Nothing production
     // deletes has changed — the digest moved because it covers the exclusions
     // too, which is the point of covering them. Moving `approvedBy` for an
-    // exclusion would claim review had approved a deletion period they were
-    // never shown.
-    approvedBy: '[redacted]',
+    // exclusion would claim a review of a deletion period that never happened.
+    approvedBy: 'external-review-2026-08-19',
     approvedAt: '2026-08-19',
     supersedes: '2026-08-19.4',
     rulesDigest: 'e8777bba4323007d42ba6b0e2aac0a12bde29798ebdd0604e4ae4b70e6a118a6',

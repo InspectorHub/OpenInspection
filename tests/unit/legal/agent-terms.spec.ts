@@ -2,19 +2,19 @@
  * An agent is a third party, and now signs something that says so — once, for the
  * whole deployment.
  *
- * review A3 opened this: an agent is a `users` row with `tenant_id IS NULL`, a
+ * The shape of the problem: an agent is a `users` row with `tenant_id IS NULL`, a
  * global identity with no company behind it, so neither a tenant's Privacy URL nor
  * a company's contract governs them, and the signup path used to accept
  * `termsAccepted: undefined` and write NULL.
  *
- * ── What review changed, and why this file was rewritten ───────────────────
+ * ── What changed, and why this file was rewritten ────────────────────────────
  * The first implementation put the document in `tenant_legal_versions`, reasoning
  * that in standalone the operator IS the single tenant. That reasoning worked in
  * standalone and broke SaaS outright: the lookup went through
  * `profile.fixedTenantId`, which is null there, so every SaaS agent signup was
  * refused for a reason having nothing to do with the caller.
  *
- * review review settled the underlying question — ONE acceptance covers the
+ * The underlying question is settled — ONE acceptance covers the
  * whole deployment, so the ledger is `agent × terms version` and never
  * `agent × company × terms version`. That makes the document tenant-less, which
  * removes the mode branch rather than parameterising it. `deployment_legal_versions`
@@ -29,8 +29,8 @@
  *
  * ── What ships versus what goes live ────────────────────────────────────────
  * The store, the acceptance shape, the fail-closed signup and the publish path
- * ship. GOING LIVE gates on review-approved text (review, and review says
- * the current draft is not it), which is why nothing below asserts any particular
+ * ship. GOING LIVE gates on APPROVED text, and the current draft is not it,
+ * which is why nothing below asserts any particular
  * wording — and why `agent-terms:publish` refuses a body that still carries
  * placeholders.
  */

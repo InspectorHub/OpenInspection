@@ -4,11 +4,11 @@ import { AUTHORITY_BASES } from '../../../auth/authority-basis';
 /**
  * What the person accepted, recorded where the account was born.
  *
- * review A2's invariant is that an account and its acceptance are ONE write. The
+ * THE INVARIANT: an account and its acceptance are ONE write. The
  * mechanism this table exists to serve is deliberately not the obvious one: the
  * first design enqueued the acceptance atomically with the account insert and let
- * the portal ledger become consistent afterwards, and review refused it —
- * `FAIL-CLOSED NOT SATISFIED` (review, decision). The distinction they drew is
+ * the portal ledger become consistent afterwards. That does NOT fail closed.
+ * The distinction it misses is
  * between two things that design treated as one: an outbox proves *acceptance
  * evidence was durably captured*; it cannot prove *acceptance was recorded in the
  * acceptance ledger before account creation*. While the event sits unconsumed the

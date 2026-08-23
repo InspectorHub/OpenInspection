@@ -2,8 +2,8 @@
  * An invited member's account and their acceptance are ONE write.
  *
  * `joinTeam` is the engine-native door: nobody else captured this acceptance, so
- * this side captures it, and review A2's invariant applies exactly as it does
- * on the portal-originated path. review review decision is why it is a
+ * this side captures it, and the one-write invariant applies exactly as it does
+ * on the portal-originated path. That is why it is a
  * `db.batch()` rather than an event — an outbox proves evidence was captured,
  * not that the ledger held it before the account existed.
  *
@@ -171,7 +171,7 @@ describe('joinTeam records the acceptance in the same write as the member row', 
         const invited = appended.find((e) => e.type === 'user.invited');
         // The event that creates the portal-side identity is the event that
         // must carry the evidence the account was validly created; splitting
-        // them is the belief decision is about.
+        // them is exactly the gap the one-write invariant closes.
         const acceptance = invited?.payload['acceptance'] as {
             authorityBasis: string;
             documents: Array<{ doc: string; version: string; contentHash: string; acceptedAt: number }>;

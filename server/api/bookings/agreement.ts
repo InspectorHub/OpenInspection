@@ -201,7 +201,7 @@ const agreementRoutes = createApiRouter()
         // Serve the pinned content SNAPSHOT — never the live template.
         const snapshot = await svc.getSnapshotForRequest(envelope);
 
-        // THE PRESENTATION, on the audit chain. review review: intent must
+        // THE PRESENTATION, on the audit chain. Intent must
         // come from a recorded act, not be inferred from a signature image
         // existing — and step one of that chain, "the signer was presented
         // agreement X at hash Y", was recorded nowhere. `request.viewed` had been
@@ -404,7 +404,7 @@ const agreementRoutes = createApiRouter()
         if (!resolved) throw Errors.NotFound('Agreement request not found');
         const { signer, envelope } = resolved;
 
-        // INTENT MUST COME FROM AN ACT. review review: never inferred back
+        // INTENT MUST COME FROM AN ACT. It is never inferred back
         // from the fact that a signature image exists. So before recording one,
         // the chain has to show this signer was presented THIS document.
         //

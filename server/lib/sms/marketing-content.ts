@@ -4,8 +4,8 @@
  * The consent a recipient gave describes appointment and report updates. A
  * review request is promotional, and promotional content changes which consent
  * the message needs — so it is refused at the send gate rather than trusted to
- * the person writing the template. review framing is the reason this is not
- * a template-editor warning: do not leave the compliance decision to the
+ * the person writing the template. That is the reason this is not
+ * a template-editor warning: the compliance decision must not be left to the
  * content author. A tenant may write any body they like; the gate is the only
  * place that can hold.
  *

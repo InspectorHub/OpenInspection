@@ -1,7 +1,7 @@
 /**
  * Who sent an SMS, and on whose behalf. Two questions, two answers.
  *
- * review review: the owner of the number is not automatically the legal
+ * The owner of the number is not automatically the legal
  * sender. In the default mode a message leaves the PLATFORM's shared number
  * carrying the TENANT's brand — so "who initiated this transmission" and "on
  * whose behalf was it sent" are genuinely different, and neither should have to
@@ -13,7 +13,7 @@
  * They are not. We chose the provider, we wrote the template, we operate the
  * consent gate, and we decide what may go out; a bring-your-own key changes
  * whose account is billed, not who built the path. Collapsing the two roles is
- * the exact move review identified — and the spec asserts against it in both
+ * the exact move to avoid — and the spec asserts against it in both
  * BYO-shaped modes rather than trusting the comment.
  *
  * ── Why the name is not `resolveSenderIdentity` ──────────────────────────────

@@ -123,7 +123,7 @@ function VerifyBody() {
           {result.documentTitle ?? m.public_verify_document_fallback()}
           {result.clientName ? m.public_verify_for_client({ name: result.clientName }) : ""}
         </p>
-        {/* The heading alone cannot carry this. review decision (2026-08-15):
+        {/* The heading alone cannot carry this. The verification-copy policy:
             a verification surface may state what the check established and no
             more, and a failure must be attributed to the check rather than to
             the signature or the signer — calling a real person's signature

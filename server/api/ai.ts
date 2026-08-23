@@ -143,8 +143,8 @@ const suggestCommentRoute = createRoute(withMcpMetadata({
  * POST /api/ai/reviews
  *
  * Records that a person reviewed model-assisted text before publication (#61).
- * NOT "accept": review refused the reading that a user clicking confirm
- * absolves the platform, so the verb here and in every label is `review`.
+ * NOT "accept": a user clicking confirm does not absolve the platform, so the
+ * verb here and in every label is `review`.
  */
 const contentReviewRoute = createRoute(withMcpMetadata({
     method: 'post',

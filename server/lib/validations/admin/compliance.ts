@@ -189,7 +189,7 @@ export const EraseDataResponseSchema = createApiResponseSchema(z.object({
         // BOTH values, and the older one is not deprecation debt.
         //
         // `erase_in_place` replaced `anonymize` in the source vocabulary on
-        // 2026-08-17 (review review, CA-08 — the old label invited a reader
+        // 2026-08-17 (the old label invited a reader
         // to conclude we had produced legally deidentified data). This schema is
         // not source: it describes a RESPONSE and it validates the same array
         // that is persisted in `erasure_log.decisions_json` and shipped to

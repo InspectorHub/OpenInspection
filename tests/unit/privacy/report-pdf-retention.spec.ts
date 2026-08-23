@@ -1,9 +1,9 @@
 /**
  * How long a rendered report PDF is kept, and who chose the number.
  *
- * The number survived a review review; its old reasoning did not. The
- * "5 + 2 = 7" derivation this repository used to carry was put to review and
- * REJECTED (review, decision): Illinois is five years OR two years past
+ * The number stands; its old reasoning does not. The
+ * "5 + 2 = 7" derivation this repository used to carry was
+ * REJECTED: Illinois is five years OR two years past
  * final disposition of a qualifying proceeding, WHICHEVER IS LONGER, so the
  * second figure is an event-dependent tail rather than a fixed cap, and a
  * proceeding ending in year six pushes the statutory period past seven. Seven
@@ -61,8 +61,8 @@ describe('the basis is data, not prose', () => {
         expect(REPORT_PDF_RETENTION_BASIS.secondaryReason).toBe('regulatory_record_retention');
     });
 
-    it('carries review\'s wording verbatim, including the disclaimer sentence', () => {
-        // Supplied by review and not to be paraphrased. The assertion is on
+    it('carries the approved wording verbatim, including the disclaimer sentence', () => {
+        // Reviewed wording, not to be paraphrased. The assertion is on
         // the two clauses a paraphrase would lose first.
         expect(REPORT_PDF_RETENTION_BASIS.disclosure).toContain(
             'not a statutory retention period and not a representation that seven years is the maximum legally required period',
@@ -75,7 +75,7 @@ describe('the basis is data, not prose', () => {
     it('every jurisdiction fact carries an as-of date', () => {
         // Washington completed a home-inspector rules revision in July 2026. A
         // citation with no as-of date cannot be known to be stale, so the
-        // structure refuses to hold one (review, second constraint).
+        // structure refuses to hold one.
         expect(REPORT_PDF_RETENTION_BASIS.jurisdictionFacts.length).toBeGreaterThan(0);
         for (const f of REPORT_PDF_RETENTION_BASIS.jurisdictionFacts) {
             expect(f.checkedOn, `${f.jurisdiction} has no as-of date`).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -84,7 +84,7 @@ describe('the basis is data, not prose', () => {
     });
 
     it('does not claim seven years is the longest statutory period anywhere', () => {
-        // The exact sentence review struck. Asserting its absence is cheap and
+        // The exact sentence that was struck. Asserting its absence is cheap and
         // it is the one that would come back if someone rewrote the prose from
         // memory.
         expect(REPORT_PDF_RETENTION_BASIS.disclosure).not.toMatch(/longest statutory/i);

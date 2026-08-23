@@ -43,7 +43,7 @@ export function ReportSignatureBlock({ isPublished, signature, ownerPreview, tim
     <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-8 mb-4">
       <div className="border border-ih-border rounded-xl p-6 bg-ih-bg-card">
         {/* The heading is part of the claim. "Inspected & Signed By" over a
-            report nobody signed is the defect review ruled on, so the wording
+            report nobody signed is the defect, so the wording
             follows the state rather than sitting above it. */}
         <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-4">
           {sig.variant === "attribution" ? m.pca_signature_inspected_by() : m.pca_signature_signed_by()}
@@ -59,7 +59,7 @@ export function ReportSignatureBlock({ isPublished, signature, ownerPreview, tim
           {/* Nothing is drawn where no signature exists. There was a variant
               here that set the inspector's NAME in the report's display font on
               a ruled line — the visual language of a handwritten signature, for
-              a signature that did not exist. review decision: never
+              a signature that did not exist. The rule: never
               synthesize a signature from a person's name. */}
           <div className="text-sm text-ih-fg-2 space-y-0.5">
             <div className="font-semibold text-ih-fg-1">{sig.inspectorName}</div>

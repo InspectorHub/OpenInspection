@@ -115,7 +115,6 @@ export const repairRequestItems = sqliteTable('repair_request_items', {
   // or offered. Name the roles in the columns (`requested_action` vs
   // `responded_action`) and give the response its own enum, even if the
   // members happen to coincide.
-  // Evidence: [redacted]
   repairActionTag: text('repair_action_tag', { enum: REPAIR_ACTION_TAGS }),
 }, (t) => ({
   idxRr: index('idx_repair_request_items_rr').on(t.repairRequestId),

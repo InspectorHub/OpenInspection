@@ -31,9 +31,8 @@ const b = env as unknown as { DB: D1Database };
 /**
  * The acceptance the portal captured, on every credential-bearing command here.
  *
- * `applyAdminCredential` REFUSES to create an account without one (review A2 /
- * review decision), so a credential command that would mint `boss@x.com`
- * must carry it. These specs are about the sequence guards, so this is fixture
+ * `applyAdminCredential` REFUSES to create an account without one, so a
+ * credential command that would mint `boss@x.com` must carry it. These specs are about the sequence guards, so this is fixture
  * rather than subject — the refusal and the batch atomicity behind it are
  * specified in `account-acceptance-atomicity.spec.ts`.
  *
@@ -76,9 +75,9 @@ async function seedSchema(): Promise<void> {
         "CREATE TABLE IF NOT EXISTS sync_outbox (id TEXT PRIMARY KEY, event_type TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, last_tried_at INTEGER, last_error TEXT);",
     );
     await b.DB.exec(USERS_TEST_DDL);
-    // The acceptance rows ride the SAME batch as the users insert
-    // (review A2 / review decision), so this table is not optional
-    // scenery: without it the credential apply rolls the account back too.
+    // The acceptance rows ride the SAME batch as the users insert, so this
+    // table is not optional scenery: without it the credential apply rolls
+    // the account back too.
     // The unique index comes with it — it is what makes a redelivered
     // command unable to mint a second acceptance, and this seam is
     // at-least-once.

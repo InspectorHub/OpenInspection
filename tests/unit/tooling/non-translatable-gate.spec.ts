@@ -2,11 +2,11 @@
  * Proof that the non-translatable content registry gate
  * (`scripts/check-non-translatable.mjs`) bites — OI #58.
  *
- * The rule it enforces: review review named eight categories of content
- * inside the report and the agreement — reliance clauses, limitation of
- * liability, arbitration, warranty disclaimer, governing law, contract terms,
- * signatures, acknowledgements — and ruled that they are a legal instrument
- * rather than content. English is authoritative for all eight.
+ * The rule it enforces: eight categories of content inside the report and the
+ * agreement — reliance clauses, limitation of liability, arbitration, warranty
+ * disclaimer, governing law, contract terms, signatures, acknowledgements — are
+ * terms of a legal instrument rather than content. English is authoritative for
+ * all eight.
  *
  * ## Why this spec is the whole enforcement today
  *
@@ -67,7 +67,7 @@ describe('non-translatable registry gate', () => {
         // the real run has to be pinned to "found something" — and to eight of
         // eight, since seven of eight is what a decayed register looks like.
         const { output } = runGate();
-        expect(output).toMatch(/[1-9]\d* manifest entries covering 8\/8 review categories/);
+        expect(output).toMatch(/[1-9]\d* manifest entries covering 8\/8 required categories/);
         expect(output).toMatch(/[1-9]\d* out-of-scope/);
     });
 
@@ -88,7 +88,7 @@ describe('non-translatable registry gate', () => {
             expect(output).toContain("manifest #4 (probe-no-locator): missing/empty 'locator'.");
         });
 
-        it('names a category review never ruled on', () => {
+        it('names a category outside the eight', () => {
             expect(output).toContain("category 'shipping_terms' is not one of the eight");
         });
 

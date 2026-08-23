@@ -143,7 +143,7 @@ describe('portal #88 — the repair-request columns', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The columns PII_HEURISTIC cannot see (external review P1, 2026-08-07).
+// The columns PII_HEURISTIC cannot see (found by external review, 2026-08-07).
 //
 // Every key below was found by walking the Drizzle schema table by table, NOT
 // by anything going red: `scripts/check-erasure-manifest.mjs` matches none of

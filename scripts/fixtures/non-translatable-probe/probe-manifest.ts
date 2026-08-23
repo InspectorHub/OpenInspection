@@ -60,7 +60,7 @@ export const NON_TRANSLATABLE_MANIFEST = [
         category: 'shipping_terms',
         source: 'probe-clean-source.ts',
         locator: 'PROBE_SIGNATURE_BLOCK',
-        reason: 'a category review never named',
+        reason: 'a category outside the closed set of eight',
     },
     // VIOLATION — source path does not exist.
     {

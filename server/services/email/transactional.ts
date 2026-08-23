@@ -47,7 +47,7 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
         }
 
         /**
-         * The two statutory-rights messages (review B2).
+         * The two statutory-rights messages.
          *
          * These do NOT go through `renderOr`, and that is the one deliberate
          * departure from every other method on this surface. Every other
@@ -223,7 +223,7 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
         /**
          * A workspace destruction that did not finish, told to the controller.
          *
-         * review: without undue delay after the failure is KNOWN, not after
+         * Without undue delay after the failure is KNOWN, not after
          * it is remediated. The purge calls this the moment its incomplete list
          * is final.
          *

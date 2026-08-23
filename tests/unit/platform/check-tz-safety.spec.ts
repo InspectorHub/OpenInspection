@@ -2,9 +2,9 @@
  * Unit tests for the calendar timezone-safety gate.
  *
  * Tests the exported `findTzViolations` from `scripts/check-tz-safety.mjs`
- * with string fixtures. The gate keeps the off-by-one bug
- * ([redacted])
- * from creeping back into the calendar surface.
+ * with string fixtures. The gate keeps the calendar off-by-one bug — a civil
+ * day mixed with UTC conversion shifts a day in UTC-positive zones — from
+ * creeping back into the calendar surface.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { pathToFileURL } from 'node:url';

@@ -19,8 +19,8 @@ describe('email template registry', () => {
     // them would be rewriting something they are not the author of.
     //
     // `destruction-incomplete` is non-editable for a stronger reason than the
-    // billing pair: it reports, under a review ruling, that data the recipient
-    // asked us to erase still exists. A tenant able to edit it could soften or
+    // billing pair: it reports that data the recipient asked us to erase still
+    // exists. A tenant able to edit it could soften or
     // contradict the fact being reported about their own deletion.
     const platform = REGISTRY.filter(d => !d.editable).map(d => d.trigger);
     expect(platform).toEqual([

@@ -58,8 +58,8 @@ interface AuditParams {
  *
  * `metadata` is free-form JSON a caller composes, and callers do put subject
  * identifiers in it: a recipient email on a report delivery, a phone on an SMS
- * send, a property address on an inspection update. Portal's review ruled on
- * the identical column (`audit_logs.details`) that carrying such a column
+ * send, a property address on an inspection update. The same call was made on
+ * the portal's identical column (`audit_logs.details`): carrying such a column
  * through an erasure is an incomplete DSAR. This is the write-time half of the
  * answer; the erasure half is the `audit_logs.metadata` anonymize rule in
  * `compliance/erasure-manifest.ts`, and it is the half that is complete.

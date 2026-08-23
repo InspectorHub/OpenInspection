@@ -1,7 +1,7 @@
 -- Record HOW each signer row came to say that a given signature is a given
 -- person's. Structure only: nothing is moved or dropped here.
 --
--- WHY (review review, 2026-08-15). The next migration relocates retained
+-- WHY. The next migration relocates retained
 -- signature evidence off the envelope and onto signer rows, and one of those
 -- cases derives the signer's identity from the envelope's recipient fields
 -- rather than reading it from a signing event. A record produced that way is

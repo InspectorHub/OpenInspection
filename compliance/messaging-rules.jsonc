@@ -1,6 +1,6 @@
 // Jurisdictional messaging rules — message class x jurisdiction, as data.
 //
-// review review. The rules are data because they are not one rule: what a
+// The rules are data because they are not one rule: what a
 // message owes depends on WHAT it is and WHERE the recipient is, and code that
 // answers that with an `if` grows a global rule out of whichever jurisdiction
 // its author happened to study.
@@ -74,17 +74,17 @@
 //    make one entry answer for a country it has not studied.
 //
 // ── WHAT IS DELIBERATELY NOT HERE ───────────────────────────────────────────
-// A blanket 8am-9pm rule for all SMS. review review refused that premise:
+// A blanket 8am-9pm rule for all SMS. Review refused that premise:
 // the restriction sits in the telephone-solicitation rules and a transactional
 // robotext does not inherit it. And no area-code-derived timezone: a number
 // ports and its holder travels, so an area code is not the recipient's local
-// time. The evidence order review set is explicit recipient timezone ->
+// time. The evidence order is explicit recipient timezone ->
 // verified address -> other reliable signal -> conservative fallback, and we
 // hold none of the first three today, which is why a `required` quiet-hours
 // rule refuses instead of computing a window.
 {
   "reviewed_on": "2026-08-17",
-  "authority": "[redacted] (26a-1, 26a-2, 26a-5)",
+  "authority": "TCPA 47 CFR 64.1200 (US) and CASL S.C. 2010 c.23 with the CRTC Unsolicited Telecommunications Rules (CA). Per-rule provenance, and how far each was actually verified, is recorded on every citation below - read those, not this line.",
 
   "rules": [
     // ── United States / California ──────────────────────────────────────────
@@ -127,7 +127,7 @@
           "citations": ["ctia-messaging-principles"],
           "basis_citation": "ctia-messaging-principles",
           "note": "64.1200(b)'s identification duty is written for artificial or prerecorded voice messages, so no federal provision read here imposes sender identification on a transactional SMS. We record it as required anyway, and say plainly that the source is industry guidance nobody here has read rather than a statute.",
-          "architecture_note": "resolveSmsSenderIdentity records the platform sender and the tenant on whose behalf the message went out (review 26a-3). That is a RECORD of identification, which is not the same as identifying the sender inside the message body.",
+          "architecture_note": "resolveSmsSenderIdentity records the platform sender and the tenant on whose behalf the message went out (as reviewed). That is a RECORD of identification, which is not the same as identifying the sender inside the message body.",
           "open_question": "Is there a US provision - federal or California - that requires sender identification inside a transactional SMS body, or is CTIA guidance the only source? Until that is read, this value is our own posture and must not be cited as law."
         },
         "unsubscribe": {
@@ -159,7 +159,7 @@
           "citations": ["cfr-64.1200-a2", "cfr-64.1200-f9", "cfr-64.1200-f13"],
           "basis_citation": "cfr-64.1200-a2",
           "note": "(a)(2) demands prior express WRITTEN consent for a call that includes or introduces an advertisement or constitutes telemarketing, and (f)(9) defines that as an agreement in writing bearing the signature of the person called. The consent this product holds was captured under a disclosure describing appointment and report updates; it is not that agreement.",
-          "architecture_note": "Marketing is refused on this channel outright, by content variable and by class category, before any jurisdiction rule is consulted (review 26a-2, option (a)). The refusal is a product decision, not a reading that the statute forbids the message."
+          "architecture_note": "Marketing is refused on this channel outright, by content variable and by class category, before any jurisdiction rule is consulted (reviewed; option (a)). The refusal is a product decision, not a reading that the statute forbids the message."
         },
         "quiet_hours": {
           "value": "required",
@@ -169,8 +169,8 @@
           "citations": ["cfr-64.1200-c1", "cfr-64.1200-e", "cfr-64.1200-f15", "ca-state-quiet-hours"],
           "basis_citation": "cfr-64.1200-c1",
           "note": "Permitted window is 08:00-21:00 LOCAL TIME AT THE CALLED PARTY'S LOCATION - the regulation forbids initiating 'before the hour of 8 a.m. or after 9 p.m.', and (e) extends (c) to text messages to wireless numbers. The window is quoted rather than restated because the last time it was restated it was written wider than the text.",
-          "architecture_note": "We hold no explicit recipient timezone and no verified address, and area-code inference is forbidden as the legal local-time fact (review 26a-1). With no rung of the evidence ladder available, the conservative fallback is refusal - the gate cannot show a send is inside the window, so it does not send.",
-          "open_question": "(f)(15)(ii) excludes a message to a person with whom the caller has an established business relationship, which a review request to a past client might fall under. NOT relied on: it is a fact-specific judgement about each recipient and we have no review ruling applying it."
+          "architecture_note": "We hold no explicit recipient timezone and no verified address, and area-code inference is forbidden as the legal local-time fact (as reviewed). With no rung of the evidence ladder available, the conservative fallback is refusal - the gate cannot show a send is inside the window, so it does not send.",
+          "open_question": "(f)(15)(ii) excludes a message to a person with whom the caller has an established business relationship, which a review request to a past client might fall under. NOT relied on: it is a fact-specific judgement about each recipient and we have no decision applying it."
         },
         "identification": {
           "value": "required",
@@ -198,7 +198,7 @@
 
     // ── Canada ──────────────────────────────────────────────────────────────
     // Encoded as classification -> applicability -> exception -> requirements,
-    // never `transactional = exempt`. review 26a-5 corrected exactly that
+    // never `transactional = exempt`. Review corrected exactly that
     // shorthand, and the statute's own wording is why: 6(6) excuses PARAGRAPH
     // (1)(a) only, and only for a message that SOLELY does one of the listed
     // things. The content duties in 6(2) survive the exception untouched.
@@ -237,7 +237,7 @@
           "checked_on": "2026-08-17",
           "citations": ["casl-6-2"],
           "basis_citation": "casl-6-2",
-          "note": "6(2)(a) requires prescribed information identifying the sender AND the person on whose behalf the message is sent where different, and 6(2)(b) requires contact information the recipient can readily use. This is owed even where 6(6) excuses consent, which is the half of our earlier reading review called too wide. A phone number alone does not discharge it.",
+          "note": "6(2)(a) requires prescribed information identifying the sender AND the person on whose behalf the message is sent where different, and 6(2)(b) requires contact information the recipient can readily use. This is owed even where 6(6) excuses consent, which is the half of our earlier reading was judged too wide. A phone number alone does not discharge it.",
           "architecture_note": "The two-role record exists (resolveSmsSenderIdentity: platform sender plus tenant on whose behalf). What is NOT proven is that the message BODY carries the prescribed identification and contact information.",
           "open_question": "Which prescribed information does the Electronic Commerce Protection Regulations require in the body, and does our SMS body carry it? Unanswered; the record is not the disclosure."
         },
@@ -249,7 +249,7 @@
           "citations": ["casl-6-2", "casl-11-1", "casl-11-2", "casl-11-3", "crtc-stop-as-unsubscribe"],
           "basis_citation": "casl-6-2",
           "note": "6(2)(c) requires an unsubscribe mechanism conforming to 11(1); 11(2) requires the address or page in 11(1)(b) to stay valid for a minimum of 60 days after the message is sent; 11(3) requires effect to be given without delay and no later than 10 business days.",
-          "architecture_note": "Reply STOP is our mechanism and it is processed on receipt, which satisfies 11(3)'s outer limit by construction rather than by a job. That CRTC accepts STOP as a mechanism is review citation and is recorded as a secondary source."
+          "architecture_note": "Reply STOP is our mechanism and it is processed on receipt, which satisfies 11(3)'s outer limit by construction rather than by a job. That CRTC accepts STOP as a mechanism is a second-hand citation and is recorded as a secondary source."
         }
       }
     },
@@ -452,8 +452,8 @@
       "authority": "CRTC guidance that replying STOP can constitute an unsubscribe mechanism for SMS",
       "verified_against": "secondary_source",
       "checked_on": "2026-08-17",
-      "source": "[redacted] (26a-5)",
-      "quote": "CRTC ... acknowledges that using STOP in an SMS can constitute an unsubscribe mechanism [review summary of the CRTC guidance; the CRTC document itself was not opened]"
+      "source": "internal statutory review note, 2026-08-15 - the CRTC document itself was not opened",
+      "quote": "CRTC ... acknowledges that using STOP in an SMS can constitute an unsubscribe mechanism [second-hand summary; the CRTC document itself was not opened]"
     },
     {
       "id": "crtc-utr-calling-hours",

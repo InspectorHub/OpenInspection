@@ -5,18 +5,16 @@ recipient who presented a valid portal access token.
 
 **Status:** written **before** the code (OI #271, Task 1 of the delivery
 confirmation plan), **caught up to it on 2026-08-07**, and **materially
-corrected on 2026-08-17** after external review found the balancing test
-resting on a premise the product did not support. It reaches a **split
-conclusion**: one shape of the feature passes the balancing test and one does
-not.
+corrected on 2026-08-17** after a review found the balancing test resting on a
+premise the product did not support. It reaches a **split conclusion**: one
+shape of the feature passes the balancing test and one does not.
 
 ---
 
-## What review corrected, and why it changed the code
+## What the correction was, and why it changed the code
 
-review (review, decision) read this assessment against the implementation
-and found that **the interest it balances was assigned to a party who could not
-act on it**.
+This assessment was read against the implementation, and **the interest it
+balances turned out to be assigned to a party who could not act on it**.
 
 The interest is the inspection company's: knowing that the report they were paid
 to produce actually reached the client. That is a real interest and the purpose
@@ -29,9 +27,9 @@ test still holds. But at the time this document was written, the company:
 A legitimate interest is an interest of a controller who is exercising it. A
 controller who cannot decline the processing is not exercising an interest; the
 processing is simply being performed, and the interest is doing rhetorical work
-in an assessment rather than legal work in a decision. review words: a
-tenant's legitimate interest may not be a mask for processing they cannot
-decline.
+in an assessment rather than legal work in a decision. The rule this document
+now follows: a tenant's legitimate interest may not be a mask for processing
+they cannot decline.
 
 **What changed in the product.** `tenant_configs.is_report_view_counting_enabled`
 now exists, defaults to **false**, and is the FIRST condition
@@ -451,9 +449,9 @@ the assessment has to be redone rather than cited.
 
 10. **The tenant can decline it, and has not been asked to accept it.**
     `tenant_configs.is_report_view_counting_enabled` defaults to false and is
-    the first condition `shouldCountReportView` checks. review B4: an interest
-    assigned to a controller who cannot enable, disable or see the processing is
-    not an interest being exercised. Without this switch the assessment balances
+    the first condition `shouldCountReportView` checks. An interest assigned to
+    a controller who cannot enable, disable or see the processing is not an
+    interest being exercised. Without this switch the assessment balances
     a benefit against a right on behalf of a party who had no say in either.
     The switch answers the TENANT's side only; the recipient's Art. 21 objection
     in condition 9 is a separate right and is unaffected by it.

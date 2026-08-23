@@ -1,12 +1,11 @@
 /**
  * An account and its acceptance are ONE write, or there is no account.
  *
- * review A2's invariant, and review review decision is why it is enforced
- * this way rather than the obvious way. The first design enqueued the acceptance
- * atomically with the account insert and let the ledger catch up; it came back
- * `FAIL-CLOSED NOT SATISFIED`. Their distinction: an outbox proves *acceptance
- * evidence was durably captured*, but not *acceptance was recorded in the
- * acceptance ledger before account creation* — and while the event is unconsumed
+ * Why it is enforced this way rather than the obvious way: the first design
+ * enqueued the acceptance atomically with the account insert and let the ledger
+ * catch up, and that is NOT fail-closed. The distinction: an outbox proves
+ * *acceptance evidence was durably captured*, but not *acceptance was recorded
+ * in the acceptance ledger before account creation* — and while the event is unconsumed
  * the state is `account = EXISTS, acceptance_ledger = ABSENT`, which violates the
  * invariant whatever the envelope holds.
  *
@@ -47,10 +46,10 @@ describe('buildAcceptanceStatement refuses what it cannot record honestly', () =
             documents: [doc(), doc({ doc: 'privacy' })],
         });
         expect(stmts).toHaveLength(2);
-        // The whole point of 24D: nothing is in the ledger until the CALLER runs
+        // The whole point: nothing is in the ledger until the CALLER runs
         // these inside the batch that also creates the account. A builder that
         // executed its own insert would look correct and would reopen the exact
-        // window review refused.
+        // window the invariant closes.
         expect(await db.select().from(accountAcceptances).all()).toHaveLength(0);
 
         for (const s of stmts) await s;

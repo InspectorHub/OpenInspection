@@ -59,8 +59,8 @@ const AgentTermsResponseSchema = z.object({
  * Public and GET, because the signup page has to SHOW the text. The checkbox said
  * "I have read and accept the Agent Terms" while the page displayed nothing and
  * linked nowhere, so the acceptance recorded a presentation that had not happened
- * — the same defect review review §26d-2 closed for e-signature, where intent
- * must come from a recorded act rather than be inferred from an artefact existing.
+ * — the same defect that was closed for e-signature, where intent must come
+ * from a recorded act rather than be inferred from an artefact existing.
  *
  * `contentHash` travels with the body so the form can send back what it rendered
  * and a stale page can be refused. That value is a staleness check only; the
@@ -155,8 +155,8 @@ const agentSignupRoutes = createApiRouter()
         // client asserting what it read, which is precisely the evidence this
         // record exists to replace.
         //
-        // No published agent terms means no signup. That is the review gate
-        // (review) expressed as behaviour rather than a note: a deployment
+        // No published agent terms means no signup. That gate is expressed as
+        // behaviour rather than as a note: a deployment
         // that has not published a document written for agents cannot take an
         // agent's agreement to one. The message says so plainly, because an
         // operator hitting this needs to know it is their action that is missing.

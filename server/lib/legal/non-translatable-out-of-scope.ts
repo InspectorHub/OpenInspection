@@ -42,12 +42,12 @@ export const NON_TRANSLATABLE_OUT_OF_SCOPE: NonTranslatableOutOfScopeEntry[] = [
     {
         id: 'oos-report-view-disclosure',
         source: 'server/lib/legal/report-view-disclosure.ts',
-        reason: 'The Art. 13 report-view notice. A platform notice ABOUT the report, not a term OF it: it tells a recipient that a view counter exists, what it deliberately does not record, and how to object. It is already rendered through the message catalogue with a live es-419 value, on review advice, and that is correct — a transparency notice does its job only if the reader can read it. Freezing it to English would weaken the lawful basis it supports, which is the opposite of what the eight-category ruling protects.',
+        reason: 'The Art. 13 report-view notice. A platform notice ABOUT the report, not a term OF it: it tells a recipient that a view counter exists, what it deliberately does not record, and how to object. It is already rendered through the message catalogue with a live es-419 value, deliberately, and that is correct — a transparency notice does its job only if the reader can read it. Freezing it to English would weaken the lawful basis it supports, which is the opposite of what the eight-category ruling protects.',
     },
     {
         id: 'oos-agreement-language-disclosure',
         source: 'server/lib/legal/agreement-language-disclosure.ts',
-        reason: 'The neutral disclosure shown alongside an agreement. review positioned it as a neutral platform disclosure on 2026-08-02: it states a fact and decides nothing, with no governs / prevails / controls language anywhere in it. It is versioned platform copy rather than a catalogue string, but for VERSION-INTEGRITY reasons — its version is signature evidence on agreement_signers.language_disclosure_version — and not because the eight-category ruling reaches it. Recorded here so the two justifications are never merged into one.',
+        reason: 'The neutral disclosure shown alongside an agreement. It is positioned as a neutral platform disclosure: it states a fact and decides nothing, with no governs / prevails / controls language anywhere in it. It is versioned platform copy rather than a catalogue string, but for VERSION-INTEGRITY reasons — its version is signature evidence on agreement_signers.language_disclosure_version — and not because the eight-category ruling reaches it. Recorded here so the two justifications are never merged into one.',
     },
 
     {

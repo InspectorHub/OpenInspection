@@ -52,7 +52,7 @@ function firstCjkIndex(text) {
  * `.md` is here because the gate's own reason applies to it identically: this
  * repository's `docs/` are published, and a reader who cannot read Chinese hits
  * the same dead end in a compliance note as in a comment. It was missing, and
- * the omission was found the honest way — a review quotation pasted into
+ * the omission was found the honest way — a quoted legal passage pasted into
  * `retention-policy.ts` failed CI while the SAME quotation in
  * `docs/compliance/retention-policy.md` sat green beside it.
  *

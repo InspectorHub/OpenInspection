@@ -15,7 +15,7 @@
 -- had an author of its own. That copy is gone from the code; this moves the
 -- rows it left behind. Provenance columns come from the migration before this
 -- one, and every row written here records which rule attributed it and what
--- that rule read (review review, 2026-08-15).
+-- that rule read.
 --
 -- THE TWO CASES, AND THE ONE THAT IS NOT HANDLED.
 --   exactly one signer row  -> the signature is that person's; copy it down.
@@ -27,7 +27,7 @@
 --                              copies `status` WITHOUT the signature, which is
 --                              why it cannot be relied on to do this.
 --   more than one signer row, none carrying a signature -> NOT handled, on
---                              purpose, and review has ruled this must stay a
+--                              purpose, and this must stay a
 --                              hard failure. No normal path produces it: signing
 --                              writes the signer's own row, `findOrCreate` only
 --                              merges signers into NON-terminal envelopes, and

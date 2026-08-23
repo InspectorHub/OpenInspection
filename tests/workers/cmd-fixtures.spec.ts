@@ -42,9 +42,9 @@ describe('cmd golden fixtures — consumer can apply every fixture (A-21)', () =
         // inline-ddl-schema-sync.spec.ts; it used to be a second copy here,
         // which is how three columns went missing without a local gate noticing.
         await b.DB.exec(USERS_TEST_DDL);
-        // The acceptance rows ride the SAME batch as the users insert
-        // (review A2 / review decision), so this table is not optional
-        // scenery: without it the credential apply rolls the account back too.
+        // The acceptance rows ride the SAME batch as the users insert, so this
+        // table is not optional scenery: without it the credential apply rolls
+        // the account back too.
         // The unique index comes with it — it is what makes a redelivered
         // command unable to mint a second acceptance, and this seam is
         // at-least-once.

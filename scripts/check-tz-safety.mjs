@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Timezone-safety gate for the calendar surface (see
- * [redacted]).
+ * Timezone-safety gate for the calendar surface.
  *
  * A civil calendar day mixed with UTC conversion shifts a day in UTC-positive
  * zones — the calendar off-by-one bug. The correct path is server-side tz

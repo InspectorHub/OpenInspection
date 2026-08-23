@@ -2,20 +2,21 @@
  * Build the acceptance rows that ride the SAME write as the account.
  *
  * ── Why this returns statements instead of writing them ─────────────────────
- * review review, decision. The original design enqueued the acceptance
+ * The original design enqueued the acceptance
  * atomically with the account insert and let the ledger become consistent
- * afterwards; it came back `FAIL-CLOSED NOT SATISFIED`. Their distinction: an
+ * afterwards; that does NOT fail closed. The distinction it misses: an
  * outbox proves *acceptance evidence was durably captured*, but it cannot prove
  * *acceptance was recorded in the acceptance ledger before account creation* —
  * and while the event is unconsumed the state is `account = EXISTS,
- * acceptance_ledger = ABSENT`, which violates A2 whatever the envelope holds.
+ * acceptance_ledger = ABSENT`, which breaks the one-write invariant whatever
+ * the envelope holds.
  *
  * So this function does not own a transaction and cannot start one. It hands back
  * statements for the caller to place in the `db.batch()` that also inserts the
  * `users` row — D1's only atomic primitive. If the account write rolls back, so
  * does the acceptance, because they are the same write. A version of this that
  * executed its own insert would be correct-looking and would reintroduce exactly
- * the window review refused.
+ * the window this design refuses.
  *
  * ── Fail closed, and fail HERE ──────────────────────────────────────────────
  * Every refusal below happens before any statement is produced, so a caller

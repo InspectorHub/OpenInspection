@@ -1,26 +1,25 @@
 /**
  * Publish the deployment's agent terms.
  *
- * `POST /api/agent-signup` refuses while nothing is published, which is the round
- * 24c gate: a deployment that has not published a document written for agents
- * cannot take an agent's agreement to one. This script is the only way out of that
- * state, and it is deliberately hard to run by accident.
+ * `POST /api/agent-signup` refuses while nothing is published: a deployment that
+ * has not published a document written for agents cannot take an agent's
+ * agreement to one. This script is the only way out of that state, and it is
+ * deliberately hard to run by accident.
  *
  * ── What it refuses, and why each refusal exists ────────────────────────────
- *  - A body still containing a `{{PLACEHOLDER}}`. review review ruled that
- *    `{{GOVERNING_LAW}}` must not survive to publication, and governing law is not
- *    the only one: a liability cap of `{{LIABILITY_FLOOR}}` is worse than no cap
- *    because it reads as a term. This check is what makes that ruling mechanical
- *    instead of remembered.
+ *  - A body still containing a `{{PLACEHOLDER}}`. `{{GOVERNING_LAW}}` must not
+ *    survive to publication, and governing law is not the only one: a liability
+ *    cap of `{{LIABILITY_FLOOR}}` is worse than no cap because it reads as a
+ *    term. This check is what makes that rule mechanical instead of remembered.
  *  - A body whose status line still says draft. The document carries its own
  *    review state, and publishing a file that says it is not published is a
  *    contradiction no reviewer would sign off.
  *  - A missing or malformed `--version`. The version is the date a reader is shown
  *    and it goes on every acceptance; deriving it from today's clock would stamp
- *    the deploy date onto a document review approved on another day.
+ *    the deploy date onto a document that was approved on another day.
  *
  * ── What it strips ──────────────────────────────────────────────────────────
- * HTML comments. The file carries the review status and the review decision
+ * HTML comments. The file carries the review status and the open decision
  * points inline so they travel with the text under review — and none of that is
  * part of the agreement. Publishing them would put our open questions in front of
  * the signer. The stripped body is what gets hashed, so the hash is of exactly
@@ -50,7 +49,7 @@ const version = versionIdx >= 0 ? argv[versionIdx + 1] : undefined;
 const die = (msg) => { console.error(`\n✘ ${msg}\n`); process.exit(1); };
 
 if (!version || !/^\d{4}-\d{2}-\d{2}$/.test(version)) {
-    die('--version YYYY-MM-DD is required (the date review approved the text, not today).');
+    die('--version YYYY-MM-DD is required (the date the text was approved, not today).');
 }
 
 const raw = readFileSync(SOURCE, 'utf8');
@@ -110,17 +109,17 @@ console.log(`  body length         : ${body.length} chars (${raw.length} before 
 console.log(`  placeholders left   : ${placeholders.length}${placeholders.length ? ` — ${placeholders.join(', ')}` : ''}`);
 console.log(`  status line         : ${statusLine}`);
 
-// ── The publish gate (review review) ─────────────────────────────────────
-// review closing recommendation was to stop line-editing and run a PUBLISH
-// GATE instead: a fixed checklist that must be entirely green before this
-// document may go live. Encoded here rather than kept as a list somebody
-// remembers, because a checklist nobody executes is how a blocker gets forgotten
-// on the day everything else turns green.
+// ── The publish gate ────────────────────────────────────────────────────────
+// Line-editing the document is not the control; a PUBLISH GATE is: a fixed
+// checklist that must be entirely green before this document may go live.
+// Encoded here rather than kept as a list somebody remembers, because a
+// checklist nobody executes is how a blocker gets forgotten on the day
+// everything else turns green.
 const noAgency = /no agency or employment/i.test(body);
 
-// Retention is a SECOND blocker, independent of the operating entity: review
-// approved no retention window, so §15 must not go live implying one. The signal
-// is the policy header's own state, not a human's recollection of it.
+// Retention is a SECOND blocker, independent of the operating entity: no
+// retention window is approved yet, so §15 must not go live implying one. The
+// signal is the policy header's own state, not a human's recollection of it.
 let retentionApproved = false;
 let retentionDetail = 'could not read retention-policy.ts — treated as NOT approved';
 try {
@@ -128,7 +127,7 @@ try {
     // `[a-z_]+`, and the underscore is not a detail. This read `[a-z]+`, which
     // could not match `approved_with_conditions` — so it parsed as "(none)",
     // "(none) !== 'interim'" was true, and the gate went GREEN on the one status
-    // review invented specifically so nobody would treat it as approved. A check
+    // that exists specifically so nobody would treat it as approved. A check
     // that fails to parse and reports success is worse than no check.
     const status = rp.match(/status:\s*'([a-z_]+)'/)?.[1] ?? '(unparsed)';
     const approvedBy = rp.match(/approvedBy:\s*(null|'[^']*')/)?.[1] ?? 'null';
@@ -141,15 +140,15 @@ try {
 
 const gate = [
     ['contracting party + contact resolved', !placeholders.includes('OPERATOR_NAME') && !placeholders.includes('OPERATOR_CONTACT_EMAIL')],
-    // Governing law and the dispute mechanism are NO LONGER gate lines. review
-    // review §4: "governing law 'must not ship as a placeholder'" never meant
-    // every contract must contain the clause, and a document with no choice-of-law
-    // clause is not thereby invalid — so §17 was deleted rather than filled. What
-    // it does NOT mean is that the risk is gone: with no governing law, no venue
-    // and no arbitration, a dispute still has to find a forum. It means the
-    // Agent Portal is no longer blocked ON THIS.
+    // Governing law and the dispute mechanism are NO LONGER gate lines.
+    // "Governing law must not ship as a placeholder" never meant every contract
+    // must contain the clause, and a document with no choice-of-law clause is
+    // not thereby invalid — so §17 was deleted rather than filled. What it does
+    // NOT mean is that the risk is gone: with no governing law, no venue and no
+    // arbitration, a dispute still has to find a forum. It means the Agent
+    // Portal is no longer blocked ON THIS.
     //
-    // review also declined an explicit "no choice of law is made" sentence: it
+    // An explicit "no choice of law is made" sentence was also rejected: it
     // converts a mere absence into an affirmative contractual statement, for no
     // commercial gain.
     ['privacy notice URL resolved', !placeholders.includes('PRIVACY_URL')],
@@ -165,16 +164,16 @@ console.log(`      · retention signal : ${retentionDetail}`);
 
 if (green < gate.length) {
     die(`publish gate: ${gate.length - green} of ${gate.length} check(s) not green — see the list above.\n`
-      + '  This document does not go live until every one of them is. review review\n'
-      + '  endorsed exactly this: keeping the publisher fail-closed until every check\n'
-      + '  is green is the correct posture. The ruling itself is archived at\n'
-      + '  [redacted] in the superproject.');
+      + '  This document does not go live until every one of them is. Keeping the\n'
+      + '  publisher fail-closed until every check is green is the correct posture:\n'
+      + '  a version people have accepted can never be edited afterwards, so an open\n'
+      + '  blocker that reaches publication cannot be withdrawn, only superseded.');
 }
 
 if (placeholders.length > 0) {
     die(`The body still contains ${placeholders.length} unresolved placeholder(s): ${placeholders.join(', ')}.\n`
-      + '  review review: governing law must not ship as a placeholder, and a liability\n'
-      + '  cap that reads as a term while naming no figure is worse than none. Fill them in\n'
+      + '  Governing law must not ship as a placeholder, and a liability cap that reads\n'
+      + '  as a term while naming no figure is worse than none. Fill them in\n'
       + '  (per deployment) and publish again.');
 }
 if (draftish) {

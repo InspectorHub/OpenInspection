@@ -50,12 +50,12 @@ export interface JoinTeamDeps {
  * conflict with the still-present soft-deleted row.
  *
  * ── The account and its acceptance are ONE write ────────────────────────
- * review A2's invariant, enforced as review review decision requires:
+ * The invariant is enforced strictly:
  * the member row and the `account_acceptances` rows go into a single
  * `db.batch()`, D1's only atomic primitive. An acceptance written after the
  * account — even microseconds after, even durably enqueued — leaves the
  * state `account = EXISTS, acceptance_ledger = ABSENT` in between, which is
- * the state the ruling refused.
+ * the state this design refuses.
  *
  * REACTIVATION OWES ONE TOO. It is tempting to treat it as "they already
  * accepted", and the row itself says otherwise: the code below already
@@ -163,7 +163,7 @@ export async function joinTeam(
 
     // THE one write. No sequential fallback for drivers without `batch` —
     // the fallback would look correct and would reopen exactly the window
-    // decision closed.
+    // this design closes.
     await db.batch([memberStatement, ...acceptanceStatements] as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 
     await db.update(tenantInvites).set({ status: 'accepted' }).where(eq(tenantInvites.id, token));
@@ -184,8 +184,8 @@ export async function joinTeam(
                 // event is what creates the portal-side identity and
                 // membership, so an event carrying the account WITHOUT the
                 // evidence it was validly created teaches the receiving
-                // side that the two are separable — which is the belief
-                // decision is about. Additive and unparsed on that side
+                // side that the two are separable — the exact belief this
+                // one-write rule exists to prevent. Additive and unparsed on that side
                 // today; see `UserSyncAcceptance` for what does and does
                 // not consume it.
                 acceptance,

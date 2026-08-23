@@ -246,7 +246,7 @@ async function applyKnownCmd(
                 // The acceptance rides the SAME parameter object as the
                 // credential and is never applied on its own — an acceptance
                 // written without the account it belongs to would be the
-                // mirror-image of the state review refused.
+                // mirror-image of the state this path refuses.
                 await applyCredentialIfFresh(dbBinding, {
                     tenantId: data.tenantId,
                     adminEmail: data.adminEmail,

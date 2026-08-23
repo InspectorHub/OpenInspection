@@ -76,7 +76,7 @@ const reportVerifyRoute = createRoute(withMcpMetadata({
             // True when the key this version names is not on file, so the
             // signature could not be checked either way. Separate from
             // `signatureValid: false`, which asserts a check that RAN and failed
-            // — a distinction the reader is entitled to (review decision).
+            // — a distinction the reader is entitled to.
             keyMissing: z.boolean(),
             propertyAddressMasked: z.string(),
             notPublished: z.boolean(),

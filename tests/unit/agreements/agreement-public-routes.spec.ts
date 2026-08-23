@@ -67,7 +67,7 @@ function buildApp(db: BetterSQLite3Database<typeof schema>, stubs: Stubs = {}) {
     //
     // The stub used to be a pure recorder, which was fine while nothing read the
     // table back. The sign path now refuses a signature with no recorded
-    // PRESENTATION (review review — intent comes from an act, never inferred
+    // PRESENTATION (intent comes from an act, never inferred
     // from a signature image existing) and reads `esign_audit_logs` to check it.
     // A recorder that never persisted made every signature in this file fail for
     // a reason that looked like the new check and was really a test double one
@@ -179,8 +179,8 @@ function signReq(body: Record<string, unknown>) {
 /**
  * Load the agreement the way a signer does, before signing it.
  *
- * The sign route now refuses a signature with no recorded PRESENTATION (review
- * review: intent comes from an act, never inferred from a signature image
+ * The sign route now refuses a signature with no recorded PRESENTATION (intent
+ * comes from an act, never inferred from a signature image
  * existing), and the presentation is appended by this GET. A spec that POSTs a
  * signature without ever loading the document was asserting a flow no human
  * performs — the signing page fetches this endpoint before it can render a
@@ -434,7 +434,7 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
 
     it('a signature with NO recorded presentation is refused', async () => {
         // The original shape: POST a signature having never been shown the
-        // document. review review — intent must come from a recorded act, not
+        // document. Intent must come from a recorded act, not
         // be inferred back from a signature image existing. Every other test in
         // this file now calls present() first, which is what a signing page does
         // before it can render a character; this is the one that must not.

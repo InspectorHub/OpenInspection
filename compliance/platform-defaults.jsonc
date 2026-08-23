@@ -1,7 +1,7 @@
 // Platform-defaults register — the values a fresh workspace receives, and who
 // decided them.
 //
-// review review B5: a default is a decision, and a decision made quietly on a
+// A default is a decision, and a decision made quietly on a
 // controller's behalf is the one nobody can point at afterwards. Each entry
 // carries B5's three fields — `default_owner`, `decision_type`,
 // `controller_override` — for one shipped default.
@@ -27,7 +27,7 @@
 //
 // ── SIX RULES ───────────────────────────────────────────────────────────────
 //
-// 1. `decision_type` takes review three values, plus an honest fourth:
+// 1. `decision_type` takes three reviewed values, plus an honest fourth:
 //      · `technical`         — processor service design. Retry counts, display
 //                              formats, scheduling mechanics, sequence seeds.
 //      · `service_safeguard` — a service characteristic the Terms/DPA must
@@ -40,7 +40,7 @@
 //                              gate on every run. An unreviewed default that
 //                              reads as reviewed is the failure mode here.
 // 2. RETENTION-SHAPED DEFAULTS ARE `controller_choice` WITH
-//    `controller_override: required`. review was explicit that how long client
+//    `controller_override: required`. It is settled that how long client
 //    data is kept is not ours to decide on a controller's behalf without
 //    surfacing it. The gate enforces this on the column name rather than
 //    trusting the classifier.
@@ -187,7 +187,7 @@
       "default_value": "6",
       "default_owner": "engine",
       "decision_type": "controller_choice",
-      "basis": "A retention period. review review B5: how long client data is kept is the controller's substantive decision. The window itself lives in the retention manifest, and the disclosed derivation (the UK Limitation Act simple-contract period) is the platform's suggestion, never an instruction.",
+      "basis": "A retention period. How long client data is kept is the controller's substantive decision. The window itself lives in the retention manifest, and the disclosed derivation (the UK Limitation Act simple-contract period) is the platform's suggestion, never an instruction.",
       "controller_override": "required",
       "override_surface": "app/routes/settings-compliance.tsx"
     },
@@ -197,26 +197,26 @@
       "default_value": "7",
       "default_owner": "engine",
       "decision_type": "controller_choice",
-      "basis": "A retention period, and the one review named explicitly (review B1a): the platform default is prominently disclosed and the controller may choose longer or indefinite. An explicit tenant choice, 0 (indefinite) included, is a controller instruction and always wins.",
+      "basis": "A retention period, and the one named explicitly in review: the platform default is prominently disclosed and the controller may choose longer or indefinite. An explicit tenant choice, 0 (indefinite) included, is a controller instruction and always wins.",
       "controller_override": "required",
       "override_surface": "app/routes/settings-compliance.tsx",
       "note": "The market default among competitors is indefinite storage even after cancellation, so this default diverges from tenant expectation and has to be disclosed prominently rather than buried."
     },
-    // ── review own rulings ────────────────────────────────────────────────
+    // ── Settled by review ───────────────────────────────────────────────────
     {
       "column": "is_report_view_counting_enabled",
       "property": "reportViewCountingEnabled",
       "default_value": "false",
       "default_owner": "engine",
       "decision_type": "controller_choice",
-      "basis": "review review B4 assigns the legitimate interest in counting report opens to the COMPANY, not to us, so the company has to be able to decline it — and a default of false is the only position where nobody is counted until somebody chose to be.",
+      "basis": "The legitimate interest in counting report opens belongs to the COMPANY, not to us, so the company has to be able to decline it — and a default of false is the only position where nobody is counted until somebody chose to be.",
       "controller_override": "required",
       "override_surface": "app/routes/settings-compliance.tsx"
     },
     // ── Open questions: who may see whose data (rule 1, `unreviewed`) ───────
-    // Six defaults whose classification turns on a disclosure question no
-    // review round has answered. Each has a working settings surface, recorded
-    // and verified; what is missing is the ruling, not the switch.
+    // Six defaults whose classification turns on a disclosure question that has
+    // not been answered. Each has a working settings surface, recorded and
+    // verified; what is missing is the decision, not the switch.
     {
       "column": "point_of_contact",
       "property": "pointOfContact",
@@ -226,7 +226,7 @@
       "basis": null,
       "controller_override": "unreviewed",
       "override_surface": "app/routes/settings-communication.tsx",
-      "note": "Decides whether client-facing messages carry the individual inspector's identity or the company's. That is a disclosure decision about STAFF personal data, which looks like controller_choice — but review controller_choice examples are all about the client's data, and extending them to staff would be our inference, not their ruling. Default 'company' is the narrower disclosure either way."
+      "note": "Decides whether client-facing messages carry the individual inspector's identity or the company's. That is a disclosure decision about STAFF personal data, which looks like controller_choice — but the reviewed controller_choice examples are all about the client's data, and extending them to staff would be our inference, not their ruling. Default 'company' is the narrower disclosure either way."
     },
     {
       "column": "is_archive_revoking_access",
@@ -312,7 +312,7 @@
       "default_value": "sql`'{\"agreement_unsigned_h\":72,\"invoice_overdue_h\":72,\"report_unpublished_h\":72}'`",
       "default_owner": "engine",
       "decision_type": "technical",
-      "basis": "Hours before an item enters the INTERNAL 'Needs Attention' bucket on the tenant's own dashboard. Nothing is sent to anybody on this timer, which is what keeps it out of review automated-client-messaging category.",
+      "basis": "Hours before an item enters the INTERNAL 'Needs Attention' bucket on the tenant's own dashboard. Nothing is sent to anybody on this timer, which is what keeps it out of the automated-client-messaging category.",
       "controller_override": "available",
       "override_surface": "server/api/admin/admin-settings.ts",
       "note": "The 72-hour value is ALSO written as a module constant in the admin settings validations, so this default already exists twice in the codebase. That second copy is exactly the class of default this register cannot enumerate — a constant, not a schema declaration — and it is named here as the worked example of the limit in the header."

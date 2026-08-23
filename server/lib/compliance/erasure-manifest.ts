@@ -36,10 +36,9 @@ export interface ErasureRule {
     /**
      * Fideslang-style data category, e.g. 'user.contact.email'.
      *
-     * ⚠️ THIS IS OUR CLASSIFICATION, NOT A LEGAL FINDING. review raised this
-     * directly (review full review, 2026-08-15): a category here records how
-     * WE choose to govern a column, and must never be cited downstream as a
-     * determination that the law classifies it that way.
+     * ⚠️ THIS IS OUR CLASSIFICATION, NOT A LEGAL FINDING. A category here
+     * records how WE choose to govern a column, and must never be cited
+     * downstream as a determination that the law classifies it that way.
      *
      * The live example is `user.signature.rendered_image` on ONE column —
      * `agreement_signers.signature_base64`, the drawn image a signer produced.
@@ -61,8 +60,9 @@ export interface ErasureRule {
      * do not make and that `scripts/check-signature-dynamics.mjs` exists to
      * keep us from ever making.
      *
-     * review named the failure mode from our own history: an internal
-     * classification read by the next legal document as an established fact.
+     * The failure mode this guards against comes from our own history: an
+     * internal classification read by the next legal document as an
+     * established fact.
      */
     category: string;
     /**
@@ -79,8 +79,8 @@ export interface ErasureRule {
     /**
      * Masking strategy for this column on erasure.
      *
-     * `erase_in_place` was called `anonymize` until review (review, CA-08)
-     * ruled the name out: what it does is overwrite identifier columns with a
+     * `erase_in_place` was called `anonymize` until that name was retired:
+     * what it does is overwrite identifier columns with a
      * sentinel in a row that survives, which is neither CCPA deidentification
      * (that carries substantive conditions we do not meet) nor GDPR
      * anonymisation. The old name invited a future reader to cite it as proof
@@ -339,7 +339,7 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // addresses. `audit.ts` now strips the machine-detectable identifiers at
     // write time, but prose is not detectable at all and historical rows
     // predate the redactor — so the column is SCRUBBED wholesale on an erasure,
-    // the same call portal's review made on the identical `details` column
+    // the same call made on the portal's identical `details` column
     // (retaining it through an erasure is an incomplete DSAR). The ROW stays:
     // the security/accountability trail is the retention basis, and what makes
     // it one is the structured event (action/entity), not the blob.
@@ -407,7 +407,7 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // not on its checked-in list, and FAILS outright once the deadline passes.
     // The tripwire in `tests/unit/privacy/erasure-manifest-coverage.spec.ts`
     // fails the day the sweep learns about `inspections`, so this notice cannot
-    // outlive its gap either. A DIFFERENT question about the two coordinate columns — whether they are statutory precise geolocation under §1798.140(w), which review answered NO because that definition reaches only data derived from a device (CA-10) — is recorded with its trip-wire in `STATUTORY_CLASSIFICATIONS`, in the out-of-scope companion file. It is kept out of `ErasureRule` on purpose: `category` above is our own label and may not be cited as a legal determination, while that entry is one.
+    // outlive its gap either. A DIFFERENT question about the two coordinate columns — whether they are statutory precise geolocation under §1798.140(w), answered NO on the ground that the definition reaches only data derived from a device — is recorded with its trip-wire in `STATUTORY_CLASSIFICATIONS`, in the out-of-scope companion file. It is kept out of `ErasureRule` on purpose: `category` above is our own label and may not be cited as a legal determination, while that entry is one.
     { table: 'inspections', column: 'property_address',  category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
     { table: 'inspections', column: 'address_place_id',  category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
     { table: 'inspections', column: 'address_street',    category: 'user.address',  action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },

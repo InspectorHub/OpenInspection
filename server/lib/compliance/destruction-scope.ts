@@ -8,7 +8,7 @@
  * store in it actually reported success. A record written before Durable
  * Objects were purgeable answers yes to the first and no to the second, and
  * that is correct rather than a defect: the old destruction did not fail, it
- * measured less (review).
+ * measured less.
  *
  * ── Why this is not a third status value ────────────────────────────────────
  * The obvious shape is `status = 'incomplete'`. `destruction-status.ts` has

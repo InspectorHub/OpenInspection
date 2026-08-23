@@ -99,7 +99,7 @@ export async function runRetentionSweep(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = rawDb as any;
 
-    // Legal hold outranks this clock too (review review). It is a SCHEDULED
+    // Legal hold outranks this clock too. It is a SCHEDULED
     // deletion — the invariant is over all of them, not only the fixed-window
     // sweep next door — and it destroys more than most: a signature and three R2
     // artefacts, none of which can be reconstructed. Read before anything is
@@ -156,7 +156,7 @@ export async function runRetentionSweep(
 
     if (dueIds.length === 0) return { purgedEnvelopes: 0, purgedSigners: 0, purgedArtefacts: 0 };
 
-    // review review: nulling the column while `signed.pdf` still embeds the
+    // Nulling the column while `signed.pdf` still embeds the
     // same image is DATABASE retention wearing the name of retention. The column
     // and the artefacts are one evidence object, so a sweep that cannot reach
     // the artefacts must not destroy half of it and report success.
@@ -197,7 +197,7 @@ export async function runRetentionSweep(
     // SAVED DEFAULT signature (`users.default_signature_base64`) is a different
     // clock — an account asset that expires with the account — and both are now
     // written down in erasure-out-of-scope.ts rather than left indefinite by
-    // omission (review review).
+    // omission.
     const envRes = await db.update(agreementRequests)
         .set({ ...ANONYMIZE_REQUEST_PII, inspectorSignatureBase64: null, purgedAt: new Date(now) })
         .where(and(inArray(agreementRequests.id, dueIds), isNull(agreementRequests.purgedAt)))

@@ -119,8 +119,8 @@ export interface SmsGateArgs {
      * something every caller HAS — omitting it is forgetfulness, which is why it
      * is required and why `lint:sms-gate-args` watches it. A jurisdiction is a
      * fact about the recipient that nothing in this system currently holds:
-     * there is no explicit recipient timezone, no verified address, and review
-     * 26a-1 forbids deriving it from the area code, which is the only signal the
+     * there is no explicit recipient timezone, no verified address, and
+     * deriving it from the area code is forbidden — the only signal the
      * destination number carries. `+1` cannot even separate the US from Canada.
      *
      * So absent means "not established", and the rules are not consulted. It
@@ -204,7 +204,7 @@ export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
             // Read here rather than by a second query in the caller: this is
             // the one place that already holds the tenant's config row, and the
             // sender-identity record the send path writes needs the brand a
-            // recipient actually sees (review 26-5).
+            // recipient actually sees.
             companyName:  tenantConfigs.companyName,
         }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
     } catch { cfg = null; }
@@ -243,11 +243,11 @@ export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
     //
     // The consent we hold was captured under a disclosure describing
     // appointment and report updates. A review request is promotional, which
-    // changes which consent the message needs, so review ruling is to refuse
+    // changes which consent the message needs, so the rule is to refuse
     // marketing on this channel outright until a separate marketing-SMS consent
     // exists. It is decided HERE and not in the template editor because a
-    // tenant can write any body they like: "do not leave the compliance
-    // decision to the content author."
+    // tenant can write any body they like: the compliance decision must not be
+    // left to the content author.
     //
     // WHY BOTH CHECKS. The class check sees anything carrying a seeded class
     // id. It cannot see a tenant-authored template, which has no class by
@@ -305,7 +305,7 @@ export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
     //     is refused, because the consent this product captures is a disclosure
     //     about appointment and report updates and is not that agreement.
     //   quiet_hours — a rule that ATTACHES is refused, because we hold no rung of
-    //     review evidence ladder (explicit recipient timezone → verified
+    //     the evidence ladder (explicit recipient timezone → verified
     //     address → other reliable signal → conservative fallback) and area-code
     //     inference is forbidden as the local-time fact. We cannot show a send is
     //     inside the window, so we do not send. `unknown` refuses for the

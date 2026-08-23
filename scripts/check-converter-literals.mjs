@@ -21,8 +21,8 @@
  *     its own classification. A discriminator inlined at its use site is still
  *     a discriminator, and it is the form that escapes review.
  *
- * ⚠️ NO LENGTH RULE. "Shorter than N characters is safe" was put to review and
- * rejected in as many words: length is not the test. This gate classifies; it
+ * ⚠️ NO LENGTH RULE. "Shorter than N characters is safe" was proposed and
+ * rejected outright: length is not the test. This gate classifies; it
  * does not measure. The one exemption is by NAME — the eight answers `typeof`
  * can give — because a JavaScript type name is not anybody's expression.
  *

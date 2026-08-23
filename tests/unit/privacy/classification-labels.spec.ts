@@ -1,9 +1,8 @@
 /**
  * The compliance labels that answer a legal question we are not asking.
  *
- * review review (CA-08) and review landed the same finding twice: an
- * INTERNAL label gets read downstream as a legal determination. Two labels in
- * this engine were doing it.
+ * The same finding landed twice: an INTERNAL label gets read downstream as a
+ * legal determination. Two labels in this engine were doing it.
  *
  *  - `anonymize` as an erasure/retention action. What the code does is write a
  *    sentinel over identifier columns in a row that survives. That is not CCPA

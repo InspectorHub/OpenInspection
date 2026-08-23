@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * i18n formatting gate (see [redacted]).
+ * i18n formatting gate.
  *
  * Phase A routed every user-facing date/time/number/currency render through the
  * shared locale-aware formatter (app/lib/format.ts + server/lib/format.ts), driven

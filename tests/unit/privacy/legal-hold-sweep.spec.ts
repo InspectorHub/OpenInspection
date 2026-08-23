@@ -1,7 +1,7 @@
 /**
  * A legal hold outranks every scheduled deletion — proved per table, not asserted.
  *
- * review review made this a global invariant rather than a per-table note, and
+ * This is a global invariant rather than a per-table note, and
  * the way an invariant like this actually fails is not that somebody disagrees
  * with it: it is that one executor out of twelve forgets the filter, compiles,
  * passes every type check, and deletes under a preservation order. Nothing in

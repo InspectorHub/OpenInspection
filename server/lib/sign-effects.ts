@@ -90,7 +90,7 @@ export async function runEnvelopeCompletionPipeline(
         })());
     }
 
-    // (4) review free-tier structured log — redundancy in case the D1 audit
+    // (4) Free-tier structured log — redundancy in case the D1 audit
     // write fails after the Workers commit.
     logger.info('agreement.signed.audit', {
         event: 'agreement.signed.audit',

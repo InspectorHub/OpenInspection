@@ -139,7 +139,7 @@ export const agreementSigners = sqliteTable('agreement_signers', {
     expiresAt:          integer('expires_at', { mode: 'timestamp_ms' }),
     revokedAt:          integer('revoked_at', { mode: 'timestamp_ms' }),
     // Which version of the platform language DISCLOSURE this signer was shown.
-    // Not a contractual term (review, 2026-08-02) — but still the only way to
+    // Not a contractual term — but still the only way to
     // answer "what was this person actually shown", which is the question a
     // dispute turns on.
     //
@@ -153,11 +153,11 @@ export const agreementSigners = sqliteTable('agreement_signers', {
     //
     // Appended at the table end (see the expiresAt/revokedAt note above).
     languageDisclosureVersion: integer('language_disclosure_version'),
-    // ── Attribution provenance (review review, 2026-08-15) ───────────────
+    // ── Attribution provenance ───────────────────────────────────────────────
     //
     // How this row came to say that THIS person's signature is THIS image. A
     // record produced by a migration is not the same fact as one captured at
-    // signing, and review rule is that the two must stay distinguishable —
+    // signing, and the two must stay distinguishable —
     // so that nobody reading `signature -> Alice` years from now mistakes an
     // attribution we derived for an identity the signing event recorded.
     //

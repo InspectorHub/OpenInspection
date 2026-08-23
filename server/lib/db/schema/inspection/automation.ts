@@ -169,7 +169,7 @@ export const automationLogs = sqliteTable('automation_logs', {
     /**
      * WHO SENT IT, and ON WHOSE BEHALF — recorded, not inferred.
      *
-     * review review: the owner of the number is not automatically the legal
+     * The owner of the number is not automatically the legal
      * sender. In the default mode a message leaves the platform's shared number
      * carrying the tenant's brand, so the two questions have different answers.
      * Both were previously reconstructable only by reading `sms_mode` off the

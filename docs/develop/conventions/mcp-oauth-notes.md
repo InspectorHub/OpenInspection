@@ -225,11 +225,10 @@ AND the OAuth grant `props` (the authoritative value the DO trusts for tenant sc
 > project URL-clarity rule; it aligns with product terminology (Company) and with competitor
 > Spectora (Company). An earlier draft used the abbreviated `/t/` prefix — superseded.
 
-This matches the approved design spec
-(`[redacted]` §4.2 / §11.3),
-which deliberately chose **tenant-in-URL `/company/{slug}/mcp` + RFC 8707 resource indicator**. The
-path-based approach is REQUIRED — not merely cosmetic — because the spec mandates two things a
-query-string approach cannot provide:
+This matches the approved design, which deliberately chose **tenant-in-URL
+`/company/{slug}/mcp` + RFC 8707 resource indicator**. The
+path-based approach is REQUIRED — not merely cosmetic — because two things a
+query-string approach cannot provide are mandatory here:
 
 1. **Per-workspace distinct URLs** — each workspace gets its own canonical MCP endpoint
    (`https://host.com/company/acme/mcp`), so MCP clients register and store one URL per workspace.

@@ -48,7 +48,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/tenant/account-acceptances.ts · 10 columns · primary key `id`</sub>
 
-> What the person accepted, recorded where the account was born. review A2's invariant is that an account and its acceptance are ONE write.
+> What the person accepted, recorded where the account was born. THE INVARIANT: an account and its acceptance are ONE write.
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -162,8 +162,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `expires_at` | integer |  |  |  | IA-37 — signer-token lifecycle. Appended at the table end (D1 can't add a column mid-table on a referenced table — reference_d1_add_column_at_end). |
 | `revoked_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
-| `language_disclosure_version` | integer |  |  |  | Which version of the platform language DISCLOSURE this signer was shown. Not a contractual term (review, 2026-08-02) — but still the only way to answer "what was this person actually shown", which is the question a dispute turns on. **[more]** |
-| `attribution_basis` | text |  |  |  | ── Attribution provenance (review review, 2026-08-15) ─────────────── How this row came to say that THIS person's signature is THIS image. **[more]** |
+| `language_disclosure_version` | integer |  |  |  | Which version of the platform language DISCLOSURE this signer was shown. Not a contractual term — but still the only way to answer "what was this person actually shown", which is the question a dispute turns on. **[more]** |
+| `attribution_basis` | text |  |  |  | ── Attribution provenance ─────────────────────────────────────────────── How this row came to say that THIS person's signature is THIS image. **[more]** |
 | `attribution_source` | text |  |  |  | For a relocated row, WHERE the attribution came from, in durable terms (table + column names, which survive renumbering). |
 | `attributed_at` | integer |  |  |  | When the attribution was made: the signing time for a captured one, the migration's run time for a relocated one. |
 
@@ -230,7 +230,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `artifact_type` | text | NN UQ |  | `inspection_result, report` | WHICH TABLE holds the row that received the text. `artifact_id` below is that row's primary key, so neither column means anything without the other. **[more]** |
 | `artifact_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
-| `reviewed_by` | text | NN UQ |  |  | The STAFF user who reviewed the text (`users.id`), never a contact. Named `reviewed_by` and not `accepted_by` on purpose — the control that writes this row says "Review AI-assisted content before publication", and a column called "accepted" would quietly restate the claim review refused. **[more]** |
+| `reviewed_by` | text | NN UQ |  |  | The STAFF user who reviewed the text (`users.id`), never a contact. Named `reviewed_by` and not `accepted_by` on purpose — the control that writes this row says "Review AI-assisted content before publication", and a column called "accepted" would quietly restate the absolution claim this product … **[more]** |
 | `reviewed_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `ai_call_id` | text | NN UQ IX |  |  | -> `ai_call_provenance.id`. No `.references()` (Schema Rules): the join is enforced at the application layer like every other one here. |
 
@@ -289,7 +289,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `notice_id` | text |  |  |  | Communication C1 (design §3.13) — the NOTICE HEADER this channel-attempt belongs to (notifications.id). **[more]** |
 | `attempts` | integer | NN | `0` |  | How many times flush() has PICKED THIS ROW UP. Stamped when the batch is claimed — before anything is dispatched — and that ordering is the entire point. **[more]** |
 | `last_attempt_at` | integer |  |  |  | When the last claim happened — `attempts` says how many, this says how stale. A row stuck at attempts=6 tells you nothing without it. |
-| `sender_identity` | text |  |  |  | WHO SENT IT, and ON WHOSE BEHALF — recorded, not inferred. review review: the owner of the number is not automatically the legal sender. **[more]** |
+| `sender_identity` | text |  |  |  | WHO SENT IT, and ON WHOSE BEHALF — recorded, not inferred. The owner of the number is not automatically the legal sender. **[more]** |
 
 **Indexes**
 
@@ -1486,7 +1486,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/tenant/legal-holds.ts · 9 columns · primary key `id`</sub>
 
-> A preservation obligation that outranks every scheduled deletion. review review made this a global invariant rather than a per-table note: a record within the scope of a legal hold, dispute, regulatory investigation or DSAR/complaint preservation must not be removed by an ordinary retention sweep until the hold is released.
+> A preservation obligation that outranks every scheduled deletion. This is a GLOBAL invariant rather than a per-table note: a record within the scope of a legal hold, dispute, regulatory investigation or DSAR/complaint preservation must not be removed by an ordinary retention sweep until the hold is released.
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|

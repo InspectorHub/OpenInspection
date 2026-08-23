@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Verification-copy policy gate — review rulings 16C / 17a-17c (2026-08-15),
- * extended by review (2026-08-17).
+ * Verification-copy policy gate.
  *
  * A verification surface may state what the system actually checked and what
  * that check established. It may NOT convert an integrity result into a
@@ -10,7 +9,7 @@
  * than characterise the signature, signer, document or legal effect as invalid.
  *
  * ── This is a Global Core control, not a regional overlay ───────────────────
- * review promoted it and named it: **Verification Claim Integrity**. The
+ * The control has a name: **Verification Claim Integrity**. The
  * rule is written down here because it is load-bearing under FOUR regimes at
  * once, none of which is a single jurisdiction's overlay:
  *
@@ -25,10 +24,10 @@
  * deleting a control they took for a leftover of some other regime's rules.
  *
  * This exists because the rule is forward-looking. The two strings that
- * prompted it ("Signature Verified" / "Invalid Signature") are gone, but
- * review named the disguises the same claim reappears in — "Identity
+ * prompted it ("Signature Verified" / "Invalid Signature") are gone, but the
+ * same claim keeps reappearing in disguise — "Identity
  * Verified", "Consent Verified", "Agreement Validated", "Legally Binding",
- * "Verified Document", and (review) "Authentic Signature", "Genuine
+ * "Verified Document", and later "Authentic Signature", "Genuine
  * Signature", "Valid Signature", "Legally Valid Signature", "Signer Verified",
  * "Authorized Signature", "Confirmed by [person]" and "Signed by [person]" —
  * and a policy document does not stop any of them landing in a catalogue.
@@ -72,8 +71,8 @@ const BANNED = [
   { re: /\b(verified|verificado)\s+(document|documento)\b|\b(document|documento)\s+(verified|verificado)\b/i,
     why: 'labels a document as verified — on a page that ran no check this states a result never computed' },
 
-  // ── review. Eight more disguises, each with the same shape: an integrity
-  //    result restated as a fact about a human, a mark, or a legal outcome. ──
+  // ── Eight more disguises, each with the same shape: an integrity result
+  //    restated as a fact about a human, a mark, or a legal outcome. ─────────
 
   { re: /\b(authentic|genuine)\s+(signature|firma)\b|\b(signature|firma)\s+(is\s+|es\s+|sea\s+)?(authentic|genuine|auténtica|genuina)\b/i,
     why: 'calls a signature authentic or genuine — the chain establishes that the stored record is unaltered, never that a particular human produced the mark' },
@@ -90,8 +89,8 @@ const BANNED = [
 /**
  * A DENIAL of the claim is the opposite of making it, and the denial contains
  * the words. "…does not constitute a legally binding agreement" and "this does
- * not establish that the signature is invalid" are both exactly what review
- * asked us to write — and the first version of this gate flagged both, which
+ * not establish that the signature is invalid" are both exactly what this
+ * policy asks for — and the first version of this gate flagged both, which
  * would have pressured an author to delete the disclaimer to get to green.
  *
  * So a match counts only when the CLAUSE it sits in is not negated. Clause and
@@ -113,30 +112,30 @@ function scanValue(v) {
 /**
  * The gate must be able to fail, and must be able NOT to fail.
  *
- * `MUST_FLAG` is the claim in each disguise review named. `MUST_NOT_FLAG` is
+ * `MUST_FLAG` is the claim in each disguise listed above. `MUST_NOT_FLAG` is
  * the careful wording those disguises get replaced with — including the two
  * real strings the negation-blind first version flagged. A pattern that drifts
  * in either direction turns a clean scan into a false green, and the second
  * direction is the expensive one: a gate that punishes the disclaimer teaches
  * people to remove the disclaimer.
  *
- * ── review added eight claims, and every one of them reuses an ordinary
- *    product word. So each new rule below carries a REAL string from these
+ * ── The eight later claims each reuse an ordinary product word. So each of
+ *    those rules below carries a REAL string from these
  *    catalogues as its negative control, and the three that needed narrowing
  *    say so here, because the narrowing is the whole design: ──
  *
  *  - "valid" is everywhere ("Enter a valid email", "Confirmation links are
  *    valid for 7 days", "Connected — key is valid"). The rule is the ADJECTIVAL
  *    form only — `valid signature` / `firma válida`. The PREDICATE form is
- *    deliberately NOT banned, because review already approved "Audit chain is
- *    intact and Ed25519 signatures are valid": there the subject is the
- *    cryptographic signature and the claim is exactly the check that ran.
+ *    deliberately NOT banned: in "Audit chain is intact and Ed25519 signatures
+ *    are valid" the subject is the cryptographic signature and the claim is
+ *    exactly the check that ran.
  *  - "authorized" ships in "Authorized representative", "Authorize access", and
  *    the whole connected-apps surface. The rule requires the word to land on
  *    the noun `signature` / `firma`.
  *  - "Signed by" / "Firmado por" are REAL CAPTIONS in this repository — the
  *    printable agreement and the PCA report both use them as a bare field label
- *    over a rendered image. A caption is not a claim. review prohibition is
+ *    over a rendered image. A caption is not a claim. The prohibition is
  *    written "[person]", and the attribution only exists once an identity is
  *    interpolated, so the rule requires the placeholder that supplies it.
  *
@@ -163,12 +162,12 @@ const MUST_NOT_FLAG = [
   'This list does not constitute a legally binding agreement.',
   'Esta lista no constituye un acuerdo legalmente vinculante.',
   'Esto no establece por sí solo que la firma sea inválida.',
-  // review approved narrow wording (review). Highest false-positive cost
+  // The approved narrow wording. Highest false-positive cost
   // in the file: flagging these would push an author back to the broad claim.
   'Signature image integrity check passed',
   'The stored signature image matches the signature image fingerprint recorded at signing.',
   // Real strings from these catalogues. Each one is the ordinary product use of
-  // a word one of the review rules bans, and is why that rule is narrow.
+  // a word one of the later rules bans, and is why that rule is narrow.
   'Signed by',                                                    // en/checkout.json agreement_printable_signed_by
   'Inspected & Signed By',                                        // en/pca-report.json pca_signature_signed_by
   'Firmado por',                                                  // es-419/checkout.json agreement_printable_signed_by
@@ -242,7 +241,7 @@ if (hits.length) {
     console.error(`     "${h.value}"`);
     console.error(`     ${h.why}\n`);
   }
-  console.error('review rulings 16C / 17a-17c: state what was checked and what it found.');
+  console.error('State what was checked and what it found.');
   console.error('See docs/develop/verification-copy-policy.md\n');
   process.exit(1);
 }

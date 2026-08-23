@@ -127,7 +127,7 @@ describe('AuditLogService.append — partial dedup index', () => {
 
   /**
    * If the key a row names cannot be produced, the honest answer is "we cannot
-   * check this", not "this signature is bad". review decision: a verification
+   * check this", not "this signature is bad". A verification
    * surface may report what its check established and no more, and this result
    * reaches a public page where the second phrasing would be a statement against
    * the signer's interest.

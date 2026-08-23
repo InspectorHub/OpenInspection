@@ -127,7 +127,7 @@ export function makeAgentSignupSchema() {
       .max(120, m.auth_validation_password_too_long()),
     // An agent is a third party with a direct relationship to the operator and no
     // company behind it, so neither a tenant's Privacy text nor a company's
-    // contract governs them (review review A3). The tick is REQUIRED and the
+    // contract governs them. The tick is REQUIRED and the
     // account is not created without it: recording a consent somebody did not
     // give is worse than lacking one.
     //

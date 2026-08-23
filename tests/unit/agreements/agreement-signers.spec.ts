@@ -478,7 +478,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
             .rejects.toThrow(/Token sealing key unavailable/);
     });
 
-    // review decision (2026-08-15): a record produced by a migration is not
+    // A record produced by a migration is not
     // the same fact as one captured at signing, and the two have to stay
     // distinguishable. A signature we watched arrive says so on its own row, so
     // that a NULL basis anywhere reads as "not recorded" rather than "captured,

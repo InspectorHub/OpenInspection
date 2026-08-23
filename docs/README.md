@@ -110,7 +110,7 @@ Why things are built the way they are. Read these when the reference told you
 
 ## Compliance
 
-Written for auditors and review, not for engineers.
+Written for auditors and reviewers, not for engineers.
 
 | Doc | Topic |
 |---|---|

@@ -703,7 +703,7 @@ describe('the shipped agent-terms document, and what it means for the gate', () 
         ).toEqual({
             placeholders: 3,
             names: ['OPERATOR_NAME', 'PRIVACY_URL', 'OPERATOR_CONTACT_EMAIL'],
-            statusLine: '**Status:** review-ready draft (v5) — not published',
+            statusLine: '**Status:** draft (v5) — not published',
             draftish: true,
         });
     });

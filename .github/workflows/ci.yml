@@ -237,8 +237,8 @@ jobs:
   # ⚠️ The other way to attack the same term — relaxing vitest's per-file process
   # isolation — was investigated and REJECTED, not merely skipped. 348 specs mock
   # `drizzle-orm/d1` at module scope and share one `vi.fn()` once the registry is
-  # shared; vitest offers no per-file isolation override. See
-  # [redacted] (superproject).
+  # shared; vitest offers no per-file isolation override. The measurement that
+  # settled it is kept beside the setting it protects, in `vitest.api.config.ts`.
   #
   # `fail-fast: false` so one red shard does not hide the others' results.
   test-unit:

@@ -6,7 +6,7 @@
  * truthfully: that purge finished everything it set out to do. It cannot
  * support a certification whose scope includes those objects, because it never
  * measured them. That is not a failed destruction — it is a narrower one, and
- * review requires the difference to be visible rather than inferred.
+ * the difference has to be visible rather than inferred.
  */
 import { describe, it, expect } from 'vitest';
 import {

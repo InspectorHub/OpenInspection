@@ -50,7 +50,7 @@ export interface RetentionRule {
     purpose: string;
     /**
      * How this rule obeys the global invariant that a legal hold outranks every
-     * scheduled deletion (review review). Required on every rule, because the
+     * scheduled deletion. Required on every rule, because the
      * failure this field exists to prevent is a table nobody classified — which
      * looks identical to a table that does not need classifying.
      *

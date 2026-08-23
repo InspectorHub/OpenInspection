@@ -2,10 +2,10 @@
  * Jurisdictional messaging rules, and the two ways this repository has already
  * got them wrong.
  *
- * review review refused a premise we had asserted: the 8am-9pm restriction
+ * One premise we had asserted was wrong: the 8am-9pm restriction
  * lives in the telephone-solicitation rules (47 CFR 64.1200(c)(1), imposed on a
  * "telephone solicitation" as (f)(15) defines it), and a transactional robotext
- * does not inherit it. review 26a-5 corrected a second one: CASL 6(6) excuses
+ * does not inherit it. A second correction: CASL 6(6) excuses
  * "Paragraph (1)(a)" — the consent limb — and only for a message that SOLELY
  * does one of the listed things, so identification and unsubscribe survive the
  * exception untouched. `transactional = exempt` is not a rule this file may

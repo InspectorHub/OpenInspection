@@ -1,5 +1,5 @@
 /**
- * review A5 — on what basis does an acceptance bind anyone?
+ * On what basis does an acceptance bind anyone?
  *
  * The binary a row has to answer is: *can this person bind this company?* Not
  * "what is their role" — role is a different axis, and conflating the two is the
@@ -70,8 +70,8 @@ export interface AuthorityContext {
  * Derive the authority basis at ACCEPTANCE TIME, to be stamped on the row.
  *
  * Takes a door, not a database. It cannot look at the users table, and that is
- * deliberate: review ruled that inferring authority — "they were the first user,
- * so they must be the owner" — must stop being treated as a legal fact. The
+ * deliberate: inferring authority — "they were the first user, so they must be
+ * the owner" — is never treated as a legal fact. The
  * function's only input is how the person arrived.
  */
 export function deriveAuthorityBasis(ctx: AuthorityContext): AuthorityBasis {

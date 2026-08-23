@@ -5,7 +5,7 @@
  * that could not enable this processing, could not disable it, and could not
  * see it happening. A legitimate interest may not be a mask for processing its
  * supposed beneficiary cannot decline, so the assessment did not hold until
- * this control existed (review review, B4).
+ * this control existed.
  *
  * It is a checkbox rather than a toggle because the two retention windows
  * beside it are text inputs with a Save, and one control that commits on click

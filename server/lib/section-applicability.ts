@@ -1,7 +1,6 @@
 /**
  * Section applicability resolver — FROZEN / DEAD CODE (module A of the
- * authoring-surface unification, see [redacted]
- * authoring-unification-plan3-template-side.md: the template editor is now
+ * authoring-surface unification: the template editor is now
  * property-type-as-identity, so sections no longer carry authored applicability).
  *
  * Not deleted because: (1) `tests/unit/inspections/commercial-subtypes.spec.ts` still exercises

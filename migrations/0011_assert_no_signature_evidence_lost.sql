@@ -1,6 +1,6 @@
 -- Assert that no signature evidence was lost. Changes nothing; fails closed.
 --
--- WHY THIS EXISTS. review full review of review (2026-08-15) pointed out
+-- WHY THIS EXISTS. A full review of the signature work pointed out
 -- that the relocation migration checked only ONE invariant — that no envelope
 -- signature failed to reach a signer row — and that this is not the same as
 -- checking that no evidence was lost. Their words: "不要只验证'没有 ambiguous

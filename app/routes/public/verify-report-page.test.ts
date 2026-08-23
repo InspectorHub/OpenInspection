@@ -37,7 +37,7 @@ describe('verifyResultModel', () => {
 
   // `keyMissing` means no check ran, so the page must not reach the "failed"
   // copy, which offers "the content may have been altered" as the explanation.
-  // review decision: report what the check established and no more.
+  // The rule: report what the check established and no more.
   it('returns key_missing, not failed, when the signing key is not on file', () => {
     const result = verifyResultModel({
       legacy: false,

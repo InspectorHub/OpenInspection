@@ -11,10 +11,10 @@ This file is the other half: every period has to be answerable with one page
 saying why this number and not another, and a digest cannot say that.
 
 > **Where this file lives.** The gate's failure message points at `[redacted]`,
-> which is the private review archive in the parent repository. This is the
-> open-source engine, so the record lives here beside
-> [`destruction-evidence.md`](destruction-evidence.md). Nothing in this file is
-> privileged; it states which periods apply and the public basis for each.
+> a directory this repository does not have. The record lives here instead,
+> beside [`destruction-evidence.md`](destruction-evidence.md). Nothing in this
+> file is privileged; it states which periods apply and the public basis for
+> each.
 
 ## Status
 
@@ -70,14 +70,15 @@ legally-directed event, and stated here rather than left to be discovered.
 
 ---
 
-## 2026-08-19.2 — the two pending tables close, and review is partly withdrawn
+## 2026-08-19.2 — the two pending tables close, and an earlier call is withdrawn
 
 **What changed.** `notifications` and `qbo_sync_errors` were the last two rules with
-no decision. Both now have one, and review withdrew part of review.
+no decision. Both now have one, and part of the 2026-08-19.1 decision below is
+withdrawn.
 
 | Rule | Now | Why |
 |---|---|---|
-| `notifications` | **24 months from `created_at`** | The inbox, not the record that a communication happened — `automation_logs` answers that and is kept by design. review explicitly declined anchoring on `read_at`/`archived_at`: an unread notice would become immortal, which turns a UI-state field into a retention control |
+| `notifications` | **24 months from `created_at`** | The inbox, not the record that a communication happened — `automation_logs` answers that and is kept by design. Anchoring on `read_at`/`archived_at` was explicitly rejected: an unread notice would become immortal, which turns a UI-state field into a retention control |
 | `qbo_sync_errors` | **90 days after RESOLUTION**; unresolved never age out | An unresolved failure is outstanding work, not a record of work. "A sync failure that remains unresolved for a year should not disappear merely because it is old" |
 
 **A column had to be added to implement it faithfully.** There was no
@@ -88,27 +89,27 @@ timestamp. Rows resolved before the column existed have a NULL anchor and are ne
 swept: an unknown resolution date fails closed.
 
 **No exception for the customer name.** `error_msg` is Intuit's own text and may
-quote one. review refused to give it a longer window for possibly explaining a
-billing dispute later — that is what the accounting records are for — and stated
-the principle: *"Do not retain potentially identifying diagnostic text longer merely
-because it might someday be useful."*
+quote one. It gets no longer window for possibly explaining a billing dispute
+later — that is what the accounting records are for. The principle: do not
+retain potentially identifying diagnostic text longer merely because it might
+someday be useful.
 
-**review's instruction on the legal-version tables is WITHDRAWN.** Both stay in
-the sweep with reference-preserving executors. review drew the distinction we had
-missed: *"Not subject to unconditional age-based deletion" ≠ "must not be processed
-by the sweep."* A reference-aware sweep is the mechanism that gives bounded
+**The earlier instruction on the legal-version tables is WITHDRAWN.** Both stay in
+the sweep with reference-preserving executors. The distinction we had missed:
+"not subject to unconditional age-based deletion" ≠ "must not be processed
+by the sweep." A reference-aware sweep is the mechanism that gives bounded
 retention while preserving evidentiary dependencies; an exemption would have made
 these tables accumulate forever.
 
-**And the method rule that cost a wasted ruling:** do not classify retention
+**And the method rule that cost a wasted review cycle:** do not classify retention
 behaviour from the manifest or the table name — the executor is authoritative
 evidence of what the sweep actually does. We reported a defect in
 `sms_disclosure_versions` that its executor had always prevented, because we read a
 table and a number instead of the query.
 
-## 2026-08-19.1 — review ruled, and it is APPROVED WITH CONDITIONS
+## 2026-08-19.1 — the windows are APPROVED WITH CONDITIONS
 
-**What changed.** review reviewed all 15 rules: 8 approved as written, 4 windows
+**What changed.** All 15 rules were reviewed: 8 approved as written, 4 windows
 changed, 2 tables removed from the fixed sweep entirely.
 
 | Rule | Was | Now | Why |
@@ -120,10 +121,10 @@ changed, 2 tables removed from the fixed sweep entirely.
 | `sms_disclosure_versions` | 36m | **removed from sweep** | See below |
 | `tenant_legal_versions` | 36m | **removed from sweep** | See below |
 
-**The defect we reported, and the half of it that was not real.** We told review
-that a consent record could outlive the text it names, and asked for both tables to
-leave the sweep. review agreed and generalised it into a rule. Then implementing it
-meant reading the executors, and they did not say what the manifest said:
+**The defect we reported, and the half of it that was not real.** We reported
+that a consent record could outlive the text it names, and proposed that both tables
+leave the sweep. The point was accepted and generalised into a rule. Then implementing
+it meant reading the executors, and they did not say what the manifest said:
 
 - `sms_disclosure_versions` **was already reference-preserving**. Its executor
   deletes only a version that is superseded AND cited by no `sms_consent_log` row,
@@ -137,14 +138,14 @@ meant reading the executors, and they did not say what the manifest said:
 
 So the rule stands and the framing was half wrong. Both tables stay IN the sweep
 with reference-preserving executors, rather than being removed from it — the
-ruling is retain-while-referenced, not keep-forever, and it does not mean every
+rule is retain-while-referenced, not keep-forever, and it does not mean every
 SMS disclosure version is stored permanently. Removing them from the sweep would
 have let superseded rows accumulate indefinitely, which is not what was asked
 for. The missing
 `notExists(account_acceptances)` check is now in the tenant executor, so both tables
 implement the same rule.
 
-**Why this version is `approved_with_conditions` and not `approved`.** A ruling
+**Why this version is `approved_with_conditions` and not `approved`.** A decision
 handed straight to an engineering team has to carry its own unmet conditions, so
 the status names them rather than implying there are none. Three of the five
 were unmet at this version — the dependency-aware sweep, the `legal_hold`
@@ -154,7 +155,7 @@ shipped; see 2026-08-19.3 above), and the customer ToS re-accept change summary.
 
 **And a scope limit that belongs here rather than in a plan.** This covers
 DATABASE retention only. Object storage, Durable Objects, KV and queues were never
-in the compliance register (review). A green retention gate does not mean the
+in the compliance register. A green retention gate does not mean the
 data lifecycle has been reviewed.
 
 ## 2026-08-18.1 — the acceptance ledger declared out of scope, and nothing deleted
@@ -166,8 +167,8 @@ table is new: one row per document a staff member accepted, written in the same
 **Why out of scope rather than a window.** Expiring a row here does not shrink a
 record — it destroys one, and it destroys it in a specific direction. The account
 survives; the proof that its holder accepted anything does not. That is the state
-`account = EXISTS, acceptance_ledger = ABSENT` which review review decision
-refused, and which this table was created to make unreachable. A retention sweep
+`account = EXISTS, acceptance_ledger = ABSENT` that must never occur, and which
+this table was created to make unreachable. A retention sweep
 would reach it deliberately, on a timer, for every account old enough — the one
 mechanism guaranteed to produce it.
 
@@ -197,15 +198,15 @@ digest moved because the gate hashes the exclusion list too.
 **What changed.** `deployment_legal_versions` is declared `RETENTION_OUT_OF_SCOPE`.
 The table is new in the same change: it holds the deployment's own legal documents
 — the agent terms — which have no tenant, because an agent account is global and
-its counterparty is whoever operates the deployment (review review).
+its counterparty is whoever operates the deployment.
 
 **Why out of scope rather than a window.** The row is the ONLY copy of the text an
 acceptance points at. `users.terms_accepted` stores a version and a content hash,
 not the body, so deleting a row here does not shrink a record — it makes an
 existing one unverifiable, and the signer can no longer be shown what they agreed
-to. review review endorsed the version+hash design specifically because the
-accepted version can be reconstructed later, and a sweep over this table is the one
-thing that would make that claim false.
+to. The version+hash design is only defensible because the accepted version can be
+reconstructed later, and a sweep over this table is the one thing that would make
+that claim false.
 
 The usual argument for a window does not apply either: the table grows with
 PUBLICATIONS, not with usage — a handful of rows over the life of a deployment.
@@ -233,13 +234,13 @@ which is the gate working as designed: it cannot tell a rename from a
 re-decision, so it refuses both until a human says which one this is. This one is
 a rename.
 
-**Why the old name had to go.** External review, review, decision. What
-the action does is overwrite identifier columns with a sentinel in a row that
+**Why the old name had to go.** What the action does is overwrite identifier
+columns with a sentinel in a row that
 survives. That is not CCPA deidentification — which carries substantive
 conditions we do not meet — and it is not GDPR anonymisation either. Calling it
 `anonymize` invited a future reader, or a future legal document, to cite the
-label as evidence that we had produced legally deidentified data. It is the same
-failure mode review named: an internal classification read downstream as an
+label as evidence that we had produced legally deidentified data. It is a
+familiar failure mode: an internal classification read downstream as an
 established fact. `erase_in_place` describes the operation and asserts nothing
 about its legal effect.
 
@@ -271,8 +272,8 @@ representation that seven years is the maximum legally required period.
 That distinction is the whole reason this entry exists. An earlier derivation in
 this repository read seven as "five plus two" — five years from Illinois for
 home-inspection contracts, reports and supporting data, plus two years past
-final disposition of a qualifying judicial proceeding. External review rejected
-it (review, decision): the Illinois period is five years **or** two years
+final disposition of a qualifying judicial proceeding. That derivation does not
+hold: the Illinois period is stated as five years **or** two years
 past final disposition, **whichever is longer**, so the second figure is an
 event-dependent tail rather than a fixed cap. A proceeding ending in year six
 extends the statutory period past seven. Seven years therefore cannot be
@@ -299,8 +300,8 @@ wrong answer gets an authoritative shape.
 
 **Why the disclosure sits next to the control.** The dominant competitor stores
 reports indefinitely, including after cancellation. A customer who never opens a
-disclosure would reasonably assume our number is required of them, so review
-wording renders plainly beside the field rather than behind a disclosure control
+disclosure would reasonably assume our number is required of them, so the
+disclosure wording renders plainly beside the field rather than behind a control
 or on a policy page.
 
 **Mechanically.** This is the first rule that reaches outside D1. The row points

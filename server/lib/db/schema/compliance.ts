@@ -100,8 +100,8 @@ export const smsConsentLog = sqliteTable('sms_consent_log', {
      *
      * `staff` is internal-operational: an employee under account/employment
      * terms, never consumer consent. It is a separate value precisely so a
-     * staff STOP can be recorded without polluting the consumer evidence the
-     * ISV filing rests on — see [redacted]
+     * staff STOP can be recorded without polluting the consumer consent
+     * evidence a carrier or regulatory filing rests on.
      */
     recipientType:     text('recipient_type', { enum: ['client', 'agent', 'other', 'staff'] }).notNull(),
     // The consent VERDICT. The latest row per subject is the whole answer the

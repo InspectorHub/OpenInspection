@@ -2,7 +2,7 @@
 
 This guide is for operators who have deployed OpenInspection on their own infrastructure and want to enable SMS notifications. It covers Privacy / Terms pages (per company), how they connect to booking and carrier registration, and the carrier steps you complete in your Twilio or Telnyx account.
 
-> **Not legal advice.** Have review review TCPA/CTIA wording before publishing.
+> **Not legal advice.** Have your TCPA/CTIA wording professionally reviewed before publishing.
 
 ---
 

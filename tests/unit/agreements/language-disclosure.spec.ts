@@ -18,7 +18,7 @@ describe('agreement language disclosure', () => {
     });
 
     it('makes NO contractual assertion', () => {
-        // review: a disclosure may state a fact, it may not decide which text
+        // A disclosure may state a fact, it may not decide which text
         // prevails. Every word below allocates risk between two parties we are
         // not one of. This test is the line, and it is why the plan was rewritten.
         // The heading is held to the same standard as the sentence: it is shown
@@ -61,7 +61,7 @@ describe('agreement language disclosure', () => {
 });
 
 // ---------------------------------------------------------------------------
-// This repo is PUBLIC. The module's header used to carry review preliminary
+// This repo is PUBLIC. The module's header used to carry a preliminary legal
 // position, the platform's legal posture, and a citation to a document that
 // exists only in the private superproject — and the guard here asserted all of
 // it STAYED. That was backwards twice over: it published private legal analysis
@@ -88,7 +88,7 @@ describe('agreement language disclosure — the module stays publishable', () =>
         expect(src()).toContain('DISCLOSURE_VERSION');
     });
 
-    it('carries no review record, jurisdiction analysis, or platform legal posture', () => {
+    it('carries no private legal review, jurisdiction analysis, or platform legal posture', () => {
         for (const forbidden of [/review/i, /\b1632\b/, /Civil Code/i, /not a party/i]) {
             expect(src(), `${forbidden} reads as private legal material in a public repo`)
                 .not.toMatch(forbidden);
@@ -251,7 +251,7 @@ describe('agreement language disclosure — what reaches the screen', () => {
         // disclosure cannot travel through the agreement pipeline intact — pasted into
         // the body it arrives stripped of the wrapper that marks it as NOT a clause,
         // i.e. as an anonymous paragraph among the terms. That is the failure mode
-        // review ruled out, and this asserts the pipeline itself refuses the shape.
+        // this rule exists to prevent, and this asserts the pipeline itself refuses the shape.
         const throughAgreementSanitizer = sanitizeAgreementHtml(D.html);
         expect(throughAgreementSanitizer).not.toBe(D.html);
         expect(throughAgreementSanitizer).not.toMatch(/<section/i);

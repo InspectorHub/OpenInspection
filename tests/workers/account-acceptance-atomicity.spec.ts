@@ -1,9 +1,9 @@
 /**
  * The invariant, proven against a REAL D1 binding.
  *
- * review A2: an account and its acceptance are one write. review review
- * decision: an outbox does not satisfy it, because while the event sits
- * unconsumed the state is `account = EXISTS, acceptance_ledger = ABSENT`. So
+ * An account and its acceptance are one write. An outbox does not satisfy that,
+ * because while the event sits unconsumed the state is
+ * `account = EXISTS, acceptance_ledger = ABSENT`. So
  * the implementation puts both in one `db.batch()` and the invariant reduces to
  * a single claim about D1: A FAILED STATEMENT IN A BATCH UNDOES THE ONES BEFORE
  * IT.

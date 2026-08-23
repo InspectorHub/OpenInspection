@@ -1,42 +1,34 @@
 # Agent Terms
 
 <!--
-review-READY v5 — rounds 29, 30, 31 and 32 landed. NOT APPROVED FOR PUBLICATION.
-
-THIS FILE IS A DRAFT DERIVED FROM RULINGS. IT IS NOT A RULING SOURCE.
-review review asked for this explicitly. The binding text is the archived Round
-response; what we owe and its status is the register. Where this file and either of
-those disagree, this file is the one that is wrong:
-
-  [redacted]          (superproject)
-  [redacted]
+DRAFT v5 — NOT APPROVED FOR PUBLICATION.
 
 Do not add reasoning here that exists nowhere else. Explanatory notes stay only
 where they say what a CLAUSE means or which code fact it rests on.
 
 WHY IT CANNOT BE PUBLISHED, and how that is enforced: run
-`npm run agent-terms:publish`. It prints the review publish-gate checklist and
+`npm run agent-terms:publish`. It prints the publish-gate checklist and
 refuses while any line is red.
 
-§17 IS GONE. review ruled that governing law may be omitted rather than named:
+§17 IS GONE. Governing law may be omitted rather than named:
 "must not ship as a placeholder" never meant every contract must contain the
 clause. That removes a blocker; it does not remove the risk — with no governing
-law, no venue and no arbitration, a dispute still has to find a forum. review also
-declined an explicit "no choice of law is made" sentence, which would convert an
+law, no venue and no arbitration, a dispute still has to find a forum. An explicit
+"no choice of law is made" sentence is deliberately absent too: it would convert an
 absence into an affirmative statement for no gain.
 
 What still blocks: the operator's own identity (contracting party and contact —
-review keeps this P0) and the retention model (review approved no window). The
+still P0) and the retention model (approved with no window). The
 gate reads the retention signal out of the policy header rather than trusting
 anybody's recollection.
 
 Factual clauses cite the code they were read off, so a reviewer can check the claim
 rather than take it. Where a clause and the code disagree, the code is what is true.
-review found one that had drifted, which is the argument for keeping them.
+One had drifted when this was last checked, which is the argument for keeping them.
 -->
 
 
-**Status:** review-ready draft (v5) — not published
+**Status:** draft (v5) — not published
 **Applies to:** anyone who creates or uses an Agent account on
 {{OPERATOR_NAME}}'s OpenInspection deployment
 
@@ -65,7 +57,7 @@ create, an agency, employment, partnership, joint venture, fiduciary, franchise,
 other representative relationship between you and us. You have no authority to bind
 us or to make commitments on our behalf.
 
-*(review asked for an explicit no-agency statement and no draft had one. §1's
+*(Review asked for an explicit no-agency statement and no draft had one. §1's
 "the Inspection Company is not a party" is a different sentence: it says who is NOT
 on the other side of this contract, and says nothing about what YOU are to US. The
 word "Agent" invites the question "agent of whom", and this answers it.)*
@@ -275,7 +267,7 @@ and country it came from.
 *(Code: `users.terms_accepted` stores `{ at, version, contentHash, ip?, country? }` —
 the last two are OPTIONAL, which is why this clause says "where collected". It said
 they were recorded, full stop, while the code reference two lines below showed the
-question marks. review caught it (review §11); a deployment behind a proxy that
+question marks. A deployment behind a proxy that
 strips the header would otherwise have made the sentence false.
 — `server/lib/db/schema/tenant/user.ts`.)*
 
@@ -399,21 +391,21 @@ reconstructed later.
 <!--
 ## What is still open
 
-Kept SHORT on purpose — the authoritative list is the register's review/31/32
-rows, and duplicating it here is how a draft turns into a second ruling source.
+Kept SHORT on purpose — duplicating a decision list here is how a draft turns
+into a second source of truth.
 
 BLOCKING (both must be green before this publishes; the gate enforces both):
   · the operating entity — §17 governing law and dispute mechanism
-  · the retention model — review approved no window, so §15 may not imply one
+  · the retention model — no window is approved, so §15 may not imply one
 
-FOR THE OPERATOR TO DECIDE, not review:
+FOR THE OPERATOR TO DECIDE:
   · the §14 liability floor — DECIDED: US$200, the most conservative of the values
-    on the table. review leaned US$100 and was explicit that no figure is legally
-    "safe"; the operator went higher because the only real risk in this clause is a
+    on the table. US$100 was the lower option considered, and no figure is legally
+    "safe" either way; the operator went higher because the only real risk here is a
     court finding the floor low enough to raise enforceability on a wholly free
     service, and US$200 has industry precedent (Google) at effectively no cost.
 
-ENGINEERING, from review and not a drafting item:
+ENGINEERING, not a drafting item:
   · the repair-request message must stay transaction-specific. Whether it is a
     commercial message is decided by the content actually generated, not by a
     clause in here — so the constraint belongs in the template and in a gate.

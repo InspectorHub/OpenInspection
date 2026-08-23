@@ -717,7 +717,7 @@ export class InspectionReportService extends InspectionSubService {
         const resultsData = resultsRow?.data as Record<string, unknown> | null | undefined;
         const rawSig = resultsData?._inspector_signature as InspectorSig | undefined;
 
-        // review decision/18c (2026-08-15). `method` is a DOMAIN state, decided
+        // `method` is a DOMAIN state, decided
         // here where the record is, and not inferrable downstream. It used to be
         // an object built with `?? null` on every field, so "nobody signed this"
         // and "signed, image missing" reached the renderer as the same value —
@@ -885,7 +885,7 @@ export class InspectionReportService extends InspectionSubService {
             unitConditionMatrix,
             defectCountsByUnit: unitDefectCounts,
             samplingDeclaration: (inspection as { samplingDeclaration?: unknown }).samplingDeclaration ?? null,
-            // Layer-2 report signature + verification (see [redacted]).
+            // Layer-2 report signature + verification.
             isPublished,
             signature,
             verification,

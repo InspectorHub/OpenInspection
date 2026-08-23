@@ -60,7 +60,7 @@ export const reportPdfsExecutor: Executor = async (rawDb, _cutoff, ctx) => {
         // every silent tenant to the opposite of the stated default.
         const years = byTenant.get(r.tenantId) ?? resolveReportPdfRetentionYears(null);
         if (years === 0) continue;  // indefinite — a controller instruction
-        // Legal hold outranks the window (review review). This rule filters in
+        // Legal hold outranks the window. This rule filters in
         // JS rather than SQL because its window is per-tenant, so the exclusion
         // goes here rather than through `notHeld` — same invariant, and the only
         // place in this file where a tenant is decided about.

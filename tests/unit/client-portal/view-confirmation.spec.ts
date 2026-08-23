@@ -138,8 +138,8 @@ describe('OI #271 — report view confirmation', () => {
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        // Counting is OFF by default now (review B4 — a legitimate interest may
-        // not be a mask for processing its supposed beneficiary cannot decline),
+        // Counting is OFF by default now (a legitimate interest may not be a
+        // mask for processing its supposed beneficiary cannot decline),
         // so every case below has to enable it or it would be asserting that the
         // counter works while the switch was refusing every request. That is not
         // fixture noise: it is the tenant decision the whole feature now rests on,

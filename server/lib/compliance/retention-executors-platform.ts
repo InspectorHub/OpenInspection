@@ -1,8 +1,8 @@
 /**
  * The executors whose tables have NO tenant dimension.
  *
- * The split from `retention-executors.ts` is on exactly the line review round
- * 33's legal-hold invariant draws. A hold is placed on a tenant; an executor
+ * The split from `retention-executors.ts` is on exactly the line the
+ * legal-hold invariant draws. A hold is placed on a tenant; an executor
  * over a table with a `tenant_id` column can exclude that tenant's rows, and one
  * over a table without it cannot express the hold at all. Keeping the second
  * group in its own file makes that property structural instead of something a

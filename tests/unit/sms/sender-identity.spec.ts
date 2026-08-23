@@ -1,7 +1,7 @@
 /**
  * Who sent it, and on whose behalf — two questions, both recorded.
  *
- * review review: the number's owner is not automatically the legal sender.
+ * The number's owner is not automatically the legal sender.
  * In the default mode a message leaves OUR shared number carrying the TENANT's
  * brand, so "who initiated this" and "on whose behalf was it sent" have
  * different answers, and neither should have to be reconstructed from the
@@ -77,7 +77,7 @@ describe('resolveSmsSenderIdentity', () => {
         // the tenant IS the sender, so report them". They are not. We chose the
         // provider, we wrote the template, we operate the gate — a BYO key
         // changes whose account is billed, not who built the path. Collapsing
-        // the two roles is exactly what review said not to do.
+        // the two roles is exactly what this resolver must not do.
         for (const smsMode of ['own', 'managed_dedicated'] as const) {
             const id = resolveSmsSenderIdentity({ smsMode, companyName: 'Acme' }, TENANT);
             expect(id.platformSender).not.toBe(TENANT);

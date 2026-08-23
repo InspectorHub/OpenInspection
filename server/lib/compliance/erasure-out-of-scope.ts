@@ -66,9 +66,9 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // accounts; staff offboarding is a separate lifecycle.
     { table: 'users',               column: 'email',                     reason: 'staff account — not consumer-DSAR scope' },
     { table: 'users',               column: 'phone',                     reason: 'staff account — not consumer-DSAR scope' },
-    // review review. 'staff signature asset' said WHOSE it is and stopped
+    // 'staff signature asset' said WHOSE it is and stopped
     // there, which left the column indefinite by omission rather than by
-    // decision — and review is explicit that a staff signature may not inherit
+    // decision — and a staff signature may not inherit
     // 'indefinite' from the client column having a six-year rule. Two different
     // clocks, and they must say so:
     //   - This one is an ACCOUNT ASSET. It is the inspector's saved default
@@ -96,7 +96,7 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // attributed a signature to a person, what that rule read, and when it ran.
     // Declared rather than left to the heuristic because they sit on the table
     // holding Art. 17(3)(e) retained evidence, where a future reader is entitled
-    // to see that every column was ruled on (review review, 2026-08-15).
+    // to see that every column was ruled on.
     { table: 'agreement_signers',   column: 'attribution_basis',         reason: 'provenance metadata — names a rule, carries no personal data' },
     { table: 'agreement_signers',   column: 'attribution_source',        reason: 'provenance metadata — names source COLUMNS, never their values' },
     { table: 'agreement_signers',   column: 'attributed_at',             reason: 'provenance metadata — when the attribution was made, not a subject event' },
@@ -231,7 +231,7 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
 
     // ── account_acceptances ───────────────────────────────────────────────────
     // What a STAFF member accepted, recorded in the same write as the `users`
-    // row it belongs to (review A2 / review decision). The subject is an
+    // row it belongs to — one write, never two. The subject is an
     // owner, admin or invited member of the workspace — an employee lifecycle,
     // the same posture as every `users.*` entry above — so a consumer erasure
     // request never reaches this table at all.

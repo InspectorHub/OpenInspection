@@ -1,7 +1,6 @@
 /**
  * Route metadata gate — fails CI when any route in server/api/ lacks the
  * required MCP/Skill metadata. See:
- *   [redacted]
  *   docs/route-metadata-conventions.md
  *
  * The SKIP_MODULES set lists modules not yet backfilled. As each module is

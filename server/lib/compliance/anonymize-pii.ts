@@ -65,8 +65,8 @@ export const ANONYMIZE_BOOKING_REQUEST_PII = {
  * composes, so it MAY embed a name, an address or a phrase about a person that
  * no pattern can recognise; `audit.ts` strips the machine-detectable
  * identifiers at write time, which is not the same as the column being clean.
- * Portal's review rejected retaining the equivalent column through an erasure
- * as an incomplete DSAR, so the whole value goes rather than parts of it — the
+ * Retaining the portal's equivalent column through an erasure was rejected as
+ * an incomplete DSAR, so the whole value goes rather than parts of it — the
  * one action that needs no judgement and has no false-negative rate.
  *
  * The column is nullable, so the convention above applies: NULL, not the

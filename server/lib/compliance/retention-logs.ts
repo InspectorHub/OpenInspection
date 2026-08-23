@@ -102,7 +102,7 @@ export async function runLogRetentionSweep(
     let total = 0;
 
     // ONE read for the whole tick, and deliberately NOT wrapped in the try/catch
-    // below. review review made legal hold a global invariant over every
+    // below. Legal hold is a global invariant over every
     // scheduled deletion, and the failure that invariant exists to prevent is a
     // sweep that could not see the holds and deleted under them anyway — which
     // is indistinguishable, from in here, from a tick where nothing was held. A

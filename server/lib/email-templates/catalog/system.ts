@@ -96,7 +96,7 @@ export const SYSTEM_TEMPLATES: EmailTemplateDescriptor[] = [
   // A workspace deletion that did not finish.
   //
   // `editable: false` for a stronger reason than the quota notices: this is a
-  // compliance statement made under review, and a tenant able to rewrite it
+  // compliance statement the deployment is making, and a tenant able to rewrite it
   // could soften or contradict the fact being reported. `brand: 'platform'`
   // because by the time it sends the workspace's own branding has been
   // destroyed along with everything else.

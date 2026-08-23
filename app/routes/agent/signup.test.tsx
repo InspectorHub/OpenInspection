@@ -66,7 +66,7 @@ const VALID_SIGNUP = {
   email: "a@x.com",
   password: "SuperSecret123!",
   // An agent is a third party and the tick is required — an account is not
-  // created without it (review review A3). A fixture that omitted it would
+  // created without it. A fixture that omitted it would
   // make every returnTo case below fail on the acceptance instead, which is what
   // happened when the field landed.
   agentTerms: "on",

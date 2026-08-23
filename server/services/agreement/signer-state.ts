@@ -286,7 +286,7 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
                     // This row is the signing event, not a later reading of one.
                     // Stated rather than left NULL so that a NULL basis anywhere
                     // reads as "not recorded" and never as "captured, probably" —
-                    // the distinction review asked us to keep legible between a
+                    // the distinction that must stay legible between a
                     // signature we watched arrive and one a migration attributed.
                     attributionBasis: 'signing_event',
                     attributedAt: new Date(opts.signedAtMs),

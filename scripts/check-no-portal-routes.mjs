@@ -42,10 +42,7 @@ function trackedMarkdown() {
     const out = execFileSync('git', ['ls-files', '*.md'], { cwd: root, encoding: 'utf8' });
     return out
         .split('\n')
-        .filter(Boolean)
-        // Working notes that reference plans and specs, archived and deleted by
-        // design. Same exclusion the link gate makes, for the same reason.
-        .filter((f) => !f.startsWith('[redacted]'));
+        .filter(Boolean);
 }
 
 const files = trackedMarkdown();

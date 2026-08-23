@@ -194,8 +194,8 @@ export async function sendOneSms(args: SendOneSmsArgs): Promise<void> {
     if (messagingServiceSid) sendArgs.messagingServiceSid = messagingServiceSid;
     const res = await provider.sendMessage(sendArgs);
     if (res.ok) {
-        // WHO SENT IT and ON WHOSE BEHALF, snapshotted at send time (review
-        // 26-5). Both were previously answerable only by reading `sms_mode` off
+        // WHO SENT IT and ON WHOSE BEHALF, snapshotted at send time.
+        // Both were previously answerable only by reading `sms_mode` off
         // the tenant config AS IT IS TODAY — which answers a question about last
         // year's message with this year's configuration. Written alongside the
         // outcome, in the same statement, so a sent row can never lack it.

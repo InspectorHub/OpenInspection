@@ -22,7 +22,7 @@ import { r2Keys } from '../lib/r2-keys';
  * `contractingEntity` is read from the envelope's FROZEN identity columns, never
  * from `tenant_configs`. The zip's certificate.pdf already names the entity, but
  * only as rasterized pixels; anyone processing an evidence pack programmatically
- * (opposing review e-discovery, an insurer, our own verifier) had no field to
+ * (an e-discovery process, an insurer, our own verifier) had no field to
  * read it from. NULL means the envelope predates identity capture and says so —
  * resolving today's name here would assert something untrue about what was
  * signed, which is the defect the snapshot columns exist to prevent.

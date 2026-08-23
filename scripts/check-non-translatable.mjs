@@ -22,7 +22,7 @@
  * Sibling gates (erasure, retention) derive their in-scope set from the schema
  * and then demand an answer for each member. This one cannot: "is this text a
  * term of a legal instrument" is not a property of a column name. The in-scope
- * set is the eight categories review named, and it is closed. That makes
+ * set is eight enumerated categories, and it is closed. That makes
  * CATEGORY COVERAGE the load-bearing check here — a registry naming five of
  * eight reads exactly like a complete one, and nothing else in the repo would
  * notice the other three.
@@ -77,8 +77,8 @@ const OUT_OF_SCOPE_FILE = FIXTURE
 const SOURCE_ROOT = FIXTURE ?? ROOT;
 
 /**
- * The eight categories from review review, held here independently of the
- * source so the two can be compared. Order is review, not alphabetical.
+ * The eight categories, held here independently of the source so the two can be
+ * compared. Order is the register's own, not alphabetical.
  */
 const COUNSEL_CATEGORIES = [
     "reliance_clause",
@@ -247,7 +247,7 @@ const counselSet = new Set(COUNSEL_CATEGORIES);
 for (const c of COUNSEL_CATEGORIES) {
     if (!declaredSet.has(c)) {
         errors.push(
-            `NON_TRANSLATABLE_CATEGORIES is missing '${c}', which review review named. ` +
+            `NON_TRANSLATABLE_CATEGORIES is missing '${c}', which is one of the eight. ` +
             `Dropping a category from the source list would otherwise silently drop it from ` +
             `the coverage check below.`,
         );
@@ -257,8 +257,8 @@ for (const c of declaredCategories) {
     if (!counselSet.has(c)) {
         errors.push(
             `NON_TRANSLATABLE_CATEGORIES declares '${c}', which is not one of the eight ` +
-            `review categories this gate enforces. Widening the registry is a decision that ` +
-            `updates COUNSEL_CATEGORIES in scripts/check-non-translatable.mjs too.`,
+            `categories this gate enforces. Widening the registry is a decision that ` +
+            `updates the category list in scripts/check-non-translatable.mjs too.`,
         );
     }
 }
@@ -319,7 +319,7 @@ manifest.forEach((entry, i) => {
 for (const c of COUNSEL_CATEGORIES) {
     if (!covered.has(c)) {
         errors.push(
-            `category '${c}' has NO manifest entry. review named eight; a register carrying ` +
+            `category '${c}' has NO manifest entry. Eight are required; a register carrying ` +
             `${covered.size} of them looks complete and is not. Add the entry, or if the ` +
             `content genuinely does not exist in this codebase yet, say so in an entry whose ` +
             `reason states that.`,
@@ -380,6 +380,6 @@ if (errors.length > 0) {
 
 console.log(
     `non-translatable lint: OK (${manifest.length} manifest entries covering ` +
-    `${covered.size}/${COUNSEL_CATEGORIES.length} review categories, ` +
+    `${covered.size}/${COUNSEL_CATEGORIES.length} required categories, ` +
     `${outOfScope.length} out-of-scope).`,
 );

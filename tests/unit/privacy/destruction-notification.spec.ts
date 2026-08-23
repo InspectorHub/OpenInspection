@@ -7,8 +7,8 @@
  * owner's email is therefore resolved in the same pre-cascade block as the KV
  * keys and the report ids — and then used, and then dropped.
  *
- * WHAT THE ROW KEEPS, and what it does not. review requires notification
- * without undue delay after the failure is known. It does not require this
+ * WHAT THE ROW KEEPS, and what it does not. Notification is owed without undue
+ * delay after the failure is known. That does not require this
  * table to retain the address. `tenant_destruction_records` survives the tenant
  * by three years, and the retention manifest sets that period on the stated
  * ground that the row is non-personal — tenant id, slug and counts. Writing the

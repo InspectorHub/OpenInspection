@@ -178,8 +178,7 @@ export const cmdTenantAiCapsDataSchema = z.object({
  * gated on the membership role from the company JWT — the company's own admin,
  * not a platform operator. There is no third party here whose choice could be
  * trampled; it is the tenant renaming itself in the other of the two places it
- * can. (`[redacted]`
- * §1.3 records the two columns diverging as a DEFECT, not a design.)
+ * can. (The two columns diverging is a DEFECT, not a design.)
  *
  * Renames the DISPLAY name only. `legal_name` is a separate column with a
  * separate meaning — agreements, signature certificates, the invoice "from"

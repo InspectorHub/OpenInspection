@@ -44,7 +44,7 @@ export interface ReportViewSignals {
     /**
      * The tenant's own decision, from `tenant_configs`. Default OFF.
      *
-     * review B4: the legitimate-interests assessment assigned the interest to
+     * The legitimate-interests assessment assigned the interest to
      * the inspection company — a company that could not enable this, could not
      * disable it, and could not see it happening. A tenant's legitimate
      * interest may not be a mask for processing they cannot decline, so the

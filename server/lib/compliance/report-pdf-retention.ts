@@ -4,11 +4,11 @@
  * A platform DEFAULT, not a legal requirement, and the difference is the whole
  * point of this file existing rather than a bare constant.
  *
- * ── What review struck, and why it matters here ────────────────────────────
+ * ── What was struck, and why it matters here ────────────────────────────────
  * This repository used to derive seven years as "5 + 2": Illinois requires five
  * years for home-inspection contracts, reports and supporting data, plus two
- * years past final disposition of a qualifying judicial proceeding. Put to
- * review, that derivation was REJECTED (review, decision). Illinois is
+ * years past final disposition of a qualifying judicial proceeding. That
+ * derivation was REJECTED and has been withdrawn. Illinois is
  * five years OR two years past final disposition, WHICHEVER IS LONGER — the
  * second figure is an event-dependent tail, not a fixed cap, and a proceeding
  * ending in year six extends the statutory period past seven. So seven years
@@ -20,7 +20,7 @@
  * settings screen shows a customer.
  *
  * ── Zero means indefinite ───────────────────────────────────────────────────
- * That is a controller instruction under review round-14 framing, which the
+ * That is an explicit controller instruction, which the
  * platform executes. It is not the default and it is not us declining to have
  * one. The dominant competitor stores reports indefinitely including after
  * cancellation, so our having a default at all runs against what an inspection
@@ -28,7 +28,7 @@
  * setting rather than on a policy page.
  *
  * ── What this module does NOT decide ────────────────────────────────────────
- * Tenant override is not absolute (24a-2): the effective period is
+ * Tenant override is not absolute: the effective period is
  * `jurisdictional minimum + tenant instruction + platform constraints`, never
  * `tenant choice > law`. This function answers only the middle term — what the
  * tenant asked for, or the default when they have not asked. A jurisdictional
@@ -46,7 +46,7 @@ export interface RetentionJurisdictionFact {
     /**
      * YYYY-MM-DD. Required, and required for a reason: Washington completed a
      * home-inspector rules revision in July 2026, and a citation with no as-of
-     * date cannot be known to be stale (review, second constraint).
+     * date cannot be known to be stale.
      */
     checkedOn: string;
 }
@@ -64,7 +64,7 @@ export const REPORT_PDF_RETENTION_BASIS = {
     statutoryRequirement: false,
 
     /**
-     * review replacement wording, VERBATIM. Not to be paraphrased — the
+     * The disclosure wording, VERBATIM. Not to be paraphrased — the
      * clauses a paraphrase loses first are the two that do the work, and both
      * are asserted in `report-pdf-retention.spec.ts`.
      */

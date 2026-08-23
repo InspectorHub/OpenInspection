@@ -6,7 +6,7 @@
  * an envelope, this one is the moment a person signs.
  *
  * ── Why the presentation is ATTESTED here and OBSERVED on the remote path ────
- * review review requires the audit chain to show the signer was presented
+ * The audit chain must show the signer was presented
  * this content before a signature is recorded. Remotely that is observed: the
  * signer's own browser fetches the agreement and the fetch is appended.
  *
@@ -139,7 +139,7 @@ agreementSignRoutes.post('/:id/sign', async (c) => {
         // THE PRESENTATION, on the in-person path, and it is a different FACT
         // from the remote one rather than the same fact recorded elsewhere.
         //
-        // review review requires the chain to show the signer was presented
+        // The chain must show the signer was presented
         // this content before a signature is recorded. Remotely that is observed:
         // the signer's own browser fetches the agreement and the fetch is
         // appended. In person there is no such fetch — the inspector is holding

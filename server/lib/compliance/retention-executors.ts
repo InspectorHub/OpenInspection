@@ -16,7 +16,7 @@
  *
  * ── Every table here has a tenant, and every executor uses it ───────────────
  * This file holds the `tenant_scoped` half of the catalogue. Each statement
- * ends with `notHeld(<table>.tenantId, ctx)`, which is how review review's
+ * ends with `notHeld(<table>.tenantId, ctx)`, which is how the global
  * invariant — a legal hold outranks every scheduled deletion — is actually
  * enforced. The tenant-less rules live in `retention-executors-platform.ts`,
  * where a hold cannot be expressed as a filter and is handled by the driver
@@ -228,8 +228,8 @@ export const EXECUTORS: Record<string, Executor> = {
         // Without it, an acceptance outlives the text it names — which is the one
         // property the acceptance architecture exists to provide.
         //
-        // review review §8 stated the rule: retain while referenced. Note this
-        // is NOT "keep forever" — they were explicit that a version nothing cites
+        // The rule is: retain while referenced. Note this
+        // is NOT "keep forever" — a version nothing cites
         // may still retire. The sibling `sms_disclosure_versions` executor already
         // did exactly this against `sms_consent_log`; this one had simply never
         // been given a referencing table to check.

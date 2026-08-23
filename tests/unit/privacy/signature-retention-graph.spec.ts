@@ -1,7 +1,7 @@
 /**
  * A signature and the documents holding its picture expire together.
  *
- * review round-26 finding, and it is the whole task: nulling
+ * The finding, and it is the whole task: nulling
  * `agreement_signers.signature_base64` while `signed.pdf` still embeds the same
  * image is DATABASE retention wearing the name of retention. The column and the
  * three artefacts are representations of one evidence object. They expire as

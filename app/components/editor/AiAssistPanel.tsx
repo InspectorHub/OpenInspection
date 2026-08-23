@@ -31,8 +31,8 @@ export interface AiAssistPanelProps {
  * makes the inspector's text and the model's text indistinguishable a second
  * later; here they are two things until someone says otherwise.
  *
- * ⚠️ THE CONTROL SAYS *REVIEW*, NEVER *ACCEPT*. review was explicit that
- * "the user clicked confirm, therefore the platform is absolved" is not a
+ * ⚠️ THE CONTROL SAYS *REVIEW*, NEVER *ACCEPT*. "The user clicked confirm,
+ * therefore the platform is absolved" is not a
  * position this product may take. So the checkbox states a fact the inspector
  * is in a position to state — that they read it — and the row that gets written
  * is `reviewed_by`. Nothing here asks anyone to accept liability, and no label

@@ -31,11 +31,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // and accept the Agent Terms" and the account records the version and content
   // hash of "the text shown" — while this page displayed nothing and linked
   // nowhere, so the acceptance asserted a presentation that never happened. Same
-  // defect review review §26d-2 closed for e-signature: intent comes from a
+  // defect closed for e-signature: intent comes from a
   // recorded act, never from an artefact existing.
   //
   // A null document is the deployment having published none, and signup is closed
-  // in that case (review). The page says so instead of offering a tick against
+  // in that case. The page says so instead of offering a tick against
   // nothing.
   const api = createApi(context);
   let terms: AgentTermsInForce | null = null;
@@ -326,7 +326,7 @@ export default function AgentSignupPage() {
             {/*
               An agent is a third party. The tick is required and the account is
               not created without it — recording a consent somebody did not give
-              is worse than lacking one (review review A3). Only the tick is
+              is worse than lacking one. Only the tick is
               submitted; the version and content hash of the text shown are
               recorded server-side from the document in force.
             */}

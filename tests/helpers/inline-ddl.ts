@@ -41,7 +41,7 @@ export const USERS_TEST_DDL =
 
 /**
  * `account_acceptances` is here because `applyAdminCredential` now writes it in
- * the SAME `db.batch()` as the `users` row (review A2 / review decision).
+ * the SAME `db.batch()` as the `users` row.
  * A missing table here does not park quietly — it fails the whole batch, which
  * is the correct behaviour and an incomprehensible test failure.
  *

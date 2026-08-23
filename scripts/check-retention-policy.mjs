@@ -281,7 +281,7 @@ if (recorded && recorded !== digest) {
         'the retention rules changed but the policy header did not.\n' +
         '       What production deletes is now different from what version ' + version + ' describes.\n' +
         '       Fix: bump RETENTION_POLICY.version, run `npm run lint:retention-policy -- --update`,\n' +
-        '       and record the reasoning in [redacted] — review requires every period to be\n' +
+        '       and record the reasoning alongside the rule — every period must be\n' +
         '       answerable with one page saying why this number and not another.',
     );
 } else if (!recorded) {

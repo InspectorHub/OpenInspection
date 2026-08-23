@@ -4,9 +4,9 @@
  * The consent we hold was captured under a disclosure describing appointment
  * and report updates. A review request is promotional, and promotional content
  * changes which consent the message needs — so it is refused at the gate rather
- * than trusted to whoever writes the template. review framing is the reason
- * this lives in the gate and not in a template validator: "do not leave the
- * compliance decision to the content author."
+ * than trusted to whoever writes the template. That is the reason
+ * this lives in the gate and not in a template validator: do not leave the
+ * compliance decision to the content author.
  *
  * TWO checks, because neither alone is sufficient:
  *   - the CLASS check catches anything carrying a known class id;

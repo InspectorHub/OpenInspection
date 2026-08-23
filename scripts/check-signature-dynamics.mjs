@@ -3,7 +3,7 @@
  * lint:signature-dynamics — a signature may be a picture. It may never become a
  * biometric template.
  *
- * The invariant, in review words:
+ * The invariant:
  *
  *   OpenInspection may persist a rendered signature image for execution and
  *   evidence purposes, but must not persist or derive a reusable biometric or
@@ -34,11 +34,11 @@
  * `crypto.subtle.verify` or a constant-time compare. Same word, inverted duty.
  * The names must stay distinct or the two will be read as one rule.
  *
- * ── The other half of this invariant (CA-17, review) ──────────────────────
+ * ── The other half of this invariant ────────────────────────────────────────
  * The first half above is about the INPUT: how the mark was made. This half is
  * about the USE: a signature image is never used or stored for biometric
- * AUTHENTICATION. review asked for it in THIS gate rather than beside it,
- * because §1798.81.5(d)(1)(A)(vi) turns on "used to authenticate" — and split
+ * AUTHENTICATION. It belongs in THIS gate rather than beside it, because
+ * §1798.81.5(d)(1)(A)(vi) turns on "used to authenticate" — and split
  * across two gates someone could satisfy one while breaking the other. A pad
  * that captures nothing but a picture still crosses the line the moment that
  * picture is matched against a stored one to decide who somebody is.
@@ -118,7 +118,7 @@ const BANNED = new RegExp([
     '\\b(?:signature)?(?:[Vv]elocity|[Aa]cceleration)\\s*:\\s*(?:z\\.|number|integer\\(|real\\()',
     // 5 — timing arrays
     '\\b(?:strokeTimings?|pointTimestamps?)\\b',
-    // ── CA-17: the AUTHENTICATION half ──
+    // ── The AUTHENTICATION half ──
     // 6 — feature extraction from a signature image
     // NOTE ON THE LEADING BOUNDARY: rules 6-8 carry NO `\b` in front. A mutation
     // proof planted `loadSignatureImageTemplate(...)` and the gate stayed
@@ -198,7 +198,7 @@ function selfTest() {
         'const stroke = ctx.strokeStyle;',
         'await ctx.stroke();',
         'strokeWidth(pen, pressure)',
-        // Real lines. The first is the APPROVED mechanism CA-17 leaves intact:
+        // Real lines. The first is the APPROVED mechanism this leaves intact:
         // a fingerprint of the image, which proves nothing about a person.
         'signatureImageHash: sigHash ? `sha256:${sigHash}` : null,',
         "return await crypto.subtle.verify('HMAC', key, sigBytes, encoder.encode(rawBody));",
@@ -253,7 +253,7 @@ if (hits.length > 0) {
     console.error('     not leave app/components/media-studio/ — not in a schema, not in a');
     console.error('     column, and not inside inspection_results.data, which is JSON and');
     console.error('     would carry one with no schema change at all.');
-    console.error('  2. AN AUTHENTICATOR (CA-17). Extracting features from the image, storing');
+    console.error('  2. AN AUTHENTICATOR. Extracting features from the image, storing');
     console.error('     a template of it, or comparing two of them to decide who someone is');
     console.error('     makes it biometric data under a statute that turns on the words "used');
     console.error('     to authenticate". Hashing the image is the approved alternative and is');

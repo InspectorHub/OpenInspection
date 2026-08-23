@@ -33,7 +33,7 @@ export interface AdminCredentialParams {
  *  idempotent upsert; safe to apply out of sequence order.
  *
  * ── The account and its acceptance are ONE write ────────────────────────────
- * review A2's invariant, enforced the way review review decision requires
+ * The invariant is enforced the strict way
  * rather than the obvious way. Enqueuing the acceptance atomically with the
  * account insert and letting the portal ledger catch up came back
  * `FAIL-CLOSED NOT SATISFIED`: an outbox proves *acceptance evidence was
@@ -73,7 +73,7 @@ export async function applyAdminCredential(
             throw new Error(
                 `refusing to create an account for ${p.adminEmail}: the command carries no `
                 + 'acceptance, and an account with no acceptance is the state this path exists '
-                + 'to make unreachable (review A2 / review decision)',
+                + 'to make unreachable',
             );
         }
         const userId = crypto.randomUUID();
