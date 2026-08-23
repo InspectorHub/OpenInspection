@@ -460,5 +460,31 @@ describe('POST /api/admin/import — delivering a converted bundle', () => {
                 .where(eq(schema.migrationBatches.id, batchId));
             expect((await post('/import/acknowledge', { batchId })).status).toBe(409);
         });
+
+        it("refuses to acknowledge another workspace's run", async () => {
+            // The one door here whose tenant scoping is its OWN. Delivery and
+            // decline both re-read the run inside the service that writes, so
+            // their cross-tenant refusal survives `loadOwnBatch` being wrong —
+            // verified by deleting that filter and watching both stay green.
+            // Acknowledging re-reads nothing, so this is the assertion that
+            // actually pins it, and a 200 would both confirm an id is real to a
+            // workspace with no business knowing it and post mail about it.
+            await db.update(schema.migrationBatches).set({ tenantId: OTHER_TENANT })
+                .where(eq(schema.migrationBatches.id, batchId));
+
+            const res = await post('/import/acknowledge', { batchId });
+            expect(res.status).toBe(404);
+            expect((await refusal(res)).message).toBe('Migration batch not found');
+            expect(sentMail).toEqual([]);
+            const row = await db.select().from(schema.migrationBatches)
+                .where(eq(schema.migrationBatches.id, batchId)).get();
+            expect(JSON.parse(row?.manifest as string).acknowledgedAt).toBeUndefined();
+
+            // Positive control: the same call, the same run, once it is this
+            // workspace's again.
+            await db.update(schema.migrationBatches).set({ tenantId: TENANT })
+                .where(eq(schema.migrationBatches.id, batchId));
+            expect((await post('/import/acknowledge', { batchId })).status).toBe(200);
+        });
     });
 });
