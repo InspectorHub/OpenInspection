@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { getDeploymentProfile, SAAS_PROFILE, STANDALONE_PROFILE } from '../../../server/lib/deployment-profile';
 import { assertRowCountWithin, assertSourceSizeWithin, limitsFor } from '../../../server/lib/migration-intake/limits';
+import { extForFileName } from '../../../server/services/migration-intake/source-file.service';
 
 describe('deployment defaults', () => {
     it('gives a self-hosted deployment the smaller defaults', () => {
@@ -118,6 +119,22 @@ describe('limit assertions', () => {
     it('uses the vendor-export cap for a json source', () => {
         expect(() => assertSourceSizeWithin(limits, 'json', limits.maxCsvBytes + 1)).not.toThrow();
         expect(() => assertSourceSizeWithin(limits, 'json', limits.maxVendorExportBytes + 1)).toThrow();
+    });
+
+    it('gives a binary workbook the vendor cap, whichever workbook dialect it is', () => {
+        // The two halves composed, because the cap is the consequence the
+        // operator actually feels: the namer decides the ext, the ext decides
+        // the cap. A dialect the namer misses lands on `csv` here and is
+        // refused at the smaller number, which reads to the operator as "this
+        // spreadsheet is too big" for a file that is nowhere near the limit
+        // for its kind.
+        const overCsv = limits.maxCsvBytes + 1;
+        for (const name of ['Master Template.xlsm', 'clients.xlsb', 'contacts.ods', 'Contact List.numbers']) {
+            expect(() => assertSourceSizeWithin(limits, extForFileName(name), overCsv)).not.toThrow();
+        }
+        // The control: a real CSV of the same size still takes the CSV cap, so
+        // this is not passing because the cap stopped applying to anything.
+        expect(() => assertSourceSizeWithin(limits, extForFileName('contacts.csv'), overCsv)).toThrow();
     });
 
     it('reports the real row count, so the operator knows how far over they are', () => {

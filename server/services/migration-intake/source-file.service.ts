@@ -12,8 +12,37 @@ import { r2Keys } from '../../lib/r2-keys';
  */
 export type SourceExt = 'csv' | 'json' | 'bin';
 
-/** Binary container formats vendors actually export. Lower-cased before matching. */
-const BINARY_SUFFIXES = ['.xls', '.xlsx', '.tpz', '.tpx', '.tpzx', '.hgf', '.zip', '.pdf'];
+/**
+ * Names whose bytes are certainly not text. Lower-cased before matching.
+ *
+ * The test this list applies is NOT "can something here parse it". It is
+ * narrower and it is the only one a name can answer: would decoding these bytes
+ * as UTF-8 destroy them. A format nothing here reads still belongs on the list —
+ * it is kept whole, filed as `bin`, and routed to the assisted path with its
+ * bytes intact, which is the outcome the operator can still act on.
+ *
+ * A workbook has several dialects and they are all the same decision: `.xlsm`
+ * and `.xlsb` are what Excel writes for a macro-enabled and a binary workbook,
+ * `.ods` and `.numbers` are the two other office suites' packages. Every one of
+ * them is a container. A name missing from here is not merely unrecognised — it
+ * falls to `csv`, so the file is stored as `source.csv` stamped `text/csv` and
+ * measured against the SMALLER cap, and the operator is told their spreadsheet
+ * is too big for a file nowhere near the limit for its kind.
+ *
+ * `.xlsm` is on the list ON PURPOSE, macros and all. Nothing here executes a
+ * workbook: the reader pulls one zip entry (`xl/worksheets/sheet1.xml`) and
+ * parses XML, and `vbaProject.bin` is never opened. Refusing by name would also
+ * refuse nothing real — the same bytes renamed `.xlsx` are accepted by every
+ * check downstream, because those read the file's leading bytes rather than its
+ * name — while turning away operators whose export merely carries the suffix.
+ * Where a person opens one of these by hand, the staff-download route is the
+ * boundary that governs it, and it already serves the bytes as
+ * `application/octet-stream` under a name with no extension at all.
+ */
+const BINARY_SUFFIXES = [
+    '.xls', '.xlsx', '.xlsm', '.xlsb', '.ods', '.numbers',
+    '.tpz', '.tpx', '.tpzx', '.hgf', '.zip', '.pdf',
+];
 
 /**
  * The extension the STORED object gets, derived from the uploaded file's name.

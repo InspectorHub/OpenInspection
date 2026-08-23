@@ -74,6 +74,33 @@ describe('extForFileName', () => {
         expect(extForFileName('contacts.tsv')).toBe('csv');
     });
 
+    it('reads a binary workbook as bin whatever the workbook dialect', () => {
+        // The list is not "the formats we can parse" — it is "the names whose
+        // bytes are certainly not text". Getting one wrong is not a failed
+        // parse: the file is filed as `source.csv`, stamped `text/csv`, and
+        // measured against the CSV cap instead of the vendor-export one, so a
+        // workbook well inside the limit for its kind is refused as an
+        // oversized spreadsheet.
+        expect(extForFileName('Master Template.xlsm')).toBe('bin');
+        expect(extForFileName('clients.XLSB')).toBe('bin');
+        expect(extForFileName('contacts.ods')).toBe('bin');
+        expect(extForFileName('Contact List.numbers')).toBe('bin');
+    });
+
+    it('still reads the text formats as text — the control for the list above', () => {
+        // Positive control for the case above, in the same file. Widening the
+        // binary list is only right if it does not start swallowing the formats
+        // that really are text. A green above and a red here would mean the
+        // suffix match got greedy rather than longer.
+        expect(extForFileName('contacts.csv')).toBe('csv');
+        expect(extForFileName('contacts.tsv')).toBe('csv');
+        expect(extForFileName('export.json')).toBe('json');
+        // The ENDING, not a substring — the same rule the `.xlsx` control below
+        // pins, restated for the names this list just gained.
+        expect(extForFileName('xlsm-notes.csv')).toBe('csv');
+        expect(extForFileName('numbers-for-2026.csv')).toBe('csv');
+    });
+
     it('is not fooled by a name that merely mentions json', () => {
         // Positive control for the two above: the rule is the ENDING, not a
         // substring. A `.csv` export of a JSON-shaped table would otherwise be
