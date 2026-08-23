@@ -98,6 +98,7 @@ import portalNoticeRoutes from './api/portal/notices';
 import portalNotificationPreferenceRoutes from './api/portal/notification-preferences';
 import tagsRoutes, { inspectionTagRoutes } from './api/tags';
 import publicSlugRoutes from './api/public-slug';
+import unsubscribeRoutes from './api/unsubscribe';
 import publicShareRoutes from './api/public-share';
 import publicReportRoutes from './api/public-report';
 import clientDocumentsRoutes, { inspectorDocumentsRoutes } from './api/client-documents';
@@ -383,6 +384,9 @@ const routes = app
   .route('/api/public', clientMessageRoutes)
   // Track L (D6/D9) — public SMS opt-in resolve/confirm + inbound STOP/START webhook.
   .route('/api/public', smsPublicRoutes)
+  // Signed email unsubscribe. MUST stay under /api/public — that prefix is what
+  // keeps it outside the agent-terms gate; see server/api/unsubscribe.ts.
+  .route('/api/public', unsubscribeRoutes)
   // Unified client portal — magic-link request/redeem + session-gated data routes.
   // The :tenant slug lives inside the route definitions (tenantRouter resolves it).
   .route('/api/portal', portalRoutes)
@@ -505,9 +509,6 @@ app.doc('/doc', {
 
 // ---------- SSR page handlers removed — React Router v7 frontend serves all HTML pages ----------
 
-
-
-
 // Booking #7 Sprint C-2 — busy-only iCal feed. Subscribers (partner agents,
 // the inspector's own personal calendar) see opaque "Busy" blocks with no
 // addresses, client names, or emails. Cancelled inspections drop out so
@@ -591,8 +592,6 @@ app.get('/sign/:tenant/:id', async (c) => {
     }
     return c.redirect('/not-found?from=agreement-sign', 302);
 });
-
-
 
 // Spec 5H P2 — Public verifier (no-auth, court-friendly). The base JSON route
 // `GET /api/public/verify/:envelopeId` is now the typed route in

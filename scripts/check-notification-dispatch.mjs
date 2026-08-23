@@ -114,6 +114,15 @@ const SEND_EMAIL_ALLOW = [
   // classified send from `deliver-email.ts` and only forwards it; there is no
   // class to name at this level because it does not know what it is carrying.
   /^server\/lib\/automation-core\/deliver\.ts$/,
+  // The unsubscribe fan-out. Unlike the seam above, this one DOES know its
+  // class — `classId` is its parameter, and it is what decides whether a
+  // footer is minted at all. It cannot pass it on: `EmailSendArgs` has no
+  // classId field, because the class is consumed BEFORE the transport
+  // (dedupe, the cooling window, metering) and never travels with the
+  // message. Every caller reaches here through `EmailService.sendEmail`,
+  // which this gate already checks — so the class is named exactly once on
+  // the path, and naming it again here would mean nothing.
+  /^server\/lib\/notifications\/unsubscribe-footer\.ts$/,
 ];
 
 // ── Rule 3: no SMS send without consulting the gate ────────────────────────

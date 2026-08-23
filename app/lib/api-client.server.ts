@@ -1,4 +1,5 @@
 import { hc } from "hono/client";
+import { MOUNT } from "./api-mounts";
 import type {
     AdminApi,
     AdminBrandingApi,
@@ -70,6 +71,7 @@ import type {
     TagsApi,
     TeamApi,
     TenantPresenceApi,
+    UnsubscribeApi,
     UsageApi,
     UsersApi,
     WidgetApi,
@@ -208,92 +210,12 @@ export interface Api {
     tags:               ReturnType<typeof hc<TagsApi>>;
     team:               ReturnType<typeof hc<TeamApi>>;
     tenantPresence:     ReturnType<typeof hc<TenantPresenceApi>>;
+    unsubscribe:        ReturnType<typeof hc<UnsubscribeApi>>;
     usage:              ReturnType<typeof hc<UsageApi>>;
     users:              ReturnType<typeof hc<UsersApi>>;
     widget:             ReturnType<typeof hc<WidgetApi>>;
 }
 
-/**
- * Module mount paths. Verified against `apps/core/server/index.ts` route()
- * calls. Some modules share a mount (e.g. inspections + inspectionSync +
- * inspectionTag all under `/api/inspections`); each client only sees ITS OWN
- * routes typed in its `*Api`, so collisions on the path prefix are fine.
- */
-const MOUNT: Record<keyof Api, string> = {
-    admin:              "/api/admin",
-    adminBranding:      "/api/admin",
-    agent:              "/api/agent",
-    agents:             "/api/agents",
-    agentSignup:        "/api/agent-signup",
-    agentLogin:         "/api/agent",
-    agentMagicLogin:    "/api/agent",
-    agentTerms:         "/api/agent",
-    ai:                 "/api/ai",
-    analytics:          "/api/analytics",
-    auth:               "/api/auth",
-    automations:        "/api/automations",
-    availability:       "/api/availability",
-    billing:            "/api/billing",
-    bookings:           "/api/public",
-    calendar:           "/api/calendar",
-    calendarEvents:     "/api/calendar/events",
-    concierge:          "/api/concierge",
-    contractorTypes:    "/api/contractor-types",
-    credentials:        "/api/credentials",
-    contacts:           "/api/contacts",
-    contactsImport:     "/api/contacts",
-    data:               "/api/data",
-    defectCategories:   "/api/admin",
-    events:             "/api",
-    inspectionTypes:    "/api/admin",
-    emailTemplates:     "/api/admin",
-    evidence:           "/api/admin",
-    identity:           "/api/identities",
-    inspectionPrefs:    "/api/tenant/inspection-prefs",
-    inspectionRequests: "/api/inspection-requests",
-    inspections:        "/api/inspections",
-    inspectionSync:     "/api/inspections",
-    inspectionTag:      "/api/inspections",
-    integrations:       "/api/integrations",
-    integrationsAi:     "/api/integrations/ai",
-    imports:            "/api/imports",
-    invoices:           "/api/invoices",
-    marketplace:        "/api/templates/marketplace",
-    mcpGrants:          "/api/mcp",
-    messageTemplates:   "/api/message-templates",
-    messages:           "/api/messages",
-    inspectorMessages:  "/api/inspections",
-    metrics:            "/api/metrics",
-    audit:              "/api/audit",
-    notifications:      "/api/notifications",
-    places:             "/api/places",
-    portal:             "/api/portal",
-    portalNotices:      "/api/portal",
-    notificationPrefs:      "/api",
-    agentNotificationPrefs: "/api/agent",
-    portalNotificationPrefs: "/api/portal",
-    agentNotices:       "/api/agent",
-    profile:            "/api/profile",
-    publicShare:        "/api/public",
-    publicReport:       "/api/public",
-    publicSlug:         "/api/public",
-    ratingSystems:      "/api/rating-systems",
-    recommendations:    "/api/recommendations",
-    repairBuilder:      "/api/public",
-    roleProfiles:       "/api/role-profiles",
-    schedule:           "/api/schedule",
-    secrets:            "/api/admin",
-    services:           "/api/services",
-    sessionContext:     "/api/session",
-    smsPublic:          "/api/public",
-    smsAdmin:           "/api/admin",
-    tags:               "/api/tags",
-    team:               "/api/team",
-    tenantPresence:     "/api/tenant",
-    usage:              "/api/usage",
-    users:              "/api/users",
-    widget:             "/api/public/widget",
-};
 
 /**
  * Typed BFF-aware client factory. Builds one `hc<TModule>` per module so each
@@ -390,6 +312,7 @@ export function createApi(context: LoadContext, opts: CreateApiOptions = {}): Ap
         tags:               mk<TagsApi>(MOUNT.tags),
         team:               mk<TeamApi>(MOUNT.team),
         tenantPresence:     mk<TenantPresenceApi>(MOUNT.tenantPresence),
+        unsubscribe:        mk<UnsubscribeApi>(MOUNT.unsubscribe),
         usage:              mk<UsageApi>(MOUNT.usage),
         users:              mk<UsersApi>(MOUNT.users),
         widget:             mk<WidgetApi>(MOUNT.widget),

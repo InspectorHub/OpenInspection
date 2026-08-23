@@ -9,6 +9,7 @@ import { ResendProvider } from '../../lib/email/providers/resend';
 import type { EmailProvider } from '../../lib/email/provider';
 import type { EmailDedupePort } from '../../lib/email/dedupe';
 import type { OutboundCoolingPort } from '../../lib/email/outbound-cooling-window';
+import { deliverWithUnsubscribe, type UnsubscribeLinkPort } from '../../lib/notifications/unsubscribe-footer';
 import { escapeHtml, appendSignature, arrayBufferToBase64 } from './html-helpers';
 
 // Re-exported: these moved to ./html-helpers when this file crossed the
@@ -86,6 +87,12 @@ export class EmailBaseService {
          * than by a branch in here.
          */
         public cooling?: OutboundCoolingPort,
+        /**
+         * The recipient's way out, carried IN the mail — most recipients have
+         * no account to switch it off from, and a gate-held agent cannot reach
+         * the screen. Same guard as `preferences`: it needs a tenant to name.
+         */
+        public unsubscribeLinks?: UnsubscribeLinkPort,
     ) {
         this.provider = provider ?? new ResendProvider({ apiKey: this.apiKey });
     }
@@ -348,14 +355,17 @@ export class EmailBaseService {
             })
             : undefined;
 
-        const result = await this.provider.sendEmail({
+        // Each recipient gets their OWN unsubscribe link, so a suppressible
+        // class fans out to one provider call per address (see
+        // `deliverWithUnsubscribe` — a shared link would let either recipient
+        // switch the other off). Single-recipient sends are unchanged, and the
+        // meter below still counts one send, because one notification went out.
+        const result = await deliverWithUnsubscribe(this.provider, {
             from,
-            to,
             subject,
-            html,
             ...(resolved.replyTo ? { replyTo: resolved.replyTo } : {}),
             ...(providerAttachments ? { attachments: providerAttachments } : {}),
-        });
+        }, to, html, this.unsubscribeLinks, opts?.classId);
 
         if (!result.ok) {
             logger.error('[email] Delivery failed', { error: result.error });

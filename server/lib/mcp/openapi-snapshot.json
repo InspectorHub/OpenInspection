@@ -17126,6 +17126,34 @@
     "description": "Resolves the opaque opt-in token to the company name + current SMS disclosure for the public double-opt-in page. Returns 404 on a bad/expired token."
   },
   {
+    "operationId": "resolveUnsubscribeLink",
+    "method": "GET",
+    "pathTemplate": "/api/public/unsubscribe/resolve",
+    "scopes": [
+      "read"
+    ],
+    "tag": "public",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "token",
+          "in": "query",
+          "required": true,
+          "description": "The signed token from the unsubscribe link in the email. Names one address and one notification.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The signed token from the unsubscribe link in the email. Names one address and one notification."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Describe what a signed unsubscribe link would switch off",
+    "description": "A PURE READ. Resolves the signed token to the company, the one notification it covers, and whether that notification is already off for this address. Writes nothing — link scanners and mail clients fetch every URL in an email, so acting here would unsubscribe people who never opened the message."
+  },
+  {
     "operationId": "restoreContact",
     "method": "POST",
     "pathTemplate": "/api/contacts/{id}/restore",
@@ -18149,6 +18177,39 @@
     },
     "summary": "Replace inspector restriction list for a service",
     "description": "Full-replace the qualified inspector list for a service. An empty userIds array clears all restrictions (back to all-qualified). Every userId must be a non-deleted, non-agent member of the caller's tenant. Admin or owner only."
+  },
+  {
+    "operationId": "setUnsubscribePreference",
+    "method": "POST",
+    "pathTemplate": "/api/public/unsubscribe",
+    "scopes": [
+      "write"
+    ],
+    "tag": "public",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The signed token from the unsubscribe link in the email. Names one address and one notification."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "false to stop this notification; true to start it again."
+          }
+        },
+        "required": [
+          "token",
+          "enabled"
+        ]
+      }
+    },
+    "summary": "Switch one notification off for this address",
+    "description": "Records the recipient's own choice for the ONE notification the token names, on the email channel, against the same `notification_preferences` row the signed-in screen writes. Needs no session. Two-directional on purpose — a recipient with no account has no other way back."
   },
   {
     "operationId": "signInspectionCompliance",

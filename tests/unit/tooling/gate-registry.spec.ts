@@ -79,6 +79,18 @@ describe('gate registry', () => {
             // difference — measured, the rung went 15 gates to 16 and stayed
             // at 6s.
             'gateregistry',
+            // Added 2026-08-23 with the Chrome-record judge, and this edit is
+            // again the decision the lock exists to force. What runs here is
+            // ONLY `--self-test`: the judge scored against its own 30 labelled
+            // examples. The judging itself is commit-msg, not this rung.
+            //
+            // It earns pre-commit on the same argument as `gateregistry`
+            // above: what it catches is the judge silently disagreeing with
+            // its own fixtures, which is invisible by construction — a broken
+            // judge reports PASS on everything, so nothing downstream goes red
+            // and the gate reads as green on the day it stopped working.
+            // Cost is one node start and 30 string matches, no file walk.
+            'chromerecord',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);

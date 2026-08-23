@@ -100,6 +100,41 @@ export async function isPreferenceMuted(
  * of the two failures by a wide margin — the recipient never learns the message
  * existed.
  */
+/**
+ * An ADDRESS to the preference subjects it stands for, inside one tenant.
+ *
+ * Exported, and that is the point: the send boundary reaches a preference row
+ * this way, and so does the signed unsubscribe link
+ * (`server/api/unsubscribe.ts`), which has nothing but an address either. Two
+ * copies of this resolution would be two answers to "whose row is this", and
+ * the day they disagreed the symptom would be a person who unsubscribed and
+ * kept receiving mail — which nobody reports, because the only evidence is an
+ * email that did arrive.
+ *
+ * BOTH id spaces, because one person can be both: an agent with an account who
+ * is also a contact on an inspection. Note that an agent's `users` row carries
+ * `tenant_id IS NULL`, so inside a tenant they resolve through `contacts` —
+ * which is the row their per-company preferences are keyed on anyway.
+ */
+export async function resolveSubjectsForAddress(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    d: { select: (...args: any[]) => any },
+    tenantId: string,
+    email: string,
+): Promise<PreferenceSubject[]> {
+    const normalized = email.trim().toLowerCase();
+    const [userRows, contactRows] = await Promise.all([
+        d.select({ id: users.id }).from(users)
+            .where(and(eq(users.tenantId, tenantId), eq(users.email, normalized))).all(),
+        d.select({ id: contacts.id }).from(contacts)
+            .where(and(eq(contacts.tenantId, tenantId), eq(contacts.email, normalized))).all(),
+    ]);
+    return [
+        ...userRows.map((r: { id: string }) => ({ kind: 'user' as const, id: r.id })),
+        ...contactRows.map((r: { id: string }) => ({ kind: 'contact' as const, id: r.id })),
+    ];
+}
+
 export function buildNotificationPreferences(db: D1Database, tenantId: string): NotificationPreferencePort {
     return {
         async isMuted(classId: string, email: string): Promise<boolean> {
@@ -107,18 +142,7 @@ export function buildNotificationPreferences(db: D1Database, tenantId: string): 
             if (!isSuppressible(classId)) return false;
 
             const d = drizzle(db);
-            const normalized = email.trim().toLowerCase();
-
-            const [userRows, contactRows] = await Promise.all([
-                d.select({ id: users.id }).from(users)
-                    .where(and(eq(users.tenantId, tenantId), eq(users.email, normalized))).all(),
-                d.select({ id: contacts.id }).from(contacts)
-                    .where(and(eq(contacts.tenantId, tenantId), eq(contacts.email, normalized))).all(),
-            ]);
-            const subjects: PreferenceSubject[] = [
-                ...userRows.map((r) => ({ kind: 'user' as const, id: r.id })),
-                ...contactRows.map((r) => ({ kind: 'contact' as const, id: r.id })),
-            ];
+            const subjects = await resolveSubjectsForAddress(d, tenantId, email);
             return isPreferenceMuted(d, tenantId, classId, 'email', subjects);
         },
     };

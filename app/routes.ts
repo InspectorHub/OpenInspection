@@ -59,6 +59,10 @@ export default [
     ),
     // Track L (D6, path B) — public SMS double-opt-in confirmation page.
     route("sms-optin/:token", "routes/public/sms-optin.tsx"),
+    // Where an emailed unsubscribe link lands. The loader only DESCRIBES the
+    // link; the change is a POST behind a confirm control, because every mail
+    // scanner between the sender and the inbox fetches this URL.
+    route("unsubscribe/:token", "routes/public/unsubscribe.tsx"),
     // Per-tenant legal pages — privacy/terms URLs for managed compliance (TFV/A2P)
     // and booking opt-in links. doc ∈ privacy|terms; unknown → 404.
     route("legal/:tenant/:doc", "routes/public/legal.tsx"),

@@ -1,0 +1,91 @@
+import type { Api } from "./api-client.server";
+
+/**
+ * Module mount paths, lifted out of `api-client.server.ts` when that file
+ * crossed the 400-line ceiling. A table of literals is exactly the kind of
+ * cohesive unit that belongs in its own module: it is the only part of the
+ * client that has to be checked against `server/index.ts`, and it is now the
+ * whole content of a file rather than a third of a longer one.
+ */
+/**
+ * Module mount paths. Verified against `apps/core/server/index.ts` route()
+ * calls. Some modules share a mount (e.g. inspections + inspectionSync +
+ * inspectionTag all under `/api/inspections`); each client only sees ITS OWN
+ * routes typed in its `*Api`, so collisions on the path prefix are fine.
+ */
+export const MOUNT: Record<keyof Api, string> = {
+    admin:              "/api/admin",
+    adminBranding:      "/api/admin",
+    agent:              "/api/agent",
+    agents:             "/api/agents",
+    agentSignup:        "/api/agent-signup",
+    agentLogin:         "/api/agent",
+    agentMagicLogin:    "/api/agent",
+    agentTerms:         "/api/agent",
+    ai:                 "/api/ai",
+    analytics:          "/api/analytics",
+    auth:               "/api/auth",
+    automations:        "/api/automations",
+    availability:       "/api/availability",
+    billing:            "/api/billing",
+    bookings:           "/api/public",
+    calendar:           "/api/calendar",
+    calendarEvents:     "/api/calendar/events",
+    concierge:          "/api/concierge",
+    contractorTypes:    "/api/contractor-types",
+    credentials:        "/api/credentials",
+    contacts:           "/api/contacts",
+    contactsImport:     "/api/contacts",
+    data:               "/api/data",
+    defectCategories:   "/api/admin",
+    events:             "/api",
+    inspectionTypes:    "/api/admin",
+    emailTemplates:     "/api/admin",
+    evidence:           "/api/admin",
+    identity:           "/api/identities",
+    inspectionPrefs:    "/api/tenant/inspection-prefs",
+    inspectionRequests: "/api/inspection-requests",
+    inspections:        "/api/inspections",
+    inspectionSync:     "/api/inspections",
+    inspectionTag:      "/api/inspections",
+    integrations:       "/api/integrations",
+    integrationsAi:     "/api/integrations/ai",
+    imports:            "/api/imports",
+    invoices:           "/api/invoices",
+    marketplace:        "/api/templates/marketplace",
+    mcpGrants:          "/api/mcp",
+    messageTemplates:   "/api/message-templates",
+    messages:           "/api/messages",
+    inspectorMessages:  "/api/inspections",
+    metrics:            "/api/metrics",
+    audit:              "/api/audit",
+    notifications:      "/api/notifications",
+    places:             "/api/places",
+    portal:             "/api/portal",
+    portalNotices:      "/api/portal",
+    notificationPrefs:      "/api",
+    agentNotificationPrefs: "/api/agent",
+    portalNotificationPrefs: "/api/portal",
+    agentNotices:       "/api/agent",
+    profile:            "/api/profile",
+    publicShare:        "/api/public",
+    publicReport:       "/api/public",
+    publicSlug:         "/api/public",
+    ratingSystems:      "/api/rating-systems",
+    recommendations:    "/api/recommendations",
+    repairBuilder:      "/api/public",
+    roleProfiles:       "/api/role-profiles",
+    schedule:           "/api/schedule",
+    secrets:            "/api/admin",
+    services:           "/api/services",
+    sessionContext:     "/api/session",
+    smsPublic:          "/api/public",
+    smsAdmin:           "/api/admin",
+    tags:               "/api/tags",
+    team:               "/api/team",
+    tenantPresence:     "/api/tenant",
+    unsubscribe:        "/api/public",
+    usage:              "/api/usage",
+    users:              "/api/users",
+    widget:             "/api/public/widget",
+};

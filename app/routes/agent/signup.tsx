@@ -352,6 +352,22 @@ export default function AgentSignupPage() {
                 {form.errors[0]}
               </div>
             )}
+
+            {/* "You can unsubscribe at any time."
+                This string had no consumer anywhere in the tree, and until the
+                signed unsubscribe link existed it could not honestly have one —
+                an agent held by the agent-terms gate could not reach the
+                preferences screen, and no email carried a way out. It says what
+                is now true, so it is shown where the agreeing happens.
+
+                The key is named `..._invite_...` because it was written for an
+                `/agent-invite/:token` page that no longer exists in this repo.
+                The signup form is the surviving surface where an agent accepts
+                this, so the text moved and the key did not — renaming a message
+                key is a translation-catalog change, not a copy change. */}
+            <p className="mt-4 text-[13px] text-ih-fg-3 text-center">
+              {m.auth_agent_invite_footer_note()}
+            </p>
           </Form>
 
           <p className="mt-6 text-[14px] text-ih-fg-3 text-center">

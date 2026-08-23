@@ -72,6 +72,7 @@ export type { ScheduleApi }           from '../../server/api/schedule-week-summa
 export type { SecretsApi }            from '../../server/api/secrets';
 export type { ServicesApi }           from '../../server/api/services';
 export type { SmsPublicApi, SmsAdminApi } from '../../server/api/sms';
+export type { UnsubscribeApi } from '../../server/api/unsubscribe';
 export type { SessionContextApi }     from '../../server/api/session-context';
 export type { TagsApi }               from '../../server/api/tags';
 export type { TeamApi }               from '../../server/api/team';

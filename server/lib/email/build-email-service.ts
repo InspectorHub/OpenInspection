@@ -11,6 +11,7 @@ import { resolveEmailProvider, coerceEmailByoProvider, type EmailByoProvider } f
 import { buildEmailSuppression } from './suppression';
 import { buildEmailDedupe } from './dedupe';
 import { buildNotificationPreferences } from '../notifications/preference-port';
+import { buildUnsubscribeLinks } from '../notifications/unsubscribe-footer';
 import { buildOutboundCoolingWindow, coolingWindowApplies } from './outbound-cooling-window';
 import { getDeploymentProfile } from '../deployment-profile';
 import { logger } from '../logger';
@@ -220,6 +221,15 @@ export function assembleTenantEmailService(
     const preferences = meterTenantId
         ? buildNotificationPreferences(env.DB, meterTenantId)
         : undefined;
+    // The same choice, offered from inside the mail. Under the SAME guard as
+    // `preferences` for the same reason (the token names a tenant), plus
+    // APP_BASE_URL — a token in a relative URL is not a link anyone can click,
+    // and an unsubscribe that only sometimes works is worse than a visible
+    // absence. `linkFor` itself returns null when either is missing, so a
+    // deployment with no base URL simply sends the mail without a footer.
+    const unsubscribeLinks = meterTenantId
+        ? buildUnsubscribeLinks(meterTenantId, env.JWT_SECRET, env.APP_BASE_URL)
+        : undefined;
     // M1 idempotency (portal #107) — outbound dedupe, under the SAME guard as
     // `meter`: the key is tenant-scoped, so a send with no resolved tenant gets
     // no gate rather than a key in a shared namespace.
@@ -265,7 +275,7 @@ export function assembleTenantEmailService(
         );
     }
 
-    return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider, suppression, quota, preferences, dedupe, cooling);
+    return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider, suppression, quota, preferences, dedupe, cooling, unsubscribeLinks);
 }
 
 /**
