@@ -132,9 +132,9 @@ export interface VendorMismatch {
  * for the fields a contact list holds, gathered here so a spreadsheet exported
  * from anywhere can be recognised. They belong to no product: nothing in this
  * list came from any one export, and no product's own vocabulary is reproduced
- * by it.
+ * by it. Exported so `../contacts-template.ts` DERIVES the starter file.
  */
-const CONTACT_HEADERS = {
+export const CONTACT_HEADERS = {
     name: ['name', 'full name', 'fullname', 'contact', 'contact name'],
     email: ['email', 'e-mail', 'email address'],
     phone: ['phone', 'tel', 'mobile', 'phone number'],

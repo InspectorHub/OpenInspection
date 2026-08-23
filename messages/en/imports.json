@@ -42,6 +42,7 @@
   "imports_upload_staff_authorize": "If nothing here can read it, let someone on the support team open it and convert it.",
   "imports_upload_staff_authorize_help": "This file may contain your clients' names, email addresses and phone numbers.",
   "imports_upload_choose_file": "Choose file",
+  "imports_download_template": "Download a starter spreadsheet",
   "imports_upload_submit": "Upload",
   "imports_upload_needs_file": "Choose the file you exported.",
   "imports_upload_needs_authorize": "Agree to us keeping the file, so this import can be picked up again later.",

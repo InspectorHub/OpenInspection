@@ -42,6 +42,7 @@
   "imports_upload_staff_authorize": "Si nada aquí puede leerlo, permitir que alguien del equipo de soporte lo abra y lo convierta.",
   "imports_upload_staff_authorize_help": "Este archivo puede contener nombres, correos electrónicos y teléfonos de sus clientes.",
   "imports_upload_choose_file": "Elegir archivo",
+  "imports_download_template": "Descargar una hoja de cálculo inicial",
   "imports_upload_submit": "Subir",
   "imports_upload_needs_file": "Elija el archivo que exportó.",
   "imports_upload_needs_authorize": "Acepte que conservemos el archivo, para poder retomar esta importación más tarde.",

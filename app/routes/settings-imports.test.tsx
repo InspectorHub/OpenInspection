@@ -343,3 +343,34 @@ describe("settings → imports: declaring which product the file came from", () 
             .toBe("Choose the file you exported.");
     });
 });
+
+describe("settings → imports: the starter contacts spreadsheet", () => {
+    it("offers a file to start from on the entry point that uploads contacts", async () => {
+        // The one failure a template removes is a whole file whose headings the
+        // importer does not recognise, so it is offered next to the file
+        // chooser — the moment before the wrong file is picked — and not on a
+        // page somebody would have had to go looking for.
+        renderPage({ entry: "/settings/imports?intent=contacts.import" });
+
+        const link = await screen.findByRole("link", { name: "Download a starter spreadsheet" });
+        expect(link.getAttribute("href")).toBe("/resources/contacts-template");
+        // `download` is the browser's save hint; the server's
+        // Content-Disposition still decides the name.
+        expect(link.hasAttribute("download")).toBe(true);
+        expect(link.closest("form")).toBe(
+            screen.getByRole("button", { name: "Upload" }).closest("form"),
+        );
+    });
+
+    it("does NOT offer it on an entry point it would not describe", async () => {
+        // The positive control for the assertion above: the team-member entry
+        // reads a different set of columns, so a contacts template there would
+        // teach the wrong format. The panel itself is asserted present, so this
+        // cannot pass because nothing rendered.
+        renderPage({ entry: "/settings/imports?intent=members.invite" });
+
+        expect(await screen.findByRole("button", { name: "Upload" })).toBeTruthy();
+        expect(screen.getByTestId("import-start-intent").textContent).toBe("Team members");
+        expect(screen.queryByRole("link", { name: "Download a starter spreadsheet" })).toBeNull();
+    });
+});

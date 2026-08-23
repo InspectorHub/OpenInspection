@@ -112,6 +112,29 @@ export function StartImportPanel({
                 />
             </label>
 
+            {/* Offered HERE, and only for contacts: the failure a starter file
+                removes is a whole upload whose headings nothing matched, and
+                the moment to prevent that is the moment before a file is
+                chosen. The other entry points read different columns, so the
+                same file there would teach the wrong format.
+
+                Its columns are derived from the importer's own header
+                vocabulary — see server/lib/migration-intake/contacts-template.ts
+                — so this link can never advertise a format the parser stopped
+                accepting. */}
+            {entry.intent === "contacts.import" && (
+                <p className="text-[12px]">
+                    <a
+                        data-testid="import-start-template"
+                        href="/resources/contacts-template"
+                        download
+                        className="font-bold text-ih-primary-text hover:underline"
+                    >
+                        {m.imports_download_template()}
+                    </a>
+                </p>
+            )}
+
             <div className="space-y-1">
                 <Checkbox
                     data-testid="import-start-authorize"

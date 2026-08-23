@@ -106,6 +106,11 @@ export default [
   route("resources/repair-items", "routes/resources/repair-items.tsx"),
   route("resources/cost-items", "routes/resources/cost-items.tsx"),
   route("resources/cost-export", "routes/resources/cost-export.tsx"),
+  // The starter contacts spreadsheet, offered where an operator is about to
+  // upload one. Its columns are DERIVED from the importer's own header
+  // vocabulary; the route module and server/lib/migration-intake/
+  // contacts-template.ts say why it is a resource route and not an API path.
+  route("resources/contacts-template", "routes/resources/contacts-template.ts"),
   route("resources/inspection-prefs", "routes/resources/inspection-prefs.tsx"),
   route("resources/marketplace-install", "routes/resources/marketplace-install.tsx"),
   route("resources/inspection-settings-sheet", "routes/resources/inspection-settings-sheet.tsx"),
