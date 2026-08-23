@@ -116,8 +116,17 @@ test.describe('Subsystem E — pre-flight, list workflow, exports, metrics, repo
         await loginAsSeedUser(page, SEED_EMAILS.admin);
         await page.goto('/settings/integrations');
 
+        // "AI provider", not "Gemini AI". The multi-provider AI work renamed the
+        // card when the feature stopped being about one vendor; the message KEY
+        // is still `settings_integrations_gemini_name`, so a grep for the key
+        // finds nothing wrong and only the rendered value moved.
+        //
+        // This assertion was stale from that rename until it first ran here.
+        // These specs only run on a pull request, and the work that renamed the
+        // card reached main by a force-push — so nothing executed them in
+        // between. The gap, not the label, is the thing worth remembering.
         for (const name of ['QuickBooks Online', 'Google Calendar', 'Google Places',
-                            'Resend', 'Zapier', 'Gemini AI']) {
+                            'Resend', 'Zapier', 'AI provider']) {
             await expect(page.getByText(name, { exact: true })).toBeVisible();
         }
         // Stripe is on this page, but as its own panel — not a grid card.
