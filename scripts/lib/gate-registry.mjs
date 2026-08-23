@@ -185,6 +185,17 @@ export const SCRIPT_GATES = [
     { key: 'signaturedynamics', label: 'lint:signature-dynamics', script: 'check-signature-dynamics.mjs', fix: 'npm run lint:signature-dynamics', rung: PUSH },
     { key: 'smsgateargs', label: 'lint:sms-gate-args', script: 'check-sms-gate-args.mjs', fix: 'npm run lint:sms-gate-args', rung: PUSH },
     { key: 'messagingrules', label: 'lint:messaging-rules', script: 'check-messaging-rules.mjs', fix: 'npm run lint:messaging-rules', rung: PUSH },
+    // PUSH rather than PRECOMMIT, and the argument is the opposite of the price
+    // and tracking gates above: what this one catches is not a capability
+    // ARRIVING, it is a resolution step that reads one of two id spaces. That
+    // shape is created by a query being written and then, usually, by a second
+    // query elsewhere in the tree failing to be written at all — so the commit
+    // that creates the defect is often not the commit that would fail. PUSH is
+    // the first rung that sees the whole change. It walks ~987 server sources,
+    // strips comments and matches four regexes, which is the same order of cost
+    // as the tracking gate that does sit at pre-commit; the rung choice here is
+    // about WHEN the answer is complete, not about the price.
+    { key: 'consentsubjects', label: 'lint:consent-subjects', script: 'check-consent-subject-kinds.mjs', fix: 'npm run lint:consent-subjects', rung: PUSH },
     // PUSH, not PRECOMMIT, and the argument cuts the other way from the price /
     // tracking / AI gates above. Those catch a CAPABILITY arriving, where the
     // moment to argue is while the line is typed. This one catches a vocabulary

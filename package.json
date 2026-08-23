@@ -139,6 +139,7 @@
     "lint:sigcompare": "node scripts/check-signature-compare.mjs",
     "lint:sms-gate-args": "node scripts/check-sms-gate-args.mjs",
     "lint:messaging-rules": "node scripts/check-messaging-rules.mjs",
+    "lint:consent-subjects": "node scripts/check-consent-subject-kinds.mjs",
     "lint:verification-copy": "node scripts/check-verification-copy.mjs",
     "lint:view-invariants": "node scripts/check-view-tracking-invariants.mjs",
     "docs:schema": "node scripts/gen-schema-doc.mjs",

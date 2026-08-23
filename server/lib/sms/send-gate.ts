@@ -42,14 +42,14 @@ export type SmsGateOutcome =
  */
 import { and, eq, desc, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { contacts, smsConsentLog, tenantConfigs } from '../db/schema';
+import { smsConsentLog, tenantConfigs } from '../db/schema';
+import { subjectsForPhone, subjectKindOf } from './consent-subjects';
 import { managedSendAllowed, type ManagedSendGateEnv } from './managed-send-gate';
 import { requiresExpressSmsConsent } from './consent-basis';
-import { normalizeE164 } from './phone';
 import type { RoleKind } from '../people/role-kinds';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 import { logger } from '../logger';
-import { isPreferenceMuted } from '../notifications/preference-port';
+import { isPreferenceMuted, type PreferenceSubject } from '../notifications/preference-port';
 import { categoryOf } from '../notifications/classes';
 import { marketingVarsIn } from './marketing-content';
 import { rulesFor, jurisdictionKey, type Jurisdiction, type MessagingRule } from './messaging-rules';
@@ -64,7 +64,12 @@ export interface SmsGateArgs {
     to: string;
     purpose: SmsPurpose;
     /**
-     * The contact this message is addressed to, when one is known.
+     * The SUBJECT this message is addressed to, when one is known.
+     *
+     * The name is historical and the id is not always a contact: for a staff or
+     * inspector recipient the automation recipient resolver puts a `users` id
+     * here. Which space it belongs to is resolved rather than assumed — see
+     * `subjectKindOf` — because the two are read by different queries.
      *
      * A notification knows it (stamped on the log at enqueue). A test send does
      * not, so revocation falls back to matching the NUMBER — which is the same
@@ -154,24 +159,34 @@ async function latestConsent(
 }
 
 /**
- * Contacts in this tenant whose number is the one being texted.
+ * WHO this send is about, in the id space each subject actually lives in.
  *
- * Matches on the NORMALIZED phone, because stored phones may not be — the
- * inbound STOP webhook normalizes on read for exactly this reason, and if the
- * two matchers disagreed, a revocation could be recorded against a contact this
- * check would then fail to find.
+ * Both halves are shared with the inbound STOP webhook (`consent-subjects.ts`)
+ * rather than reimplemented: the webhook RECORDS the revocation this function
+ * READS, and a matcher that disagreed with it would look for the revocation
+ * under a subject it was never written against.
+ *
+ * The preference lookup below needs the KIND as well as the id, and it is asked
+ * rather than assumed. For a staff or inspector recipient the caller's
+ * `contactId` holds a `users` id, while the staff notifications screen stores
+ * those rows as `subject_kind = 'user'` — labelling every id `contact` meant the
+ * write path and the read path named different things, so no staff row could
+ * ever match. That is a DISAGREEMENT rather than a live silence: today the only
+ * class that is both staff-audience and SMS-capable is one the recipient is
+ * told is always sent, and `isPreferenceMuted` returns before any lookup for
+ * those. The screen already renders and stores an SMS switch for every optional
+ * class it shows, so a mute can be recorded now that would be read wrongly the
+ * moment such a class exists.
  */
-async function contactIdsForPhone(
+async function consultableSubjects(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     db: DrizzleD1Database<any>,
     tenantId: string,
+    contactId: string | null | undefined,
     to: string,
-): Promise<string[]> {
-    const target = normalizeE164(to);
-    if (!target) return [];
-    const rows = await db.select({ id: contacts.id, phone: contacts.phone })
-        .from(contacts).where(eq(contacts.tenantId, tenantId)).all();
-    return rows.filter((r) => normalizeE164(r.phone) === target).map((r) => r.id);
+): Promise<PreferenceSubject[]> {
+    if (!contactId) return subjectsForPhone(db, tenantId, to);
+    return [{ kind: await subjectKindOf(db, tenantId, contactId), id: contactId }];
 }
 
 export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
@@ -207,8 +222,8 @@ export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
     // EXPRESS CONSENT is required only of consumers (client kind). Agents,
     // other business counterparties and staff are implied (D5 + A3.2); the
     // absence of a granted row is not a reason to withhold from them.
-    const consultable = contactId ? [contactId] : await contactIdsForPhone(db, tenantId, to);
-    for (const id of consultable) {
+    const consultable = await consultableSubjects(db, tenantId, contactId, to);
+    for (const { id } of consultable) {
         if (await latestConsent(db, tenantId, id) === 'revoked') {
             // Distinct reason string: "opted out" and "never opted in" are
             // different facts, and the Outbox / inbox reason maps read them.
@@ -338,9 +353,10 @@ export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
     // never widen it. Before quota because a text nobody wanted must not spend
     // the tenant's allowance — the same ordering the email boundary uses.
     if (classId && consultable.length > 0) {
+        // Each subject carries the id space it was found in — see `subjectKindOf`
+        // for why guessing one made the staff rows unmatchable.
         const muted = await isPreferenceMuted(
-            db, tenantId, classId, 'sms',
-            consultable.map((id) => ({ kind: 'contact' as const, id })),
+            db, tenantId, classId, 'sms', consultable,
         ).catch(() => false); // Fail OPEN: a failed lookup must not silence a send.
         if (muted) return { allowed: false, reason: 'recipient switched this off' };
     }

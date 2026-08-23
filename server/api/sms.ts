@@ -24,7 +24,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { and, eq } from 'drizzle-orm';
-import { contacts, inspections, tenants, tenantConfigs, messagingCompliance } from '../lib/db/schema';
+import { inspections, tenants, tenantConfigs, messagingCompliance } from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
@@ -38,6 +38,7 @@ import { ensureClientContact } from '../lib/sms/ensure-client-contact';
 import { resolveOptinToken } from '../lib/sms/optin-token';
 import { resolveSmsBrand } from '../lib/sms/brand-name';
 import { normalizeE164 } from '../lib/sms/phone';
+import { subjectsForPhone } from '../lib/sms/consent-subjects';
 import { loadProviderForTenant, resolveTwilioSource } from '../lib/sms/resolve-twilio';
 import { resolveComplianceProvider } from '../lib/sms/resolve-compliance-provider';
 import { recordIntegrationTest } from '../lib/integration-test-results';
@@ -236,7 +237,8 @@ registerEmailEventsRoute(smsPublicRoutes);
 /**
  * Shared inbound handler. Verifies the provider's inbound signature, extracts
  * From/Body (Twilio form params, or Telnyx JSON payload), then applies
- * STOP/START to the matching contact(s) via one shared consent tail.
+ * STOP/START to every subject holding that number — contacts AND staff `users`
+ * rows — via one shared consent tail.
  * scopeTenantId=null → platform shape (all platform-mode tenants matching From);
  * scopeTenantId set → tenant-scoped shape (that tenant only).
  *
@@ -293,30 +295,27 @@ async function handleInbound(
     if (!from) return c.text('<Response/>', 200, { 'Content-Type': 'text/xml' });
 
     const db = getDrizzle(c);
-    // Pull candidate contacts (filtered to a tenant, or all platform-mode tenants),
-    // then match on the NORMALIZED phone (stored phones may be unnormalized).
-    const candidateRows = await db
-        .select({ id: contacts.id, tenantId: contacts.tenantId, phone: contacts.phone })
-        .from(contacts)
-        .where(opts.scopeTenantId ? eq(contacts.tenantId, opts.scopeTenantId) : undefined)
-        .all();
-
-    // For the platform shape, restrict to tenants in platform SMS mode (or unset).
-    let allowedTenant: ((tenantId: string) => boolean) = () => true;
-    if (!opts.scopeTenantId) {
-        const cfgs = await db.select({ tenantId: tenantConfigs.tenantId, smsMode: tenantConfigs.smsMode })
-            .from(tenantConfigs).all();
-        const ownTenants = new Set(cfgs.filter((r) => r.smsMode === 'own').map((r) => r.tenantId));
-        allowedTenant = (tid: string) => !ownTenants.has(tid);
-    }
-
-    const matched = candidateRows.filter((r) =>
-        normalizeE164(r.phone) === from && allowedTenant(r.tenantId));
+    // EVERY subject holding this number, in BOTH id spaces
+    // (`lib/sms/consent-subjects`) — not the first one found. A staff member has
+    // no contact row, so a contacts-only set left the loop below running zero
+    // times while the provider still got its 200, and staff are texted on an
+    // implied basis, which makes an honoured STOP their only way out. One person
+    // can also be both a contact and a seat, and a half-applied opt-out is worse
+    // than none.
+    const matched = await subjectsForPhone(db, opts.scopeTenantId, from);
 
     const consentSvc = new SmsConsentService(c.env.DB);
     for (const row of matched) {
         if (isRevoke || isGrant) {
-            await consentSvc.record(row.tenantId, row.id, isRevoke ? 'revoked' : 'granted', 'admin', {});
+            // `capturedVia` stays 'admin' and it is the weakest word here: none
+            // of the four capture methods names an inbound message. A fifth
+            // value is its own change — the settings screen maps the four to
+            // recipient-facing copy, so an unmapped one would fault that screen
+            // on a START. What this row must get right is WHO it is about and
+            // WHICH basis they were reachable under; both have columns.
+            await consentSvc.record(row.tenantId, row.id, isRevoke ? 'revoked' : 'granted', 'admin', {
+                recipientType: row.recipientType, subjectKind: row.kind,
+            });
         }
         // NOTE: a non-command inbound body is acknowledged but NOT persisted as an
         // automation_logs row — that table's automation_id/inspection_id are NOT
