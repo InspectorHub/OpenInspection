@@ -49,7 +49,6 @@ import {
     conciergeConfirmTokens,
     inspectionAccessTokens,
     inspectionRequests,
-    reportViews,
     reports,
     auditLogs,
 } from '../db/schema';
@@ -61,6 +60,7 @@ import {
 } from './anonymize-pii';
 import { changeCount, toMs, addYearsMs } from './db-row-utils';
 import { eraseRepairRequests } from './erase-repair-requests';
+import { eraseReportViews, eraseReportTranslations } from './erase-report-artifacts';
 import { holdGate, writeErasureLog } from './erasure-hold-gate';
 
 /**
@@ -340,16 +340,12 @@ export async function runErasure(
         return changeCount(res);
     });
 
-    // Delivery counters (#271), keyed on the access token. MUST precede the
-    // token delete below: `access_token_id` is the only locator back to the
-    // subject, so dropping the tokens first strands these rows permanently, for
-    // this pass and every later one. LIA condition 7.
-    const tokIds = (await db.select({ id: inspectionAccessTokens.id }).from(inspectionAccessTokens)
-        .where(and(eq(inspectionAccessTokens.tenantId, tenantId), eq(inspectionAccessTokens.recipientEmail, subjectEmail)))
-        .all() as Array<{ id: string }>).map((t) => t.id);
-    await step('report_views', 'delete', {}, async () => tokIds.length === 0 ? 0 : changeCount(
-        await db.delete(reportViews)
-            .where(and(eq(reportViews.tenantId, tenantId), inArray(reportViews.accessTokenId, tokIds))).run()));
+    // What a delivered report left behind — the delivery counters (#271) and
+    // the courtesy translation. Both in `erase-report-artifacts.ts`; the views
+    // step MUST precede the token delete below (LIA condition 7).
+    const artifactInput = { tenantId, subjectEmail, inspectionIds: await subjectInspectionIds(), step };
+    await eraseReportViews(db, artifactInput);
+    await eraseReportTranslations(db, artifactInput);
 
     // Persistent portal links — deleting them deliberately REVOKES portal
     // access: an erased subject's magic links must stop working.

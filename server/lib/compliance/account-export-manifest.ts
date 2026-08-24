@@ -48,6 +48,22 @@
  * carries the same warning after two of its justifications were checked against
  * the code and found false. Before relying on one of these lines, go read what
  * writes the column.
+ *
+ * ── WHAT THIS FILE IS NOT ABOUT, asked and answered ─────────────────────────
+ *
+ * Its scope is the columns of the `users` row, and nothing else. `exportAccount`
+ * hands back that record plus the agent-tenant links; it carries no INSPECTION
+ * content of any kind — not a report, not a finding, and not a courtesy
+ * translation of one (`report_translations`).
+ *
+ * That was checked rather than assumed, because the obvious worry is real in
+ * shape: an export that returned the English report while withholding the
+ * translation the subject was actually sent would be answering a different
+ * question than the one asked. There is no such asymmetry here, because neither
+ * half is in this export. A subject-access request that reaches report content
+ * does not travel through this module, and adding a table row to a
+ * column-classification catalogue would make the catalogue mean two things.
+ * Recorded so the next reader does not have to re-derive it.
  */
 
 /**

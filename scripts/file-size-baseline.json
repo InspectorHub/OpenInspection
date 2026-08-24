@@ -41,7 +41,7 @@
   "app/routes/inspection-edit/action.server.ts": 501,
   "server/services/portal-access.service.ts": 500,
   "app/components/collab/VersionHistoryPanel.tsx": 497,
-  "server/lib/compliance/erasure-orchestrator.ts": 488,
+  "server/lib/compliance/erasure-orchestrator.ts": 484,
   "server/portal/integration.routes.ts": 488,
   "server/services/report-export-consumer.ts": 482,
   "server/api/admin/admin-config.ts": 472,

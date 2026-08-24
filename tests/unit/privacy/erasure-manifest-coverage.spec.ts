@@ -40,6 +40,12 @@ const repairRequestStepPath = path.resolve(
     __dirname,
     '../../../server/lib/compliance/erase-repair-requests.ts',
 );
+// The second delegated step, same shape and same reason: the orchestrator is at
+// its line cap. It carries `report_views` and `report_translations`.
+const reportArtifactsStepPath = path.resolve(
+    __dirname,
+    '../../../server/lib/compliance/erase-report-artifacts.ts',
+);
 const retentionSweepPath = path.resolve(
     __dirname,
     '../../../server/lib/compliance/retention-sweep.ts',
@@ -49,7 +55,8 @@ const retentionSweepPath = path.resolve(
 const orchestratorSource =
     fs.readFileSync(orchestratorPath, 'utf8') +
     fs.readFileSync(sharedAnonymizePath, 'utf8') +
-    fs.readFileSync(repairRequestStepPath, 'utf8');
+    fs.readFileSync(repairRequestStepPath, 'utf8') +
+    fs.readFileSync(reportArtifactsStepPath, 'utf8');
 
 /**
  * A delegated step only counts if the orchestrator actually calls it. Reading
@@ -57,9 +64,11 @@ const orchestratorSource =
  * its executor sits unreferenced — the "rule that exists but never runs"
  * failure, with the drift guard now helping it hide.
  */
-const orchestratorCallsRepairRequestStep = fs
-    .readFileSync(orchestratorPath, 'utf8')
-    .includes('eraseRepairRequests(');
+const rawOrchestrator = fs.readFileSync(orchestratorPath, 'utf8');
+const orchestratorCallsRepairRequestStep = rawOrchestrator.includes('eraseRepairRequests(');
+const orchestratorCallsReportArtifactSteps =
+    rawOrchestrator.includes('eraseReportViews(') &&
+    rawOrchestrator.includes('eraseReportTranslations(');
 
 /** Source with comments stripped, so prose cannot satisfy or trip a scan. */
 function stripComments(src: string): string {
@@ -99,6 +108,15 @@ describe('erasure-manifest coverage', () => {
         }
 
         expect(missing, `Orchestrator missing delete/null tables: ${missing.join(', ')}`).toHaveLength(0);
+    });
+
+    it('the delegated report-artifact steps are actually called by the orchestrator', () => {
+        expect(
+            orchestratorCallsReportArtifactSteps,
+            'erase-report-artifacts.ts is read into the drift scan above. If the orchestrator ' +
+            'stops calling eraseReportViews() / eraseReportTranslations(), the report_views and ' +
+            'report_translations rules would still pass the scan while nothing executed them.',
+        ).toBe(true);
     });
 
     it('the delegated repair-request step is actually called by the orchestrator', () => {

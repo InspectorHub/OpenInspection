@@ -95,4 +95,31 @@ export const REPORT_DELIVERABLE_ERASURE_RULES: ErasureRule[] = [
     // Put it in the snapshot and this rule must be re-decided: an erasure would
     // then either leave the prose inside a signed blob or break its signature.
     { table: 'reports', column: 'inspector_narrative', category: 'user.freetext', action: 'erase_in_place', legalBasis: 'art_17_3_e', retention: 'P6Y' },
+
+    // ── report_translations (#23) ─────────────────────────────────────────────
+    // A courtesy translation of one report: inspector prose about a named
+    // person's property, rendered into another language. DERIVED personal data,
+    // and the gap was that a derived copy of governed data was itself
+    // ungoverned — its parent columns `reports.title` and
+    // `reports.inspector_narrative` are both answered two rules above.
+    //
+    // `lint:erasure` was green over this table for its whole life and could not
+    // have been anything else: PII_HEURISTIC matches none of its eleven column
+    // names — not `content`, not `locale`, not `source`, not `english_hash`.
+    // Found by reading, not by anything going red.
+    //
+    // DELETE the row, not `erase_in_place` on the column, and both were
+    // defensible so the choice is recorded rather than left open. The row
+    // doubles as the opt-in record: no row = never translated, a row whose hash
+    // matches = live, a row whose hash does not = previously translated and
+    // currently withheld. Deleting converts the third state into the first, and
+    // that is the right conversion — once the English the translation described
+    // has been erased around it, "never translated" is the state the report is
+    // genuinely in. A workflow convenience is not a reason to keep a derived
+    // copy of a subject's data through their erasure request.
+    //
+    // No `legalBasis`: none is claimed, because nothing is retained. Located
+    // through `reports.inspection_id` (the table carries no identifier of a
+    // person at all) — see `erase-report-artifacts.ts`.
+    { table: 'report_translations', column: 'content', category: 'user.freetext', action: 'delete' },
 ];
