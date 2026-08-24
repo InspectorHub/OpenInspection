@@ -22,7 +22,7 @@ import { MEMBER_EXCHANGE } from '../../../server/lib/data-exchange/members';
 import { headerVocabulary, INTAKE_HEADERS } from '../../../server/lib/data-exchange/headers';
 import { auditVocabularyCoverage, type ExchangeVocabulary } from '../../../server/lib/data-exchange/types';
 import { contacts, users } from '../../../server/lib/db/schema';
-import { CONTACT_HEADERS } from '../../../server/lib/migration-intake/adapters/registry';
+import { INTAKE_HEADERS as REGISTRY_HEADERS } from '../../../server/lib/migration-intake/adapters/registry';
 
 const VOCABULARIES = [CONTACT_EXCHANGE, MEMBER_EXCHANGE];
 
@@ -62,7 +62,9 @@ describe('exchange vocabulary — every field is well formed', () => {
 
 describe('exchange vocabulary — one alias dictionary', () => {
     it('is what the intake registry reads', () => {
-        expect(CONTACT_HEADERS).toBe(INTAKE_HEADERS);
+        // Identity, not equality: this is what keeps the registry pointed at
+        // the ONE dictionary rather than at a copy that could drift from it.
+        expect(REGISTRY_HEADERS).toBe(INTAKE_HEADERS);
     });
 
     it('still spells today five fields exactly as it did', () => {
