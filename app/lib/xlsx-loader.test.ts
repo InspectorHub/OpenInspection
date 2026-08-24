@@ -22,13 +22,18 @@ const realCreateElement = document.createElement.bind(document);
 
 type Loader = typeof import('./xlsx-loader');
 
-/** A module registry reset per case, because the load promise is memoised at
- *  module scope: without this the second case would inherit the first's memo
- *  and prove nothing. */
-async function freshLoader(): Promise<Loader> {
-    vi.resetModules();
-    return import('./xlsx-loader');
-}
+/**
+ * A module instance per case, because the load promise is memoised at module
+ * scope: without a reset the second case would inherit the first's memo and
+ * prove nothing.
+ *
+ * It is loaded in `beforeEach` rather than inside a test, so the graph is
+ * billed against `hookTimeout` and never against any one case's deadline
+ * (`npm run lint:test-imports`). It cannot be a static import at the top —
+ * that would give every case the same instance, which is exactly what the
+ * memo assertions need to not be true.
+ */
+let loader: Loader;
 
 function vendorScripts(): NodeListOf<HTMLScriptElement> {
     return document.querySelectorAll<HTMLScriptElement>(`script[src="${VENDOR_SRC}"]`);
@@ -52,7 +57,7 @@ async function workbookFile(name: string, sheets: string[]): Promise<File> {
     });
 }
 
-beforeEach(() => {
+beforeEach(async () => {
     // ⚠️ happy-dom resolves a `<script src>` the moment it is CONNECTED, and
     // with JavaScript evaluation off (vitest's default) it dispatches `error`
     // synchronously inside `appendChild`, before this file gets a turn. Every
@@ -76,6 +81,8 @@ beforeEach(() => {
     );
     document.head.innerHTML = '';
     clearGlobalExcelJs();
+    vi.resetModules();
+    loader = await import('./xlsx-loader');
 });
 
 afterEach(() => {
@@ -86,7 +93,7 @@ afterEach(() => {
 describe('loadWorkbookFromFile', () => {
     it('parses a real workbook and hands back its worksheets', async () => {
         setGlobalExcelJs(ExcelJS);
-        const { loadWorkbookFromFile } = await freshLoader();
+        const { loadWorkbookFromFile } = loader;
 
         const workbook = await loadWorkbookFromFile(await workbookFile('Contacts.xlsx', ['Cover', 'Contacts']));
 
@@ -97,7 +104,7 @@ describe('loadWorkbookFromFile', () => {
 
     it('rejects rather than returning an empty workbook when the bytes are not a workbook', async () => {
         setGlobalExcelJs(ExcelJS);
-        const { loadWorkbookFromFile } = await freshLoader();
+        const { loadWorkbookFromFile } = loader;
 
         const junk = new File(['this is not a zip at all'], 'Contacts.xlsx', { type: 'text/plain' });
 
@@ -108,7 +115,7 @@ describe('loadWorkbookFromFile', () => {
     });
 
     it('rejects when the reader itself never arrives', async () => {
-        const { loadWorkbookFromFile } = await freshLoader();
+        const { loadWorkbookFromFile } = loader;
 
         const pending = loadWorkbookFromFile(await workbookFile('Contacts.xlsx', ['Contacts']));
         const rejection = expect(pending).rejects.toThrow();
@@ -119,7 +126,7 @@ describe('loadWorkbookFromFile', () => {
 
 describe('loadExcelJs', () => {
     it('appends exactly one script and resolves when it loads', async () => {
-        const { loadExcelJs } = await freshLoader();
+        const { loadExcelJs } = loader;
 
         // Positive control: "no second script" would also be true of a module
         // that appends none at all, so the count is asserted BEFORE as well.
@@ -136,7 +143,7 @@ describe('loadExcelJs', () => {
     });
 
     it('appends no second script for a second call', async () => {
-        const { loadExcelJs } = await freshLoader();
+        const { loadExcelJs } = loader;
 
         const first = loadExcelJs();
         const second = loadExcelJs();
@@ -152,14 +159,14 @@ describe('loadExcelJs', () => {
 
     it('touches the DOM not at all when the library is already there', async () => {
         setGlobalExcelJs(ExcelJS);
-        const { loadExcelJs } = await freshLoader();
+        const { loadExcelJs } = loader;
 
         await expect(loadExcelJs()).resolves.toBe(ExcelJS);
         expect(vendorScripts()).toHaveLength(0);
     });
 
     it('rejects when the script fails to load', async () => {
-        const { loadExcelJs } = await freshLoader();
+        const { loadExcelJs } = loader;
 
         const pending = loadExcelJs();
         const rejection = expect(pending).rejects.toThrow(/vendor\/exceljs\.min\.js/);
@@ -168,7 +175,7 @@ describe('loadExcelJs', () => {
     });
 
     it('rejects when the script loads but leaves no global behind', async () => {
-        const { loadExcelJs } = await freshLoader();
+        const { loadExcelJs } = loader;
 
         const pending = loadExcelJs();
         const rejection = expect(pending).rejects.toThrow();
