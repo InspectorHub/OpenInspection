@@ -19,6 +19,16 @@ export interface AiConfigInput {
     aiEnabled: boolean;
     /** The OpenAI-compatible endpoint. Blank means unset. */
     aiBaseUrl: string;
+    /**
+     * #23 — whether this workspace may PRODUCE a courtesy translation.
+     *
+     * ⚠️ Production only. Reader paths answer from stored rows and never
+     * consult it, so switching it off stops new translations being made and can
+     * never strip one from a report already delivered. Defaults FALSE, unlike
+     * `aiEnabled` above: that one means "nothing switched off", this one is a
+     * decision to spend on every publish, and off is the absence of a choice.
+     */
+    courtesyTranslationEnabled: boolean;
     /** The model id to send. Blank means unset. */
     aiModel: string;
 }
@@ -50,6 +60,9 @@ export async function saveAiConfig(db: Db, tenantId: string, input: AiConfigInpu
             aiEnabled: input.aiEnabled,
             aiBaseUrl: orNull(input.aiBaseUrl),
             aiModel: orNull(input.aiModel),
+            // #23 — the courtesy-translation switch rides the same save,
+            // because it is the same page and the same decision to make.
+            courtesyTranslationEnabled: input.courtesyTranslationEnabled,
             aiConfigVersion: sql`${tenantConfigs.aiConfigVersion} + 1`,
             updatedAt: new Date(),
         })
@@ -70,6 +83,7 @@ export async function readAiConfig(db: Db, tenantId: string): Promise<AiConfigIn
             aiEnabled: tenantConfigs.aiEnabled,
             aiBaseUrl: tenantConfigs.aiBaseUrl,
             aiModel: tenantConfigs.aiModel,
+            courtesyTranslationEnabled: tenantConfigs.courtesyTranslationEnabled,
         })
         .from(tenantConfigs)
         .where(eq(tenantConfigs.tenantId, tenantId))
@@ -78,6 +92,9 @@ export async function readAiConfig(db: Db, tenantId: string): Promise<AiConfigIn
         aiEnabled: row?.aiEnabled ?? true,
         aiBaseUrl: row?.aiBaseUrl ?? '',
         aiModel: row?.aiModel ?? '',
+        // FALSE with no row, matching the column default. A workspace that has
+        // never opened this page has not opted into per-publish spend.
+        courtesyTranslationEnabled: row?.courtesyTranslationEnabled ?? false,
     };
 }
 

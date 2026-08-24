@@ -35,6 +35,9 @@ import { getTenantId } from '../../lib/route-helpers';
 import { Errors } from '../../lib/errors';
 import { SUPPORTED_CONTACT_LOCALES } from '../../lib/i18n/contact-locale';
 import { generateCourtesyTranslation, removeCourtesyTranslation } from '../../lib/translation/generate';
+import { readTranslationState } from '../../lib/translation/read-for-report';
+import { listReports } from '../../lib/inspection/reports';
+import { getDrizzle } from '../../lib/route-helpers';
 import { isCourtesyTranslationEnabled } from '../../lib/translation/production-switch';
 
 /**
@@ -85,7 +88,62 @@ const reportTranslationRoute = createRoute(withMcpMetadata({
     description: 'Regenerates or removes the courtesy translation of one report. Regenerate always translates the report as it stands right now, so it is also how a translation withheld by an edit is brought back. It does not cut a new report version. Removal stays available when translation production is switched off for the workspace.',
 }, { scopes: ['write'], tier: 'extended' }));
 
+/**
+ * GET the state of every deliverable's translation on one inspection.
+ *
+ * Its own read rather than a field on the hub payload: computing it costs a
+ * content hash PER REPORT, and the hub is the page's one aggregate round trip.
+ * A card that needs it asks for it.
+ */
+const reportTranslationStateRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/{id}/report-translation',
+    tags: ['inspections'],
+    summary: 'Courtesy-translation state for each report on this inspection',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        params: z.object({ id: z.string().min(1).describe('Inspection id') }),
+        query: z.object({ locale: z.string().optional().describe('Target locale; defaults to the one this deployment offers.') }),
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({
+                locale: z.string(),
+                reports: z.array(z.object({
+                    reportId: z.string(),
+                    state: z.enum(['none', 'live', 'withheld'])
+                        .describe('none = never translated. live = delivered and current. withheld = translated, then the report changed, so it is not being shown — regenerate translates the report as it stands now.'),
+                })),
+            })) } },
+            description: 'Per-report translation state',
+        },
+    },
+    operationId: 'getInspectionReportTranslationState',
+    description: 'The three states a report translation can be in, per deliverable. The withheld state is the one that is otherwise silent: a report edited and republished stops showing its translation by design, and without this nobody is told until a client asks where it went.',
+}, { scopes: ['read'], tier: 'extended' }));
+
 const reportTranslationRoutes = createApiRouter()
+    .openapi(reportTranslationStateRoute, async (c) => {
+        const tenantId = getTenantId(c);
+        const { id } = c.req.valid('param');
+        const locale = c.req.valid('query').locale || (TRANSLATABLE_LOCALES[0] ?? '');
+        const deps = {
+            db: c.env.DB,
+            inspection: c.var.services.inspection,
+            translations: c.var.services.reportTranslation,
+        };
+        const rows = await listReports(getDrizzle(c), tenantId, id);
+        const reports = [];
+        for (const r of rows) {
+            reports.push({
+                reportId: r.id,
+                state: await readTranslationState(deps, {
+                    tenantId, inspectionId: id, reportId: r.id, locale,
+                }),
+            });
+        }
+        return c.json({ success: true as const, data: { locale, reports } }, 200);
+    })
     .openapi(reportTranslationRoute, async (c) => {
         const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');

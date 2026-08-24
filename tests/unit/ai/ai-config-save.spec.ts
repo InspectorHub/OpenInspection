@@ -30,6 +30,7 @@ describe('saveAiConfig', () => {
             aiEnabled: true,
             aiBaseUrl: 'https://api.groq.com/openai/v1',
             aiModel: 'llama-3.3-70b',
+            courtesyTranslationEnabled: false,
         });
         const c = config()!;
         expect(c.aiBaseUrl).toBe('https://api.groq.com/openai/v1');
@@ -45,9 +46,9 @@ describe('saveAiConfig', () => {
      */
     it('bumps the config version on every save', async () => {
         expect(config()!.aiConfigVersion).toBe(0);
-        await saveAiConfig(d1, TENANT, { aiEnabled: true, aiBaseUrl: 'https://a/v1', aiModel: 'm' });
+        await saveAiConfig(d1, TENANT, { aiEnabled: true, aiBaseUrl: 'https://a/v1', aiModel: 'm', courtesyTranslationEnabled: false });
         expect(config()!.aiConfigVersion).toBe(1);
-        await saveAiConfig(d1, TENANT, { aiEnabled: true, aiBaseUrl: 'https://b/v1', aiModel: 'm' });
+        await saveAiConfig(d1, TENANT, { aiEnabled: true, aiBaseUrl: 'https://b/v1', aiModel: 'm', courtesyTranslationEnabled: false });
         expect(config()!.aiConfigVersion).toBe(2);
     });
 
@@ -62,11 +63,13 @@ describe('saveAiConfig', () => {
             aiEnabled: true,
             aiBaseUrl: 'https://api.groq.com/openai/v1',
             aiModel: 'llama-3.3-70b',
+            courtesyTranslationEnabled: false,
         });
         await saveAiConfig(d1, TENANT, {
             aiEnabled: false,
             aiBaseUrl: 'https://api.groq.com/openai/v1',
             aiModel: 'llama-3.3-70b',
+            courtesyTranslationEnabled: false,
         });
         const c = config()!;
         expect(c.aiEnabled).toBe(false);
@@ -80,17 +83,60 @@ describe('saveAiConfig', () => {
      * and refuses with the wrong reason.
      */
     it('stores a blank endpoint or model as null rather than an empty string', async () => {
-        await saveAiConfig(d1, TENANT, { aiEnabled: true, aiBaseUrl: '  ', aiModel: '' });
+        await saveAiConfig(d1, TENANT, { aiEnabled: true, aiBaseUrl: '  ', aiModel: '', courtesyTranslationEnabled: false });
         const c = config()!;
         expect(c.aiBaseUrl).toBeNull();
         expect(c.aiModel).toBeNull();
+    });
+
+    /**
+     * #23 — the courtesy-translation switch round-trips.
+     *
+     * Written because widening `AiConfigInput` to carry it turned seven
+     * fixtures red, and satisfying the compiler by adding `false` to each would
+     * have left the new field with no coverage at all — a column the save path
+     * writes and nothing checks.
+     */
+    it('stores the courtesy-translation switch the workspace submitted', async () => {
+        await saveAiConfig(d1, TENANT, {
+            aiEnabled: true, aiBaseUrl: 'https://a/v1', aiModel: 'm',
+            courtesyTranslationEnabled: true,
+        });
+        expect(config()!.courtesyTranslationEnabled).toBe(true);
+        await saveAiConfig(d1, TENANT, {
+            aiEnabled: true, aiBaseUrl: 'https://a/v1', aiModel: 'm',
+            courtesyTranslationEnabled: false,
+        });
+        // Both directions. A save path that only ever wrote `true` would pass
+        // the first assertion and leave a workspace unable to switch it off.
+        expect(config()!.courtesyTranslationEnabled).toBe(false);
+    });
+
+    /**
+     * The two switches are independent, which is the whole reason they are two
+     * controls rather than one. "AI is available here" and "produce a second
+     * copy of every report we publish" are different decisions, and the second
+     * one spends money on every publish.
+     */
+    it('does not couple the courtesy-translation switch to the AI switch', async () => {
+        await saveAiConfig(d1, TENANT, {
+            aiEnabled: true, aiBaseUrl: 'https://a/v1', aiModel: 'm',
+            courtesyTranslationEnabled: true,
+        });
+        await saveAiConfig(d1, TENANT, {
+            aiEnabled: false, aiBaseUrl: 'https://a/v1', aiModel: 'm',
+            courtesyTranslationEnabled: true,
+        });
+        const c = config()!;
+        expect(c.aiEnabled).toBe(false);
+        expect(c.courtesyTranslationEnabled).toBe(true);
     });
 
     it('writes nothing for another tenant', async () => {
         const other = '00000000-0000-0000-0000-0000000000d2';
         await db.insert(schema.tenants).values({ id: other, slug: 'd2', createdAt: new Date() });
         await db.insert(schema.tenantConfigs).values({ tenantId: other, updatedAt: new Date() });
-        await saveAiConfig(d1, TENANT, { aiEnabled: false, aiBaseUrl: 'https://a/v1', aiModel: 'm' });
+        await saveAiConfig(d1, TENANT, { aiEnabled: false, aiBaseUrl: 'https://a/v1', aiModel: 'm', courtesyTranslationEnabled: false });
         const untouched = db.select().from(schema.tenantConfigs)
             .where(eq(schema.tenantConfigs.tenantId, other)).get()!;
         expect(untouched.aiBaseUrl).toBeNull();

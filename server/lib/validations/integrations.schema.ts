@@ -47,6 +47,8 @@ export const AiConfigBodySchema = z.object({
     aiEnabled: z.boolean().describe('Whether this workspace may be offered AI at all.'),
     aiBaseUrl: z.string().max(300).describe('OpenAI-compatible base URL. Blank means unset.'),
     aiModel: z.string().max(200).describe('Model id to send. Blank means unset.'),
+    courtesyTranslationEnabled: z.boolean()
+        .describe('Whether this workspace may PRODUCE a courtesy translation of a report. Gates production only — switching it off stops new translations being made and never removes one already delivered, because reader paths answer from stored rows and never consult this. Defaults false, unlike aiEnabled beside it: this is a decision to spend on every publish, and off is the absence of a choice.'),
 }).openapi('AiConfigBody');
 
 export const AiConnectionTestBodySchema = z

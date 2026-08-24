@@ -17,6 +17,7 @@
 import type { Api } from "~/lib/api-client.server";
 import { toActionResult } from "~/lib/inspector-portal-actions";
 import { m } from "~/paraglide/messages";
+import { COURTESY_TRANSLATION_LOCALE } from "./courtesy-locale";
 
 /** Fields of `UpdateInspectionSchema` the hub's order cards are allowed to write. */
 const ORDER_FIELDS = [
@@ -184,6 +185,31 @@ export async function handleReportDelete(
         param: { id: inspectionId, reportId },
     });
     return toActionResult(res, "report-delete", m.inspections_hub_error_report_delete());
+}
+
+/**
+ * #23 — regenerate or remove a report's courtesy translation.
+ *
+ * ONE handler for both, because the route is one route: they answer the same
+ * question and a person choosing between them is choosing once. Regenerate
+ * always translates the report AS IT STANDS NOW, so it is also how a
+ * translation withheld by an edit is brought back.
+ */
+export async function handleReportTranslation(
+    api: Api,
+    inspectionId: string,
+    formData: FormData,
+): Promise<{ ok: boolean; intent: "report-translation"; error: string | undefined }> {
+    const reportId = String(formData.get("reportId") ?? "").trim();
+    const action = String(formData.get("action") ?? "").trim();
+    if (!reportId || (action !== "regenerate" && action !== "remove")) {
+        return { ok: false, intent: "report-translation", error: m.inspections_hub_error_report_delete() };
+    }
+    const res = await api.inspections[":id"]["report-translation"].$post({
+        param: { id: inspectionId },
+        json: { action, locale: COURTESY_TRANSLATION_LOCALE, reportId },
+    });
+    return toActionResult(res, "report-translation", m.inspections_hub_error_report_delete());
 }
 
 /**

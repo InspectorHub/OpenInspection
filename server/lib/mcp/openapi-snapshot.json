@@ -7742,6 +7742,44 @@
     "description": "Returns the inspector's own prose about the report as a whole (`reports.inspector_narrative`), or null. This is NOT `report_versions.summary`, which is the amendment reason recorded at each publish and is a different field with a different meaning."
   },
   {
+    "operationId": "getInspectionReportTranslationState",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/report-translation",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id"
+          }
+        },
+        {
+          "name": "locale",
+          "in": "query",
+          "required": false,
+          "description": "Target locale; defaults to the one this deployment offers.",
+          "schema": {
+            "type": "string",
+            "description": "Target locale; defaults to the one this deployment offers."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Courtesy-translation state for each report on this inspection",
+    "description": "The three states a report translation can be in, per deliverable. The withheld state is the one that is otherwise silent: a report edited and republished stops showing its translation by design, and without this nobody is told until a client asks where it went."
+  },
+  {
     "operationId": "getInspectionRequest",
     "method": "GET",
     "pathTemplate": "/api/inspection-requests/{id}",

@@ -149,3 +149,29 @@ export async function readCourtesyTranslationForReport(
         generatedAt: stored.generatedAt.getTime(),
     };
 }
+
+/**
+ * The three states a report's translation can be in, for an INSPECTOR surface.
+ *
+ * The distinction a reader has nothing to do with is exactly the one the
+ * inspector needs, so this is the read the client path deliberately does not
+ * make. `withheld` was completely silent before it existed: a report edited and
+ * republished stops showing its translation by design, nobody is told, and the
+ * first signal is a client asking where the Spanish went.
+ */
+export type ReportTranslationState = 'none' | 'live' | 'withheld';
+
+export async function readTranslationState(
+    deps: ReadTranslationDeps,
+    input: { tenantId: string; reportId: string; inspectionId: string; locale: string },
+): Promise<ReportTranslationState> {
+    const stored = await deps.translations.read(input.tenantId, input.reportId, input.locale);
+    if (!stored) return 'none';
+    const current = await deps.inspection.getReportContentHash(
+        input.inspectionId, input.tenantId, input.reportId,
+    );
+    // The SAME comparison the reader path makes, on purpose. Two answers to
+    // "is this fresh" is how a surface comes to promise something the client
+    // page does not show.
+    return stored.englishHash === current ? 'live' : 'withheld';
+}

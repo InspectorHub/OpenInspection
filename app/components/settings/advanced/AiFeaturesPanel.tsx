@@ -12,6 +12,9 @@ interface AiFeaturesPanelProps {
   /** Whether this workspace may be offered AI at all — a provisioning answer,
    *  not a permission. Whether a given call runs is decided server-side. */
   aiEnabled: boolean;
+  /** #23 — whether this workspace may PRODUCE a courtesy translation of a
+   *  report. Gates production only; it never removes one already delivered. */
+  courtesyTranslationEnabled: boolean;
   aiBaseUrl: string;
   aiModel: string;
   value: string;
@@ -22,7 +25,7 @@ interface AiFeaturesPanelProps {
   testResults?: ConnectionTestResult[];
 }
 
-export function AiFeaturesPanel({ geminiConfigured, aiEnabled, aiBaseUrl, aiModel, value, fieldError, saving, geminiTestFetcher, testResults = [] }: AiFeaturesPanelProps) {
+export function AiFeaturesPanel({ geminiConfigured, aiEnabled, courtesyTranslationEnabled, aiBaseUrl, aiModel, value, fieldError, saving, geminiTestFetcher, testResults = [] }: AiFeaturesPanelProps) {
   const aiTest = geminiTestFetcher.data;
   // Held in state so the Test button can probe what is ON SCREEN rather than
   // what was last saved — testing the saved value would answer a question
@@ -91,6 +94,23 @@ export function AiFeaturesPanel({ geminiConfigured, aiEnabled, aiBaseUrl, aiMode
               states a promise the save path has to keep, not because a checkbox
               needs explaining. */}
           <p className="text-[12px] text-ih-fg-3 mt-1 ml-6">{m.settings_ai_enabled_hint()}</p>
+        </div>
+
+        {/* #23 — courtesy translations. Its own control rather than a mode of
+            the switch above: this one commits to spending on every publish, so
+            "AI is available" and "produce a second copy of every report" are
+            two decisions and are made separately. */}
+        <div>
+          <Checkbox
+            name="courtesyTranslationEnabled"
+            value="on"
+            defaultChecked={courtesyTranslationEnabled}
+            label={m.courtesy_translation_setting_label()}
+          />
+          <p className="text-[12px] text-ih-fg-3 mt-1 ml-6">{m.courtesy_translation_setting_help()}</p>
+          {/* Says what OFF does, because the honest answer is surprising: it
+              stops new translations and leaves delivered ones alone. */}
+          <p className="text-[12px] text-ih-fg-3 mt-1 ml-6">{m.courtesy_translation_setting_off_note()}</p>
         </div>
 
         {/*

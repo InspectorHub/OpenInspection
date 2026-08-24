@@ -1,6 +1,6 @@
 {
   "app/routes/inspection-edit.tsx": 2561,
-  "app/routes/inspector-portal.tsx": 1270,
+  "app/routes/inspector-portal.tsx": 1302,
   "server/services/inspection/inspection-report.service.ts": 938,
   "server/durable-objects/inspection-doc.ts": 945,
   "app/routes/inspections.tsx": 909,
@@ -17,7 +17,7 @@
   "app/hooks/usePhotoOps.ts": 670,
   "app/components/editor/ItemEditor.tsx": 658,
   "server/lib/messaging/providers/telnyx-compliance.ts": 657,
-  "server/services/inspection/inspection-publish.service.ts": 653,
+  "server/services/inspection/inspection-publish.service.ts": 665,
   "app/components/inspection-edit/CompliancePanel.tsx": 638,
   "server/api/auth.ts": 611,
   "app/hooks/useInspection.ts": 600,
