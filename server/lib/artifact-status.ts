@@ -86,17 +86,53 @@ export function liveDeliverableKeys(
         r2Keys.agreementFile(tenantId, inspectionId, envelopeId, file));
 }
 
-/** `…/agreements/{envelopeId}/{one of the three files}`. */
-const LIVE_DELIVERABLE_KEY_RE = new RegExp(
-    `/agreements/[^/]+/(?:${LIVE_DELIVERABLE_FILES.join('|').replace(/\./g, '\\.')})$`,
-);
+/** The three names, as a set, so membership is an exact string comparison. */
+const LIVE_DELIVERABLE_FILE_SET: ReadonlySet<string> = new Set(LIVE_DELIVERABLE_FILES);
 
 /**
  * What a stored object is. Recognised by key SHAPE rather than by a stored
  * label, so an object cannot be reclassified by editing a row.
+ *
+ * Shape is read by SPLITTING the key, not by a regex built from the filenames.
+ * The regex this replaced interpolated `LIVE_DELIVERABLE_FILES` into a pattern
+ * and escaped `.` by hand — which was correct for exactly the three names that
+ * happen to be there now, and silently wrong for the first name anyone adds
+ * containing any other metacharacter. `evidence+.zip` would have made the `+`
+ * a quantifier, and the classifier would have gone on returning an answer:
+ * the wrong one, with nothing failing. (CodeQL `js/incomplete-sanitization`
+ * saw the same thing from the other end — it flagged the unescaped backslash.)
+ *
+ * Comparing segments cannot acquire that failure mode, because there is no
+ * pattern to corrupt. It is also exactly as strict: `/agreements/` had to be a
+ * whole path segment there too.
  */
 export function artifactClass(key: string): ArtifactClass {
-    return LIVE_DELIVERABLE_KEY_RE.test(key) ? 'live' : 'unclassified';
+    return classifyByShape(key, LIVE_DELIVERABLE_FILE_SET);
+}
+
+/**
+ * The shape rule, with the names it matches passed in.
+ *
+ * Injectable for ONE reason, and it is the reason this function exists rather
+ * than the body being inlined above: the property that matters — a filename is
+ * compared, never interpreted — cannot be demonstrated using only the three
+ * names that are hard-coded today, because none of them contains a
+ * metacharacter other than `.`. A test that fed the old regex-building version
+ * these same three names passed too. Given a name like `evidence+.zip` the two
+ * implementations disagree, and that is the test worth having.
+ *
+ * @internal exported for that test, not part of the module's working surface.
+ */
+export function classifyByShape(key: string, files: ReadonlySet<string>): ArtifactClass {
+    const segments = key.split('/');
+    const file = segments.at(-1);
+    const envelopeId = segments.at(-2);
+    const marker = segments.at(-3);
+    const live =
+        marker === 'agreements'
+        && envelopeId !== undefined && envelopeId.length > 0
+        && file !== undefined && files.has(file);
+    return live ? 'live' : 'unclassified';
 }
 
 /**
