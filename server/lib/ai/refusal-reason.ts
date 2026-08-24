@@ -27,7 +27,16 @@ export const AI_REFUSAL_REASONS = [
     'over_cap',
     /** THE OPERATOR'S misconfiguration: an entitled workspace on a deployment
      *  whose platform key was never provisioned. Never instruct the workspace
-     *  to fix this — there is no setting of theirs that would. */
+     *  to fix this — there is no setting of theirs that would.
+     *
+     *  ALSO covers a platform credential that EXISTS but cannot be used: one
+     *  that will not parse, and one that refreshes itself and failed to. The
+     *  member was not split, because the property that matters is the one it
+     *  already carries — nobody the workspace can reach fixes any of them, and
+     *  every renderer already treats it that way. A more precise member would
+     *  say something more precise to nobody, while breaking every exhaustive
+     *  switch for no reader's benefit. The distinction that IS worth keeping
+     *  lives in the log, where the operator reads. */
     'platform_key_missing',
     /** The workspace has not accepted the current privacy version, so the
      *  processing this capability performs is not yet authorised for them. */

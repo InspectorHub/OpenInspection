@@ -5,6 +5,7 @@ import { tenants } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import { loadTenantSecrets } from '../lib/secrets-cache';
 import { resolveRuntimeAiSource } from '../lib/ai/metering';
+import { resolveManagedAiCredential } from '../lib/ai/managed-credential';
 import { getDeploymentProfile } from '../lib/deployment-profile';
 
 /**
@@ -36,7 +37,12 @@ import { getDeploymentProfile } from '../lib/deployment-profile';
 export async function aiProvisioningHandler(c: Context<HonoConfig>) {
     try {
         const profile = getDeploymentProfile(c.env);
-        const managedKey = c.env.AI_MANAGED_API_KEY ?? null;
+        // The SAME resolution the runtime uses. Reading the environment
+        // directly here was safe while one variable answered the question; it
+        // stopped being safe once a deployment could fund AI with a credential
+        // of a different shape, because this console would then report every
+        // workspace as unprovisioned while calls resolved perfectly well.
+        const managedKey = resolveManagedAiCredential(c.env);
         const model = c.env.AI_MODEL ?? '';
         const rows = await drizzle(c.env.DB)
             // `status` as well as `tier`: entitlement is a property of the

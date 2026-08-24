@@ -30,8 +30,18 @@ export interface JwtKeyring {
 const ALG = 'ES256' as const;
 const ECDSA_PARAMS = { name: 'ECDSA', namedCurve: 'P-256' } as const;
 
-/** Decode a PEM body (BEGIN/END stripped + whitespace removed) to ArrayBuffer. */
-function pemToBuf(pem: string): ArrayBuffer {
+/**
+ * Decode a PEM body (BEGIN/END stripped + whitespace removed) to ArrayBuffer.
+ *
+ * Exported for reuse, NOT as an invitation to sign session tokens elsewhere.
+ * This and the two base64url encoders below are pure byte plumbing with no
+ * key policy in them; the policy — ES256 only, a kid on every token — lives in
+ * signJwt/verifyJwt, and those remain the only sanctioned way to mint or check
+ * a session token. Another subsystem that must sign an assertion for a THIRD
+ * PARTY, in an algorithm that party dictates, needs these bytes and must not
+ * need a second transcription of them.
+ */
+export function pemToBuf(pem: string): ArrayBuffer {
     const b64 = pem
         .replace(/-----BEGIN [A-Z ]+-----/, '')
         .replace(/-----END [A-Z ]+-----/, '')
@@ -51,13 +61,13 @@ function base64UrlDecodeToBytes(input: string): Uint8Array {
     return out;
 }
 
-function base64UrlEncodeBytes(bytes: Uint8Array): string {
+export function base64UrlEncodeBytes(bytes: Uint8Array): string {
     let bin = '';
     for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i] as number);
     return btoa(bin).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
-function base64UrlEncodeString(str: string): string {
+export function base64UrlEncodeString(str: string): string {
     return base64UrlEncodeBytes(new TextEncoder().encode(str));
 }
 

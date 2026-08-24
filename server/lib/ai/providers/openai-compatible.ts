@@ -24,6 +24,7 @@
 import { Errors } from '../../errors';
 import { AI_REFUSAL_REASON } from '../refusal-reason';
 import { logger } from '../../logger';
+import { isAccessTokenSource, type AiCredential } from '../credential';
 import type { AiProvider, AiRequest, AiResponse } from '../provider';
 
 /** Status codes that mean "your credentials or your account", not "try again".
@@ -46,6 +47,20 @@ export const PROVIDER_REJECTED_MESSAGE =
     + 'service tier, or billing configuration with your provider.';
 
 /**
+ * The sentence for a credential the DEPLOYMENT owns and could not obtain.
+ *
+ * Deliberately not the one above. A short-lived token that could not be
+ * refreshed produces the same 401 an invalid key would, but the two are fixed
+ * by different people: this one by whoever configured the deployment, and by
+ * nobody the workspace can reach. Telling an inspector to check an API key
+ * they do not hold sends them somewhere nothing can be changed, which is the
+ * worst available answer for a fault that is ours.
+ */
+export const DEPLOYMENT_CREDENTIAL_MESSAGE =
+    'AI is unavailable: this deployment could not obtain credentials for its AI backend. '
+    + 'Nothing in workspace settings affects this — it is the deployment\'s own configuration.';
+
+/**
  * The one place a base URL becomes a request address.
  *
  * Exported because the settings connection test posts to it too. That is the
@@ -58,7 +73,9 @@ export function chatCompletionsUrl(baseUrl: string): string {
 }
 
 export interface OpenAiCompatibleCredentials {
-    apiKey: string;
+    /** An API key that does not expire, or a credential that refreshes itself.
+     *  Resolved per CALL, never cached on this instance — see the type. */
+    apiKey: AiCredential;
     model: string;
     /** Root of an OpenAI-compatible API, with or without a trailing slash. */
     baseUrl: string;
@@ -73,7 +90,48 @@ export class OpenAiCompatibleProvider implements AiProvider {
     readonly id: string;
 
     constructor(private readonly creds: OpenAiCompatibleCredentials) {
-        this.id = deriveProviderId(creds.baseUrl, creds.model);
+        // A credential that refreshes itself KNOWS which backend it belongs to
+        // and says so; that beats reading a vendor prefix off a model string,
+        // which would make the recorded backend a function of how the model id
+        // is spelled. Everything else keeps the derivation it always had.
+        this.id = isAccessTokenSource(creds.apiKey)
+            ? creds.apiKey.providerId
+            : deriveProviderId(creds.baseUrl, creds.model);
+    }
+
+    /**
+     * The bearer value for one request.
+     *
+     * A plain key is returned as it stands — the same string, spent the same
+     * way, which is the bring-your-own-key path unchanged. A self-refreshing
+     * credential is asked EVERY time, because the whole point of it is that
+     * the answer changes; remembering one here would rebuild the staleness it
+     * exists to remove.
+     */
+    private async bearer(): Promise<string> {
+        const cred = this.creds.apiKey;
+        if (!isAccessTokenSource(cred)) return cred;
+        try {
+            return await cred.getAccessToken();
+        } catch {
+            // LAYER 2 — the id and the fact, never the cause's text. The
+            // thrown error is deliberately NOT bound: a token exchange reports
+            // its failure in a body that can quote the credential material it
+            // rejected, so there must be no variable here for anyone to log
+            // later.
+            logger.error('AI deployment credential could not be obtained', {
+                provider:  this.id,
+                timestamp: new Date().toISOString(),
+            });
+            // LAYER 1 — an operator's problem, said as one. The reason is the
+            // vocabulary's existing "the deployment's platform credential is
+            // not usable" member, which every renderer already treats as
+            // nothing the workspace can act on.
+            throw Errors.AINotConfigured(
+                DEPLOYMENT_CREDENTIAL_MESSAGE,
+                AI_REFUSAL_REASON.PLATFORM_KEY_MISSING,
+            );
+        }
     }
 
     async complete(input: AiRequest): Promise<AiResponse> {
@@ -84,10 +142,15 @@ export class OpenAiCompatibleProvider implements AiProvider {
             );
         }
 
+        // Before the address, and before anything is serialised: a credential
+        // that cannot be obtained must fail without a request being built, so
+        // no inspection text is ever assembled for a call that cannot go.
+        const token = await this.bearer();
+
         const url = chatCompletionsUrl(this.creds.baseUrl);
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.creds.apiKey}`,
+            'Authorization': `Bearer ${token}`,
         };
         if (isCloudflareGateway(this.creds.baseUrl)) {
             // NOT a dashboard setting. AI Gateway stores request and response

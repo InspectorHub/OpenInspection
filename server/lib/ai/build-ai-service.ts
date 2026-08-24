@@ -18,6 +18,7 @@ import { buildAiMeter, buildAiQuotaPreflight } from './metering';
 import { resolveAi, isRefusal } from './resolve-provider';
 import { isPaidPlan } from '../../features/plan-quota/policy';
 import { buildAiProvenanceSink } from './provenance';
+import type { AiCredential } from './credential';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 import type { TenantPlan } from '../../features/plan-quota/policy';
 import type { DeploymentProfile } from '../deployment-profile';
@@ -31,8 +32,10 @@ interface BuildAiServiceArgs {
     tenantId: string | null;
     /** The workspace's own stored key (Settings → Advanced → AI), or null. */
     tenantKey: string | null;
-    /** The deployment-provided key, when one has been provisioned. */
-    managedKey: string | null;
+    /** The deployment-provided credential, when one has been provisioned.
+     *  A long-lived key, or one that refreshes itself — resolved upstream so
+     *  the runtime and the provisioning read cannot answer it differently. */
+    managedKey: AiCredential | null;
     /** `AI_MODEL`. Empty fails closed at the service, never with a default. */
     model: string;
     /** The tenant's commercial standing, or null when it was not read. Null is
