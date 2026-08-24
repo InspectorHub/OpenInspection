@@ -89,6 +89,7 @@ const bundleContactSchema = z.object({
     email: z.string().optional(),
     phone: z.string().optional(),
     agency: z.string().optional(),
+    notes: z.string().optional(),
     /**
      * Present but unjudged. The KEY is still required — a bundle that never
      * mentioned the type did not describe the row, whereas a bundle that says

@@ -45,6 +45,7 @@ export interface CsvContactMapping {
     email?: string | undefined;
     phone?: string | undefined;
     agency?: string | undefined;
+    notes?: string | undefined;
     type: CsvValueSource<BundleContactType>;
 }
 
@@ -72,7 +73,7 @@ function missingColumn(columns: string[], wanted: string): boolean {
 function requiredColumns(options: CsvGenericOptions): string[] {
     if (options.entity === 'contact') {
         const m = options.mapping;
-        const cols = [m.name, m.email, m.phone, m.agency].filter((c): c is string => typeof c === 'string');
+        const cols = [m.name, m.email, m.phone, m.agency, m.notes].filter((c): c is string => typeof c === 'string');
         if ('column' in m.type) cols.push(m.type.column);
         return cols;
     }
@@ -165,8 +166,9 @@ export const csvGenericAdapter: MigrationAdapter<CsvGenericOptions> = {
                 const email = cell(row, m.email);
                 const phone = cell(row, m.phone);
                 const agency = cell(row, m.agency);
+                const notes = cell(row, m.notes);
                 const typeCell = 'fixed' in m.type ? '' : cell(row, m.type.column);
-                if (!name && !email && !phone && !agency && !typeCell) {
+                if (!name && !email && !phone && !agency && !notes && !typeCell) {
                     counts.dropped.push({ at, reason: 'every mapped column is empty on this line' });
                     return;
                 }
@@ -179,6 +181,7 @@ export const csvGenericAdapter: MigrationAdapter<CsvGenericOptions> = {
                 if (email) entry.email = email;
                 if (phone) entry.phone = phone;
                 if (agency) entry.agency = agency;
+                if (notes) entry.notes = notes;
                 contacts.push(entry);
                 counts.emitted++;
                 return;

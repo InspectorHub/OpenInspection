@@ -18,6 +18,7 @@ export interface ContactPriorState {
     email: string | null;
     phone: string | null;
     agency: string | null;
+    notes: string | null;
     type: ContactRecord['type'];
 }
 
@@ -31,6 +32,7 @@ export function captureContactPriorState(row: ContactRecord): string {
         email: row.email,
         phone: row.phone,
         agency: row.agency,
+        notes: row.notes,
         type: row.type,
     };
     return JSON.stringify(snapshot);
@@ -69,7 +71,10 @@ export function parseContactPriorState(json: string): ContactPriorState | null {
     const email = asNullableString(snapshot.email);
     const phone = asNullableString(snapshot.phone);
     const agency = asNullableString(snapshot.agency);
-    if (email === undefined || phone === undefined || agency === undefined) return null;
+    const notes = asNullableString(snapshot.notes);
+    if (email === undefined || phone === undefined || agency === undefined || notes === undefined) {
+        return null;
+    }
 
     // The column's own enum is the vocabulary, read at runtime rather than
     // restated here — a restated list is a second answer to the same question.
@@ -77,5 +82,5 @@ export function parseContactPriorState(json: string): ContactPriorState | null {
     const allowed: readonly string[] = contacts.type.enumValues;
     if (typeof type !== 'string' || !allowed.includes(type)) return null;
 
-    return { name, email, phone, agency, type: type as ContactRecord['type'] };
+    return { name, email, phone, agency, notes, type: type as ContactRecord['type'] };
 }

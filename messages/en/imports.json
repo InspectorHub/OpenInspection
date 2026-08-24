@@ -36,6 +36,7 @@
   "imports_mapping_needs_email": "Choose which column holds the email address.",
   "imports_mapping_needs_name": "Choose which column holds the name.",
   "imports_mapping_none": "Not in this file",
+  "imports_mapping_notes": "Notes",
   "imports_mapping_phone": "Phone",
   "imports_mapping_ratings_choices": "They record what you found",
   "imports_mapping_ratings_choices_help": "Every item becomes a list of these answers to pick from.",

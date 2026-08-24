@@ -128,6 +128,73 @@ describe('csvGenericAdapter — contacts', () => {
     });
 });
 
+describe('csvGenericAdapter — contact notes', () => {
+    const withNotes = [
+        'Full Name,Email,Notes',
+        'Alice Ng,alice@example.test,"Prefers mornings.\nMet at the open house."',
+    ].join('\n');
+
+    it('carries the notes column onto the entry', async () => {
+        const result = await csvGenericAdapter.convert(withNotes, {
+            entity: 'contact' as const,
+            mapping: {
+                name: 'Full Name', email: 'Email', notes: 'Notes',
+                type: { fixed: 'client' as const },
+            },
+        });
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.bundle.contacts).toHaveLength(1);
+        expect(result.bundle.contacts[0].notes).toBe('Prefers mornings.\nMet at the open house.');
+    });
+
+    it('POSITIVE CONTROL — the same convert with no notes column still carries everything else', async () => {
+        // Without this, "notes is missing" would also pass on a bundle that
+        // carried no contacts at all.
+        const result = await csvGenericAdapter.convert(
+            'Full Name,Email\nAlice Ng,alice@example.test',
+            {
+                entity: 'contact' as const,
+                mapping: { name: 'Full Name', email: 'Email', type: { fixed: 'client' as const } },
+            },
+        );
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.bundle.contacts).toHaveLength(1);
+        expect(result.bundle.contacts[0].notes).toBeUndefined();
+        expect(result.bundle.contacts[0].name).toBe('Alice Ng');
+        expect(result.bundle.contacts[0].email).toBe('alice@example.test');
+    });
+
+    it('keeps a line whose ONLY filled cell is the note', async () => {
+        // The one drop rule is "every mapped column is empty on this line".
+        // A note is a mapped column now, so a row carrying nothing but a note
+        // is a row with something to repair rather than a spreadsheet artefact.
+        const result = await csvGenericAdapter.convert(
+            'Full Name,Notes\n,Ring the doorbell twice',
+            {
+                entity: 'contact' as const,
+                mapping: { name: 'Full Name', notes: 'Notes', type: { fixed: 'client' as const } },
+            },
+        );
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.bundle.contacts).toHaveLength(1);
+        expect(result.bundle.contacts[0].notes).toBe('Ring the doorbell twice');
+    });
+
+    it('validates as a bundle with the note on it', async () => {
+        // `bundleContactSchema` is `.strict()`, so an unlisted key does not get
+        // dropped - the WHOLE BUNDLE is rejected.
+        const result = await csvGenericAdapter.convert(withNotes, {
+            entity: 'contact' as const,
+            mapping: { name: 'Full Name', notes: 'Notes', type: { fixed: 'client' as const } },
+        });
+        if (!result.ok) throw new Error('convert refused the file');
+        expect(() => parseMigrationBundle(result.bundle)).not.toThrow();
+    });
+});
+
 describe('csvGenericAdapter — members', () => {
     const csv = [
         'Email,Name,Role',

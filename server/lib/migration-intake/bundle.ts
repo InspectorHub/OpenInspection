@@ -204,6 +204,9 @@ export interface BundleContact {
     email?: string | undefined;
     phone?: string | undefined;
     agency?: string | undefined;
+    /** Optional because a contact book row commonly HAS no note, not because
+     *  the field is unimportant: it round-trips like every other one. */
+    notes?: string | undefined;
     /** Required on purpose: a default here is a question the mapping step never asks. */
     type: string;
 }

@@ -48,7 +48,10 @@ function readBack(csv: string): { columns: string[]; rows: Record<string, string
 
 describe('contacts template — which columns it carries', () => {
     it('carries the fields the contacts mapping binds, and nothing else', () => {
-        expect(headers()).toEqual(['name', 'email', 'phone', 'agency']);
+        // `notes` joined this list the day the contacts mapping learned to
+        // bind it. That is the derivation working, not an edit to keep up
+        // with: nobody touched this file to add the column.
+        expect(headers()).toEqual(['name', 'email', 'phone', 'agency', 'notes']);
     });
 
     it('leaves out a vocabulary field the contacts mapping never binds', () => {
@@ -120,7 +123,7 @@ describe('contacts template — the derivation is live', () => {
 describe('contacts template — the file', () => {
     it('is one header row and one example row', () => {
         const { columns, rows } = readBack(buildContactsTemplateCsv());
-        expect(columns).toEqual(['name', 'email', 'phone', 'agency']);
+        expect(columns).toEqual(['name', 'email', 'phone', 'agency', 'notes']);
         expect(rows).toHaveLength(1);
     });
 

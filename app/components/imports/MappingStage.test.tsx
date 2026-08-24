@@ -183,6 +183,48 @@ describe("MappingStage: an optional field left blank", () => {
     });
 });
 
+describe("MappingStage: the note column", () => {
+    it("offers a notes control, so a file carrying one can say so", () => {
+        renderStage(contacts());
+        const notes = asSelect(screen.getByLabelText("Notes"), "the notes column select");
+        expect([...notes.options].map((o) => o.value))
+            .toEqual(["", "Alpha", "Beta", "Gamma"]);
+    });
+
+    it("hands the chosen column back", () => {
+        const { onApply } = renderStage(contacts());
+        fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Gamma" } });
+        fireEvent.click(save());
+        expect(onApply).toHaveBeenCalledWith({
+            kind: "contacts",
+            mapping: { name: "Alpha", notes: "Gamma", type: { fixed: "client" } },
+        });
+    });
+
+    it("drops it again when the operator answers 'not in this file'", () => {
+        // The positive control for the assertion above: the form has to be
+        // able to STOP sending the field, or "it sent notes" proves only that
+        // the key is always there.
+        const { onApply } = renderStage({
+            kind: "contacts",
+            mapping: { name: "Alpha", notes: "Gamma", type: { fixed: "client" } },
+        });
+        fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "" } });
+        fireEvent.click(save());
+        expect(onApply).toHaveBeenCalledWith({
+            kind: "contacts",
+            mapping: { name: "Alpha", type: { fixed: "client" } },
+        });
+    });
+
+    it("does not offer it on the team-member arm, which has no such field", () => {
+        renderStage({ kind: "members", mapping: { email: "Alpha", role: { fixed: "inspector" } } });
+        expect(screen.queryByLabelText("Notes")).toBeNull();
+        // Positive control: the members arm did render its own controls.
+        expect(screen.getByLabelText("Email")).toBeTruthy();
+    });
+});
+
 describe("MappingStage: the answer the file does not contain", () => {
     it("asks the contact type as a question rather than defaulting silently", () => {
         // Every contact imported through the path this replaces got the schema

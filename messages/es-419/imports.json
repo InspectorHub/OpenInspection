@@ -36,6 +36,7 @@
   "imports_mapping_needs_email": "Elija qué columna contiene el correo electrónico.",
   "imports_mapping_needs_name": "Elija qué columna contiene el nombre.",
   "imports_mapping_none": "No está en este archivo",
+  "imports_mapping_notes": "Notas",
   "imports_mapping_phone": "Teléfono",
   "imports_mapping_ratings_choices": "Registran lo que usted encontró",
   "imports_mapping_ratings_choices_help": "Cada elemento pasa a ser una lista de estas respuestas para elegir.",

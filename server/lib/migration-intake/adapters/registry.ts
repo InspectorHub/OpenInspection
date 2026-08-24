@@ -310,16 +310,12 @@ export function defaultMappingFor(
 
     const mapping: CsvContactMapping = {
         name: pickColumn(columns, INTAKE_HEADERS.name) ?? '',
-        // The answer WHEN THE FILE IS SILENT. The type set is ours, not the
-        // exporting product's, and most contact books carry no column for it —
-        // so a fixed answer is what the majority of files need, and the two
-        // recognised spellings below are deliberately few for the same reason.
-        //
-        // When the file DOES name a type column the file wins, exactly as the
-        // members arm above lets a file name a role. A value outside our
-        // vocabulary is passed through verbatim and becomes a repair row the
-        // operator can see and correct — never a silent retype to `client`,
-        // which is what this arm used to do to our own export.
+        // The answer WHEN THE FILE IS SILENT — most contact books carry no
+        // column for a type set that is ours rather than the exporting
+        // product's. When the file DOES name one it wins, exactly as the
+        // members arm above lets a file name a role, and a word outside our
+        // vocabulary becomes a repair row rather than a silent retype to
+        // `client` — which is what this arm used to do to our own export.
         type: { fixed: 'client' },
     };
     const email = pickColumn(columns, INTAKE_HEADERS.email);
@@ -328,6 +324,8 @@ export function defaultMappingFor(
     if (phone) mapping.phone = phone;
     const agency = pickColumn(columns, INTAKE_HEADERS.agency);
     if (agency) mapping.agency = agency;
+    const notes = pickColumn(columns, INTAKE_HEADERS.notes);
+    if (notes) mapping.notes = notes;
     const type = pickColumn(columns, INTAKE_HEADERS.type);
     if (type) mapping.type = { column: type };
     return { kind: 'contacts', mapping };

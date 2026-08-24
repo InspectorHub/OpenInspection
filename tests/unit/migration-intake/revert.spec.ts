@@ -416,6 +416,30 @@ describe('MigrationRevertService.revert', () => {
         expect(await db.select().from(schema.contacts).all()).toHaveLength(1);
     });
 
+    it('restores the note an overwrite replaced', async () => {
+        await db.insert(schema.contacts).values({
+            id: 'existing-notes', tenantId: TENANT, type: 'client', name: 'Alice Old',
+            email: 'alice@example.test', notes: 'Gate code 4021.', createdAt: new Date(),
+        });
+        const staged = await stageContacts([
+            { name: 'Alice New', email: 'alice@example.test', notes: 'Call ahead.', type: 'client' },
+        ]);
+        await applyBatch(staged.batchId, 'overwrite');
+        // Positive control: the overwrite really did replace the note. Without
+        // it, "the old note is back" also passes on a write that never
+        // happened.
+        const after = await db.select().from(schema.contacts)
+            .where(eq(schema.contacts.id, 'existing-notes')).get();
+        expect(after?.notes).toBe('Call ahead.');
+
+        const result = await revert.revert({ tenantId: TENANT, batchId: staged.batchId });
+        expect(result).toMatchObject({ status: 'reverted', reverted: 1 });
+
+        const live = await db.select().from(schema.contacts)
+            .where(eq(schema.contacts.id, 'existing-notes')).get();
+        expect(live?.notes).toBe('Gate code 4021.');
+    });
+
     it('refuses a contact overwrite whose snapshot lost a field, rather than half-restoring the row', async () => {
         await db.insert(schema.contacts).values({
             id: 'existing-1', tenantId: TENANT, type: 'client', name: 'Alice Old',
