@@ -34,7 +34,7 @@ import { zipOf } from '../helpers/zip-fixture';
 const TPL = `<?xml version="1.0" encoding="UTF-8"?>
 <java version="10.0.2" class="java.beans.XMLDecoder">
  <object class="example.TemplateInfo">
-  <void property="templateName"><string>AHIT Master</string></void>
+  <void property="templateName"><string>Whole House Checklist</string></void>
   <void property="ratingNames">
    <void method="add"><string>Satisfactory</string></void>
    <void method="add"><string>Marginal</string></void>
@@ -95,7 +95,7 @@ const hipBytes = (): Promise<Uint8Array> => zipOf({ 'TabbedPanes.tpl': TPL });
 
 const asHip = async (ratingKind: 'severity' | 'choices' | 'none'): Promise<string[]> =>
     landings(await homeInspectorProAdapter.convert(await hipBytes(), {
-        name: 'AHIT Master', ratingKind,
+        name: 'Whole House Checklist', ratingKind,
     }));
 
 const asSpectora = async (): Promise<string[]> =>

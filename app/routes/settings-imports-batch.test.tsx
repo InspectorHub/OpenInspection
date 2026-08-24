@@ -102,17 +102,17 @@ function templateReport(
         },
         inspection: {
             kind: "template",
-            name: "AHIT Master",
+            name: "Whole House Checklist",
             sections: 6,
             items: 41,
             ratings: over.ratings ?? ["Satisfactory", "Marginal", "Poor"],
             ratingsDescribe: over.ratingsDescribe ?? "items",
             ratingsShown: null,
         },
-        mapping: { kind: "template", name: "AHIT Master", ratingKind: "severity" },
+        mapping: { kind: "template", name: "Whole House Checklist", ratingKind: "severity" },
         entityKind: "template",
         structure: {
-            name: "AHIT Master",
+            name: "Whole House Checklist",
             sections: [
                 { title: "Roof", items: [{ label: "Covering", landedAs: "rated" }] },
                 { title: "Executive Summary", items: [] },
@@ -442,7 +442,7 @@ describe("an import run: the three stages sit on their own steps", () => {
         await waitFor(() => expect(posted).toHaveLength(1));
         expect(posted[0].get("op")).toBe("mapping");
         expect(JSON.parse(String(posted[0].get("mapping")))).toEqual({
-            kind: "template", name: "AHIT Master", ratingKind: "choices",
+            kind: "template", name: "Whole House Checklist", ratingKind: "choices",
         });
     });
 

@@ -92,7 +92,7 @@ describe('POST /api/imports — the uploaded file reaches storage intact', () =>
         form.set('vendor', 'home_inspector_pro');
         form.set('uploadAuthorized', 'true');
         form.set('staffAccessAuthorized', 'true');
-        form.set('file', new File([TPZ_BYTES], 'AHIT Master.tpz'));
+        form.set('file', new File([TPZ_BYTES], 'Whole House Checklist.tpz'));
 
         const res = await appFor(store)(form);
         expect(res.status).toBe(201);

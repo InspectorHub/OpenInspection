@@ -164,7 +164,7 @@ describe('the answer the wizard starts from', () => {
         const mapping = defaultMappingFor(
             'templates.create',
             inspection ?? null,
-            intakeSourceFromBytes('AHIT Master.tpz', bytes),
+            intakeSourceFromBytes('Whole House Checklist.tpz', bytes),
         );
         expect(mapping.kind).toBe('template');
         if (mapping.kind !== 'template') throw new Error('unreachable');

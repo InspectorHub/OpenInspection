@@ -27,7 +27,7 @@ function items(n: number, landedAs: "rated" | "choices" | "plain") {
 
 function structure(over: Partial<BatchStructure> = {}): BatchStructure {
     return {
-        name: "AHIT Master",
+        name: "Whole House Checklist",
         sections: [{ title: "Roof", items: items(3, "rated") }],
         dropped: [],
         warnings: [],
