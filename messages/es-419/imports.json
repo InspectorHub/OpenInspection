@@ -46,6 +46,8 @@
   "imports_download_template": "Descargar una hoja de cálculo inicial",
   "imports_upload_submit": "Subir",
   "imports_upload_needs_file": "Elija el archivo que exportó.",
+  "imports_upload_reading_workbook": "Leyendo el libro…",
+  "imports_upload_needs_sheet": "Elija qué hoja contiene la lista.",
   "imports_upload_needs_authorize": "Acepte que conservemos el archivo, para poder retomar esta importación más tarde.",
   "imports_upload_needs_staff_authorize": "Acepte que alguien del equipo de soporte abra el archivo, porque nada aquí puede leerlo.",
   "imports_mapping_title": "Qué columna contiene qué",

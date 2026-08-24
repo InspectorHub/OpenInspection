@@ -57,10 +57,20 @@ export function StartImportPanel({
 
     const blockedReason = importStartBlockedReason(
         entry,
-        { vendor, hasFile: fileName !== null, uploadAuthorized, staffAccessAuthorized },
+        {
+            vendor,
+            hasFile: fileName !== null,
+            // This panel does not read workbooks yet, so the only honest answer
+            // is that whatever was chosen is not one.
+            workbook: "not-a-workbook",
+            uploadAuthorized,
+            staffAccessAuthorized,
+        },
         {
             needsSource: m.imports_start_needs_source(),
             needsFile: m.imports_upload_needs_file(),
+            readingWorkbook: m.imports_upload_reading_workbook(),
+            needsSheet: m.imports_upload_needs_sheet(),
             needsUploadAuthorized: m.imports_upload_needs_authorize(),
             needsStaffAccessAuthorized: m.imports_upload_needs_staff_authorize(),
         },

@@ -46,6 +46,8 @@
   "imports_download_template": "Download a starter spreadsheet",
   "imports_upload_submit": "Upload",
   "imports_upload_needs_file": "Choose the file you exported.",
+  "imports_upload_reading_workbook": "Reading the workbook…",
+  "imports_upload_needs_sheet": "Choose which sheet holds the list.",
   "imports_upload_needs_authorize": "Agree to us keeping the file, so this import can be picked up again later.",
   "imports_upload_needs_staff_authorize": "Agree to someone on the support team opening the file, because nothing here can read it.",
   "imports_mapping_title": "Which column holds what",

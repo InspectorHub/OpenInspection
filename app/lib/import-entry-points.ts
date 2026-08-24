@@ -93,6 +93,27 @@ export function importEntryHref(intent: ImportEntryIntent): string {
     return `/settings/imports?intent=${intent}`;
 }
 
+/**
+ * Where the chosen file has got to in the workbook question.
+ *
+ * FIVE states and not a boolean, because four of them mean different things to
+ * the submit button and the fifth is the one a "ready / not ready" flag would
+ * quietly delete:
+ *
+ * 🔴 `unreadable` must NOT block the submit. It is the path an `.xlsx` takes
+ * today and must keep taking — the original file is uploaded untouched, the
+ * server recognises no adapter for it, and it goes to whoever converts such
+ * files by hand. Collapsing it into "not ready" is how that path would be
+ * removed from the product by a later tidy-up, with no server code changed and
+ * nothing to notice.
+ */
+export type WorkbookStage =
+    | 'not-a-workbook'  // a CSV/JSON/container, or a vendor that reads containers
+    | 'reading'         // the parser is loading, or the workbook is parsing
+    | 'unreadable'      // nothing here could read it — the original file uploads
+    | 'pending'         // more than one sheet has rows and none is chosen
+    | 'chosen';         // a sheet is chosen and the input holds its CSV
+
 /** What the person has answered so far. Not the stored run — this form has no
  *  run yet; creating one is what it does. */
 export interface ImportStartDraft {
@@ -106,6 +127,10 @@ export interface ImportStartDraft {
      */
     vendor: string | null;
     hasFile: boolean;
+    /** How far the chosen file has got through the workbook question.
+     *  `not-a-workbook` for every file that is not a convertible workbook,
+     *  which is most of them. */
+    workbook: WorkbookStage;
     uploadAuthorized: boolean;
     staffAccessAuthorized: boolean;
 }
@@ -114,6 +139,8 @@ export interface ImportStartDraft {
 export interface ImportStartCopy {
     needsSource: string;
     needsFile: string;
+    readingWorkbook: string;
+    needsSheet: string;
     needsUploadAuthorized: string;
     needsStaffAccessAuthorized: string;
 }
@@ -137,6 +164,12 @@ export function importStartBlockedReason(
     // rule it replaced was the server quietly answering it for them.
     if (importSourcesFor(entry.intent).length > 1 && !draft.vendor) return copy.needsSource;
     if (!draft.hasFile) return copy.needsFile;
+    // Directly after the file, because these are questions ABOUT the file, and
+    // they are asked where the operator is still looking. Only two of the five
+    // stages appear here — see `WorkbookStage` for why `unreadable` is not one
+    // of them.
+    if (draft.workbook === 'reading') return copy.readingWorkbook;
+    if (draft.workbook === 'pending') return copy.needsSheet;
     if (!draft.uploadAuthorized) return copy.needsUploadAuthorized;
     if (entry.readByPerson && !draft.staffAccessAuthorized) return copy.needsStaffAccessAuthorized;
     return null;
