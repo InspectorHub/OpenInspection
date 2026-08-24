@@ -82,9 +82,21 @@ export class OutboxService implements UserSyncOutbox {
         private publish?: (row: OutboxRow) => void,
     ) {}
 
+    /**
+     * `drizzle(this.db)` — no cast. The `as any` that used to sit here was not
+     * working around anything: `drizzle`'s parameter is `AnyD1Database`, which
+     * resolves to exactly the global `D1Database` this class already holds
+     * (`@miniflare/d1` is not a dependency, so drizzle's optional Miniflare arm
+     * collapses to `never`). It compiles unchanged with the cast removed.
+     *
+     * Its real cost was the suppression comment above it, which disabled
+     * `no-explicit-any` for the line and left the file looking like it had a
+     * reviewed exception. There are further `drizzle(… as any)` and
+     * `drizzle(… as never)` sites under server/api/ that are almost certainly
+     * the same non-problem, copied outward from somewhere like here.
+     */
     private getDb() {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return drizzle(this.db as any);
+        return drizzle(this.db);
     }
 
     /**
