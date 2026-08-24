@@ -31,6 +31,7 @@ import { InspectionAnnotationsService } from './inspection/inspection-annotation
 import { InspectionPhotoService } from './inspection/inspection-photo.service';
 import { InspectionResultsService } from './inspection/inspection-results.service';
 import { InspectionReportService } from './inspection/inspection-report.service';
+import type { TranslationIdentity } from './inspection/report-grain';
 import { InspectionPublishService } from './inspection/inspection-publish.service';
 import { InspectionCoreService } from './inspection/inspection-core.service';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
@@ -422,10 +423,8 @@ export class InspectionService {
     /**
      * Builds structured report data for a given inspection.
      *
-     * `makePhotoUrl` lets the caller control how each photo key is turned into
-     * a fetchable URL. The default points at the authenticated editor serve
-     * route; the public report endpoint passes a token-scoped public URL so the
-     * no-login report viewer can load images (A-9).
+     * `makePhotoUrl` controls how each photo key becomes a fetchable URL — see
+     * `inspection/inspection-report.service.ts`, which owns the implementation.
      */
     async getReportData(
         inspectionId: string,
@@ -435,8 +434,9 @@ export class InspectionService {
         videoCtx?: ReportMediaContext,
         /** Renders the named published version's snapshot instead of live state. */
         versionNumber?: number,
+        reportId?: string, // which deliverable; absent = the primary report (report-grain.ts)
     ) {
-        return this.report.getReportData(inspectionId, tenantId, makePhotoUrl, videoCtx, versionNumber);
+        return this.report.getReportData(inspectionId, tenantId, makePhotoUrl, videoCtx, versionNumber, reportId);
     }
 
     /**
@@ -728,8 +728,8 @@ export class InspectionService {
      * it is not returned by getReportData — branding changes are instead
      * covered by bumping RENDER_VERSION.
      */
-    async getReportContentHash(id: string, tenantId: string): Promise<string> {
-        return this.report.getReportContentHash(id, tenantId);
+    async getReportContentHash(id: string, tenantId: string, reportId?: string, translation: TranslationIdentity | null = null): Promise<string> {
+        return this.report.getReportContentHash(id, tenantId, reportId, translation);
     }
 
     async getReportPdfFooterContext(

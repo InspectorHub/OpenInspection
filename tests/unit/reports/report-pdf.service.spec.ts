@@ -68,6 +68,30 @@ describe('ReportPdfService', () => {
         expect(mockR2.put).toHaveBeenCalledWith(rec.r2Key, expect.any(ArrayBuffer));
     });
 
+    it('a translated render and an untranslated one are two different cached files', async () => {
+        // The content hash carries the translation identity, so the same report
+        // published English-only and then republished with a translation keys
+        // to two different R2 objects. Without that the second read is served
+        // the first render — and removing a translation serves the translated
+        // file back to a reader who no longer has one.
+        const english = await svc.renderAndStore(INSP_1, TENANT_A, 'full', {
+            reportUrl: 'u', sourceVersion: 1, contentHash: 'hash-english-only',
+        });
+        const translated = await svc.renderAndStore(INSP_1, TENANT_A, 'full', {
+            reportUrl: 'u', sourceVersion: 2, contentHash: 'hash-with-es419',
+        });
+
+        expect(english.r2Key).not.toBe(translated.r2Key);
+        // Both are real content-addressed keys, not two empty strings — the
+        // positive control for the inequality above.
+        expect(english.r2Key).toBe(`${TENANT_A}/${INSP_1}/reports/full-hash-english-only.pdf`);
+        expect(translated.r2Key).toBe(`${TENANT_A}/${INSP_1}/reports/full-hash-with-es419.pdf`);
+        // And each render was actually written to its OWN object, so neither
+        // key can serve the other's file.
+        expect(mockR2.put).toHaveBeenCalledWith(english.r2Key, expect.any(ArrayBuffer));
+        expect(mockR2.put).toHaveBeenCalledWith(translated.r2Key, expect.any(ArrayBuffer));
+    });
+
     it('summary type appends ?summary=1 to render URL', async () => {
         await svc.renderAndStore(INSP_1, TENANT_A, 'summary', {
             reportUrl: 'https://example.com/report/insp-1',
