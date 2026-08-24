@@ -24,6 +24,7 @@ import * as schema from '../../server/lib/db/schema';
 import { ReportVersionService } from '../../server/services/report-version.service';
 import { InspectionService } from '../../server/services/inspection.service';
 import { PortalAccessService } from '../../server/services/portal-access.service';
+import { ReportTranslationService } from '../../server/services/report-translation.service';
 import { seedRoleProfiles } from '../../server/services/seed/seed-role-profiles';
 import publicReportRoutes from '../../server/api/public-report';
 import type { HonoConfig } from '../../server/types/hono';
@@ -68,6 +69,18 @@ function reportApp() {
             // is a DI misconfiguration, and optional-chaining it would turn a
             // loud 500 into a report silently served from live tables.
             reportVersion: reportVersionService(),
+            // Same rule, one service later. The public report read now asks for
+            // a courtesy translation before it renders — and gets null, because
+            // nothing here stores one. That null is the answer; the CRASH was
+            // this stub omitting the service, not the route asking for it.
+            //
+            // Registered rather than made optional in the route. `translations`
+            // being absent and `translations` returning null mean opposite
+            // things: the second says this report has no translation to show,
+            // the first says nobody wired the reader. Optional-chaining the
+            // call would spell them the same way, and the reader who noticed
+            // would be a client wondering where their Spanish went.
+            reportTranslation: new ReportTranslationService(env.DB),
         } as unknown as HonoConfig['Variables']['services']);
         await next();
     });
