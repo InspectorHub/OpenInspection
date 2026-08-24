@@ -103,6 +103,29 @@ describe('gate registry', () => {
             // repair is a one-line edit closes when the commit is created.
             // Measured at 0.67s over 3,605 files, so the rung costs nothing.
             'privatereview',
+            // Added 2026-08-24 with the agent-terms route classification, and
+            // the lock caught it: the gate was registered at this rung without
+            // this entry, so `npm run test:unit` went red on a tree whose
+            // pre-commit hook and pre-push hook were both green. That is the
+            // lock working, not failing — this rung is the one place where
+            // joining is supposed to cost an argument.
+            //
+            // It earns pre-commit on the family argument: what it catches is a
+            // route added with no classification row, and an unclassified route
+            // is simply absent from the exemption reckoning. Nothing goes red;
+            // the gate that decides whether an agent must accept the terms just
+            // answers nothing for that path. A green run that means less than
+            // it looks like — the same shape as `gateregistry` and
+            // `chromerecord` above.
+            //
+            // It is not hypothetical. When this gate was designed the plan
+            // named five unclassified routes; the real universe was 25, and the
+            // preference routes mount from `server/api/agent.ts` rather than
+            // `server/index.ts`, so a parser reading only the index would have
+            // reported a clean run over 20 routes and missed five in silence.
+            // Cost: parses ~12 source files with the TypeScript parser,
+            // single-digit milliseconds in the shared process.
+            'agenttermsclass',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);
