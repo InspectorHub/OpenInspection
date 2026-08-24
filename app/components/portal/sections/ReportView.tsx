@@ -43,6 +43,8 @@ import { PhotoAppendix } from "./report/PhotoAppendix";
 import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
 import { ReportVerificationBlock } from "./report/ReportVerificationBlock";
 import { ReportViewDisclosure } from "./report/ReportViewDisclosure";
+import { TranslationNotice } from "./report/TranslationNotice";
+import { useTranslationHalf } from "./report/use-translation-half";
 import { ReportRepairPanel } from "./report/ReportRepairPanel";
 import { BuildingProfile } from "./report/BuildingProfile";
 import { PcaSkeleton } from "./report/PcaSkeleton";
@@ -109,7 +111,12 @@ function mediaTileKey(photo: ReportPhoto, idx: number): string {
 /* ------------------------------------------------------------------ */
 
 export function ReportView(props: ReportViewProps) {
-  const data = props;
+  // #23 — which HALF the reader is looking at. English by default; see the hook.
+  const { courtesy, showingTranslation, parts, toggle } = useTranslationHalf(
+    { sections: props.sections, outline: props.outline, photoAppendix: props.photoAppendix },
+    props.courtesyTranslation,
+  );
+  const data: ReportViewProps = showingTranslation ? { ...props, ...parts } : props;
   const tenant = props.tenant;
   const id = props.reportId || data.inspectionId;
   const urlToken = props.token;
@@ -220,6 +227,19 @@ export function ReportView(props: ReportViewProps) {
         onToggleRepairPanel={() => setRepairPanel(!repairPanel)}
       />
 
+      {/* #23 — permanent, non-dismissible, and ABOVE the content it describes.
+          The wording is a versioned legal constant resolved server-side; only
+          the button label around it is catalogue copy. */}
+      {courtesy && (
+        <TranslationNotice
+          notice={courtesy.notice}
+          showingTranslation={showingTranslation}
+          translationLocale={courtesy.locale}
+          onToggle={toggle}
+          printMode={data.printMode}
+        />
+      )}
+
       <ReportCoverPhoto coverPhotoUrl={data.coverPhotoUrl} address={data.address} printMode={data.printMode} />
 
       <ReportSummaryStats sections={data.sections} total={data.stats.total} />
@@ -292,6 +312,7 @@ export function ReportView(props: ReportViewProps) {
             renderMediaTile={renderMediaTile}
             repairItems={repairItems}
             onToggleRepairItem={toggleRepairItem}
+            showingTranslation={showingTranslation}
           />
         ))}
 

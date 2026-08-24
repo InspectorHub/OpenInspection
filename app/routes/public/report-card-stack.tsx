@@ -145,6 +145,11 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  reportTimeZone: d?.reportTimeZone ?? "UTC",
  isDelivered: d?.isDelivered ?? false,
  viewTrackingObjected,
+ // #23 — a SIBLING of `data` in the envelope, not a field inside it: a
+ // translation is about the report rather than part of it, and keeping it
+ // outside is what lets the span register stay a description of the payload.
+ courtesyTranslation: ((body as Record<string, unknown>).courtesyTranslation
+   ?? null) as ReportLoaderResult["courtesyTranslation"],
  brand,
  error: res.ok ? null : "Report not found",
  notPublished: (res.status as number) === 403,

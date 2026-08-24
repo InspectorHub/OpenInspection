@@ -15,6 +15,7 @@
  */
 import type { ReactNode } from "react";
 import { m } from "~/paraglide/messages";
+import { EnglishSpanBadge } from "./TranslationNotice";
 import { getSectionIcon } from "~/lib/report-helpers";
 import { ReportItemCard } from "./ReportItemCard";
 import {
@@ -36,6 +37,16 @@ export interface ReportSectionBlockProps {
   renderMediaTile: (photo: ReportPhoto, alt: string, idx: number) => ReactNode;
   repairItems: Record<string, boolean>;
   onToggleRepairItem: (itemId: string) => void;
+  /**
+   * True while the reader is looking at the courtesy-translation half.
+   *
+   * A translated deliverable is mixed-language by construction — the
+   * per-section disclaimer is part of the inspection record and is never
+   * machine-translated — so the English spans inside it are MARKED rather than
+   * left to look like an untranslated remnant. A reader who thinks the
+   * translation is broken discounts the notice too.
+   */
+  showingTranslation?: boolean;
 }
 
 export function ReportSectionBlock({
@@ -48,6 +59,7 @@ export function ReportSectionBlock({
   renderMediaTile,
   repairItems,
   onToggleRepairItem,
+  showingTranslation = false,
 }: ReportSectionBlockProps) {
   if (filter === "defects" && section.items.length === 0) return null;
   return (
@@ -110,6 +122,7 @@ export function ReportSectionBlock({
         <div className="mt-4 px-4 py-3 rounded-md border border-ih-border bg-ih-watch-bg/40 text-[12px] leading-relaxed text-ih-fg-3">
           <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-watch-fg mb-1">
             {m.report_view_disclaimer()}
+            <EnglishSpanBadge showing={showingTranslation} />
           </div>
           <p className="whitespace-pre-line">{section.disclaimerText}</p>
         </div>

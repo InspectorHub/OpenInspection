@@ -6,6 +6,7 @@
  * (avoids a circular import). ReportView re-exports every symbol here, so its
  * public type/constant surface is unchanged.
  */
+import type { CourtesyTranslationPayload } from "~/lib/report-translation";
 import type { TenantBrand } from "~/lib/brand";
 import type { ReportMedia } from "../../../../../server/lib/report-video";
 
@@ -117,30 +118,11 @@ export type FilterKey = "all" | "defects" | "summary";
  *  app/ cannot import server/lib/report-tier, so it's re-declared here). */
 type ReportTier = 'light_commercial' | 'full_pca';
 
-/* ------------------------------------------------------------------ */
-/* Print layout constants (exported for tests + re-exported via the    */
-/* standalone route). PRINT-ONLY — on-screen rendering is unchanged.   */
-/* ------------------------------------------------------------------ */
-
-/** Inspection-item / defect / stats cards: never split a card across pages. */
-export const PRINT_CARD_CLASS = "print:break-inside-avoid";
-/** Photo cells: never split a photo across a page boundary. */
-export const PRINT_FIGURE_CLASS = "print:break-inside-avoid";
-/** Section headings: keep a heading glued to the content that follows. */
-export const PRINT_SECTION_HEADING_CLASS = "print:break-after-avoid";
-/** Defect photo grid (screen 3/4-col) collapses to a dense 3-col in print. */
-export const DEFECT_PHOTO_GRID_CLASS =
-  "grid grid-cols-3 sm:grid-cols-4 print:grid-cols-3 gap-1.5";
-/** Item photo grid (screen 2/3-col) collapses to a dense 3-col in print. */
-export const ITEM_PHOTO_GRID_CLASS =
-  "grid grid-cols-2 sm:grid-cols-3 print:grid-cols-3 gap-2";
-/** CF Images thumbnail width: smaller in print to keep the PDF lean. */
-export const printThumbWidth = (isPrint: boolean): number => (isPrint ? 480 : 800);
-
-/** Report heading typography — driven by the resolved profile's `--report-*`
- *  vars (Report Style Presets). Shared by the report title and every section
- *  heading, so a preset can never restyle one of them and miss the other. */
-export const REPORT_HEADING_STYLE = { fontFamily: "var(--report-heading-font)", fontWeight: "var(--report-heading-weight)" as unknown as number, letterSpacing: "var(--report-heading-spacing)", textTransform: "var(--report-heading-transform)" as unknown as "none" };
+export {
+    PRINT_CARD_CLASS, PRINT_FIGURE_CLASS, PRINT_SECTION_HEADING_CLASS,
+    DEFECT_PHOTO_GRID_CLASS, ITEM_PHOTO_GRID_CLASS, printThumbWidth,
+    REPORT_HEADING_STYLE,
+} from "./print-layout";
 
 export interface ReportSignature {
   /**
@@ -347,6 +329,8 @@ export interface ReportLoaderResult {
    * gated on the STORED marker, never on what this page believes).
    */
   viewTrackingObjected?: boolean;
+  /** #23 — the courtesy translation, or null (see ~/lib/report-translation). */
+  courtesyTranslation?: CourtesyTranslationPayload | null;
   styleProfile?: StyleProfileClient;
   inspectorCredentials?: Array<{ label: string; memberNumber: string | null; imageUrl: string | null }>;
   initialFilter: FilterKey;
