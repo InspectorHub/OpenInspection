@@ -35,6 +35,22 @@ export interface ImportSourceOption {
      * over rather than after.
      */
     readHere: boolean;
+    /**
+     * Whether this source's file is read as TEXT (a table) rather than as a
+     * container.
+     *
+     * Decides whether the browser may flatten a chosen workbook down to one
+     * sheet of CSV before uploading it. A container vendor's `.xlsx` is a
+     * package the reader opens itself — a Spectora template export carries far
+     * more than a grid of cells — and one sheet of it is not that file. So the
+     * question conversion is keyed on is never "is this file an .xlsx"; it is
+     * "did the operator declare a source that is read as a table".
+     *
+     * ⚠️ A claim about the READER, restated here rather than imported, for the
+     * reason the module header gives. `import-sources.test.ts` asserts it
+     * against `CONTAINER_VENDORS` in both directions.
+     */
+    tabular: boolean;
 }
 
 /**
@@ -47,9 +63,9 @@ export interface ImportSourceOption {
  * be given if he can say what he has.
  */
 const TEMPLATE_SOURCES: readonly ImportSourceOption[] = [
-    { vendor: 'spectora', readHere: true },
-    { vendor: 'home_inspector_pro', readHere: true },
-    { vendor: 'homegauge', readHere: false },
+    { vendor: 'spectora', readHere: true, tabular: false },
+    { vendor: 'home_inspector_pro', readHere: true, tabular: false },
+    { vendor: 'homegauge', readHere: false, tabular: false },
 ];
 
 /**
@@ -60,7 +76,7 @@ const TEMPLATE_SOURCES: readonly ImportSourceOption[] = [
  * than one per vendor with the same reader behind each.
  */
 const TABULAR_SOURCES: readonly ImportSourceOption[] = [
-    { vendor: 'csv_generic', readHere: true },
+    { vendor: 'csv_generic', readHere: true, tabular: true },
 ];
 
 /**
@@ -96,6 +112,21 @@ export function importSourcesFor(intent: ImportEntryIntent): readonly ImportSour
 export function defaultImportSourceFor(intent: ImportEntryIntent): VendorId | null {
     const sources = importSourcesFor(intent);
     return sources.length === 1 ? sources[0].vendor : null;
+}
+
+/**
+ * Whether the declared source at this entry point is read as a table.
+ *
+ * Asked of the ENTRY POINT and not of the vendor name alone: a field carrying
+ * `spectora` on the contacts entry is not a declaration that entry accepts, so
+ * it is certainly not a licence to rewrite the file. An unoffered vendor, and a
+ * null one, are both false — which is what keeps the raw-workbook escape hatch
+ * reachable, because `assisted.full` offers no source at all and therefore
+ * never converts.
+ */
+export function sourceIsTabular(intent: ImportEntryIntent, vendor: string | null): boolean {
+    if (!vendor) return false;
+    return importSourcesFor(intent).find((s) => s.vendor === vendor)?.tabular ?? false;
 }
 
 /** Whether a value is a source this entry point offers. Narrowed, never cast. */
