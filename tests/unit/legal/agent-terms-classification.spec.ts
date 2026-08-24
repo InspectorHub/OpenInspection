@@ -143,14 +143,18 @@ describe('the agent-route classification table', () => {
         expect(duplicated).toEqual([]);
     });
 
-    it('keeps the five paths that are already exempt exempt', () => {
-        // A refactor that silently drops one of these is the worst outcome
-        // available here: the gate keeps working, and an agent who wants to
-        // leave, or to ask for their own data, is told to sign something first.
+    it('keeps every path that is exempt exempt', () => {
+        // Written out by name rather than derived, on purpose. A refactor that
+        // silently drops one of these is the worst outcome available here: the
+        // gate keeps working, and an agent who wants to leave, or to ask for
+        // their own data, or to check what they already signed, is told to sign
+        // something first. Adding to this list is a decision somebody makes;
+        // losing from it is an accident nobody notices.
         expect([...EXEMPT_PATHS].sort()).toEqual([
             '/api/agent-signup',
             '/api/agent-signup/terms',
             '/api/agent/accept-terms',
+            '/api/agent/terms/history',
             '/api/identities/account/delete',
             '/api/identities/account/export',
         ]);

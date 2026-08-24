@@ -225,19 +225,27 @@ export const AGENT_ROUTE_BINDING: ReadonlyArray<AgentRouteBinding> = [
             + 'product on another person\'s behalf.',
     },
 
-    // ── Two rows that are open questions, not settled answers ───────────────
-    // Both are recorded here as gated because that is what the code does today,
-    // and a table that disagreed with the running system would be worse than no
-    // table. Neither is written as a conclusion.
+    // ── Reading the record of what you signed ───────────────────────────────
     {
         path: '/api/agent/terms/history',
-        requiresBinding: true,
-        why: 'Returns the agent their own record of what they accepted and when. '
-            + 'Classified as gated because that is the behaviour today, and this '
-            + 'row is the place the question is visible: reading the record of '
-            + 'what you signed sits much closer to the export path above than to '
-            + 'the product surface it is currently grouped with.',
+        requiresBinding: false,
+        why: 'Returns the agent their own acceptance record — every version they '
+            + 'accepted, when, and the text that was shown at the time. It takes '
+            + 'no account identifier, because the only account it can answer for '
+            + 'is the one holding the session. That is a record ABOUT the reader, '
+            + 'and specifically the record that says whether they are bound at '
+            + 'all; refusing it until they accept is a loop, and it lands hardest '
+            + 'on the agent who believes they already signed and wants to check. '
+            + 'It belongs beside the export entry above rather than beside the '
+            + 'product surface. The handler checks the session itself and refuses '
+            + 'an anonymous caller, so this is an exemption from the gate and not '
+            + 'from authentication.',
     },
+
+    // ── Rows that are open questions, not settled answers ───────────────────
+    // Recorded here as gated because that is what the code does today, and a
+    // table that disagreed with the running system would be worse than no table.
+    // Not written as conclusions.
     {
         path: '/api/agent/notification-preferences',
         requiresBinding: true,

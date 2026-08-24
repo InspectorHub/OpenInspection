@@ -121,10 +121,17 @@ const HistoryResponseSchema = z
  * about it, so there is nothing to get wrong: an endpoint that accepted a user
  * id would be one bad authorization check away from answering for somebody else.
  *
- * NOT on the agent-terms gate's exemption list, unlike `/accept-terms`. That
- * list exists for the ways OUT of the gate, and reading history is not one of
- * them; an agent who owes an acceptance is sent to accept it first, which is the
- * ordinary behaviour and needs no entry here.
+ * Exempt from the agent-terms gate, like `/accept-terms`. This comment used to
+ * say the opposite — that the exemption list is for the ways OUT of the gate and
+ * that an agent who owes an acceptance is simply sent to accept it first. The
+ * list is not only for the ways out: it is also for the mechanisms a gate must
+ * not price at a signature, and a person's own record of what they signed is
+ * one. Refusing it until they accept is a loop, and it lands hardest on the
+ * agent who believes they already signed and wants to check.
+ *
+ * The exemption is from the GATE, not from authentication. The handler below
+ * checks the session itself, for the reason `/accept-terms` does: the JWT
+ * middleware does not reject a token-less request, it simply sets nothing.
  */
 const historyRoute = createRoute(withMcpMetadata({
     method: 'get',

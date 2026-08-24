@@ -372,6 +372,72 @@ describe('the agent-terms gate', () => {
             expect(sibling.status).toBe(428);
         });
 
+        /**
+         * Reading the record of what you signed.
+         *
+         * `GET /api/agent/terms/history` returns the agent their own acceptance
+         * ledger — every version they accepted, when, and the text that was
+         * actually shown at the time. It takes no input at all: no query
+         * parameter, no path parameter, no body, and therefore no account
+         * identifier. The only account it can answer for is the one holding the
+         * session.
+         *
+         * That places it beside the export entry above rather than beside the
+         * product surface it used to be grouped with. It is not functionality
+         * whose use requires the agent to be bound; it is a record ABOUT the
+         * reader, and the specific record that says whether they are bound at
+         * all. Answering "not until you accept these terms" to somebody asking
+         * what they already accepted is the loop the exemption principle exists
+         * to prevent — and it is worst for the agent who thinks they already
+         * signed and wants to check.
+         *
+         * The exemption is from the GATE, not from authentication: the handler
+         * checks `agentUserId` itself and 401s an anonymous caller, which is why
+         * this can be exempt without opening anything.
+         */
+        it('a gated agent can still READ their own acceptance history', async () => {
+            await publishTerms('2026-08-01', 'the agent terms');
+            await seedAgent(null);
+            const app = buildApp();
+            const cookie = await passwordLoginCookie(app);
+
+            // Positive control on the fixture: this session really is gated, so
+            // a pass below cannot be "the gate was off for everything".
+            expect((await app.request(PROTECTED, { headers: { Cookie: cookie } })).status).toBe(428);
+
+            const history = await app.request('https://x.test/api/agent/terms/history', {
+                headers: { Cookie: cookie },
+            });
+            expect(history.status).not.toBe(428);
+            expect(history.status).toBe(200);
+        });
+
+        it('the history exemption does not leak to its neighbours under /api/agent/terms', async () => {
+            await publishTerms('2026-08-01', 'the agent terms');
+            await seedAgent(null);
+            const app = buildApp();
+            const cookie = await passwordLoginCookie(app);
+
+            // The control for the test above. Exact paths, never prefixes:
+            // exempting the history read must not open everything beneath it.
+            const sibling = await app.request('https://x.test/api/agent/terms/history/extra', {
+                headers: { Cookie: cookie },
+            });
+            expect(sibling.status).toBe(428);
+        });
+
+        it('an ANONYMOUS history read is still refused — the exemption is from the gate, not from auth', async () => {
+            await publishTerms('2026-08-01', 'the agent terms');
+            await seedAgent(null);
+            const app = buildApp();
+
+            // Exempting a path switches off the reason an unauthenticated caller
+            // usually does not reach an agent route, because the JWT middleware
+            // does not reject a token-less request — it simply sets nothing.
+            const res = await app.request('https://x.test/api/agent/terms/history');
+            expect(res.status).toBe(401);
+        });
+
         it('the deletion exemption does not leak to its neighbours under /api/identities', async () => {
             await publishTerms('2026-08-01', 'the agent terms');
             await seedAgent(null);
