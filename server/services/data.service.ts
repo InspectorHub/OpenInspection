@@ -1,9 +1,10 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
-import { inspections, contacts, contactRoleProfiles, inspectionPeople } from '../lib/db/schema';
+import { inspections, contacts, contactRoleProfiles, inspectionPeople, users } from '../lib/db/schema';
 import { PRIMARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { CONTACT_EXCHANGE } from '../lib/data-exchange/contacts';
+import { MEMBER_EXCHANGE } from '../lib/data-exchange/members';
 import { exportCell, exportHeaders, type ExchangeVocabulary } from '../lib/data-exchange/types';
 
 // Task 9c-X3 — the buyer_agent role join, aliased so it can coexist in the
@@ -97,6 +98,28 @@ export class DataService {
         const rows = await db.select().from(contacts)
             .where(eq(contacts.tenantId, tenantId));
         return this.toCsv(CONTACT_EXCHANGE, rows as unknown as Record<string, unknown>[]);
+    }
+
+    /**
+     * This tenant's team, as a file the invitation entry point can read back.
+     *
+     * `users` carries three credentials — the password hash, the TOTP seed and
+     * the hashed recovery codes — and none of them can appear here, BY
+     * CONSTRUCTION rather than by a filter: the projection takes only what
+     * `MEMBER_EXCHANGE` names, and the manifest does not name them. That is a
+     * stronger guarantee than the one
+     * `server/lib/compliance/account-export-manifest.ts` had to build, which
+     * star-selects and therefore needs EVERY column classified to be safe.
+     *
+     * A tenant's rows exclude global agent accounts on their own, because such
+     * an account carries `tenant_id IS NULL`. That is asserted rather than
+     * assumed in `tests/unit/data/export-members.spec.ts`.
+     */
+    async exportMembersCSV(tenantId: string): Promise<string> {
+        const db = this.getDrizzle();
+        const rows = await db.select().from(users)
+            .where(eq(users.tenantId, tenantId));
+        return this.toCsv(MEMBER_EXCHANGE, rows as unknown as Record<string, unknown>[]);
     }
 
     /**
