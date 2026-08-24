@@ -18,12 +18,14 @@
     {
       "id": "user-defined-vocabulary",
       "kind": "data",
-      "statement": "The rating vocabulary is defined by whoever authored the template. Vocabularies of three, four and five entries were observed, sharing no words."
+      "statement": "The rating vocabulary is defined by whoever authored the template. Two templates may share every word, some words, or none, so no word may be given a meaning by the reader.",
+      "measuredNote": "Restated 2026-08-24. The earlier wording said 'three, four and five entries were observed, sharing no words'; measured against the corpus, every template declares exactly five, and while a bare majority of template pairs share no word, nearly half share at least one. The property that matters -- that the words are the author's and not a fixed set -- survives; the two numbers attached to it did not."
     },
     {
       "id": "absent-vocabulary",
       "kind": "data",
-      "statement": "The rating vocabulary may be absent entirely, and that is common rather than exceptional."
+      "statement": "The rating vocabulary may be absent entirely, and a reader must have an answer for a template that declares none.",
+      "measuredNote": "⚠️ DECLARED, NEVER SEEN. The earlier wording said absence was 'common rather than exceptional' on the strength of 8 of 22; re-measured 2026-08-24 with two instruments, it is 0 of 22. The reader's fallback for this case is therefore exercised by no real file. Keep the fallback -- a format that permits it will eventually produce it -- but do not read the fallback's passing tests as evidence anybody has met one."
     },
     {
       "id": "padded-vocabulary-entries",
@@ -33,12 +35,20 @@
     {
       "id": "absent-boolean-property",
       "kind": "data",
-      "statement": "A boolean property may be absent rather than false, and absence is the common case."
+      "statement": "A boolean property may be absent rather than false, and absent is the more common case. It may also be present as a REFERENCE to something else in the document rather than as a value, which a reader that does not resolve references cannot tell from absent.",
+      "measuredNote": "Measured 2026-08-24: absent in 13 of 22, present as a literal in 8, present as a reference in 1. Every literal is false and none is true, so nothing in the corpus turns the flag on -- which means the 'on' branch downstream has never been driven by a real file either."
+    },
+    {
+      "id": "object-reference-instead-of-value",
+      "kind": "encoding",
+      "statement": "A property may hold a back-reference to an object defined elsewhere in the document instead of a value. Some of those targets are not stored values at all but the result of reading another property, which cannot be resolved without executing the graph -- and this reader never executes anything. Such a property is reported as absent.",
+      "measuredNote": "Added 2026-08-24. Measured, not assumed, and nothing had recorded it: 15 of 22 templates use references, 713 uses in total. It is the reason 'absent' has to be understood as 'this reader has no value', not as 'the file said nothing'."
     },
     {
       "id": "absent-version",
       "kind": "container",
-      "statement": "The document may carry no version, and the versions carried by those that do span many years."
+      "statement": "A document may carry no version. Two different things in these files can be called one -- the attribute the document opens with, and a property inside the graph -- and a claim about 'the version' has to say which.",
+      "measuredNote": "⚠️ DECLARED, NEVER SEEN as stated. Re-measured 2026-08-24: the opening attribute is present on 22 of 22, the property is absent on 9 of 22, and the recorded 21 of 22 matches neither. The old note's second half -- that the values span many years -- does hold of the attribute. Nothing in the reader branches on either, which is how a number nobody used stayed wrong."
     },
     {
       "id": "unrelated-entries",

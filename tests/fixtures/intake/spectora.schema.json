@@ -18,12 +18,14 @@
     {
       "id": "empty-shared-strings",
       "kind": "container",
-      "statement": "The shared-string table may be empty, with every value written inline in the worksheet."
+      "statement": "There may be no shared-string table at all, with every value carried in the worksheet itself. The type marking those values is `str`, which the format defines as a FORMULA's string result, not `inlineStr`. A reader that recognises only `inlineStr` therefore finds no text anywhere and reports an empty sheet rather than an error.",
+      "measuredNote": "Restated 2026-08-24 from what the corpus file actually contains. The earlier wording said the table 'may be empty, with every value written inline', and both halves were wrong in a way that matters: the table is ABSENT rather than empty, and the values are not inline strings."
     },
     {
       "id": "double-escaped-ampersand",
       "kind": "encoding",
-      "statement": "A value's text may be escaped twice, so one decode leaves an entity where a character belongs."
+      "statement": "A value's text may be escaped twice, so ONE decode leaves an entity where a character belongs. Whether that reaches the reader depends on the reader: a conformant XML parser decodes exactly once and surfaces the entity, while a parser that decodes until the text stops changing resolves it by accident and shows the right character.",
+      "measuredNote": "The second sentence is the important half and was added 2026-08-24 after measuring it. This deployment's parser is the second kind, so this quirk currently has NO visible consequence here — which is not the same as the file being clean, and would flip the day the parser is replaced by a conformant one."
     },
     {
       "id": "empty-discriminator-cell",
@@ -38,7 +40,13 @@
     {
       "id": "sparse-columns",
       "kind": "container",
-      "statement": "A row may omit a cell entirely rather than writing an empty one, so position in the row does not give a column."
+      "statement": "A row may omit a cell entirely rather than writing an empty one, so position in the row does not give a column. A row also carries EMPTY cells that are written as a self-closing element with no value, so both spellings of 'nothing here' occur in the same row and neither can be read positionally."
+    },
+    {
+      "id": "non-breaking-space-in-text",
+      "kind": "data",
+      "statement": "A text value may carry U+00A0 rather than an ordinary space, including at its start and end. It is not a separator to split on, and it is invisible in every view of the file a person has.",
+      "measuredNote": "Added 2026-08-24. Measured, not assumed, and it was not in this schema before: nobody had looked. Confined to the comment-text column in the corpus file, so it does not affect how rows group into sections and items — but a reader that trims with a set of characters of its own rather than the language's whitespace definition would leave it on the ends of values."
     }
   ]
 }
