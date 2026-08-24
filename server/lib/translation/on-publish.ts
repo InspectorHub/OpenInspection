@@ -33,7 +33,12 @@ import { isCourtesyTranslationEnabled } from './production-switch';
 import { logger } from '../logger';
 import type { HonoConfig } from '../../types/hono';
 
-export interface OnPublishTranslationInput {
+/**
+ * Not exported: the only caller is `translateOnPublishForRequest` below, which
+ * assembles it from the request. An exported shape nobody constructs is surface
+ * to keep in sync for no reason, and the dead-code gate says so.
+ */
+interface OnPublishTranslationInput {
     tenantId: string;
     inspectionId: string;
     /** Which deliverable was published. Absent = the primary report. */
@@ -56,7 +61,8 @@ export type OnPublishTranslationOutcome =
     /** Asked for, attempted, and it did not happen. The report is still published. */
     | { status: 'failed'; locale: string; reason: string };
 
-export async function translateOnPublish(
+/** Not exported, for the same reason as the input shape above. */
+async function translateOnPublish(
     deps: GenerateCourtesyTranslationDeps,
     input: OnPublishTranslationInput,
 ): Promise<OnPublishTranslationOutcome> {
