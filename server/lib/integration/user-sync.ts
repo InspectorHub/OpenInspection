@@ -5,7 +5,7 @@
 // depend on this interface so they never import a concrete portal symbol.
 
 import type { AuthorityBasis } from '../auth/authority-basis';
-import type { TenantSyncEventType, UserSyncEventType } from '../sync-events/envelope';
+import type { MigrationSyncEventType, TenantSyncEventType, UserSyncEventType } from '../sync-events/envelope';
 
 // The event-type unions used here are DERIVED from the seam registry in
 // lib/sync-events/envelope (`Extract<SyncEventType, 'user.…'>` and `'tenant.…'`),
@@ -91,6 +91,35 @@ export interface TenantSyncEvent {
     };
 }
 
+/**
+ * An import run waiting on a person at the deployment operator.
+ *
+ * The payload is spelled out rather than left open for the same reason the
+ * tenant event's is: there is exactly one shape, and an open record is how a
+ * second emitter drifts from the first. It mirrors
+ * `migrationAssistanceRequestedDataSchema` in lib/sync-events/envelope, which is
+ * what validates it on the way out.
+ *
+ * ⚠️ BOTH TIMESTAMPS ARE EPOCH MILLISECONDS, unlike the tenant event next door,
+ * which carries seconds. They are milliseconds because that is what the column
+ * they are read from holds, and converting on the way out would put a second
+ * unit in the pipeline for nothing.
+ */
+export interface MigrationSyncEvent {
+    type: MigrationSyncEventType;
+    payload: {
+        tenantId: string;
+        batchId: string;
+        /** The operator's own declaration, or null when they could not name one. */
+        vendor: string | null;
+        /** Epoch MILLISECONDS. */
+        uploadedAt: number;
+        /** Epoch MILLISECONDS. */
+        expiresAt: number;
+        secondaryUseAuthorised: boolean;
+    };
+}
+
 /** Minimal surface core services use. The concrete OutboxService adds
  *  listPending/publishRow/markFailedFromDlq for the queue transport — not
  *  needed here.
@@ -100,5 +129,5 @@ export interface TenantSyncEvent {
  *  is what lets `UserSyncEventType` stay honestly user-only — before this, the
  *  tenant event was smuggled into that union just to make `append` typecheck. */
 export interface UserSyncOutbox {
-    append(event: UserSyncEvent | TenantSyncEvent): Promise<string>;
+    append(event: UserSyncEvent | TenantSyncEvent | MigrationSyncEvent): Promise<string>;
 }

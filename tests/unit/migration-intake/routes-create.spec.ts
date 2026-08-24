@@ -43,6 +43,7 @@ import {
 // The shared R2 double rather than a copy of it: the store holds bytes, and a
 // per-file copy is the drift the harness exists to prevent.
 import { intakeBucket, storedText } from '../helpers/migration-intake-routes-harness';
+import type { OutboxEvent } from '../../../server/portal/outbox.service';
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
 const USER = '22222222-2222-2222-2222-2222222222b2';
@@ -66,6 +67,15 @@ interface AppOpts {
     store: Map<string, Uint8Array>;
     /** `permission_overrides` the capability resolver should read off the user row. */
     overrides?: Record<string, boolean>;
+    /**
+     * Collects whatever the route hands the core→platform outbox.
+     *
+     * Absent on purpose in every other test here: the sink does not exist in
+     * standalone, and leaving `services` unset is the faithful shape of that.
+     * A route that dereferenced it unguarded would fail those tests rather than
+     * this one, which is the right way round.
+     */
+    emitted?: OutboxEvent[];
 }
 
 function appFor(opts: AppOpts) {
@@ -86,6 +96,12 @@ function appFor(opts: AppOpts) {
         if (opts.overrides) {
             c.set('sdb', {
                 getById: async () => ({ permissionOverrides: opts.overrides }),
+            } as never);
+        }
+        if (opts.emitted) {
+            const sink = opts.emitted;
+            c.set('services', {
+                outbox: { append: async (e: OutboxEvent) => { sink.push(e); return 'id'; } },
             } as never);
         }
         await next();
@@ -135,6 +151,11 @@ async function templateExport(): Promise<Uint8Array> {
         'xl/worksheets/sheet1.xml':
             `<?xml version="1.0"?><worksheet><sheetData>${body}</sheetData></worksheet>`,
     });
+}
+
+/** The waiting-run event, if this request produced one. */
+function assistanceEvent(emitted: OutboxEvent[]) {
+    return emitted.find((e) => e.type === 'migration.assistance_requested');
 }
 
 function post(opts: AppOpts, fields: Record<string, string>, file: UploadedFile) {
@@ -263,6 +284,118 @@ describe('POST /api/imports', () => {
         // The longer window: this clock is on us, not on the operator.
         const days = ((row?.expiresAt as Date).getTime() - Date.now()) / DAY_MS;
         expect(Math.round(days)).toBe(MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS);
+    });
+
+    /**
+     * Whether anything actually TELLS the deployment operator.
+     *
+     * Everything above proves a waiting run is created correctly. None of it
+     * proves anybody hears about it, and for the whole life of this pipeline
+     * nobody did: `notifyReceived` emails the workspace's own owners and
+     * managers, so a file could sit in `needs_assistance` until it expired with
+     * no one on the operator's side ever having been told it arrived.
+     *
+     * ⚠️ There is an audit action of the SAME NAME, written a few lines from the
+     * emit in the route. It is not this. A search for the name finds it first,
+     * and finding it proves only that this workspace's own trail records the
+     * request — the audit table is tenant-scoped and nothing on the operator's
+     * side reads it. These tests assert the OTHER artefact.
+     */
+    describe('telling the platform a file is waiting', () => {
+        it('emits the waiting-run event through the door that names assistance outright', async () => {
+            const emitted: OutboxEvent[] = [];
+            const res = await post(
+                { role: 'owner', store, emitted },
+                { intent: 'assisted.full', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+                { name: 'mystery.bin', text: UNREADABLE },
+            );
+            expect(res.status).toBe(201);
+            const body = await res.json() as { data: { batchId: string } };
+            const event = assistanceEvent(emitted);
+            expect(event, 'nothing told the platform a file is waiting').toBeDefined();
+            expect(event!.payload['batchId']).toBe(body.data.batchId);
+            expect(event!.payload['tenantId']).toBe(TENANT);
+            // No adapter ran, and this door never asked which product it came
+            // from — so there is no vendor to name and the wire says so.
+            expect(event!.payload['vendor']).toBeNull();
+        });
+
+        it('emits it through the OTHER door too — the one an unreadable file falls through', async () => {
+            // The two doors reach the same decision by different routes, and the
+            // owner rule already had to be written on both after it was written
+            // on only one. A notice on only one door is that defect again.
+            const emitted: OutboxEvent[] = [];
+            const res = await post(
+                { role: 'owner', store, emitted },
+                { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+                { name: 'weird.json', text: UNREADABLE },
+            );
+            expect(res.status).toBe(201);
+            const event = assistanceEvent(emitted);
+            expect(event, 'the unreadable-file door told nobody').toBeDefined();
+            // This door DID ask which product the file came from, so the
+            // operator's own declaration travels. It is not a guess: no adapter
+            // read the file, and nothing here inferred anything.
+            expect(event!.payload['vendor']).toBe('csv_generic');
+        });
+
+        it('carries the retention clock, in the unit the console subtracts', async () => {
+            const emitted: OutboxEvent[] = [];
+            await post(
+                { role: 'owner', store, emitted },
+                { intent: 'assisted.full', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+                { name: 'mystery.bin', text: UNREADABLE },
+            );
+            const payload = assistanceEvent(emitted)!.payload;
+            const days = ((payload['expiresAt'] as number) - (payload['uploadedAt'] as number)) / DAY_MS;
+            expect(Math.round(days)).toBe(MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS);
+            // The row's clock and the wire's clock are the same clock. Two
+            // numbers that agree today and are computed twice drift.
+            const row = await db.select().from(schema.migrationBatches).get();
+            expect(payload['expiresAt']).toBe((row?.expiresAt as Date).getTime());
+        });
+
+        it('says the file may not be used for anything beyond this run', async () => {
+            // Always false, on every run: two authorisations are asked for —
+            // keeping the file, and a person opening it — and there is no third.
+            // The console shows this per row so the rule is visible where
+            // somebody could break it, rather than remembered.
+            const emitted: OutboxEvent[] = [];
+            await post(
+                { role: 'owner', store, emitted },
+                { intent: 'assisted.full', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+                { name: 'mystery.bin', text: UNREADABLE },
+            );
+            expect(assistanceEvent(emitted)!.payload['secondaryUseAuthorised']).toBe(false);
+        });
+
+        it('NEGATIVE CONTROL — a run that staged cleanly tells the platform nothing', async () => {
+            // Otherwise every assertion above would pass for a route that
+            // emitted the event on every upload, and the operator's queue would
+            // fill with runs nobody is waiting on.
+            const emitted: OutboxEvent[] = [];
+            const res = await post(
+                { role: 'owner', store, emitted },
+                { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true' },
+                { name: 'contacts.csv', text: CONTACTS_CSV },
+            );
+            expect(res.status).toBe(201);
+            expect(assistanceEvent(emitted)).toBeUndefined();
+        });
+
+        it('NEGATIVE CONTROL — a refused upload tells the platform nothing either', async () => {
+            // The refusal happens before the run exists. An event naming a batch
+            // id nothing ever wrote would put a row in the operator's queue that
+            // can never be opened, downloaded or closed.
+            const emitted: OutboxEvent[] = [];
+            const res = await post(
+                { role: 'owner', profile: STANDALONE_PROFILE, store, emitted },
+                { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+                { name: 'weird.json', text: UNREADABLE },
+            );
+            expect(res.status).not.toBe(201);
+            expect(assistanceEvent(emitted)).toBeUndefined();
+        });
     });
 
     it('refuses an unreadable file BEFORE storing it where there is nobody to hand it to', async () => {

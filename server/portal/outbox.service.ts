@@ -5,7 +5,7 @@ import { SYNC_OUTBOX_STATUS } from '../lib/status/sync-outbox-status';
 import { logger } from '../lib/logger';
 import { toCloudEvent } from '../lib/sync-events/envelope';
 import type { CmdReplyEventType, SyncEnvelope } from '../lib/sync-events/envelope';
-import type { TenantSyncEvent, UserSyncEvent, UserSyncOutbox } from '../lib/integration/user-sync';
+import type { MigrationSyncEvent, TenantSyncEvent, UserSyncEvent, UserSyncOutbox } from '../lib/integration/user-sync';
 
 /**
  * Core -> Portal sync outbox (A-13/A-14, Cloudflare Queues transport).
@@ -47,7 +47,7 @@ import type { TenantSyncEvent, UserSyncEvent, UserSyncOutbox } from '../lib/inte
 // list, it is the one the wire is built from, and an event type absent from it
 // cannot be passed to `append()` — that is a compile error, proven by
 // tests/unit/sync/outbox-event-type-closed.spec-d.ts.
-export type OutboxEvent = UserSyncEvent | TenantSyncEvent | {
+export type OutboxEvent = UserSyncEvent | TenantSyncEvent | MigrationSyncEvent | {
     type: CmdReplyEventType;
     payload: Record<string, unknown>;
 };

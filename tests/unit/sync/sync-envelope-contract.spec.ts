@@ -62,6 +62,17 @@ const CASES: { file: string; eventType: SyncEventType }[] = [
     // parked. Nothing here reached across to notice, because a list below
     // decided what got tested and this type was not on it.
     { file: 'tenant-compliance-status-updated.v1.json', eventType: 'tenant.compliance_status_updated' },
+    // The one event on this seam addressed to the DEPLOYMENT OPERATOR rather
+    // than to a workspace. `vendor: null` is the fixture's value on purpose: the
+    // door that produces most of these is the one for a file nobody could
+    // classify, so null is the ordinary case rather than the edge.
+    //
+    // ⚠️ Both timestamps here are epoch MILLISECONDS, and the sibling
+    // `tenant-compliance-status-updated` fixture two lines up carries SECONDS.
+    // That disagreement is real and deliberate (each matches the column it comes
+    // off), which makes it exactly the kind of thing only a pinned envelope
+    // catches — a Zod `z.number()` is equally happy with either.
+    { file: 'migration-assistance-requested.v1.json', eventType: 'migration.assistance_requested' },
 ];
 
 describe('sync envelope contract (golden fixtures)', () => {
