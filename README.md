@@ -87,7 +87,7 @@ npm run deploy              # full react-router build, then wrangler deploy
 
 - `npm run setup:cloudflare` (`scripts/setup-cloudflare.js`) provisions the Cloudflare resources and writes their real IDs into a gitignored `wrangler.local.jsonc` (bootstrapped from the committed placeholder `wrangler.jsonc`).
 - Use `npm run deploy`, **not** raw `wrangler deploy` — the npm script runs the full `react-router build` (bundling `server/` API + `app/` SSR into one worker) before deploying. Its tail then runs idempotent ensure-steps that provision the JWT keypair and **print the `SETUP_CODE` in the deploy output** if one is not already set (it never overwrites an existing value). Visit `/setup` with that code for your first login.
-- For local development, use `npm run dev:hmr` (Vite dev server with hot module replacement, port 5173) for the fast iteration loop, or `npm run dev` (build-based — `react-router build` then `wrangler dev` on port 8788) to run the real bundled worker.
+- For local development, use `npm run dev:hmr` (Vite dev server with hot module replacement, port 5173) for the fast iteration loop, or `npm run dev` (build-based — `react-router build` then `wrangler dev` on port 8787) to run the real bundled worker.
 
 Deep dive: [`docs/operate/deploy.md`](docs/operate/deploy.md). Architecture overview: [`docs/develop/architecture.md`](docs/develop/architecture.md).
 

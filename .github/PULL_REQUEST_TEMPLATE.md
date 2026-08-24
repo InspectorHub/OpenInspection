@@ -34,13 +34,15 @@ Thanks for sending a PR! Before you submit:
 
 ## Checklist
 
-- [ ] My code follows the [contributing guidelines](https://github.com/InspectorHub/OpenInspection/blob/main/apps/core/CONTRIBUTING.md)
-- [ ] I have read and agreed to the [Code of Conduct](https://github.com/InspectorHub/OpenInspection/blob/main/apps/core/CODE_OF_CONDUCT.md)
+- [ ] My code follows the [contributing guidelines](https://github.com/InspectorHub/OpenInspection/blob/main/CONTRIBUTING.md)
+- [ ] I have read and agreed to the [Code of Conduct](https://github.com/InspectorHub/OpenInspection/blob/main/CODE_OF_CONDUCT.md)
 - [ ] I have added tests that prove my fix is effective or that my feature works (or explained why tests are not feasible)
 - [ ] I have updated the documentation in `docs/` where relevant
 - [ ] I have added entries to `CHANGELOG.md` if this PR is user-visible
 - [ ] My commits include `Co-Authored-By:` lines for any AI assistants used
 
-<!-- Maintainer note: PRs targeting `apps/core` may be auto-merged after CI green
-     by an authorized squash-merge. PRs touching billing/auth always need a
-     human reviewer. -->
+<!-- Maintainer note: a PR may be merged once CI is green, with a normal merge
+     commit. Do NOT squash: a squash rewrites the branch's commits into a new
+     one, so `git merge-base --is-ancestor` and `git cherry` both go on calling
+     the landed work unmerged, and the branch looks safe to delete when it is
+     not. PRs touching billing or auth always need a human reviewer. -->

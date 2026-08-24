@@ -17,7 +17,7 @@ git clone https://github.com/InspectorHub/OpenInspection.git
 cd OpenInspection
 npm install
 npm run setup:cloudflare    # provisions D1 / R2 / KV (or use --local)
-npm run dev                 # http://localhost:8788
+npm run dev                 # http://localhost:8787
 ```
 
 Detailed setup including Cloudflare bindings and environment variables: [`docs/operate/deploy.md`](docs/operate/deploy.md). Architecture overview: [`docs/develop/architecture.md`](docs/develop/architecture.md). Everything else: [`docs/README.md`](docs/README.md).
