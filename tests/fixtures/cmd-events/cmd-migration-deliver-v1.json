@@ -1,0 +1,31 @@
+{
+  "specversion": "1.0",
+  "id": "b1d2e3f4-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+  "type": "io.inspectorhub.cmd.migration.deliver",
+  "source": "portal",
+  "time": "2026-08-25T10:00:00.000Z",
+  "dataschema": "cmd-migration-deliver/v1",
+  "tenantseq": 1,
+  "replyto": "import:fixture-batch-1",
+  "data": {
+    "tenantId": "fixture-tenant-5",
+    "batchId": "fixture-batch-1",
+    "bundle": {
+      "formatVersion": 1,
+      "manifest": {
+        "source": { "vendor": "csv_generic" },
+        "adapter": { "name": "staff-conversion", "version": "1" },
+        "counts": {
+          "template": { "readFromSource": 0, "emitted": 0, "dropped": [] },
+          "contact": { "readFromSource": 1, "emitted": 1, "dropped": [] },
+          "member": { "readFromSource": 0, "emitted": 0, "dropped": [] }
+        },
+        "warnings": []
+      },
+      "templates": [],
+      "contacts": [{ "name": "Fixture Client", "email": "fixture@example.test", "type": "client" }],
+      "members": []
+    },
+    "actor": { "platformAdminId": "fixture-admin-1", "email": "ops@example.test" }
+  }
+}

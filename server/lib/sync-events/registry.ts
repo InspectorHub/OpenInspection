@@ -255,6 +255,40 @@ const tenantComplianceStatusUpdatedDataSchema = z.object({
 });
 
 /**
+ * The operator's answer to a waiting import run, coming back the other way.
+ *
+ * THREE replies rather than one with an `outcome`, unlike the DSAR and
+ * correction replies next door, and the difference is real: those two model ONE
+ * request with two possible endings, where a consumer reading the payload must
+ * not be able to mistake a refusal for a completion. These are three DIFFERENT
+ * commands a person chose between. `acknowledged` in particular is not an ending
+ * at all — the run stays waiting and the deadline keeps running — so folding it
+ * into a union with `delivered` would give a consumer a shape in which "somebody
+ * said hello" and "somebody finished" are the same field.
+ *
+ * `batchId` is on all three even though `replyto` already encodes it
+ * (`import:<batchId>`). The correlation handle is an opaque string by contract,
+ * and a consumer that had to parse it to find the row would be reading a
+ * routing detail as data.
+ */
+const migrationReplyBase = {
+    tenantId: z.string(),
+    correlationId: z.string(),
+    replyto: z.string(),
+    batchId: z.string(),
+};
+
+/** `rows` is how many entries the run now carries. A delivery of nothing is
+ *  refused by the stager, so it is never zero on a reply that exists. */
+const replyMigrationDeliveredDataSchema = z.object({ ...migrationReplyBase, rows: z.number() });
+
+/** `reason` is the refusal in its own words. Required for the same reason the
+ *  command's copy is: a refusal with no stated ground reads as nobody looked. */
+const replyMigrationDeclinedDataSchema = z.object({ ...migrationReplyBase, reason: z.string().min(1) });
+
+const replyMigrationAcknowledgedDataSchema = z.object(migrationReplyBase);
+
+/**
  * An import run has stopped and is waiting for a person at the deployment
  * operator to open its file and convert it by hand.
  *
@@ -324,6 +358,14 @@ export const SCHEMAS = {
     // A run whose file nothing could read is waiting for a person at the
     // deployment operator. The one event on this seam addressed to THEM.
     'migration.assistance_requested': ['v1'],
+    // The operator's three answers, coming back. Correlated by
+    // `data.replyto` = `import:<batchId>`, which is a durable row on the
+    // other side rather than a parked Workflow — so nothing times out
+    // behind these and there is no RPC fallback; the outbox is the
+    // durability.
+    'reply.migration.delivered': ['v1'],
+    'reply.migration.declined': ['v1'],
+    'reply.migration.acknowledged': ['v1'],
 } as const satisfies Record<string, readonly string[]>;
 
 /** Zod validator per event type, for tests and producer-side assertions. */
@@ -339,6 +381,9 @@ export const DATA_SCHEMAS: Record<SyncEventType, z.ZodTypeAny> = {
     'reply.report.corrected': replyReportCorrectedDataSchema,
     'tenant.compliance_status_updated': tenantComplianceStatusUpdatedDataSchema,
     'migration.assistance_requested': migrationAssistanceRequestedDataSchema,
+    'reply.migration.delivered': replyMigrationDeliveredDataSchema,
+    'reply.migration.declined': replyMigrationDeclinedDataSchema,
+    'reply.migration.acknowledged': replyMigrationAcknowledgedDataSchema,
 };
 
 /** Is this stored `event_type` one the registry knows? A type predicate rather

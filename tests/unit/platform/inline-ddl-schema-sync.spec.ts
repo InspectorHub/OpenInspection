@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
-import { tenantConfigs, inspectionResults, users, accountAcceptances } from '../../../server/lib/db/schema';
+import { tenantConfigs, inspectionResults, users, accountAcceptances, migrationBatches, migrationRows, auditLogs } from '../../../server/lib/db/schema';
 import {
     TENANT_CONFIGS_TEST_DDL, INSPECTION_RESULTS_TEST_DDL, USERS_TEST_DDL,
-    ACCOUNT_ACCEPTANCES_TEST_DDL,
+    ACCOUNT_ACCEPTANCES_TEST_DDL, MIGRATION_BATCHES_TEST_DDL, MIGRATION_ROWS_TEST_DDL,
+    AUDIT_LOGS_TEST_DDL,
 } from '../../helpers/inline-ddl';
 
 /**
@@ -101,4 +102,29 @@ describe('workers inline DDL stays in sync with the Drizzle schema', () => {
                 'Add them to INSPECTION_RESULTS_TEST_DDL so the collab DO can persist in workers tests.',
         ).toEqual([]);
     });
+
+    /**
+     * The three assisted-import tables the `cmd.migration.*` commands write.
+     *
+     * Driven by one loop rather than three copies of the same eight lines: the
+     * assertion is identical for all of them, and three near-identical blocks
+     * is how the fifth table gets added to the DDL and forgotten here.
+     */
+    for (const [label, ddl, table] of [
+        ['migration_batches', MIGRATION_BATCHES_TEST_DDL, migrationBatches],
+        ['migration_rows', MIGRATION_ROWS_TEST_DDL, migrationRows],
+        ['audit_logs', AUDIT_LOGS_TEST_DDL, auditLogs],
+    ] as const) {
+        it(`${label} test DDL covers every Drizzle schema column`, () => {
+            const ddlColumns = ddlColumnNames(ddl);
+            const schemaColumns = getTableConfig(table).columns.map((c) => c.name);
+            const missing = schemaColumns.filter((name) => !ddlColumns.has(name));
+            expect(
+                missing,
+                `tests/helpers/inline-ddl.ts is missing ${label} column(s): ${missing.join(', ')}. ` +
+                    'Add them, or the cmd.migration.* appliers park in real workerd — which on this ' +
+                    'seam means the delivery is retried to exhaustion and dies in the dead-letter queue.',
+            ).toEqual([]);
+        });
+    }
 });

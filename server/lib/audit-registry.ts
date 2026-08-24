@@ -201,6 +201,13 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'migration.abandoned': { family: 'migration_batch', label: 'audit_action_migration_abandoned', meta: {}, status: { kind: 'live' } },
     'migration.applied': { family: 'migration_batch', label: 'audit_action_migration_applied', meta: { applied: 'count', failed: 'count', intent: 'name', invitesFailed: 'count', invitesSent: 'count', skipped: 'count' }, status: { kind: 'live' } },
     'migration.assistance_requested': { family: 'migration_batch', label: 'audit_action_migration_assistance_requested', meta: { intent: 'name' }, status: { kind: 'live' } },
+    // A person at the deployment operator says they have picked the file up.
+    // No metadata: what it records is that somebody took it, and the run's own
+    // row already says which file. The row exists at all because the actor is
+    // the thing worth recording — this is the first moment somebody outside the
+    // workspace commits to opening it, and until this seam there was no row
+    // anywhere that could name them rather than the workspace's own admin.
+    'migration.acknowledged': { family: 'migration_batch', label: 'audit_action_migration_acknowledged', meta: {}, status: { kind: 'live' } },
     'migration.delivered': { family: 'migration_batch', label: 'audit_action_migration_delivered', meta: { byEntity: 'count', rows: 'count' }, status: { kind: 'live' } },
     // No metadata, for the same reason `migration.row_repaired` carries none,
     // and one step further: the reason a file could not be converted is free

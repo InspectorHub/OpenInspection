@@ -73,6 +73,13 @@ const CASES: { file: string; eventType: SyncEventType }[] = [
     // off), which makes it exactly the kind of thing only a pinned envelope
     // catches — a Zod `z.number()` is equally happy with either.
     { file: 'migration-assistance-requested.v1.json', eventType: 'migration.assistance_requested' },
+    // The operator's three answers, coming back. THREE types rather than one
+    // with an `outcome` — unlike the two unions above — because these are three
+    // different commands a person chose between, and `acknowledged` is not an
+    // ending at all: the run stays waiting and its deadline keeps running.
+    { file: 'reply-migration-delivered.v1.json', eventType: 'reply.migration.delivered' },
+    { file: 'reply-migration-declined.v1.json', eventType: 'reply.migration.declined' },
+    { file: 'reply-migration-acknowledged.v1.json', eventType: 'reply.migration.acknowledged' },
 ];
 
 describe('sync envelope contract (golden fixtures)', () => {

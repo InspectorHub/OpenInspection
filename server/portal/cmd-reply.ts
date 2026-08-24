@@ -43,6 +43,17 @@ export function replyTypeFor(cmdType: string): CmdReplyType | null {
         // merely leave a request waiting, an absent reply here is also the
         // signal for the third ending — see `apply-report-correction.ts`.
         case 'io.inspectorhub.cmd.report.correct': return 'reply.report.corrected';
+        // The operator's three answers to a waiting import run. THREE replies
+        // and not one with an outcome: these are three different commands a
+        // person chose between, not one request with several endings — and
+        // `acknowledged` is not an ending at all, since the run stays waiting
+        // and its deadline keeps running. Like the DSAR replies these wake
+        // nothing: the correlation handle (`import:<batchId>`) names a durable
+        // row on the other side, not a parked Workflow, so there is no
+        // waitForEvent timeout behind them and no RPC fallback.
+        case 'io.inspectorhub.cmd.migration.deliver': return 'reply.migration.delivered';
+        case 'io.inspectorhub.cmd.migration.decline': return 'reply.migration.declined';
+        case 'io.inspectorhub.cmd.migration.acknowledge': return 'reply.migration.acknowledged';
         default: return null;
     }
 }

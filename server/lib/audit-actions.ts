@@ -104,6 +104,7 @@ export type AuditAction =
     | 'migration.abandoned'
     | 'migration.delivered'
     | 'migration.declined'
+    | 'migration.acknowledged'
     // A person at the deployment operator opened the file a workspace uploaded.
     // The only one of these written by a route that REFUSES to answer unless the
     // row lands, because a served download with no row is the state it exists to

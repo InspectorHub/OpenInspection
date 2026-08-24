@@ -1,0 +1,16 @@
+{
+  "specversion": "1.0",
+  "id": "c2e3f4a5-6b7c-4d8e-9f0a-1b2c3d4e5f60",
+  "type": "io.inspectorhub.cmd.migration.decline",
+  "source": "portal",
+  "time": "2026-08-25T10:05:00.000Z",
+  "dataschema": "cmd-migration-decline/v1",
+  "tenantseq": 2,
+  "replyto": "import:fixture-batch-1",
+  "data": {
+    "tenantId": "fixture-tenant-5",
+    "batchId": "fixture-batch-1",
+    "reason": "The export is a screenshot archive; there are no records to convert.",
+    "actor": { "platformAdminId": "fixture-admin-1", "email": "ops@example.test" }
+  }
+}
