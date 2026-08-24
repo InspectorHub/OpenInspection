@@ -1,6 +1,6 @@
 /**
- * The reader side of the courtesy translation, and the two things it must never
- * do.
+ * The reader side of the courtesy translation, and the three things it must
+ * never do — one per invariant in `server/lib/translation/read-for-report.ts`.
  *
  * 1. **Serve a stale one.** The withhold rule is asserted explicitly, paired
  *    with a matching-hash control on the same fixture — a read that always
@@ -10,6 +10,11 @@
  *    already-published report untouched. Asserted by switching it off and
  *    re-reading, because the invariant lives in prose everywhere else and prose
  *    is not a test.
+ * 3. **Map a mismatched segment list positionally.** The third invariant was
+ *    described in that header as tested and was not. Its own branch comment
+ *    calls it unreachable, which is the argument FOR asserting it: an
+ *    unreachable branch nobody exercises is a branch nobody notices becoming
+ *    reachable.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
@@ -138,6 +143,37 @@ describe('the hash decides whether a reader sees it', () => {
     });
 
     it('returns null when nothing was ever stored', async () => {
+        expect(await read()).toBeNull();
+    });
+});
+
+describe('the segment count must still line up', () => {
+    it('REFUSES a stored list whose length no longer matches the segmenter', async () => {
+        // The third invariant in read-for-report.ts's header. Its own comment
+        // calls this branch "should be unreachable" — a matching hash means the
+        // render inputs are byte-identical, so the segmenter's output is too —
+        // and that is exactly why it needs an assertion rather than a reader.
+        // Segments are re-inserted POSITIONALLY, so a list one longer than the
+        // spans maps translated prose onto the wrong components and produces a
+        // document that reads correctly and describes the wrong house. Nothing
+        // downstream detects that: no gate, no test of the rendered document,
+        // and no reader who does not speak both languages.
+        const segments = await storeFresh();
+        // The control, on the same fixture and in the same test: a read that
+        // always returned null would satisfy the refusal below on its own.
+        expect(await read(), 'the fixture must be readable before it is broken').not.toBeNull();
+
+        const englishHash = await inspection.getReportContentHash(INSPECTION, TENANT, REPORT);
+        await translations.store(TENANT, REPORT, LOCALE, {
+            // One extra segment, and the SAME English hash — so the check above
+            // this one in read-for-report.ts passes and this is the only thing
+            // standing between the reader and a misaligned document.
+            segments: [...segments, 'ES-extra'],
+            source: 'recording:byo',
+            englishHash,
+            aiCallId: 'call-2',
+        });
+
         expect(await read()).toBeNull();
     });
 });

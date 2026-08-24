@@ -8,7 +8,9 @@
  *     "don't show again". This is the sentence that tells a reader WHICH
  *     DOCUMENT IS THE RECORD; a notice a reader can close once and never see
  *     again is the state it exists to prevent. The co-located test asserts the
- *     absence of a dismiss control.
+ *     absence of a dismiss control — as "the only control in here is the
+ *     toggle", not as "there is no button called dismiss", because the next one
+ *     added will not be called that.
  *  2. **`role="note"`, explicitly.** No element maps to that role implicitly,
  *     so without it `getByRole('note')` never finds this and every E2E
  *     assertion about the notice silently passes over nothing.
