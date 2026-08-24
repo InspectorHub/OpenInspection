@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc, asc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions, inspectionUnits } from '../../lib/db/schema';
+import { inspections, templates, users, tenantConfigs, reportVersions, inspectionUnits } from '../../lib/db/schema';
 import { CredentialService, type RenderableCredential } from '../credential.service';
 import { primaryLicenseOf } from '../../lib/credentials/primary';
 import { pinnedLead } from '../../lib/version-diff';
@@ -15,8 +15,6 @@ import { renderTemplate } from '../../lib/mustache';
 import { mapRepairItems } from '../../lib/report-repair-items';
 import { selectReportMedia, type ReportMediaContext } from '../../lib/report-video';
 import { readItemEntry } from '../../lib/read-item-defects';
-import { sha256Hex } from '../signing-key.service';
-import { RENDER_VERSION } from '../../lib/pdf';
 import { resolvePdfSettings, type PdfSettings } from '../../lib/pdf-settings';
 import { isReportPublished } from '../../lib/status/report-status';
 import { resolveBuildingProfile } from '../../lib/building-profile';
@@ -28,6 +26,7 @@ import { resolveProfile } from '../../lib/report-style/resolve';
 import type { Deviation } from '../../lib/pca-deviations';
 import type { DefectCommentState } from '../../types/inspection-item-state';
 import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS, requireTemplateSnapshot } from './shared';
+import { reportContentHash, resolveResultsRow } from './report-grain';
 import { InspectionSubService } from './base';
 import { DefectCategoryService } from './defect-category.service';
 import { buildCostTables } from '../../lib/pca-costs';
@@ -161,9 +160,7 @@ export class InspectionReportService extends InspectionSubService {
         const template = inspection.templateId
             ? await db.select().from(templates).where(and(eq(templates.id, inspection.templateId), eq(templates.tenantId, tenantId))).get()
             : null;
-        const resultsRow = await db.select().from(inspectionResults)
-            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
-            .get();
+        const resultsRow = await resolveResultsRow(db, tenantId, inspectionId);
 
         // Spec 5B — v2 schema is the authoritative shape. Items are 'rich'
         // (rating + 3 tabs of canned comments) or 'text' (free-text notes).
@@ -900,22 +897,12 @@ export class InspectionReportService extends InspectionSubService {
     }
 
     /**
-     * Compute a stable content hash over the render inputs for an inspection
-     * report. Used to skip Browser Rendering when identical-content PDFs are
-     * already cached.
-     *
-     * Photo URLs use the raw R2 key (no volatile render/auth token) so the hash
-     * is stable across token refreshes. Template CSS / layout changes are
-     * covered by bumping RENDER_VERSION in server/lib/pdf.ts.
-     *
-     * Note: branding (logo image, primaryColor) is NOT included here because
-     * it is not returned by getReportData — branding changes are instead
-     * covered by bumping RENDER_VERSION.
+     * A stable content hash over the render inputs for a report. What goes into
+     * the basis, and what the hash is NOT, live with the function in
+     * `report-grain.ts`.
      */
     async getReportContentHash(id: string, tenantId: string): Promise<string> {
-        const data = await this.getReportData(id, tenantId, (key: string) => key);
-        const payload = JSON.stringify({ v: RENDER_VERSION, data });
-        return sha256Hex(payload);
+        return reportContentHash(await this.getReportData(id, tenantId, (key: string) => key));
     }
 
     /**
