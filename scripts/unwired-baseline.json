@@ -1,0 +1,106 @@
+{
+  "server/api/inspections-pdf-helpers.ts": {
+    "kind": "deferred",
+    "reason": "Resolves the immutable archive version for a report download. No route calls it, so the archive-version resolution it exists to perform never runs on a real download."
+  },
+  "server/features/seat-quota/seat-banner.tsx": {
+    "kind": "deferred",
+    "reason": "A tenant-facing seat-quota banner that nothing renders. Seat enforcement is a SaaS-profile capability; the component was built ahead of the surface that would show it."
+  },
+  "server/lib/ai/providers/recording.ts": {
+    "kind": "test-only",
+    "reason": "Its own header says TEST-ONLY AI transport: it records requests and replays canned text so a spec can assert what a caller asked for. Correct to be unreachable from production."
+  },
+  "server/lib/audit-read-model.ts": {
+    "kind": "deferred",
+    "reason": "The projection over the two audit tables. Ledger section 40 Tasks 14-24 are written and committed but not executed, and this is the half of them that has no reader."
+  },
+  "server/lib/audit-registry.ts": {
+    "kind": "deferred",
+    "reason": "How one metadata key renders in an audit entry. Same unshipped half of section 40 as the read model beside it."
+  },
+  "server/lib/automation-core/schedule.ts": {
+    "kind": "deferred",
+    "reason": "Reminder due-time derived live from the event anchor. Mirrors a derivation that runs elsewhere; nothing in this deployment's reminder path calls this copy."
+  },
+  "server/lib/compliance/legal-hold-release.ts": {
+    "kind": "deferred",
+    "reason": "Ending a preservation order and returning the erasures it deferred. legal_holds shipped with a release shape and no route that performs the release."
+  },
+  "server/lib/compliance/statutory-classifications.ts": {
+    "kind": "tool-consumed",
+    "reason": "Carries @gateConsumed: read as TEXT by a gate script, so the module graph cannot see the consumer. Split out of erasure-out-of-scope.ts on file size."
+  },
+  "server/lib/editor-search.ts": {
+    "kind": "deferred",
+    "reason": "Editor full-text search helpers, built for competitor parity. The editor route does not import them, so the search they implement is not offered anywhere."
+  },
+  "server/lib/icons.tsx": {
+    "kind": "deferred",
+    "reason": "A centralised icon registry of 27 Heroicons paths. Components import icons directly instead, so the registry that was meant to end that never took over."
+  },
+  "server/lib/inspection-resolvers.ts": {
+    "kind": "deferred",
+    "reason": "Explicit resolver functions for unit/section/item resolution. Pure, tested, and not called by the code that resolves those things today."
+  },
+  "server/lib/legal/non-translatable-manifest.ts": {
+    "kind": "tool-consumed",
+    "reason": "Carries @gateConsumed: the eleven-category registry is read as text by scripts/check-non-translatable.mjs, which the module graph cannot see."
+  },
+  "server/lib/legal/non-translatable-out-of-scope.ts": {
+    "kind": "tool-consumed",
+    "reason": "The companion out-of-scope register to the manifest above, read by the same gate script rather than imported."
+  },
+  "server/lib/mcp/snapshot-helpers.ts": {
+    "kind": "tool-consumed",
+    "reason": "Shared reduction used by the OpenAPI snapshot GENERATOR and its drift gate - both scripts. Nothing in the worker needs it at runtime."
+  },
+  "server/lib/migration-intake/infer-template.ts": {
+    "kind": "deferred",
+    "reason": "Turns a document's text into a template outline and refuses to call it a template until somebody looks. Part of the PDF-inference path whose server side has no route."
+  },
+  "server/lib/migration-intake/pdf-content.ts": {
+    "kind": "deferred",
+    "reason": "Reads text out of a page's content stream. Reachable only through pdf-text.ts, which is itself unreachable - one cluster, not three findings."
+  },
+  "server/lib/migration-intake/pdf-fonts.ts": {
+    "kind": "deferred",
+    "reason": "How to read the bytes a PDF shows through a given font. Same PDF-inference cluster as pdf-content and pdf-text."
+  },
+  "server/lib/migration-intake/pdf-text.ts": {
+    "kind": "deferred",
+    "reason": "PDF bytes to text, one string per page. The head of the PDF-inference reading cluster, and nothing on a route calls it."
+  },
+  "server/lib/rbac/can-edit.ts": {
+    "kind": "deferred",
+    "reason": "A canEdit permission matrix from an earlier design-system phase. The decision it answers is made elsewhere today, so this copy is not consulted."
+  },
+  "server/lib/report-section-numbering.ts": {
+    "kind": "deferred",
+    "reason": "Report section numbering plus edit-permission helpers, built for competitor parity. No renderer imports them."
+  },
+  "server/lib/report-style/infer-profile.ts": {
+    "kind": "deferred",
+    "reason": "Chooses a report appearance for a workspace arriving from another product. Part of the import path that has no step invoking it."
+  },
+  "server/lib/section-applicability.ts": {
+    "kind": "frozen",
+    "reason": "Its own header says FROZEN / DEAD CODE: superseded by the authoring-surface unification, kept deliberately rather than deleted. Not work owed."
+  },
+  "server/lib/statutory/render.ts": {
+    "kind": "deferred",
+    "reason": "Writes values onto the authority's own PDF. Ledger section 52: Task 6 needs a surface that renders a statutory form and no such surface exists, so nothing on a route reaches the renderer."
+  },
+  "server/lib/subtype-specials.ts": {
+    "kind": "deferred",
+    "reason": "Commercial PCA subtype-special chains driven by Building Profile flags. The commercial PCA surface does not consult them."
+  },
+  "server/lib/system-coverage.ts": {
+    "kind": "deferred",
+    "reason": "Commercial PCA system-coverage registry and standard attribution. Its own header calls attribution CORRECTNESS-CRITICAL for the conformance statement, and nothing produces that statement yet."
+  },
+  "server/services/seed/backfill-people.ts": {
+    "kind": "deferred",
+    "reason": "A one-shot backfill under services/seed. Nothing schedules or exposes it, so it can only be run by editing code."
+  }
+}

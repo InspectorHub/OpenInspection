@@ -125,6 +125,14 @@ export const SCRIPT_GATES = [
     // this change and none of them was in the hook. Moving one down a rung is
     // a cost decision for every commit in the repo and belongs in its own
     // change, with the argument written beside it like the entries above.
+    // PUSH and deliberately not PRECOMMIT. What it catches is not a keystroke:
+    // a module becomes unreachable-from-production the moment a body of work
+    // ENDS without its last wire, so the earliest honest place to ask is the
+    // batch boundary. Asked per commit it would go red in the middle of every
+    // plan that builds a primitive before its caller, and a gate that is red
+    // for a legitimate reason all week is a gate people learn to pass with
+    // --no-verify. ~10s: one knip pass over the production entry graph.
+    { key: 'unwired', label: 'lint:unwired', script: 'check-unwired.mjs', fix: 'npm run lint:unwired', rung: PUSH },
     { key: 'erasure', label: 'lint:erasure', script: 'check-erasure-manifest.mjs', fix: 'npm run lint:erasure', rung: PUSH },
     { key: 'retention', label: 'lint:retention', script: 'check-retention-manifest.mjs', fix: 'npm run lint:retention', rung: PUSH },
     { key: 'retentionpolicy', label: 'lint:retention-policy', script: 'check-retention-policy.mjs', fix: 'npm run lint:retention-policy', rung: PUSH },
