@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Form } from "react-router";
 import { Banner, Button, Checkbox } from "@core/shared-ui";
 
@@ -6,9 +6,40 @@ import { m } from "~/paraglide/messages";
 import {
     importStartBlockedReason,
     type ImportEntryPoint,
+    type WorkbookStage,
 } from "~/lib/import-entry-points";
-import { defaultImportSourceFor, importSourcesFor } from "~/lib/import-sources";
+import { defaultImportSourceFor, importSourcesFor, sourceIsTabular } from "~/lib/import-sources";
+import { csvFileNameFor, isWorkbookFileName } from "~/lib/xlsx-intake";
+import { sheetChoices, workbookSheetToCsv, type SheetChoice, type WorkbookLike } from "~/lib/xlsx-import";
+import { loadWorkbookFromFile } from "~/lib/xlsx-loader";
+import { SheetPicker } from "./SheetPicker";
 import { SourcePicker } from "./SourcePicker";
+
+/**
+ * Where the chosen file has got to in the workbook question.
+ *
+ * Panel-internal, and one state richer than `WorkbookStage`: `ready` carries
+ * the sheets to offer and which one is chosen, neither of which the blocked
+ * reason has any use for. The mapping between the two is `stageOf` below.
+ */
+type WorkbookState =
+    | { kind: "none" }
+    | { kind: "reading" }
+    | { kind: "ready"; sheets: SheetChoice[]; chosen: number | null }
+    | { kind: "unreadable" };
+
+function stageOf(state: WorkbookState): WorkbookStage {
+    switch (state.kind) {
+        case "none":
+            return "not-a-workbook";
+        case "reading":
+            return "reading";
+        case "unreadable":
+            return "unreadable";
+        case "ready":
+            return state.chosen === null ? "pending" : "chosen";
+    }
+}
 
 /**
  * The form that turns a file into an import run.
@@ -24,6 +55,26 @@ import { SourcePicker } from "./SourcePicker";
  * Which is also why the input is `sr-only` rather than `hidden`: it still has
  * to hold the chosen file when the form submits, and it still has to be
  * focusable. Only its APPEARANCE is replaced, by the label beside it.
+ *
+ * ── The workbook, and the three things not to undo ──────────────────────────
+ * An `.xlsx` chosen here is parsed IN THE BROWSER and replaced, in this same
+ * input, by one sheet of it as CSV. That is why the form stays a native
+ * submission and why nothing downstream changes: the server, the mapping step
+ * and the preview step receive a CSV they already know how to read.
+ *
+ * 1. The parsed workbook lives in a REF, not in state and not in the input.
+ *    After the first swap the input holds the CSV, so the workbook is gone from
+ *    it — changing the sheet has to re-convert from the ref, or it would be
+ *    converting a CSV.
+ * 2. Conversion is keyed on the DECLARED VENDOR, not on the file extension. A
+ *    Spectora export is also an `.xlsx`, and the server opens it as a package
+ *    itself; flattening one sheet of it would destroy it. `sourceIsTabular`
+ *    answers this, and the entries where it is true have exactly one source, so
+ *    the vendor cannot change after a file is chosen.
+ * 3. A workbook nothing here can read is left ALONE, and the submit stays
+ *    enabled. That file then travels exactly as it does today. Blocking it
+ *    would remove that path from the product without changing a line of server
+ *    code.
  *
  * The two agreements are separate controls because they authorise different
  * things with different lifetimes. Keeping the file is about resuming this
@@ -54,15 +105,76 @@ export function StartImportPanel({
     const [fileName, setFileName] = useState<string | null>(null);
     const [uploadAuthorized, setUploadAuthorized] = useState(false);
     const [staffAccessAuthorized, setStaffAccessAuthorized] = useState(false);
+    const [workbook, setWorkbook] = useState<WorkbookState>({ kind: "none" });
+
+    const inputRef = useRef<HTMLInputElement>(null);
+    /** The parsed workbook and the name it arrived under — see (1) above. */
+    const heldRef = useRef<{ workbook: WorkbookLike; fileName: string } | null>(null);
+    /** Which read is current. A second file chosen while the first is still
+     *  parsing must not have its result overwritten by the one it replaced. */
+    const readRef = useRef(0);
+
+    /** Put one sheet of the held workbook into the file input, as CSV. */
+    const applySheet = (sheetIndex: number, sheetName: string) => {
+        const held = heldRef.current;
+        const input = inputRef.current;
+        if (!held || !input) return;
+        const csv = workbookSheetToCsv(held.workbook, sheetIndex);
+        const converted = new File([csv], csvFileNameFor(held.fileName, sheetName), {
+            type: "text/csv",
+        });
+        // Assigning `files` does not fire `change`, so this cannot re-enter the
+        // handler below.
+        const transfer = new DataTransfer();
+        transfer.items.add(converted);
+        input.files = transfer.files;
+    };
+
+    const onFileChosen = (file: File | null) => {
+        // Always starts from the newly chosen file, so choosing a second one
+        // resets every answer the first produced.
+        const read = ++readRef.current;
+        heldRef.current = null;
+        setFileName(file?.name ?? null);
+
+        if (!file || !sourceIsTabular(entry.intent, vendor) || !isWorkbookFileName(file.name)) {
+            setWorkbook({ kind: "none" });
+            return;
+        }
+
+        setWorkbook({ kind: "reading" });
+        loadWorkbookFromFile(file)
+            .then((parsed) => {
+                if (read !== readRef.current) return;
+                const sheets = sheetChoices(parsed);
+                // No sheet with rows is a parse failure by another name: every
+                // answer on offer would convert to an empty CSV.
+                if (sheets.length === 0) {
+                    setWorkbook({ kind: "unreadable" });
+                    return;
+                }
+                heldRef.current = { workbook: parsed, fileName: file.name };
+                if (sheets.length === 1) {
+                    applySheet(sheets[0].index, sheets[0].name);
+                    setWorkbook({ kind: "ready", sheets, chosen: sheets[0].index });
+                } else {
+                    setWorkbook({ kind: "ready", sheets, chosen: null });
+                }
+            })
+            .catch(() => {
+                // Every failure means the same thing: leave the input alone, so
+                // the original workbook is what submits. See (3) above.
+                if (read !== readRef.current) return;
+                setWorkbook({ kind: "unreadable" });
+            });
+    };
 
     const blockedReason = importStartBlockedReason(
         entry,
         {
             vendor,
             hasFile: fileName !== null,
-            // This panel does not read workbooks yet, so the only honest answer
-            // is that whatever was chosen is not one.
-            workbook: "not-a-workbook",
+            workbook: stageOf(workbook),
             uploadAuthorized,
             staffAccessAuthorized,
         },
@@ -113,14 +225,48 @@ export function StartImportPanel({
                     </span>
                 </span>
                 <input
+                    ref={inputRef}
                     data-testid="import-start-file"
                     type="file"
                     name="file"
                     accept=".csv,.xlsx,.json"
                     className="sr-only"
-                    onChange={(e) => setFileName(e.currentTarget.files?.[0]?.name ?? null)}
+                    onChange={(e) => onFileChosen(e.currentTarget.files?.[0] ?? null)}
                 />
             </label>
+
+            {/* Nothing at all below two sheets — see SheetPicker. */}
+            {workbook.kind === "ready" && (
+                <SheetPicker
+                    sheets={workbook.sheets}
+                    value={workbook.chosen}
+                    onPick={(sheetIndex) => {
+                        const sheet = workbook.sheets.find((s) => s.index === sheetIndex);
+                        if (!sheet) return;
+                        applySheet(sheet.index, sheet.name);
+                        setWorkbook({ ...workbook, chosen: sheet.index });
+                    }}
+                />
+            )}
+
+            {/* One sheet: information, not a question. */}
+            {workbook.kind === "ready" && workbook.sheets.length === 1 && (
+                <p data-testid="import-start-sheet-used" className="text-[12px] text-ih-fg-3">
+                    {m.imports_sheet_using({ name: workbook.sheets[0].name })}
+                </p>
+            )}
+
+            {/* The two sentences differ because the outcomes differ: a
+                deployment with no support path refuses the upload rather than
+                storing it, so "someone will convert it" would be a promise
+                nothing can keep. */}
+            {workbook.kind === "unreadable" && (
+                <p data-testid="import-start-sheet-unreadable" className="text-[12px] text-ih-fg-3">
+                    {hasAssistedMigration
+                        ? m.imports_sheet_unreadable_assisted()
+                        : m.imports_sheet_unreadable_standalone()}
+                </p>
+            )}
 
             {/* Offered HERE, and only for contacts: the failure a starter file
                 removes is a whole upload whose headings nothing matched, and
