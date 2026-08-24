@@ -16,10 +16,12 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { getTableColumns } from 'drizzle-orm';
 import { CONTACT_EXCHANGE } from '../../../server/lib/data-exchange/contacts';
 import { MEMBER_EXCHANGE } from '../../../server/lib/data-exchange/members';
 import { headerVocabulary, INTAKE_HEADERS } from '../../../server/lib/data-exchange/headers';
-import type { ExchangeVocabulary } from '../../../server/lib/data-exchange/types';
+import { auditVocabularyCoverage, type ExchangeVocabulary } from '../../../server/lib/data-exchange/types';
+import { contacts, users } from '../../../server/lib/db/schema';
 import { CONTACT_HEADERS } from '../../../server/lib/migration-intake/adapters/registry';
 
 const VOCABULARIES = [CONTACT_EXCHANGE, MEMBER_EXCHANGE];
@@ -85,6 +87,33 @@ describe('exchange vocabulary — one alias dictionary', () => {
         // Proves the throw above is about the conflict and not about the
         // merge refusing every input it is handed.
         expect(() => headerVocabulary(CONTACT_EXCHANGE, MEMBER_EXCHANGE)).not.toThrow();
+    });
+});
+
+describe('exchange vocabulary — coverage of the real table', () => {
+    // The INSTRUMENT is checked before the catalogue. A coverage checker that
+    // reports nothing is indistinguishable from a green run, so these two make
+    // it report something first, over column lists nobody's table has.
+    it('POSITIVE CONTROL — the audit reports a column nobody ruled on', () => {
+        const complaints = auditVocabularyCoverage(CONTACT_EXCHANGE, ['id', 'bogus_column']);
+        expect(complaints.join('\n')).toContain('bogus_column');
+    });
+
+    it('POSITIVE CONTROL — the audit reports a rule for a column that is gone', () => {
+        const complaints = auditVocabularyCoverage(CONTACT_EXCHANGE, ['id']);
+        expect(complaints.join('\n')).toContain('notes');
+    });
+
+    it('rules on every column of contacts', () => {
+        const columns = Object.values(getTableColumns(contacts)).map((c) => c.name);
+        expect(columns.length).toBeGreaterThan(10);
+        expect(auditVocabularyCoverage(CONTACT_EXCHANGE, columns)).toEqual([]);
+    });
+
+    it('rules on every column of users', () => {
+        const columns = Object.values(getTableColumns(users)).map((c) => c.name);
+        expect(columns.length).toBeGreaterThan(10);
+        expect(auditVocabularyCoverage(MEMBER_EXCHANGE, columns)).toEqual([]);
     });
 });
 
