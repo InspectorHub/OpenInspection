@@ -43,14 +43,26 @@
  * A notice a reader can close once and never see again is the state this exists
  * to prevent.
  *
- * The Spanish rendering of this sentence is a SEPARATE decision from the text
- * below and is not made here: this module holds the English wording and the
- * version, and a renderer that needs the sentence in the reader's language
- * takes it from the message catalogue keyed by this version — the treatment
- * `report-view-disclosure.ts` already uses for a notice that only does its job
- * if the reader can read it. What must never happen is the notice passing
- * through the same machine translation it is describing.
+ * A rendering of this sentence in the READER'S language is a separate decision
+ * from the text below and is not made here. This module holds the English
+ * wording and the version; which text a reader is actually shown is answered by
+ * `courtesyTranslationNoticeFor` at the bottom of this file, which consults the
+ * register of REVIEWED per-language constants.
+ *
+ * ⚠️ Not the message catalogue, and the reason is the sentence itself. This is
+ * the text that DEFINES WHICH DOCUMENT CARRIES AUTHORITY, so it must never pass
+ * through the machine translation it is describing — and it must not be an
+ * ordinary catalogue string either, because a bulk translation pass could then
+ * reword it with nobody deciding anything. A target-language wording becomes
+ * authoritative only once a qualified legal translator has reviewed it. That
+ * register is empty today, so every reader is shown the English, which is the
+ * record itself.
  */
+
+import {
+    resolveReviewedConstant,
+    type ResolvedConstantText,
+} from './reviewed-language-constants';
 
 /**
  * Version of the notice copy. Bump on ANY wording change.
@@ -76,3 +88,23 @@ export const COURTESY_TRANSLATION_NOTICE = Object.freeze({
         + 'This courtesy translation is provided to assist understanding '
         + 'and may not reflect the exact wording of the English report.',
 });
+
+/**
+ * The notice as one reader should see it, and whether that text IS the record.
+ *
+ * Today this always answers with the English wording and `authoritative: true`,
+ * because no language has been reviewed. That is not a stub: it is the correct
+ * answer, and it becomes a different answer the day a reviewed constant is
+ * registered — without this function or its callers changing.
+ *
+ * ⚠️ The English string and `version` above are NOT touched by any of this.
+ * Every stored translation records the version in force when it was produced,
+ * so a bump orphans every one of those records.
+ */
+export function courtesyTranslationNoticeFor(locale: string): ResolvedConstantText {
+    return resolveReviewedConstant('courtesy_translation_notice', locale, {
+        version: COURTESY_TRANSLATION_NOTICE.version,
+        title: COURTESY_TRANSLATION_NOTICE.title,
+        text: COURTESY_TRANSLATION_NOTICE.text,
+    });
+}
