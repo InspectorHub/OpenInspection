@@ -70,3 +70,7 @@ tests/e2e/zz-e2e-coverage-probe.spec.ts
 # Vitest run reports — a durable record of every run, so an intermittent
 # failure is diagnosable after the fact rather than only while watching.
 .vitest/
+
+# Test-run logs — full stdout per run, so an intermittent failure is
+# diagnosable after the fact. See scripts/run-logged.mjs.
+.runlogs/
