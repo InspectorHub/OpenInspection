@@ -45,6 +45,7 @@
     "lint:ds": "node scripts/check-ds-tokens.mjs",
     "lint:contrast": "node scripts/check-contrast.mjs",
     "lint:agent-routes": "node scripts/check-agent-routes.mjs",
+    "lint:agent-terms-classification": "node scripts/check-agent-terms-classification.mjs",
     "lint:naming": "node scripts/check-naming.mjs",
     "lint:svg": "node scripts/check-svg-dimensions.mjs",
     "lint:erasure": "node scripts/check-erasure-manifest.mjs",

@@ -28,11 +28,20 @@
  * moved into the exempt list. An exemption is a decision and decisions get
  * argued away; being structurally out of reach cannot be.
  */
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { EXEMPT_PATHS } from '../../../server/lib/middleware/agent-terms-gate';
 import { AGENT_ROUTE_BINDING } from '../../../server/lib/middleware/agent-terms-routes';
+// @ts-expect-error — a build script, deliberately untyped and loaded natively.
+import { collectAgentRoutes } from '../../../scripts/check-agent-terms-classification.mjs';
 
 const table = AGENT_ROUTE_BINDING;
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+
+/** The three mounts the gate script descends into; asserted, not assumed. */
+const AGENT_MOUNT_COUNT = 8;
 
 /**
  * The mounts an authenticated agent session can reach.
@@ -168,6 +177,23 @@ describe('the agent-route classification table', () => {
             { exempt: table.filter((e) => !e.requiresBinding).length, patterned: patterned.map((e) => e.path) },
             'an exemption must be a literal path, because the match is exact',
         ).toEqual({ exempt: table.filter((e) => !e.requiresBinding).length, patterned: [] });
+    });
+
+    it('is read the same way by the gate script as by the running application', () => {
+        // The positive control on the gate script's parser. That script reads
+        // routes STATICALLY, from source; this spec reads them from the mounted
+        // app. Two readers, one answer — so a parser that quietly stops seeing a
+        // router shows up here as a disagreement, rather than as a gate that
+        // examines fewer and fewer routes while printing a clean pass.
+        const fromSource = collectAgentRoutes({
+            readFile: (relative: string) => {
+                const abs = resolve(REPO_ROOT, relative);
+                return existsSync(abs) ? readFileSync(abs, 'utf8') : null;
+            },
+        });
+        expect(fromSource.problems).toEqual([]);
+        expect(fromSource.paths).toEqual(universe);
+        expect(fromSource.mountsExamined).toBe(AGENT_MOUNT_COUNT);
     });
 
     it('does not reach into the structurally unreachable public surface', () => {

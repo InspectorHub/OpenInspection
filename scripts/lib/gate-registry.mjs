@@ -37,6 +37,19 @@ export const SCRIPT_GATES = [
     { key: 'filesize', label: 'Large-file ratchet', script: 'check-file-size.mjs', fix: 'npm run lint:filesize', rung: PRECOMMIT },
     { key: 'tz', label: 'Calendar timezone-safety', script: 'check-tz-safety.mjs', fix: 'npm run lint:tz', rung: PRECOMMIT },
     { key: 'idempotency', label: 'Mutating-route retry safety', script: 'check-idempotency-coverage.mjs', fix: 'npm run lint:idempotency', rung: PRECOMMIT },
+    // Pre-commit for the same reason as the price, tracking and AI gates: what
+    // it catches is a route ARRIVING with nobody having said whether reaching it
+    // requires the agent to be bound by the Agent Terms. That question is cheap
+    // at the moment the route is typed and the author is present, and expensive
+    // later -- by the time anyone asks, the route is written, shipped, and the
+    // person who could answer has moved on. It is also the rung that sees the
+    // moment: a route is added exactly once.
+    // ⚠️ NOT `agentroutes`. That gate is about UI route prefixes under
+    // agent-layout and which sign-in door a session lands on; this one reads the
+    // API routers. Distinct keys on purpose so the two are never read as one.
+    // Parses ~12 source files with the TypeScript parser: single-digit
+    // milliseconds, among the cheapest entries here.
+    { key: 'agenttermsclass', label: 'Agent-terms route classification', script: 'check-agent-terms-classification.mjs', fix: 'npm run lint:agent-terms-classification', rung: PRECOMMIT },
     // Pre-commit and not CI because a collision is created at exactly one moment
     // -- when a file is added or renamed -- and this is the rung that sees that
     // moment. It is also the rung where the fix is free: renaming a file nobody
