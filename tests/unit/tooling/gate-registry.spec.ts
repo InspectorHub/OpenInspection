@@ -172,6 +172,30 @@ describe('gate registry', () => {
         expect(schemaDoc!.args).toEqual(['--check']);
     });
 
+    it('runs the copy-policy gates against the repository, not against their own fixtures', () => {
+        // Both copy gates accept `--self-test`: they score their patterns against
+        // a labelled must-flag / must-not-flag list, print "self-test OK" and
+        // exit 0 WITHOUT reading a single catalogue. That is a useful mode and a
+        // dangerous registration — registered with those args, the gate passes
+        // forever while looking at nothing, which is this repository's oldest
+        // failure shape.
+        //
+        // The shape is not hypothetical here: `chromerecord` a few rows above is
+        // registered exactly that way, deliberately, so the pattern is sitting
+        // in the same file waiting to be copied onto a gate whose whole value is
+        // the scan. This locks the two that must never take it.
+        for (const key of ['verificationcopy', 'endorsementcopy']) {
+            const gate = SCRIPT_GATES.find((g) => g.key === key);
+            expect(gate, `${key} is not registered`).toBeDefined();
+            expect(
+                gate!.args,
+                `${key} is registered with args ${JSON.stringify(gate!.args)} — a copy gate that runs `
+                + 'its self-test instead of its scan reports a clean catalogue it never opened',
+            ).toBeUndefined();
+            expect(gate!.rung, `${key} should stay on the push rung`).toBe(PUSH);
+        }
+    });
+
     it('summarises a run with both numbers, not just the failures', async () => {
         // A runner that prints only failures reads as "all clear" on the day it
         // silently ran nothing. The summary has to state how many gates ran.

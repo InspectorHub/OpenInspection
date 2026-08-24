@@ -192,6 +192,23 @@ export const SCRIPT_GATES = [
     { key: 'noportalroutes', label: 'lint:no-portal-routes', script: 'check-no-portal-routes.mjs', fix: 'npm run lint:no-portal-routes', rung: PUSH },
     { key: 'schemadoc', label: 'lint:schema-doc', script: 'gen-schema-doc.mjs', fix: 'npm run lint:schema-doc', rung: PUSH, args: ['--check'] },
     { key: 'verificationcopy', label: 'lint:verification-copy', script: 'check-verification-copy.mjs', fix: 'npm run lint:verification-copy', rung: PUSH },
+    // The other copy-policy gate, and it sits beside `verificationcopy` on the
+    // same rung for the same reason. What it catches is a claim that an
+    // AUTHORITY approved what this software renders — "OIR-approved", "approved
+    // by the Office of Insurance Regulation" — which is a statement about a
+    // third party that nobody at that agency ever made.
+    //
+    // PUSH rather than PRECOMMIT, on two arguments. First, its subject is
+    // authored in batches, not keystrokes: statutory-form copy arrives when a
+    // form is published, by hand, weeks apart — the same rhythm that puts
+    // `statutoryfidelity` at this rung. Second, and this is the one that
+    // settles it, the gate reads every LOCALE. A claim and its translation
+    // routinely land in different commits, so a per-commit rung would go green
+    // on the English commit and red on the translation, blaming the wrong
+    // change; PUSH is the first rung where the answer is complete. It walks
+    // ~83 files / ~20k strings in well under a second, so the cost is not what
+    // decides it — the completeness of the answer is.
+    { key: 'endorsementcopy', label: 'lint:endorsement-copy', script: 'check-endorsement-copy.mjs', fix: 'npm run lint:endorsement-copy', rung: PUSH },
     // PUSH rather than PRECOMMIT, unlike the tracking gate above it, and for a
     // reason that is about WHERE the breakage comes from rather than how much
     // it costs: this one fails when an anchor comment is deleted or a guarded
