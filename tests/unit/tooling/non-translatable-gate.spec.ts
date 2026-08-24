@@ -2,18 +2,19 @@
  * Proof that the non-translatable content registry gate
  * (`scripts/check-non-translatable.mjs`) bites — OI #58.
  *
- * The rule it enforces: eight categories of content inside the report and the
- * agreement — reliance clauses, limitation of liability, arbitration, warranty
- * disclaimer, governing law, contract terms, signatures, acknowledgements — are
- * terms of a legal instrument rather than content. English is authoritative for
- * all eight.
+ * The rule it enforces: eleven categories of content inside the report, the
+ * agreement and the records taken alongside them — reliance clauses, limitation
+ * of liability, arbitration, warranty disclaimer, governing law, contract terms,
+ * signatures, acknowledgements, legal notices, consents and waivers, statutory
+ * certification language — are terms of a legal instrument rather than content.
+ * English is authoritative for every one of them.
  *
  * ## Why this spec is the whole enforcement today
  *
  * The `translation` output class is released on a workspace's own provider key,
  * but no pipeline segments a report yet. Nothing reads the
  * registry at runtime and nothing will until that ships, so the registry's only
- * enemy for now is decay: a renamed constant, a moved file, a ninth category
+ * enemy for now is decay: a renamed constant, a moved file, a new category
  * added to the type and not the list. Every assertion below is about the gate
  * noticing decay, because that is the failure that would hand #23 a register
  * that looks authoritative and is not.
@@ -37,6 +38,10 @@ import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import {
+    NON_TRANSLATABLE_CATEGORIES,
+    NON_TRANSLATABLE_MANIFEST,
+} from '../../../server/lib/legal/non-translatable-manifest';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const GATE = path.join(ROOT, 'scripts', 'check-non-translatable.mjs');
@@ -54,6 +59,44 @@ function violationLines(output: string): string[] {
     return output.split('\n').filter((l) => /^ {2}\S/.test(l));
 }
 
+describe('the closed category set covers every class that stays English', () => {
+    /**
+     * Three classes of content must never be delivered as authoritative text in
+     * a machine translation, and none of them had a category: a notice whose
+     * wording is the operative act, a consent or waiver, and statutory
+     * certification language. They are listed here rather than derived from the
+     * tuple on purpose — a test that reads the tuple it is checking cannot
+     * notice a category going missing from it.
+     */
+    const REQUIRED = ['legal_notice', 'consent_waiver', 'statutory_certification'] as const;
+
+    for (const category of REQUIRED) {
+        it(`declares '${category}' as a category`, () => {
+            expect(NON_TRANSLATABLE_CATEGORIES).toContain(category);
+        });
+
+        it(`carries at least one real subject for '${category}'`, () => {
+            // A category with no entry is the failure the gate's coverage check
+            // exists for; asserting the entries here as well means the registry
+            // cannot be widened by name alone.
+            const entries = NON_TRANSLATABLE_MANIFEST.filter((e) => e.category === category);
+            expect(entries.length).toBeGreaterThan(0);
+            for (const entry of entries) {
+                expect(entry.reason.trim().length).toBeGreaterThan(0);
+            }
+        });
+    }
+
+    it('keeps every pre-existing category, because widening must never narrow', () => {
+        for (const category of [
+            'reliance_clause', 'limitation_of_liability', 'arbitration', 'warranty_disclaimer',
+            'governing_law', 'contract_terms', 'signature', 'acknowledgement',
+        ]) {
+            expect(NON_TRANSLATABLE_CATEGORIES).toContain(category);
+        }
+    });
+});
+
 describe('non-translatable registry gate', () => {
     it('passes on the real registry', () => {
         const { status, output } = runGate();
@@ -61,13 +104,18 @@ describe('non-translatable registry gate', () => {
         expect(status).toBe(0);
     });
 
-    it('reports a NON-EMPTY registry covering all eight categories', () => {
+    it('reports a NON-EMPTY registry covering all eleven categories', () => {
         // The positive control for every "it fails when the registry is empty"
         // assertion below. A gate that parsed nothing would also print OK, so
-        // the real run has to be pinned to "found something" — and to eight of
-        // eight, since seven of eight is what a decayed register looks like.
+        // the real run has to be pinned to "found something" — and to all of
+        // them, since all-but-one is what a decayed register looks like.
+        //
+        // The 11 is WRITTEN OUT rather than read from the tuple on purpose.
+        // Deriving it here would make this assertion agree with any widening or
+        // narrowing automatically, and widening the closed set is a decision
+        // that should have to walk past a red test.
         const { output } = runGate();
-        expect(output).toMatch(/[1-9]\d* manifest entries covering 8\/8 required categories/);
+        expect(output).toMatch(/[1-9]\d* manifest entries covering 11\/11 required categories/);
         expect(output).toMatch(/[1-9]\d* out-of-scope/);
     });
 
@@ -88,8 +136,10 @@ describe('non-translatable registry gate', () => {
             expect(output).toContain("manifest #4 (probe-no-locator): missing/empty 'locator'.");
         });
 
-        it('names a category outside the eight', () => {
-            expect(output).toContain("category 'shipping_terms' is not one of the eight");
+        it('names a category outside the closed set', () => {
+            expect(output).toContain(
+                "category 'shipping_terms' is not one of the 11 required categories",
+            );
         });
 
         it('names a source path that no longer exists', () => {
