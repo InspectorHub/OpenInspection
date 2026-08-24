@@ -64,6 +64,13 @@
  * loud; anything that fails it does not need a new entry, it needs the entry it
  * is missing.
  *
+ * Answering it out loud is now the only way to add a route. Every agent-reachable
+ * path carries a row in `agent-terms-routes.ts` with its answer in prose, the
+ * exempt list below is derived from the rows that answer no, and
+ * `scripts/check-agent-terms-classification.mjs` fails the commit on a route
+ * with no row at all. The rule stopped being something a reader had to remember
+ * to apply.
+ *
  * The report-token track needs no entry here and that is structural, not lucky.
  * A client or agent opening a report link presents an `inspection_access_tokens`
  * bearer, not a session; the JWT middleware short-circuits those paths before
@@ -79,6 +86,7 @@ import { Errors } from '../errors';
 import { logger } from '../logger';
 import type { HonoConfig } from '../../types/hono';
 import { agentTermsStatus } from '../../services/agent/terms-acceptance';
+import { AGENT_ROUTE_BINDING } from './agent-terms-routes';
 
 /**
  * Where a gated agent is sent to read the text and accept it.
@@ -90,54 +98,25 @@ import { agentTermsStatus } from '../../services/agent/terms-acceptance';
 const AGENT_ACCEPT_TERMS_PATH = '/agent-accept-terms';
 
 /**
- * Exact paths, never prefixes.
+ * Exact paths, never prefixes — and DERIVED, never hand-kept.
  *
- * The JWT middleware beside this one learned that the hard way: `path ===
- * '/api/agent-signup'` does not cover `/api/agent-signup/terms`, and the fix was
- * to list the child rather than to loosen the match. A prefix here would exempt
- * every future path underneath it, which for `/api/agent` would be the whole
- * agent API.
+ * Every agent-reachable route carries a row in `AGENT_ROUTE_BINDING` saying
+ * whether using it requires the agent to be bound, and the rows that say no are
+ * this Set. Nothing is added here directly. That is the whole point: a hand-kept
+ * exemption list spells "we decided this route is gated" and "nobody has looked
+ * at this route" identically, as absence, and the second one is the failure this
+ * mechanism exists to prevent. The gate script refuses a route with no row, so
+ * the question gets asked at the moment it is cheap to answer.
+ *
+ * Exact, and not a prefix, for the reason the JWT middleware beside this one
+ * learned the hard way: `path === '/api/agent-signup'` does not cover
+ * `/api/agent-signup/terms`, and the fix was to list the child rather than to
+ * loosen the match. A prefix here would exempt every future path underneath it,
+ * which for `/api/agent` would be the whole agent API.
  */
-const EXEMPT_PATHS = new Set<string>([
-    // The way out. Records the acceptance; refusing it would be the lockout.
-    '/api/agent/accept-terms',
-    // The text itself. The signup page reads it with no session at all, so it is
-    // already public — listed anyway, because a session-bearing read of the
-    // document you are being asked to accept must never depend on that.
-    '/api/agent-signup/terms',
-    // Signup records an acceptance as part of creating the account. An agent who
-    // is already signed in does not come through here, but a second tab might.
-    '/api/agent-signup',
-    // The other way out. A gate whose only exits are "agree" and "keep an
-    // account you no longer want" is the coercion this whole mechanism exists to
-    // avoid, so leaving is exempt even though it is an authenticated write.
-    //
-    // ⚠️ This string is the MOUNT plus the route path — `server/index.ts` mounts
-    // identityRoutes at `/api/identities` (plural). Two comments in the tree name
-    // this endpoint differently (`server/api/identity.ts` header says
-    // `/api/identity/…`, `server/lib/db/schema/tenant/user.ts` said
-    // `/api/account/…`); both were wrong, and both were corrected for THIS
-    // endpoint when it was added. The sweep stopped at the delete line — the
-    // export line beside it in `identity.ts` stayed singular until the entry
-    // below was written. Because the matching here is exact, either of those
-    // spellings would have compiled, passed review, and exempted nothing.
-    '/api/identities/account/delete',
-    // The privacy half of the principle in the header. A data export is an
-    // access request: the agent is asking for their own data, and answering "not
-    // until you accept these terms" would price a privacy-rights mechanism at a
-    // signature. It is NOT covered by the deletion entry above — the two are
-    // different acts, this one is not an exit, and an exact-match Set gives no
-    // family discounts.
-    //
-    // ⚠️ Same mount trap as the line above, and it had NOT been swept for this
-    // one: `server/index.ts` mounts identityRoutes at `/api/identities` (plural)
-    // and `server/api/identity.ts` declares the route as `/account/export`, so
-    // the string is `/api/identities/account/export`. That file's own header
-    // said `POST /api/identity/account/export` (singular) until this entry was
-    // added, and it was corrected then — the singular spelling compiles, reviews
-    // clean, and exempts nothing at all.
-    '/api/identities/account/export',
-]);
+export const EXEMPT_PATHS = new Set<string>(
+    AGENT_ROUTE_BINDING.filter((route) => !route.requiresBinding).map((route) => route.path),
+);
 
 export const agentTermsGate: MiddlewareHandler<HonoConfig> = async (c, next) => {
     const agentUserId = c.get('agentUserId');
