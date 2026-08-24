@@ -129,11 +129,31 @@ async function replies(): Promise<Array<{ eventType: string; payload: Record<str
     return results.map((r) => ({ eventType: r.event_type, payload: JSON.parse(r.payload) as Record<string, unknown> }));
 }
 
-describe('cmd.migration.* through the real consumer', () => {
+/**
+ * ⚠️ A RAISED TIMEOUT, and the reason is not "these are slow tests".
+ *
+ * Run alone every assertion here finishes in tens of milliseconds. Run as part
+ * of the whole `tests/workers` suite — 32 files, each its own workerd isolate,
+ * contending for one machine — the FIRST test in this file blew the 5s default
+ * while it paid a one-off cost nothing else pays: the applier is reached by a
+ * dynamic import, and it pulls in the bundle parser and the staging service on
+ * whichever test happens to run first.
+ *
+ * That timeout did not fail alone. The timed-out test's second delivery was
+ * still in flight when the next test began, so it staged its row into a table
+ * `beforeEach` had just cleared and the POSITIVE CONTROL read three rows where
+ * it expected two — a cascade that looks exactly like a dedup bug and is not
+ * one. The `beforeAll` below pays the import cost up front so no single test
+ * carries it, and the timeout covers the contention that remains.
+ */
+describe('cmd.migration.* through the real consumer', { timeout: 30_000 }, () => {
     beforeAll(async () => {
         await seedSchema();
         await b.DB.prepare('INSERT OR IGNORE INTO tenants (id, slug, created_at) VALUES (?, ?, ?)')
             .bind(TENANT, 'cmd-mig', Date.now()).run();
+        // Warm the dynamically-imported applier and everything under it, so the
+        // first assertion measures the consumer rather than a module graph.
+        await import('../../server/portal/apply-migration-commands');
     });
     beforeEach(clearTables);
 
