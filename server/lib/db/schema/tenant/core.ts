@@ -581,6 +581,25 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
      * precisely the drift worth being able to see.
      */
     aiKeyAttestationConfigVersion: integer('ai_key_attestation_config_version'),
+    /**
+     * Whether this workspace may PRODUCE courtesy translations of a report.
+     *
+     * ⚠️ It gates production and never consumption. Switching it off must not
+     * alter a single already-published report: reader paths answer from
+     * `report_translations` rows and never consult this column, so turning the
+     * feature off stops new translations being made and can never strip one
+     * from a document already delivered. Removal of a translation stays
+     * available while it is off, because cleaning up after switching off is
+     * exactly when it is needed.
+     *
+     * Defaults to FALSE, unlike `is_ai_enabled` above, and the asymmetry is
+     * deliberate. That column means "nothing switched off"; this one is a
+     * decision to spend money on every publish, and off is the absence of a
+     * choice rather than a choice.
+     * Appended at END per the D1 add-column-at-end rule (tenant_configs is
+     * FK-referenced).
+     */
+    courtesyTranslationEnabled: integer('courtesy_translation_enabled', { mode: 'boolean' }).notNull().default(false),
 });
 
 /**

@@ -160,6 +160,8 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'inspection.report_narrative.update': { family: 'inspection', label: 'audit_action_inspection_report_narrative_update', meta: { cleared: 'flag', length: 'count', reportId: 'id' }, status: { kind: 'live' } },
     'inspection.report_relocked': { family: 'inspection', label: 'audit_action_inspection_report_relocked', meta: {}, status: { kind: 'live' } },
     'inspection.report_unlocked': { family: 'inspection', label: 'audit_action_inspection_report_unlocked', meta: { alreadyUnlocked: 'flag', reason: 'reason' }, status: { kind: 'live' } },
+    'inspection.report_translation_regenerated': { family: 'inspection', label: 'audit_action_inspection_report_translation_regenerated', meta: { locale: 'name', reportId: 'id', segmentCount: 'count' }, status: { kind: 'live' } },
+    'inspection.report_translation_removed': { family: 'inspection', label: 'audit_action_inspection_report_translation_removed', meta: { locale: 'name', reportId: 'id', removed: 'flag' }, status: { kind: 'live' } },
     'inspection.rescheduled': { family: 'inspection', label: 'audit_action_inspection_rescheduled', meta: { conflicts: 'count', from: 'from', to: 'to' }, status: { kind: 'live' } },
     'inspection.results_batch_patched': { family: 'inspection', label: 'audit_action_inspection_results_batch_patched', meta: { applied: 'to', by: 'person' }, status: { kind: 'live' } },
     'inspection.send_pdf': { family: 'inspection', label: 'audit_action_inspection_send_pdf', meta: { recipient: 'person', roleKey: 'name' }, status: { kind: 'live' } },

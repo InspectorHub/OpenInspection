@@ -24,6 +24,7 @@ import { fireAutomation } from '../../services/inspection/shared';
 import { refuseLeaveCancelledViaStatusWrite } from './cancel-write-path';
 import { eq, and } from 'drizzle-orm';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
+import { translateOnPublishForRequest } from '../../lib/translation/on-publish';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 
 /**
@@ -375,6 +376,14 @@ const publishRoutes = createApiRouter()
             ...(body.reportId ? { reportId: body.reportId } : {}),
         };
         const result = await service.publishInspection(id, tenantId, publishOptions);
+
+        // #23 — the courtesy translation, when the publisher asked for one on
+        // THIS publish. Never blocks: a translation that could not be produced
+        // leaves the English report published and correct, which is the state
+        // the feature degrades to by design. See lib/translation/on-publish.ts.
+        c.executionCtx.waitUntil(
+            translateOnPublishForRequest(c, id, body.translateTo ?? null, body.reportId),
+        );
 
         // Design System 0520 subsystem D phase 9 — Republish snapshot.
         // After the inspection's status flips to published, persist a frozen

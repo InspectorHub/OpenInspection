@@ -1,0 +1,1 @@
+ALTER TABLE `tenant_configs` ADD `courtesy_translation_enabled` integer DEFAULT false NOT NULL;

@@ -14,6 +14,7 @@ import {
     type VersionedPrompt,
 } from '../lib/ai/prompts';
 import { parseTranslatedSegments } from '../lib/ai/translate-response';
+import { translationSourceTag } from '../lib/ai/translation-source';
 import { defectDigest, NO_DEFECTS_SUMMARY } from '../lib/ai/defect-digest';
 import type { AiProvenanceSink } from '../lib/ai/provenance';
 import type { AiQuotaPreflight } from '../lib/ai/metering';
@@ -274,9 +275,10 @@ export class AIService {
      * 'assist', and a translation counted there makes both metrics wrong at once — with no type error. The capability gate reads the
      * PROMPT's classification inside `callGemini`; response shape and segment-count invariance live in `lib/ai/translate-response.ts`.
      */
-    async translateSegments(input: TranslateSegmentsPromptArgs): Promise<{ segments: string[]; aiCallId: string }> {
+    async translateSegments(input: TranslateSegmentsPromptArgs): Promise<{ segments: string[]; aiCallId: string; source: string }> {
         const { text, aiCallId } = await this.callGemini(AI_PROMPTS.translate, input, 'translate');
-        return { segments: parseTranslatedSegments(text, input.segments.length), aiCallId };
+        const segments = parseTranslatedSegments(text, input.segments.length);
+        return { segments, aiCallId, source: translationSourceTag(this.provider?.id, this.credentials.source) };
     }
 
     /**

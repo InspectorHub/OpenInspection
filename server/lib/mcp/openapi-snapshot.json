@@ -19146,6 +19146,61 @@
     "description": "Partially update the tenant-level inspection editor preferences. Supplied fields are merged with existing values and the result is re-validated before persisting to the tenant config."
   },
   {
+    "operationId": "updateInspectionReportTranslation",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/report-translation",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection id"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "regenerate",
+              "remove"
+            ],
+            "description": "regenerate translates the CURRENT English and replaces the stored copy; remove takes it down."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 20,
+            "description": "BCP-47 target locale, e.g. es-419."
+          },
+          "reportId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Which deliverable. Absent means the primary report of this inspection."
+          }
+        },
+        "required": [
+          "action",
+          "locale"
+        ]
+      }
+    },
+    "summary": "Regenerate or remove the courtesy translation of a report",
+    "description": "Regenerates or removes the courtesy translation of one report. Regenerate always translates the report as it stands right now, so it is also how a translation withheld by an edit is brought back. It does not cut a new report version. Removal stays available when translation production is switched off for the workspace."
+  },
+  {
     "operationId": "updateInspectionService",
     "method": "PATCH",
     "pathTemplate": "/api/inspections/{id}/services/{lineId}",

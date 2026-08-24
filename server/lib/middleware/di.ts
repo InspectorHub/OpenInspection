@@ -39,6 +39,7 @@ import { InspectionTypeService } from '../../services/inspection-type.service';
 import { TotpService } from '../../services/totp.service';
 import { TemplateSeedService } from '../../services/template-seed.service';
 import { ReportPdfService } from '../../services/report-pdf.service';
+import { ReportTranslationService } from '../../services/report-translation.service';
 import { ReportExportService } from '../../services/report-export.service';
 import { SigningKeyService } from '../../services/signing-key.service';
 import { AuditLogService } from '../../services/audit-log.service';
@@ -330,6 +331,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'reportPdf':
                     target.reportPdf = new ReportPdfService(c.env.DB, c.env.BROWSER, c.env.PHOTOS);
+                    break;
+                case 'reportTranslation':
+                    target.reportTranslation = new ReportTranslationService(c.env.DB);
                     break;
                 case 'reportExport':
                     // Commercial PCA Phase W Task 4 — .docx export status row + R2

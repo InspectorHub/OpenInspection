@@ -253,6 +253,13 @@
       "when": 1787436755616,
       "tag": "0035_statutory_form_sightings",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1787574473945,
+      "tag": "0036_report_translation_setting",
+      "breakpoints": true
     }
   ]
 }
