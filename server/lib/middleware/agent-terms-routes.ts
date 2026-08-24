@@ -246,31 +246,50 @@ export const AGENT_ROUTE_BINDING: ReadonlyArray<AgentRouteBinding> = [
     // Recorded here as gated because that is what the code does today, and a
     // table that disagreed with the running system would be worse than no table.
     // Not written as conclusions.
+    //
+    // ⚠️ The four preference paths below are gated, and the argument for that
+    // rests on a MEASURED fact about the mail rather than on a view about
+    // preferences. Every suppressible message sent to an agent carries its own
+    // unsubscribe link (`lib/notifications/unsubscribe-footer.ts`); the page it
+    // lands on is mounted under `/api/public` and is structurally outside this
+    // gate; and the write it performs covers every subject the address stands
+    // for, which is at least as much as the in-product switch writes. A blocked
+    // agent can therefore already stop the mail — what they cannot do is manage
+    // it from inside the product.
+    //
+    // Three conditions carry that, and if any stops holding the reasoning goes
+    // with it: the link is minted only where the send has a resolved tenant, a
+    // signing secret and a configured public base URL. A deployment with no
+    // base URL sends the message with no footer at all, and then there is no way
+    // out other than accepting.
     {
         path: '/api/agent/notification-preferences',
         requiresBinding: true,
-        why: 'What each company sends this agent, and the switches for it. '
-            + 'Gated today, and that means a blocked agent cannot turn a message '
-            + 'off from inside the product until they accept. Whether switching '
-            + 'off a message is ordinary functionality or something a gate must '
-            + 'not price at a signature is an open question and is recorded as '
-            + 'one.',
+        why: 'One path, two methods, and the table is keyed on the path: the GET '
+            + 'reads what each company sends this agent, the PUT changes one '
+            + 'switch. The PUT is not a withdrawal endpoint — it takes `enabled` '
+            + 'as a boolean, so the same call that switches a message off '
+            + 'switches it on. The GET is gated with it rather than on its own '
+            + 'because it is the loader for one screen whose every control is one '
+            + 'of these writes, and a read that renders a page of buttons that '
+            + 'all refuse is a worse answer than the one the page gives today.',
     },
     {
         path: '/api/agent/notification-preferences/bulk',
         requiresBinding: true,
-        why: 'The same switches applied to a whole row, column or grid at once. '
-            + 'It carries the same open question as the single-switch path above '
-            + 'and must not be split from it by accident.',
+        why: 'Applies one action to a whole row, column or grid. Not a withdrawal '
+            + 'endpoint: the action is enable, disable or reset, so the same path '
+            + 'that switches messages off switches them on. Gated for that reason '
+            + 'and not for a view about what a preference is.',
     },
     {
         path: '/api/agent/notification-preferences/sms-consent',
         requiresBinding: true,
-        why: 'Turns text messages back ON at one company. Deliberately listed '
-            + 'apart from the two rows above even though the URL makes it look '
-            + 'like a sibling: GRANTING consent is not the same act as '
-            + 'withdrawing it, and an exemption that let a blocked agent grant it '
-            + 'would produce a consent record made under a gate. If these ever '
+        why: 'Turns text messages back ON at one company. Listed apart from the '
+            + 'rows above even though the URL makes it look like a sibling: '
+            + 'GRANTING consent is not the same act as withdrawing it, and an '
+            + 'exemption here would produce a consent record made by somebody who '
+            + 'was being told to sign something at the time. If these ever '
             + 'diverge, this is the one that stays.',
     },
 ];

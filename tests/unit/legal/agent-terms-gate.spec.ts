@@ -151,6 +151,15 @@ describe('the agent-terms gate', () => {
         // `/api/identities/account/export`; that file's own header said
         // `/api/identity/account/export` (singular) until this was added.
         app.post('/api/identities/account/export', (c) => c.json({ success: true, data: {} }));
+        // The notification-preference surface, at its REAL mounted paths.
+        // Stand-ins rather than the real routers, because what is under test is
+        // the gate, which runs on `*` before anything is routed — but the PATHS
+        // have to be the real ones or the assertions say nothing. `agent.ts`
+        // mounts the preference router at `/`, itself mounted at `/api/agent`.
+        app.get('/api/agent/notification-preferences', (c) => c.json({ success: true, data: {} }));
+        app.put('/api/agent/notification-preferences', (c) => c.json({ success: true }));
+        app.put('/api/agent/notification-preferences/bulk', (c) => c.json({ success: true }));
+        app.put('/api/agent/notification-preferences/sms-consent', (c) => c.json({ success: true }));
         return app;
     }
 
@@ -452,6 +461,87 @@ describe('the agent-terms gate', () => {
                 body: JSON.stringify({}),
             });
             expect(sibling.status).toBe(428);
+        });
+    });
+
+    /**
+     * The notification-preference surface, and what a gated agent can and
+     * cannot do about the email aimed at them.
+     *
+     * These four paths are GATED, and this block pins that rather than
+     * describing it, because the reason they are gated turns on facts that can
+     * change under them.
+     *
+     * The fact that matters: a blocked agent is not without a way out. Every
+     * suppressible message sent to them carries its own unsubscribe link
+     * (`server/lib/notifications/unsubscribe-footer.ts`), the page that link
+     * lands on is mounted under `/api/public` and is structurally outside this
+     * gate — the JWT middleware short-circuits before anybody is classified —
+     * and the write it performs covers every subject the address stands for,
+     * which is at least as much as the in-product switch writes. So a gated
+     * agent can already stop the mail; what they cannot do is manage it from
+     * inside the product.
+     *
+     * The three conditions that finding rests on are worth stating, because if
+     * any of them stops holding, so does the reasoning: the link is minted only
+     * where the send has a resolved tenant, a signing secret, and a configured
+     * public base URL. A deployment with no base URL sends the message with no
+     * footer at all.
+     *
+     * And these are not withdrawal endpoints. Both writes take a direction —
+     * `enabled: boolean` on one, `enable | disable | reset` on the other — so
+     * the same path that switches a message off switches it on. `sms-consent`
+     * is further from the others still: it GRANTS consent to be texted, and an
+     * exemption there would produce a consent record made by somebody who was
+     * being told to sign something at the time. They share a URL prefix and not
+     * an answer.
+     */
+    describe('notification preferences stay behind the gate', () => {
+        const PREFERENCE_PATHS: Array<[string, string]> = [
+            ['GET', 'https://x.test/api/agent/notification-preferences'],
+            ['PUT', 'https://x.test/api/agent/notification-preferences'],
+            ['PUT', 'https://x.test/api/agent/notification-preferences/bulk'],
+            ['PUT', 'https://x.test/api/agent/notification-preferences/sms-consent'],
+        ];
+
+        it('refuses all four to an agent who has not accepted', async () => {
+            await publishTerms('2026-08-01', 'the agent terms');
+            await seedAgent(null);
+            const app = buildApp();
+            const cookie = await passwordLoginCookie(app);
+
+            const statuses = await Promise.all(PREFERENCE_PATHS.map(async ([method, url]) => {
+                const res = await app.request(url, {
+                    method,
+                    headers: { Cookie: cookie, 'content-type': 'application/json' },
+                    body: method === 'GET' ? undefined : JSON.stringify({}),
+                });
+                return `${method} ${new URL(url).pathname} ${res.status}`;
+            }));
+
+            expect(statuses).toEqual(PREFERENCE_PATHS.map(([method, url]) => `${method} ${new URL(url).pathname} 428`));
+        });
+
+        it('and lets the same four through once that agent accepts', async () => {
+            // The positive control. Without it, "all four are refused" is
+            // equally satisfied by four paths that do not exist, or by a gate
+            // that refuses everybody — and the assertion above would still be
+            // green in both of those worlds.
+            const current = await publishTerms('2026-08-01', 'the agent terms');
+            await seedAgent(current);
+            const app = buildApp();
+            const cookie = await passwordLoginCookie(app);
+
+            const statuses = await Promise.all(PREFERENCE_PATHS.map(async ([method, url]) => {
+                const res = await app.request(url, {
+                    method,
+                    headers: { Cookie: cookie, 'content-type': 'application/json' },
+                    body: method === 'GET' ? undefined : JSON.stringify({}),
+                });
+                return `${method} ${new URL(url).pathname} ${res.status}`;
+            }));
+
+            expect(statuses).toEqual(PREFERENCE_PATHS.map(([method, url]) => `${method} ${new URL(url).pathname} 200`));
         });
     });
 
