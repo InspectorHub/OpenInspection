@@ -143,6 +143,16 @@ export default defineConfig({
             testMatch: 'inspection-lifecycle-publish.spec.ts',
             dependencies: ['api'],
         },
+        {
+            // #23 — the printed deliverable of a translated report: one file,
+            // English first. Seeds its own commercial inspection (a non-null
+            // report tier is what gives the report a table of contents and the
+            // PCA front matter the spec reads), so it depends on `api` for the
+            // shared admin rather than on the shared editor-seed fixture.
+            name: 'courtesy-translation-pdf',
+            testMatch: 'report-courtesy-translation-pdf.spec.ts',
+            dependencies: ['api'],
+        },
         // ...all projects previously in playwright.api.config.ts, verbatim
         // (the `api` initializer project is declared first, above):
         {

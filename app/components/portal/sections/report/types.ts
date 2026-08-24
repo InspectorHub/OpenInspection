@@ -121,7 +121,7 @@ type ReportTier = 'light_commercial' | 'full_pca';
 export {
     PRINT_CARD_CLASS, PRINT_FIGURE_CLASS, PRINT_SECTION_HEADING_CLASS,
     DEFECT_PHOTO_GRID_CLASS, ITEM_PHOTO_GRID_CLASS, printThumbWidth,
-    REPORT_HEADING_STYLE,
+    REPORT_HEADING_STYLE, PRINT_TRANSLATED_HALF_CLASS,
 } from "./print-layout";
 
 export interface ReportSignature {

@@ -1,4 +1,5 @@
 import { m } from "~/paraglide/messages";
+import { useAnchorId } from "./report-half-scope";
 import type { ReportOutlineEntry } from "./types";
 
 /**
@@ -25,10 +26,15 @@ export function ReportToc({
   entries: ReportOutlineEntry[];
   tocPages?: Record<string, number>;
 }) {
+  // Every id BOTH sides of an intra-document link goes through the half's
+  // anchor scope. In the printed two-half file the second copy of this list has
+  // to point into the second copy of the report, not back into the English
+  // pages — and a duplicate id resolves to the first match without erroring.
+  const anchorId = useAnchorId();
   if (!entries.length) return null;
   return (
     <section
-      id="report-toc"
+      id={anchorId("report-toc")}
       className="mb-8 print:break-after-page"
       aria-label={m.pca_toc_aria()}
     >
@@ -45,14 +51,14 @@ export function ReportToc({
             }`}
           >
             <a
-              href={`#${entry.id}`}
+              href={`#${anchorId(entry.id)}`}
               className="hover:text-ih-primary-text transition-colors"
               onClick={(ev) => {
                 // RR scrollRestoration='manual' — a bare href doesn't scroll.
                 ev.preventDefault();
-                const el = document.getElementById(entry.id);
+                const el = document.getElementById(anchorId(entry.id));
                 if (el) {
-                  history.replaceState(null, "", `#${entry.id}`);
+                  history.replaceState(null, "", `#${anchorId(entry.id)}`);
                   el.scrollIntoView({ behavior: "smooth", block: "start" });
                 }
               }}
@@ -73,7 +79,7 @@ export function ReportToc({
               className="toc-pageref text-ih-fg-4 tabular-nums"
               aria-hidden="true"
             >
-              {tocPages?.[entry.id] ?? ""}
+              {tocPages?.[anchorId(entry.id)] ?? ""}
             </span>
           </li>
         ))}

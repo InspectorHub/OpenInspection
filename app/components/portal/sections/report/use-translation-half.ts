@@ -17,6 +17,14 @@
  * The payload arrives with the SERVER'S paths. Which spans were eligible was
  * settled by the segmenter; re-deriving that in the browser would be a second
  * implementation of the rule, and the two would drift the day either changed.
+ *
+ * ## `forced` is for the printed file, where BOTH halves exist at once
+ *
+ * On screen a reader is looking at one half and a control moves them between
+ * the two. On paper there is no control: the file carries the English record
+ * and then the courtesy translation, so the same component renders twice and
+ * each render is TOLD which half it is. `forced` says so; there is no state to
+ * toggle in that case and pressing nothing can change it.
  */
 import { useMemo, useState } from "react";
 import { applyCourtesyTranslation, type CourtesyTranslationPayload } from "~/lib/report-translation";
@@ -41,6 +49,8 @@ export interface TranslationHalf<T extends TranslatableParts> {
 export function useTranslationHalf<T extends TranslatableParts>(
   parts: T,
   courtesyTranslation: CourtesyTranslationPayload | null | undefined,
+  /** Pin the half instead of letting the reader choose. See the header. */
+  forced?: "en" | "translated",
 ): TranslationHalf<T> {
   const [showTranslation, setShowTranslation] = useState(false);
   const courtesy = courtesyTranslation ?? null;
@@ -48,7 +58,8 @@ export function useTranslationHalf<T extends TranslatableParts>(
     () => applyCourtesyTranslation(parts, courtesy).payload,
     [parts, courtesy],
   );
-  const showingTranslation = showTranslation && courtesy != null;
+  const chosen = forced === undefined ? showTranslation : forced === "translated";
+  const showingTranslation = chosen && courtesy != null;
   return {
     courtesy,
     showingTranslation,

@@ -29,6 +29,20 @@ export const ITEM_PHOTO_GRID_CLASS =
 /** CF Images thumbnail width: smaller in print to keep the PDF lean. */
 export const printThumbWidth = (isPrint: boolean): number => (isPrint ? 480 : 800);
 
+/**
+ * The seam between the English record and the courtesy translation that follows
+ * it in the SAME printed file.
+ *
+ * A page break and nothing else. It deliberately does NOT reset a page counter:
+ * the page numbers in the footer are printed by the headless renderer over the
+ * whole document (`server/lib/pdf.ts`), and they run continuously across this
+ * break because both halves are one render. A `counter-reset` here — or a
+ * deliverable assembled by merging two separately rendered PDFs — would restart
+ * the numbering, and a file with two page-1s reads as two documents stapled
+ * together, whereupon the first thing a client asks is which one is current.
+ */
+export const PRINT_TRANSLATED_HALF_CLASS = "print:break-before-page";
+
 /** Report heading typography — driven by the resolved profile's `--report-*`
  *  vars (Report Style Presets). Shared by the report title and every section
  *  heading, so a preset can never restyle one of them and miss the other. */

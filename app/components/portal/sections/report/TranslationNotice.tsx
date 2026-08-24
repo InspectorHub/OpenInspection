@@ -26,6 +26,7 @@
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import { m } from "~/paraglide/messages";
+import { useAnchorId } from "./report-half-scope";
 
 export interface TranslationNoticeProps {
   /** The notice text, resolved server-side. */
@@ -37,6 +38,16 @@ export interface TranslationNoticeProps {
   onToggle: () => void;
   /** Headless PDF render: both halves are in the file, so there is no toggle. */
   printMode?: boolean;
+  /**
+   * Which half of a PRINTED file this notice heads, when there are two.
+   *
+   * Undefined on screen, where there is only ever one half and the toggle
+   * already says which. In print it is load-bearing: both halves open with the
+   * same masthead, the same address and the same notice, so without a line
+   * naming the half a reader turning to the seam sees the report apparently
+   * starting over. Caught by reading an actual render, not by any assertion.
+   */
+  half?: "en" | "translated";
 }
 
 export function TranslationNotice({
@@ -45,7 +56,13 @@ export function TranslationNotice({
   translationLocale,
   onToggle,
   printMode = false,
+  half,
 }: TranslationNoticeProps) {
+  // The printed file carries this block TWICE — once at the head of each half —
+  // so its heading id is namespaced like every other anchor in the document.
+  // `aria-labelledby` pointing at the other half's heading is the kind of
+  // breakage that only a screen reader would ever report.
+  const anchorId = useAnchorId();
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
       <section
@@ -53,11 +70,11 @@ export function TranslationNotice({
         data-testid="courtesy-translation-notice"
         data-notice-locale={notice.locale}
         data-showing={showingTranslation ? translationLocale : "en"}
-        aria-labelledby="courtesy-translation-heading"
+        aria-labelledby={anchorId("courtesy-translation-heading")}
         className="border border-ih-border rounded-xl p-5 bg-ih-bg-card"
       >
         <h2
-          id="courtesy-translation-heading"
+          id={anchorId("courtesy-translation-heading")}
           className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-2"
         >
           {notice.title}
@@ -66,6 +83,18 @@ export function TranslationNotice({
         <p lang={notice.locale} className="text-[13px] leading-relaxed text-ih-fg-2">
           {notice.text}
         </p>
+
+        {/* Where the reader is in a two-half file. CHROME, not the notice: the
+            notice text is a versioned constant and nothing may be appended to
+            it, so this is a separate sentence from the catalogue that says
+            which half this is and that the other one is in the same file. */}
+        {half && (
+          <p data-testid="courtesy-translation-half-note" className="mt-2 text-[12px] leading-relaxed text-ih-fg-3">
+            {half === "translated"
+              ? m.courtesy_translation_print_seam()
+              : m.courtesy_translation_print_continues()}
+          </p>
+        )}
 
         {/* No dismiss control, deliberately — see the header. The only control
             is the one that changes which half is on screen. */}

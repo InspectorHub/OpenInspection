@@ -16,6 +16,7 @@
 import type { ReactNode } from "react";
 import { m } from "~/paraglide/messages";
 import { EnglishSpanBadge } from "./TranslationNotice";
+import { useAnchorId } from "./report-half-scope";
 import { getSectionIcon } from "~/lib/report-helpers";
 import { ReportItemCard } from "./ReportItemCard";
 import {
@@ -61,9 +62,11 @@ export function ReportSectionBlock({
   onToggleRepairItem,
   showingTranslation = false,
 }: ReportSectionBlockProps) {
+  // A TOC target — so it is namespaced per half. See report-half-scope.
+  const anchorId = useAnchorId();
   if (filter === "defects" && section.items.length === 0) return null;
   return (
-    <div id={section.id} className="mb-6 group/section relative scroll-mt-4" style={section.alwaysPageBreak ? { breakBefore: "page" } : undefined}>
+    <div id={anchorId(section.id)} className="mb-6 group/section relative scroll-mt-4" style={section.alwaysPageBreak ? { breakBefore: "page" } : undefined}>
       <div className={`flex items-center gap-3 mb-4 ${PRINT_SECTION_HEADING_CLASS}`}>
         <span className="text-2xl">{getSectionIcon(section.title)}</span>
         <h2 className="text-2xl text-ih-fg-1" style={REPORT_HEADING_STYLE}>
