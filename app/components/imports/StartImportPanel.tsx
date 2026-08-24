@@ -19,6 +19,18 @@ import { stageOf, type WorkbookState } from "./workbook-state";
 import { SourcePicker } from "./SourcePicker";
 
 /**
+ * Where each entry point's starter spreadsheet lives. A map rather than a
+ * condition: "does this entry point have a template" and "which one" have the
+ * same answer and should be read from one place. An intent absent here has
+ * none — the right answer for a template import, whose input is a vendor
+ * export rather than a spreadsheet somebody fills in.
+ */
+const TEMPLATE_DOWNLOAD_PATHS: Readonly<Record<string, string>> = {
+    "contacts.import": "/resources/contacts-template",
+    "members.invite": "/resources/members-template",
+};
+
+/**
  * The form that turns a file into an import run.
  *
  * A NATIVE form submission, not a fetcher. The file has to reach the server as
@@ -310,21 +322,21 @@ export function StartImportPanel({
                 </p>
             )}
 
-            {/* Offered HERE, and only for contacts: the failure a starter file
-                removes is a whole upload whose headings nothing matched, and
-                the moment to prevent that is the moment before a file is
-                chosen. The other entry points read different columns, so the
-                same file there would teach the wrong format.
+            {/* Offered HERE: the failure a starter file removes is a whole
+                upload whose headings nothing matched, and the moment to prevent
+                that is the moment before a file is chosen.
 
-                Its columns are derived from the importer's own header
-                vocabulary — see server/lib/migration-intake/contacts-template.ts
-                — so this link can never advertise a format the parser stopped
-                accepting. */}
-            {entry.intent === "contacts.import" && (
+                ONE TEMPLATE PER ENTRY POINT, never one shared file — they read
+                different columns, so a shared file would teach one of them the
+                wrong format. Each is derived from its own entity manifest (see
+                server/lib/migration-intake/starter-template.ts), which is both
+                why a second one became possible and why neither can advertise a
+                format the parser stopped accepting. */}
+            {TEMPLATE_DOWNLOAD_PATHS[entry.intent] && (
                 <p className="text-[12px]">
                     <a
                         data-testid="import-start-template"
-                        href="/resources/contacts-template"
+                        href={TEMPLATE_DOWNLOAD_PATHS[entry.intent]}
                         download
                         className="font-bold text-ih-primary-text hover:underline"
                     >
