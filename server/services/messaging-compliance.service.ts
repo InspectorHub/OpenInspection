@@ -373,7 +373,7 @@ export class MessagingComplianceService {
                 if (result.changed && outbox) {
                     // Fail-soft outbox emit: a queue failure must not abort the sweep.
                     outbox.append({
-                        type: 'io.inspectorhub.tenant.compliance_status_updated',
+                        type: 'tenant.compliance_status_updated',
                         payload: {
                             tenantId,
                             complianceStatus: result.complianceStatus,

@@ -18,22 +18,27 @@
 
 import { z } from 'zod';
 
-/** The event types the seam carries. The three user-lifecycle events mirror
- *  `UserSyncEventType` in lib/integration/user-sync (kept independent so this
- *  contract module has no dependency on the outbox service surface).
- *  `reply.tenant.updated` (A-21 batch 2) is the command-reply channel: core's
- *  answer to a portal->core `cmd.tenant.update` that asked for a reply — it
- *  rides this same sync queue (no new queue; one consumer per queue). */
-export type SyncEventType =
-    | 'user.invited'
-    | 'user.password_changed'
-    | 'user.deleted'
-    | 'reply.tenant.updated'
-    | 'reply.tenant.export_completed'
-    | 'reply.tenant.purged'
-    | 'reply.subject.exported'
-    | 'reply.subject.erased'
-    | 'reply.report.corrected';
+/**
+ * The event types the seam carries — `keyof typeof SCHEMAS`, so the registry is
+ * the ONE list. Every downstream union in this repo is an `Extract<>` off this
+ * type (the three group aliases below), which is what stops a fourth list
+ * appearing; see `toCloudEvent` for what happened when one did.
+ *
+ * ⚠️ Members are the SUFFIX only — `toCloudEvent` adds `io.inspectorhub.`.
+ */
+export type SyncEventType = keyof typeof SCHEMAS;
+
+/** User-lifecycle third of the seam; types `UserSyncEvent` in lib/integration/user-sync. */
+export type UserSyncEventType = Extract<SyncEventType, `user.${string}`>;
+
+/** The command-reply channel (A-21 batch 2/3, P3, CA-03): core's answer to a
+ *  portal->core `cmd.*` that asked for a reply. Rides this same sync queue (no
+ *  new queue; one consumer per queue). `CmdReplyType` in portal/cmd-reply is an
+ *  alias of this — the two lists its old comment warned about are now one. */
+export type CmdReplyEventType = Extract<SyncEventType, `reply.${string}`>;
+
+/** Tenant-lifecycle facts that are NOT user events (no user SID involved). */
+export type TenantSyncEventType = Extract<SyncEventType, `tenant.${string}`>;
 
 /** CloudEvents 1.0 envelope (subset profile used by this seam). */
 export interface SyncEnvelope {
@@ -262,10 +267,36 @@ const replyReportCorrectedDataSchema = z.discriminatedUnion('outcome', [
     }),
 ]);
 
-/** Registry mapping each event type to its supported dataschema versions.
- *  Portal's `isKnown(type, dataschema)` consults the equivalent registry; a
- *  version absent here parks rather than 400s on the consumer side. */
-export const SCHEMAS: Record<SyncEventType, readonly string[]> = {
+/**
+ * Core-managed messaging-compliance state (10DLC brand/campaign, toll-free
+ * verification) crossing to portal, which renders it read-only.
+ *
+ * `complianceStatus` is `z.string()` and not an enum on purpose: the vocabulary
+ * is the upstream carrier's, and portal already logs-and-stores an unrecognised
+ * value rather than rejecting it — an enum here would make the producer stricter
+ * than the consumer, backwards for a tolerant-reader seam. `rejectionReason` is
+ * nullable because an approval has no reason and `undefined` is dropped by
+ * JSON.stringify, turning an explicit "no reason" into a missing key.
+ */
+const tenantComplianceStatusUpdatedDataSchema = z.object({
+    tenantId: z.string(),
+    complianceStatus: z.string(),
+    rejectionReason: z.string().nullable(),
+    /** Epoch SECONDS — both emitters divide by 1000. */
+    updatedAt: z.number(),
+});
+
+/**
+ * Registry of supported dataschema versions per event type, and the single
+ * declaration of what the seam carries: registering a type here is what makes it
+ * nameable. Portal's `isKnown(type, dataschema)` consults its equivalent; a
+ * version absent there parks rather than 400s on the consumer side.
+ *
+ * ⚠️ KEYS ARE UNPREFIXED. `toCloudEvent` prepends `io.inspectorhub.` and the
+ * dataschema is this key kebab-cased, while portal's `KNOWN_TYPES` is keyed by
+ * the PREFIXED wire type — so a key here must equal portal's minus the prefix.
+ */
+export const SCHEMAS = {
     'user.invited': ['v1'],
     'user.password_changed': ['v1'],
     'user.deleted': ['v1'],
@@ -275,7 +306,10 @@ export const SCHEMAS: Record<SyncEventType, readonly string[]> = {
     'reply.subject.exported': ['v1'],
     'reply.subject.erased': ['v1'],
     'reply.report.corrected': ['v1'],
-};
+    // Core-managed 10DLC/TFV messaging-compliance state. Portal keeps a
+    // read-only snapshot; core is the source of truth.
+    'tenant.compliance_status_updated': ['v1'],
+} as const satisfies Record<string, readonly string[]>;
 
 /** Zod validator per event type, for tests and producer-side assertions. */
 export const DATA_SCHEMAS: Record<SyncEventType, z.ZodTypeAny> = {
@@ -288,6 +322,7 @@ export const DATA_SCHEMAS: Record<SyncEventType, z.ZodTypeAny> = {
     'reply.subject.exported': replySubjectExportedDataSchema,
     'reply.subject.erased': replySubjectErasedDataSchema,
     'reply.report.corrected': replyReportCorrectedDataSchema,
+    'tenant.compliance_status_updated': tenantComplianceStatusUpdatedDataSchema,
 };
 
 /** `user.invited` -> `user-invited`, `user.password_changed` ->
@@ -314,16 +349,47 @@ export interface OutboxRowLike {
     createdAt: Date;
 }
 
+/** Is this stored `event_type` one the registry knows? A type predicate rather
+ *  than a cast, because the value genuinely arrives as `string` — it is a D1
+ *  column — so checking is the only honest route to `SyncEventType`. */
+export function isRegisteredEventType(eventType: string): eventType is SyncEventType {
+    return Object.prototype.hasOwnProperty.call(SCHEMAS, eventType);
+}
+
 /**
  * Serialize a raw outbox row into a CloudEvents envelope. The `id` and `time`
  * come straight from the row so the round-trip is exact (golden-fixture
  * contract tests rely on this determinism).
+ *
+ * THROWS on an unregistered event type. This line used to be
+ * `row.eventType as SyncEventType`, and that cast is the whole reason
+ * `tenant.compliance_status_updated` shipped broken: the outbox service kept its
+ * own hand-written union holding the ALREADY-PREFIXED name, the cast waved it
+ * past the template literal, and every such event reached the queue as
+ * `io.inspectorhub.io.inspectorhub.tenant.…` with a matching junk dataschema.
+ * Portal knew neither, so it parked them all — silently, because parking IS the
+ * designed answer to an unknown type, and nothing distinguishes "a producer we
+ * have not taught it yet" from "a name that cannot exist".
+ *
+ * Throwing is the loud version of the same refusal, and it lands where someone
+ * looks: both callers (inline waitUntil publish, cron sweeper) catch and leave
+ * the row `pending`, so `counts().oldestPendingAge` climbs and the sync-health
+ * badge lights. The producer side is fenced at compile time (`OutboxEvent`
+ * derives from `SyncEventType`), so reaching this throw means a row that
+ * predates the fence — exactly the case worth seeing.
  */
 export function toCloudEvent(row: OutboxRowLike): SyncEnvelope {
+    if (!isRegisteredEventType(row.eventType)) {
+        throw new Error(
+            `[sync] refusing to serialize unregistered event type "${row.eventType}" `
+            + '(register it in SCHEMAS/DATA_SCHEMAS in lib/sync-events/envelope.ts; '
+            + 'note the keys there are UNPREFIXED — toCloudEvent adds io.inspectorhub.)',
+        );
+    }
     return {
         specversion: '1.0',
         id: row.id,
-        type: `io.inspectorhub.${row.eventType as SyncEventType}`,
+        type: `io.inspectorhub.${row.eventType}`,
         source: 'core',
         time: row.createdAt.toISOString(),
         dataschema: dataschemaFor(row.eventType),

@@ -5,12 +5,17 @@
 // depend on this interface so they never import a concrete portal symbol.
 
 import type { AuthorityBasis } from '../auth/authority-basis';
+import type { TenantSyncEventType, UserSyncEventType } from '../sync-events/envelope';
 
-type UserSyncEventType =
-    | 'user.invited'
-    | 'user.password_changed'
-    | 'user.deleted'
-    | 'io.inspectorhub.tenant.compliance_status_updated';
+// The event-type unions used here are DERIVED from the seam registry in
+// lib/sync-events/envelope (`Extract<SyncEventType, 'user.…'>` and `'tenant.…'`),
+// not restated. This file used to keep its own list, and the list had drifted:
+// it carried `io.inspectorhub.tenant.compliance_status_updated` — a fully
+// prefixed wire name in a slot that holds unprefixed suffixes — which is how
+// that event reached the queue double-prefixed. Importing a type from the
+// contract module costs nothing at runtime (erased) and does not breach the
+// portal-isolation invariant: sync-events lives outside server/portal precisely
+// so seam modules may depend on it.
 
 /**
  * The acceptance that was recorded HERE, travelling outward with the account it
@@ -65,9 +70,35 @@ export interface UserSyncEvent {
     payload: Record<string, unknown>;
 }
 
+/**
+ * A tenant-lifecycle fact — no user SID involved, so not a `UserSyncEvent`
+ * however much it travels the same queue.
+ *
+ * The payload is spelled out rather than left as `Record<string, unknown>`
+ * because there is exactly one shape and two emitters (the compliance webhook
+ * and the managed-status sweeper), and an open record is how the two would drift
+ * apart. It mirrors `tenantComplianceStatusUpdatedDataSchema` in
+ * lib/sync-events/envelope, which is what validates it on the way out.
+ */
+export interface TenantSyncEvent {
+    type: TenantSyncEventType;
+    payload: {
+        tenantId: string;
+        complianceStatus: string;
+        rejectionReason: string | null;
+        /** Epoch SECONDS. */
+        updatedAt: number;
+    };
+}
+
 /** Minimal surface core services use. The concrete OutboxService adds
  *  listPending/publishRow/markFailedFromDlq for the queue transport — not
- *  needed here. */
+ *  needed here.
+ *
+ *  ⚠️ The name says User because user-lifecycle events came first, but the sink
+ *  is the whole outbound seam: tenant facts ride it too. Widening the parameter
+ *  is what lets `UserSyncEventType` stay honestly user-only — before this, the
+ *  tenant event was smuggled into that union just to make `append` typecheck. */
 export interface UserSyncOutbox {
-    append(event: UserSyncEvent): Promise<string>;
+    append(event: UserSyncEvent | TenantSyncEvent): Promise<string>;
 }

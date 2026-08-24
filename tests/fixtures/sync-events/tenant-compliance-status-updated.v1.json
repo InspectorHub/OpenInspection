@@ -1,0 +1,9 @@
+{
+  "specversion": "1.0",
+  "id": "00000000-0000-4000-8000-000000000010",
+  "type": "io.inspectorhub.tenant.compliance_status_updated",
+  "source": "core",
+  "time": "2026-06-27T00:00:00.000Z",
+  "dataschema": "tenant-compliance-status-updated/v1",
+  "data": { "tenantId": "tenant-fixture-1", "complianceStatus": "approved", "rejectionReason": null, "updatedAt": 1751000000 }
+}

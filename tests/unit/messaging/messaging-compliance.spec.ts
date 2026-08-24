@@ -10,6 +10,7 @@ import {
     type TwilioComplianceClient,
 } from '../../../server/lib/messaging/providers/twilio-compliance';
 import { resolveComplianceProvider } from '../../../server/lib/sms/resolve-compliance-provider';
+import { toCloudEvent } from '../../../server/lib/sync-events/envelope';
 import type { ComplianceProvider, ComplianceProviderId } from '../../../server/lib/messaging/compliance-provider';
 import type { ComplianceStateStore } from '../../../server/lib/messaging/compliance-state-store';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -537,7 +538,22 @@ describe('compliance-status webhook → outbox emit (Task 11)', () => {
         expect(res.status).toBe(200);
         expect(appendSpy).toHaveBeenCalledOnce();
         const [calledWith] = appendSpy.mock.calls[0] as [{ type: string; payload: Record<string, unknown> }];
-        expect(calledWith.type).toBe('io.inspectorhub.tenant.compliance_status_updated');
+        // This used to assert the emitter's own literal back at itself — and the
+        // literal was `io.inspectorhub.tenant.compliance_status_updated`, which
+        // `toCloudEvent` then prefixed AGAIN. The test was green the whole time,
+        // because agreeing with the producer says nothing about what reaches the
+        // consumer. So assert the stored suffix, then serialize it and assert
+        // the WIRE type — the string portal's KNOWN_TYPES is keyed by.
+        expect(calledWith.type).toBe('tenant.compliance_status_updated');
+        expect(toCloudEvent({
+            id: 'row-1',
+            eventType: calledWith.type,
+            payload: JSON.stringify(calledWith.payload),
+            createdAt: new Date('2026-06-27T00:00:00.000Z'),
+        })).toMatchObject({
+            type: 'io.inspectorhub.tenant.compliance_status_updated',
+            dataschema: 'tenant-compliance-status-updated/v1',
+        });
         expect(calledWith.payload.tenantId).toBe(TENANT_WH);
         expect(calledWith.payload.complianceStatus).toBe('approved');
         expect(calledWith.payload.rejectionReason).toBeNull();
