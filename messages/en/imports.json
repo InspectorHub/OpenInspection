@@ -125,7 +125,7 @@
   "imports_source_read_by_nobody": "Nothing here reads this format yet, and this deployment has no one to hand it to. Export a spreadsheet from it instead, or build the template here.",
   "imports_source_read_by_pdf": "You can also print a blank template to PDF and upload that instead — read here, now.",
   "imports_source_read_by_person": "Nothing here reads this format yet, so someone on the support team converts it by hand: confirmed within 2 working days, back with you within 10.",
-  "imports_source_read_here": "Read as soon as you upload it. Stay on this page while it reads.",
+  "imports_source_read_here": "Read as soon as you upload it — seconds, not minutes. Stay on this page while it reads.",
   "imports_source_replace_note": "To bring in a different file, start a new import from the Imports page. Replacing the file here would throw away every correction made since it was read.",
   "imports_source_title": "Where this import came from",
   "imports_source_vendor_csv_generic": "A spreadsheet",

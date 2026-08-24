@@ -121,5 +121,44 @@
       "fileSha256": "7182c2d8fdb518ed201ba9de6f7fdfee1664cb363cab932f92d3f4a0e6dc11c9",
       "note": "1 of 22, exactly as recorded. It declares no sections and no items and still carries a full five-entry vocabulary, so an empty template is not an empty document."
     }
-  ]
+  ],
+  "measurementsPurpose": "How long a real import actually takes, so the source picker can state a duration instead of guessing one. Separate from `observations` because a duration is not a quirk: the observation list is checked against the schemas both ways, and an entry there for something no schema declares is an orphan. Same discipline otherwise -- a measurement names a HASH, never a path and never a filename, and records that a file was timed rather than what it said.",
+  "measurementsMethod": "Real workerd via vitest-pool-workers, NOT Node. Median of 7 runs in one isolate. Node was measured too, on the same code and the same bytes, and over-reported by 1.5x on the spreadsheet and 2.6x on the template archive -- so the often-quoted 2.5x is workload-dependent and is not a conversion factor. workerd advances its clock only on I/O, so a pure-CPU block between two bare clock reads measures 0; each timing here is bracketed by a real await, and the run carries a busy-loop control that fails if the clock ever reads 0. Timed span is parse (source decode + adapter inspect) plus convert (adapter convert, which is where validation happens). It EXCLUDES the HTTP upload, the source-file store and the staging write -- a template import stages one row, so the excluded database work is one insert.",
+  "measurements": [
+    {
+      "vendor": "spectora",
+      "measuredOn": "2026-08-25",
+      "fileSha256": "333e44424830127e6170f311e65b91e09c427cab8f9ca2b2ebaeb026f3bb29c0",
+      "shape": "278519 bytes on disk; 1873 sheet rows read (1872 data rows plus the header) across 42 columns, from 1780878 bytes of decompressed worksheet markup; resolving to 16 sections and 90 items. The row, column, section and item counts agree exactly with the `repeated-parent-values` and `sparse-columns` observations above, which is how this run was confirmed to have read the same file whole rather than a prefix.",
+      "parseMedianMs": 21,
+      "convertMedianMs": 23,
+      "totalMedianMs": 43,
+      "totalRangeMs": [40, 74],
+      "nodeTotalMedianMs": 63
+    },
+    {
+      "vendor": "home_inspector_pro",
+      "measuredOn": "2026-08-25",
+      "fileSha256": "bb02fb964ddd615a913deb93050d6f073db79068464b769432584edd7bfbb0a1",
+      "shape": "507968 bytes on disk, resolving to 39 sections and 357 items. Larger on disk than the spreadsheet above and five times faster to read, so file size alone does not predict the cost.",
+      "parseMedianMs": 5,
+      "convertMedianMs": 4,
+      "totalMedianMs": 9,
+      "totalRangeMs": [9, 23],
+      "nodeTotalMedianMs": 23
+    }
+  ],
+  "scaling": {
+    "measuredOn": "2026-08-25",
+    "why": "One point cannot answer whether the picker's duration still holds at the SIZE CAP, and the caps are far above this corpus -- 2 MB hosted, 20 MB self-hosted, against a 278 KB file. Extrapolating from one point assumes linearity, so linearity was measured rather than assumed: the real worksheet was rebuilt at multiples of its own row block (synthetic bytes, real row shape) and re-timed.",
+    "againstSha256": "333e44424830127e6170f311e65b91e09c427cab8f9ca2b2ebaeb026f3bb29c0",
+    "points": [
+      { "multiple": 1, "rows": 1873, "worksheetBytes": 1780878, "medianMs": 36 },
+      { "multiple": 2, "rows": 3746, "worksheetBytes": 3560586, "medianMs": 70 },
+      { "multiple": 4, "rows": 7492, "worksheetBytes": 7120002, "medianMs": 140 },
+      { "multiple": 8, "rows": 14984, "worksheetBytes": 14238834, "medianMs": 277 }
+    ],
+    "result": "Linear, at 34.6 to 36.0 ms per multiple across an eightfold range -- about 20 ms per MB of decompressed worksheet. The 1x synthetic runs 36 ms against the real file's 43 ms, and the gap is the deflate the synthetic does not pay, which decomposes the headline number.",
+    "bounds": "The real file compresses 6.4:1. A hosted upload at the 2 MB cap compressing the same way holds roughly 13 MB of worksheet and lands near 0.26 s; a self-hosted upload at the 20 MB cap holds roughly 128 MB and lands near 2.6 s. Those two are arithmetic on a measured slope rather than measurements, and the second one is very likely unreachable for a different reason: 128 MB of decoded markup does not fit the Worker memory limit, so such a file would fail on memory before it became slow. Nobody has tried it."
+  }
 }

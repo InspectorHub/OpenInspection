@@ -96,6 +96,34 @@ describe("SourcePicker: how long it takes", () => {
         expect(spectora?.textContent).toMatch(/stay on this page/i);
     });
 
+    it("STATES A DURATION for a product with a reader — spec §3.2b requires one on every path", () => {
+        // This assertion could not be written until 2026-08-25, and the reason
+        // is the point of it. §3.2b asks every source path to say how long it
+        // takes; the assisted path has said "2 working days / back within 10"
+        // all along, and the readable path said only "stay on this page" —
+        // true, and not an answer to the question. The gap was deliberate:
+        // nobody had timed a real conversion in workerd, and an invented
+        // duration is worse than none.
+        //
+        // It has now been timed. tests/fixtures/intake/manifest.json carries
+        // the numbers against the file hashes they were measured on: 43 ms
+        // median for the 1873-row spreadsheet, 9 ms for the 357-item template
+        // archive, in real workerd, with a linear scaling curve behind them.
+        // So the sentence can carry a scale honestly.
+        //
+        // Matching the SCALE and not a number: the copy must not harden into a
+        // figure, because the wait a person actually experiences is dominated
+        // by their upload, not by the 43 ms at the far end.
+        renderPicker();
+        const spectora = screen.getByRole("radio", { name: /Spectora/i }).closest("label");
+        expect(spectora?.textContent).toMatch(/seconds/i);
+        // NOT the "you can leave this page" escape hatch §3.2b attaches to a
+        // path over a few seconds. Asserting its ABSENCE is what stops the two
+        // sentences being pasted together: this path holds the request open,
+        // so an invitation to leave would lose the operator their import.
+        expect(spectora?.textContent).not.toMatch(/leave this page/i);
+    });
+
     it("does not promise a person where this deployment has none", () => {
         // Self-hosted has no support path, and there the upload is refused
         // before anything is stored. Offering the assisted timescale would be

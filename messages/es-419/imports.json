@@ -125,7 +125,7 @@
   "imports_source_read_by_nobody": "Aquí todavía nada lee este formato, y esta instalación no tiene a quién entregárselo. Exporte una hoja de cálculo desde ese producto, o construya la plantilla aquí.",
   "imports_source_read_by_pdf": "También puede imprimir una plantilla en blanco a PDF y subir ese archivo — se lee aquí, ahora.",
   "imports_source_read_by_person": "Aquí todavía nada lee este formato, así que alguien del equipo de soporte lo convierte a mano: confirmado en un plazo de 2 días hábiles, devuelto en un plazo de 10.",
-  "imports_source_read_here": "Se lee apenas lo suba. Permanezca en esta página mientras se lee.",
+  "imports_source_read_here": "Se lee apenas lo suba: segundos, no minutos. Permanezca en esta página mientras se lee.",
   "imports_source_replace_note": "Para traer un archivo distinto, inicie una importación nueva desde la página de Importaciones. Reemplazar el archivo aquí descartaría todas las correcciones hechas desde que se leyó.",
   "imports_source_title": "De dónde vino esta importación",
   "imports_source_vendor_csv_generic": "Una hoja de cálculo",
