@@ -129,6 +129,33 @@ export function sourceIsTabular(intent: ImportEntryIntent, vendor: string | null
     return importSourcesFor(intent).find((s) => s.vendor === vendor)?.tabular ?? false;
 }
 
+/**
+ * Whether this declared source is one the operator supplies as a printed PDF,
+ * from which the structure is inferred.
+ *
+ * It is the SAME predicate as `readHere: false`, deliberately not a second
+ * flag beside it. A source we cannot read and a source that takes the PDF route
+ * are one fact stated once: the PDF route exists *because* nothing here reads
+ * the file, and two flags would eventually disagree about the same vendor.
+ *
+ * ⚠️ THIS CHANGES WHAT HAPPENS TO SUCH A SOURCE. Before, declaring one and
+ * uploading its own export produced a run parked for a person; now the entry
+ * asks for a blank template printed to PDF instead. The person-reads-it door is
+ * NOT closed by this — `assisted.full` is a separate entry point and is
+ * untouched — but it is no longer where a NAMED unreadable source lands. If
+ * that is the wrong trade for a given vendor, the change is one field in
+ * `TEMPLATE_SOURCES`, not a change here.
+ *
+ * Asked of the ENTRY POINT for the reason `sourceIsTabular` gives: a vendor
+ * name that this entry does not offer is not a declaration it can act on. A
+ * null vendor is false, so the question is never asked before the source is.
+ */
+export function sourceNeedsPdfInference(intent: ImportEntryIntent, vendor: string | null): boolean {
+    if (!vendor) return false;
+    const source = importSourcesFor(intent).find((s) => s.vendor === vendor);
+    return source ? !source.readHere : false;
+}
+
 /** Whether a value is a source this entry point offers. Narrowed, never cast. */
 export function asImportSource(
     intent: ImportEntryIntent,

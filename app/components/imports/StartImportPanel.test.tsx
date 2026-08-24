@@ -282,3 +282,60 @@ describe("StartImportPanel — the escape hatch", () => {
         expect(standalone).toMatch(/CSV/);
     });
 });
+
+describe("the PDF route, for a source nothing here can read", () => {
+    it("swaps the file chooser for the PDF surface, rather than adding a second one", async () => {
+        // 🔴 The assertion that makes this a VARIANT and not an extra section.
+        // Appending would leave two pickers on one screen — one accepting
+        // `.csv,.xlsx,.json` and one accepting `application/pdf` — and the
+        // operator would have to guess which is theirs. The negative half is
+        // the load-bearing one: the sheet picker and the visible chooser label
+        // must both be gone.
+        renderPanel({ entry: TEMPLATES });
+        fireEvent.click(screen.getByDisplayValue("homegauge"));
+
+        await waitFor(() => {
+            expect(screen.getByTestId("pdf-upload")).toBeTruthy();
+        });
+        expect(screen.getByTestId("blank-template-guidance")).toBeTruthy();
+        expect(screen.getByTestId("user-processing-statement")).toBeTruthy();
+        expect(screen.queryByTestId("import-start-choose-file")).toBeNull();
+        expect(screen.queryByTestId("import-start-sheet")).toBeNull();
+    });
+
+    it("leaves the readable sources exactly as they were", async () => {
+        // Positive control, and the only thing that makes the case above mean
+        // anything: the SAME entry with a source that IS read here keeps its
+        // own chooser and grows no statement.
+        renderPanel({ entry: TEMPLATES });
+        fireEvent.click(screen.getByDisplayValue("spectora"));
+
+        await waitFor(() => {
+            expect(screen.getByTestId("import-start-choose-file")).toBeTruthy();
+        });
+        expect(screen.queryByTestId("pdf-upload")).toBeNull();
+        expect(screen.queryByTestId("user-processing-statement")).toBeNull();
+    });
+
+    it("puts the chosen PDF on the form, so the server receives the file itself", async () => {
+        // The panel submits through one `<input name="file">`; the PDF surface
+        // has a dropzone of its own that is not a form control. If the file is
+        // not transferred, this screen collects a PDF and uploads nothing —
+        // which is indistinguishable from working until the run is inspected.
+        const form = renderPanel({ entry: TEMPLATES });
+        fireEvent.click(screen.getByDisplayValue("homegauge"));
+        await waitFor(() => expect(screen.getByTestId("user-processing-statement")).toBeTruthy());
+
+        fireEvent.click(screen.getByTestId("user-processing-statement"));
+        const pdf = new File(["%PDF-1.7"], "blank-template.pdf", { type: "application/pdf" });
+        const dropzone = screen
+            .getByTestId("pdf-upload")
+            .querySelector('input[type="file"]') as HTMLInputElement;
+        fireEvent.change(dropzone, { target: { files: [pdf] } });
+
+        await waitFor(async () => {
+            expect((await uploadedFile(form)).name).toBe("blank-template.pdf");
+        });
+        expect((await uploadedFile(form)).type).toBe("application/pdf");
+    });
+});

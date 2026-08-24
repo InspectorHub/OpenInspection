@@ -71,6 +71,22 @@ describe("SourcePicker: how long it takes", () => {
         expect(homegauge?.textContent).toMatch(/working days/i);
     });
 
+    it("offers the PDF route WITHOUT dropping the commitment it sits beside", () => {
+        // 🔴 Both sentences, and this asserts both — because the failure mode is
+        // that the faster option quietly replaces the disclosure rather than
+        // joining it. An earlier attempt at this did exactly that, and the
+        // "working days" test above is what caught it.
+        //
+        // It also has to be here at all: the panel below this picker now offers
+        // the PDF route, and before this line the selected card told the
+        // operator to export a spreadsheet while the panel underneath asked for
+        // a printed PDF. Both were on one screen and every unit test passed.
+        renderPicker();
+        const homegauge = screen.getByRole("radio", { name: /HomeGauge/i }).closest("label");
+        expect(homegauge?.textContent).toMatch(/working days/i);
+        expect(homegauge?.textContent).toMatch(/print a blank template to PDF/i);
+    });
+
     it("POSITIVE CONTROL — a product with a reader does NOT show that timescale", () => {
         renderPicker();
         const spectora = screen.getByRole("radio", { name: /Spectora/i }).closest("label");

@@ -80,11 +80,30 @@ export function SourcePicker({
                 description: (
                     <>
                         {VENDOR_FILE[source.vendor]()}{" "}
-                        {source.readHere
-                            ? m.imports_source_read_here()
-                            : hasAssistedMigration
-                                ? m.imports_source_read_by_person()
-                                : m.imports_source_read_by_nobody()}
+                        {source.readHere ? (
+                            m.imports_source_read_here()
+                        ) : (
+                            /* BOTH sentences, and the order is the design.
+                               The existing one first, because it carries a
+                               disclosed commitment — a person, and how long
+                               they take — that a faster option must not be
+                               allowed to quietly replace. The PDF line is
+                               added AFTER it as an alternative, not instead
+                               of it.
+                               It has to be here at all because the panel below
+                               now offers that route: before this line existed,
+                               the selected card said "export a spreadsheet
+                               instead" while the panel underneath asked for a
+                               printed PDF, and both were visible in one
+                               screenshot. Every unit test in this directory
+                               passed on that screen. */
+                            <>
+                                {hasAssistedMigration
+                                    ? m.imports_source_read_by_person()
+                                    : m.imports_source_read_by_nobody()}{" "}
+                                {m.imports_source_read_by_pdf()}
+                            </>
+                        )}
                     </>
                 ),
             }))}

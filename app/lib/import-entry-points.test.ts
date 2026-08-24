@@ -25,8 +25,10 @@ import {
 const COPY: ImportStartCopy = {
     needsSource: 'NEEDS_SOURCE',
     needsFile: 'NEEDS_FILE',
+    needsPdfFile: 'NEEDS_PDF_FILE',
     readingWorkbook: 'READING_WORKBOOK',
     needsSheet: 'NEEDS_SHEET',
+    needsStatement: 'NEEDS_STATEMENT',
     needsUploadAuthorized: 'NEEDS_UPLOAD_AUTHORIZED',
     needsStaffAccessAuthorized: 'NEEDS_STAFF_ACCESS_AUTHORIZED',
 };
@@ -121,5 +123,80 @@ describe('importStartBlockedReason — the staff agreement', () => {
     it('is asked last, after the workbook question', () => {
         const draft: ImportStartDraft = { ...draftWith('reading'), vendor: null };
         expect(importStartBlockedReason(ASSISTED, draft, COPY)).toBe('READING_WORKBOOK');
+    });
+});
+
+describe('importStartBlockedReason — the statement axis (PDF inference)', () => {
+    /** A draft on the templates entry with a source nothing here can read, so
+     *  the PDF route applies. Everything else is answered, so each case below
+     *  differs from the others in exactly one field. */
+    function pdfDraft(over: Partial<ImportStartDraft> = {}): ImportStartDraft {
+        return {
+            vendor: 'homegauge',
+            hasFile: true,
+            workbook: 'not-a-workbook',
+            statementAccepted: true,
+            uploadAuthorized: true,
+            staffAccessAuthorized: false,
+            ...over,
+        };
+    }
+
+    it('blocks on the statement BEFORE it blocks on the file', () => {
+        // 🔴 The whole reason this arm exists, and the reason its POSITION is
+        // the design rather than an implementation detail. The PDF dropzone is
+        // `disabled={!statementAccepted}`, so an operator who has not ticked the
+        // statement CANNOT choose a file. If this arm sat after `needsFile` —
+        // where all six existing arms sit — the button would say "choose the
+        // file you exported" beside a picker that refuses to open, and the
+        // operator would have no way to learn what is actually wanted.
+        expect(
+            importStartBlockedReason(TEMPLATES, pdfDraft({ statementAccepted: false, hasFile: false }), COPY),
+        ).toBe('NEEDS_STATEMENT');
+    });
+
+    it('stops blocking once the statement is accepted', () => {
+        // Positive control for the case above, differing in that one field.
+        // Without it, an arm that returned NEEDS_STATEMENT unconditionally
+        // would pass the assertion above and never let anybody import.
+        // 🔴 And it names the PRINTED file, not an exported one. The screen's
+        // own guidance has just told the operator to print a PDF; a sentence
+        // asking for "the file you exported" is wrong about what they did, and
+        // being told to produce something they were never asked for is how a
+        // person concludes they are on the wrong screen.
+        expect(importStartBlockedReason(TEMPLATES, pdfDraft({ hasFile: false }), COPY)).toBe('NEEDS_PDF_FILE');
+    });
+
+    it('does not ask for a statement on a source this deployment can read', () => {
+        // The arm is keyed on the SOURCE, not on the entry: spectora is read
+        // here, so its upload is unchanged and never grows a second gate.
+        expect(
+            importStartBlockedReason(
+                TEMPLATES,
+                pdfDraft({ vendor: 'spectora', statementAccepted: false }),
+                COPY,
+            ),
+        ).toBeNull();
+    });
+
+    it('does not ask for a statement before a source has been named', () => {
+        // A null vendor is not a declaration that anything is unreadable, and
+        // the ladder must still ask the question it already asks first.
+        expect(
+            importStartBlockedReason(TEMPLATES, pdfDraft({ vendor: null, statementAccepted: false }), COPY),
+        ).toBe('NEEDS_SOURCE');
+    });
+
+    it('does not ask for a statement on the assisted entry, which offers no source', () => {
+        // `assisted.full` exists for a file whose owner could not name the
+        // product. There is no source to be unreadable, so the PDF route does
+        // not apply and the person-reads-it agreement is what is asked instead.
+        expect(
+            importStartBlockedReason(
+                ASSISTED,
+                pdfDraft({ vendor: null, statementAccepted: false, staffAccessAuthorized: false }),
+                COPY,
+            ),
+        ).toBe('NEEDS_STAFF_ACCESS_AUTHORIZED');
     });
 });

@@ -1,45 +1,22 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Form } from "react-router";
 import { Banner, Button, Checkbox } from "@core/shared-ui";
 
 import { m } from "~/paraglide/messages";
+import { PdfInferenceUpload } from "./PdfInferenceUpload";
+import { importStartBlockedReason, type ImportEntryPoint } from "~/lib/import-entry-points";
 import {
-    importStartBlockedReason,
-    type ImportEntryPoint,
-    type WorkbookStage,
-} from "~/lib/import-entry-points";
-import { defaultImportSourceFor, importSourcesFor, sourceIsTabular } from "~/lib/import-sources";
+    defaultImportSourceFor,
+    importSourcesFor,
+    sourceIsTabular,
+    sourceNeedsPdfInference,
+} from "~/lib/import-sources";
 import { csvFileNameFor, isWorkbookFileName } from "~/lib/xlsx-intake";
-import { sheetChoices, workbookSheetToCsv, type SheetChoice, type WorkbookLike } from "~/lib/xlsx-import";
+import { sheetChoices, workbookSheetToCsv, type WorkbookLike } from "~/lib/xlsx-import";
 import { loadWorkbookFromFile } from "~/lib/xlsx-loader";
 import { SheetPicker } from "./SheetPicker";
+import { stageOf, type WorkbookState } from "./workbook-state";
 import { SourcePicker } from "./SourcePicker";
-
-/**
- * Where the chosen file has got to in the workbook question.
- *
- * Panel-internal, and one state richer than `WorkbookStage`: `ready` carries
- * the sheets to offer and which one is chosen, neither of which the blocked
- * reason has any use for. The mapping between the two is `stageOf` below.
- */
-type WorkbookState =
-    | { kind: "none" }
-    | { kind: "reading" }
-    | { kind: "ready"; sheets: SheetChoice[]; chosen: number | null }
-    | { kind: "unreadable" };
-
-function stageOf(state: WorkbookState): WorkbookStage {
-    switch (state.kind) {
-        case "none":
-            return "not-a-workbook";
-        case "reading":
-            return "reading";
-        case "unreadable":
-            return "unreadable";
-        case "ready":
-            return state.chosen === null ? "pending" : "chosen";
-    }
-}
 
 /**
  * The form that turns a file into an import run.
@@ -106,6 +83,11 @@ export function StartImportPanel({
     const [uploadAuthorized, setUploadAuthorized] = useState(false);
     const [staffAccessAuthorized, setStaffAccessAuthorized] = useState(false);
     const [workbook, setWorkbook] = useState<WorkbookState>({ kind: "none" });
+    /** What the operator said they did to the file before uploading it. Only
+     *  the PDF route asks — see the warning on `ImportStartDraft.statementAccepted`
+     *  about why this is not called an attestation. */
+    const [statementAccepted, setStatementAccepted] = useState(false);
+    const fileInputId = useId();
 
     const inputRef = useRef<HTMLInputElement>(null);
     /** The parsed workbook and the name it arrived under — see (1) above. */
@@ -127,6 +109,20 @@ export function StartImportPanel({
         // handler below.
         const transfer = new DataTransfer();
         transfer.items.add(converted);
+        input.files = transfer.files;
+    };
+
+    /** Put the PDF the dropzone collected into the form's own file input.
+     *  The dropzone is not a form control, so without this the screen would
+     *  collect a file and upload nothing — which looks like it worked until
+     *  somebody opens the run. */
+    const applyPdf = (file: File) => {
+        const input = inputRef.current;
+        if (!input) return;
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        // Assigning `files` does not fire `change`, so this cannot re-enter
+        // `onFileChosen` behind the explicit call beside it.
         input.files = transfer.files;
     };
 
@@ -169,20 +165,28 @@ export function StartImportPanel({
             });
     };
 
+    /** Whether the declared source takes the PDF route. One predicate, read in
+     *  two places: it decides which half of the panel renders, and it decides
+     *  whether the ladder asks for the statement. */
+    const needsPdf = sourceNeedsPdfInference(entry.intent, vendor);
+
     const blockedReason = importStartBlockedReason(
         entry,
         {
             vendor,
             hasFile: fileName !== null,
             workbook: stageOf(workbook),
+            statementAccepted,
             uploadAuthorized,
             staffAccessAuthorized,
         },
         {
             needsSource: m.imports_start_needs_source(),
             needsFile: m.imports_upload_needs_file(),
+            needsPdfFile: m.imports_upload_needs_pdf_file(),
             readingWorkbook: m.imports_upload_reading_workbook(),
             needsSheet: m.imports_upload_needs_sheet(),
+            needsStatement: m.imports_upload_needs_statement(),
             needsUploadAuthorized: m.imports_upload_needs_authorize(),
             needsStaffAccessAuthorized: m.imports_upload_needs_staff_authorize(),
         },
@@ -217,23 +221,61 @@ export function StartImportPanel({
                 <input type="hidden" name="vendor" value={vendor} />
             )}
 
-            <label className="block">
-                <span className="inline-flex items-center gap-3">
+            {/* The form's ONE carrier, outside both branches.
+                Every route below submits through this input, whatever control
+                the operator actually touched — the PDF surface has a dropzone
+                of its own that is not a form control, so its file is copied in
+                here. Two inputs would mean two things could be submitted and
+                only one of them was the file on screen. */}
+            <input
+                ref={inputRef}
+                id={fileInputId}
+                data-testid="import-start-file"
+                type="file"
+                name="file"
+                accept={needsPdf ? "application/pdf,.pdf" : ".csv,.xlsx,.json"}
+                className="sr-only"
+                onChange={(e) => onFileChosen(e.currentTarget.files?.[0] ?? null)}
+            />
+
+            {needsPdf ? (
+                /* A VARIANT of this half of the panel, not a section appended
+                   to it. The PDF route is a different upload contract: another
+                   accept type, a statement that must be answered BEFORE the
+                   picker opens, and a result that can send the operator back
+                   for a different file. Rendered alongside the chooser below,
+                   the screen would carry two pickers and the operator would
+                   have to guess which one is theirs. */
+                <PdfInferenceUpload
+                    scanResult={null}
+                    statementAccepted={statementAccepted}
+                    onStatementChange={setStatementAccepted}
+                    fileName={fileName}
+                    busy={busy}
+                    onFile={(file) => {
+                        applyPdf(file);
+                        onFileChosen(file);
+                    }}
+                />
+            ) : (
+                /* The text sits DIRECTLY under the label rather than in a
+                   wrapper span: the input moved out of the label when it became
+                   the shared carrier for both routes, so the association is now
+                   `htmlFor`, and a11y linting reads the label's own text at a
+                   bounded depth. Wrapped one level deeper it reported the label
+                   as having no accessible text — which is what a screen reader
+                   would have found too. */
+                <label
+                    htmlFor={fileInputId}
+                    data-testid="import-start-choose-file"
+                    className="flex items-center gap-3 cursor-pointer"
+                >
                     <span className={fileChooserClass}>{m.imports_upload_choose_file()}</span>
                     <span className="text-[11px] text-ih-fg-3">
                         {fileName ?? m.imports_upload_hint()}
                     </span>
-                </span>
-                <input
-                    ref={inputRef}
-                    data-testid="import-start-file"
-                    type="file"
-                    name="file"
-                    accept=".csv,.xlsx,.json"
-                    className="sr-only"
-                    onChange={(e) => onFileChosen(e.currentTarget.files?.[0] ?? null)}
-                />
-            </label>
+                </label>
+            )}
 
             {/* Nothing at all below two sheets — see SheetPicker. */}
             {workbook.kind === "ready" && (
