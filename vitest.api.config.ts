@@ -30,6 +30,34 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Every run leaves a machine-readable record behind, because the console
+    // one is not durable and an intermittent failure only shows up in a run
+    // nobody was watching.
+    //
+    // This exists because of a specific loss. On 2026-08-24 a full run reported
+    // one failure in `tests/unit/bookings/booking-people.spec.ts` — the
+    // "originated in ... while it was running" shape. By the time it was read,
+    // only the tail of the output survived, so the error text was gone. The
+    // spec passed 4/4 in isolation, passed again in the next full run, and that
+    // run failed four *different* files instead.
+    //
+    // ⚠️ MEASURED LIMIT, 2026-08-24 — this reporter does NOT record that shape.
+    // A probe that threw from a background promise after its test body returned
+    // produced, on the console, exactly the wording above plus `Errors 1 error`
+    // — while the JSON report contained **zero** occurrences of the thrown
+    // message. Unhandled errors reach the console reporter and not this one, so
+    // this file is a record of ASSERTION failures only. It would have preserved
+    // the gate-registry regression found the same day; it would NOT have
+    // preserved the booking one.
+    //
+    // Keeping it anyway, because assertion failures are most failures and the
+    // cost is one file write. But do not read a clean report as a clean run —
+    // read the count line, and for the "originated in" shape, capture stdout.
+    // Gitignored (`.vitest/`), so it never reaches a commit.
+    reporters: [
+      'default',
+      ['json', { outputFile: '.vitest/api-report.json' }],
+    ],
     // ⚠️ Do NOT turn on `clearMocks` / `mockReset` / `restoreMocks` here without
     // re-reading the measurement recorded below. It is the whole reason this
     // setting looks wrong and is not.

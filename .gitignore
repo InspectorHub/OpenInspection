@@ -66,3 +66,7 @@ drizzle-introspect-db.sqlite
 # leave a spec nothing collects in a commit; the gate refuses to start when the
 # file is present and names it.
 tests/e2e/zz-e2e-coverage-probe.spec.ts
+
+# Vitest run reports — a durable record of every run, so an intermittent
+# failure is diagnosable after the fact rather than only while watching.
+.vitest/
