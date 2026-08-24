@@ -20,8 +20,9 @@ import { createTestDb, setupSchema } from '../db';
 import { toD1Binding } from '../helpers/d1-binding';
 import { asD1DrizzleReturn, type TestDb } from '../helpers/test-db';
 import { DataService } from '../../../server/services/data.service';
-import { contacts, tenants } from '../../../server/lib/db/schema';
+import { contacts, tenants, users } from '../../../server/lib/db/schema';
 import { CONTACT_EXCHANGE } from '../../../server/lib/data-exchange/contacts';
+import { MEMBER_EXCHANGE } from '../../../server/lib/data-exchange/members';
 import { exportHeaders, roundTripFields } from '../../../server/lib/data-exchange/types';
 import { parseCsvTable } from '../../../server/lib/migration-intake/csv';
 import {
@@ -75,6 +76,18 @@ beforeEach(async () => {
         },
     ]);
     await fix.db.insert(contacts).values(SEED);
+    // Two roles on purpose: one of them is NOT the invitation default, which
+    // is the members-side twin of the contacts `type` regression.
+    await fix.db.insert(users).values([
+        {
+            id: 'u-owner', tenantId: TENANT, email: 'ola@example.com', name: 'Ola Owner',
+            role: 'owner', passwordHash: 'x', createdAt: new Date('2026-01-05T00:00:00.000Z'),
+        },
+        {
+            id: 'u-inspector', tenantId: TENANT, email: 'ivan@example.com', name: 'Ivan Inspector',
+            role: 'inspector', passwordHash: 'x', createdAt: new Date('2026-02-06T00:00:00.000Z'),
+        },
+    ]);
     svc = new DataService(toD1Binding(fix.sqlite));
 });
 
@@ -94,6 +107,16 @@ async function mappingForOurOwnExport(csv: string) {
     if (!match) throw new Error('our own export was not recognised as a spreadsheet');
     const mapping = defaultMappingFor('contacts.import', match.inspection, source);
     if (mapping.kind !== 'contacts') throw new Error('unreachable');
+    return mapping.mapping;
+}
+
+/** The same chain for the OTHER entity — one vocabulary, two entry points. */
+async function memberMappingForOurOwnExport(csv: string) {
+    const source = intakeSourceFromText('members-export.csv', csv);
+    const match = await matchAdapter('members.invite', 'csv_generic', source);
+    if (!match) throw new Error('our own export was not recognised as a spreadsheet');
+    const mapping = defaultMappingFor('members.invite', match.inspection, source);
+    if (mapping.kind !== 'members') throw new Error('unreachable');
     return mapping.mapping;
 }
 
@@ -228,5 +251,76 @@ describe('contacts round trip — the writer honours the vocabulary', () => {
         expect(first.agency).toBe(SEED.agency);
         expect(second.agency).toBeNull();
         expect(second.notes).toBeNull();
+    });
+});
+
+/**
+ * The members half — the same properties, over the other manifest.
+ *
+ * This is the concrete payoff of one vocabulary rather than two: the questions
+ * are identical, so only the manifest and the intent change.
+ */
+describe('members round trip — our own export needs no mapping', () => {
+    it('binds every roundTrip field to its own header', async () => {
+        const mapping = await memberMappingForOurOwnExport(await svc.exportMembersCSV(TENANT));
+        const bound = new Map(
+            Object.entries(mapping).map(([k, v]) => [k, boundHeader(v)]),
+        );
+        for (const f of roundTripFields(MEMBER_EXCHANGE)) {
+            expect(bound.get(f.field), `${f.header} should bind to itself`).toBe(f.header);
+        }
+        // `role` binds as a COLUMN and not as the fixed invitation default —
+        // the members-side twin of the contacts `type` regression.
+        expect(mapping.role).toEqual({ column: 'role' });
+        expect(mapping.role).not.toEqual({ fixed: 'inspector' });
+    });
+
+    it('binds no exportOnly field anywhere', async () => {
+        const mapping = await memberMappingForOurOwnExport(await svc.exportMembersCSV(TENANT));
+        const boundHeaders = Object.values(mapping).map(boundHeader).filter(Boolean);
+        for (const f of MEMBER_EXCHANGE.fields.filter((x) => x.disposition === 'exportOnly')) {
+            expect(boundHeaders).not.toContain(f.header);
+        }
+        // POSITIVE CONTROL — the same list is not simply empty.
+        expect(boundHeaders).toContain('email');
+    });
+
+    it('NEGATIVE CONTROL — the same rows under strange headings bind nothing', async () => {
+        const strange = 'col1,col2,col3\nola@example.com,Ola Owner,owner\n';
+        const source = intakeSourceFromText('theirs.csv', strange);
+        const match = await matchAdapter('members.invite', 'csv_generic', source);
+        const mapping = defaultMappingFor('members.invite', match!.inspection, source);
+        if (mapping.kind !== 'members') throw new Error('unreachable');
+        expect(mapping.mapping.email).toBe('');
+        expect(mapping.mapping.name).toBeUndefined();
+        expect(mapping.mapping.role).toEqual({ fixed: 'inspector' });
+    });
+});
+
+describe('members round trip — the values survive', () => {
+    it('reproduces each seeded member, keeping the role the file states', async () => {
+        const csv = await svc.exportMembersCSV(TENANT);
+        const mapping = await memberMappingForOurOwnExport(csv);
+        const result = await csvGenericAdapter.convert(csv, { entity: 'member', mapping });
+        if (!result.ok) throw new Error(`convert refused the file: ${result.error.code}`);
+
+        const byEmail = new Map(result.bundle.members.map((m) => [m.email, m]));
+        expect(byEmail.get('ola@example.com')?.role).toBe('owner');
+        expect(byEmail.get('ola@example.com')?.name).toBe('Ola Owner');
+        // The owner did NOT come back as the invitation default.
+        expect(byEmail.get('ola@example.com')?.role).not.toBe('inspector');
+        // POSITIVE CONTROL — a member who genuinely IS an inspector still is,
+        // so the assertion above is about the role travelling and not about
+        // `inspector` having become unreachable.
+        expect(byEmail.get('ivan@example.com')?.role).toBe('inspector');
+    });
+
+    it('never carries the one role an import may not grant', async () => {
+        const csv = await svc.exportMembersCSV(TENANT);
+        const roles = parseCsvTable(csv).rows.map((r) => r.role);
+        expect(roles).not.toContain('agent');
+        // POSITIVE CONTROL — two DISTINCT roles are present, so the absence of
+        // `agent` is not the absence of data.
+        expect(new Set(roles).size).toBeGreaterThan(1);
     });
 });
