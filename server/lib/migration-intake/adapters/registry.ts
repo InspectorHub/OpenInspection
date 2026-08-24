@@ -1,4 +1,5 @@
 import { ROLE } from '../../auth/roles';
+import { INTAKE_HEADERS } from '../../data-exchange/headers';
 import type { TemplateRatingKind, VendorId } from '../bundle';
 import type { AdapterInspection, BundleResult, MigrationAdapter } from './types';
 import { csvGenericAdapter, type CsvContactMapping, type CsvMemberMapping } from './csv-generic';
@@ -126,21 +127,14 @@ export interface VendorMismatch {
 }
 
 /**
- * Header spellings that mean a given field. Matched case-insensitively, whole-cell.
- *
- * ⚠️ LITERAL-USE CLASSIFICATION: FORMAT DISCRIMINATORS. Ordinary English words
- * for the fields a contact list holds, gathered here so a spreadsheet exported
- * from anywhere can be recognised. They belong to no product: nothing in this
- * list came from any one export, and no product's own vocabulary is reproduced
- * by it. Exported so `../contacts-template.ts` DERIVES the starter file.
+ * The header spellings live in `server/lib/data-exchange/`, merged from the
+ * per-entity manifests the CSV EXPORT reads too. Re-exported here so an intake
+ * caller keeps one import, and aliased for one task while call sites move.
  */
-export const CONTACT_HEADERS = {
-    name: ['name', 'full name', 'fullname', 'contact', 'contact name'],
-    email: ['email', 'e-mail', 'email address'],
-    phone: ['phone', 'tel', 'mobile', 'phone number'],
-    agency: ['agency', 'company', 'organization', 'organisation', 'brokerage', 'firm'],
-    role: ['role', 'permission', 'access'],
-} as const;
+export {
+    INTAKE_HEADERS,
+    INTAKE_HEADERS as CONTACT_HEADERS,
+} from '../../data-exchange/headers';
 
 function pickColumn(columns: string[], candidates: readonly string[]): string | undefined {
     const lowered = columns.map((c) => c.trim().toLowerCase());
@@ -307,28 +301,28 @@ export function defaultMappingFor(
 
     if (intent === 'members.invite') {
         const mapping: CsvMemberMapping = {
-            email: pickColumn(columns, CONTACT_HEADERS.email) ?? '',
+            email: pickColumn(columns, INTAKE_HEADERS.email) ?? '',
             role: { fixed: ROLE.INSPECTOR },
         };
-        const name = pickColumn(columns, CONTACT_HEADERS.name);
+        const name = pickColumn(columns, INTAKE_HEADERS.name);
         if (name) mapping.name = name;
-        const role = pickColumn(columns, CONTACT_HEADERS.role);
+        const role = pickColumn(columns, INTAKE_HEADERS.role);
         if (role) mapping.role = { column: role };
         return { kind: 'members', mapping };
     }
 
     const mapping: CsvContactMapping = {
-        name: pickColumn(columns, CONTACT_HEADERS.name) ?? '',
+        name: pickColumn(columns, INTAKE_HEADERS.name) ?? '',
         // A fixed answer rather than a column: the type set is ours, not the
         // exporting product's, so a column of their words rarely lines up. The
         // operator can switch it to a column in the mapping step.
         type: { fixed: 'client' },
     };
-    const email = pickColumn(columns, CONTACT_HEADERS.email);
+    const email = pickColumn(columns, INTAKE_HEADERS.email);
     if (email) mapping.email = email;
-    const phone = pickColumn(columns, CONTACT_HEADERS.phone);
+    const phone = pickColumn(columns, INTAKE_HEADERS.phone);
     if (phone) mapping.phone = phone;
-    const agency = pickColumn(columns, CONTACT_HEADERS.agency);
+    const agency = pickColumn(columns, INTAKE_HEADERS.agency);
     if (agency) mapping.agency = agency;
     return { kind: 'contacts', mapping };
 }

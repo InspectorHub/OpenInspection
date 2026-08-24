@@ -15,7 +15,7 @@
  * nothing downstream reads this file. So the columns are computed from the two
  * facts that actually decide what the importer accepts:
  *
- *   1. `CONTACT_HEADERS` — which spellings mean which field;
+ *   1. `INTAKE_HEADERS` — which spellings mean which field;
  *   2. `defaultMappingFor('contacts.import', …)` — which of those fields the
  *      CONTACTS entry point binds to a column at all.
  *
@@ -41,8 +41,8 @@
  * the North American range set aside for fiction, so neither can reach a real
  * person, and the run is previewed before anything is written anyway.
  */
+import { INTAKE_HEADERS, type IntakeHeaderVocabulary } from '../data-exchange/headers';
 import {
-    CONTACT_HEADERS,
     defaultMappingFor,
     intakeSourceFromText,
 } from './adapters/registry';
@@ -51,15 +51,14 @@ import {
 export const CONTACTS_TEMPLATE_FILE_NAME = 'contacts-template.csv';
 
 /**
- * The shape of the header vocabulary: field name to its accepted spellings,
- * most-preferred first.
- *
- * A parameter rather than a hard import at the use site so the derivation can
- * be driven with a vocabulary a test writes — which is the only way to show
- * that this file MOVES with the vocabulary instead of merely agreeing with it
- * on the day it was written.
+ * `IntakeHeaderVocabulary` is re-exported rather than declared: the shape now
+ * belongs to `server/lib/data-exchange/headers.ts`, which is also where the one
+ * dictionary is merged. Still taken as a PARAMETER below so the derivation can
+ * be driven with a vocabulary a test writes — the only way to show that this
+ * file MOVES with the vocabulary instead of merely agreeing with it on the day
+ * it was written.
  */
-export type ContactHeaderVocabulary = Readonly<Record<string, readonly string[]>>;
+export type { IntakeHeaderVocabulary };
 
 /** One column of the template: the field it stands for, and its heading. */
 export interface ContactsTemplateColumn {
@@ -110,7 +109,7 @@ function csvCell(value: string): string {
  * read is worse in a template than no column at all.
  */
 export function contactsTemplateColumns(
-    vocabulary: ContactHeaderVocabulary = CONTACT_HEADERS,
+    vocabulary: IntakeHeaderVocabulary = INTAKE_HEADERS,
 ): ContactsTemplateColumn[] {
     const candidates: ContactsTemplateColumn[] = [];
     for (const [field, aliases] of Object.entries(vocabulary)) {

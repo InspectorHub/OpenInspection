@@ -26,7 +26,7 @@ import {
     CONTACTS_TEMPLATE_FILE_NAME,
     buildContactsTemplateCsv,
     contactsTemplateColumns,
-    type ContactHeaderVocabulary,
+    type IntakeHeaderVocabulary,
 } from '../../../server/lib/migration-intake/contacts-template';
 import {
     defaultMappingFor,
@@ -36,7 +36,7 @@ import {
 import { parseCsvTable } from '../../../server/lib/migration-intake/csv';
 
 /** Just the header strings, in the order the file carries them. */
-function headers(vocabulary?: ContactHeaderVocabulary): string[] {
+function headers(vocabulary?: IntakeHeaderVocabulary): string[] {
     return contactsTemplateColumns(vocabulary).map((c) => c.header);
 }
 
@@ -66,7 +66,7 @@ describe('contacts template — which columns it carries', () => {
         // `pickColumn` scans a field's aliases IN ORDER and takes the first one
         // present, so the first alias is not an arbitrary pick — it is the
         // spelling the importer itself resolves to when a file offers several.
-        const vocabulary: ContactHeaderVocabulary = {
+        const vocabulary: IntakeHeaderVocabulary = {
             name: ['contact name', 'name'],
             email: ['email'],
         };
@@ -78,7 +78,7 @@ describe('contacts template — the derivation is live', () => {
     it('follows the vocabulary when a field is respelled', () => {
         // `email address` is a real alias of the real vocabulary, so the
         // importer still binds it — and the template has to say so.
-        const vocabulary: ContactHeaderVocabulary = {
+        const vocabulary: IntakeHeaderVocabulary = {
             name: ['name'],
             email: ['email address'],
         };
@@ -90,7 +90,7 @@ describe('contacts template — the derivation is live', () => {
     });
 
     it('drops a field whose spelling the importer would not recognise', () => {
-        const vocabulary: ContactHeaderVocabulary = {
+        const vocabulary: IntakeHeaderVocabulary = {
             name: ['name'],
             email: ['electronic mail'],
         };
@@ -101,7 +101,7 @@ describe('contacts template — the derivation is live', () => {
     });
 
     it('ignores a field invented in the vocabulary that no mapping reads', () => {
-        const vocabulary: ContactHeaderVocabulary = {
+        const vocabulary: IntakeHeaderVocabulary = {
             name: ['name'],
             nickname: ['nickname'],
         };
@@ -109,7 +109,7 @@ describe('contacts template — the derivation is live', () => {
     });
 
     it('follows the vocabulary when the fields are reordered', () => {
-        const vocabulary: ContactHeaderVocabulary = {
+        const vocabulary: IntakeHeaderVocabulary = {
             agency: ['agency'],
             name: ['name'],
         };
