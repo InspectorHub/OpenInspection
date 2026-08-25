@@ -15,7 +15,8 @@ import { PublicAgreementBodySchema } from '../../lib/validations/agreement-publi
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
 import { getDrizzle } from '../../lib/route-helpers';
 import { resolveAutomationCompanyName } from '../../services/automation/company-name';
-import { AGREEMENT_LANGUAGE_DISCLOSURE } from '../../lib/legal/agreement-language-disclosure';
+import { AGREEMENT_LANGUAGE_DISCLOSURE } from '../../lib/legal/agreement-language-disclosure';
+import { fireAndForget } from '../../lib/fire-and-forget';
 
 // Local aliases for the literal unions the DB columns are narrowed to in the
 // JSON responses below. Kept file-local (not exported) so the public router
@@ -490,12 +491,12 @@ const agreementRoutes = createApiRouter()
         // Spec 2A — per-signer automation event so per-tenant rules can react to
         // each individual signature (fires on EVERY sign, not just completion).
         if (result.inspectionId) {
-            c.var.services.automation.trigger({
+            fireAndForget(c, c.var.services.automation.trigger({
                 tenantId: result.tenantId,
                 inspectionId: result.inspectionId,
                 triggerEvent: 'agreement.signer_signed',
                 companyName: await resolveAutomationCompanyName(getDrizzle(c), result.tenantId), reportBaseUrl: c.env.APP_BASE_URL || '',
-            }).catch(() => {});
+            }), 'automation trigger', { event: 'agreement.signer_signed', tenantId: result.tenantId });
         }
 
         // Envelope completion side-effects fire EXACTLY ONCE — gated on the
@@ -565,13 +566,13 @@ const agreementRoutes = createApiRouter()
 
         // Envelope-level automation fires ONLY when the WHOLE envelope declined.
         if (r.inspectionId && r.envelopeStatus === 'declined') {
-            c.var.services.automation.trigger({
+            fireAndForget(c, c.var.services.automation.trigger({
                 tenantId: r.tenantId,
                 inspectionId: r.inspectionId,
                 triggerEvent: 'agreement.declined',
                 companyName: await resolveAutomationCompanyName(getDrizzle(c), r.tenantId),
                 reportBaseUrl: c.env.APP_BASE_URL || '',
-            }).catch(() => {});
+            }), 'automation trigger', { event: 'agreement.declined', tenantId: r.tenantId });
         }
 
         return c.json({ success: true as const }, 200);

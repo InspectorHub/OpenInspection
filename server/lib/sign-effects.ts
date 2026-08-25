@@ -6,7 +6,8 @@ import { logger } from './logger';
 import { resolveAutomationCompanyName } from '../services/automation/company-name';
 import { getBookingHost } from './url';
 import { envelopeVerifyUrl } from './agreement-verify-url';
-import type { HonoConfig } from '../types/hono';
+import type { HonoConfig } from '../types/hono';
+import { fireAndForget } from './fire-and-forget';
 
 /**
  * Track I-a — fire-and-forget side effects that run exactly ONCE when an
@@ -111,13 +112,13 @@ export async function runEnvelopeCompletionPipeline(
 
     // (6) Spec 2A — envelope-level automation event so per-tenant rules can react.
     if (inspectionId) {
-        c.var.services.automation.trigger({
+        fireAndForget(c, c.var.services.automation.trigger({
             tenantId,
             inspectionId,
             triggerEvent: 'agreement.signed',
             companyName: await resolveAutomationCompanyName(drizzle(c.env.DB), tenantId),
             reportBaseUrl: c.env.APP_BASE_URL || '',
-        }).catch(() => {});
+        }), 'automation trigger', { event: 'agreement.signed', tenantId });
     }
 
     // (7) Sprint 1 C-8 — confirmation email to the signer (CC the inspector so

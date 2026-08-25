@@ -24,7 +24,7 @@
   "app/hooks/useInspection.ts": 600,
   "server/services/concierge.service.ts": 595,
   "server/api/public-report.ts": 586,
-  "server/api/bookings/agreement.ts": 581,
+  "server/api/bookings/agreement.ts": 582,
   "server/services/agent/referral.ts": 566,
   "app/lib/collab/results-binding.ts": 560,
   "app/routes/settings-profile.tsx": 548,

@@ -22,7 +22,8 @@ import { getTenantId, getDrizzle } from '../lib/route-helpers';
 import { resolveLocale } from '../lib/locale';
 import { formatCurrency } from '../lib/format';
 import { qboPaymentKey } from '../lib/qbo-payment-key';
-import invoicePaymentRoutes from './invoices/payments';
+import invoicePaymentRoutes from './invoices/payments';
+import { fireAndForget } from '../lib/fire-and-forget';
 
 const listInvoicesRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
@@ -137,7 +138,15 @@ const invoiceRoutes = createApiRouter()
     })
     .openapi(createInvoiceRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const invoice = await c.var.services.invoice.createInvoice(tenantId, c.req.valid('json'));
+        // The third argument is the invoice.created automation's home. Without
+        // it the service AWAITS the trigger, which is correct but pays for it in
+        // response latency; a route has an execution context, so it does not
+        // have to.
+        const invoice = await c.var.services.invoice.createInvoice(
+            tenantId,
+            c.req.valid('json'),
+            work => fireAndForget(c, work, 'automation trigger', { event: 'invoice.created', tenantId }),
+        );
         if (c.env.QBO_CLIENT_ID) {
             c.executionCtx.waitUntil(
                 c.var.services.qbo.upsertInvoice(tenantId, {
@@ -295,7 +304,7 @@ const invoiceRoutes = createApiRouter()
                 clientEmail,
                 amountCents,
                 lineItems,
-            });
+            }, work => fireAndForget(c, work, 'automation trigger', { event: 'invoice.created', tenantId }));
             invoiceId = created.id;
             invoiceCurrency = created.currency;
         }
