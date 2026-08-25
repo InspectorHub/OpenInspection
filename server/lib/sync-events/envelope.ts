@@ -27,7 +27,7 @@ import {
 // registry moved to its own module when this file crossed the size gate; what
 // the seam CARRIES and how it is SERIALIZED are different questions, and only
 // the second one is left here.
-export { SCHEMAS, DATA_SCHEMAS, isRegisteredEventType };
+export { SCHEMAS, DATA_SCHEMAS };
 export type { SyncEventType };
 
 // The group aliases. Every one is an `Extract<>` off `SyncEventType`, which is

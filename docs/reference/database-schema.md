@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 104 |
-| Columns | 1234 |
+| Columns | 1235 |
 | Indexes (excluding primary keys) | 176 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 593 (48%) |
+| Columns carrying a source comment | 594 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -2459,7 +2459,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `tenant_configs`
 
-<sub>server/lib/db/schema/tenant/core.ts · 98 columns · primary key `tenant_id`</sub>
+<sub>server/lib/db/schema/tenant/core.ts · 99 columns · primary key `tenant_id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2561,6 +2561,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `ai_key_attestation_service_tier` | text |  |  |  | Which of the provider's terms the workspace says govern this account. A free tier and a paid tier are different contracts at most vendors, and no endpoint this client calls reports which one a key belongs to — so the workspace's statement is the only signal that exists. |
 | `ai_key_attestation_intended_use` | text |  |  |  | What the workspace says they are sending it for, in their own words. |
 | `ai_key_attestation_config_version` | integer |  |  |  | The `ai_config_version` this attestation was made about. Without it the attestation floats free: a workspace could attest to one destination, change the endpoint, and the stored statement would still read as though it covered every call. **[more]** |
+| `courtesy_translation_enabled` | integer | NN | `false` |  | Whether this workspace may PRODUCE courtesy translations of a report. ⚠️ It gates production and never consumption. **[more]** |
 
 ---
 

@@ -77,7 +77,7 @@ export interface CsvRecord {
  * An unterminated quote ends as one final record rather than as a throw. A
  * malformed file has to reach the repair screen, not a 500.
  */
-export function splitCsvRecords(csv: string): CsvRecord[] {
+function splitCsvRecords(csv: string): CsvRecord[] {
     const records: CsvRecord[] = [];
     let cur = '';
     let inQuotes = false;
