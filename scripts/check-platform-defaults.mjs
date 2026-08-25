@@ -54,9 +54,31 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const REGISTER = join(ROOT, 'compliance', 'platform-defaults.jsonc');
 const SCHEMA_DIR = join('server', 'lib', 'db', 'schema');
-/** The one input with a real denominator. Everything else is out of scope. */
-const ANCHOR_FILE = join(SCHEMA_DIR, 'tenant', 'core.ts');
-const ANCHOR_TABLE = 'tenant_configs';
+/**
+ * The inputs with a real denominator. Everything else is out of scope.
+ *
+ * This is a LIST because the anchored set MOVED, not because breadth was wanted.
+ * `tenant_configs` hit D1's 100-column ceiling and the AI subsystem was split out
+ * into `tenant_ai_configs`; three classified defaults went with it.
+ *
+ * Anchoring on one table would have let the contract migration quietly evict
+ * three reviewed decisions from this gate's scope: `is_ai_enabled`,
+ * `ai_config_version` and `is_courtesy_translation_enabled` would each have read
+ * as 'a column that no longer exists', and deleting their entries is what a green
+ * run would then have asked for. A decision made quietly on a controller's behalf
+ * is the one nobody can point at afterwards -- which is the whole reason this
+ * register exists. Letting a table split do the forgetting is that same failure
+ * with a migration in front of it.
+ *
+ * A table belongs here only when its `.default()` set is enumerable AND its
+ * defaults are workspace-facing. Adding one WIDENS WHAT THIS GATE CLAIMS, so it
+ * takes register entries with it, not just a line here.
+ */
+const ANCHORS = [
+    { file: join(SCHEMA_DIR, 'tenant', 'core.ts'), table: 'tenant_configs' },
+    { file: join(SCHEMA_DIR, 'tenant', 'ai.ts'), table: 'tenant_ai_configs' },
+];
+const anchorLabel = (a) => a.file.split('\\').join('/');
 
 const REQUIRED_FIELDS = [
     'column', 'property', 'default_value', 'default_owner', 'decision_type',
@@ -255,8 +277,9 @@ function outOfScopeDefaults() {
         files++;
         const rel = relative(ROOT, f).split('\\').join('/');
         let text = blankTsComments(readFileSync(f, 'utf8'));
-        if (rel === ANCHOR_FILE.split('\\').join('/')) {
-            const body = tableBody(readFileSync(f, 'utf8'), ANCHOR_TABLE);
+        for (const a of ANCHORS) {
+            if (rel !== anchorLabel(a)) continue;
+            const body = tableBody(readFileSync(f, 'utf8'), a.table);
             if (body) text = text.split(body).join('');
         }
         count += (text.match(/\.default\(/g) ?? []).length;
@@ -272,7 +295,7 @@ const findMissing = (declared, entries) =>
 
 const findStale = (declared, entries) =>
     entries.filter((e) => !declared.some((d) => d.column === e.column))
-        .map((e) => `${e.column} — no such .default() in ${ANCHOR_TABLE}`);
+        .map((e) => `${e.column} — no such .default() in ${ANCHORS.map((a) => a.table).join(' or ')}`);
 
 /**
  * One column, one entry. A copy-pasted entry whose classification was only
@@ -354,8 +377,18 @@ function overrideSurfaceProblems(entry, exists, readFile) {
     if (!surface) return [];
     if (!exists(surface)) return [`${id}: override_surface '${surface}' does not exist`];
     const text = readFile(surface);
-    if (!text.includes(entry.column) && !text.includes(entry.property)) {
-        return [`${id}: override_surface '${surface}' exists but mentions neither '${entry.column}' nor '${entry.property}'`];
+    // `override_field` is the name the SURFACE uses, when that differs from the
+    // column and the Drizzle property. It is not a convenience: after the AI
+    // subsystem moved to `tenant_ai_configs` the column became `is_enabled` and
+    // the property `isEnabled`, while the form field a controller actually
+    // touches is still `aiEnabled` -- so no UI file mentions either name and this
+    // check could no longer see a surface that plainly exists. Recording the
+    // third name keeps the link checkable AND writes down the divergence, which
+    // is worth knowing on its own: somebody searching the settings page for
+    // `isEnabled` will not find it.
+    const names = [entry.column, entry.property, entry.override_field].filter(Boolean);
+    if (!names.some((n) => text.includes(n))) {
+        return [`${id}: override_surface '${surface}' exists but mentions none of ${names.map((n) => `'${n}'`).join(', ')}`];
     }
     return [];
 }
@@ -496,7 +529,27 @@ function selfTest() {
     t('an override_surface that never mentions the field is refused', overrideSurfaceProblems(
         baseEntry({ controller_override: 'available', override_surface: 'app/routes/settings-inspection.tsx' }),
         yes, () => 'unrelated file contents',
-    ).some((p) => p.includes('mentions neither')));
+    ).some((p) => p.includes('mentions none of')));
+    // `override_field` is the third accepted name, for a surface that calls the
+    // control something other than the column or the Drizzle property. Both
+    // directions are asserted: it must let a real surface through, and it must
+    // not become a way to name any file at all.
+    t('an override_surface mentioning only the override_field passes', overrideSurfaceProblems(
+        baseEntry({
+            controller_override: 'available',
+            override_surface: 'app/routes/settings-inspection.tsx',
+            override_field: 'formFieldName',
+        }),
+        yes, () => 'name="formFieldName"',
+    ).length === 0);
+    t('an override_field that the surface never mentions is still refused', overrideSurfaceProblems(
+        baseEntry({
+            controller_override: 'available',
+            override_surface: 'app/routes/settings-inspection.tsx',
+            override_field: 'formFieldName',
+        }),
+        yes, () => 'unrelated file contents',
+    ).some((p) => p.includes('mentions none of')));
     t('an override_surface mentioning the property passes', overrideSurfaceProblems(
         baseEntry({ controller_override: 'available', override_surface: 'app/routes/settings-inspection.tsx' }),
         yes, () => 'const { xCol } = data;',
@@ -536,18 +589,36 @@ if (!selfTest()) {
 let failed = false;
 const die = (msg) => { console.error(`\n✘ ${msg}`); failed = true; };
 
-const anchorPath = join(ROOT, ANCHOR_FILE);
 let declared = [];
-let bodyFound = false;
-if (!existsSync(anchorPath)) {
-    die(`${ANCHOR_FILE.split('\\').join('/')} is not there — the schema moved and this gate did not notice.`);
-} else {
-    const body = tableBody(readFileSync(anchorPath, 'utf8'), ANCHOR_TABLE);
+let bodyFound = ANCHORS.length > 0;
+for (const a of ANCHORS) {
+    const anchorPath = join(ROOT, a.file);
+    if (!existsSync(anchorPath)) {
+        die(`${anchorLabel(a)} is not there — the schema moved and this gate did not notice.`);
+        bodyFound = false;
+        continue;
+    }
+    const body = tableBody(readFileSync(anchorPath, 'utf8'), a.table);
     if (body === null) {
-        die(`Could not find the '${ANCHOR_TABLE}' table in ${ANCHOR_FILE.split('\\').join('/')} — that is a parse failure, not a table with no defaults.`);
-    } else {
-        bodyFound = true;
-        declared = parseDefaults(body);
+        die(`Could not find the '${a.table}' table in ${anchorLabel(a)} — that is a parse failure, not a table with no defaults.`);
+        bodyFound = false;
+        continue;
+    }
+    declared.push(...parseDefaults(body));
+}
+
+// The register is keyed by COLUMN alone, so two anchors sharing a column name
+// would let one table's entry satisfy the other's requirement while every count
+// still added up. Refuse rather than produce a green run that means less than it
+// says. (Checked, not assumed: today the two anchored sets are disjoint.)
+{
+    const seen = new Map();
+    for (const d of declared) seen.set(d.column, (seen.get(d.column) ?? 0) + 1);
+    const collided = [...seen].filter(([, n]) => n > 1).map(([c]) => c);
+    if (collided.length) {
+        die(`Column name(s) declared in more than one anchored table: ${collided.join(', ')}. `
+            + 'The register is keyed by column, so these cannot be told apart. Key it by '
+            + 'table+column before anchoring a table that reuses a name.');
     }
 }
 
@@ -581,7 +652,7 @@ const outOfScope = outOfScopeDefaults();
 
 // Both numbers, side by side, every run. "0 problems" alone cannot be told from
 // a gate that scanned nothing.
-console.log(`\nplatform defaults — anchored on ${ANCHOR_TABLE} in ${ANCHOR_FILE.split('\\').join('/')}`);
+console.log(`\nplatform defaults — anchored on ${ANCHORS.map((a) => `${a.table} in ${anchorLabel(a)}`).join(', ')}`);
 console.log(`  .default() declarations : ${declared.length} declared / ${declared.length - missing.length} registered`);
 console.log(`  register entries        : ${entries.length} total / ${unreviewed.length} unreviewed`);
 console.log(`  value agreement        : ${declared.length - missing.length} compared / ${drift.length} drifted`);
@@ -591,13 +662,13 @@ console.log(`  controller_override    : ${OVERRIDE_STATES.map((k) => `${k} ${byO
 const surfacesNamed = entries.filter((e) => e.override_surface).length;
 console.log(`  override surfaces      : ${surfacesNamed} named / ${surfaceProblems.length} unsupported`);
 console.log('  OUT OF SCOPE, uncounted by design:');
-console.log(`      · ${outOfScope.count} further .default() declarations across ${outOfScope.files} schema file(s) outside ${ANCHOR_TABLE}`);
+console.log(`      · ${outOfScope.count} further .default() declarations across ${outOfScope.files} schema file(s) outside ${ANCHORS.map((a) => a.table).join(' / ')}`);
 console.log('      · every default that lives in a module constant or a code branch — this gate cannot enumerate those at all,');
 console.log('        so the denominator above is PARTIAL and a green run is not a claim of completeness.');
 for (const u of unreviewed) console.log(`  still unreviewed: ${u.column}`);
 
 if (bodyFound && parseIsImplausible(declared)) {
-    die(`Parsed zero .default() declarations from '${ANCHOR_TABLE}' — that is a parse failure, not a table with no defaults.`);
+    die(`Parsed zero .default() declarations from ${ANCHORS.map((a) => a.table).join(' / ')} — that is a parse failure, not tables with no defaults.`);
 }
 if (register && entries.length === 0) {
     die('The register has zero entries — an empty register cannot pass; it has not been written yet.');
@@ -626,4 +697,4 @@ if (failed) {
     process.exit(1);
 }
 
-console.log(`\n✓ Every ${ANCHOR_TABLE} default is classified — and the limit above is stated, not hidden.\n`);
+console.log(`\n✓ Every anchored default is classified — and the limit above is stated, not hidden.\n`);
