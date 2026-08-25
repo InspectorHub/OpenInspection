@@ -196,7 +196,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.0.0",
     "@cloudflare/vitest-pool-workers": "^0.14.2",
-    "@cloudflare/workers-types": "^4.20260629.1",
+    "@cloudflare/workers-types": "^4.20260702.1",
     "@eslint/js": "^9.39.4",
     "@fontsource/bricolage-grotesque": "^5.2.10",
     "@fontsource/dm-sans": "^5.2.8",
