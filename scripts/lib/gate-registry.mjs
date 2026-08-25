@@ -37,6 +37,12 @@ export const SCRIPT_GATES = [
     { key: 'filesize', label: 'Large-file ratchet', script: 'check-file-size.mjs', fix: 'npm run lint:filesize', rung: PRECOMMIT },
     { key: 'tz', label: 'Calendar timezone-safety', script: 'check-tz-safety.mjs', fix: 'npm run lint:tz', rung: PRECOMMIT },
     { key: 'idempotency', label: 'Mutating-route retry safety', script: 'check-idempotency-coverage.mjs', fix: 'npm run lint:idempotency', rung: PRECOMMIT },
+    // PRECOMMIT, and the rung is the point. D1 stops at 100 columns per table,
+    // and the only thing that ever crosses that line is somebody adding one
+    // column to a table that was already wide. Catching it at PUSH would still
+    // be after the schema, the migration and the inline DDL had been written
+    // against a shape the database will not accept.
+    { key: 'columnceiling', label: "D1 column ceiling", script: 'check-column-ceiling.mjs', fix: 'npm run lint:columns', rung: PRECOMMIT },
     // Pre-commit for the same reason as the price, tracking and AI gates: what
     // it catches is a route ARRIVING with nobody having said whether reaching it
     // requires the agent to be bound by the Agent Terms. That question is cheap

@@ -62,6 +62,7 @@
     "lint:ai-classification": "node scripts/check-ai-classification.mjs",
     "lint:price-capability": "node scripts/check-price-capability.mjs",
     "lint:filesize": "node scripts/check-file-size.mjs",
+    "lint:columns": "node scripts/check-column-ceiling.mjs",
     "lint:converter-capability": "node scripts/check-converter-capability.mjs",
     "lint:converter-literals": "node scripts/check-converter-literals.mjs",
     "lint:statutory-fidelity": "node scripts/check-statutory-fidelity.mjs",
