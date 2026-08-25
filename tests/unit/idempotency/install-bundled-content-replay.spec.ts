@@ -39,6 +39,7 @@ import adminRoutes from '../../../server/api/admin';
 import { idempotencyMiddleware } from '../../../server/lib/middleware/idempotency';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '11111111-1111-4111-8111-111111111111';
 
@@ -84,10 +85,9 @@ function buildApp() {
 }
 
 const ENV = { DB: {}, JWT_SECRET: 'test-secret', APP_BASE_URL: 'https://app.test' };
-const EXEC = {
-    waitUntil: (p: Promise<unknown>) => { void Promise.resolve(p).catch(() => {}); },
-    passThroughOnException: () => {},
-} as ExecutionContext;
+// Settled at teardown by the helper. `void` attached a catch but nothing that
+// could await the work, so it ran on past the end of the file.
+const EXEC = makeExecutionContext().ctx;
 
 function install(key: string | null) {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };

@@ -29,13 +29,17 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import inspectionRepairRequestRoutes from '../../../server/api/inspections/repair-requests';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = 't-repairlog-1';
 const USER = 'u-repairlog-1';
 const INSP = 'i-repairlog-1';
 
 const ENV = { DB: {} } as never;
-const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const CTX = makeExecutionContext().ctx;
 
 const LIST_ROW = {
     id: 'rr1',

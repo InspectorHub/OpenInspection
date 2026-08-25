@@ -28,6 +28,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 // eslint-disable-next-line import/order
 import adminRoutes from '../../../server/api/admin';
 import { LegalVersionService } from '../../../server/services/legal-version.service';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT_ID = 'aaaaaaaa-0000-0000-0000-000000000001';
 const OTHER_TENANT = 'bbbbbbbb-0000-0000-0000-000000000002';
@@ -72,7 +73,10 @@ function buildApp(
 const ENV = { DB: {}, JWT_SECRET: 'x' } as unknown as HonoConfig['Bindings'];
 
 /** Minimal ExecutionContext stub — auditFromContext reads c.executionCtx. */
-const EXEC_CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const EXEC_CTX = makeExecutionContext().ctx;
 
 /** Like app.request but threads an ExecutionContext (production always has one). */
 function request(app: OpenAPIHono<HonoConfig>, url: string, init: RequestInit = {}) {

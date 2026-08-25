@@ -19,6 +19,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import agentRoutes from '../../../server/api/agent';
 import type { HonoConfig } from '../../../server/types/hono';
 import { asD1Db } from '../helpers/test-db';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const AGENT_CONTACT = '00000000-0000-4000-8000-0000000000a1';
@@ -43,7 +44,10 @@ function buildApp(userRole: string) {
 }
 
 const ENV = { DB: {} } as never;
-const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const CTX = makeExecutionContext().ctx;
 
 describe('GET /api/agent/my-reports — buyer_agent via inspection_people (Task 9c)', () => {
     beforeEach(async () => {

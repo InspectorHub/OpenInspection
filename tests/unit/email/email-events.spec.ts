@@ -19,6 +19,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 // eslint-disable-next-line import/order
 import { smsPublicRoutes } from '../../../server/api/sms';
 import { sealSecrets } from '../../../server/lib/config-crypto';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const FIXED_NOW = 1_700_000_000_000; // ms — pins the anti-replay clock
@@ -30,8 +31,13 @@ const FAKE_ENV = {
     WEBHOOK_NOW_MS: FIXED_NOW,
 } as unknown as HonoConfig['Bindings'];
 
+/** One context for the file, not one per call. `makeExecutionContext` registers
+ *  the teardown that settles background work, and `afterEach` is only
+ *  registrable while a suite is being COLLECTED -- building a fresh context
+ *  inside a test would silently settle nothing. */
+const EXEC_CTX = makeExecutionContext().ctx;
 function makeExecCtx() {
-    return { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
+    return EXEC_CTX;
 }
 
 function buildApp(database: BetterSQLite3Database<typeof schema>) {

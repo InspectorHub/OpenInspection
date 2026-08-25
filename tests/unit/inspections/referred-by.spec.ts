@@ -17,6 +17,7 @@ import coreRoutes from '../../../server/api/inspections/core';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import type { HonoConfig } from '../../../server/types/hono';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const T = 't-refby-1';
 const OTHER = 't-refby-2';
@@ -25,7 +26,10 @@ const INSP = 'i-refby-1';
 let db: BetterSQLite3Database<typeof schema>;
 
 const ENV = { DB: {} } as never;
-const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const CTX = makeExecutionContext().ctx;
 
 function buildApp() {
     const app = new OpenAPIHono<HonoConfig>();

@@ -19,6 +19,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import metricsRoutes from '../../../server/api/metrics';
 import type { HonoConfig } from '../../../server/types/hono';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const AGENT_CONTACT = 'contact-agent-1';
@@ -41,7 +42,10 @@ function buildApp() {
 }
 
 const ENV = { DB: {} } as never;
-const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const CTX = makeExecutionContext().ctx;
 
 describe('GET /api/metrics — topAgents via inspection_people (Task 9c)', () => {
     beforeEach(async () => {

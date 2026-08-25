@@ -42,9 +42,13 @@ const FAKE_ENV = {
     TENANT_CACHE: { get: async () => null, put: async () => {} },
 } as unknown as HonoConfig['Bindings'];
 
+/** One context for the file, not one per call. `makeExecutionContext` registers
+ *  the teardown that settles background work, and `afterEach` is only
+ *  registrable while a suite is being COLLECTED -- building a fresh context
+ *  inside a test would silently settle nothing. */
+const EXEC_CTX = makeExecutionContext().ctx;
 function makeExecCtx() {
-    const ctx = { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
-    return ctx;
+    return EXEC_CTX;
 }
 
 function buildApp(db: BetterSQLite3Database<typeof schema>, profile: typeof SAAS_PROFILE | typeof STANDALONE_PROFILE = STANDALONE_PROFILE) {
@@ -1865,7 +1869,8 @@ describe('Managed-eligibility gate — POST /sms/compliance/provision and /resub
 
 // ─── MeteringService.getCount (Task 10) ─────────────────────────────────────
 
-import { MeteringService } from '../../../server/services/metering.service';
+import { MeteringService } from '../../../server/services/metering.service';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 describe('MeteringService.getCount (Task 10)', () => {
     let meteringDb: BetterSQLite3Database<typeof schema>;

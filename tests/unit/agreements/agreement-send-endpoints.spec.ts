@@ -24,6 +24,7 @@ import adminRoutes from '../../../server/api/admin';
 import type { HonoConfig } from '../../../server/types/hono';
 import { AgreementService } from '../../../server/services/agreement.service';
 import { AppError } from '../../../server/lib/errors';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 function attachErrorHandler(app: OpenAPIHono<HonoConfig>) {
     app.onError((err, c) => {
@@ -69,10 +70,9 @@ function buildApp() {
 }
 
 const ENV = { DB: {}, JWT_SECRET: 'test-secret', APP_BASE_URL: 'https://app.test' };
-const EXEC = {
-    waitUntil: (p: Promise<unknown>) => { void Promise.resolve(p).catch(() => {}); },
-    passThroughOnException: () => {},
-} as ExecutionContext;
+// Settled at teardown by the helper. `void` attached a catch but nothing that
+// could await the work, so it ran on past the end of the file.
+const EXEC = makeExecutionContext().ctx;
 
 beforeEach(async () => {
     const fixture = createTestDb();

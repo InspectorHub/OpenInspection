@@ -28,6 +28,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { inspectionsRoutes } from '../../../server/api/inspections';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { ComplianceService } from '../../../server/services/compliance/pca-compliance.service';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const SECRET = 'test-encryption-secret-32-bytes-long!!';
 const TENANT  = '00000000-0000-0000-0000-000000000001';
@@ -39,7 +40,10 @@ const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
 // accessing when app.request() is called without a 4th executionCtx arg
 // (unlike the real CF Workers runtime). Stub it so the write routes' fire-
 // and-forget audit call doesn't 500 the request.
-const FAKE_EXEC_CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const FAKE_EXEC_CTX = makeExecutionContext().ctx;
 
 function buildApp(db: BetterSQLite3Database<typeof schema>, role: UserRole) {
     (mockDrizzle as ReturnType<typeof vi.fn>).mockReturnValue(db);
