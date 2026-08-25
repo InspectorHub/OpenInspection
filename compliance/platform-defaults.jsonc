@@ -241,36 +241,38 @@
     },
     {
       "column": "is_courtesy_translation_enabled",
-      "property": "courtesyTranslationEnabled",
+      "property": "isCourtesyTranslationEnabled",
+      "override_field": "courtesyTranslationEnabled",
       "default_value": "false",
       "default_owner": "engine",
       "decision_type": "service_safeguard",
       "basis": "OFF is the only honest default for a switch whose ON position sends a client's report text to a third party. The question a default answers is what happens to somebody who touches nothing, and for a workspace that has never considered machine translation the answer must be that their client's inspection findings stay where they are. Note that this differs from the AI switch above, which defaults ON, and the difference is not inconsistency: that column was carved out of behaviour workspaces already had, whereas nothing was translating anything before this one existed. A default of true would have been a new outbound flow nobody asked for.",
       "controller_override": "available",
       "override_surface": "app/routes/settings-advanced.tsx",
-      "note": "The switch governs PRODUCTION of a translation, never consumption: once one is stored, a reader is served it whatever this column says later. That asymmetry is deliberate — turning the switch off must not retract a document a client has already been given, and the erasure rules are where a stored translation is actually removed. Consumption is gated instead on the translation still describing the current English, which is a freshness question rather than a permission one."
+      "note": "The switch governs PRODUCTION of a translation, never consumption: once one is stored, a reader is served it whatever this column says later. That asymmetry is deliberate — turning the switch off must not retract a document a client has already been given, and the erasure rules are where a stored translation is actually removed. Consumption is gated instead on the translation still describing the current English, which is a freshness question rather than a permission one. MOVED to `tenant_ai_configs` when `tenant_configs` hit D1's 100-column ceiling; the classification did not change, and this gate follows the column rather than the table so that the split could not quietly retire a reviewed decision."
     },
     {
-      "column": "is_ai_enabled",
-      "property": "aiEnabled",
+      "column": "is_enabled",
+      "property": "isEnabled",
+      "override_field": "aiEnabled",
       "default_value": "true",
       "default_owner": "engine",
       "decision_type": "technical",
       "basis": "Preserves the behaviour the column was carved out of. The switch is new; what it governs is not — a workspace that had configured AI credentials before this column existed was already able to run AI, and a default of false would have switched that off for every one of them at migration, silently. The privacy question a default answers is 'what happens to somebody who touches nothing', and for somebody who touches nothing this default changes nothing at all: with no credentials configured, every AI call still refuses at the resolver.",
-      "controller_override": "none",
-      "override_surface": null,
-      "note": "⚠ TODAY NOTHING IN THE PRODUCT CAN CHANGE THIS. The column ships defaulting on and the settings control that would turn it off was not built with it, so 'none' is the factual answer rather than the intended one. The change that adds the AI provider controls must move this to 'available' and name the surface — and until it does, the only thing standing between a workspace and an AI call is the absence of credentials. Read as a PROVISIONING answer (may this workspace be offered AI) and not as a permission — the runtime permission is decided in resolveAi, where a provider is actually built. The two are separate on purpose: resolveRuntimeAiSource repaints another repository's console from this value with no deploy, so a value that meant 'permitted' would let a console edit grant a capability."
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-advanced.tsx",
+      "note": "⚠ THIS ENTRY PREVIOUSLY SAID NOTHING IN THE PRODUCT COULD CHANGE IT, AND THAT IS NO LONGER TRUE. The switch it asked for exists: a checkbox in AiFeaturesPanel, read by the settings-advanced action as `fd.get('aiEnabled')` and written through `saveAiConfig` to `tenant_ai_configs.is_enabled`. Verified end to end rather than inferred from the panel rendering a control. The old note instructed whoever built those controls to move this to 'available' and name the surface; that is what this edit does. Read as a PROVISIONING answer (may this workspace be offered AI) and not as a permission — the runtime permission is decided in resolveAi, where a provider is actually built. The two are separate on purpose: resolveRuntimeAiSource repaints another repository's console from this value with no deploy, so a value that meant 'permitted' would let a console edit grant a capability. MOVED to `tenant_ai_configs` with the rest of the AI subsystem; the default and its basis are unchanged."
     },
     {
-      "column": "ai_config_version",
-      "property": "aiConfigVersion",
+      "column": "config_version",
+      "property": "configVersion",
       "default_value": "0",
       "default_owner": "engine",
       "decision_type": "technical",
       "basis": "A counter, starting where no configuration has been saved. A non-zero default would claim a revision that never happened.",
       "controller_override": "none",
       "override_surface": null,
-      "note": "Bumped when the AI provider configuration is saved, so a cached client can tell its resolved endpoint is stale. Carries no subject data and answers no question about a person."
+      "note": "Bumped when the AI provider configuration is saved, so a cached client can tell its resolved endpoint is stale. Carries no subject data and answers no question about a person. MOVED to `tenant_ai_configs`. ⚠ Its READER was never built: no call site passes a version to recordProvenance, so ai_call_provenance.config_version is NULL on every row and the join that would answer 'which configuration was in force when this data was processed' still has no left-hand side. The counter is real; the question it exists to answer is not yet answerable."
     },
     {
       "column": "is_customer_repair_export_enabled",
