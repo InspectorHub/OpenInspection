@@ -20,6 +20,11 @@ vi.mock('drizzle-orm/d1', () => ({
 
 import { inspectorPaletteMiddleware } from '../../../server/lib/middleware/inspector-palette';
 import type { HonoConfig } from '../../../server/types/hono';
+import { makeExecutionContext } from '../helpers/exec-ctx';
+
+/** Settled at teardown by the helper -- `void p` used to detach the promise,
+ *  which is how a run with every test passing could still exit non-zero. */
+const EXEC_CTX = makeExecutionContext().ctx;
 
 function makeApp(opts: {
     requestedTenantSlug?: string;
@@ -38,7 +43,10 @@ function makeApp(opts: {
         c.set('branding', { companyName: 'X', primaryColor: '#fff' } as never);
         if (opts.requestedTenantSlug) c.set('requestedTenantSlug', opts.requestedTenantSlug as never);
         Object.defineProperty(c, 'executionCtx', {
-            value: { waitUntil: (p: Promise<unknown>) => { void p; } },
+            // From module scope, not built here: this runs per request, so a
+            // fresh context each time would register a teardown hook from
+            // inside a test and settle nothing. One context, settled once.
+            value: EXEC_CTX,
             configurable: true,
         });
         await next();

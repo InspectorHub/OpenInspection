@@ -37,7 +37,8 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // Must import AFTER the drizzle mock.
 // eslint-disable-next-line import/order
-import { bookingsRoutes } from '../../../server/api/bookings';
+import { bookingsRoutes } from '../../../server/api/bookings';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 vi.mock('../../../server/lib/rate-limit', () => ({
     checkRateLimit: vi.fn().mockResolvedValue(undefined),
@@ -50,10 +51,9 @@ const TEST_DATE = '2026-07-07';
 const SLOT_ISO = `${TEST_DATE}T08:00:00Z`;
 
 const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
-const FAKE_EXEC_CTX = {
-    waitUntil: (p: Promise<unknown>) => { void p.catch(() => {}); },
-    passThroughOnException: () => {},
-} as ExecutionContext;
+// Background work is settled at teardown by the helper. Hand-rolled stubs here
+// detached it instead, which is how a fully-passing run could still exit 1.
+const FAKE_EXEC_CTX = makeExecutionContext().ctx;
 
 function bookingBody(overrides: Record<string, unknown> = {}) {
     return {

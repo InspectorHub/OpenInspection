@@ -16,6 +16,11 @@ vi.mock('../../../server/services/payment-ledger.service', () => ({ recordPaymen
 vi.mock('../../../server/lib/route-helpers', () => ({ getDrizzle: () => ({}) }));
 
 import stripeWebhookApi from '../../../server/api/stripe-webhook';
+import { makeExecutionContext } from '../helpers/exec-ctx';
+
+/** Settled at teardown by the helper -- `void p` used to detach the promise,
+ *  which is how a run with every test passing could still exit non-zero. */
+const EXEC_CTX = makeExecutionContext().ctx;
 
 function makeApp(opts: {
     tenantId?: string;
@@ -36,7 +41,10 @@ function makeApp(opts: {
             inspection: { markPaymentReceived: opts.markPaymentReceived ?? vi.fn() },
         } as never);
         Object.defineProperty(c, 'executionCtx', {
-            value: { waitUntil: (p: Promise<unknown>) => { void p; } },
+            // From module scope, not built here: this runs per request, so a
+            // fresh context each time would register a teardown hook from
+            // inside a test and settle nothing. One context, settled once.
+            value: EXEC_CTX,
             configurable: true,
         });
         await next();

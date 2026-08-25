@@ -31,6 +31,7 @@ import { InvoiceService } from '../../../server/services/invoice.service';
 import { idempotencyMiddleware } from '../../../server/lib/middleware/idempotency';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const USER_ID = '00000000-0000-0000-0000-000000000300';
@@ -68,7 +69,9 @@ function buildApp() {
 
 // QBO connected, so the push is live and a duplicate is observable.
 const ENV = { DB: {}, QBO_CLIENT_ID: 'qbo-test-client' } as never;
-const CTX = { waitUntil: (p: Promise<unknown>) => void p, passThroughOnException: () => {} } as never;
+// `void p` did not even attach a catch, so a rejecting background promise was
+// an unhandled rejection outright. The helper settles both at teardown.
+const CTX = makeExecutionContext().ctx as never;
 
 function post(path: string, body: unknown, key: string | null) {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
