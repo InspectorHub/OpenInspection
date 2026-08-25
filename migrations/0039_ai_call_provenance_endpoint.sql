@@ -1,0 +1,21 @@
+-- Record where an AI call actually went.
+--
+-- `ai_call_provenance` recorded how a call was made -- capability, adapter,
+-- credential source, model, prompt version -- and not where it was sent. The
+-- destination is the one fact `AI_BASE_URL` is documented to answer ("where is
+-- inspection text processed"), and a self-hosted operator may point it inside
+-- their own network.
+--
+-- Nullable, because rows written before this column existed have no answer and
+-- a default would invent one. Populated on both the managed and BYO paths.
+--
+-- The value is normalised before it is stored (`server/lib/ai/endpoint.ts`):
+-- scheme, host, port and path, with userinfo, query and fragment structurally
+-- absent. That matters because the endpoint at which a workspace saves a base
+-- URL has validated only its length, and a URL may legally carry a credential.
+--
+-- Additive only. Verified free of the table-rebuild signature with the
+-- four-token grep the Schema Rules in CLAUDE.md spell out, which is
+-- deliberately not quoted here because quoting it makes the file fail its own
+-- check.
+ALTER TABLE `ai_call_provenance` ADD `endpoint` text;

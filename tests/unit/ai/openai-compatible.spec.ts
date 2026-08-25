@@ -371,3 +371,33 @@ describe('OpenAiCompatibleProvider — a credential that refreshes itself', () =
         spy.mockRestore();
     });
 });
+
+describe('endpoint — the destination, observed off the adapter that ran', () => {
+    it('is the normalised base URL the adapter was actually built with', () => {
+        const p = new OpenAiCompatibleProvider({
+            apiKey: 'k', model: 'm', baseUrl: 'https://ai.corp.internal:8000/v1/',
+        });
+        expect(p.endpoint).toBe('https://ai.corp.internal:8000/v1');
+    });
+
+    it('carries no credential even when the configured URL did', () => {
+        // The save endpoint validates the base URL's LENGTH only, and stored
+        // values predate any tightening of that, so this is not hypothetical.
+        const p = new OpenAiCompatibleProvider({
+            apiKey: 'k', model: 'm', baseUrl: 'https://u:sk-secret@h/v1',
+        });
+        expect(p.endpoint).toBe('https://h/v1');
+        expect(p.endpoint).not.toContain('sk-secret');
+    });
+
+    it('is observed, not configured — it names where THIS adapter sends', () => {
+        // `provider` is derived from base URL AND model, so two adapters can
+        // share an id while pointing at different hosts. That is exactly the
+        // divergence the row exists to make visible, so the two are asserted
+        // apart rather than together.
+        const a = new OpenAiCompatibleProvider({ apiKey: 'k', model: 'vendor/m', baseUrl: 'https://one.test/v1' });
+        const b = new OpenAiCompatibleProvider({ apiKey: 'k', model: 'vendor/m', baseUrl: 'https://two.test/v1' });
+        expect(a.id).toBe(b.id);
+        expect(a.endpoint).not.toBe(b.endpoint);
+    });
+});

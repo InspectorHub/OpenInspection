@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
+import { AiConfigBodySchema } from '../../../server/lib/validations/integrations.schema';
 
 const TENANT = '00000000-0000-0000-0000-0000000000c1';
 let db: BetterSQLite3Database<typeof schema>;
@@ -67,5 +68,34 @@ describe('tenant AI provider configuration', () => {
             baseUrl: 'https://api.example.com/openai/v1',
             model: 'a-model',
         });
+    });
+});
+
+describe('the saved base URL is validated as a URL', () => {
+    it('refuses a value that is not a URL', () => {
+        // The connection-TEST endpoint has always used z.string().url(); the
+        // SAVE endpoint validated only length. The two disagreeing meant a
+        // workspace could store something the tester would have rejected.
+        const r = AiConfigBodySchema.safeParse({
+            aiEnabled: true, aiBaseUrl: 'not a url', aiModel: 'm',
+            courtesyTranslationEnabled: false,
+        });
+        expect(r.success).toBe(false);
+    });
+
+    it('still accepts an empty string, which means unset', () => {
+        const r = AiConfigBodySchema.safeParse({
+            aiEnabled: true, aiBaseUrl: '', aiModel: '',
+            courtesyTranslationEnabled: false,
+        });
+        expect(r.success).toBe(true);
+    });
+
+    it('accepts a private-network address, because a self-host operator uses one', () => {
+        const r = AiConfigBodySchema.safeParse({
+            aiEnabled: true, aiBaseUrl: 'http://10.0.0.5:8000/v1', aiModel: 'm',
+            courtesyTranslationEnabled: false,
+        });
+        expect(r.success).toBe(true);
     });
 });

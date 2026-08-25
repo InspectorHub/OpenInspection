@@ -72,7 +72,7 @@ describe('the provenance sink writes one fully-populated row', () => {
         const sink = buildAiProvenanceSink({
             db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'a-configured-model',
         });
-        const returnedId = await sink!.record({ capability: 'assist', promptVersion: 'professional-comment.v1', provider: 'api.example.test' });
+        const returnedId = await sink!.record({ capability: 'assist', promptVersion: 'professional-comment.v1', provider: 'api.example.test', endpoint: 'https://api.example.test/v1' });
 
         const all = rows();
         expect(all).toHaveLength(1);
@@ -100,7 +100,7 @@ describe('the provenance sink writes one fully-populated row', () => {
         const sink = buildAiProvenanceSink({
             db: {} as D1Database, tenantId: TENANT, source: 'managed', model: 'm',
         });
-        await sink!.record({ capability: 'translate', promptVersion: 'x.v1', provider: 'api.example.test' });
+        await sink!.record({ capability: 'translate', promptVersion: 'x.v1', provider: 'api.example.test', endpoint: 'https://api.example.test/v1' });
         expect(rows()[0]!.mode).toBe('managed');
         expect(rows()[0]!.capability).toBe('translate');
     });
@@ -142,6 +142,10 @@ describe('the chokepoint records every AI call', () => {
         expect(record).toHaveBeenCalledTimes(1);
         expect(record).toHaveBeenCalledWith({
             capability: 'assist', promptVersion: 'professional-comment.v1', provider: 'api.example.test',
+            // The destination the adapter under test was built with. Asserted
+            // exhaustively like every other field: an entry checked field by
+            // field except one is an entry that field can go missing from.
+            endpoint: 'https://api.example.test/v1',
         });
     });
 
@@ -153,6 +157,10 @@ describe('the chokepoint records every AI call', () => {
         expect(record).toHaveBeenCalledTimes(1);
         expect(record).toHaveBeenCalledWith({
             capability: 'assist', promptVersion: 'rewrite-comment.v1', provider: 'api.example.test',
+            // The destination the adapter under test was built with. Asserted
+            // exhaustively like every other field: an entry checked field by
+            // field except one is an entry that field can go missing from.
+            endpoint: 'https://api.example.test/v1',
         });
     });
 
@@ -161,6 +169,10 @@ describe('the chokepoint records every AI call', () => {
         expect(record).toHaveBeenCalledTimes(1);
         expect(record).toHaveBeenCalledWith({
             capability: 'assist', promptVersion: 'suggest-comment.v1', provider: 'api.example.test',
+            // The destination the adapter under test was built with. Asserted
+            // exhaustively like every other field: an entry checked field by
+            // field except one is an entry that field can go missing from.
+            endpoint: 'https://api.example.test/v1',
         });
     });
 
@@ -359,5 +371,62 @@ describe('no prompt text is ever stored', () => {
         expect(stored).not.toContain('Oak St');
         expect(stored).not.toContain('Jane');
         expect(stored).not.toContain('cracked flashing');
+    });
+});
+
+describe('endpoint — the destination the row was missing', () => {
+    beforeEach(async () => {
+        await freshDb();
+    });
+
+    it('stores where the adapter that ran actually sends', async () => {
+        const sink = buildAiProvenanceSink({
+            db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'a-model',
+        })!;
+        await sink.record({
+            capability: 'assist',
+            promptVersion: 'v1',
+            provider: 'api.example.test',
+            endpoint: 'https://api.example.test/v1',
+        });
+        const row = rows().at(-1)!;
+        expect(row.endpoint).toBe('https://api.example.test/v1');
+    });
+
+    it('no longer writes config_version — the column is retired next release', async () => {
+        // Asserted as NULL rather than left unmentioned. A column that stopped
+        // being written and a column nobody looked at are the same shape in a
+        // passing test, and only one of them is the intended state.
+        const sink = buildAiProvenanceSink({
+            db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'a-model',
+        })!;
+        await sink.record({
+            capability: 'assist', promptVersion: 'v1',
+            provider: 'p', endpoint: 'https://h/v1',
+        });
+        const row = rows().at(-1)!;
+        expect(row.configVersion).toBeNull();
+    });
+});
+
+describe('the assurance export carries the destination', () => {
+    beforeEach(async () => {
+        await freshDb();
+    });
+
+    it('returns endpoint alongside provider and model', async () => {
+        // The export selects columns by name, not `select *`. A column added to
+        // the table and not to this list is a record of "what the automated
+        // system did on the tenant's behalf" that is missing where it went.
+        const sink = buildAiProvenanceSink({
+            db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'a-model',
+        })!;
+        await sink.record({
+            capability: 'assist', promptVersion: 'v1',
+            provider: 'h', endpoint: 'https://h/v1',
+        });
+        const { readAiAssurance } = await import('../../../server/lib/compliance/assurance-records');
+        const out = await readAiAssurance(db as never, { tenantId: TENANT });
+        expect(out.calls[0]).toMatchObject({ endpoint: 'https://h/v1' });
     });
 });
