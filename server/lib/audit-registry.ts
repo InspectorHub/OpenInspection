@@ -160,6 +160,8 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'inspection.report_narrative.update': { family: 'inspection', label: 'audit_action_inspection_report_narrative_update', meta: { cleared: 'flag', length: 'count', reportId: 'id' }, status: { kind: 'live' } },
     'inspection.report_relocked': { family: 'inspection', label: 'audit_action_inspection_report_relocked', meta: {}, status: { kind: 'live' } },
     'inspection.report_unlocked': { family: 'inspection', label: 'audit_action_inspection_report_unlocked', meta: { alreadyUnlocked: 'flag', reason: 'reason' }, status: { kind: 'live' } },
+    'inspection.report_translation_regenerated': { family: 'inspection', label: 'audit_action_inspection_report_translation_regenerated', meta: { locale: 'name', reportId: 'id', segmentCount: 'count' }, status: { kind: 'live' } },
+    'inspection.report_translation_removed': { family: 'inspection', label: 'audit_action_inspection_report_translation_removed', meta: { locale: 'name', reportId: 'id', removed: 'flag' }, status: { kind: 'live' } },
     'inspection.rescheduled': { family: 'inspection', label: 'audit_action_inspection_rescheduled', meta: { conflicts: 'count', from: 'from', to: 'to' }, status: { kind: 'live' } },
     'inspection.results_batch_patched': { family: 'inspection', label: 'audit_action_inspection_results_batch_patched', meta: { applied: 'to', by: 'person' }, status: { kind: 'live' } },
     'inspection.send_pdf': { family: 'inspection', label: 'audit_action_inspection_send_pdf', meta: { recipient: 'person', roleKey: 'name' }, status: { kind: 'live' } },
@@ -199,6 +201,13 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'migration.abandoned': { family: 'migration_batch', label: 'audit_action_migration_abandoned', meta: {}, status: { kind: 'live' } },
     'migration.applied': { family: 'migration_batch', label: 'audit_action_migration_applied', meta: { applied: 'count', failed: 'count', intent: 'name', invitesFailed: 'count', invitesSent: 'count', skipped: 'count' }, status: { kind: 'live' } },
     'migration.assistance_requested': { family: 'migration_batch', label: 'audit_action_migration_assistance_requested', meta: { intent: 'name' }, status: { kind: 'live' } },
+    // A person at the deployment operator says they have picked the file up.
+    // No metadata: what it records is that somebody took it, and the run's own
+    // row already says which file. The row exists at all because the actor is
+    // the thing worth recording — this is the first moment somebody outside the
+    // workspace commits to opening it, and until this seam there was no row
+    // anywhere that could name them rather than the workspace's own admin.
+    'migration.acknowledged': { family: 'migration_batch', label: 'audit_action_migration_acknowledged', meta: {}, status: { kind: 'live' } },
     'migration.delivered': { family: 'migration_batch', label: 'audit_action_migration_delivered', meta: { byEntity: 'count', rows: 'count' }, status: { kind: 'live' } },
     // No metadata, for the same reason `migration.row_repaired` carries none,
     // and one step further: the reason a file could not be converted is free

@@ -20,6 +20,7 @@ import type { Context } from 'hono';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { withBatch } from '../helpers/d1-binding';
 import { saveSecretsImpl } from '../../../server/api/secrets';
 import { openSecrets } from '../../../server/lib/config-crypto';
 import {
@@ -77,6 +78,15 @@ describe('BYO AI key attestation — POST/PUT /api/admin/secrets', () => {
             .where(eq(schema.tenantConfigs.tenantId, TENANT)).get();
     }
 
+    // The attestation lives in its own table now; the KEY is still sealed into
+    // `tenant_configs.secrets_enc`. These specs read both, because the property
+    // under test spans them: the two are written in one `db.batch()`, so a
+    // stored key with no record behind it is the state to catch.
+    async function attestation() {
+        return testDb.select().from(schema.tenantAiAttestations)
+            .where(eq(schema.tenantAiAttestations.tenantId, TENANT)).get();
+    }
+
     async function storedSecrets(): Promise<Record<string, string>> {
         const row = await config();
         if (!row?.secretsEnc) return {};
@@ -88,7 +98,12 @@ describe('BYO AI key attestation — POST/PUT /api/admin/secrets', () => {
         testDb = fix.db;
         await setupSchema(fix.sqlite);
         const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        // The save writes the key and the attestation in ONE `db.batch()` --
+        // they live in different tables now, so a batch is what makes them one
+        // write. better-sqlite3 has no such method; `withBatch` supplies it
+        // over a real BEGIN/COMMIT, so these specs exercise the atomicity they
+        // are asserting rather than two independent statements.
+        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(withBatch(testDb, fix.sqlite));
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
@@ -136,16 +151,19 @@ describe('BYO AI key attestation — POST/PUT /api/admin/secrets', () => {
 
         expect((await storedSecrets()).GEMINI_API_KEY).toBe(KEY);
 
-        const row = await config();
-        // Field by field: a row-exists assertion would pass with five of six
-        // columns null, which is exactly the failure this record guards against.
-        expect(row?.aiKeyAttestationProvider).toBe('gemini');
-        expect(row?.aiKeyAttestationMode).toBe('tenant_key');
-        expect(row?.aiKeyAttestationAccountOwner).toBe('tenant');
-        expect(row?.aiKeyAttestationTermsVersion).toBe(AI_PROVIDER_TERMS_VERSION);
-        expect(row?.aiKeyAttestationPolicyVersion).toBe(AI_KEY_ATTESTATION_POLICY_VERSION);
-        expect(row?.aiKeyAttestationAttestedAt).toBeInstanceOf(Date);
-        expect(row!.aiKeyAttestationAttestedAt!.getTime()).toBeGreaterThanOrEqual(before);
+        const row = await attestation();
+        // Still field by field, though the columns are NOT NULL here and a row
+        // cannot be half-written any more. The old shape made this mandatory —
+        // five of six nulls would have satisfied a row-exists check — and
+        // keeping it costs nothing while proving the values are the ones the
+        // record was supposed to carry, not merely that a row appeared.
+        expect(row?.provider).toBe('gemini');
+        expect(row?.mode).toBe('tenant_key');
+        expect(row?.accountOwner).toBe('tenant');
+        expect(row?.termsVersion).toBe(AI_PROVIDER_TERMS_VERSION);
+        expect(row?.policyVersion).toBe(AI_KEY_ATTESTATION_POLICY_VERSION);
+        expect(row?.attestedAt).toBeInstanceOf(Date);
+        expect(row!.attestedAt!.getTime()).toBeGreaterThanOrEqual(before);
     });
 
     it('records terms and policy revisions as addressable constants, not free text', async () => {
@@ -155,10 +173,10 @@ describe('BYO AI key attestation — POST/PUT /api/admin/secrets', () => {
         // no answer, so the stored value must be the constant that moves in a
         // commit.
         await save({ GEMINI_API_KEY: KEY, aiKeyAttestation: FULL_ATTESTATION });
-        const row = await config();
+        const row = await attestation();
         expect(AI_PROVIDER_TERMS_VERSION).toMatch(/^\d{4}-\d{2}$/);
         expect(AI_KEY_ATTESTATION_POLICY_VERSION).toMatch(/^\d{4}-\d{2}$/);
-        expect(row?.aiKeyAttestationTermsVersion).toBe(AI_PROVIDER_TERMS_VERSION);
+        expect(row?.termsVersion).toBe(AI_PROVIDER_TERMS_VERSION);
     });
 
     it('never stores the confirmation in the shape it arrived in', async () => {
@@ -170,14 +188,14 @@ describe('BYO AI key attestation — POST/PUT /api/admin/secrets', () => {
 
     it('leaves the attestation alone when an unrelated secret is saved', async () => {
         await save({ GEMINI_API_KEY: KEY, aiKeyAttestation: FULL_ATTESTATION });
-        const attestedAt = (await config())?.aiKeyAttestationAttestedAt;
+        const attestedAt = (await attestation())?.attestedAt;
 
         const res = await save({ GOOGLE_PLACES_API_KEY: 'places-key' });
 
         expect(res.status).toBe(200);
-        const row = await config();
-        expect(row?.aiKeyAttestationTermsVersion).toBe(AI_PROVIDER_TERMS_VERSION);
-        expect(row?.aiKeyAttestationAttestedAt).toEqual(attestedAt);
+        const row = await attestation();
+        expect(row?.termsVersion).toBe(AI_PROVIDER_TERMS_VERSION);
+        expect(row?.attestedAt).toEqual(attestedAt);
         expect((await storedSecrets()).GOOGLE_PLACES_API_KEY).toBe('places-key');
     });
 
@@ -186,13 +204,13 @@ describe('BYO AI key attestation — POST/PUT /api/admin/secrets', () => {
         // not touch. Treating that as a new key would make every unrelated save
         // fail, and would stamp a fresh attestation nobody made.
         await save({ GEMINI_API_KEY: KEY, aiKeyAttestation: FULL_ATTESTATION });
-        const attestedAt = (await config())?.aiKeyAttestationAttestedAt;
+        const attestedAt = (await attestation())?.attestedAt;
 
         const res = await save({ GEMINI_API_KEY: 'AIza••••••••dKey' });
 
         expect(res.status).toBe(200);
         expect((await storedSecrets()).GEMINI_API_KEY).toBe(KEY);
-        expect((await config())?.aiKeyAttestationAttestedAt).toEqual(attestedAt);
+        expect((await attestation())?.attestedAt).toEqual(attestedAt);
     });
 
     it('records a confirmation for a key that is ALREADY stored, without re-entry', async () => {
@@ -205,21 +223,19 @@ describe('BYO AI key attestation — POST/PUT /api/admin/secrets', () => {
         const seeded = await save({ GEMINI_API_KEY: KEY, aiKeyAttestation: FULL_ATTESTATION });
         expect(seeded.status).toBe(200);
         // Wipe the record to reproduce a key stored before the rule existed.
-        await testDb.update(schema.tenantConfigs).set({
-            aiKeyAttestationProvider: null, aiKeyAttestationMode: null,
-            aiKeyAttestationAccountOwner: null, aiKeyAttestationTermsVersion: null,
-            aiKeyAttestationAttestedAt: null, aiKeyAttestationPolicyVersion: null,
-        }).where(eq(schema.tenantConfigs.tenantId, TENANT));
-        expect(await config()).toMatchObject({ aiKeyAttestationTermsVersion: null });
+        // Six nulls became one DELETE — the same state, said once.
+        await testDb.delete(schema.tenantAiAttestations)
+            .where(eq(schema.tenantAiAttestations.tenantId, TENANT));
+        expect(await attestation()).toBeUndefined();
         probe.mockClear(); // the seeding save verified the key; measure only what follows
 
         const res = await save({ aiKeyAttestation: FULL_ATTESTATION });
 
         expect(res.status).toBe(200);
-        const row = await config();
-        expect(row?.aiKeyAttestationProvider).toBe('gemini');
-        expect(row?.aiKeyAttestationTermsVersion).toBe(AI_PROVIDER_TERMS_VERSION);
-        expect(row?.aiKeyAttestationAttestedAt).toBeInstanceOf(Date);
+        const row = await attestation();
+        expect(row?.provider).toBe('gemini');
+        expect(row?.termsVersion).toBe(AI_PROVIDER_TERMS_VERSION);
+        expect(row?.attestedAt).toBeInstanceOf(Date);
         // The stored credential is untouched — this path confirms, it does not
         // re-key, and it must not have needed the plaintext to do so.
         expect((await storedSecrets()).GEMINI_API_KEY).toBe(KEY);
@@ -230,20 +246,20 @@ describe('BYO AI key attestation — POST/PUT /api/admin/secrets', () => {
     it('confirms nothing when there is no key to confirm', async () => {
         const res = await save({ aiKeyAttestation: FULL_ATTESTATION });
         expect(res.status).toBe(200);
-        expect((await config())?.aiKeyAttestationProvider ?? null).toBeNull();
+        expect(await attestation()).toBeUndefined();
     });
 
     it('re-stamps the record when a different key is saved', async () => {
         await save({ GEMINI_API_KEY: KEY, aiKeyAttestation: FULL_ATTESTATION });
-        const first = (await config())?.aiKeyAttestationAttestedAt;
+        const first = (await attestation())?.attestedAt;
         vi.useFakeTimers({ shouldAdvanceTime: true });
         vi.setSystemTime(new Date(Date.now() + 60_000));
 
         await save({ GEMINI_API_KEY: 'AIzaSyADifferentKeyEntirely', aiKeyAttestation: FULL_ATTESTATION });
 
-        const row = await config();
+        const row = await attestation();
         expect((await storedSecrets()).GEMINI_API_KEY).toBe('AIzaSyADifferentKeyEntirely');
-        expect(row!.aiKeyAttestationAttestedAt!.getTime()).toBeGreaterThan(first!.getTime());
+        expect(row!.attestedAt!.getTime()).toBeGreaterThan(first!.getTime());
         vi.useRealTimers();
     });
 });

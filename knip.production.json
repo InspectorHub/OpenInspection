@@ -1,0 +1,79 @@
+// Production-only view of the module graph, for `scripts/check-unwired.mjs`.
+//
+// The SAME project as knip.json, asked a different question. knip.json's
+// `entry` includes the test globs, which is right for "is anything importing
+// this" — it stops that gate demanding the deletion of every test helper. It is
+// wrong for "can the product reach this": a module imported by its own spec and
+// by nothing else counts as used, so a pipeline reachable only from its tests
+// is invisible.
+//
+// Here the test globs are removed from `entry` AND negated out of `project`, so
+// the only roots are the worker entry, the API, the routes and the scripts.
+// Whatever comes back unused is what the running product cannot get to.
+//
+// ⚠️ Keep the two files in step. A new entry point added to knip.json and not
+// here would show up as thirty-one unreachable files, and the fix would look
+// like a census finding.
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "workers/app.ts",
+    "server/index.ts",
+    "app/routes.ts",
+    "app/root.tsx",
+    "app/entry.server.tsx",
+    "app/routes/**/*.{ts,tsx}",
+    "scripts/**/*.{js,mjs,ts}",
+    "*.config.{ts,js,mjs}",
+    "react-router.config.ts",
+    "drizzle.config.ts",
+    "drizzle.config.trial.ts",
+    "playwright.config.ts",
+    "playwright.integration.config.ts",
+    "playwright.remote.config.ts",
+    "vitest.api.config.ts",
+    "vitest.config.ts",
+    "vitest.typecheck.config.ts",
+    "vitest.workers.config.ts",
+    "vite.config.ts",
+    "app/components/media-studio/react-konva.ssr-stub.tsx",
+    "server/lib/compliance/retention-policy.ts",
+    "packages/shared-ui/src/index.ts",
+    "packages/api-types/index.ts"
+  ],
+  "project": [
+    "app/**/*.{ts,tsx}",
+    "server/**/*.{ts,tsx}",
+    "workers/**/*.ts",
+    "packages/**/*.{ts,tsx}",
+    "scripts/**/*.{js,mjs,ts}",
+    "!**/*.test.{ts,tsx}",
+    "!**/*.spec.{ts,tsx}",
+    "!tests/**"
+  ],
+  "ignore": [
+    "build/**",
+    ".react-router/**",
+    "public/vendor/**",
+    "public/fonts/**",
+    "node_modules/**",
+    ".worktrees/**",
+    "server/generated/**",
+    "scripts/fixtures/**",
+    "worker-configuration.d.ts",
+    "**/*.d.ts"
+  ],
+  "tags": [
+    "-gateConsumed",
+    "-declarationEmit"
+  ],
+  "ignoreDependencies": [
+    "@fontsource/.+",
+    "swagger-ui-dist",
+    "tailwindcss",
+    "miniflare",
+    "lint-staged",
+    "cloudflare",
+    "@inlang/plugin-message-format"
+  ]
+}

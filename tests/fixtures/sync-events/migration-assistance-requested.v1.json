@@ -1,0 +1,9 @@
+{
+  "specversion": "1.0",
+  "id": "00000000-0000-4000-8000-000000000011",
+  "type": "io.inspectorhub.migration.assistance_requested",
+  "source": "core",
+  "time": "2026-08-25T09:00:00.000Z",
+  "dataschema": "migration-assistance-requested/v1",
+  "data": { "tenantId": "tenant-fixture-1", "batchId": "batch-fixture-1", "vendor": null, "uploadedAt": 1787648400000, "expiresAt": 1795424400000, "secondaryUseAuthorised": false }
+}

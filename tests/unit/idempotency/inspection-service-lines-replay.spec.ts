@@ -38,6 +38,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // eslint-disable-next-line import/order
 import { inspectionsRoutes } from '../../../server/api/inspections';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const T = 't1';
 const INSP = 'i1';
@@ -45,7 +46,10 @@ const SVC_SEWER = 'svc-sewer';
 const LINE = 'line-home';
 const MGR = 'mgr';
 const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
-const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const CTX = makeExecutionContext().ctx;
 
 let db: DrizzleD1Database;
 

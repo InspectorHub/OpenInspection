@@ -26,6 +26,7 @@ import { MeteringService } from '../../services/metering.service';
 import { aiUsageMetric, currentPeriodKey, managedAiMetric, type AiUsageKind } from '../usage/period';
 import { resolveAi, isRefusal, type AiCredentialSource } from './resolve-provider';
 import { isPaidPlan, type TenantPlan } from '../../features/plan-quota/policy';
+import type { AiCredential } from './credential';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 import type { DeploymentProfile } from '../deployment-profile';
 
@@ -64,7 +65,9 @@ export interface AiQuotaPreflight {
 export function resolveRuntimeAiSource(args: {
     profile: DeploymentProfile;
     tenantKey: string | null;
-    managedKey: string | null;
+    /** The deployment's own credential — a long-lived key, or one that
+     *  refreshes itself. Only its presence is read here. */
+    managedKey: AiCredential | null;
     model: string;
     /** The tenant's commercial standing, or null when it could not be read.
      *  Null is not an entitlement — see `isPaidPlan`. */

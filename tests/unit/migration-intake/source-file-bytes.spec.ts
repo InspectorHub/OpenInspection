@@ -89,7 +89,7 @@ describe('MigrationSourceFileService — bytes survive the round trip', () => {
 
     it('names a binary extension for the formats real vendors export', () => {
         expect(extForFileName('Commercial Inspection.xls')).toBe('bin');
-        expect(extForFileName('AHIT Master.tpz')).toBe('bin');
+        expect(extForFileName('Whole House Checklist.tpz')).toBe('bin');
         expect(extForFileName('bundle.tpzx')).toBe('bin');
         expect(extForFileName('form.HGF')).toBe('bin');
         expect(extForFileName('export.json')).toBe('json');

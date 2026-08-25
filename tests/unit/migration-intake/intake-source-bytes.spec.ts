@@ -40,7 +40,7 @@ describe('assertSourceSizeWithin', () => {
 describe('IntakeSource', () => {
     it('keeps the bytes it was built from, byte for byte', () => {
         const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0xff, 0xfe]);
-        const src = intakeSourceFromBytes('AHIT Master.tpz', bytes);
+        const src = intakeSourceFromBytes('Whole House Checklist.tpz', bytes);
         expect(Array.from(src.bytes)).toEqual(Array.from(bytes));
     });
 
@@ -52,7 +52,7 @@ describe('IntakeSource', () => {
 
     it('a binary source still reaches the adapters without being altered', async () => {
         const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0xff, 0xfe]);
-        const src = intakeSourceFromBytes('AHIT Master.tpz', bytes);
+        const src = intakeSourceFromBytes('Whole House Checklist.tpz', bytes);
         // Six bytes are a zip signature and nothing else, so no reader can make
         // anything of them. What matters here is that reaching that answer left
         // the bytes alone.

@@ -31,6 +31,7 @@ import {
 import { communicationCounts, type CommunicationCounts } from '../../lib/communication-counts';
 import type { HubInvoiceCore } from '../../lib/validations/inspection/read';
 import { listReportsForHub, type ReportListItem } from '../../lib/inspection/reports';
+import { isCourtesyTranslationEnabled } from '../../lib/translation/production-switch';
 import { InspectionSubService } from './base';
 import { CredentialService } from '../credential.service';
 import type { InspectionService } from '../inspection.service';
@@ -279,6 +280,10 @@ export class InspectionPublishService extends InspectionSubService {
             clientEmail: string | null;
             clientPhone: string | null;
             clientContactId: string | null;
+            /** The client's preferred language, for the publish nudge. Null when unknown. */
+            clientLocale: string | null;
+            /** Whether this workspace may PRODUCE a courtesy translation (#23). */
+            courtesyTranslationEnabled: boolean;
             status: string;
             reportStatus: string;
             date: string | null;
@@ -434,6 +439,11 @@ export class InspectionPublishService extends InspectionSubService {
         ]);
 
         const communication = await communicationCounts(db, tenantId, inspectionId);
+        // #23 — whether this workspace may PRODUCE a courtesy translation. On
+        // the hub because the publish surface needs it and every role that can
+        // publish must be able to see the opt-in; the settings endpoint that
+        // also answers this is owner/manager only.
+        const courtesyTranslationEnabled = await isCourtesyTranslationEnabled(this.db, tenantId);
         const reportList = await listReportsForHub(db, tenantId, inspectionId);
 
         // Task 8 — resolve the referrer's display name for the Order details
@@ -455,6 +465,8 @@ export class InspectionPublishService extends InspectionSubService {
                 clientEmail:       primaryClient?.email ?? null,
                 clientPhone:       primaryClient?.phone ?? null,
                 clientContactId:   primaryClient?.contactId ?? null,
+                clientLocale:      primaryClient?.locale ?? null,
+                courtesyTranslationEnabled,
                 status:            insp.status,
                 reportStatus:      insp.reportStatus as string,
                 date:              insp.date ?? null,

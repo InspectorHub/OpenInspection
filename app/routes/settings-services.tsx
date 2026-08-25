@@ -233,7 +233,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     // forwarded as themselves, because the column's whole purpose is that the
     // two are different answers.
     const id = String(form.get("serviceId") ?? "");
-    let raw: unknown = null;
+    let raw: unknown;
     try {
       raw = JSON.parse(String(form.get("depositPolicy") ?? "null"));
     } catch {

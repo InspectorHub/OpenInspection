@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { OpenAiCompatibleProvider } from '../../../server/lib/ai/providers/openai-compatible';
+import {
+    OpenAiCompatibleProvider,
+    DEPLOYMENT_CREDENTIAL_MESSAGE,
+    PROVIDER_REJECTED_MESSAGE,
+} from '../../../server/lib/ai/providers/openai-compatible';
 import { AppError, ErrorCode } from '../../../server/lib/errors';
 import { logger } from '../../../server/lib/logger';
 
@@ -253,5 +257,117 @@ describe('OpenAiCompatibleProvider — gateway invariants', () => {
             .toBe('https://gateway.ai.cloudflare.com/v1/a/g/compat/chat/completions');
         expect(headersOf(0)['Authorization']).toBe('Bearer k');
         expect(headersOf(0)['Content-Type']).toBe('application/json');
+    });
+});
+
+describe('OpenAiCompatibleProvider — a credential that refreshes itself', () => {
+    // Some backends authenticate with a SHORT-LIVED access token rather than a
+    // key that never expires. A credential resolved once at construction would
+    // be stale within the hour, and the resulting rejection would reach an
+    // inspector as advice to check their own key — for a fault that belongs to
+    // whoever configured the deployment.
+    const source = (over: Partial<{ providerId: string; token: string }> = {}) => {
+        const getAccessToken = vi.fn().mockResolvedValue(over.token ?? 'tok-1');
+        return {
+            cred: { providerId: over.providerId ?? 'vertex-ai', getAccessToken },
+            getAccessToken,
+        };
+    };
+
+    const withSource = (
+        cred: { providerId: string; getAccessToken: () => Promise<string> },
+        model = 'a-model',
+    ) => new OpenAiCompatibleProvider({
+        apiKey: cred,
+        model,
+        baseUrl: 'https://example-region-aiplatform.googleapis.test/v1/projects/p/locations/example-region/endpoints/openapi',
+    });
+
+    it('resolves the credential at call time and sends the token it returned', async () => {
+        fetchMock.mockResolvedValue(OK('x'));
+        const { cred, getAccessToken } = source({ token: 'fresh-token' });
+        await withSource(cred).complete({ prompt: 'p' });
+
+        expect(getAccessToken).toHaveBeenCalledTimes(1);
+        expect(headersOf(0)['Authorization']).toBe('Bearer fresh-token');
+    });
+
+    it('asks the credential again on the next call, so a rotated token is picked up', async () => {
+        // The provider instance is built once per request but outlives no
+        // token. Caching the resolved string on the instance would reintroduce
+        // exactly the staleness this design exists to remove.
+        // A fresh Response per call: a body may only be read once, so a single
+        // shared object would fail the second call for a reason unrelated to
+        // what is under test.
+        fetchMock.mockImplementation(() => Promise.resolve(OK('x')));
+        const getAccessToken = vi.fn()
+            .mockResolvedValueOnce('tok-1')
+            .mockResolvedValueOnce('tok-2');
+        const p = new OpenAiCompatibleProvider({
+            apiKey: { providerId: 'vertex-ai', getAccessToken },
+            model: 'a-model',
+            baseUrl: 'https://api.example.com/v1',
+        });
+        await p.complete({ prompt: 'p' });
+        await p.complete({ prompt: 'p' });
+
+        expect(headersOf(0)['Authorization']).toBe('Bearer tok-1');
+        expect(headersOf(1)['Authorization']).toBe('Bearer tok-2');
+    });
+
+    it('takes its provenance id from the credential, not from the model slash rule', async () => {
+        // `ai_call_provenance.provider` must name the backend that actually
+        // ran. Derived from the model string it would instead name whatever
+        // prefix the configured model id happens to carry, so re-spelling a
+        // model id would silently relabel every row written afterwards.
+        const { cred } = source({ providerId: 'vertex-ai' });
+        expect(withSource(cred, 'google/gemini-x').id).toBe('vertex-ai');
+    });
+
+    it('still derives the id from the model and host for a plain string key', async () => {
+        // The positive control for the assertion above: the declared id must
+        // win only where one was declared, and the bring-your-own-key path
+        // declares none.
+        expect(provider({ model: 'vendor/m' }).id).toBe('vendor');
+        expect(provider({ model: 'm', baseUrl: 'https://api.example.com/v1' }).id)
+            .toBe('api.example.com');
+    });
+
+    it('reports a failure to obtain a token as the deployment\'s fault, never the workspace\'s', async () => {
+        const getAccessToken = vi.fn().mockRejectedValue(new Error('token endpoint said 400'));
+        const p = new OpenAiCompatibleProvider({
+            apiKey: { providerId: 'vertex-ai', getAccessToken },
+            model: 'a-model',
+            baseUrl: 'https://api.example.com/v1',
+        });
+
+        const err = await p.complete({ prompt: 'p' }).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(AppError);
+        expect((err as AppError).code).toBe(ErrorCode.AI_NOT_CONFIGURED);
+        expect((err as AppError).details).toMatchObject({ reason: 'platform_key_missing' });
+        expect((err as AppError).message).toBe(DEPLOYMENT_CREDENTIAL_MESSAGE);
+        // The sentence that must NOT appear: it tells the workspace to check a
+        // key they do not own and cannot change. Asserted against the constant
+        // the credential path really uses, so the two cannot converge later.
+        expect((err as AppError).message).not.toBe(PROVIDER_REJECTED_MESSAGE);
+        expect((err as AppError).message).not.toContain('Check your API key');
+        // Nothing was sent — the failure happened before any content could go.
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('puts neither the token nor the credential error detail into what it logs', async () => {
+        const spy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+        const getAccessToken = vi.fn().mockRejectedValue(new Error('private_key was rejected: SECRET-MATERIAL'));
+        const p = new OpenAiCompatibleProvider({
+            apiKey: { providerId: 'vertex-ai', getAccessToken },
+            model: 'a-model',
+            baseUrl: 'https://api.example.com/v1',
+        });
+        await p.complete({ prompt: 'p' }).catch(() => {});
+
+        expect(spy).toHaveBeenCalled();
+        const logged = JSON.stringify(spy.mock.calls);
+        expect(logged).not.toContain('SECRET-MATERIAL');
+        spy.mockRestore();
     });
 });

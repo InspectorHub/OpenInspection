@@ -156,6 +156,7 @@ function ColumnMappingForm({
             if (d.mapping.email) out.email = d.mapping.email;
             if (d.mapping.phone) out.phone = d.mapping.phone;
             if (d.mapping.agency) out.agency = d.mapping.agency;
+            if (d.mapping.notes) out.notes = d.mapping.notes;
             return { kind: "contacts", mapping: out };
         }
         const out: MemberMapping = { email: d.mapping.email, role: d.mapping.role };
@@ -219,6 +220,11 @@ function ColumnMappingForm({
                         label={m.imports_mapping_agency()} options={columnOptions} disabled={busy}
                         value={draft.mapping.agency ?? NOT_IN_FILE}
                         onChange={(e) => setContact({ agency: e.currentTarget.value })}
+                    />
+                    <Select
+                        label={m.imports_mapping_notes()} options={columnOptions} disabled={busy}
+                        value={draft.mapping.notes ?? NOT_IN_FILE}
+                        onChange={(e) => setContact({ notes: e.currentTarget.value })}
                     />
                     <SourceSelect
                         label={m.imports_mapping_type()}

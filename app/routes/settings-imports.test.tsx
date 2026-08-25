@@ -362,15 +362,28 @@ describe("settings → imports: the starter contacts spreadsheet", () => {
         );
     });
 
-    it("does NOT offer it on an entry point it would not describe", async () => {
-        // The positive control for the assertion above: the team-member entry
-        // reads a different set of columns, so a contacts template there would
-        // teach the wrong format. The panel itself is asserted present, so this
-        // cannot pass because nothing rendered.
+    it("offers the team-member entry its OWN file, not the contacts one", async () => {
+        // The team-member entry reads a different set of columns, so a contacts
+        // template here would teach the wrong format. It gets a template of its
+        // own instead — derived from a different manifest, which is exactly why
+        // a second one became possible.
         renderPage({ entry: "/settings/imports?intent=members.invite" });
 
         expect(await screen.findByRole("button", { name: "Upload" })).toBeTruthy();
         expect(screen.getByTestId("import-start-intent").textContent).toBe("Team members");
+        const link = screen.getByRole("link", { name: "Download a starter spreadsheet" });
+        expect(link.getAttribute("href")).toBe("/resources/members-template");
+        expect(link.getAttribute("href")).not.toBe("/resources/contacts-template");
+    });
+
+    it("does NOT offer one on an entry point no spreadsheet describes", async () => {
+        // The negative control for both assertions above: a template import
+        // takes a VENDOR EXPORT, not a spreadsheet somebody fills in, so there
+        // is no starter file that could help. The panel itself is asserted
+        // present, so this cannot pass because nothing rendered.
+        renderPage({ entry: "/settings/imports?intent=templates.create" });
+
+        expect(await screen.findByRole("button", { name: "Upload" })).toBeTruthy();
         expect(screen.queryByRole("link", { name: "Download a starter spreadsheet" })).toBeNull();
     });
 });

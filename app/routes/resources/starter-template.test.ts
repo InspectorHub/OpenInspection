@@ -15,9 +15,12 @@
  * place.
  */
 import { vi, beforeEach, describe, it, expect } from "vitest";
-import { loader } from "./contacts-template";
+import { loader } from "./starter-template";
+import { loader as membersLoader } from "./members-template";
 import { getToken } from "~/lib/session.server";
-import { buildContactsTemplateCsv } from "../../../server/lib/migration-intake/contacts-template";
+import { buildTemplateCsv } from "../../../server/lib/migration-intake/starter-template";
+import { CONTACT_EXCHANGE } from "../../../server/lib/data-exchange/contacts";
+import { MEMBER_EXCHANGE } from "../../../server/lib/data-exchange/members";
 import { routeArgs } from "../../../tests/helpers/route-args";
 
 vi.mock("~/lib/session.server", () => ({ getToken: vi.fn() }));
@@ -36,7 +39,16 @@ function call() {
     );
 }
 
-describe("resources/contacts-template", () => {
+function callMembers() {
+    return membersLoader(
+        routeArgs(new Request("https://app.example/resources/members-template"), {
+            context: CONTEXT,
+            params: {},
+        }),
+    );
+}
+
+describe("resources/starter-template — contacts", () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
@@ -45,7 +57,7 @@ describe("resources/contacts-template", () => {
         getTokenMock.mockResolvedValue(null);
         const res = await call();
         expect(res.status).toBe(401);
-        expect(await res.text()).not.toContain("name,email");
+        expect(await res.text()).not.toContain("type,name,email");
     });
 
     it("serves the derived file to a signed-in caller", async () => {
@@ -55,13 +67,13 @@ describe("resources/contacts-template", () => {
         getTokenMock.mockResolvedValue("jwt");
         const res = await call();
         expect(res.status).toBe(200);
-        expect(await res.text()).toContain("name,email");
+        expect(await res.text()).toContain("type,name,email");
     });
 
     it("hands back exactly the derived file, byte for byte", async () => {
         getTokenMock.mockResolvedValue("jwt");
         const res = await call();
-        expect(await res.text()).toBe(buildContactsTemplateCsv());
+        expect(await res.text()).toBe(buildTemplateCsv(CONTACT_EXCHANGE));
     });
 
     it("tells the browser to save it under a name that says what it is", async () => {
@@ -70,6 +82,47 @@ describe("resources/contacts-template", () => {
         expect(res.headers.get("Content-Type")).toBe("text/csv; charset=utf-8");
         expect(res.headers.get("Content-Disposition")).toBe(
             'attachment; filename="contacts-template.csv"',
+        );
+    });
+});
+
+describe("resources/members-template", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("refuses a caller with no session, and hands back no file at all", async () => {
+        getTokenMock.mockResolvedValue(null);
+        const res = await callMembers();
+        expect(res.status).toBe(401);
+        expect(await res.text()).not.toContain("email,name,role");
+    });
+
+    it("hands back exactly the derived file, byte for byte", async () => {
+        // The positive control for the refusal above, and the assertion that
+        // this route is derived from the MEMBERS manifest rather than being a
+        // second copy of the contacts one.
+        getTokenMock.mockResolvedValue("jwt");
+        const res = await callMembers();
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe(buildTemplateCsv(MEMBER_EXCHANGE));
+    });
+
+    it("teaches a DIFFERENT format from the contacts template", async () => {
+        getTokenMock.mockResolvedValue("jwt");
+        const members = await (await callMembers()).text();
+        const contacts = await (await call()).text();
+        expect(members).not.toBe(contacts);
+        expect(members.startsWith("email,name,role")).toBe(true);
+        expect(members).not.toContain("agency");
+    });
+
+    it("tells the browser to save it under a name that says what it is", async () => {
+        getTokenMock.mockResolvedValue("jwt");
+        const res = await callMembers();
+        expect(res.headers.get("Content-Type")).toBe("text/csv; charset=utf-8");
+        expect(res.headers.get("Content-Disposition")).toBe(
+            'attachment; filename="members-template.csv"',
         );
     });
 });

@@ -10,19 +10,37 @@
  * instantiates anything the document names.
  *
  * ── What twenty-two real templates taught this reader to refuse to assume ───
- *  · The rating vocabulary is USER-DEFINED. Three, four and five entries were
- *    seen, sharing no words, and eight of the twenty-two had none at all. So
- *    the vocabulary is reported rather than interpreted, and reported verbatim:
- *    real entries carry leading and trailing spaces, and trimming them hides
- *    from the person classifying them exactly the thing he is classifying.
- *  · `showRatings` was ABSENT far more often than present. Absent is null here,
- *    not false, because false is a statement the file did not make.
- *  · Twenty-one of the twenty-two carry NO version, and the Java versions of
- *    the ones that do span fifteen years. Nothing branches on a version.
+ * Re-measured against the corpus on 2026-08-24. Three of the five claims below
+ * had numbers attached that did not survive; the numbers are now the measured
+ * ones and the two that were simply wrong are marked. See
+ * `tests/fixtures/intake/manifest.json`, which records each against a hash.
+ *  · The rating vocabulary is USER-DEFINED — thirty-three distinct words across
+ *    the corpus, and a bare majority of template pairs share not one of them.
+ *    So the vocabulary is reported rather than interpreted, and reported
+ *    verbatim: real entries carry leading and trailing spaces, and trimming
+ *    them hides from the person classifying them exactly the thing he is
+ *    classifying. ⚠️ Every template declares exactly FIVE entries, not the
+ *    "three, four and five" this comment used to claim, and NONE of the
+ *    twenty-two is without one — so the fallback below is a path no real file
+ *    has ever taken. Keep it; do not mistake its green tests for evidence.
+ *  · `showRatings` is ABSENT more often than present — thirteen against nine.
+ *    Absent is null here, not false, because false is a statement the file did
+ *    not make. ⚠️ Two things follow that this comment used to miss: where the
+ *    flag IS present it is false in every case and true in none, so nothing
+ *    downstream of "ratings shown" has been driven by a real file; and one more
+ *    template supplies it as an object REFERENCE, which this reader reports as
+ *    absent because resolving it would mean executing the graph. Three states,
+ *    not two.
+ *  · ⚠️ NOT twenty-one of twenty-two carrying no version. There are two things
+ *    here that can be called a version: the attribute the document opens with,
+ *    carried by all twenty-two and spanning about fifteen years, and a property
+ *    inside the graph, absent on nine. Nothing branches on either — which is
+ *    exactly how a number nobody read stayed wrong.
  *  · Archives held between three and fifty-four entries, so NOTHING is required
  *    to be present except the structure file.
  *  · One of the twenty-two is EMPTY. An empty template converts to an empty
- *    template; it does not refuse the upload.
+ *    template; it does not refuse the upload. It still carries a full
+ *    vocabulary, so empty template does not mean empty document.
  *
  * ── Purity ──────────────────────────────────────────────────────────────────
  * Ids are derived from position, never minted, so the same bytes convert to the

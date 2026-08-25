@@ -7,7 +7,6 @@ import { resolveRenderAccess } from '../lib/render-token';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
-import { ReportDataResponseSchema } from '../lib/validations/inspection.schema';
 import { resolvePortalAccess, resolveOwnerPreview, classifyPortalAccess } from '../lib/public-access';
 import { resolveClientActor } from '../lib/portal-client-actor';
 import { recordReportView } from '../lib/report-views';
@@ -25,6 +24,8 @@ import publicVerifyRoutes from './public/verify';
 import publicInspectorProfileRoutes from './public/inspector-profile';
 import { PublicInvoiceBodySchema } from '../lib/validations/invoice.schema';
 import { getDrizzle } from '../lib/route-helpers';
+import { readCourtesyTranslationForReport } from '../lib/translation/read-for-report';
+import { COURTESY_TRANSLATION_LOCALE, PublicReportResponseSchema } from '../lib/validations/courtesy-translation.schema';
 
 /**
  * Shared client-facing tenant resolution for the public report endpoints:
@@ -74,7 +75,7 @@ const reportRoute = createRoute(withMcpMetadata({
         }),
     },
     responses: {
-        200: { content: { 'application/json': { schema: createApiResponseSchema(ReportDataResponseSchema) } }, description: 'Report data' },
+        200: { content: { 'application/json': { schema: PublicReportResponseSchema } }, description: 'Report data' },
         404: { description: 'Not found, or the token names nothing' },
         410: { description: 'The link was valid but has expired or been revoked (IA-36 ⑨) — code REPORT_LINK_EXPIRED / REPORT_LINK_REVOKED' },
     },
@@ -380,7 +381,14 @@ const publicReportRoutes = createApiRouter()
             appBaseUrl,
             r2BaseUrl: `/api/inspections/${id}/media/video`,
         }, pinnedVersion);
-        return c.json({ success: true as const, data }, 200);
+        // #23 — the courtesy translation, when one is stored AND still describes
+        // this English. ⚠️ No tenant setting is read: production is gated,
+        // consumption never is. See lib/translation/read-for-report.ts.
+        const courtesyTranslation = await readCourtesyTranslationForReport(
+            { db: c.env.DB, inspection: c.var.services.inspection, translations: c.var.services.reportTranslation },
+            { tenantId, inspectionId: id, locale: COURTESY_TRANSLATION_LOCALE, data },
+        );
+        return c.json({ success: true as const, data, courtesyTranslation }, 200);
     })
     .openapi(reportPhotoRoute, async (c) => {
         const { id } = c.req.valid('param');

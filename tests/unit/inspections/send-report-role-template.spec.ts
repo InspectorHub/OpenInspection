@@ -32,6 +32,7 @@ import { inspectionsRoutes } from '../../../server/api/inspections';
 import { PeopleService } from '../../../server/services/people.service';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const CLIENT = 'contact-client-1';
@@ -93,7 +94,10 @@ function buildApp(withPdf = false) {
 
 
 const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com', JWT_SECRET: 'test-secret' } as never;
-const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const CTX = makeExecutionContext().ctx;
 
 function post(recipients: unknown) {
     return new Request(`https://acme.example.com/api/inspections/${INSP_ID}/send-report-pdf`, {

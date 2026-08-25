@@ -34,6 +34,35 @@ export function assertStaffAccessDecisionIsOwners(role: string | undefined): voi
 }
 
 /**
+ * Whether anything authorises using an uploaded file's CONTENTS for anything
+ * beyond the one run it was uploaded for.
+ *
+ * ⚠️ IT IS ALWAYS FALSE, and that is a property of this deployment rather than
+ * of any particular run. Two authorisations are asked for and recorded on a
+ * batch — keeping the file (A), and a person opening it to convert it (B) —
+ * and there is no third. No column can carry a yes, so no run can produce one.
+ *
+ * It is a function taking the run, and it is on the wire, for two separate
+ * reasons that are worth keeping apart:
+ *
+ *   - The operator console must SHOW this state per run. A screen that simply
+ *     omits it would leave "may this file be used for anything else" as
+ *     something each person has to remember; showing "no" on every row is the
+ *     rule made visible at the moment somebody could break it.
+ *   - If a deployment ever adds a third authorisation, the answer starts
+ *     varying per run. The wire field and this signature are already shaped for
+ *     that; a hardcoded `false` at the emit site would have to be found first.
+ *
+ * The parameter is deliberately unused TODAY. Anyone adding a third
+ * authorisation reads this comment on their way to using it.
+ */
+export function secondaryUseAuthorisedFor(
+    _batch: Pick<typeof migrationBatches.$inferSelect, 'id'>,
+): boolean {
+    return false;
+}
+
+/**
  * Refuses to act on a run whose staff access was never authorised.
  *
  * All three columns, not one. A `by` with no `at` is a row somebody

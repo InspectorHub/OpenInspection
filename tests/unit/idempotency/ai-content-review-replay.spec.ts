@@ -32,6 +32,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // eslint-disable-next-line import/order
 import aiRoutes from '../../../server/api/ai';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const T = 't1';
 const INSPECTOR = 'user-inspector';
@@ -44,7 +45,10 @@ const ARTIFACT = 'result-1';
  *  contained in some other string. */
 const PATH = '/api/ai/reviews';
 const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
-const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const CTX = makeExecutionContext().ctx;
 
 // The better-sqlite3 handle, typed as what it actually is. The route under
 // test receives it through the mocked `drizzle-orm/d1` factory below; the spec

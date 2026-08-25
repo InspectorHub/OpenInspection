@@ -20,6 +20,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import agentRoutes from '../../../server/api/agent';
 import type { HonoConfig } from '../../../server/types/hono';
 import { asD1Db } from '../helpers/test-db';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const T = '00000000-0000-0000-0000-0000000000c1';
 const AGENT_USER = '00000000-0000-4000-8000-0000000000d1';
@@ -61,6 +62,10 @@ async function seatAs(key: string) {
         roleProfileId: roleProfileId(key), createdAt: new Date(),
     });
 }
+
+/** Module scope, not inline at the call: the helper registers the teardown
+ *  that settles background work, and that must happen during collection. */
+const EXEC_CTX = makeExecutionContext().ctx;
 
 describe('agent portal visibility', () => {
     beforeEach(seedBase);
@@ -122,7 +127,7 @@ describe('referral attribution', () => {
             await next();
         });
         app.route('/api/agent', agentRoutes);
-        const res = await app.request('/api/agent/leaderboard', {}, { DB: {} } as never, { waitUntil: () => {}, passThroughOnException: () => {} } as never);
+        const res = await app.request('/api/agent/leaderboard', {}, { DB: {} } as never, EXEC_CTX);
         expect(res.status).toBe(200);
         const body = await res.json() as { data: { leaderboard: Array<{ agentId: string; name: string | null; total: number }> } };
         expect(body.data.leaderboard).toHaveLength(1);

@@ -227,6 +227,44 @@ describe('defaultMappingFor', () => {
         expect(mapping.kind === 'contacts' && mapping.mapping.type).toEqual({ fixed: 'client' });
     });
 
+    it('takes the contact type from a column when the file names one', () => {
+        // The entry point answers when the file is SILENT; the file answers
+        // when it speaks. Before this, our own contacts export was re-typed to
+        // `client` on the way back in, because nothing could detect the column.
+        const source = intakeSourceFromText('theirs.csv', '');
+        const mapping = defaultMappingFor(
+            'contacts.import',
+            { kind: 'columns', columns: ['name', 'email', 'type'], sampleRows: [] },
+            source,
+        );
+        if (mapping.kind !== 'contacts') throw new Error('unreachable');
+        expect(mapping.mapping.type).toEqual({ column: 'type' });
+    });
+
+    it('keeps the fixed default when the file has no type column', () => {
+        // POSITIVE CONTROL for the assertion above AND the compatibility
+        // guarantee: every file that imports cleanly today still does.
+        const source = intakeSourceFromText('theirs.csv', '');
+        const mapping = defaultMappingFor(
+            'contacts.import',
+            { kind: 'columns', columns: ['name', 'email'], sampleRows: [] },
+            source,
+        );
+        if (mapping.kind !== 'contacts') throw new Error('unreachable');
+        expect(mapping.mapping.type).toEqual({ fixed: 'client' });
+    });
+
+    it('reads "contact type" as the same field', () => {
+        const source = intakeSourceFromText('theirs.csv', '');
+        const mapping = defaultMappingFor(
+            'contacts.import',
+            { kind: 'columns', columns: ['name', 'Contact Type'], sampleRows: [] },
+            source,
+        );
+        if (mapping.kind !== 'contacts') throw new Error('unreachable');
+        expect(mapping.mapping.type).toEqual({ column: 'Contact Type' });
+    });
+
     it('names a template from the file, stripped of its extension', () => {
         // This export carries no name of its own, so the filename is all there
         // is — and it is the fallback rather than the answer.

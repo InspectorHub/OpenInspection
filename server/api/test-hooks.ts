@@ -3,7 +3,9 @@ import { eq } from 'drizzle-orm';
 import type { HonoConfig } from '../types/hono';
 import { sinkKey } from '../lib/email/providers/recording';
 import { calendarConnections } from '../lib/db/schema';
-import { getDrizzle } from '../lib/route-helpers';
+import { getDrizzle, getTenantId } from '../lib/route-helpers';
+import { resolveRenderedReportId } from '../services/inspection/report-grain';
+import { segmentReport } from '../lib/translation/segment-report';
 
 /**
  * TEST-ONLY routes, fail-closed behind `E2E_EMAIL_SINK`. In every real deploy
@@ -79,6 +81,61 @@ testHooks.post('/calendar-connection', async (c) => {
   });
 
   return c.json({ data: { id: body.id } }, 200);
+});
+
+/**
+ * Seed a courtesy translation for one report, without calling a model.
+ *
+ * The print-render E2E needs a report that HAS a translation. The real
+ * production path cannot supply one here: `AIService.translateSegments` has no
+ * dev-mock arm — it goes straight to the configured provider — so a test
+ * environment with no AI credentials can never reach a stored row through the
+ * regenerate endpoint, and the whole two-half render would be untestable.
+ *
+ * It seeds by doing exactly what production does either side of the model call,
+ * and nothing else: resolve the report, segment it with the SAME segmenter, and
+ * store the result under the current English hash. Only the middle step differs
+ * — each span comes back prefixed with the caller's `marker` instead of
+ * translated. That keeps the fixture honest in the two ways that matter: the
+ * segment COUNT is the segmenter's own (a hand-written list would drift from it
+ * silently, and `readCourtesyTranslationForReport` refuses a mismatch), and the
+ * marker makes every translated span visible in the render, so a test can tell
+ * the two halves apart by content rather than by position alone.
+ *
+ * `tenantId` comes from the verified JWT, never the body — a test-only route is
+ * still a route, and a seeded row belongs to the workspace that asked for it.
+ */
+testHooks.post('/report-translation', async (c) => {
+  // Fail closed, exactly like the two hooks above: absent flag, no route.
+  if (c.env.E2E_EMAIL_SINK !== '1') return c.json({ error: 'Not found' }, 404);
+
+  const body = await c.req.json<{ inspectionId: string; locale: string; marker: string }>();
+  const tenantId = getTenantId(c);
+
+  const reportId = await resolveRenderedReportId(getDrizzle(c), tenantId, body.inspectionId);
+  if (!reportId) return c.json({ error: 'That inspection has no primary report.' }, 404);
+
+  const inspection = c.var.services.inspection;
+  const data = await inspection.getReportData(
+    body.inspectionId, tenantId, (key: string) => key, undefined, undefined, reportId,
+  );
+  const spans = segmentReport(data);
+  if (spans.length === 0) return c.json({ error: 'That report has no translatable spans.' }, 400);
+
+  // Taken BEFORE the store, on the same basis production uses: the English-only
+  // hash, with no translation identity in it.
+  const englishHash = await inspection.getReportContentHash(body.inspectionId, tenantId, reportId);
+
+  await c.var.services.reportTranslation.store(tenantId, reportId, body.locale, {
+    segments: spans.map((s) => `${body.marker} ${s.text}`),
+    // Shaped like the real `<provider>:<credential source>` tag, and false in
+    // neither half: no provider ran, on nobody's credentials.
+    source: 'e2e-fixture:none',
+    englishHash,
+    aiCallId: 'e2e-fixture-no-model-call',
+  });
+
+  return c.json({ data: { reportId, segmentCount: spans.length } }, 200);
 });
 
 export default testHooks;

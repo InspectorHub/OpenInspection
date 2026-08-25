@@ -340,6 +340,10 @@ export const RETENTION_OUT_OF_SCOPE: RetentionOutOfScopeEntry[] = [
         reason: 'Deleted by the migration_batches executor in the same pass, because a staging row has no lifetime of its own — it exists only as part of a run. A second rule here would give one lifetime two clocks, and the two would drift the first time either window moved. Recorded rather than omitted so a reader can tell "governed elsewhere" from "nobody looked".',
     },
     {
+        table: 'report_translations',
+        reason: 'A courtesy translation has no lifetime of its own. It is a rendering of ONE report, produced from one state of it, and it is meaningful only for as long as that document is. Giving it an independent window would give one lifetime two clocks, and the two would drift the first time either moved — the same argument as migration_intake_entries above. Its clock is therefore the clock of the report, and what actually removes it is stated rather than implied: a subject erasure deletes the row outright (ERASURE_MANIFEST, report_translations.content), and a tenant destruction removes it with the database it lives in. ⚠️ Nothing expires a `reports` row on a calendar, so this is NOT a claim that translations age out — it is a claim that they die when the document does, which is the honest description of the current design and is why no window is declared here. Declared although the gate never asked: LEDGER_NAME matches no part of `report_translations`, so this table could have shipped with lint:retention green — the same silence that let tenant_destruction_records go a year without a decision.',
+    },
+    {
         table: 'sms_delivery_status',
         reason: 'A per-message state cell, not an append-only ledger: rows are upserted last-writer-wins by (tenant, provider_message_id). The columns are a provider message id, a normalized status enum and a provider error code — no recipient identifier and no free text. The person the delivery concerns lives on the contact row, under the erasure manifest.',
     },

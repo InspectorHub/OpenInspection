@@ -1,0 +1,49 @@
+/**
+ * Print-layout constants for the report render.
+ *
+ * Split out of `types.ts` when that file reached the large-file limit, on the
+ * seam the file already drew for itself: everything else there describes the
+ * SHAPE of report data, and these describe how it is laid out on paper. They
+ * grow for different reasons — a new payload field is not a new page-break
+ * rule — and only these are PRINT-ONLY, with on-screen rendering unchanged.
+ *
+ * `types.ts` re-exports every name here, so no import site changed.
+ */
+/* ------------------------------------------------------------------ */
+/* Print layout constants (exported for tests + re-exported via the    */
+/* standalone route). PRINT-ONLY — on-screen rendering is unchanged.   */
+/* ------------------------------------------------------------------ */
+
+/** Inspection-item / defect / stats cards: never split a card across pages. */
+export const PRINT_CARD_CLASS = "print:break-inside-avoid";
+/** Photo cells: never split a photo across a page boundary. */
+export const PRINT_FIGURE_CLASS = "print:break-inside-avoid";
+/** Section headings: keep a heading glued to the content that follows. */
+export const PRINT_SECTION_HEADING_CLASS = "print:break-after-avoid";
+/** Defect photo grid (screen 3/4-col) collapses to a dense 3-col in print. */
+export const DEFECT_PHOTO_GRID_CLASS =
+  "grid grid-cols-3 sm:grid-cols-4 print:grid-cols-3 gap-1.5";
+/** Item photo grid (screen 2/3-col) collapses to a dense 3-col in print. */
+export const ITEM_PHOTO_GRID_CLASS =
+  "grid grid-cols-2 sm:grid-cols-3 print:grid-cols-3 gap-2";
+/** CF Images thumbnail width: smaller in print to keep the PDF lean. */
+export const printThumbWidth = (isPrint: boolean): number => (isPrint ? 480 : 800);
+
+/**
+ * The seam between the English record and the courtesy translation that follows
+ * it in the SAME printed file.
+ *
+ * A page break and nothing else. It deliberately does NOT reset a page counter:
+ * the page numbers in the footer are printed by the headless renderer over the
+ * whole document (`server/lib/pdf.ts`), and they run continuously across this
+ * break because both halves are one render. A `counter-reset` here — or a
+ * deliverable assembled by merging two separately rendered PDFs — would restart
+ * the numbering, and a file with two page-1s reads as two documents stapled
+ * together, whereupon the first thing a client asks is which one is current.
+ */
+export const PRINT_TRANSLATED_HALF_CLASS = "print:break-before-page";
+
+/** Report heading typography — driven by the resolved profile's `--report-*`
+ *  vars (Report Style Presets). Shared by the report title and every section
+ *  heading, so a preset can never restyle one of them and miss the other. */
+export const REPORT_HEADING_STYLE = { fontFamily: "var(--report-heading-font)", fontWeight: "var(--report-heading-weight)" as unknown as number, letterSpacing: "var(--report-heading-spacing)", textTransform: "var(--report-heading-transform)" as unknown as "none" };

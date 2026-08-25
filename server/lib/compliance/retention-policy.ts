@@ -169,7 +169,7 @@ export interface RetentionPolicyHeader {
  * every production store is covered.
  */
 export const RETENTION_POLICY: RetentionPolicyHeader = {
-    version: '2026-08-19.6',
+    version: '2026-08-19.7',
     status: 'approved_with_conditions',
     effectiveAt: '2026-08-08',
     // The document named below remains what approved the seventeen rules it
@@ -183,6 +183,14 @@ export const RETENTION_POLICY: RetentionPolicyHeader = {
     // exclusion would claim a review of a deletion period that never happened.
     approvedBy: 'external-review-2026-08-19',
     approvedAt: '2026-08-19',
-    supersedes: '2026-08-19.4',
-    rulesDigest: 'e8777bba4323007d42ba6b0e2aac0a12bde29798ebdd0604e4ae4b70e6a118a6',
+    // `.7` adds `report_translations`, and unlike `.6` this one DOES change what
+    // production deletes: a stored courtesy translation is a derived copy of
+    // report text, and it now has a period of its own rather than inheriting
+    // one by accident. `approvedBy`/`approvedAt` still do not move, for the
+    // reason given above — the external review saw seventeen rules and this is
+    // not one of them. **A reviewer reading this header must be able to tell
+    // which rules were approved from which were added afterwards, and the
+    // version suffix is the only thing carrying that.**
+    supersedes: '2026-08-19.6',
+    rulesDigest: '0d782dbd0e8afe1790a6d53b4d07819f5dfa83884e6ba1837c4b652bb737f892',
 };

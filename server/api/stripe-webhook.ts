@@ -133,7 +133,7 @@ api.post('/', async (c) => {
     }
 
     const invoiceId = settled.purpose.invoiceId;
-    let appended: Awaited<ReturnType<typeof c.var.services.invoice.markPaid>> = null;
+    let appended: Awaited<ReturnType<typeof c.var.services.invoice.markPaid>>;
     try {
         appended = await c.var.services.invoice.markPaid(invoiceId, tenantId, 'oi', 'card');
         if (settled.inspectionId) {

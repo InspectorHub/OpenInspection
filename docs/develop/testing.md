@@ -107,6 +107,11 @@ tests/
   because `getApiUrl()` falls back to `localhost:8788` and the BFF's
   graceful-degradation `catch` would otherwise swallow a real ECONNREFUSED and
   let the test pass while only ever exercising the error path.
+  ⚠️ **8788 here is not a typo for the dev port and must not be "corrected" to
+  8787.** It is the constant compiled into `app/lib/api.server.ts`, which is a
+  different thing from where `npm run dev` listens. That the two disagree is a
+  real defect in that fallback rather than in this sentence — the number is
+  recorded here so a reader can tell the two apart.
 
 ### API / service unit (`tests/unit/<domain>/*.spec.ts`)
 

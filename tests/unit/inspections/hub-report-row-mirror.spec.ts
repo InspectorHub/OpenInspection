@@ -25,7 +25,13 @@ const CARD_PATH = fileURLToPath(new URL('../../../app/components/inspector-porta
 
 function declaredReportRowFields(): string[] {
     const source = readFileSync(CARD_PATH, 'utf8');
-    const body = /export interface ReportRow \{\n([\s\S]*?)\n\}/.exec(source)?.[1];
+    // The line-break alternation is not decoration. core.autocrlf is true in
+    // this repo, so a fresh Windows clone checks this .tsx out with Windows
+    // line endings, and a pattern that only accepts Unix ones matches
+    // nothing: the parse yields no fields and the guard below reports an
+    // honest-looking "interface not found". CI runs on Linux, so it would
+    // never show there.
+    const body = /export interface ReportRow \{\r?\n([\s\S]*?)\r?\n\}/.exec(source)?.[1];
     // A rename or a reshape must fail loudly here rather than yield an empty
     // set that trivially "matches" nothing — an empty result would read as
     // green while checking nothing at all.
@@ -35,11 +41,50 @@ function declaredReportRowFields(): string[] {
     return fields;
 }
 
+/**
+ * Fields `ReportRow` carries that the hub payload does NOT, because the loader
+ * joins them in from a second request.
+ *
+ * `translationState` costs a content hash per report, and the hub is the page's
+ * one aggregate round trip — so it is fetched separately and merged in
+ * `inspector-portal.tsx`. That is a deliberate design decision, stated at the
+ * merge site, not drift.
+ *
+ * This list must stay SHORT and each entry must be justified where it is
+ * merged. It is an exemption from the mirror rule, and an exemption nobody
+ * argues for is how the rule stops meaning anything.
+ */
+const LOADER_JOINED = ['translationState'];
+
 describe('ReportRow mirrors the hub schema reports entry', () => {
     it('declares every field the schema puts on the wire', () => {
+        // The direction that rots silently: the server keeps sending a field
+        // and the card's type never mentions it, while the compiler stays happy
+        // because a wider object is assignable to a narrower one.
         const schemaFields = Object.keys(InspectionHubSchema.shape.reports.element.shape);
         expect(schemaFields.length).toBeGreaterThan(0);
-        expect([...declaredReportRowFields()].sort()).toEqual([...schemaFields].sort());
+        const declared = new Set(declaredReportRowFields());
+        expect(schemaFields.filter((f) => !declared.has(f))).toEqual([]);
+    });
+
+    it('carries nothing beyond the schema except what the loader joins in', () => {
+        // The other direction, which used to be covered by asserting exact
+        // equality. Equality broke the moment a field was deliberately fetched
+        // outside the hub, and loosening it to a one-way check would have
+        // retired the half that catches an invented field. So the extras are
+        // enumerated instead of allowed.
+        const schemaFields = new Set(Object.keys(InspectionHubSchema.shape.reports.element.shape));
+        const extras = declaredReportRowFields().filter((f) => !schemaFields.has(f));
+        expect(extras.sort()).toEqual([...LOADER_JOINED].sort());
+    });
+
+    it('drops an exemption once the field joins the payload', () => {
+        // The positive control on the list above. If `translationState` ever
+        // becomes a hub field, the exemption must be DELETED rather than left
+        // behind — a stale entry would go on excusing a field that no longer
+        // needs excusing, and would hide the next one that does.
+        const schemaFields = new Set(Object.keys(InspectionHubSchema.shape.reports.element.shape));
+        expect(LOADER_JOINED.filter((f) => schemaFields.has(f))).toEqual([]);
     });
 
     it('knows about the narrative flag the server sends', () => {

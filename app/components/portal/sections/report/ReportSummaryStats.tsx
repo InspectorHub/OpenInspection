@@ -18,10 +18,13 @@
  */
 import { m } from "~/paraglide/messages";
 import { PRINT_CARD_CLASS, type ReportSection } from "./types";
+import { useAnchorId } from "./report-half-scope";
 
 const BUCKET_RANK: Record<string, number> = { satisfactory: 0, monitor: 1, defect: 2, other: 3 };
 
 export function ReportSummaryStats({ sections, total }: { sections: ReportSection[]; total: number }) {
+  // A TOC target — so it is namespaced per half. See report-half-scope.
+  const anchorId = useAnchorId();
   const ratingTally = new Map<string, { label: string; color: string; bucket: string; count: number; seen: number }>();
   let seenOrder = 0;
   for (const it of sections.flatMap((s) => s.items)) {
@@ -38,7 +41,7 @@ export function ReportSummaryStats({ sections, total }: { sections: ReportSectio
   ];
 
   return (
-    <div id="pca-summary" className="max-w-4xl mx-auto px-4 sm:px-6 mb-6 scroll-mt-4">
+    <div id={anchorId("pca-summary")} className="max-w-4xl mx-auto px-4 sm:px-6 mb-6 scroll-mt-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {summaryCards.map((s) => (
           <div key={s.label} className={`bg-ih-bg-card border border-ih-border rounded-lg p-4 text-center ${PRINT_CARD_CLASS}`}>

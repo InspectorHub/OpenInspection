@@ -13,24 +13,28 @@
  * The presentational blocks (masthead, cover, summary row, export bar, one
  * block per section and one card per item, signature / verification / repair
  * panel) live colocated in ./report/*, as do the prop contract
- * (./report/report-view-props) and the shared types. The pure helpers live in
- * ~/lib/report-helpers.
+ * (./report/report-view-props), the shared types and the print-layout rules.
+ * The pure helpers live in ~/lib/report-helpers.
  *
  * WHAT STAYS HERE is what no single block can own: the report-wide interactive
  * state (filter, lightbox, repair selection, failed-photo Set), the media-tile
- * renderer those pieces close over, and the composition order of the page.
- * Anything a reader would look up by name — "the item card", "the cover photo",
- * "the dead-link page" — is a file next door.
+ * renderer those pieces close over, the composition order of the page, and
+ * WHICH HALVES a reader gets — one on screen, two in print. Anything a reader
+ * would look up by name is a file next door.
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import { useState } from "react";
-import { m } from "~/paraglide/messages";
 import { usePdfExport } from "~/hooks/usePdfExport";
 import { brandTokens } from "~/lib/brand";
 import { presetTokens } from "~/lib/report-style/preset-tokens";
 import { itemDrivesSummary } from "~/lib/report-helpers";
 import { ReportMediaTile } from "./report/ReportMediaTile";
+import { mediaTileKey } from "./report/media-tile-key";
+import { ReportFilterChips } from "./report/ReportFilterChips";
+import { ReportLightbox } from "./report/ReportLightbox";
+import { ReportHalfScope } from "./report/report-half-scope";
+import { PRINT_TRANSLATED_HALF_CLASS } from "./report/print-layout";
 import { badgeUrl } from "../../../../server/lib/media/badge-variant";
 import { primaryBadgeOf } from "../../../../server/lib/credentials/primary";
 import { ReportUnavailable } from "./report/ReportUnavailable";
@@ -43,6 +47,8 @@ import { PhotoAppendix } from "./report/PhotoAppendix";
 import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
 import { ReportVerificationBlock } from "./report/ReportVerificationBlock";
 import { ReportViewDisclosure } from "./report/ReportViewDisclosure";
+import { TranslationNotice } from "./report/TranslationNotice";
+import { useTranslationHalf } from "./report/use-translation-half";
 import { ReportRepairPanel } from "./report/ReportRepairPanel";
 import { BuildingProfile } from "./report/BuildingProfile";
 import { PcaSkeleton } from "./report/PcaSkeleton";
@@ -84,32 +90,20 @@ export {
 } from "~/lib/report-helpers";
 
 /**
- * React key for a media tile. Videos key on their stream/media id (stable across
- * reorders); photos key on their storage key. Pulled out of the JSX because the
- * inline form was a five-deep nested ternary.
+ * ONE half of the report: the English record, or the courtesy translation.
+ *
+ * On screen there is only ever one and a control moves the reader between them.
+ * In the printed file there are two — see <ReportView> at the bottom, the only
+ * thing that renders this twice.
  */
-function mediaTileKey(photo: ReportPhoto, idx: number): string {
-  const media = photo.media;
-  switch (media?.kind) {
-    case "video-player":
-      return `v-${media.streamUid}-${idx}`;
-    case "video-poster":
-      return `vp-${media.streamUid}-${idx}`;
-    case "r2-video-player":
-      return `r2v-${media.mediaId}-${idx}`;
-    case "r2-video-poster":
-      return `r2vp-${media.mediaId}-${idx}`;
-    default:
-      return photo.key;
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/* Component */
-/* ------------------------------------------------------------------ */
-
-export function ReportView(props: ReportViewProps) {
-  const data = props;
+function ReportHalf(props: ReportViewProps & { forcedHalf?: "en" | "translated" }) {
+  // #23 — which HALF the reader is looking at. English by default; see the hook.
+  const { courtesy, showingTranslation, parts, toggle } = useTranslationHalf(
+    { sections: props.sections, outline: props.outline, photoAppendix: props.photoAppendix },
+    props.courtesyTranslation,
+    props.forcedHalf,
+  );
+  const data: ReportViewProps = showingTranslation ? { ...props, ...parts } : props;
   const tenant = props.tenant;
   const id = props.reportId || data.inspectionId;
   const urlToken = props.token;
@@ -174,9 +168,8 @@ export function ReportView(props: ReportViewProps) {
     );
   }
 
-  const toggleRepairItem = (itemId: string) => {
+  const toggleRepairItem = (itemId: string) =>
     setRepairItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
-  };
 
   const selectedRepairList = data.sections
     .flatMap((s) => s.items)
@@ -193,7 +186,22 @@ export function ReportView(props: ReportViewProps) {
       : data.sections;
 
   return (
-    <div className={standalone ? "min-h-screen bg-ih-bg-card" : undefined} data-report-profile={data.styleProfile?.id || undefined} style={{ ...brandTokens(data.brand.primaryColor), ...presetTokens(data.styleProfile?.tokens) }}>
+    <ReportHalfScope
+      /* Only the SECOND half of a printed file namespaces its anchors; a lone
+         half on screen keeps every id it always had. See report-half-scope. */
+      anchorPrefix={props.forcedHalf === "translated" && courtesy ? `${courtesy.locale}--` : ""}
+      showingTranslation={showingTranslation}
+    >
+    <div
+      className={`${standalone ? "min-h-screen bg-ih-bg-card" : ""} ${props.forcedHalf === "translated" ? PRINT_TRANSLATED_HALF_CLASS : ""}`.trim() || undefined}
+      /* Which half this is, named on the element rather than inferred from
+         position: the printed file's whole promise is that a reader can tell
+         them apart, and a test that reads order alone cannot see them swap. */
+      data-report-half={props.forcedHalf ? (showingTranslation && courtesy ? courtesy.locale : "en") : undefined}
+      lang={showingTranslation && courtesy ? courtesy.locale : undefined}
+      data-report-profile={data.styleProfile?.id || undefined}
+      style={{ ...brandTokens(data.brand.primaryColor), ...presetTokens(data.styleProfile?.tokens) }}
+    >
       <ReportExportBar
         inspectionId={data.inspectionId}
         ownerPreview={data.ownerPreview}
@@ -220,6 +228,19 @@ export function ReportView(props: ReportViewProps) {
         onToggleRepairPanel={() => setRepairPanel(!repairPanel)}
       />
 
+      {/* #23 — permanent, non-dismissible, and ABOVE the content it describes.
+          The wording is a versioned legal constant resolved server-side; only
+          the button label around it is catalogue copy. */}
+      {courtesy && (
+        <TranslationNotice
+          notice={courtesy.notice}
+          showingTranslation={showingTranslation}
+          translationLocale={courtesy.locale}
+          onToggle={toggle}
+          printMode={data.printMode} half={props.forcedHalf}
+        />
+      )}
+
       <ReportCoverPhoto coverPhotoUrl={data.coverPhotoUrl} address={data.address} printMode={data.printMode} />
 
       <ReportSummaryStats sections={data.sections} total={data.stats.total} />
@@ -229,28 +250,13 @@ export function ReportView(props: ReportViewProps) {
         <BuildingProfile rows={data.buildingProfile ?? []} />
       </div>
 
-      {/* Filter chips */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-8 print:hidden">
-        <div className="flex gap-2">
-          {(["all", "defects", "summary"] as FilterKey[]).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFilter(f)}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all ${
-                filter === f
-                  ? "bg-ih-primary text-ih-primary-fg"
-                  : "border border-ih-border text-ih-fg-3"
-              }`}
-            >
-              {f === "all" ? m.report_view_filter_all() : f === "defects" ? m.report_view_filter_defects() : m.report_view_filter_summary()}
-            </button>
-          ))}
-        </div>
-      </div>
+      <ReportFilterChips filter={filter} onChange={setFilter} />
 
       {/* Sections */}
-      <div className={`max-w-4xl mx-auto px-4 sm:px-6 ${repairPanel ? "pb-[65vh]" : "pb-32"}`}>
+      {/* `data-report-body` marks where the report's own content starts. The
+          notice that says which document is the record has to sit ABOVE it, in
+          every half, and "above" is only checkable against a named boundary. */}
+      <div data-report-body className={`max-w-4xl mx-auto px-4 sm:px-6 ${repairPanel ? "pb-[65vh]" : "pb-32"}`}>
         {/* PCA Skeleton — Commercial PCA Phase S front matter. data.pcaReport is
             null for non-commercial reports (server gates it in getReportData), so
             PcaSkeleton renders nothing on residential home inspections. The
@@ -292,6 +298,7 @@ export function ReportView(props: ReportViewProps) {
             renderMediaTile={renderMediaTile}
             repairItems={repairItems}
             onToggleRepairItem={toggleRepairItem}
+            showingTranslation={showingTranslation}
           />
         ))}
 
@@ -348,20 +355,45 @@ export function ReportView(props: ReportViewProps) {
         />
       )}
 
-      {/* Lightbox */}
-      {lightboxUrl && (
-        <div
-          /* ds-allow: customer report render surface, not app chrome — fixed-dark image lightbox */
-          className="fixed inset-0 z-[60] bg-[rgba(15,23,42,0.9)] flex items-center justify-center p-4 cursor-pointer"
-          onClick={() => setLightboxUrl(null)}
-        >
-          <img
-            src={lightboxUrl}
-            alt=""
-            className="max-w-full max-h-[90vh] object-contain rounded-lg"
-          />
-        </div>
-      )}
+      <ReportLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
     </div>
+    </ReportHalfScope>
   );
+}
+
+/**
+ * The report as a reader receives it — on screen, or as one printed file.
+ *
+ * ON SCREEN: one half, English first, with a control that switches. That is the
+ * whole of it, and it is what this component was before the printed shape
+ * existed.
+ *
+ * IN PRINT: the English inspection record, then the courtesy translation, in
+ * ONE render. Three things follow from doing it that way and none of them
+ * survives the alternative:
+ *
+ *  - **One file.** Nobody has to be told which of two attachments is current.
+ *  - **Continuous page numbers.** The footer is printed by the headless
+ *    renderer over the whole document, straight through the seam.
+ *  - **A table of contents that covers the file.** Each half carries its own,
+ *    resolving into its own pages — the translated half namespaces its anchors
+ *    (report-half-scope).
+ *
+ * 🔴 **Do not build this by rendering two PDFs and concatenating them.**
+ * `pdf-lib` is a dependency and the move is an obvious one; it is used HERE
+ * only to READ a rendered file back (`server/lib/toc-pages.ts`). A merge
+ * produces two page-number sequences and a contents page that covers half the
+ * document — the two defects this shape exists to avoid. Append within one
+ * render, never merge two.
+ */
+export function ReportView(props: ReportViewProps) {
+  if (props.printMode && props.courtesyTranslation) {
+    return (
+      <>
+        <ReportHalf {...props} forcedHalf="en" />
+        <ReportHalf {...props} forcedHalf="translated" />
+      </>
+    );
+  }
+  return <ReportHalf {...props} />;
 }

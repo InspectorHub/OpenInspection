@@ -141,6 +141,7 @@ export async function applyContactRow(
             name: payload.name,
             phone: payload.phone ?? null,
             agency: payload.agency ?? null,
+            notes: payload.notes ?? null,
             type,
         }).where(and(eq(contacts.id, live.id), eq(contacts.tenantId, tenantId)));
 
@@ -156,6 +157,7 @@ export async function applyContactRow(
         email,
         phone: payload.phone ?? null,
         agency: payload.agency ?? null,
+        notes: payload.notes ?? null,
         createdAt: new Date(),
     });
     return { kind: 'applied', createdId: id, priorState: null };

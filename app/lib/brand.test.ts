@@ -90,13 +90,12 @@ describe("contrastForeground over the sRGB cube", () => {
   it("never fails AA when one of its two candidates would have cleared it", () => {
     const white = relLuminance([255, 255, 255]);
     const dark = relLuminance(rgb("#111827"));
-    let n = 0;
     let chosenFail = 0;
     let residual = 0;
     let worstChosen = { r: Infinity, hex: "" };
     let worstResidual = { r: Infinity, hex: "" };
 
-    n = eachSampledColor(3, (r, g, b) => {
+    const n = eachSampledColor(3, (r, g, b) => {
       const hex = `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
       const fill = relLuminance([r, g, b]);
       const best = Math.max(ratio(white, fill), ratio(dark, fill));
@@ -141,13 +140,12 @@ describe("brandTextColor over the sRGB cube", () => {
     ];
     for (const surface of surfaces) {
       const bg = relLuminance(rgb(surface.hex));
-      let n = 0;
       let failures = 0;
       let unchanged = 0;
       let worst = { r: Infinity, hex: "", got: "" };
       let biggestShift = { shift: 0, hex: "", got: "" };
 
-      n = eachSampledColor(8, (r, g, b) => {
+      const n = eachSampledColor(8, (r, g, b) => {
         const hex = `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
         const got = brandTextColor(hex, surface.hex);
         const rt = ratio(relLuminance(rgb(got)), bg);

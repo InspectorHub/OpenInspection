@@ -26,6 +26,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import messageTemplateRoutes from '../../../server/api/message-templates';
 import * as resolveTwilioModule from '../../../server/lib/sms/resolve-twilio';
 import { MeteringService } from '../../../server/services/metering.service';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '00000000-0000-0000-0000-0000000000f3';
 const FAKE_ENV = {
@@ -34,8 +35,13 @@ const FAKE_ENV = {
     TWILIO_AUTH_TOKEN: 'platform-auth-token',
 } as unknown as HonoConfig['Bindings'];
 
+/** One context for the file, not one per call. `makeExecutionContext` registers
+ *  the teardown that settles background work, and `afterEach` is only
+ *  registrable while a suite is being COLLECTED -- building a fresh context
+ *  inside a test would silently settle nothing. */
+const EXEC_CTX = makeExecutionContext().ctx;
 function makeExecCtx() {
-    return { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
+    return EXEC_CTX;
 }
 
 function buildApp(db: BetterSQLite3Database<typeof schema>, profile: typeof SAAS_PROFILE | typeof STANDALONE_PROFILE = STANDALONE_PROFILE) {

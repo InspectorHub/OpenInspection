@@ -16,7 +16,7 @@
  * from the caller, the same way `import-wizard-steps.ts` takes its copy, so
  * both rules can be asserted without a DOM and stay translatable.
  */
-import { importSourcesFor } from './import-sources';
+import { importSourcesFor, sourceNeedsPdfInference } from './import-sources';
 
 /** The intents a person can start a run from. `templates.overwrite` is absent
  *  on purpose: it needs a template to replace, so it can only be started from
@@ -93,6 +93,27 @@ export function importEntryHref(intent: ImportEntryIntent): string {
     return `/settings/imports?intent=${intent}`;
 }
 
+/**
+ * Where the chosen file has got to in the workbook question.
+ *
+ * FIVE states and not a boolean, because four of them mean different things to
+ * the submit button and the fifth is the one a "ready / not ready" flag would
+ * quietly delete:
+ *
+ * 🔴 `unreadable` must NOT block the submit. It is the path an `.xlsx` takes
+ * today and must keep taking — the original file is uploaded untouched, the
+ * server recognises no adapter for it, and it goes to whoever converts such
+ * files by hand. Collapsing it into "not ready" is how that path would be
+ * removed from the product by a later tidy-up, with no server code changed and
+ * nothing to notice.
+ */
+export type WorkbookStage =
+    | 'not-a-workbook'  // a CSV/JSON/container, or a vendor that reads containers
+    | 'reading'         // the parser is loading, or the workbook is parsing
+    | 'unreadable'      // nothing here could read it — the original file uploads
+    | 'pending'         // more than one sheet has rows and none is chosen
+    | 'chosen';         // a sheet is chosen and the input holds its CSV
+
 /** What the person has answered so far. Not the stored run — this form has no
  *  run yet; creating one is what it does. */
 export interface ImportStartDraft {
@@ -106,6 +127,27 @@ export interface ImportStartDraft {
      */
     vendor: string | null;
     hasFile: boolean;
+    /** How far the chosen file has got through the workbook question.
+     *  `not-a-workbook` for every file that is not a convertible workbook,
+     *  which is most of them. */
+    workbook: WorkbookStage;
+    /**
+     * Whether the operator has said what they did to the file before uploading
+     * it — asked only where the source is one nothing here can read, because
+     * that is the only route on which they supply a printed PDF.
+     *
+     * ⚠️ NOT an attestation, and the name is where that lives. Called
+     * `attested` or `accepted` the next reader takes it for "the customer
+     * accepted the risk" and builds the next feature against that reading, at
+     * which point the control has quietly become a waiver. It is not one. The
+     * same warning is written at the field in `PdfInferenceUpload`, which is
+     * the control this flag mirrors.
+     *
+     * Optional because six of the seven ladder arms have nothing to do with it,
+     * and a required field would make every existing caller carry a value it
+     * has no opinion about.
+     */
+    statementAccepted?: boolean;
     uploadAuthorized: boolean;
     staffAccessAuthorized: boolean;
 }
@@ -114,6 +156,15 @@ export interface ImportStartDraft {
 export interface ImportStartCopy {
     needsSource: string;
     needsFile: string;
+    /** The same outstanding thing, worded for the route that PRINTS a file
+     *  rather than exporting one. Two fields and not one, because "choose the
+     *  file you exported" is wrong on a screen whose own guidance just told the
+     *  operator to print one — and a sentence that is wrong about what the
+     *  person did is how they conclude they are on the wrong screen. */
+    needsPdfFile: string;
+    readingWorkbook: string;
+    needsSheet: string;
+    needsStatement: string;
     needsUploadAuthorized: string;
     needsStaffAccessAuthorized: string;
 }
@@ -136,7 +187,27 @@ export function importStartBlockedReason(
     // it would be asked of somebody who has stopped reading the form — and the
     // rule it replaced was the server quietly answering it for them.
     if (importSourcesFor(entry.intent).length > 1 && !draft.vendor) return copy.needsSource;
-    if (!draft.hasFile) return copy.needsFile;
+    // 🔴 BEFORE the file, and alone among these arms in being so.
+    //
+    // On the PDF route the picker is `disabled` until this is ticked, so an
+    // operator who has not ticked it CANNOT choose a file. Placed after
+    // `needsFile` — where every other arm sits — the button would say "choose
+    // the file you exported" beside a control that refuses to open, and nothing
+    // on the screen would say what is actually wanted.
+    //
+    // Keyed on the SOURCE rather than the entry, for the reason `sourceIsTabular`
+    // gives at length: a declaration is a property of what the operator said
+    // they have, and an entry-level flag would ask this of the two sources on
+    // the same entry that are read here and never involve a PDF.
+    const needsPdf = sourceNeedsPdfInference(entry.intent, draft.vendor);
+    if (needsPdf && !draft.statementAccepted) return copy.needsStatement;
+    if (!draft.hasFile) return needsPdf ? copy.needsPdfFile : copy.needsFile;
+    // Directly after the file, because these are questions ABOUT the file, and
+    // they are asked where the operator is still looking. Only two of the five
+    // stages appear here — see `WorkbookStage` for why `unreadable` is not one
+    // of them.
+    if (draft.workbook === 'reading') return copy.readingWorkbook;
+    if (draft.workbook === 'pending') return copy.needsSheet;
     if (!draft.uploadAuthorized) return copy.needsUploadAuthorized;
     if (entry.readByPerson && !draft.staffAccessAuthorized) return copy.needsStaffAccessAuthorized;
     return null;

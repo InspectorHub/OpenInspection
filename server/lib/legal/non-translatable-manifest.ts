@@ -1,11 +1,13 @@
 /**
  * OI #58 — the non-translatable content registry.
  *
- * EIGHT CATEGORIES of content ride inside the inspection report and the
- * inspection agreement: reliance clauses, limitation of liability, arbitration,
- * warranty disclaimer, governing law, contract terms, signatures and
- * acknowledgements. The rule is one sentence long and it is the reason this
- * file exists: these are not *content*, they are a legal instrument.
+ * ELEVEN CATEGORIES of content ride inside the inspection report, the
+ * inspection agreement and the records taken alongside them: reliance clauses,
+ * limitation of liability, arbitration, warranty disclaimer, governing law,
+ * contract terms, signatures, acknowledgements, legal notices, consents and
+ * waivers, and statutory certification language. The rule is one sentence long
+ * and it is the reason this file exists: these are not *content*, they are a
+ * legal instrument.
  *
  * English is authoritative for every entry below. None of it is eligible for
  * machine translation, and none of it is eligible for the message catalogue
@@ -21,11 +23,11 @@
  * nothing calls for a translation of one, so there is still no consumer for
  * this list. It remains a PRECONDITION of #23 rather than a feature of it: the
  * register has to exist, and be enforced, before the pipeline that would
- * otherwise have to remember all eight categories at review time.
+ * otherwise have to remember every category at review time.
  *
  * ⚠️ The release is why this file matters more than it did, not less. While the
  * capability was refused outright, an omission here could not reach a client;
- * now the only thing between the eight categories and a model is that no
+ * now the only thing between these categories and a model is that no
  * caller has been written yet.
  *
  * ⚠️ Read the direction of the rule correctly. This is NOT an exemption list
@@ -34,6 +36,15 @@
  * Nothing here licenses translating anything that is not here; the out-of-scope
  * register (`non-translatable-out-of-scope.ts`) is where "translatable, and here
  * is why" is written down, and it is deliberately short.
+ *
+ * ⚠️ And read the direction of ENFORCEMENT correctly too. This register is not
+ * what a pipeline filters against. A filter built from a list of forbidden
+ * things silently re-opens the moment the payload it filters grows a field, and
+ * that has already happened once here: the assembled reliance block reaches the
+ * report payload as `relianceText` and no exclusion list in the codebase would
+ * have kept it out. What decides eligibility is an enumeration of PERMITTED
+ * spans, built independently; this register is the classification that
+ * enumeration is checked against, not the check itself.
  *
  * ## Platform notices are a DIFFERENT module — do not merge them in
  *
@@ -71,11 +82,16 @@
  */
 
 /**
- * The eight categories. A CLOSED set.
+ * The eleven categories. A CLOSED set.
  *
  * The gate carries its own copy of this list and compares the two in both
  * directions, because a gate whose scope is a private constant is a gate that
  * can be narrowed by editing the thing it checks.
+ *
+ * The last three were added when the classification was written down in full.
+ * `contract_terms` and `signature` are wider than they strictly need to be and
+ * that is deliberate — this set is a floor, and no entry here is ever narrowed
+ * to make room for a new one.
  *
  * @gateConsumed read as source text by `scripts/check-non-translatable.mjs`.
  */
@@ -88,6 +104,9 @@ export const NON_TRANSLATABLE_CATEGORIES = [
     'contract_terms',
     'signature',
     'acknowledgement',
+    'legal_notice',
+    'consent_waiver',
+    'statutory_certification',
 ] as const;
 
 /**
@@ -112,7 +131,7 @@ export type NonTranslatableCategory = (typeof NON_TRANSLATABLE_CATEGORIES)[numbe
 export interface NonTranslatableEntry {
     /** Stable slug. Never reused, and never shared with an out-of-scope entry. */
     id: string;
-    /** Which of the eight categories this is. */
+    /** Which of the eleven categories this is. */
     category: NonTranslatableCategory;
     /** Repo-relative path to the file that HOLDS the text or declares the column. */
     source: string;
@@ -268,5 +287,70 @@ export const NON_TRANSLATABLE_MANIFEST: NonTranslatableEntry[] = [
         source: 'server/lib/pca-attestation.ts',
         locator: 'buildAttestationPayload',
         reason: 'Builds the canonical text the field observer and PCR reviewer attest to under ASTM responsible control. It is signed byte-for-byte, so the attested wording is fixed by construction and any translation is a different attestation.',
+    },
+
+    // ── legal notices ────────────────────────────────────────────────────────
+    // ⚠️ Read this category narrowly, and read the out-of-scope register beside
+    // it. It reaches a notice whose WORDING IS THE OPERATIVE ACT — one that
+    // allocates, waives, restricts or certifies. It does not reach a notice that
+    // states a fact and decides nothing; those are platform transparency copy,
+    // they are listed out of scope, and freezing them to English would make them
+    // useless to the only reader who needs them.
+    {
+        id: 'starter-agreement-not-legal-advice-notice',
+        category: 'legal_notice',
+        source: 'server/services/starter-content/fixtures/agreement-template.ts',
+        locator: 'DISCLAIMER_PARAGRAPH',
+        reason: 'The notice that opens the seeded agreement: the template is not legal advice, requirements vary by jurisdiction, and the tenant must have their own attorney review it before sending. It does not describe the instrument, it disclaims a duty and moves responsibility onto the reader, which is the operative kind of notice. A rewording could soften either half of that.',
+    },
+    {
+        id: 'agreement-body-statutory-notices',
+        category: 'legal_notice',
+        source: 'server/lib/db/schema/inspection/agreements.ts',
+        locator: 'content',
+        reason: 'Mandated disclosures and cancellation-rights notices inside a real engagement live only in this column, and where a jurisdiction prescribes the words of a notice it prescribes them exactly. A notice delivered in words nobody prescribed is not that notice, whatever it says.',
+    },
+
+    // ── consents and waivers ─────────────────────────────────────────────────
+    // Separate from `acknowledgement` on purpose, and the distinction is worth
+    // the extra category: an acknowledgement records a statement the signer
+    // MADE, while a consent or waiver is the signer GIVING SOMETHING UP. What a
+    // dispute asks about the second is what the person was actually shown.
+    {
+        id: 'sms-consent-captured-text',
+        category: 'consent_waiver',
+        source: 'server/lib/db/schema/compliance.ts',
+        locator: 'sms_consent_log',
+        reason: 'The messaging-consent ledger: what the person was shown when they opted in, and the record that they did. Consent is only as wide as the words it was given to, so the captured text is the consent rather than a description of it, and a re-rendering answers a question nobody asked.',
+    },
+    {
+        id: 'agent-terms-acceptance-text',
+        category: 'consent_waiver',
+        source: 'server/lib/db/schema/compliance.ts',
+        locator: 'agent_terms_acceptances',
+        reason: 'Acceptance of the terms an agent is bound by when they take report access. The row exists to prove which document, in which version, was presented; substituting a translated rendering would prove acceptance of a document that was never shown.',
+    },
+    {
+        id: 'account-acceptance-document-version',
+        category: 'consent_waiver',
+        source: 'server/lib/db/schema/tenant/account-acceptances.ts',
+        locator: 'contentHash',
+        reason: 'Per-document acceptance of the published Terms and Privacy documents, recorded as the version plus a hash of the body shown. The hash is over the English bytes, so any other rendering both fails verification and records a different act.',
+    },
+
+    // ── statutory certification language ─────────────────────────────────────
+    {
+        id: 'statutory-form-published-source',
+        category: 'statutory_certification',
+        source: 'server/lib/db/schema/statutory-forms.ts',
+        locator: 'source_hash',
+        reason: 'A published statutory form is REPRODUCED from a hashed source artifact rather than composed, and the hash is what proves the reproduction is faithful. Translating it does not produce a translated form, it produces something that is no longer the form.',
+    },
+    {
+        id: 'statutory-form-artifact',
+        category: 'statutory_certification',
+        source: 'server/lib/db/schema/statutory-forms.ts',
+        locator: 'object_key',
+        reason: 'The stored artifact the form is rendered from. Where a form is prescribed, its spacing, borders and field placement are prescribed with it; a translation pass has nowhere to put the result that would still be the prescribed document.',
     },
 ];

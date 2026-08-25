@@ -71,7 +71,7 @@ export function createRecipientLocaleResolver(db: AnyDb, tenantId: string): Reci
                 const row = await db.select({ locale: users.locale }).from(users)
                     .where(and(eq(users.id, ref.id), eq(users.tenantId, tenantId))).get();
                 locale = (row?.locale as string | null) ?? null;
-            } catch { locale = null; }
+            } catch { /* leave null: fall through to the tenant default */ }
             // A staff member's own UI locale IS a stated preference, so it goes
             // in the top slot rather than the `linkedUserLocale` one.
             return resolveContactLocale({ contactLocale: locale, tenantDefault: fallbackDefault });

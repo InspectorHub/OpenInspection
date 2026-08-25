@@ -34,6 +34,7 @@ import { PeopleService } from '../../../server/services/people.service';
 import { SmsConsentService } from '../../../server/services/sms-consent.service';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '00000000-0000-0000-0000-0000000000c1';
 const CLIENT = 'ct-sms-client';
@@ -89,7 +90,10 @@ const ENV = {
     APP_NAME: 'Acme Inspect',
     JWT_SECRET: 'test-secret',
 } as never;
-const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const CTX = makeExecutionContext().ctx;
 
 function post(body: unknown) {
     return new Request(`https://acme.example.com/api/inspections/${INSP_ID}/send-sms`, {

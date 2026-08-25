@@ -37,6 +37,7 @@ import { SendReportModal } from "~/components/inspection/SendReportModal";
 import { SendSmsModal } from "~/components/inspection/SendSmsModal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { publishCapFromMe, viewCommunicationCapFromMe } from "~/lib/inspector-portal-helpers";
+import { COURTESY_TRANSLATION_LOCALE } from "~/lib/courtesy-locale";
 import {
   toActionResult,
   handlePersonAdd,
@@ -56,6 +57,7 @@ import {
   handleUnlockReport,
   handleRelockReport,
   handleReportDelete,
+  handleReportTranslation,
 } from "~/lib/inspection-order-actions";
 import { ScheduleCard, type TeamMember } from "~/components/inspector-portal/ScheduleCard";
 import { ServicesCard, type CatalogService } from "~/components/inspector-portal/ServicesCard";
@@ -92,6 +94,10 @@ interface HubData extends HubPayload {
   inspection: HubPayload["inspection"] & {
     id: string;
     propertyAddress: string;
+    /** #23 — the client's preferred language, for the publish nudge. */
+    clientLocale: string | null;
+    /** #23 — whether this workspace may PRODUCE a courtesy translation. */
+    courtesyTranslationEnabled: boolean;
     // The order-wide gate's release record; null while still gated.
     unlockedAt: string | null;
     unlockedByName: string | null;
@@ -178,6 +184,23 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     if (candRes && candRes.ok) {
       const candBody = (await candRes.json()) as { data?: { candidates?: ReinspectCandidate[] } };
       reinspectCandidates = candBody.data?.candidates ?? [];
+    }
+  }
+
+  // #23 — per-report translation state. Its own read rather than a hub field:
+  // it costs a content hash PER REPORT, and the hub is the page's one aggregate
+  // round trip. Best-effort — a failure leaves each row's state undefined, and
+  // the card renders nothing rather than guessing.
+  if (hub.inspection?.courtesyTranslationEnabled || (hub.reports?.length ?? 0) > 0) {
+    const tRes = await api.inspections[":id"]["report-translation"]
+      .$get({ param: { id }, query: {} })
+      .catch(() => null);
+    if (tRes && tRes.ok) {
+      const tBody = (await tRes.json()) as {
+        data?: { reports?: Array<{ reportId: string; state: "none" | "live" | "withheld" }> };
+      };
+      const byId = new Map((tBody.data?.reports ?? []).map((r) => [r.reportId, r.state]));
+      hub.reports = (hub.reports ?? []).map((r) => ({ ...r, translationState: byId.get(r.id) }));
     }
   }
 
@@ -346,6 +369,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   if (intent === "service-price") return handleServicePrice(api, id, formData);
   if (intent === "service-remove") return handleServiceRemove(api, id, formData);
   if (intent === "report-delete") return handleReportDelete(api, id, formData);
+  if (intent === "report-translation") return handleReportTranslation(api, id, formData);
   if (intent === "unlock-report") return handleUnlockReport(api, id, formData);
   if (intent === "relock-report") return handleRelockReport(api, id);
 
@@ -378,6 +402,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     // report_versions row (snapshotOnPublish already accepts it). Empty → omit
     // so a first publish rides the server default.
     const summary = String(formData.get("summary") ?? "").trim();
+    const translateTo = String(formData.get("translateTo") ?? "").trim();
     const notifyClient = formData.get("notifyClient") === "on";
     const notifyAgent = formData.get("notifyAgent") === "on";
     const res = await api.inspections[":id"].publish.$post({
@@ -389,6 +414,9 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         requireSignature: formData.get("requireSignature") === "on",
         requirePayment: formData.get("requirePayment") === "on",
         ...(summary ? { summary } : {}),
+        // #23 — a LOCALE or nothing. Absent is the default and means no; a
+        // failure to produce one never fails the publish.
+        ...(translateTo ? { translateTo } : {}),
       },
     });
     // Publishing succeeded silently: the modal closed and the card flipped to a
@@ -857,6 +885,7 @@ export default function InspectionHubPage() {
         <ReportsCard
           reports={hub.reports ?? []}
           canManage={isAdmin}
+          translationEnabled={inspection.courtesyTranslationEnabled ?? false}
           formatDate={(iso) => formatInspectionDateTime(iso, undefined, displayTz, fmt)}
         />
 
@@ -1197,6 +1226,9 @@ export default function InspectionHubPage() {
         agreementRequired={inspection.agreementRequired}
         paymentRequired={inspection.paymentRequired}
         isAmendment={nextPublishIsAmendment}
+        courtesyTranslationEnabled={inspection.courtesyTranslationEnabled ?? false}
+        courtesyTranslationLocale={COURTESY_TRANSLATION_LOCALE}
+        clientPrefersTranslation={inspection.clientLocale === COURTESY_TRANSLATION_LOCALE}
         fetcher={publishModal.fetcher}
         submitting={publishModal.busy}
         error={publishModal.error}

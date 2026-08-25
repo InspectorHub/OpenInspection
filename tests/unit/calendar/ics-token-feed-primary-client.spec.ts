@@ -25,6 +25,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 // eslint-disable-next-line import/order
 import icsRoutes from '../../../server/api/ics';
 import { asD1Db } from '../helpers/test-db';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '00000000-0000-0000-0000-000000000d1';
 const CLIENT = 'contact-client-ics';
@@ -37,8 +38,13 @@ function tomorrowStr(): string {
     return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+/** One context for the file, not one per call. `makeExecutionContext` registers
+ *  the teardown that settles background work, and `afterEach` is only
+ *  registrable while a suite is being COLLECTED -- building a fresh context
+ *  inside a test would silently settle nothing. */
+const EXEC_CTX = makeExecutionContext().ctx;
 function makeExecCtx() {
-    return { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
+    return EXEC_CTX;
 }
 
 describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {

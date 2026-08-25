@@ -240,6 +240,17 @@
       "note": "Decides whether archiving a contact also cuts that person's live links to their own report. A data subject's continued access to a record about them is not a question any round has reached; false (access survives archiving) is the default that takes nothing away."
     },
     {
+      "column": "is_courtesy_translation_enabled",
+      "property": "courtesyTranslationEnabled",
+      "default_value": "false",
+      "default_owner": "engine",
+      "decision_type": "service_safeguard",
+      "basis": "OFF is the only honest default for a switch whose ON position sends a client's report text to a third party. The question a default answers is what happens to somebody who touches nothing, and for a workspace that has never considered machine translation the answer must be that their client's inspection findings stay where they are. Note that this differs from the AI switch above, which defaults ON, and the difference is not inconsistency: that column was carved out of behaviour workspaces already had, whereas nothing was translating anything before this one existed. A default of true would have been a new outbound flow nobody asked for.",
+      "controller_override": "available",
+      "override_surface": "app/routes/settings-advanced.tsx",
+      "note": "The switch governs PRODUCTION of a translation, never consumption: once one is stored, a reader is served it whatever this column says later. That asymmetry is deliberate — turning the switch off must not retract a document a client has already been given, and the erasure rules are where a stored translation is actually removed. Consumption is gated instead on the translation still describing the current English, which is a freshness question rather than a permission one."
+    },
+    {
       "column": "is_ai_enabled",
       "property": "aiEnabled",
       "default_value": "true",

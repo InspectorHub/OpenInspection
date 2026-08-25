@@ -144,7 +144,6 @@ const agentSignupRoutes = createApiRouter()
                 logger.warn('agent.signup.turnstile.failed', {
                     error: err instanceof Error ? err.message : String(err),
                 });
-                ok = false;
             }
             if (!ok) throw Errors.BadRequest('Bot challenge failed');
         }

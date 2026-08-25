@@ -1,0 +1,17 @@
+{
+  "specversion": "1.0",
+  "id": "00000000-0000-4000-8000-0000000rrc02",
+  "type": "io.inspectorhub.reply.report.corrected",
+  "source": "core",
+  "time": "2026-08-10T01:00:12.000Z",
+  "dataschema": "reply-report-corrected/v1",
+  "data": {
+    "tenantId": "fixture-tenant-5",
+    "correlationId": "cmd-report-correct-fixture-2",
+    "replyto": "dsar:dsar-fixture-5",
+    "inspectionId": "inspection-fixture-2",
+    "field": "roofCondition",
+    "outcome": "refused",
+    "reason": "The disputed value is the inspector's professional opinion recorded at the time of inspection; it is not a factual inaccuracy and is retained as observed."
+  }
+}

@@ -16,6 +16,7 @@ import {
 } from '../lib/migration-intake/adapters/registry';
 import { assertConversionByPersonAvailable } from '../lib/migration-intake/unreadable-file';
 import { assertStaffAccessDecisionIsOwners } from '../services/migration-intake/staff-access';
+import { announceWaitingRun } from '../services/migration-intake/waiting-run-notice';
 import { MigrationStageService } from '../services/migration-intake/stage.service';
 import { MigrationReportService } from '../services/migration-intake/report.service';
 import { MigrationApplyService } from '../services/migration-intake/apply.service';
@@ -115,13 +116,14 @@ const migrationIntakeRoutes = createApiRouter()
             // be false — no owner can either.
             assertConversionByPersonAvailable(profile, staffAccessAuthorized);
             assertStaffAccessDecisionIsOwners(c.get('userRole'));
+            const expiresAt = expiryFor(true, now);
             const created = await withStoredFile((sourceKey) => stage.createAssistanceBatch({
                 tenantId,
                 createdBy: userId,
                 intent,
                 targetId: form.targetId ?? null,
                 sourceKey,
-                expiresAt: expiryFor(true, now),
+                expiresAt,
                 uploadAuthorizedBy: userId,
                 staffAccessAuthorizedBy: userId,
             }));
@@ -130,6 +132,17 @@ const migrationIntakeRoutes = createApiRouter()
             auditFromContext(c, 'migration.assistance_requested', 'migration_batch', {
                 entityId: created.batchId,
                 metadata: { intent },
+            });
+            // Tell the DEPLOYMENT OPERATOR, which nothing here used to do. Same
+            // NAME as the audit action above, different artefact: that row is
+            // this workspace's own trail, this event is the only thing that
+            // crosses. See `announceWaitingRun` for the whole of that reasoning.
+            announceWaitingRun(c.var.services?.outbox, {
+                tenantId,
+                batchId: created.batchId,
+                vendor: form.vendor ?? null,
+                uploadedAt: now,
+                expiresAt,
             });
             return c.json({
                 success: true as const,

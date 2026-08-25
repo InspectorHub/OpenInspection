@@ -34,6 +34,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // eslint-disable-next-line import/order
 import { bookingsRoutes } from '../../../server/api/bookings';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 vi.mock('../../../server/lib/rate-limit', () => ({
     checkRateLimit: vi.fn().mockResolvedValue(undefined),
@@ -47,10 +48,9 @@ const SVC_MAIN = 'svc-main';
 const SVC_RADON = 'svc-radon';
 
 const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
-const FAKE_EXEC_CTX = {
-    waitUntil: (p: Promise<unknown>) => { void p.catch(() => {}); },
-    passThroughOnException: () => {},
-} as ExecutionContext;
+// Background work is settled at teardown by the helper. Hand-rolled stubs here
+// detached it instead, which is how a fully-passing run could still exit 1.
+const FAKE_EXEC_CTX = makeExecutionContext().ctx;
 
 let db: BetterSQLite3Database<typeof schema>;
 /**

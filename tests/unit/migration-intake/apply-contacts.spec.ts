@@ -107,6 +107,31 @@ describe('MigrationApplyService — contact rows', () => {
         expect(row?.priorState).toBeNull();
     });
 
+    it('stores the note the file carried', async () => {
+        const staged = await stage.stage({
+            tenantId: TENANT, createdBy: USER, limits: LIMITS, intent: 'contacts.import',
+            bundle: contactsBundle([
+                { name: 'Nora', email: 'nora@example.test', notes: 'Prefers mornings.', type: 'client' },
+                // POSITIVE CONTROL, in the same run: a row whose note the file
+                // left blank stores NULL rather than the previous row's note,
+                // so "it wrote something" cannot pass for "it wrote this".
+                { name: 'Omar', email: 'omar@example.test', type: 'client' },
+            ]),
+        });
+        const result = await apply.apply({
+            tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: false,
+        });
+        expect(result).toMatchObject({ status: 'applied', applied: 2, failed: 0 });
+
+        const nora = await db.select().from(schema.contacts)
+            .where(eq(schema.contacts.email, 'nora@example.test')).get();
+        const omar = await db.select().from(schema.contacts)
+            .where(eq(schema.contacts.email, 'omar@example.test')).get();
+        expect(nora?.notes).toBe('Prefers mornings.');
+        expect(omar?.notes).toBeNull();
+        expect(omar?.name).toBe('Omar');
+    });
+
     it('skips a clashing contact under the skip policy and says so', async () => {
         await db.insert(schema.contacts).values({
             id: 'existing-1', tenantId: TENANT, type: 'client', name: 'Alice Old',
@@ -165,7 +190,8 @@ describe('MigrationApplyService — contact rows', () => {
         // snapshot missing `agency` would silently fail to restore it — and a
         // non-null check would not notice.
         expect(JSON.parse(row?.priorState as string)).toEqual({
-            name: 'Alice Old', email: 'alice@example.test', phone: '555-1', agency: 'Old Co', type: 'client',
+            name: 'Alice Old', email: 'alice@example.test', phone: '555-1', agency: 'Old Co',
+            notes: null, type: 'client',
         });
         expect(row?.createdId).toBe('existing-1');
         expect(row?.status).toBe('applied');

@@ -66,8 +66,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // A failed read reads as "not configured yet", which is what an unreachable
   // config and an unset one look like to the person on this page. The switch
   // defaults to the column's own default rather than to a second opinion.
-  const aiCfgBody = aiConfigRes?.ok ? ((await aiConfigRes.json()) as { data?: { aiEnabled: boolean; aiBaseUrl: string; aiModel: string } }) : null;
-  const ai = aiCfgBody?.data ?? { aiEnabled: true, aiBaseUrl: "", aiModel: "" };
+  const aiCfgBody = aiConfigRes?.ok ? ((await aiConfigRes.json()) as { data?: { aiEnabled: boolean; aiBaseUrl: string; aiModel: string; courtesyTranslationEnabled: boolean } }) : null;
+  const ai = aiCfgBody?.data ?? { aiEnabled: true, aiBaseUrl: "", aiModel: "", courtesyTranslationEnabled: false };
 
   return {
     config: { stripeConnected, stripeAccountId, geminiConfigured } as AdvancedConfig,
@@ -161,6 +161,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const cfgRes = await api.integrationsAi.config.$put({
       json: {
         aiEnabled: fd.get("aiEnabled") === "on",
+        courtesyTranslationEnabled: fd.get("courtesyTranslationEnabled") === "on",
         aiBaseUrl: String(fd.get("aiBaseUrl") ?? ""),
         aiModel: String(fd.get("aiModel") ?? ""),
       },
@@ -320,6 +321,7 @@ export default function SettingsAdvancedPage() {
         <AiFeaturesPanel
           geminiConfigured={config.geminiConfigured}
           aiEnabled={ai.aiEnabled}
+          courtesyTranslationEnabled={ai.courtesyTranslationEnabled}
           aiBaseUrl={ai.aiBaseUrl}
           aiModel={ai.aiModel}
           value={secrets.GEMINI_API_KEY}

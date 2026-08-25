@@ -211,6 +211,20 @@ const adminDataImportRoutes = createApiRouter()
         // is the only event on the pipeline that is OURS rather than the
         // operator's, which is why it has a name of its own rather than sharing
         // `data.import` with starter-content installs.
+        //
+        // ⚠️ THAT SENTENCE WAS HALF TRUE WHEN IT WAS WRITTEN, and it is worth
+        // saying which half. The event NAME was ours; the ACTOR recorded was
+        // not. `auditFromContext` files the row under the signed-in user, and on
+        // this route that is the workspace's own administrator — so a row saying
+        // "we delivered a conversion" named the customer instead of the person
+        // who did it. The row is now honest on BOTH counts, and it took a
+        // different route to get there: this handler still records the tenant
+        // user, correctly, because a person signed into the workspace really did
+        // press it. The DEPLOYMENT OPERATOR delivers over the command seam
+        // instead (`cmd.migration.deliver`, applied in
+        // portal/apply-migration-commands.ts), where the actor travels inside
+        // the signature and lands in `platform_actor_id` with `user_id` null.
+        // Two doors, two actors, and neither can be mistaken for the other.
         auditFromContext(c, 'migration.delivered', 'migration_batch', {
             entityId: batchId,
             metadata: { rows: result.rows.length, byEntity },

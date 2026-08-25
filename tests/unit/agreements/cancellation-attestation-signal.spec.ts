@@ -37,6 +37,7 @@ import { AgreementService } from '../../../server/services/agreement.service';
 import { BrandingService } from '../../../server/services/branding.service';
 import { AppError } from '../../../server/lib/errors';
 import { MCP_MAX_RESULT_BYTES } from '../../../server/lib/mcp/result-limits';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '11111111-1111-4111-8111-111111111111';
 /** The template the attestation names. */
@@ -49,7 +50,10 @@ let branding: BrandingService;
 let app: OpenAPIHono<HonoConfig>;
 
 const ENV = { DB: {}, JWT_SECRET: 'test-secret' };
-const EXEC = { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const EXEC = makeExecutionContext().ctx;
 
 function buildApp() {
     const built = new OpenAPIHono<HonoConfig>();

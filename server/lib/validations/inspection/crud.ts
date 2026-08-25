@@ -268,6 +268,15 @@ export const PublishInspectionSchema = z.object({
   // each with its own version chain. Omitted = the order's primary report,
   // which is what every caller predating multi-report delivery means.
   reportId: z.string().min(1).optional().describe('Report to publish; defaults to the inspection primary report.'),
+  // #23 — the per-publish courtesy-translation opt-in. A locale, or absent.
+  //
+  // Absent is the DEFAULT and means "no", because producing a translation
+  // spends money and the decision stays with whoever incurs it. It is a
+  // request, not a guarantee: the workspace switch may refuse it, and a failure
+  // to produce one never fails the publish — the English report is the record
+  // and is published either way.
+  translateTo: z.string().trim().min(2).max(20).optional()
+    .describe('BCP-47 locale to produce a courtesy translation in on this publish, e.g. es-419. Absent means none. The English report is the inspection record either way.'),
 }).openapi('PublishInspection');
 
 /**

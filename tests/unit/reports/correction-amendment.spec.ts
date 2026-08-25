@@ -42,6 +42,7 @@ import { ReportVersionService } from '../../../server/services/report-version.se
 import { correctReport } from '../../../server/services/report-correction.service';
 import {
     artifactClass,
+    classifyByShape,
     liveDeliverableKeys,
     LIVE_DELIVERABLE_FILES,
 } from '../../../server/lib/artifact-status';
@@ -218,6 +219,50 @@ describe('a signed report is corrected by amendment', () => {
         // 'live'. Without this, `artifactClass = () => 'live'` passes the loop
         // above and the guard below becomes decorative.
         expect(artifactClass(`${TENANT}/inspections/${INSPECTION}/photos/x.jpg`)).toBe('unclassified');
+    });
+
+    it('reads the key by segments, so a filename cannot be read as a pattern', () => {
+        // 🔴 The assertion that speaks on a day nobody has had yet. The
+        // classifier used to interpolate the three names into a regex and
+        // escape `.` by hand: correct for exactly those three, and silently
+        // wrong for the first name anyone adds carrying another metacharacter.
+        //
+        // These are the shapes that would separate the two implementations. A
+        // dot is NOT a wildcard, and a name that merely contains a live one is
+        // not a live one — under the old pattern the first of these depended on
+        // an escape somebody remembered to write.
+        const base = `${TENANT}/inspections/${INSPECTION}/agreements/${ENVELOPE}`;
+        expect(artifactClass(`${base}/signedXpdf`)).toBe('unclassified');
+        expect(artifactClass(`${base}/not-signed.pdf`)).toBe('unclassified');
+        expect(artifactClass(`${base}/evidence.zip.bak`)).toBe('unclassified');
+        // The envelope segment must be there and non-empty: `/agreements/` on
+        // its own is not an envelope's folder.
+        expect(artifactClass(`${TENANT}/inspections/${INSPECTION}/agreements/signed.pdf`)).toBe('unclassified');
+        expect(artifactClass(`${base}//signed.pdf`)).toBe('unclassified');
+        // POSITIVE CONTROL, so the five above are not passing because the
+        // classifier answers 'unclassified' to everything.
+        expect(artifactClass(`${base}/signed.pdf`)).toBe('live');
+
+        // ⚠️ And an admission the five above are worth less than they look:
+        // fed to the regex-building version this replaced, every one of them
+        // passes as well. They lock the behaviour; they do not discriminate.
+        // The case that does is below, and it needs a name the constant does
+        // not contain.
+    });
+
+    it('compares the filename, never interprets it', () => {
+        // 🔴 The ONLY case here that tells the two implementations apart, which
+        // is why the file set is injectable at all.
+        //
+        // The old classifier built `…(?:evidence+\.zip)$` from the names and
+        // escaped only `.`. That leaves `+` a quantifier over the preceding
+        // `e`, so it matched `evidencee.zip` — a key nobody has — and did NOT
+        // match `evidence+.zip`, the actual file. Both answers wrong, nothing
+        // failing. This asserts both directions.
+        const files: ReadonlySet<string> = new Set(['evidence+.zip']);
+        const base = `${TENANT}/inspections/${INSPECTION}/agreements/${ENVELOPE}`;
+        expect(classifyByShape(`${base}/evidence+.zip`, files)).toBe('live');
+        expect(classifyByShape(`${base}/evidencee.zip`, files)).toBe('unclassified');
     });
 
     it('refuses to defer a live deliverable rather than delaying the correction', async () => {

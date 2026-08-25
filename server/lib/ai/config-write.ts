@@ -1,6 +1,6 @@
 import type { drizzle } from 'drizzle-orm/d1';
 import { eq, sql } from 'drizzle-orm';
-import { tenantConfigs } from '../db/schema';
+import { tenantAiConfigs } from '../db/schema';
 
 // Matches `server/lib/integration-test-results.ts` — the D1 handle this file's
 // only caller already holds, not a second database abstraction.
@@ -19,6 +19,16 @@ export interface AiConfigInput {
     aiEnabled: boolean;
     /** The OpenAI-compatible endpoint. Blank means unset. */
     aiBaseUrl: string;
+    /**
+     * #23 — whether this workspace may PRODUCE a courtesy translation.
+     *
+     * ⚠️ Production only. Reader paths answer from stored rows and never
+     * consult it, so switching it off stops new translations being made and can
+     * never strip one from a report already delivered. Defaults FALSE, unlike
+     * `aiEnabled` above: that one means "nothing switched off", this one is a
+     * decision to spend on every publish, and off is the absence of a choice.
+     */
+    courtesyTranslationEnabled: boolean;
     /** The model id to send. Blank means unset. */
     aiModel: string;
 }
@@ -44,40 +54,66 @@ function orNull(value: string): string | null {
  * storing `false` would make that copy a lie.
  */
 export async function saveAiConfig(db: Db, tenantId: string, input: AiConfigInput): Promise<void> {
+    const settings = {
+        isEnabled: input.aiEnabled,
+        baseUrl: orNull(input.aiBaseUrl),
+        model: orNull(input.aiModel),
+        // #23 — the courtesy-translation switch rides the same save,
+        // because it is the same page and the same decision to make.
+        isCourtesyTranslationEnabled: input.courtesyTranslationEnabled,
+        updatedAt: new Date(),
+    };
+    // An UPSERT, where the previous version of this was a plain UPDATE.
+    // `tenant_configs` always had a row by the time anyone reached the settings
+    // page — half a dozen unrelated writers create it — so an update that
+    // matched nothing was not a case that could arise. A table of its own has
+    // no such incidental creator: the FIRST save is the row's first existence,
+    // and an UPDATE here would silently store nothing.
     await db
-        .update(tenantConfigs)
-        .set({
-            aiEnabled: input.aiEnabled,
-            aiBaseUrl: orNull(input.aiBaseUrl),
-            aiModel: orNull(input.aiModel),
-            aiConfigVersion: sql`${tenantConfigs.aiConfigVersion} + 1`,
-            updatedAt: new Date(),
-        })
-        .where(eq(tenantConfigs.tenantId, tenantId));
+        .insert(tenantAiConfigs)
+        .values({ tenantId, ...settings, configVersion: 1 })
+        .onConflictDoUpdate({
+            target: tenantAiConfigs.tenantId,
+            // The bump reads the STORED value, not the one being inserted --
+            // `excluded.config_version` would pin every save to 1.
+            set: { ...settings, configVersion: sql`${tenantAiConfigs.configVersion} + 1` },
+        });
 }
 
 /**
  * Read it back. Never returns a credential — the key lives in encrypted secrets
  * and is surfaced by its own field, so this endpoint has nothing to leak.
  *
- * No row reads the same as an unconfigured one. The switch's default lives in
- * the column definition; repeating a different one here would make the value a
- * workspace sees depend on which of two places answered.
+ * No row reads the same as an unconfigured one — and since these fields moved
+ * to a table of their own, NO ROW IS THE ORDINARY CASE. It used to be the rare
+ * one: `tenant_configs` had a row for every workspace long before anyone opened
+ * this page, so the fallbacks below were a formality. Here the row appears on
+ * first save and not before, so every workspace that has never configured AI
+ * takes this path, and these defaults are what it sees.
+ *
+ * They are kept identical to the column defaults on purpose. Repeating a
+ * DIFFERENT one would make the value a workspace sees depend on which of two
+ * places answered — and now that the no-row path is the common one, the two
+ * would disagree for almost everybody rather than almost nobody.
  */
 export async function readAiConfig(db: Db, tenantId: string): Promise<AiConfigInput> {
     const row = await db
         .select({
-            aiEnabled: tenantConfigs.aiEnabled,
-            aiBaseUrl: tenantConfigs.aiBaseUrl,
-            aiModel: tenantConfigs.aiModel,
+            aiEnabled: tenantAiConfigs.isEnabled,
+            aiBaseUrl: tenantAiConfigs.baseUrl,
+            aiModel: tenantAiConfigs.model,
+            courtesyTranslationEnabled: tenantAiConfigs.isCourtesyTranslationEnabled,
         })
-        .from(tenantConfigs)
-        .where(eq(tenantConfigs.tenantId, tenantId))
+        .from(tenantAiConfigs)
+        .where(eq(tenantAiConfigs.tenantId, tenantId))
         .get();
     return {
         aiEnabled: row?.aiEnabled ?? true,
         aiBaseUrl: row?.aiBaseUrl ?? '',
         aiModel: row?.aiModel ?? '',
+        // FALSE with no row, matching the column default. A workspace that has
+        // never opened this page has not opted into per-publish spend.
+        courtesyTranslationEnabled: row?.courtesyTranslationEnabled ?? false,
     };
 }
 

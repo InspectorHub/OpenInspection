@@ -197,7 +197,7 @@ export async function deliverTemplatedEmail(
             // exactOptionalPropertyTypes distinguishes "absent" from "present
             // and undefined", and absent is what an unclassified send means.
             const classId = automationClassId(automation);
-            let delivered = false;
+            let delivered: boolean;
             try {
                 ({ delivered } = await emailSvc.sendEmail(
                     [a.to], a.subject, a.html, undefined, classId ? { classId } : {},

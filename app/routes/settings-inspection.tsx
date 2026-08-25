@@ -28,7 +28,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         const body = res.ok ? ((await res.json()) as { data?: TagRow[] }) : { data: [] };
         tags = body.data ?? [];
     } catch {
-        tags = [];
+        // Leave it empty: a tags outage must not take the page down.
     }
     // IA-36 ⑥ — the blast radius of the bulk-expiry action, resolved before the
     // operator can press it. Its own try//catch: a tags outage must not take the

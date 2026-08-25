@@ -159,7 +159,24 @@ export class InvoiceService {
         lineItems: Array<{ description: string; amountCents: number }>;
         dueDate?: string | null | undefined;
         notes?: string | null | undefined;
-    }) {
+    },
+    /**
+     * Where to put the `invoice.created` automation trigger, which must outlive
+     * the response without being dropped.
+     *
+     * ⚠️ Omitting it AWAITS the trigger. That is the fail-safe direction and it
+     * is deliberate: the previous code dangled the promise, and on Workers an
+     * async task not registered with `executionCtx.waitUntil` is not guaranteed
+     * to run once the response is returned. `fireAutomation` already carries
+     * that lesson in its own header — the same mistake cost report.published,
+     * inspection.confirmed, inspection.cancelled and inspection.created their
+     * `automation_logs` rows until it was fixed there. A default that trades
+     * correctness for latency would reintroduce it by omission.
+     *
+     * A route handler should pass one, built on `fireAndForget(c, …)`.
+     */
+    onBackground?: (work: Promise<unknown>) => void,
+    ) {
         const db = this.getDrizzle();
         // Phase B — snapshot the tenant's currency onto the invoice so history stays
         // self-describing across a later tenant currency change. Default USD.
@@ -208,10 +225,12 @@ export class InvoiceService {
                 amountPaidCents = fresh?.amountPaidCents ?? 0;
                 partialPaidAt = fresh?.partialPaidAt ?? null;
             }
-            new AutomationService(this.db)
+            const automation = new AutomationService(this.db)
                 .trigger({ tenantId, inspectionId: data.inspectionId, triggerEvent: 'invoice.created',
                     companyName: await resolveAutomationCompanyName(drizzle(this.db), tenantId), reportBaseUrl: '' })
                 .catch(err => logger.error('automation trigger failed', { event: 'invoice.created' }, err instanceof Error ? err : undefined));
+            if (onBackground) onBackground(automation);
+            else await automation;
         }
         // `status` stays 'draft': a deposit does not send an invoice. The two
         // payment figures are returned because the hand-built `row` above does

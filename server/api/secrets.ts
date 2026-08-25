@@ -15,7 +15,8 @@ import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { createApiRouter } from '../lib/openapi-router';
 import { eq } from 'drizzle-orm';
-import { tenantConfigs } from '../lib/db/schema';
+import type { BatchItem } from 'drizzle-orm/batch';
+import { tenantConfigs, tenantAiAttestations } from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
 import { sealSecrets, openSecrets, maskSecret, isMasked } from '../lib/config-crypto';
@@ -288,39 +289,59 @@ export async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: SecretsSa
     const record = keyPresentAfterSave && isAiKeyAttested(attestation)
         ? buildAiKeyAttestationRecord(new Date())
         : null;
-    const attestationColumns = record
-        ? {
-            aiKeyAttestationProvider: record.provider,
-            aiKeyAttestationMode: record.mode,
-            aiKeyAttestationAccountOwner: record.accountOwner,
-            aiKeyAttestationTermsVersion: record.termsVersion,
-            aiKeyAttestationAttestedAt: record.attestedAt,
-            aiKeyAttestationPolicyVersion: record.policyVersion,
-        }
+    //    Record and key now live in different tables, so "the same write" is a
+    //    `db.batch()` -- D1's only atomic primitive. Two awaited statements
+    //    would reopen the exact window above: a key with no record behind it,
+    //    or a withdrawal that dropped the record and left the key.
+    //
+    //    Three shapes of statement where there were three shapes of column
+    //    list. The middle one is worth naming: "key present, no confirmation in
+    //    this save" emits NO statement, which is what leaves an existing record
+    //    alone -- previously an empty spread, and the two agree only because
+    //    neither writes.
+    const attestationStatement = record
+        ? db.insert(tenantAiAttestations)
+            .values({
+                tenantId,
+                provider: record.provider,
+                mode: record.mode,
+                accountOwner: record.accountOwner,
+                termsVersion: record.termsVersion,
+                attestedAt: record.attestedAt,
+                policyVersion: record.policyVersion,
+            })
+            .onConflictDoUpdate({
+                target: tenantAiAttestations.tenantId,
+                set: {
+                    provider: record.provider,
+                    mode: record.mode,
+                    accountOwner: record.accountOwner,
+                    termsVersion: record.termsVersion,
+                    attestedAt: record.attestedAt,
+                    policyVersion: record.policyVersion,
+                },
+            })
         : keyPresentAfterSave
-            ? {}
-            : {
-                aiKeyAttestationProvider: null,
-                aiKeyAttestationMode: null,
-                aiKeyAttestationAccountOwner: null,
-                aiKeyAttestationTermsVersion: null,
-                aiKeyAttestationAttestedAt: null,
-                aiKeyAttestationPolicyVersion: null,
-            };
+            ? null
+            // No key after this save withdraws the attestation, and DELETE is
+            // how that is spelled now. As six nullable columns it was six
+            // explicit nulls; the row's absence says the same thing without
+            // needing every reader to check that all six agree.
+            : db.delete(tenantAiAttestations).where(eq(tenantAiAttestations.tenantId, tenantId));
 
-    if (row) {
-        await db.update(tenantConfigs)
-            .set({ secretsEnc: encrypted, dekEnc, updatedAt: new Date(), ...attestationColumns })
-            .where(eq(tenantConfigs.tenantId, tenantId));
-    } else {
-        await db.insert(tenantConfigs).values({
+    const secretsStatement = row
+        ? db.update(tenantConfigs)
+            .set({ secretsEnc: encrypted, dekEnc, updatedAt: new Date() })
+            .where(eq(tenantConfigs.tenantId, tenantId))
+        : db.insert(tenantConfigs).values({
             tenantId,
             secretsEnc: encrypted,
             dekEnc,
             updatedAt: new Date(),
-            ...attestationColumns,
         });
-    }
+
+    const statements = attestationStatement ? [secretsStatement, attestationStatement] : [secretsStatement];
+    await db.batch(statements as unknown as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 
     // A-16 — drop the cached encrypted blob so the next request re-reads D1.
     await c.env.TENANT_CACHE?.delete(secretsCacheKey(tenantId)).catch(() => {});

@@ -36,6 +36,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { smsPublicRoutes } from '../../../server/api/sms';
 import { SmsConsentService } from '../../../server/services/sms-consent.service';
 import { signParams } from '../../../server/lib/sms/send-sms';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '00000000-0000-0000-0000-0000000000a1';
 const OTHER_TENANT = '00000000-0000-0000-0000-0000000000a2';
@@ -51,8 +52,12 @@ const FAKE_ENV = {
     TENANT_CACHE: { get: async () => null, put: async () => {} },
 } as unknown as HonoConfig['Bindings'];
 
-const execCtx = () =>
-    ({ waitUntil: () => {}, passThroughOnException: () => {} }) as unknown as ExecutionContext;
+/** One context for the file, not one per call. `makeExecutionContext` registers
+ *  the teardown that settles background work, and `afterEach` is only
+ *  registrable while a suite is being COLLECTED -- building a fresh context
+ *  inside a test would silently settle nothing. */
+const EXEC_CTX = makeExecutionContext().ctx;
+const execCtx = () => EXEC_CTX;
 
 let db: BetterSQLite3Database<typeof schema>;
 let sqlite: { close: () => void };

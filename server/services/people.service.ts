@@ -226,6 +226,11 @@ export class PeopleService extends RoleProfileAdminService {
     async getPrimaryClient(tenantId: string, inspectionId: string) {
         const row = await this.db.select({
             contactId: contacts.id, name: contacts.name, email: contacts.email, phone: contacts.phone,
+            // #23 — the client's preferred language, so a publish surface can
+            // NUDGE rather than decide. Projected on this read instead of a
+            // second one: two reads of the same row are two answers to who the
+            // primary client is.
+            locale: contacts.locale,
         }).from(inspectionPeople)
             .innerJoin(contactRoleProfiles, eq(inspectionPeople.roleProfileId, contactRoleProfiles.id))
             .innerJoin(contacts, eq(inspectionPeople.contactId, contacts.id))

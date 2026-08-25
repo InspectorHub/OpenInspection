@@ -296,3 +296,70 @@ describe('resolveAi — which endpoint and model each path gets', () => {
         return expect(r.provider.complete({ prompt: 'x' })).rejects.toThrow(/no AI model is configured/i);
     });
 });
+
+describe('resolveAi — a managed credential that refreshes itself', () => {
+    /**
+     * The deployment's own AI credential is no longer necessarily a string.
+     * Some backends issue only short-lived tokens, so the credential became a
+     * thing that can produce one. Every rule around it — who is entitled, what
+     * meters where, what happens when it is absent — is unchanged, and these
+     * pin that the new shape did not quietly move any of them.
+     */
+    const tokenSource = {
+        providerId: 'vertex-ai',
+        getAccessToken: () => Promise.resolve('tok'),
+    };
+    const base = {
+        model: 'a-model',
+        aiEnabled: true,
+        defaultBaseUrl: 'https://example-region-aiplatform.googleapis.test/v1/projects/p/locations/example-region/endpoints/openapi',
+        tenantKey: null,
+        managedEntitled: true,
+        underCap: true,
+    };
+
+    it('resolves the managed source on a self-refreshing credential', () => {
+        const r = resolveAi({ ...base, profile: SAAS_PROFILE, managedKey: tokenSource });
+        expect(isRefusal(r)).toBe(false);
+        expect(isRefusal(r) ? null : r.source).toBe('managed');
+    });
+
+    it('records the backend the credential declares, not a prefix of the model id', () => {
+        // `ai_call_provenance.provider` must name what actually ran. Derived
+        // from the model string it would follow how that string is spelled, so
+        // re-spelling a model id would relabel every row written after it.
+        const r = resolveAi({
+            ...base,
+            profile: SAAS_PROFILE,
+            managedKey: tokenSource,
+            model: 'google/gemini-x',
+        });
+        if (isRefusal(r)) throw new Error('unexpected refusal');
+        expect(r.provider.id).toBe('vertex-ai');
+    });
+
+    it('still refuses on a self-hosted profile, credential or not', () => {
+        // The check that protects self-hosted deployments runs before any
+        // credential is looked at, and a new KIND of credential must not have
+        // created a way around it.
+        const r = resolveAi({ ...base, profile: STANDALONE_PROFILE, managedKey: tokenSource });
+        expect(isRefusal(r) && r.refused).toBe(AI_REFUSAL_REASON.UNAVAILABLE_HERE);
+    });
+
+    it('still refuses when no credential of either shape is configured', () => {
+        const r = resolveAi({ ...base, profile: SAAS_PROFILE, managedKey: null });
+        expect(isRefusal(r) && r.refused).toBe(AI_REFUSAL_REASON.PLATFORM_KEY_MISSING);
+    });
+
+    it('buckets a self-refreshing credential as managed for the provisioning read', () => {
+        // The console and the runtime must not disagree about whether this
+        // deployment funds anything.
+        expect(resolveRuntimeAiSource({
+            profile: SAAS_PROFILE,
+            tenantKey: null,
+            managedKey: tokenSource,
+            model: 'a-model',
+            plan: { tier: 'pro', status: 'active' },
+        })).toBe('managed');
+    });
+});

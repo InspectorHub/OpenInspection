@@ -30,6 +30,15 @@ export interface ReportRow {
     hasNarrative: boolean;
     canDelete: boolean;
     deleteBlockedReason: "primary" | "published" | null;
+    /**
+     * #23 — the courtesy translation's state for this deliverable.
+     *
+     * `withheld` is the one that matters and the one that was completely
+     * silent: a report edited and republished stops showing its translation by
+     * design, nobody was told, and the first signal was a client asking where
+     * the Spanish went. Absent while the state has not been read yet.
+     */
+    translationState?: "none" | "live" | "withheld";
 }
 
 /**
@@ -50,10 +59,18 @@ export function ReportsCard({
     reports,
     canManage,
     formatDate,
+    translationEnabled = false,
 }: {
     reports: ReportRow[];
     canManage: boolean;
     formatDate: (iso: string) => string;
+    /**
+     * #23 — whether this workspace may PRODUCE a translation.
+     *
+     * Gates REGENERATE only. Removal stays offered while it is off, because
+     * cleaning up after switching the feature off is exactly when it is needed.
+     */
+    translationEnabled?: boolean;
     /**
      * #69 — where to read what clients asked for after these reports went out,
      * or null while the order is unpublished.
@@ -67,6 +84,10 @@ export function ReportsCard({
     // #106 — deleting a report is irreversible; it goes through the guard.
     const { fetcher: deleteFetcher, submit, busy } = useGuardedSubmit<typeof action>();
     const [deleting, setDeleting] = useState<ReportRow | null>(null);
+    // Both translation actions cost or destroy, so both confirm — a custom
+    // modal, never window.confirm.
+    const [regenerating, setRegenerating] = useState<ReportRow | null>(null);
+    const [removingTranslation, setRemovingTranslation] = useState<ReportRow | null>(null);
 
     const done = deleteFetcher.state === "idle" ? deleteFetcher.data : undefined;
     const error = done && "ok" in done && !done.ok && done.intent === "report-delete"
@@ -101,6 +122,14 @@ export function ReportsCard({
                                                 : m.inspections_hub_reports_status_in_progress()}
                                         </Pill>
                                     </span>
+                                    <TranslationState
+                                        report={report}
+                                        translationEnabled={translationEnabled}
+                                        canManage={canManage}
+                                        busy={busy}
+                                        onRegenerate={() => setRegenerating(report)}
+                                        onRemove={() => setRemovingTranslation(report)}
+                                    />
                                     <span className="mt-0.5 block text-[11px] text-ih-fg-3">
                                         {published && m.inspections_hub_reports_published_on({ date: formatDate(published) })}
                                         {published && report.versionCount > 0 && " · "}
@@ -138,6 +167,46 @@ export function ReportsCard({
             {/* Names the report AND what is destroyed with it. A report is not a
                 row: it carries the content somebody filled in and its own
                 editing history, and none of it comes back. */}
+            {/* Spends money on the workspace's own provider. Says so.
+                ⚠️ `confirmLabel` is NOT optional here in practice: ConfirmDialog
+                defaults it to "Delete", which on a regenerate dialog tells the
+                inspector the opposite of what the button does. Caught in the
+                browser, not by a test — every assertion about this dialog was
+                about its title and body. */}
+            <ConfirmDialog
+                open={!!regenerating}
+                title={m.courtesy_translation_regenerate_confirm_title()}
+                message={m.courtesy_translation_regenerate_confirm_body()}
+                confirmLabel={m.courtesy_translation_regenerate()}
+                tone="default"
+                busy={busy}
+                onCancel={() => setRegenerating(null)}
+                onConfirm={() => {
+                    if (!regenerating) return;
+                    if (submit(
+                        { intent: "report-translation", action: "regenerate", reportId: regenerating.id },
+                        { method: "post" },
+                    )) setRegenerating(null);
+                }}
+            />
+
+            {/* Takes something away from everyone holding a link. Says so. */}
+            <ConfirmDialog
+                open={!!removingTranslation}
+                title={m.courtesy_translation_remove_confirm_title()}
+                message={m.courtesy_translation_remove_confirm_body()}
+                confirmLabel={m.courtesy_translation_remove()}
+                busy={busy}
+                onCancel={() => setRemovingTranslation(null)}
+                onConfirm={() => {
+                    if (!removingTranslation) return;
+                    if (submit(
+                        { intent: "report-translation", action: "remove", reportId: removingTranslation.id },
+                        { method: "post" },
+                    )) setRemovingTranslation(null);
+                }}
+            />
+
             <ConfirmDialog
                 open={!!deleting}
                 title={m.inspections_hub_reports_delete_title()}
@@ -165,4 +234,73 @@ function blockedReason(report: ReportRow): string | null {
     if (report.deleteBlockedReason === "primary") return m.inspections_hub_reports_blocked_primary();
     if (report.deleteBlockedReason === "published") return m.inspections_hub_reports_blocked_published();
     return null;
+}
+
+/**
+ * The translation state for one deliverable, and the two actions on it.
+ *
+ * Renders NOTHING when there is no state to show and nothing to offer — an
+ * unpublished report with no translation and a workspace with the feature off
+ * has no business carrying a row of disabled controls.
+ *
+ * The withheld state NAMES THE REPAIR rather than only the fact. "Withheld" on
+ * its own tells an inspector something is wrong and not what to do about it,
+ * and the thing to do is one button away.
+ */
+function TranslationState({
+    report,
+    translationEnabled,
+    canManage,
+    busy,
+    onRegenerate,
+    onRemove,
+}: {
+    report: ReportRow;
+    translationEnabled: boolean;
+    canManage: boolean;
+    busy: boolean;
+    onRegenerate: () => void;
+    onRemove: () => void;
+}) {
+    const state = report.translationState;
+    if (!state) return null;
+    if (state === "none" && !translationEnabled) return null;
+
+    return (
+        <span className="mt-1 flex items-center gap-2 flex-wrap" data-testid="hub-report-translation">
+            <Pill tone={state === "live" ? "sat" : state === "withheld" ? "monitor" : "neutral"}>
+                {state === "live"
+                    ? m.courtesy_translation_state_live()
+                    : state === "withheld"
+                        ? m.courtesy_translation_state_withheld()
+                        : m.courtesy_translation_state_none()}
+            </Pill>
+            {state === "withheld" && (
+                <span className="text-[11px] text-ih-fg-3">
+                    {m.courtesy_translation_state_withheld_why()}
+                </span>
+            )}
+            {canManage && translationEnabled && (
+                <button
+                    type="button"
+                    onClick={onRegenerate}
+                    disabled={busy}
+                    className="text-[12px] font-bold text-ih-fg-3 enabled:hover:text-ih-fg-1 enabled:hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                    {m.courtesy_translation_regenerate()}
+                </button>
+            )}
+            {/* Offered even when production is switched off — see the prop. */}
+            {canManage && state !== "none" && (
+                <button
+                    type="button"
+                    onClick={onRemove}
+                    disabled={busy}
+                    className="text-[12px] font-bold text-ih-fg-3 enabled:hover:text-ih-bad-fg enabled:hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                    {m.courtesy_translation_remove()}
+                </button>
+            )}
+        </span>
+    );
 }

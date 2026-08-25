@@ -97,7 +97,7 @@ function templateBundle(): MigrationBundleV1 {
             warnings: [],
         },
         templates: [{
-            name: 'AHIT Master',
+            name: 'Whole House Checklist',
             schema: {
                 schemaVersion: 2,
                 sections: [
@@ -358,7 +358,7 @@ describe('MigrationReportService', () => {
             tenantId: TENANT, batchId: staged.batchId, seatQuotaEnforced: false,
         });
         expect(r.entityKind).toBe('template');
-        expect(r.structure?.name).toBe('AHIT Master');
+        expect(r.structure?.name).toBe('Whole House Checklist');
         expect(r.structure?.sections.map((sec) => sec.title)).toEqual(['Roof', 'Attic']);
         expect(r.structure?.sections[0]?.items.map((i) => i.landedAs))
             .toEqual(['rated', 'plain']);

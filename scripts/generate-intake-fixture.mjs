@@ -173,6 +173,23 @@ const SPECTORA_CASES = {
       [MADE_UP.parents[0], MADE_UP.children[0], '', MADE_UP.entryText, 'info'],
     ], { sparse: true }),
   }),
+  // U+00A0 where an ordinary space belongs, including on an end. Placed in the
+  // text column and nowhere else, which is where it was observed and — more to
+  // the point — is what makes it harmless: a non-breaking space in a column the
+  // reader GROUPS by would split one parent into two that look identical.
+  //
+  // Written as an escape rather than a literal on purpose. A raw U+00A0 in this
+  // file is invisible to every reviewer of it, so the one place it is allowed to
+  // be invisible is inside the file being generated, never inside the generator.
+  'non-breaking-space-in-text': (schema) => zipOf({
+    'xl/worksheets/sheet1.xml': worksheet([
+      schema.sheet.headings,
+      [
+        MADE_UP.parents[0], MADE_UP.children[0], MADE_UP.entryNames[0],
+        ` ${MADE_UP.entryText} with gaps `, 'info',
+      ],
+    ]),
+  }),
 };
 
 // ── the serialised-object format ────────────────────────────────────────────
@@ -235,6 +252,27 @@ const HIP_CASES = {
   }),
   'empty-template': (schema) => zipOf({
     [schema.structure.entry]: javaDocument(schema.structure, { vocabulary: [], sections: [] }),
+  }),
+  // A property supplied as a back-reference instead of a value.
+  //
+  // ⚠️ What this fixture asserts is that the reader reports ABSENT, not that it
+  // resolves the reference. The target here is deliberately the same shape as
+  // the observed one: an id on a property element, so the "value" is the result
+  // of READING another property rather than anything stored. Resolving it would
+  // mean executing the object graph, and this reader never executes anything.
+  //
+  // So the honest reading of a fixture that produces "absent" is: the file did
+  // say something, and this reader has no value for it. That is a third state
+  // beside present-and-true and never-mentioned, and it is why the case exists.
+  'object-reference-instead-of-value': (schema) => zipOf({
+    [schema.structure.entry]: javaDocument(schema.structure, { ratingsShown: null })
+      .replace(
+        '<void property="savedTabbedPanes">',
+        '<void id="Ref0" property="autoscrolls"/>'
+        + `<void property="${schema.structure.ratingsShownProperty}">`
+        + '<object idref="Ref0"/></void>'
+        + '<void property="savedTabbedPanes">',
+      ),
   }),
 };
 

@@ -54,6 +54,7 @@ import { AppError } from '../../../server/lib/errors';
 // eslint-disable-next-line import/order
 import type { HonoConfig } from '../../../server/types/hono';
 import { asD1Db } from '../helpers/test-db';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '00000000-0000-0000-0000-0000000000d1';
 const INSPECTION = 'insp-0000-0000-0000-000000000d01';
@@ -65,7 +66,9 @@ const ENV = {
     STRIPE_SECRET_KEY: 'sk_test_1',
     STRIPE_PUBLISHABLE_KEY: 'pk_test_1',
 } as never;
-const CTX = { waitUntil: (p: Promise<unknown>) => void p, passThroughOnException: () => {} } as never;
+// `void p` did not even attach a catch, so a rejecting background promise was
+// an unhandled rejection outright. The helper settles both at teardown.
+const CTX = makeExecutionContext().ctx as never;
 
 /** The mounted shape: tenant resolved by path-param routing, then the guard. */
 function buildApp() {

@@ -33,6 +33,7 @@ import { InvoiceService } from '../../../server/services/invoice.service';
 import { idempotencyMiddleware } from '../../../server/lib/middleware/idempotency';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const OTHER_TENANT = '00000000-0000-0000-0000-000000000002';
@@ -73,7 +74,9 @@ function buildApp(tenantId = TENANT) {
 // QBO_CLIENT_ID present, so the push the handler schedules is live and a
 // duplicate would be observable rather than compiled out.
 const ENV = { DB: {}, QBO_CLIENT_ID: 'qbo-test-client' } as never;
-const CTX = { waitUntil: (p: Promise<unknown>) => void p, passThroughOnException: () => {} } as never;
+// `void p` did not even attach a catch, so a rejecting background promise was
+// an unhandled rejection outright. The helper settles both at teardown.
+const CTX = makeExecutionContext().ctx as never;
 
 const BODY = {
     inspectionId: null,

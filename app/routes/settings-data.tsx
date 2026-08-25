@@ -53,20 +53,36 @@ export default function SettingsData() {
           <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_data_export_heading()}</h3>
           <p className="text-[12px] text-ih-fg-3 mt-1">{m.settings_data_export_subtitle()}</p>
         </div>
+        {/* One route per file. These used to be `/api/admin/export?format=csv
+            &type=…`, which reads NEITHER parameter — so all three buttons
+            returned the same whole-tenant JSON blob under three labels, and
+            the CSV routes that do produce those files had no consumer here at
+            all. The full-JSON link below is the one that genuinely belongs to
+            the admin route, and it keeps its parameter. */}
         <div className="flex gap-3 flex-wrap">
           <a
-            href="/api/admin/export?format=csv&type=inspections"
+            href="/api/data/export/inspections"
+            download
             className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors inline-flex items-center gap-2"
           >
             <DownloadIcon />
             {m.settings_data_export_inspections_csv()}
           </a>
           <a
-            href="/api/admin/export?format=csv&type=contacts"
+            href="/api/data/export/contacts"
+            download
             className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors inline-flex items-center gap-2"
           >
             <DownloadIcon />
             {m.settings_data_export_contacts_csv()}
+          </a>
+          <a
+            href="/api/data/export/members"
+            download
+            className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors inline-flex items-center gap-2"
+          >
+            <DownloadIcon />
+            {m.settings_data_export_members_csv()}
           </a>
           <a
             href="/api/admin/export?format=json"

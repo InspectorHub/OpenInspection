@@ -15,6 +15,13 @@ renderers — which is what was done here.
 hard-wired vendor endpoint was replaced by one configurable OpenAI-compatible
 adapter.
 
+**Sections 2c and "Which key it is" updated 2026-08-24**, when a
+deployment-provided credential gained a second shape — one that refreshes
+itself, for a backend authenticating with short-lived tokens — and the
+configured endpoint became capable of naming a processing region. Neither
+change alters what is sent: the request body in section 2 and the prompt tables
+in section 3 are untouched.
+
 **Section 3 completed 2026-08-23.** It had claimed four prompts and there were
 five: `translate-report-segments.v1` shipped and was never listed here, so for
 that feature this page — and the sentence in `CLAUDE.md` pointing at it — were
@@ -133,6 +140,33 @@ This is a statement about what the software makes possible, not a guarantee
 about any particular deployment: this repository ships the client, and it cannot
 observe where an operator pointed it.
 
+### 2c. The endpoint may encode a processing region
+
+Some backends publish their OpenAI-compatible root with a **region in the URL
+itself** — the host, the path, or both naming the location that serves the
+request. Where a deployment is configured against such a backend, `AI_BASE_URL`
+is the place where "where is inspection text processed" is written down, and it
+is the only place: no region is compiled in, none is composed in code, and
+nothing else in this repository records one. **E2.**
+
+(Not to be confused with section 6, which is about a different question
+entirely — which service tier a credential is on, and which users it may
+therefore serve. That one is a property of an account, not of an address.)
+
+Two consequences, stated rather than left to be inferred:
+
+- **Answering the question requires reading this deployment's configuration.**
+  Neither the code nor this page can answer it — the same limitation section 2
+  already states about the destination as a whole, of which the region is part.
+- **Changing `AI_BASE_URL` can move the processing location** with no code
+  change and with nothing in this repository noticing. A deployment that has
+  told anyone where its inspection text is processed has made a statement about
+  a configuration value, not about this software, and it stops being true the
+  moment that value changes.
+
+⚠️ **Not verified against any running deployment.** This describes what the
+configuration means, not what any deployment is set to.
+
 ### Which key it is
 
 Credentials are resolved per call by `server/lib/ai/resolve-provider.ts`
@@ -145,6 +179,24 @@ Credentials are resolved per call by `server/lib/ai/resolve-provider.ts`
   feature OFF rather than raising a credential error mid-report.
 - A self-hosted deployment has no managed path at all — the workspace's own key
   or nothing.
+
+A deployment-provided credential comes in **two shapes**, and which one is in
+use changes nothing about what is sent, only about how the request is
+authenticated (**E2**):
+
+- a **long-lived key** (`AI_MANAGED_API_KEY`), spent as it stands; or
+- a **service account** (`AI_VERTEX_SERVICE_ACCOUNT`), for a backend that
+  issues only short-lived access tokens. A signed assertion is exchanged for a
+  token, which is held in the worker isolate until shortly before it expires
+  and **is not written to any durable store**. The private key is used to sign
+  and never leaves the process; neither it, the assertion, nor the token is
+  logged or included in any error message.
+
+A workspace never supplies a credential of the second shape — that is
+deployment configuration. **A deployment credential that is missing or
+unusable resolves the feature OFF**, rather than raising an error partway
+through a report, and the refusal is reported as the deployment's to fix and
+never as a question about the workspace's own key.
 
 The two paths are metered apart (`ai_*` versus `ai_*_byo`) so the volume a
 deployment funds is never confused with the volume a workspace funds.

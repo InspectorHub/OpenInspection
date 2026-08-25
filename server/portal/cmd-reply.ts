@@ -9,16 +9,22 @@
  */
 import { logger } from '../lib/logger';
 import type { CmdEnvelope } from '../lib/sync-events/cmd-envelope';
-import type { SyncEnvelope } from '../lib/sync-events/envelope';
+import type { CmdReplyEventType, SyncEnvelope } from '../lib/sync-events/envelope';
 import { OutboxService, type OutboxRow } from './outbox.service';
 
 /** Map a command type to its reply event type (null = command never replies —
  *  quota/seed carry no replyto today and would just be ignored).
  *
- * @declarationEmit Exported so the emitted `.d.ts` can NAME it: it is
- * `replyTypeFor`'s return type, and nothing imports it. */
-export type CmdReplyType = 'reply.tenant.updated' | 'reply.tenant.export_completed' | 'reply.tenant.purged'
-    | 'reply.subject.exported' | 'reply.subject.erased' | 'reply.report.corrected';
+ * An ALIAS now, not a second list. It used to spell out the six reply names, and
+ * the outbox service spelled them out again; keeping the two in step was left to
+ * a comment, and a reply that reached only one of them compiled on the emitting
+ * side while being unassignable on the other. Both now derive from the seam
+ * registry, so registering a reply in `SCHEMAS` is the single act that makes it
+ * nameable here.
+ *
+ * @declarationEmit Kept as a named export so the emitted `.d.ts` can NAME it: it
+ * is `replyTypeFor`'s return type, and nothing imports it. */
+export type CmdReplyType = CmdReplyEventType;
 
 export function replyTypeFor(cmdType: string): CmdReplyType | null {
     switch (cmdType) {
@@ -37,6 +43,17 @@ export function replyTypeFor(cmdType: string): CmdReplyType | null {
         // merely leave a request waiting, an absent reply here is also the
         // signal for the third ending — see `apply-report-correction.ts`.
         case 'io.inspectorhub.cmd.report.correct': return 'reply.report.corrected';
+        // The operator's three answers to a waiting import run. THREE replies
+        // and not one with an outcome: these are three different commands a
+        // person chose between, not one request with several endings — and
+        // `acknowledged` is not an ending at all, since the run stays waiting
+        // and its deadline keeps running. Like the DSAR replies these wake
+        // nothing: the correlation handle (`import:<batchId>`) names a durable
+        // row on the other side, not a parked Workflow, so there is no
+        // waitForEvent timeout behind them and no RPC fallback.
+        case 'io.inspectorhub.cmd.migration.deliver': return 'reply.migration.delivered';
+        case 'io.inspectorhub.cmd.migration.decline': return 'reply.migration.declined';
+        case 'io.inspectorhub.cmd.migration.acknowledge': return 'reply.migration.acknowledged';
         default: return null;
     }
 }

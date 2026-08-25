@@ -6,6 +6,7 @@ import { UnitService } from '../../services/unit.service';
 import { UnitSwitchService } from '../../services/unit-switch.service';
 import { ReportVersionService } from '../../services/report-version.service';
 import { buildTenantAiService } from '../ai/build-ai-service';
+import { resolveManagedAiCredential } from '../ai/managed-credential';
 import { AuthService } from '../../services/auth.service';
 import { OutboxService } from '../../portal/outbox.service';
 import { publishRow } from '../../portal/outbox.service';
@@ -39,6 +40,7 @@ import { InspectionTypeService } from '../../services/inspection-type.service';
 import { TotpService } from '../../services/totp.service';
 import { TemplateSeedService } from '../../services/template-seed.service';
 import { ReportPdfService } from '../../services/report-pdf.service';
+import { ReportTranslationService } from '../../services/report-translation.service';
 import { ReportExportService } from '../../services/report-export.service';
 import { SigningKeyService } from '../../services/signing-key.service';
 import { AuditLogService } from '../../services/audit-log.service';
@@ -173,7 +175,11 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         profile: c.var.profile,
                         tenantId,
                         tenantKey: emailCfg.dbSecrets.geminiApiKey || null,
-                        managedKey: c.env.AI_MANAGED_API_KEY ?? null,
+                        // Resolved through the shared answer rather than read
+                        // straight from env: the provisioning read asks the
+                        // same question, and a deployment configured one way
+                        // and read the other way makes that console wrong.
+                        managedKey: resolveManagedAiCredential(c.env),
                         // No default: an unset AI_MODEL fails closed at the service.
                         model: c.env.AI_MODEL ?? '',
                         plan: tenantPlan,
@@ -330,6 +336,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'reportPdf':
                     target.reportPdf = new ReportPdfService(c.env.DB, c.env.BROWSER, c.env.PHOTOS);
+                    break;
+                case 'reportTranslation':
+                    target.reportTranslation = new ReportTranslationService(c.env.DB);
                     break;
                 case 'reportExport':
                     // Commercial PCA Phase W Task 4 — .docx export status row + R2

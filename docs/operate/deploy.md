@@ -95,7 +95,7 @@ The Worker entry at `workers/app.ts` is a Hono app. It routes API-owned paths (`
 
 ```bash
 npm run dev:hmr      # Vite dev server with HMR (react-router dev, port 5173) — fast iteration
-npm run dev          # build-based: react-router build + wrangler dev (one worker, port 8788)
+npm run dev          # build-based: react-router build + wrangler dev (one worker, port 8787)
 ```
 
 `npm run dev:hmr` is the everyday loop: instant hot updates for `app/` edits, and `server/` changes load through the worker entry's lazy API import. `npm run dev` is build-based (no HMR) and runs the real bundled worker on workerd — use it to verify production-shape behavior. Apply local D1 migrations first with `npm run db:migrate`. Note for contributors touching `workers/app.ts`: the entry must keep its top-level import graph tiny (the API is dynamically imported) — a static server import breaks the Vite dev runtime's export-type evaluation.

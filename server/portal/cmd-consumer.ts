@@ -209,7 +209,18 @@ export async function applyCmdEnvelope(
 function isSubjectCmd(cmdType: string): boolean {
     return cmdType === 'io.inspectorhub.cmd.subject.export'
         || cmdType === 'io.inspectorhub.cmd.subject.erase'
-        || cmdType === 'io.inspectorhub.cmd.report.correct';
+        || cmdType === 'io.inspectorhub.cmd.report.correct'
+        // The three `cmd.migration.*` commands, for the SAME reason and not the
+        // same safety argument. Reason: a delivery is not tenant-field state, so
+        // nothing about it is superseded by a seat-count change — left guarded,
+        // a quota sync that merely OVERTOOK it in the queue would drop it
+        // silently, with no reply, and the console would go on showing the run
+        // as waiting until its retention clock ran out. Safety: like
+        // `report.correct` and unlike the two subject commands, delivery is NOT
+        // idempotent — re-running one stages a second set of rows. What bounds
+        // it to at-most-once is `processed_cmd_events`, which is why the dedup
+        // insert comes first.
+        || cmdType.startsWith('io.inspectorhub.cmd.migration.');
 }
 
 /** Apply a known command. Returns the reply-payload EXTRAS for commands whose
@@ -352,6 +363,18 @@ async function applyKnownCmd(
             const { applyReportCorrection } = await import('./apply-report-correction');
             return applyReportCorrection(dbBinding, encryptionSecret, data,
                 env.replyto !== undefined ? { correctedBy: env.replyto } : {});
+        }
+        case 'io.inspectorhub.cmd.migration.deliver':
+        case 'io.inspectorhub.cmd.migration.decline':
+        case 'io.inspectorhub.cmd.migration.acknowledge': {
+            // The operator's three answers to an import run waiting on a person.
+            // One entry point for all three: they share a precondition, an actor
+            // and a reply family, and three cases here would be three places to
+            // forget one of those. Dynamically imported for the same reason the
+            // offboarding appliers are — a standalone deployment never reaches
+            // this line and should not carry the module.
+            const { applyMigrationCommand } = await import('./apply-migration-commands');
+            return applyMigrationCommand(dbBinding, env, emailEnv);
         }
         case 'io.inspectorhub.cmd.tenant.sync_quota': {
             const data = cmdSyncQuotaDataSchema.parse(env.data);

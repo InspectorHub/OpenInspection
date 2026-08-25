@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { join, relative, sep } from 'node:path';
 import { posture, type AiOutputClassification } from '../../../server/lib/ai/output-classification';
 import type { AiCredentialSource } from '../../../server/lib/ai/resolve-provider';
 import { PROVIDER_REJECTED_MESSAGE } from '../../../server/lib/ai/providers/openai-compatible';
@@ -29,6 +30,58 @@ const STATUS_LEAK = /\b40[0-9]\b|\b429\b|\b5[0-9][0-9]\b/;
 /** Every message `testAiConnection` can hand back, gathered by driving it
  *  through each failing status it distinguishes plus the transport throw. */
 const COLLECTED_TEST_MESSAGES: string[] = [];
+
+/**
+ * The adapter class names, DISCOVERED from the adapter directory rather than
+ * written down. A rule keyed on a name that someone wrote down is one rename
+ * away from matching nothing while still reporting a pass — which is exactly
+ * how the construction rule spent its life pointed at a deleted class.
+ */
+function adapterClassNames(): string[] {
+    const dir = join(ROOT, 'server/lib/ai/providers');
+    const names: string[] = [];
+    for (const file of readdirSync(dir)) {
+        if (!file.endsWith('.ts') || /\.(test|spec)\.ts$/.test(file)) continue;
+        const src = readFileSync(join(dir, file), 'utf8');
+        for (const m of src.matchAll(/^export\s+(?:abstract\s+)?class\s+([A-Za-z0-9_$]+)/gm)) {
+            names.push(m[1]);
+        }
+    }
+    return names;
+}
+
+/** Every non-spec source file under the trees a construction could hide in. */
+function sourceFiles(): string[] {
+    const out: string[] = [];
+    const skip = new Set(['node_modules', 'dist', 'build', '.types', '.react-router']);
+    for (const root of ['server', 'app', 'packages', 'workers']) {
+        const stack = [join(ROOT, root)];
+        while (stack.length) {
+            const dir = stack.pop()!;
+            for (const name of readdirSync(dir)) {
+                if (skip.has(name)) continue;
+                const full = join(dir, name);
+                if (statSync(full).isDirectory()) { stack.push(full); continue; }
+                if (!/\.tsx?$/.test(name) || /\.(test|spec)\.tsx?$/.test(name)) continue;
+                // The adapters themselves are where an adapter legitimately
+                // knows its own shape; a wrapper adapter may construct one.
+                const rel = relative(ROOT, full).split(sep).join('/');
+                if (rel.startsWith('server/lib/ai/providers/')) continue;
+                out.push(rel);
+            }
+        }
+    }
+    return out;
+}
+
+function runGate(...args: string[]) {
+    const res = spawnSync(
+        process.execPath,
+        [join(ROOT, 'scripts/check-ai-classification.mjs'), ...args],
+        { cwd: ROOT, encoding: 'utf8' },
+    );
+    return { status: res.status, output: `${res.stdout ?? ''}${res.stderr ?? ''}` };
+}
 
 describe('AI invariants that no refactor may quietly remove', () => {
     beforeAll(async () => {
@@ -132,11 +185,54 @@ describe('AI invariants that no refactor may quietly remove', () => {
         }
     });
 
-    it('the resolver is the only module that constructs an adapter', () => {
-        // The seam Task 6 exists to create. A service that built its own would
-        // be a second answer to which backend an inspector's text reaches, and
-        // the first symptom would be a managed call running on nobody's key.
-        expect(read('server/services/ai.service.ts')).not.toContain('new OpenAiCompatibleProvider');
-        expect(read('server/lib/ai/resolve-provider.ts')).toContain('new OpenAiCompatibleProvider');
+    it('the resolver is the only module that constructs an adapter, across the whole tree', () => {
+        // A service that built its own adapter would be a second answer to
+        // which backend an inspector's text reaches, and the first symptom
+        // would be a managed call running on nobody's key.
+        //
+        // ⚠️ This used to name two files. Two files is not a tree: a THIRD
+        // module constructing an adapter was caught by nothing, which is
+        // precisely the case the rule exists for — the second adapter has not
+        // been written yet, so the only construction site that matters is the
+        // one nobody has added.
+        const adapters = adapterClassNames();
+        // Positive control. A walk that discovered no class names would find no
+        // constructions either, and every assertion below would be vacuous.
+        expect(adapters.length).toBeGreaterThan(0);
+        expect(adapters).toContain('OpenAiCompatibleProvider');
+
+        const re = new RegExp(`\\bnew\\s+(?:${adapters.join('|')})\\s*\\(`);
+        const sites = sourceFiles().filter((rel) => re.test(read(rel)));
+
+        // The second positive control: the resolver really does construct one,
+        // so "no sites outside the resolver" is not "no sites at all".
+        expect(sites).toContain('server/lib/ai/resolve-provider.ts');
+        expect(sites.filter((rel) => rel !== 'server/lib/ai/resolve-provider.ts')).toEqual([]);
+    });
+
+    it('the construction rule is aimed at classes that exist, and says how many', () => {
+        // The failure this replaces: the rule was keyed on a class name that
+        // had been deleted, so it matched zero constructions in a tree that
+        // contained two — and the gate's summary reported a pass. A rule that
+        // cannot fire and a tree that is clean produce the same output unless
+        // the gate prints what it found to look for.
+        const { status, output } = runGate();
+        expect(status).toBe(0);
+        const discovered = /(\d+) adapter class\(es\) discovered/.exec(output);
+        expect(discovered, output).not.toBeNull();
+        expect(Number(discovered![1])).toBeGreaterThan(0);
+        const built = /(\d+) construction site\(s\)/.exec(output);
+        expect(built, output).not.toBeNull();
+        expect(Number(built![1])).toBeGreaterThan(0);
+    });
+
+    it('the gate proves the rule bites, on a fixture, every run', () => {
+        // A positive control the gate carries itself, so "the rule can fire" is
+        // re-established on every run rather than the day someone remembered to
+        // check. Driven through the same matcher the real scan uses.
+        const { status, output } = runGate('--self-test');
+        expect(output).toContain('ai-classification self-test');
+        expect(output).toMatch(/positive control/i);
+        expect(status).toBe(0);
     });
 });

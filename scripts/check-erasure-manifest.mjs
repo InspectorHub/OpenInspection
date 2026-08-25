@@ -284,7 +284,59 @@ if (manifestBody === null) {
   console.error("erasure-manifest lint: could not locate ERASURE_MANIFEST array.");
   process.exit(1);
 }
-const rules = objectLiterals(manifestBody).map(parseRule);
+
+/**
+ * Rules the manifest SPREADS in from a sibling module.
+ *
+ * The manifest is at its large-file cap, so parts of it live in other files and
+ * are spread back into the array at the position they occupied. This gate reads
+ * source text, so a spread it cannot follow means it parses fewer rules than
+ * exist — and goes on printing OK, which is a silent halving of an
+ * accountability check. That is not hypothetical: moving two blocks out took
+ * this gate from 58 rules to 55 with no change in its verdict.
+ *
+ * So the spreads are RESOLVED rather than listed. Every sibling module in the
+ * compliance directory is read, each `...NAME` inside the manifest body is
+ * looked up in it, and a name that resolves to nothing is a HARD FAILURE. A
+ * future split therefore cannot blind this gate either, and it does not need to
+ * remember to edit a list here.
+ */
+const PART_DIR = join(ROOT, "server", "lib", "compliance");
+let partSource = "";
+if (REAL_MANIFEST) {
+  for (const name of readdirSync(PART_DIR)) {
+    if (!name.endsWith(".ts")) continue;
+    partSource += `
+${readFileSync(join(PART_DIR, name), "utf8")}`;
+  }
+}
+const spreadNames = [...manifestBody.matchAll(/\.\.\.([A-Za-z_$][A-Za-z0-9_$]*)/g)].map((m) => m[1]);
+const partCounts = [];
+const spreadLiterals = [];
+for (const name of spreadNames) {
+  const body = arrayBody(partSource, name);
+  if (body === null) {
+    console.error(
+      `erasure-manifest lint: ERASURE_MANIFEST spreads '${name}', and no array of that name ` +
+      `was found in server/lib/compliance/. Every rule this gate cannot see reads as a rule ` +
+      `that does not exist, and the verdict would still say OK. Declare the part as ` +
+      `\`export const ${name}\` in that directory, or inline the rules.`,
+    );
+    process.exit(1);
+  }
+  const literals = objectLiterals(body);
+  if (literals.length === 0) {
+    console.error(
+      `erasure-manifest lint: spread part '${name}' parsed ZERO rules. An empty part and a ` +
+      `part this parser cannot read produce the same result, so the empty one fails too.`,
+    );
+    process.exit(1);
+  }
+  partCounts.push(`${name}: ${literals.length}`);
+  spreadLiterals.push(...literals);
+}
+
+const rules = [...objectLiterals(manifestBody), ...spreadLiterals].map(parseRule);
 
 if (rules.length === 0) {
   console.error("erasure-manifest lint: parsed ZERO rules — parser drift or empty manifest.");
@@ -506,5 +558,14 @@ if (errors.length > 0) {
 
 console.log(
   `erasure-manifest lint: OK (${rules.length} rules, ${outOfScope.size} out-of-scope declarations).`,
+);
+// Where the rules came from, on every run. The manifest is split across files
+// and the number that matters is the TOTAL — printing the parts is what lets a
+// reader see that a part stopped contributing rather than infer it from a total
+// they were not comparing against anything.
+console.log(
+  partCounts.length === 0
+    ? `  all rules inline; no spread parts.`
+    : `  ${objectLiterals(manifestBody).length} inline + spread parts (${partCounts.join(", ")}).`,
 );
 console.log(pendingLine);

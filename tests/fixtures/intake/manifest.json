@@ -3,92 +3,162 @@
   "rules": [
     "An observation names a HASH, never a path and never a filename. A filename is metadata about somebody's file; a hash is a fact that lets a later reader confirm the same file was seen.",
     "fileSha256 is null until the private corpus gate records it. A null is a GAP, and `npm run verify:real-corpus` fails on one rather than passing over it.",
+    "An observation that was LOOKED FOR and not found carries `notObserved` instead of `fileSha256`. That is a third state, and it must not be spelled as a null: a null says nobody has checked, and this says somebody checked and the quirk was not there. They point in opposite directions -- one is work owed, the other is a reason to doubt the schema entry.",
+    "A hash identifies a FILE, not a template. Verified 2026-08-24: the same template exported twice produced two files differing in 295550 vs 278519 bytes and in which cells were written self-closing, while every structural measurement below came out identical. So a corpus that no longer matches a hash may hold the same template re-exported, and that is not a confirmation.",
     "Nothing derived from a real file belongs in this repository, this manifest included. It records that a file was seen, not what it said."
   ],
   "observations": [
     {
       "quirk": "empty-shared-strings",
       "vendor": "spectora",
-      "observedOn": "2026-08-21",
-      "fileSha256": null,
-      "note": "Observed in one real template export held in the private corpus."
+      "observedOn": "2026-08-24",
+      "fileSha256": "333e44424830127e6170f311e65b91e09c427cab8f9ca2b2ebaeb026f3bb29c0",
+      "note": "The export carries no shared-string part at all, and every one of its text cells is typed as a formula string result. Zero inline strings."
     },
     {
       "quirk": "double-escaped-ampersand",
       "vendor": "spectora",
-      "observedOn": "2026-08-21",
-      "fileSha256": null,
-      "note": "Observed in one real template export held in the private corpus."
+      "observedOn": "2026-08-24",
+      "fileSha256": "333e44424830127e6170f311e65b91e09c427cab8f9ca2b2ebaeb026f3bb29c0",
+      "note": "900 doubly-escaped occurrences in the worksheet, against 3 singly-escaped ones. The count reconciles exactly with what the reader produces, which is how the reader's behaviour was established rather than assumed."
     },
     {
       "quirk": "empty-discriminator-cell",
       "vendor": "spectora",
-      "observedOn": "2026-08-21",
-      "fileSha256": null,
-      "note": "Observed on 65 of 1872 rows of one real template export."
+      "observedOn": "2026-08-24",
+      "notObserved": {
+        "checkedAgainstSha256": "333e44424830127e6170f311e65b91e09c427cab8f9ca2b2ebaeb026f3bb29c0",
+        "measured": "0 of 1872 rows -- every data row classifies itself",
+        "instruments": 2,
+        "note": "The earlier record said 65 of 1872. That number did not survive re-measurement, and the mechanism that produces it is known: a tokenizer that matches an element's opening tag by scanning to the first '>' swallows a self-closing cell together with the cell after it, so the following cell's value is attributed to the wrong column and the following column reads as empty. A tokenizer written that way was built here first, reported exactly 65, and was only caught because a second instrument disagreed. The two exports of this template differ by exactly 65 in how many cells they write self-closing, which is where the number comes from. Treat the schema's entry for this quirk as UNCONFIRMED until a real file shows it: the reader must still survive an unclassified row, and does, but nothing here has seen one."
+      },
+      "note": "Looked for and not found. See notObserved."
     },
     {
       "quirk": "repeated-parent-values",
       "vendor": "spectora",
-      "observedOn": "2026-08-21",
-      "fileSha256": null,
-      "note": "The whole of one real export's structure, 1872 rows resolving to 16 parents and 76 children."
+      "observedOn": "2026-08-24",
+      "fileSha256": "333e44424830127e6170f311e65b91e09c427cab8f9ca2b2ebaeb026f3bb29c0",
+      "note": "1872 data rows resolving to 16 parents and 90 children. 90, not the 76 recorded before: 76 is how many distinct child NAMES the file uses, and 4 of those names appear under more than one parent -- one of them under eleven. The adapter groups by parent-and-child together, so 90 is the number it produces and 76 is a number about the text. Both are true of the file; only one describes the structure."
     },
     {
       "quirk": "sparse-columns",
       "vendor": "spectora",
-      "observedOn": "2026-08-21",
-      "fileSha256": null,
-      "note": "Observed in one real template export held in the private corpus."
+      "observedOn": "2026-08-24",
+      "fileSha256": "333e44424830127e6170f311e65b91e09c427cab8f9ca2b2ebaeb026f3bb29c0",
+      "note": "Every one of the 1872 data rows omits at least one cell, up to 24 on a single row, in a sheet 42 columns wide. A third of the cells that ARE written are written empty. The header row is the exception and carries all 42."
+    },
+    {
+      "quirk": "non-breaking-space-in-text",
+      "vendor": "spectora",
+      "observedOn": "2026-08-24",
+      "fileSha256": "333e44424830127e6170f311e65b91e09c427cab8f9ca2b2ebaeb026f3bb29c0",
+      "note": "667 occurrences across 301 cells, all in the comment-text column, 163 of those cells carrying whitespace at an end. None in the columns that decide structure."
     },
     {
       "quirk": "user-defined-vocabulary",
       "vendor": "home_inspector_pro",
-      "observedOn": "2026-08-21",
-      "fileSha256": null,
-      "note": "Vocabularies of three, four and five entries across 22 real templates, sharing no words."
+      "observedOn": "2026-08-24",
+      "fileSha256": "bb02fb964ddd615a913deb93050d6f073db79068464b769432584edd7bfbb0a1",
+      "note": "The vocabulary is genuinely the author's: 33 distinct words across the corpus's 110 entries, and 124 of the 231 template pairs share not one word. But the SIZE varies less than was recorded -- every one of the 22 declares exactly five, not three, four and five. And 107 pairs DO share a word, so 'sharing no words' was true of some pairs and stated of all."
     },
     {
       "quirk": "absent-vocabulary",
       "vendor": "home_inspector_pro",
-      "observedOn": "2026-08-21",
-      "fileSha256": null,
-      "note": "8 of 22 real templates carry none."
+      "observedOn": "2026-08-24",
+      "notObserved": {
+        "checkedAgainstSha256": "bb02fb964ddd615a913deb93050d6f073db79068464b769432584edd7bfbb0a1",
+        "measured": "0 of 22 templates carry no vocabulary; every one declares exactly one vocabulary of five entries",
+        "instruments": 2,
+        "note": "The earlier record said 8 of 22. Measured with the adapter's own parser and again with an independent balanced-tag scan, both say 0. The adapter reads the FIRST such property document-wide (home-inspector-pro.ts:115) and there is never more than one, so this is not a case of the reader looking in the wrong place. The fallback to a default vocabulary is therefore a path no file in this corpus exercises -- which is a reason to keep the fallback and a reason not to believe it is tested."
+      },
+      "note": "Looked for and not found. See notObserved."
     },
     {
       "quirk": "padded-vocabulary-entries",
       "vendor": "home_inspector_pro",
-      "observedOn": "2026-08-21",
-      "fileSha256": null,
-      "note": "Leading and trailing whitespace on entries in the real corpus."
+      "observedOn": "2026-08-24",
+      "fileSha256": "1b6059efa6dbdb08714bf58cd62f29756dea20fb94ba8ad5b4eaf41c48168051",
+      "note": "2 of 22 templates, 4 entries between them. The named file carries 3 of the 4."
     },
     {
       "quirk": "absent-boolean-property",
       "vendor": "home_inspector_pro",
-      "observedOn": "2026-08-21",
-      "fileSha256": null,
-      "note": "Absent far more often than present across 22 real templates."
+      "observedOn": "2026-08-24",
+      "fileSha256": "bb02fb964ddd615a913deb93050d6f073db79068464b769432584edd7bfbb0a1",
+      "note": "Absent in 13 of 22 and present in 9 -- more often absent, not 'far more often' as recorded. Two things the earlier record did not have: where the property IS present it is false in every case and true in none, so nothing in this corpus turns the flag on; and one further template declares it as an object REFERENCE rather than a literal, which the reader reports as absent. That makes three states, not two, and the third is covered by its own quirk below."
     },
     {
       "quirk": "absent-version",
       "vendor": "home_inspector_pro",
-      "observedOn": "2026-08-21",
-      "fileSha256": null,
-      "note": "21 of 22 real templates carry no version; the versions of the rest span 2009 to 2024."
+      "observedOn": "2026-08-24",
+      "notObserved": {
+        "checkedAgainstSha256": "bb02fb964ddd615a913deb93050d6f073db79068464b769432584edd7bfbb0a1",
+        "measured": "neither reading gives 21 of 22: the document's own version attribute is present on 22 of 22, and the separate version PROPERTY is absent on 9 of 22",
+        "instruments": 2,
+        "note": "The earlier record said 21 of 22 carry no version. There are two things in these files that could be called a version and neither produces that number. The attribute the document opens with is carried by all 22 and its values do span roughly fifteen years, which is presumably where the second half of the old note came from -- so the span was measured and the count was not. Nothing in the reader branches on either, which is why this went unnoticed."
+      },
+      "note": "Looked for and not found. See notObserved."
+    },
+    {
+      "quirk": "object-reference-instead-of-value",
+      "vendor": "home_inspector_pro",
+      "observedOn": "2026-08-24",
+      "fileSha256": "3e974e45defab242368626ffd106247a882bc48d2ab414abf168f6f8186d3ceb",
+      "note": "New, and nobody had looked: 15 of the 22 templates use back-references, 713 uses in total. The named file sets a boolean property that way. The reader does not resolve references and reports the property as absent -- which is the right answer for this one, because what it points at is not a stored value but the result of reading another property, and resolving it would mean executing something. Recorded so that 'absent' is understood to cover a case the file did state."
     },
     {
       "quirk": "unrelated-entries",
       "vendor": "home_inspector_pro",
-      "observedOn": "2026-08-21",
-      "fileSha256": null,
-      "note": "Entry counts from 3 to 54 across 22 real templates."
+      "observedOn": "2026-08-24",
+      "fileSha256": "14ebe553ce166f3839d4a027de52d163a851f4846efa195c1f546627ad7b0034",
+      "note": "3 to 54 entries across the 22, exactly as recorded. The named file is the largest. Nothing but the structure entry is required to be present."
     },
     {
       "quirk": "empty-template",
       "vendor": "home_inspector_pro",
-      "observedOn": "2026-08-21",
-      "fileSha256": null,
-      "note": "1 of 22 real templates declares no sections and no items."
+      "observedOn": "2026-08-24",
+      "fileSha256": "7182c2d8fdb518ed201ba9de6f7fdfee1664cb363cab932f92d3f4a0e6dc11c9",
+      "note": "1 of 22, exactly as recorded. It declares no sections and no items and still carries a full five-entry vocabulary, so an empty template is not an empty document."
     }
-  ]
+  ],
+  "measurementsPurpose": "How long a real import actually takes, so the source picker can state a duration instead of guessing one. Separate from `observations` because a duration is not a quirk: the observation list is checked against the schemas both ways, and an entry there for something no schema declares is an orphan. Same discipline otherwise -- a measurement names a HASH, never a path and never a filename, and records that a file was timed rather than what it said.",
+  "measurementsMethod": "Real workerd via vitest-pool-workers, NOT Node. Median of 7 runs in one isolate. Node was measured too, on the same code and the same bytes, and over-reported by 1.5x on the spreadsheet and 2.6x on the template archive -- so the often-quoted 2.5x is workload-dependent and is not a conversion factor. workerd advances its clock only on I/O, so a pure-CPU block between two bare clock reads measures 0; each timing here is bracketed by a real await, and the run carries a busy-loop control that fails if the clock ever reads 0. Timed span is parse (source decode + adapter inspect) plus convert (adapter convert, which is where validation happens). It EXCLUDES the HTTP upload, the source-file store and the staging write -- a template import stages one row, so the excluded database work is one insert.",
+  "measurements": [
+    {
+      "vendor": "spectora",
+      "measuredOn": "2026-08-25",
+      "fileSha256": "333e44424830127e6170f311e65b91e09c427cab8f9ca2b2ebaeb026f3bb29c0",
+      "shape": "278519 bytes on disk; 1873 sheet rows read (1872 data rows plus the header) across 42 columns, from 1780878 bytes of decompressed worksheet markup; resolving to 16 sections and 90 items. The row, column, section and item counts agree exactly with the `repeated-parent-values` and `sparse-columns` observations above, which is how this run was confirmed to have read the same file whole rather than a prefix.",
+      "parseMedianMs": 21,
+      "convertMedianMs": 23,
+      "totalMedianMs": 43,
+      "totalRangeMs": [40, 74],
+      "nodeTotalMedianMs": 63
+    },
+    {
+      "vendor": "home_inspector_pro",
+      "measuredOn": "2026-08-25",
+      "fileSha256": "bb02fb964ddd615a913deb93050d6f073db79068464b769432584edd7bfbb0a1",
+      "shape": "507968 bytes on disk, resolving to 39 sections and 357 items. Larger on disk than the spreadsheet above and five times faster to read, so file size alone does not predict the cost.",
+      "parseMedianMs": 5,
+      "convertMedianMs": 4,
+      "totalMedianMs": 9,
+      "totalRangeMs": [9, 23],
+      "nodeTotalMedianMs": 23
+    }
+  ],
+  "scaling": {
+    "measuredOn": "2026-08-25",
+    "why": "One point cannot answer whether the picker's duration still holds at the SIZE CAP, and the caps are far above this corpus -- 2 MB hosted, 20 MB self-hosted, against a 278 KB file. Extrapolating from one point assumes linearity, so linearity was measured rather than assumed: the real worksheet was rebuilt at multiples of its own row block (synthetic bytes, real row shape) and re-timed.",
+    "againstSha256": "333e44424830127e6170f311e65b91e09c427cab8f9ca2b2ebaeb026f3bb29c0",
+    "points": [
+      { "multiple": 1, "rows": 1873, "worksheetBytes": 1780878, "medianMs": 36 },
+      { "multiple": 2, "rows": 3746, "worksheetBytes": 3560586, "medianMs": 70 },
+      { "multiple": 4, "rows": 7492, "worksheetBytes": 7120002, "medianMs": 140 },
+      { "multiple": 8, "rows": 14984, "worksheetBytes": 14238834, "medianMs": 277 }
+    ],
+    "result": "Linear, at 34.6 to 36.0 ms per multiple across an eightfold range -- about 20 ms per MB of decompressed worksheet. The 1x synthetic runs 36 ms against the real file's 43 ms, and the gap is the deflate the synthetic does not pay, which decomposes the headline number.",
+    "bounds": "The real file compresses 6.4:1. A hosted upload at the 2 MB cap compressing the same way holds roughly 13 MB of worksheet and lands near 0.26 s; a self-hosted upload at the 20 MB cap holds roughly 128 MB and lands near 2.6 s. Those two are arithmetic on a measured slope rather than measurements, and the second one is very likely unreachable for a different reason: 128 MB of decoded markup does not fit the Worker memory limit, so such a file would fail on memory before it became slow. Nobody has tried it."
+  }
 }

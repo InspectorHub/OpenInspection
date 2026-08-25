@@ -5,7 +5,15 @@
  * A spreadsheet. One row per canned comment, 42 columns wide, with the section
  * and the item repeated on every row — so the structure is implied by repeated
  * values rather than nested. A real export measured 1873 rows: one header and
- * 1872 comments, resolving to 16 sections and 76 items.
+ * 1872 comments, resolving to 16 sections and 90 items.
+ *
+ * ⚠️ 90, not the 76 this comment said until 2026-08-24. 76 is how many distinct
+ * item NAMES that file uses; four of them appear under more than one section,
+ * one of them under eleven. Grouping keys on section-and-item together (see
+ * `itemKey` below), so 90 is what this adapter actually produces — which means
+ * an operator importing that file sees 90 and the number to sanity-check
+ * against is this one. Both counts are true of the file; only one describes the
+ * structure, and the wrong one had been written down twice.
  *
  * This adapter used to read a JSON object with a `sections` array and describe
  * a four-bucket comment model. That representation exists, but it is not what

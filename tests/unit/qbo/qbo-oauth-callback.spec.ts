@@ -34,7 +34,8 @@ vi.mock('../../../server/lib/jwt-keyring', () => ({
 // eslint-disable-next-line import/order
 import qboOauthRoutes from '../../../server/api/qbo-oauth';
 // eslint-disable-next-line import/order
-import { QBO_OAUTH_MOUNT, qboRedirectUri } from '../../../server/lib/qbo-oauth-paths';
+import { QBO_OAUTH_MOUNT, qboRedirectUri } from '../../../server/lib/qbo-oauth-paths';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const APP_BASE_URL = 'https://inspect.example.com';
@@ -102,7 +103,10 @@ const ENV = (kv: ReturnType<typeof makeKv>) => ({
     JWT_SECRET:        'a'.repeat(32),
 }) as never;
 
-const CTX = { waitUntil: vi.fn(), passThroughOnException: vi.fn() } as never;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const CTX = makeExecutionContext().ctx;
 
 const INTUIT_TOKEN_HOST = 'oauth.platform.intuit.com';
 

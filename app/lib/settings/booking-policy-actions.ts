@@ -62,7 +62,7 @@ export async function saveDepositFromForm(
 ): Promise<{ ok: boolean; message?: string | undefined } | null> {
   if (!form.has("depositPolicy")) return null;
 
-  let raw: unknown = null;
+  let raw: unknown;
   try {
     raw = JSON.parse(String(form.get("depositPolicy") ?? "null"));
   } catch {
@@ -96,7 +96,7 @@ export async function handleCancellationPolicyIntent(
 ): Promise<BookingActionResult | null> {
   if (intent !== "cancellation-policy-save") return null;
 
-  let raw: unknown = null;
+  let raw: unknown;
   try {
     raw = JSON.parse(String(form.get("cancellationPolicy") ?? "null"));
   } catch {

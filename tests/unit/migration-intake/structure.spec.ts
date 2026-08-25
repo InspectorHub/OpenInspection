@@ -32,7 +32,7 @@ function item(over: Partial<TemplateItem> = {}): TemplateItem {
 
 function template(sections: { title: string; items: TemplateItem[] }[]): BundleTemplate {
     return {
-        name: 'AHIT Master',
+        name: 'Whole House Checklist',
         schema: {
             schemaVersion: 2,
             sections: sections.map((s, i) => ({ id: `s${i}`, title: s.title, items: s.items })),
@@ -59,7 +59,7 @@ describe('buildBatchStructure', () => {
             { title: 'Roof', items: [item({ label: 'Covering' }), item({ label: 'Flashing' })] },
             { title: 'Attic', items: [] },
         ])], NO_DROPS, []);
-        expect(got?.name).toBe('AHIT Master');
+        expect(got?.name).toBe('Whole House Checklist');
         expect(got?.sections.map((s) => s.title)).toEqual(['Roof', 'Attic']);
         expect(got?.sections[0]?.items.map((i) => i.label)).toEqual(['Covering', 'Flashing']);
     });

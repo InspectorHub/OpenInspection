@@ -1,8 +1,11 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
-import { inspections, contacts, contactRoleProfiles, inspectionPeople } from '../lib/db/schema';
+import { inspections, contacts, contactRoleProfiles, inspectionPeople, users } from '../lib/db/schema';
 import { PRIMARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
+import { CONTACT_EXCHANGE } from '../lib/data-exchange/contacts';
+import { MEMBER_EXCHANGE } from '../lib/data-exchange/members';
+import { exportCell, exportHeaders, type ExchangeVocabulary } from '../lib/data-exchange/types';
 
 // Task 9c-X3 — the buyer_agent role join, aliased so it can coexist in the
 // same query as the primary-client join above (contactRoleProfiles/
@@ -94,12 +97,49 @@ export class DataService {
         const db = this.getDrizzle();
         const rows = await db.select().from(contacts)
             .where(eq(contacts.tenantId, tenantId));
+        return this.toCsv(CONTACT_EXCHANGE, rows as unknown as Record<string, unknown>[]);
+    }
 
-        const header = csvRow(['id', 'type', 'name', 'email', 'phone', 'agency', 'notes', 'created_at']);
-        const dataRows = rows.map(r => csvRow([
-            r.id, r.type, r.name, r.email, r.phone, r.agency, r.notes,
-            r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
-        ]));
+    /**
+     * This tenant's team, as a file the invitation entry point can read back.
+     *
+     * `users` carries three credentials — the password hash, the TOTP seed and
+     * the hashed recovery codes — and none of them can appear here, BY
+     * CONSTRUCTION rather than by a filter: the projection takes only what
+     * `MEMBER_EXCHANGE` names, and the manifest does not name them. That is a
+     * stronger guarantee than the one
+     * `server/lib/compliance/account-export-manifest.ts` had to build, which
+     * star-selects and therefore needs EVERY column classified to be safe.
+     *
+     * A tenant's rows exclude global agent accounts on their own, because such
+     * an account carries `tenant_id IS NULL`. That is asserted rather than
+     * assumed in `tests/unit/data/export-members.spec.ts`.
+     */
+    async exportMembersCSV(tenantId: string): Promise<string> {
+        const db = this.getDrizzle();
+        const rows = await db.select().from(users)
+            .where(eq(users.tenantId, tenantId));
+        return this.toCsv(MEMBER_EXCHANGE, rows as unknown as Record<string, unknown>[]);
+    }
+
+    /**
+     * A CSV from a vocabulary and its rows.
+     *
+     * The header and the projection come from ONE list read twice, so a field
+     * added to the manifest appears in both or in neither. The previous shape —
+     * a header literal beside a positional row literal — could disagree, and
+     * did: `type` and `notes` were written into every export and readable by
+     * nothing.
+     *
+     * The manifest lives in `server/lib/data-exchange/`, NOT in
+     * `migration-intake/adapters/registry.ts`. Importing the registry here
+     * would drag its ZIP, XLSX and Java-serialisation readers into anything
+     * that exports, and would point the export at the importer — the opposite
+     * of the direction anybody would expect.
+     */
+    private toCsv(vocabulary: ExchangeVocabulary, rows: Record<string, unknown>[]): string {
+        const header = csvRow(exportHeaders(vocabulary));
+        const dataRows = rows.map((r) => csvRow(vocabulary.fields.map((f) => exportCell(r, f))));
         return [header, ...dataRows].join('\n');
     }
 }

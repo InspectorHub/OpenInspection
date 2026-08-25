@@ -28,6 +28,7 @@
  * `AppError(503, AI_NOT_CONFIGURED)`, with the reason in `details`.
  */
 import type { DeploymentProfile } from '../deployment-profile';
+import type { AiCredential } from './credential';
 import type { AiProvider } from './provider';
 import { OpenAiCompatibleProvider } from './providers/openai-compatible';
 import { AI_REFUSAL_REASON, type AiRefusalReason } from './refusal-reason';
@@ -65,8 +66,14 @@ export interface ResolveAiContext {
      *  funded by the platform key to an endpoint of its choosing. */
     tenantBaseUrl?: string | null;
     tenantModel?: string | null;
-    /** Platform-provided key, when the deployment has one configured. */
-    managedKey?: string | null;
+    /** Platform-provided credential, when the deployment has one configured.
+     *
+     *  Either a long-lived key or something that refreshes itself: some
+     *  backends issue only short-lived tokens, and the choice between the two
+     *  is deployment configuration answered in one place upstream. Every rule
+     *  below treats them identically — present or absent is the only property
+     *  this function reads. */
+    managedKey?: AiCredential | null;
     /** Whether this workspace is granted managed access. Supplied by the
      *  caller; the resolver receives a boolean and never learns what grants it. */
     managedEntitled: boolean;

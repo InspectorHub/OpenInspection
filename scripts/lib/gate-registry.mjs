@@ -37,6 +37,25 @@ export const SCRIPT_GATES = [
     { key: 'filesize', label: 'Large-file ratchet', script: 'check-file-size.mjs', fix: 'npm run lint:filesize', rung: PRECOMMIT },
     { key: 'tz', label: 'Calendar timezone-safety', script: 'check-tz-safety.mjs', fix: 'npm run lint:tz', rung: PRECOMMIT },
     { key: 'idempotency', label: 'Mutating-route retry safety', script: 'check-idempotency-coverage.mjs', fix: 'npm run lint:idempotency', rung: PRECOMMIT },
+    // PRECOMMIT, and the rung is the point. D1 stops at 100 columns per table,
+    // and the only thing that ever crosses that line is somebody adding one
+    // column to a table that was already wide. Catching it at PUSH would still
+    // be after the schema, the migration and the inline DDL had been written
+    // against a shape the database will not accept.
+    { key: 'columnceiling', label: "D1 column ceiling", script: 'check-column-ceiling.mjs', fix: 'npm run lint:columns', rung: PRECOMMIT },
+    // Pre-commit for the same reason as the price, tracking and AI gates: what
+    // it catches is a route ARRIVING with nobody having said whether reaching it
+    // requires the agent to be bound by the Agent Terms. That question is cheap
+    // at the moment the route is typed and the author is present, and expensive
+    // later -- by the time anyone asks, the route is written, shipped, and the
+    // person who could answer has moved on. It is also the rung that sees the
+    // moment: a route is added exactly once.
+    // ⚠️ NOT `agentroutes`. That gate is about UI route prefixes under
+    // agent-layout and which sign-in door a session lands on; this one reads the
+    // API routers. Distinct keys on purpose so the two are never read as one.
+    // Parses ~12 source files with the TypeScript parser: single-digit
+    // milliseconds, among the cheapest entries here.
+    { key: 'agenttermsclass', label: 'Agent-terms route classification', script: 'check-agent-terms-classification.mjs', fix: 'npm run lint:agent-terms-classification', rung: PRECOMMIT },
     // Pre-commit and not CI because a collision is created at exactly one moment
     // -- when a file is added or renamed -- and this is the rung that sees that
     // moment. It is also the rung where the fix is free: renaming a file nobody
@@ -112,6 +131,14 @@ export const SCRIPT_GATES = [
     // this change and none of them was in the hook. Moving one down a rung is
     // a cost decision for every commit in the repo and belongs in its own
     // change, with the argument written beside it like the entries above.
+    // PUSH and deliberately not PRECOMMIT. What it catches is not a keystroke:
+    // a module becomes unreachable-from-production the moment a body of work
+    // ENDS without its last wire, so the earliest honest place to ask is the
+    // batch boundary. Asked per commit it would go red in the middle of every
+    // plan that builds a primitive before its caller, and a gate that is red
+    // for a legitimate reason all week is a gate people learn to pass with
+    // --no-verify. ~10s: one knip pass over the production entry graph.
+    { key: 'unwired', label: 'lint:unwired', script: 'check-unwired.mjs', fix: 'npm run lint:unwired', rung: PUSH },
     { key: 'erasure', label: 'lint:erasure', script: 'check-erasure-manifest.mjs', fix: 'npm run lint:erasure', rung: PUSH },
     { key: 'retention', label: 'lint:retention', script: 'check-retention-manifest.mjs', fix: 'npm run lint:retention', rung: PUSH },
     { key: 'retentionpolicy', label: 'lint:retention-policy', script: 'check-retention-policy.mjs', fix: 'npm run lint:retention-policy', rung: PUSH },
@@ -179,6 +206,23 @@ export const SCRIPT_GATES = [
     { key: 'noportalroutes', label: 'lint:no-portal-routes', script: 'check-no-portal-routes.mjs', fix: 'npm run lint:no-portal-routes', rung: PUSH },
     { key: 'schemadoc', label: 'lint:schema-doc', script: 'gen-schema-doc.mjs', fix: 'npm run lint:schema-doc', rung: PUSH, args: ['--check'] },
     { key: 'verificationcopy', label: 'lint:verification-copy', script: 'check-verification-copy.mjs', fix: 'npm run lint:verification-copy', rung: PUSH },
+    // The other copy-policy gate, and it sits beside `verificationcopy` on the
+    // same rung for the same reason. What it catches is a claim that an
+    // AUTHORITY approved what this software renders — "OIR-approved", "approved
+    // by the Office of Insurance Regulation" — which is a statement about a
+    // third party that nobody at that agency ever made.
+    //
+    // PUSH rather than PRECOMMIT, on two arguments. First, its subject is
+    // authored in batches, not keystrokes: statutory-form copy arrives when a
+    // form is published, by hand, weeks apart — the same rhythm that puts
+    // `statutoryfidelity` at this rung. Second, and this is the one that
+    // settles it, the gate reads every LOCALE. A claim and its translation
+    // routinely land in different commits, so a per-commit rung would go green
+    // on the English commit and red on the translation, blaming the wrong
+    // change; PUSH is the first rung where the answer is complete. It walks
+    // ~83 files / ~20k strings in well under a second, so the cost is not what
+    // decides it — the completeness of the answer is.
+    { key: 'endorsementcopy', label: 'lint:endorsement-copy', script: 'check-endorsement-copy.mjs', fix: 'npm run lint:endorsement-copy', rung: PUSH },
     // PUSH rather than PRECOMMIT, unlike the tracking gate above it, and for a
     // reason that is about WHERE the breakage comes from rather than how much
     // it costs: this one fails when an anchor comment is deleted or a guarded

@@ -14,7 +14,7 @@
  * will not have one until #23's pipeline ships. So the failure
  * mode it defends against is not a bad translation — it is the registry quietly
  * becoming untrue in the months before anything reads it. A `source` gets
- * renamed, a `locator` gets refactored away, someone adds a ninth category to
+ * renamed, a `locator` gets refactored away, someone adds another category to
  * the type and not to the list, and by the time #23 arrives the register looks
  * authoritative and covers half of what it claims.
  *
@@ -22,12 +22,12 @@
  * Sibling gates (erasure, retention) derive their in-scope set from the schema
  * and then demand an answer for each member. This one cannot: "is this text a
  * term of a legal instrument" is not a property of a column name. The in-scope
- * set is eight enumerated categories, and it is closed. That makes
- * CATEGORY COVERAGE the load-bearing check here — a registry naming five of
- * eight reads exactly like a complete one, and nothing else in the repo would
- * notice the other three.
+ * set is the enumerated categories below, and it is closed. That makes
+ * CATEGORY COVERAGE the load-bearing check here — a registry naming some of
+ * them reads exactly like a complete one, and nothing else in the repo would
+ * notice the ones it left out.
  *
- * The gate keeps its OWN copy of the eight and compares it against the source's
+ * The gate keeps its OWN copy of the list and compares it against the source's
  * `NON_TRANSLATABLE_CATEGORIES` in both directions. Two lists that must be
  * equal are printed side by side rather than trusted: a gate whose scope is
  * defined by the file it is checking can be narrowed by editing that file.
@@ -36,8 +36,8 @@
  *   - either array missing / unparseable (the manifest is not optional)
  *   - ZERO manifest entries parsed          <- "found nothing" == "looked at nothing"
  *   - an entry missing a non-empty id / category / source / locator / reason
- *   - a `category` outside the eight
- *   - a category of the eight with NO entry (coverage)
+ *   - a `category` outside the required list
+ *   - a required category with NO entry (coverage)
  *   - a `source` path that does not exist on disk
  *   - a `locator` that does not occur in its `source`
  *   - a manifest source that imports the message catalogue (`~/paraglide/…`)
@@ -77,10 +77,19 @@ const OUT_OF_SCOPE_FILE = FIXTURE
 const SOURCE_ROOT = FIXTURE ?? ROOT;
 
 /**
- * The eight categories, held here independently of the source so the two can be
+ * The eleven categories, held here independently of the source so the two can be
  * compared. Order is the register's own, not alphabetical.
+ *
+ * ⚠️ The NAME of this constant is load-bearing in a way that is easy to undo.
+ * A sibling publication gate bans a word this repository does not use, matching
+ * it on word boundaries — and `_` followed by a capital is a word character, so
+ * that boundary never fires inside a SCREAMING_SNAKE identifier. This list was
+ * previously named after exactly that word and no gate could see it. Do not
+ * reintroduce a name of that shape here or anywhere else; a word-boundary ban is
+ * blind to the identifier casing of the same word, which makes an identifier the
+ * most durable hiding place there is.
  */
-const COUNSEL_CATEGORIES = [
+const REQUIRED_CATEGORIES = [
     "reliance_clause",
     "limitation_of_liability",
     "arbitration",
@@ -89,6 +98,9 @@ const COUNSEL_CATEGORIES = [
     "contract_terms",
     "signature",
     "acknowledgement",
+    "legal_notice",
+    "consent_waiver",
+    "statutory_certification",
 ];
 
 /**
@@ -235,29 +247,31 @@ const outOfScope = readArray("NON_TRANSLATABLE_OUT_OF_SCOPE");
 if (manifest.length === 0) {
     console.error(
         "non-translatable lint: parsed ZERO manifest entries — parser drift or an empty " +
-        "registry. A register of what must stay English cannot be empty while the eight " +
-        "categories exist.",
+        "registry. A register of what must stay English cannot be empty while the " +
+        "required categories exist.",
     );
     process.exit(1);
 }
 
 // ── The category list the gate enforces vs the one the source declares ───────
 const declaredSet = new Set(declaredCategories);
-const counselSet = new Set(COUNSEL_CATEGORIES);
-for (const c of COUNSEL_CATEGORIES) {
+const requiredSet = new Set(REQUIRED_CATEGORIES);
+for (const c of REQUIRED_CATEGORIES) {
     if (!declaredSet.has(c)) {
         errors.push(
-            `NON_TRANSLATABLE_CATEGORIES is missing '${c}', which is one of the eight. ` +
+            `NON_TRANSLATABLE_CATEGORIES is missing '${c}', which is one of the ` +
+            `${REQUIRED_CATEGORIES.length} required categories. ` +
             `Dropping a category from the source list would otherwise silently drop it from ` +
             `the coverage check below.`,
         );
     }
 }
 for (const c of declaredCategories) {
-    if (!counselSet.has(c)) {
+    if (!requiredSet.has(c)) {
         errors.push(
-            `NON_TRANSLATABLE_CATEGORIES declares '${c}', which is not one of the eight ` +
-            `categories this gate enforces. Widening the registry is a decision that ` +
+            `NON_TRANSLATABLE_CATEGORIES declares '${c}', which is not one of the ` +
+            `${REQUIRED_CATEGORIES.length} required categories this gate enforces. ` +
+            `Widening the registry is a decision that ` +
             `updates the category list in scripts/check-non-translatable.mjs too.`,
         );
     }
@@ -276,10 +290,11 @@ manifest.forEach((entry, i) => {
     }
 
     if (entry.category) {
-        if (!counselSet.has(entry.category)) {
+        if (!requiredSet.has(entry.category)) {
             errors.push(
-                `${label}: category '${entry.category}' is not one of the eight ` +
-                `(${COUNSEL_CATEGORIES.join(", ")}).`,
+                `${label}: category '${entry.category}' is not one of the ` +
+                `${REQUIRED_CATEGORIES.length} required categories ` +
+                `(${REQUIRED_CATEGORIES.join(", ")}).`,
             );
         } else {
             covered.add(entry.category);
@@ -315,11 +330,12 @@ manifest.forEach((entry, i) => {
     }
 });
 
-// ── Coverage: all eight, every time ──────────────────────────────────────────
-for (const c of COUNSEL_CATEGORIES) {
+// ── Coverage: every required category, every time ───────────────────────────
+for (const c of REQUIRED_CATEGORIES) {
     if (!covered.has(c)) {
         errors.push(
-            `category '${c}' has NO manifest entry. Eight are required; a register carrying ` +
+            `category '${c}' has NO manifest entry. ${REQUIRED_CATEGORIES.length} are ` +
+            `required; a register carrying ` +
             `${covered.size} of them looks complete and is not. Add the entry, or if the ` +
             `content genuinely does not exist in this codebase yet, say so in an entry whose ` +
             `reason states that.`,
@@ -380,6 +396,6 @@ if (errors.length > 0) {
 
 console.log(
     `non-translatable lint: OK (${manifest.length} manifest entries covering ` +
-    `${covered.size}/${COUNSEL_CATEGORIES.length} required categories, ` +
+    `${covered.size}/${REQUIRED_CATEGORIES.length} required categories, ` +
     `${outOfScope.length} out-of-scope).`,
 );

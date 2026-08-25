@@ -26,7 +26,8 @@ import { eq, and, asc } from 'drizzle-orm';
 import { inspections as inspectionTable, agreementRequests, agreementSigners } from '../../lib/db/schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
 import { getDrizzle } from '../../lib/route-helpers';
-import { resolveAutomationCompanyName } from '../../services/automation/company-name';
+import { resolveAutomationCompanyName } from '../../services/automation/company-name';
+import { fireAndForget } from '../../lib/fire-and-forget';
 
 const agreementSignRoutes = createApiRouter();
 
@@ -201,12 +202,12 @@ agreementSignRoutes.post('/:id/sign', async (c) => {
 
         // Spec 2A — per-signer automation event (fires on EVERY sign).
         if (result.inspectionId) {
-            c.var.services.automation.trigger({
+            fireAndForget(c, c.var.services.automation.trigger({
                 tenantId: result.tenantId,
                 inspectionId: result.inspectionId,
                 triggerEvent: 'agreement.signer_signed',
                 companyName: await resolveAutomationCompanyName(getDrizzle(c), result.tenantId), reportBaseUrl: c.env.APP_BASE_URL || '',
-            }).catch(() => {});
+            }), 'automation trigger', { event: 'agreement.signer_signed', tenantId: result.tenantId });
         }
 
         // Envelope completion side-effects fire EXACTLY ONCE.

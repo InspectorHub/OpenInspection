@@ -180,7 +180,11 @@ export function registerComplianceStatusRoute(router: Hono<HonoConfig>): void {
             const outbox = c.var.services?.outbox;
             if (outbox) {
                 outbox.append({
-                    type: 'io.inspectorhub.tenant.compliance_status_updated',
+                    // UNPREFIXED. `toCloudEvent` adds `io.inspectorhub.`; this
+                    // name once carried it too and the seam shipped
+                    // `io.inspectorhub.io.inspectorhub.…` to a portal that
+                    // parked every one of them.
+                    type: 'tenant.compliance_status_updated',
                     payload: {
                         tenantId: tenant.id,
                         complianceStatus: result.complianceStatus,

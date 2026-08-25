@@ -1,6 +1,7 @@
 import { m } from "~/paraglide/messages";
 import type { AppendixPhoto } from "./types";
 import { printThumbWidth, PRINT_FIGURE_CLASS } from "./types";
+import { useAnchorId } from "./report-half-scope";
 
 /**
  * Commercial PCA Phase P — centralized photo appendix (Appendix B). Full-PCA
@@ -14,16 +15,19 @@ import { printThumbWidth, PRINT_FIGURE_CLASS } from "./types";
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 export function PhotoAppendix({ photos, isPrint }: { photos: AppendixPhoto[]; isPrint: boolean }) {
+  // Both the heading and every `photo-N` figure are link targets, so both are
+  // namespaced per half — see report-half-scope.
+  const anchorId = useAnchorId();
   if (!photos.length) return null;
   const w = printThumbWidth(isPrint);
   return (
-    <section className="mt-10 print:break-before-page" aria-labelledby="appendix-b-heading">
-      <h2 id="appendix-b-heading" className="mb-4 text-lg font-semibold text-ih-fg-1">
+    <section className="mt-10 print:break-before-page" aria-labelledby={anchorId("appendix-b-heading")}>
+      <h2 id={anchorId("appendix-b-heading")} className="mb-4 text-lg font-semibold text-ih-fg-1">
         {m.pca_photo_appendix_title()}
       </h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 print:grid-cols-3">
         {photos.map((p) => (
-          <figure key={p.photoNo} id={`photo-${p.photoNo}`} className={`${PRINT_FIGURE_CLASS} text-sm`}>
+          <figure key={p.photoNo} id={anchorId(`photo-${p.photoNo}`)} className={`${PRINT_FIGURE_CLASS} text-sm`}>
             <img
               src={`${p.url}&w=${w}`}
               alt={`${p.itemLabel} — ${p.sectionTitle}`}

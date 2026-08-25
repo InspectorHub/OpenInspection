@@ -184,6 +184,7 @@
   "settings_data_export_subtitle": "Descargue sus datos en formato CSV o JSON. Se incluyen todos los registros históricos.",
   "settings_data_export_inspections_csv": "CSV de inspecciones",
   "settings_data_export_contacts_csv": "CSV de contactos",
+  "settings_data_export_members_csv": "CSV de miembros del equipo",
   "settings_data_export_full_json": "JSON completo",
   "settings_data_import_heading": "Importar contactos",
   "settings_data_import_subtitle": "Admite los formatos de exportación de Spectora e Inspector Toolbelt. Los duplicados (mismo correo electrónico) se omiten.",

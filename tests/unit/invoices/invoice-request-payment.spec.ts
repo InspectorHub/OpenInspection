@@ -15,6 +15,7 @@ import { PortalAccessService } from '../../../server/services/portal-access.serv
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 /**
  * Task 8 (Issue #111) — POST /api/invoices/request-payment.
@@ -72,7 +73,10 @@ function buildApp(role = 'manager') {
 }
 
 const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com', JWT_SECRET } as never;
-const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const CTX = makeExecutionContext().ctx;
 
 function post(body: unknown, role = 'manager') {
     const req = new Request('https://acme.example.com/api/invoices/request-payment', {

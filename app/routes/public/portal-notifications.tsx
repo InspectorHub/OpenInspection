@@ -62,7 +62,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs): Pr
   try {
     brand = await resolveTenantBrand(context, tenant, request);
   } catch {
-    brand = EMPTY_BRAND;
+    // Leave the empty brand: unbranded beats not rendering.
   }
 
   // `me` decides authed-vs-not, exactly as the portal landing does, so the two

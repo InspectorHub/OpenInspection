@@ -17,46 +17,28 @@ beforeEach(async () => {
 const config = () => db.select().from(schema.tenantConfigs)
     .where(eq(schema.tenantConfigs.tenantId, TENANT)).get();
 
-describe('the attestation records the destination, not just the key', () => {
-    it('stores endpoint, model, service tier and intended use beside the key facts', async () => {
-        await db.insert(schema.tenantConfigs).values({
-            tenantId: TENANT, updatedAt: new Date(),
-            aiKeyAttestationProvider: 'openai_compatible',
-            aiKeyAttestationEndpoint: 'https://api.example.test/openai/v1',
-            aiKeyAttestationModel: 'a-model',
-            aiKeyAttestationServiceTier: 'paid',
-            aiKeyAttestationIntendedUse: 'inspection comment drafting',
-            aiKeyAttestationConfigVersion: 3,
-        });
-        expect(config()).toMatchObject({
-            aiKeyAttestationProvider: 'openai_compatible',
-            aiKeyAttestationEndpoint: 'https://api.example.test/openai/v1',
-            aiKeyAttestationModel: 'a-model',
-            aiKeyAttestationServiceTier: 'paid',
-            aiKeyAttestationConfigVersion: 3,
-        });
-    });
-
-    it('starts the configuration version at zero, so an untouched workspace still has one', async () => {
-        await db.insert(schema.tenantConfigs).values({ tenantId: TENANT, updatedAt: new Date() });
-        expect(config()!.aiConfigVersion).toBe(0);
-    });
-
-    it('leaves every attestation field null until somebody attests', async () => {
-        // The positive control on the default above: a migration that
-        // backfilled these would make an attestation exist for a workspace
-        // that never made one, which is the worst possible failure for a
-        // record whose entire value is that a person stated it.
-        await db.insert(schema.tenantConfigs).values({ tenantId: TENANT, updatedAt: new Date() });
-        expect(config()).toMatchObject({
-            aiKeyAttestationEndpoint: null,
-            aiKeyAttestationModel: null,
-            aiKeyAttestationServiceTier: null,
-            aiKeyAttestationIntendedUse: null,
-            aiKeyAttestationConfigVersion: null,
-        });
-    });
-});
+/**
+ * ⚠️ A describe block stood here, and what it was doing is worth recording.
+ *
+ * It asserted that `ai_key_attestation_endpoint`, `_model`, `_service_tier`,
+ * `_intended_use` and `_config_version` round-tripped — the "record the
+ * destination, not just the key" half of the attestation. Every one of those
+ * assertions passed, and none of them meant anything: `AiKeyAttestationRecord`
+ * carries no such fields, so the secrets save could not write them even in
+ * principle. **This spec was the only thing that had ever put a value in those
+ * five columns**, and it was inserting them with Drizzle and reading them back,
+ * which proves SQLite stores what you give it.
+ *
+ * They were left behind when the AI fields moved to `tenant_ai_configs` /
+ * `tenant_ai_attestations`, so the assertions went with them. What the live
+ * attestation actually records is covered in
+ * `tests/unit/secrets/byo-ai-attestation.spec.ts`, against the save path rather
+ * than against the table.
+ *
+ * The version-starts-at-zero case moved too, to `ai-config-save.spec.ts`, where
+ * it now says what is true after the split: there is no row, and therefore no
+ * version, until the first save.
+ */
 
 describe('provenance answers which configuration was in force', () => {
     it('records the configuration version alongside the backend that ran', async () => {

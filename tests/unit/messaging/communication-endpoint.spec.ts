@@ -23,6 +23,7 @@ import automationRoutes from '../../../server/api/automations';
 import { MessageService } from '../../../server/services/message.service';
 import { AutomationService } from '../../../server/services/automation.service';
 import type { HonoConfig } from '../../../server/types/hono';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = 't-comm-1';
 const OTHER_TENANT = 't-comm-2';
@@ -49,7 +50,10 @@ function buildApp() {
 }
 
 const ENV = { DB: {} } as never;
-const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
+// Settled at teardown by the helper. A no-op stub still lets the promise RUN --
+// it only removes any way to await it, which is how a run with every test
+// passing could still exit 1 on an unhandled teardown rejection.
+const CTX = makeExecutionContext().ctx;
 
 beforeEach(async () => {
     const fixture = createTestDb();

@@ -114,6 +114,7 @@ export interface ContactMapping {
     email?: string;
     phone?: string;
     agency?: string;
+    notes?: string;
     type: ValueSource<BundleContactType>;
 }
 

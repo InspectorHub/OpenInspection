@@ -249,7 +249,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "calendar-read-set-save") {
     const connectionId = String(form.get("connectionId") ?? "");
-    let readCalendarIds: string[] = [];
+    let readCalendarIds: string[];
     try {
       readCalendarIds = JSON.parse(String(form.get("readCalendarIds") ?? "[]"));
     } catch {

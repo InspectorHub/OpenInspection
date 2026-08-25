@@ -25,6 +25,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 // eslint-disable-next-line import/order
 import usageRoutes from '../../../server/api/usage';
 import { MeteringService } from '../../../server/services/metering.service';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = 't-usage-1';
 
@@ -46,8 +47,13 @@ function buildApp(db: BetterSQLite3Database<typeof schema>, profile: typeof SAAS
     return app;
 }
 
+/** One context for the file, not one per call. `makeExecutionContext` registers
+ *  the teardown that settles background work, and `afterEach` is only
+ *  registrable while a suite is being COLLECTED -- building a fresh context
+ *  inside a test would silently settle nothing. */
+const EXEC_CTX = makeExecutionContext().ctx;
 function makeExecCtx() {
-    return { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
+    return EXEC_CTX;
 }
 
 describe('GET /api/usage/summary', () => {

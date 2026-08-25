@@ -4,8 +4,8 @@ import { syncOutbox } from '../lib/db/schema';
 import { SYNC_OUTBOX_STATUS } from '../lib/status/sync-outbox-status';
 import { logger } from '../lib/logger';
 import { toCloudEvent } from '../lib/sync-events/envelope';
-import type { SyncEnvelope } from '../lib/sync-events/envelope';
-import type { UserSyncEvent, UserSyncOutbox } from '../lib/integration/user-sync';
+import type { CmdReplyEventType, SyncEnvelope } from '../lib/sync-events/envelope';
+import type { MigrationSyncEvent, TenantSyncEvent, UserSyncEvent, UserSyncOutbox } from '../lib/integration/user-sync';
 
 /**
  * Core -> Portal sync outbox (A-13/A-14, Cloudflare Queues transport).
@@ -32,25 +32,24 @@ import type { UserSyncEvent, UserSyncOutbox } from '../lib/integration/user-sync
 // (replies are not user-lifecycle events).
 // P3 adds the two DSAR replies (`reply.subject.*`) to the same channel.
 //
-// ⚠️ This union and `CmdReplyType` in `cmd-reply.ts` must list the same replies.
-// They are two lists of one fact, and a reply added to only one of them compiles
-// on the emitting side and is unassignable here — which is how the correction
-// reply first failed. If a third list ever appears, make one of them derive.
-type CmdReplyEventType = 'reply.tenant.updated' | 'reply.tenant.export_completed' | 'reply.tenant.purged'
-    | 'reply.subject.exported' | 'reply.subject.erased' | 'reply.report.corrected';
-/** Tenant-lifecycle events that are NOT user events (no user SID involved). */
-type TenantSyncEventType = 'io.inspectorhub.tenant.compliance_status_updated';
-export type OutboxEvent = UserSyncEvent | {
+// ⚠️ NOTHING HERE RESTATES AN EVENT NAME, and that is the point. This union
+// used to spell out its own copy of the reply list and its own tenant type, and
+// the old comment in this slot asked the next reader to keep it in step with
+// `CmdReplyType` in `cmd-reply.ts` by hand — "two lists of one fact", it said,
+// having already been bitten once when the correction reply compiled on the
+// emitting side and was unassignable here. The prediction was right and the
+// remedy was too weak: the tenant member drifted anyway, in a way no amount of
+// keeping-in-step would have caught, because it drifted away from a THIRD list
+// (the wire registry) that the warning did not mention.
+//
+// So every member below is now an `Extract<>` off `SyncEventType` in
+// lib/sync-events/envelope, which is itself `keyof typeof SCHEMAS`. There is one
+// list, it is the one the wire is built from, and an event type absent from it
+// cannot be passed to `append()` — that is a compile error, proven by
+// tests/unit/sync/outbox-event-type-closed.spec-d.ts.
+export type OutboxEvent = UserSyncEvent | TenantSyncEvent | MigrationSyncEvent | {
     type: CmdReplyEventType;
     payload: Record<string, unknown>;
-} | {
-    type: TenantSyncEventType;
-    payload: {
-        tenantId: string;
-        complianceStatus: string;
-        rejectionReason: string | null;
-        updatedAt: number;
-    };
 };
 
 export interface OutboxRow {
@@ -82,9 +81,21 @@ export class OutboxService implements UserSyncOutbox {
         private publish?: (row: OutboxRow) => void,
     ) {}
 
+    /**
+     * `drizzle(this.db)` — no cast. The `as any` that used to sit here was not
+     * working around anything: `drizzle`'s parameter is `AnyD1Database`, which
+     * resolves to exactly the global `D1Database` this class already holds
+     * (`@miniflare/d1` is not a dependency, so drizzle's optional Miniflare arm
+     * collapses to `never`). It compiles unchanged with the cast removed.
+     *
+     * Its real cost was the suppression comment above it, which disabled
+     * `no-explicit-any` for the line and left the file looking like it had a
+     * reviewed exception. There are further `drizzle(… as any)` and
+     * `drizzle(… as never)` sites under server/api/ that are almost certainly
+     * the same non-problem, copied outward from somewhere like here.
+     */
     private getDb() {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return drizzle(this.db as any);
+        return drizzle(this.db);
     }
 
     /**

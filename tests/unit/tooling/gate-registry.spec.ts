@@ -103,6 +103,49 @@ describe('gate registry', () => {
             // repair is a one-line edit closes when the commit is created.
             // Measured at 0.67s over 3,605 files, so the rung costs nothing.
             'privatereview',
+            // Added 2026-08-24 with the agent-terms route classification, and
+            // the lock caught it: the gate was registered at this rung without
+            // this entry, so `npm run test:unit` went red on a tree whose
+            // pre-commit hook and pre-push hook were both green. That is the
+            // lock working, not failing — this rung is the one place where
+            // joining is supposed to cost an argument.
+            //
+            // It earns pre-commit on the family argument: what it catches is a
+            // route added with no classification row, and an unclassified route
+            // is simply absent from the exemption reckoning. Nothing goes red;
+            // the gate that decides whether an agent must accept the terms just
+            // answers nothing for that path. A green run that means less than
+            // it looks like — the same shape as `gateregistry` and
+            // `chromerecord` above.
+            //
+            // It is not hypothetical. When this gate was designed the plan
+            // named five unclassified routes; the real universe was 25, and the
+            // preference routes mount from `server/api/agent.ts` rather than
+            // `server/index.ts`, so a parser reading only the index would have
+            // reported a clean run over 20 routes and missed five in silence.
+            // Cost: parses ~12 source files with the TypeScript parser,
+            // single-digit milliseconds in the shared process.
+            'agenttermsclass',
+            // Added 2026-08-25 with the tenant_configs split, and the lock did
+            // its job again: registered at this rung without this entry, so the
+            // full run went red on a tree whose pre-commit hook was green.
+            //
+            // It earns pre-commit on a different argument from the others. This
+            // one does not catch a green run that means less than it looks
+            // like — it catches a change that CANNOT WORK, and catches it at the
+            // only moment the fix is cheap. D1 refuses a CREATE TABLE above 100
+            // columns, and what crosses that line is always one person adding
+            // one column. At the push rung the schema, the migration and the
+            // hand-maintained inline DDL have all already been written against
+            // a shape the database will not accept, and if it reaches a
+            // deployed table the only way back is an expand-migrate-contract
+            // sequence spanning several deploys.
+            //
+            // Not hypothetical: tenant_configs hit exactly 100 and the next
+            // column could not be added at all. Nothing in the tree noticed —
+            // db:check compares schema against migrations and is equally happy
+            // with 101 in both. Cost: reads the schema directory, ~40ms.
+            'columnceiling',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);
@@ -147,6 +190,30 @@ describe('gate registry', () => {
         // Without --check this script WRITES docs/reference/database-schema.md.
         // A gate that rewrites the file it is checking always passes.
         expect(schemaDoc!.args).toEqual(['--check']);
+    });
+
+    it('runs the copy-policy gates against the repository, not against their own fixtures', () => {
+        // Both copy gates accept `--self-test`: they score their patterns against
+        // a labelled must-flag / must-not-flag list, print "self-test OK" and
+        // exit 0 WITHOUT reading a single catalogue. That is a useful mode and a
+        // dangerous registration — registered with those args, the gate passes
+        // forever while looking at nothing, which is this repository's oldest
+        // failure shape.
+        //
+        // The shape is not hypothetical here: `chromerecord` a few rows above is
+        // registered exactly that way, deliberately, so the pattern is sitting
+        // in the same file waiting to be copied onto a gate whose whole value is
+        // the scan. This locks the two that must never take it.
+        for (const key of ['verificationcopy', 'endorsementcopy']) {
+            const gate = SCRIPT_GATES.find((g) => g.key === key);
+            expect(gate, `${key} is not registered`).toBeDefined();
+            expect(
+                gate!.args,
+                `${key} is registered with args ${JSON.stringify(gate!.args)} — a copy gate that runs `
+                + 'its self-test instead of its scan reports a clean catalogue it never opened',
+            ).toBeUndefined();
+            expect(gate!.rung, `${key} should stay on the push rung`).toBe(PUSH);
+        }
     });
 
     it('summarises a run with both numbers, not just the failures', async () => {

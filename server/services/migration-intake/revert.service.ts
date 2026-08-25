@@ -248,6 +248,7 @@ export class MigrationRevertService {
                 name: prior.name,
                 phone: prior.phone,
                 agency: prior.agency,
+                notes: prior.notes,
                 type: prior.type,
             }).where(and(eq(contacts.id, createdId), eq(contacts.tenantId, tenantId)));
             return { kind: 'reverted' };

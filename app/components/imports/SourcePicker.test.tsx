@@ -71,6 +71,22 @@ describe("SourcePicker: how long it takes", () => {
         expect(homegauge?.textContent).toMatch(/working days/i);
     });
 
+    it("offers the PDF route WITHOUT dropping the commitment it sits beside", () => {
+        // 🔴 Both sentences, and this asserts both — because the failure mode is
+        // that the faster option quietly replaces the disclosure rather than
+        // joining it. An earlier attempt at this did exactly that, and the
+        // "working days" test above is what caught it.
+        //
+        // It also has to be here at all: the panel below this picker now offers
+        // the PDF route, and before this line the selected card told the
+        // operator to export a spreadsheet while the panel underneath asked for
+        // a printed PDF. Both were on one screen and every unit test passed.
+        renderPicker();
+        const homegauge = screen.getByRole("radio", { name: /HomeGauge/i }).closest("label");
+        expect(homegauge?.textContent).toMatch(/working days/i);
+        expect(homegauge?.textContent).toMatch(/print a blank template to PDF/i);
+    });
+
     it("POSITIVE CONTROL — a product with a reader does NOT show that timescale", () => {
         renderPicker();
         const spectora = screen.getByRole("radio", { name: /Spectora/i }).closest("label");
@@ -78,6 +94,34 @@ describe("SourcePicker: how long it takes", () => {
         // And it does say what happens instead, so the absence above is a
         // different sentence rather than a missing one.
         expect(spectora?.textContent).toMatch(/stay on this page/i);
+    });
+
+    it("STATES A DURATION for a product with a reader — spec §3.2b requires one on every path", () => {
+        // This assertion could not be written until 2026-08-25, and the reason
+        // is the point of it. §3.2b asks every source path to say how long it
+        // takes; the assisted path has said "2 working days / back within 10"
+        // all along, and the readable path said only "stay on this page" —
+        // true, and not an answer to the question. The gap was deliberate:
+        // nobody had timed a real conversion in workerd, and an invented
+        // duration is worse than none.
+        //
+        // It has now been timed. tests/fixtures/intake/manifest.json carries
+        // the numbers against the file hashes they were measured on: 43 ms
+        // median for the 1873-row spreadsheet, 9 ms for the 357-item template
+        // archive, in real workerd, with a linear scaling curve behind them.
+        // So the sentence can carry a scale honestly.
+        //
+        // Matching the SCALE and not a number: the copy must not harden into a
+        // figure, because the wait a person actually experiences is dominated
+        // by their upload, not by the 43 ms at the far end.
+        renderPicker();
+        const spectora = screen.getByRole("radio", { name: /Spectora/i }).closest("label");
+        expect(spectora?.textContent).toMatch(/seconds/i);
+        // NOT the "you can leave this page" escape hatch §3.2b attaches to a
+        // path over a few seconds. Asserting its ABSENCE is what stops the two
+        // sentences being pasted together: this path holds the request open,
+        // so an invitation to leave would lose the operator their import.
+        expect(spectora?.textContent).not.toMatch(/leave this page/i);
     });
 
     it("does not promise a person where this deployment has none", () => {

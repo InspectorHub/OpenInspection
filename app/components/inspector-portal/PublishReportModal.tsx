@@ -14,6 +14,9 @@ export function PublishReportModal({
   agreementRequired,
   paymentRequired,
   isAmendment,
+  courtesyTranslationEnabled,
+  courtesyTranslationLocale,
+  clientPrefersTranslation,
   fetcher,
   submitting,
   error,
@@ -24,6 +27,25 @@ export function PublishReportModal({
   paymentRequired: boolean;
   /** IA-40 — this publish creates versionNumber > 1; ask what changed. */
   isAmendment: boolean;
+  /**
+   * #23 — whether this workspace may PRODUCE a courtesy translation.
+   *
+   * The opt-in renders only when it may. Offering a control that the server
+   * would refuse is the "a page must never offer an action the API refuses"
+   * rule, and here the refusal costs a publish's worth of confusion.
+   */
+  courtesyTranslationEnabled: boolean;
+  /** The locale a translation would be produced in, e.g. `es-419`. */
+  courtesyTranslationLocale: string;
+  /**
+   * True when the client's own preferred language is the one a translation
+   * would be produced in.
+   *
+   * A NUDGE and nothing more. It never pre-ticks the box: producing a
+   * translation spends money, and a default that spends it is a decision the
+   * product made on somebody's behalf.
+   */
+  clientPrefersTranslation: boolean;
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
   submitting: boolean;
   error: string | undefined;
@@ -74,6 +96,33 @@ export function PublishReportModal({
           label={m.hub_publish_require_payment()}
           defaultChecked={paymentRequired}
         />
+
+        {/* #23 — the per-publish opt-in. DEFAULT OFF, and it is a checkbox
+            rather than a default because producing a translation spends money
+            and the decision stays with whoever incurs it. The value posted is
+            the LOCALE, so the server is told what was asked for rather than
+            having to guess from a boolean. */}
+        {courtesyTranslationEnabled && (
+          <div>
+            <label className="flex items-center gap-2.5 text-[13px] text-ih-fg-1 cursor-pointer">
+              <input
+                type="checkbox"
+                name="translateTo"
+                value={courtesyTranslationLocale}
+                defaultChecked={false}
+                className="rounded border-ih-border text-ih-primary focus:ring-ih-primary"
+              />
+              <span>{m.courtesy_translation_publish_optin()}</span>
+            </label>
+            {/* The nudge. A fact about the recipient, stated once, next to the
+                control it is relevant to — never a pre-ticked box. */}
+            {clientPrefersTranslation && (
+              <p className="text-[12px] text-ih-fg-3 mt-1 ml-6" data-testid="courtesy-translation-nudge">
+                {m.courtesy_translation_publish_nudge()}
+              </p>
+            )}
+          </div>
+        )}
 
         {isAmendment && (
           <label className="block">

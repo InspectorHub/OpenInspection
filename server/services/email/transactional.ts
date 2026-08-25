@@ -300,7 +300,7 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             const client = await new PeopleService({ DB: deps.db }).getPrimaryClient(insp.tenantId, insp.id);
 
             let to: string | null = null;
-            let viewUrl = '';
+            let viewUrl: string;
             if (recipient === 'client') {
                 // Per-contact threading: the caller names the THREAD's contact.
                 // Falling back to the primary client keeps legacy callers working.

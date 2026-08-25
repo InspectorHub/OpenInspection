@@ -20,6 +20,7 @@ import { RecordingEmailProvider } from './providers/recording';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../db/schema';
+import { readTenantAi } from '../ai/load-tenant-ai';
 import { isAiKeyAttestationOnFile } from '../ai/byo-attestation';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 
@@ -308,27 +309,15 @@ async function loadEmailSecrets(env: EmailServiceEnv, tenantId: string): Promise
  */
 export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: string): Promise<LoadedEmailConfig> {
     const branding = new BrandingService(env.DB, env.TENANT_CACHE);
-    // One `tenant_configs` row read per request, projected. The AI confirmation
-    // columns ride along because the AI CREDENTIAL is already loaded by this same
-    // function (`dbSecrets.geminiApiKey`), and the two must describe the same
-    // moment: a key read here and a confirmation read somewhere else could
-    // disagree, which is the one thing the confirmation exists to prevent.
-    // Widening the projection costs nothing — the row is already being fetched.
-    const configReadPromise = (async () => {
+    // The `tenant_configs` projection is down to the one field this function is
+    // actually about. The AI fields used to ride along because the row was
+    // already being fetched — they moved to their own tables when that table
+    // hit D1's column ceiling, so the coupling lost its argument and went with
+    // them. `readTenantAi` states the atomicity invariant it inherited.
+    const emailConfigReadPromise = (async () => {
         try {
             return await drizzle(env.DB)
-                .select({
-                    emailByoProvider: tenantConfigs.emailByoProvider,
-                    provider: tenantConfigs.aiKeyAttestationProvider,
-                    mode: tenantConfigs.aiKeyAttestationMode,
-                    accountOwner: tenantConfigs.aiKeyAttestationAccountOwner,
-                    termsVersion: tenantConfigs.aiKeyAttestationTermsVersion,
-                    attestedAt: tenantConfigs.aiKeyAttestationAttestedAt,
-                    policyVersion: tenantConfigs.aiKeyAttestationPolicyVersion,
-                    aiEnabled: tenantConfigs.aiEnabled,
-                    aiBaseUrl: tenantConfigs.aiBaseUrl,
-                    aiModel: tenantConfigs.aiModel,
-                })
+                .select({ emailByoProvider: tenantConfigs.emailByoProvider })
                 .from(tenantConfigs)
                 .where(eq(tenantConfigs.tenantId, tenantId))
                 .get();
@@ -336,13 +325,18 @@ export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: stri
             return null;
         }
     })();
+    // Folded into the same `Promise.all` below, so two more concurrent D1
+    // queries and no extra round-trip depth.
+    const ai = readTenantAi(env.DB, tenantId);
 
-    const [emailIdentity, emailBrand, dbSecrets, overrides, configRow] = await Promise.all([
+    const [emailIdentity, emailBrand, dbSecrets, overrides, configRow, attestationRow, aiConfigRow] = await Promise.all([
         branding.getEmailIdentity(tenantId).catch(() => undefined),
         branding.getEmailBrand(tenantId).catch(() => undefined),
         loadEmailSecrets(env, tenantId).catch(() => ({} as LoadedEmailConfig['dbSecrets'])),
         new EmailTemplateService(env.DB).listForTenant(tenantId).catch(() => []),
-        configReadPromise,
+        emailConfigReadPromise,
+        ai.attestation,
+        ai.config,
     ]);
     const emailOverrides = overrides.length ? new Map(overrides.map(o => [o.trigger, o])) : undefined;
     // emailByoProvider defaults to 'resend' when the row is absent (new tenant,
@@ -352,16 +346,19 @@ export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: stri
     // A failed or absent read resolves to `false`, which is the same answer as
     // "never confirmed" — the AI gate stays closed rather than opening on an
     // error it could not read.
-    const aiKeyAttested = isAiKeyAttestationOnFile(configRow);
+    // The row's EXISTENCE is now the answer. As six nullable columns this had
+    // to check that all six were non-null together, an invariant nothing could
+    // enforce; a row in `tenant_ai_attestations` cannot be half-written.
+    const aiKeyAttested = isAiKeyAttestationOnFile(attestationRow);
     return {
         emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider, aiKeyAttested,
         // A missing row is a workspace that has not switched anything off, not
         // one that switched AI off — `?? true` rather than `?? false`, and the
         // opposite reading of the attestation above on purpose: one is a
         // permission that must be established, this is one that must be revoked.
-        aiEnabled: configRow?.aiEnabled ?? true,
-        aiBaseUrl: configRow?.aiBaseUrl ?? null,
-        aiModel: configRow?.aiModel ?? null,
+        aiEnabled: aiConfigRow?.aiEnabled ?? true,
+        aiBaseUrl: aiConfigRow?.aiBaseUrl ?? null,
+        aiModel: aiConfigRow?.aiModel ?? null,
     };
 }
 

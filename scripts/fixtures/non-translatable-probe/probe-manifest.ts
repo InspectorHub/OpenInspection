@@ -6,7 +6,7 @@
  * registry and relies on being reverted is one interrupted run away from being
  * committed (same reasoning as `scripts/fixtures/retention-gate-probe`).
  *
- * The category tuple here is the CORRECT eight. Disagreement between the source
+ * The category tuple here is the CORRECT list. Disagreement between the source
  * list and the gate's own copy is proven by breaking the real file, not here —
  * keeping it correct in the probe is what lets the other failures be read.
  */
@@ -19,6 +19,9 @@ export const NON_TRANSLATABLE_CATEGORIES = [
     'contract_terms',
     'signature',
     'acknowledgement',
+    'legal_notice',
+    'consent_waiver',
+    'statutory_certification',
 ] as const;
 
 export const NON_TRANSLATABLE_MANIFEST = [
@@ -102,6 +105,30 @@ export const NON_TRANSLATABLE_MANIFEST = [
         locator: 'PROBE_LIABILITY',
         reason: 'this id is claimed by both registers',
     },
+    // OK — the three categories added when the classification was completed.
+    // They are APPENDED so the `manifest #N` positions the spec asserts on stay
+    // put; an inserted entry renumbers every assertion after it.
+    {
+        id: 'probe-ok-legal-notice',
+        category: 'legal_notice',
+        source: 'probe-clean-source.ts',
+        locator: 'PROBE_LIABILITY',
+        reason: 'positive control: a notice whose wording is the operative act',
+    },
+    {
+        id: 'probe-ok-consent-waiver',
+        category: 'consent_waiver',
+        source: 'probe-clean-source.ts',
+        locator: 'PROBE_RELIANCE',
+        reason: 'positive control: a waiver gives something up, unlike an acknowledgement',
+    },
+    {
+        id: 'probe-ok-statutory-certification',
+        category: 'statutory_certification',
+        source: 'probe-clean-source.ts',
+        locator: 'PROBE_SIGNATURE_BLOCK',
+        reason: 'positive control: prescribed form language reproduced, not composed',
+    },
     // NOTE: no `arbitration` entry anywhere above. That omission is the
-    // coverage violation — seven of eight categories reads as complete.
+    // coverage violation — a register missing one category reads as complete.
 ];

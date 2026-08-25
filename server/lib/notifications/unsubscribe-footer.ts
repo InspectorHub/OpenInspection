@@ -84,7 +84,7 @@ export async function deliverWithUnsubscribe(
         // FAIL-OPEN, like every other gate on this path: a link we could not
         // mint must never be the reason the message did not go out.
         let url: string | null = null;
-        try { url = await links.linkFor(classId, addr); } catch { url = null; }
+        try { url = await links.linkFor(classId, addr); } catch { /* leave null: send without the footer */ }
         return { addr, html: url ? `${html}\n${unsubscribeFooterHtml(url)}` : html };
     }));
 

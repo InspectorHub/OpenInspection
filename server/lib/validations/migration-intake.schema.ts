@@ -106,6 +106,7 @@ export const RemapRequestSchema = z.object({
                 email: z.string().min(1).optional().describe('Column holding the email address'),
                 phone: z.string().min(1).optional().describe('Column holding the phone number'),
                 agency: z.string().min(1).optional().describe('Column holding the agency or company'),
+                notes: z.string().min(1).optional().describe('Column holding free-text notes'),
                 type: valueSource(z.enum(BUNDLE_CONTACT_TYPES))
                     .describe('Where each contact\'s type comes from'),
             }).strict(),

@@ -26,7 +26,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   try {
     profileRes = await api.agent.profile.$get();
   } catch {
-    profileRes = null;
+    // Leave it null: the caller treats absent as not-yet-accepted.
   }
 
   // The agent-terms gate refuses every authenticated agent request with 428
