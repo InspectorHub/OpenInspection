@@ -121,7 +121,7 @@ describe('AIService.rewriteComment', () => {
         const svc = new AIService(
             {} as D1Database, 'test-key', 'saas', 'test-model', undefined,
             OWN_CONFIRMED_KEY, PROVENANCE, undefined,
-            { id: 'x', complete: async () => { throw new Error('Failed to generate content from AI'); } },
+            { id: 'x', endpoint: 'https://stub.test/v1', complete: async () => { throw new Error('Failed to generate content from AI'); } },
         );
         await expect(svc.rewriteComment({
             itemLabel: 'Roof', sectionTitle: 'Roof', tab: 'defects',
@@ -150,7 +150,7 @@ describe('suggestComment — refusals reach the inspector, failures degrade', ()
         OWN_CONFIRMED_KEY,
         PROVENANCE,
         undefined,
-        { id: 'test', complete: async () => { throw err; } },
+        { id: 'test', endpoint: 'https://stub.test/v1', complete: async () => { throw err; } },
     );
 
     it('re-throws an upstream credential refusal instead of returning no suggestions', async () => {
@@ -181,7 +181,7 @@ describe('suggestComment — refusals reach the inspector, failures degrade', ()
         const svc = new AIService(
             {} as D1Database, 'test-key', 'saas', 'test-model', undefined,
             OWN_CONFIRMED_KEY, PROVENANCE, undefined,
-            { id: 'injected', complete: async (r) => { calls.push(r.prompt); return { text: '["a"]' }; } },
+            { id: 'injected', endpoint: 'https://stub.test/v1', complete: async (r) => { calls.push(r.prompt); return { text: '["a"]' }; } },
         );
         const out = await svc.suggestComment({ itemName: 'Roof', sectionName: 'Exterior' });
         expect(calls).toHaveLength(1);

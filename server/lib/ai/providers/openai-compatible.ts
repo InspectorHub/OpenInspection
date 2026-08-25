@@ -26,6 +26,7 @@ import { AI_REFUSAL_REASON } from '../refusal-reason';
 import { logger } from '../../logger';
 import { isAccessTokenSource, type AiCredential } from '../credential';
 import type { AiProvider, AiRequest, AiResponse } from '../provider';
+import { normaliseEndpoint } from '../endpoint';
 
 /** Status codes that mean "your credentials or your account", not "try again".
  *  These must reach the caller as a REFUSAL: on a workspace's own key it is
@@ -88,6 +89,10 @@ export interface OpenAiCompatibleCredentials {
 
 export class OpenAiCompatibleProvider implements AiProvider {
     readonly id: string;
+    /** Where this instance sends. Computed once, from the same `creds.baseUrl`
+     *  every request goes to, so the recorded destination cannot drift from the
+     *  actual one. */
+    readonly endpoint: string;
 
     constructor(private readonly creds: OpenAiCompatibleCredentials) {
         // A credential that refreshes itself KNOWS which backend it belongs to
@@ -97,6 +102,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
         this.id = isAccessTokenSource(creds.apiKey)
             ? creds.apiKey.providerId
             : deriveProviderId(creds.baseUrl, creds.model);
+        this.endpoint = normaliseEndpoint(creds.baseUrl);
     }
 
     /**

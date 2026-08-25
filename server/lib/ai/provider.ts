@@ -36,6 +36,21 @@ export interface AiProvider {
     readonly id: string;
 
     /**
+     * Where this adapter sends, normalised for recording — scheme, host, port
+     * and path, with credentials, query and fragment structurally absent
+     * (`normaliseEndpoint`).
+     *
+     * OBSERVED, like `id`: it names where THIS instance actually points, not
+     * what configuration said. `ai_call_provenance` exists to make a divergence
+     * between the two visible, so a value read back out of configuration would
+     * defeat the column that stores it.
+     *
+     * Backend-neutral by construction — every transport has a destination, and
+     * a test transport names itself exactly as it does for `id`.
+     */
+    readonly endpoint: string;
+
+    /**
      * Produce a completion. Implementations throw on transport/credential
      * failure — unlike EmailProvider.sendEmail, there is no result-shape
      * error channel here, because every existing AI call site already treats
