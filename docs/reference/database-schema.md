@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 106 |
-| Columns | 1232 |
+| Columns | 1233 |
 | Indexes (excluding primary keys) | 176 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 589 (48%) |
+| Columns carrying a source comment | 590 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -196,7 +196,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `ai_call_provenance`
 
-<sub>server/lib/db/schema/ai.ts · 9 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/ai.ts · 10 columns · primary key `id`</sub>
 
 > AI call provenance — one row per prompt this deployment sends to a model provider. WHY THE TABLE EXISTS.
 
@@ -210,7 +210,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `model` | text | NN |  |  | Model id as configured for the deployment at call time. Recorded because it is configuration: the same prompt version against a different model is a different output, and nothing else in the system remembers which one was in force. |
 | `prompt_version` | text | NN |  |  | The `AI_PROMPTS[…].version` token of the prompt that was rendered. The reason the tokens are names and not hashes: this column is what makes an old output distinguishable from a new one after a rewording. |
 | `created_at` | integer | NN IX |  |  | *Creation time, epoch milliseconds.* |
-| `config_version` | integer |  |  |  | `tenant_configs.ai_config_version` at the moment of the call. NULL for rows written before this column existed, and for the managed path, whose destination belongs to the deployment and does not move per workspace. **[more]** |
+| `config_version` | integer |  |  |  | `tenant_ai_configs.config_version` at the moment of the call. ⚠️ SUPERSEDED by `endpoint` below, and retired in the next release. **[more]** |
+| `endpoint` | text |  |  |  | Where the call actually went: scheme, host, port and path, normalised by `normaliseEndpoint` so credentials, query and fragment are structurally absent. **[more]** |
 
 **Indexes**
 
