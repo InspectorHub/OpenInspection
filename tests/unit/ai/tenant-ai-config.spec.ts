@@ -14,56 +14,58 @@ beforeEach(async () => {
     await db.insert(schema.tenants).values({ id: TENANT, slug: 'c1', createdAt: new Date() });
 });
 
-const config = () => db.select().from(schema.tenantConfigs)
-    .where(eq(schema.tenantConfigs.tenantId, TENANT)).get();
+const config = () => db.select().from(schema.tenantAiConfigs)
+    .where(eq(schema.tenantAiConfigs.tenantId, TENANT)).get();
 
 describe('tenant AI provider configuration', () => {
-    it('defaults to enabled, so existing workspaces are unaffected by the column arriving', async () => {
-        await db.insert(schema.tenantConfigs).values({ tenantId: TENANT, updatedAt: new Date() });
-        expect(config()!.aiEnabled).toBe(true);
+    it('defaults to enabled, so existing workspaces are unaffected by the table arriving', async () => {
+        await db.insert(schema.tenantAiConfigs).values({ tenantId: TENANT, updatedAt: new Date() });
+        expect(config()!.isEnabled).toBe(true);
     });
 
     it('leaves the endpoint and model unset until somebody sets them', async () => {
         // The positive control on "defaults to enabled": a migration that
         // filled every new column with a value would pass the assertion above
         // and quietly point every workspace at a destination nobody chose.
-        await db.insert(schema.tenantConfigs).values({ tenantId: TENANT, updatedAt: new Date() });
+        //
+        // `provider_kind` used to be asserted here too. It did not come across
+        // when these fields moved to their own table: an enum with one member
+        // that no code path ever set, so the only thing that had ever written
+        // it was this line.
+        await db.insert(schema.tenantAiConfigs).values({ tenantId: TENANT, updatedAt: new Date() });
         expect(config()).toMatchObject({
-            aiProviderKind: null,
-            aiBaseUrl: null,
-            aiModel: null,
+            baseUrl: null,
+            model: null,
         });
     });
 
-    it('stores a provider kind, base URL and model', async () => {
-        await db.insert(schema.tenantConfigs).values({
+    it('stores a base URL and model', async () => {
+        await db.insert(schema.tenantAiConfigs).values({
             tenantId: TENANT, updatedAt: new Date(),
-            aiProviderKind: 'openai_compatible',
-            aiBaseUrl: 'https://api.example.com/openai/v1',
-            aiModel: 'a-model',
+            baseUrl: 'https://api.example.com/openai/v1',
+            model: 'a-model',
         });
         expect(config()).toMatchObject({
-            aiProviderKind: 'openai_compatible',
-            aiBaseUrl: 'https://api.example.com/openai/v1',
-            aiModel: 'a-model',
+            baseUrl: 'https://api.example.com/openai/v1',
+            model: 'a-model',
         });
     });
 
     it('keeps base URL and model when AI is switched off', async () => {
         // The whole point of the flag: turning AI back on must not require
         // re-entering anything. "Off" is not a way to remove a credential.
-        await db.insert(schema.tenantConfigs).values({
+        await db.insert(schema.tenantAiConfigs).values({
             tenantId: TENANT, updatedAt: new Date(),
-            aiBaseUrl: 'https://api.example.com/openai/v1',
-            aiModel: 'a-model',
+            baseUrl: 'https://api.example.com/openai/v1',
+            model: 'a-model',
         });
-        await db.update(schema.tenantConfigs).set({ aiEnabled: false })
-            .where(eq(schema.tenantConfigs.tenantId, TENANT));
+        await db.update(schema.tenantAiConfigs).set({ isEnabled: false })
+            .where(eq(schema.tenantAiConfigs.tenantId, TENANT));
 
         expect(config()).toMatchObject({
-            aiEnabled: false,
-            aiBaseUrl: 'https://api.example.com/openai/v1',
-            aiModel: 'a-model',
+            isEnabled: false,
+            baseUrl: 'https://api.example.com/openai/v1',
+            model: 'a-model',
         });
     });
 });

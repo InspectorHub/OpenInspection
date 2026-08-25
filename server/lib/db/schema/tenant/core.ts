@@ -399,6 +399,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // the key was cleared, which withdraws the attestation with it.
     // Appended at END of the table per the D1 add-column-at-end rule
     // (tenant_configs is FK-referenced).
+    // ⚠️ SUPERSEDED to `aiKeyAttestationPolicyVersion`: these live in
+    // `tenant_ai_attestations` now and nothing here reads or writes them. They
+    // survive only until the contract migration, because migrations apply
+    // BEFORE the worker deploys. New reader or writer goes on the new table.
     // Widened from a single vendor because a destination the WORKSPACE chose
     // is not one this codebase gets to enumerate. Type-layer only in Drizzle —
     // no DDL is emitted for an enum change, and none is needed.
@@ -503,6 +507,8 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
      * Appended at END per the D1 add-column-at-end rule (tenant_configs is
      * FK-referenced).
      */
+    // ⚠️ SUPERSEDED — `tenant_ai_configs`. `ai_provider_kind` below never had a
+    // reader or a writer at all.
     aiEnabled: integer('is_ai_enabled', { mode: 'boolean' }).notNull().default(true),
     /**
      * Which wire protocol the configured endpoint speaks. NULL means "use the
@@ -540,6 +546,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
      * Appended at END per the D1 add-column-at-end rule.
      */
     aiConfigVersion: integer('ai_config_version').notNull().default(0),
+    // ⚠️ SUPERSEDED, and these five were never wired even here:
+    // `AiKeyAttestationRecord` has no such fields, so no path could write them.
+    // They did NOT move — relocating a field nothing writes only relocates the
+    // question. Wiring them up starts at the record type, not here.
     /**
      * WHAT THESE FIVE CAN AND CANNOT PROVE. They are a STATEMENT BY THE
      * WORKSPACE, recorded verbatim — not a measurement, and nothing here
@@ -599,6 +609,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
      * Appended at END per the D1 add-column-at-end rule (tenant_configs is
      * FK-referenced).
      */
+    // ⚠️ SUPERSEDED — `tenant_ai_configs.is_courtesy_translation_enabled`.
     courtesyTranslationEnabled: integer('is_courtesy_translation_enabled', { mode: 'boolean' }).notNull().default(false),
 });
 

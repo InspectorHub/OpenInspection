@@ -13,20 +13,23 @@
  *
  * Fails CLOSED: an unreadable or absent config row answers `false`. A workspace
  * that has never opened the settings page has not opted into per-publish spend,
- * and the absence of a choice is not a choice.
+ * and the absence of a choice is not a choice. Since these fields moved to
+ * `tenant_ai_configs`, "absent row" is the state EVERY workspace starts in
+ * rather than an edge case — which makes the fail-closed default the answer
+ * almost everyone gets, and the right one for exactly the same reason.
  */
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { tenantConfigs } from '../db/schema';
+import { tenantAiConfigs } from '../db/schema';
 
 export async function isCourtesyTranslationEnabled(
     db: D1Database,
     tenantId: string,
 ): Promise<boolean> {
     const row = await drizzle(db)
-        .select({ enabled: tenantConfigs.courtesyTranslationEnabled })
-        .from(tenantConfigs)
-        .where(eq(tenantConfigs.tenantId, tenantId))
+        .select({ enabled: tenantAiConfigs.isCourtesyTranslationEnabled })
+        .from(tenantAiConfigs)
+        .where(eq(tenantAiConfigs.tenantId, tenantId))
         .get();
     return row?.enabled === true;
 }

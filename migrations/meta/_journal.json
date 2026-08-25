@@ -260,6 +260,13 @@
       "when": 1787574473945,
       "tag": "0036_report_translation_setting",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1787620964651,
+      "tag": "0037_tenant_ai_tables",
+      "breakpoints": true
     }
   ]
 }

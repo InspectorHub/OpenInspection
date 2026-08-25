@@ -83,10 +83,18 @@ beforeEach(async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
     await db.insert(schema.tenantConfigs).values({
-        tenantId: TENANT, courtesyTranslationEnabled: true,
+        tenantId: TENANT,
         createdAt: new Date(), updatedAt: new Date(),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
+    // The production switch reads `tenant_ai_configs` — a separate table since
+    // the AI fields moved off `tenant_configs`, which had hit D1's 100-column
+    // ceiling. Seeding the old row alone leaves the switch OFF, which is the
+    // fail-closed default and would make every assertion below measure a
+    // refusal instead of the behaviour it names.
+    await db.insert(schema.tenantAiConfigs).values({
+        tenantId: TENANT, isCourtesyTranslationEnabled: true, updatedAt: new Date(),
+    });
     await db.insert(schema.templates).values({
         id: 'tpl-read', tenantId: TENANT, name: 'T', schema: SCHEMA,
         createdAt: new Date(), updatedAt: new Date(),
@@ -183,9 +191,9 @@ describe('the reader path never consults the tenant setting', () => {
         await storeFresh();
         expect(await read()).not.toBeNull();
 
-        await db.update(schema.tenantConfigs)
-            .set({ courtesyTranslationEnabled: false })
-            .where(eq(schema.tenantConfigs.tenantId, TENANT))
+        await db.update(schema.tenantAiConfigs)
+            .set({ isCourtesyTranslationEnabled: false })
+            .where(eq(schema.tenantAiConfigs.tenantId, TENANT))
             .run();
 
         // The invariant. A loader that asked "is this enabled?" before showing
