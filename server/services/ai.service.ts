@@ -237,6 +237,7 @@ export class AIService {
             capability: kind,
             promptVersion: prompt.version,
             provider: provider.id,
+            endpoint: provider.endpoint, // same instance as `provider`, called on the next line
         });
         const { text } = await provider.complete({ prompt: prompt.render(args) });
         // Meter AFTER success, never before — a model call that failed must not
