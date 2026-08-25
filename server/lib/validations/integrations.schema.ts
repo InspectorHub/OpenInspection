@@ -45,7 +45,18 @@ export const EmailValidateOkSchema = z
  */
 export const AiConfigBodySchema = z.object({
     aiEnabled: z.boolean().describe('Whether this workspace may be offered AI at all.'),
-    aiBaseUrl: z.string().max(300).describe('OpenAI-compatible base URL. Blank means unset.'),
+    // Blank is the only non-URL this accepts, and it means unset. Everything
+    // else must parse, which the connection-TEST schema below has always
+    // required — the two disagreeing let a workspace store a value the tester
+    // would have refused.
+    //
+    // ⚠️ This is NOT what keeps the recorded destination free of credentials.
+    // Values stored before this line existed are unaffected by it, and
+    // `ai_call_provenance.endpoint` is written from what is in the database.
+    // `normaliseEndpoint` strips structurally, on the way out, for that reason.
+    // A validator at the entrance is a door old data has already walked past.
+    aiBaseUrl: z.union([z.literal(''), z.string().url().max(300)])
+        .describe('OpenAI-compatible base URL. Blank means unset.'),
     aiModel: z.string().max(200).describe('Model id to send. Blank means unset.'),
     courtesyTranslationEnabled: z.boolean()
         .describe('Whether this workspace may PRODUCE a courtesy translation of a report. Gates production only — switching it off stops new translations being made and never removes one already delivered, because reader paths answer from stored rows and never consult this. Defaults false, unlike aiEnabled beside it: this is a decision to spend on every publish, and off is the absence of a choice.'),
