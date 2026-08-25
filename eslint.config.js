@@ -57,6 +57,48 @@ function toWarn(rules) {
 }
 
 export default tseslint.config(
+    // ── THE TWO LINES BELOW ARE WHERE UPSTREAM DECISIONS BECOME OURS ────
+    //
+    // Both presets are taken WHOLESALE, and both grow. ESLint and
+    // typescript-eslint each state up front that a major version adds rules to
+    // `recommended`, and that this can break an existing build. That is
+    // documented, expected behaviour — not an unwatched channel. It announces
+    // itself as a red `npm run lint`, which is the only rung that runs the full
+    // set, so the signal arrives late but it does arrive.
+    //
+    // Measured 2026-08-25: `@eslint/js` v10 promoted `no-useless-assignment`
+    // into `configs.recommended` at ERROR level. Nobody turned it on. It found
+    // 34 pre-existing dead assignments across 27 files and turned a green lint
+    // red — and every one of them was real.
+    //
+    // WHEN THAT HAPPENS AGAIN THERE ARE THREE OPTIONS, NOT TWO:
+    //
+    //   1. FIX THEM. The right answer when the findings are real and local, as
+    //      those 34 were — half of them verifiable by tsc's definite-assignment
+    //      analysis once the dead initialiser is dropped.
+    //
+    //   2. SUPPRESS THEM. `npx eslint --suppress-rule <name>` writes the
+    //      existing violations into `eslint-suppressions.json` and leaves the
+    //      rule at error, so NEW violations still fail; `--prune-suppressions`
+    //      removes entries as they are fixed. It is the same baseline-ratchet
+    //      shape as this repo's knip, file-size and tenant-scope gates, except
+    //      that ESLint ships and maintains it. Reach for this when the count
+    //      makes fixing a separate project rather than a task.
+    //
+    //   3. TURN IT OFF, with the reason written down — upstream's own guidance
+    //      is a comment saying why, or a TODO linking to an issue. A severity
+    //      downgrade with no stated reason is the one answer that is never
+    //      acceptable, because it looks identical to nobody having noticed.
+    //
+    // ⚠️ OPTION 2 IS WHY THIS COMMENT EXISTS. Faced with those 34, the first
+    // reaction was to downgrade the rule to 'warn' — because options 1 and 3
+    // looked like the whole menu. They are not, and a false binary between
+    // "fix all N now" and "stop enforcing it" is how a rule worth having gets
+    // switched off at N=500.
+    //
+    // Note the `pending cleanup` policy further down is a DIFFERENT thing: it
+    // governs the type-aware rules this config deliberately enables by name. A
+    // core rule arriving inside a preset is not covered by it.
     eslint.configs.recommended,
     ...tseslint.configs.recommended,
     {
