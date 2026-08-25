@@ -89,6 +89,12 @@ export interface AiAssuranceCall {
     mode: string;
     model: string;
     promptVersion: string;
+    /**
+     * Where the call went, normalised. Null only on rows written before the
+     * column existed — the reader has to be able to tell "we did not record it
+     * then" from "it went nowhere".
+     */
+    endpoint: string | null;
     calledAt: number;
     /**
      * Empty means NOBODY REVIEWED THE OUTPUT OF THIS CALL, which is the fact the
@@ -158,6 +164,7 @@ export async function readAiAssurance(
         mode:          aiCallProvenance.mode,
         model:         aiCallProvenance.model,
         promptVersion: aiCallProvenance.promptVersion,
+        endpoint:      aiCallProvenance.endpoint,
         createdAt:     aiCallProvenance.createdAt,
     })
         .from(aiCallProvenance)
@@ -225,6 +232,7 @@ export async function readAiAssurance(
         mode:          String(r.mode),
         model:         String(r.model),
         promptVersion: String(r.promptVersion),
+        endpoint:      r.endpoint === null || r.endpoint === undefined ? null : String(r.endpoint),
         calledAt:      toMs(r.createdAt),
         reviews:       byCall.get(String(r.id)) ?? [],
     }));

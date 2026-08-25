@@ -408,3 +408,25 @@ describe('endpoint — the destination the row was missing', () => {
         expect(row.configVersion).toBeNull();
     });
 });
+
+describe('the assurance export carries the destination', () => {
+    beforeEach(async () => {
+        await freshDb();
+    });
+
+    it('returns endpoint alongside provider and model', async () => {
+        // The export selects columns by name, not `select *`. A column added to
+        // the table and not to this list is a record of "what the automated
+        // system did on the tenant's behalf" that is missing where it went.
+        const sink = buildAiProvenanceSink({
+            db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'a-model',
+        })!;
+        await sink.record({
+            capability: 'assist', promptVersion: 'v1',
+            provider: 'h', endpoint: 'https://h/v1',
+        });
+        const { readAiAssurance } = await import('../../../server/lib/compliance/assurance-records');
+        const out = await readAiAssurance(db as never, { tenantId: TENANT });
+        expect(out.calls[0]).toMatchObject({ endpoint: 'https://h/v1' });
+    });
+});

@@ -399,9 +399,15 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // column changes this reasoning and needs a period AND something to enforce
     // it.
     //
+    // `endpoint` is the workspace's own configured destination, normalised so
+    // it cannot carry a credential. It is not any person's data — it is where
+    // the tenant chose to send their own workload — so it retains on the same
+    // basis as every other column here: a governance record you can delete on
+    // request cannot serve as one.
+    //
     // ⚠️ REVIEWER NOTE. Columns that carry no personal data would normally be
     // declared in `ERASURE_OUT_OF_SCOPE` (`erasure-out-of-scope.ts`) with a
-    // reason, which is arguably where these eight belong. They are recorded
+    // reason, which is arguably where these nine belong. They are recorded
     // here instead because a separate erasure-coverage audit was in flight over
     // that file when this landed and a concurrent edit to it would have been a
     // collision, not a decision. Moving them is a mechanical change and loses
@@ -414,4 +420,5 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     { table: 'ai_call_provenance', column: 'model',          category: 'system.operations', action: 'retain', legalBasis: 'art_17_3_b' },
     { table: 'ai_call_provenance', column: 'prompt_version', category: 'system.operations', action: 'retain', legalBasis: 'art_17_3_b' },
     { table: 'ai_call_provenance', column: 'created_at',     category: 'system.operations', action: 'retain', legalBasis: 'art_17_3_b' },
+    { table: 'ai_call_provenance', column: 'endpoint',       category: 'system.operations', action: 'retain', legalBasis: 'art_17_3_b' },
 ];
