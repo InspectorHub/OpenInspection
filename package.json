@@ -95,6 +95,7 @@
     "lint:fix": "eslint . --fix --cache",
     "security-scan": "npm audit --audit-level=high",
     "test:unit": "node scripts/run-logged.mjs unit -- vitest run --config vitest.api.config.ts",
+    "test:leaks": "vitest run --config vitest.api.config.ts --detect-async-leaks --testTimeout=120000 --hookTimeout=180000",
     "test:unit:isolation-debt": "vitest run --config vitest.api.config.ts --no-isolate",
     "test:unit:changed": "vitest run --changed --config vitest.api.config.ts",
     "test:web": "node scripts/run-logged.mjs web -- vitest run --config vitest.config.ts",
