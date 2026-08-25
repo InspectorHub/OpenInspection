@@ -240,7 +240,7 @@
       "note": "Decides whether archiving a contact also cuts that person's live links to their own report. A data subject's continued access to a record about them is not a question any round has reached; false (access survives archiving) is the default that takes nothing away."
     },
     {
-      "column": "courtesy_translation_enabled",
+      "column": "is_courtesy_translation_enabled",
       "property": "courtesyTranslationEnabled",
       "default_value": "false",
       "default_owner": "engine",

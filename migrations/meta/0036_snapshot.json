@@ -10479,8 +10479,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "courtesy_translation_enabled": {
-          "name": "courtesy_translation_enabled",
+        "is_courtesy_translation_enabled": {
+          "name": "is_courtesy_translation_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

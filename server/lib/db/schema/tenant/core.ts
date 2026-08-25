@@ -599,7 +599,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
      * Appended at END per the D1 add-column-at-end rule (tenant_configs is
      * FK-referenced).
      */
-    courtesyTranslationEnabled: integer('courtesy_translation_enabled', { mode: 'boolean' }).notNull().default(false),
+    courtesyTranslationEnabled: integer('is_courtesy_translation_enabled', { mode: 'boolean' }).notNull().default(false),
 });
 
 /**

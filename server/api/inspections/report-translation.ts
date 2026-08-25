@@ -22,7 +22,7 @@
  *
  * ## The switch gates production only
  *
- * `courtesy_translation_enabled` refuses a regenerate. It never refuses a
+ * `is_courtesy_translation_enabled` refuses a regenerate. It never refuses a
  * removal, and no reader ever consults it.
  */
 import { createRoute, z } from '@hono/zod-openapi';
