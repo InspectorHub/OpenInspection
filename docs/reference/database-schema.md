@@ -2592,7 +2592,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `ai_base_url` | text |  |  |  | Root of an OpenAI-compatible API. NULL means the deployment default (`AI_BASE_URL`). |
 | `ai_model` | text |  |  |  | Model id as the chosen backend names it. NULL means the deployment default (`AI_MODEL`). |
 | `ai_config_version` | integer | NN | `0` |  | Monotonic version of this workspace's AI configuration. Bumped on every saved change to provider, endpoint, model or key. **[more]** |
-| `ai_key_attestation_endpoint` | text |  |  |  | ⚠️ SUPERSEDED, and these five were never wired even here: no production path ever wrote them, because `AiKeyAttestationRecord` has no such fields. **[more]** |
+| `ai_key_attestation_endpoint` | text |  |  |  | ⚠️ SUPERSEDED, and these five were never wired even here: `AiKeyAttestationRecord` has no such fields, so no path could write them. **[more]** |
 | `ai_key_attestation_model` | text |  |  |  |  |
 | `ai_key_attestation_service_tier` | text |  |  |  | Which of the provider's terms the workspace says govern this account. A free tier and a paid tier are different contracts at most vendors, and no endpoint this client calls reports which one a key belongs to — so the workspace's statement is the only signal that exists. |
 | `ai_key_attestation_intended_use` | text |  |  |  | What the workspace says they are sending it for, in their own words. |

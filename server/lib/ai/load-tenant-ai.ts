@@ -1,7 +1,3 @@
-import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
-import { tenantAiConfigs, tenantAiAttestations } from '../db/schema';
-
 /**
  * A workspace's AI settings and its key attestation, read together.
  *
@@ -35,18 +31,21 @@ import { tenantAiConfigs, tenantAiAttestations } from '../db/schema';
  * row means a workspace that has switched nothing off. Neither can take email
  * sending down with it.
  */
-export interface LoadedTenantAi {
-    /** Non-null exactly when an attested key is on file. */
-    attestation: typeof tenantAiAttestations.$inferSelect | null;
-    aiEnabled: boolean;
-    aiBaseUrl: string | null;
-    aiModel: string | null;
-}
+import { drizzle } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
+import { tenantAiConfigs, tenantAiAttestations } from '../db/schema';
 
 /**
- * Both rows, concurrently. Returns two promises rather than awaiting them, so
+ * Both rows, concurrently. Returns two PROMISES rather than awaiting them, so
  * the caller can fold them into a `Promise.all` it is already running and pay
  * no extra round-trip depth.
+ *
+ * The resolved shapes are declared inline rather than as an exported interface.
+ * A named one existed here for exactly as long as it took the dead-code gate to
+ * point out that nothing imported it — a type describing a return value the
+ * signature already states is a second place for the same fact to drift from.
+ *
+ * `attestation` resolves non-null exactly when an attested key is on file.
  */
 export function readTenantAi(db: D1Database, tenantId: string): {
     attestation: Promise<typeof tenantAiAttestations.$inferSelect | null>;
