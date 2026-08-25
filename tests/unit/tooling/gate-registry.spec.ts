@@ -126,6 +126,26 @@ describe('gate registry', () => {
             // Cost: parses ~12 source files with the TypeScript parser,
             // single-digit milliseconds in the shared process.
             'agenttermsclass',
+            // Added 2026-08-25 with the tenant_configs split, and the lock did
+            // its job again: registered at this rung without this entry, so the
+            // full run went red on a tree whose pre-commit hook was green.
+            //
+            // It earns pre-commit on a different argument from the others. This
+            // one does not catch a green run that means less than it looks
+            // like — it catches a change that CANNOT WORK, and catches it at the
+            // only moment the fix is cheap. D1 refuses a CREATE TABLE above 100
+            // columns, and what crosses that line is always one person adding
+            // one column. At the push rung the schema, the migration and the
+            // hand-maintained inline DDL have all already been written against
+            // a shape the database will not accept, and if it reaches a
+            // deployed table the only way back is an expand-migrate-contract
+            // sequence spanning several deploys.
+            //
+            // Not hypothetical: tenant_configs hit exactly 100 and the next
+            // column could not be added at all. Nothing in the tree noticed —
+            // db:check compares schema against migrations and is equally happy
+            // with 101 in both. Cost: reads the schema directory, ~40ms.
+            'columnceiling',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);
