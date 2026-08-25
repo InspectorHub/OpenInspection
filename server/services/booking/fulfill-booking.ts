@@ -67,7 +67,7 @@ export async function fulfillBooking(
     const inspectionRequestService = c.var.services.inspectionRequest;
     let createdRequestId: string;
     let primaryInspectionId: string;
-    let allInspectionIds: string[] = [];
+    let allInspectionIds: string[];
     // Task 7b (people-role-profiles) — set only by the direct-insert
     // (legacy single-service) branch below. The multi-service branch
     // routes through InspectionRequestService.create, which owns its
@@ -294,7 +294,6 @@ export async function fulfillBooking(
             await snapshotOrderDeposit(db, tenantId, inspectionId, allInspectionIds, depositRequiredCents);
         }
     } catch (e) {
-        depositRequiredCents = 0;
         logger.error('booking.deposit.snapshot.failed', { inspectionId }, e instanceof Error ? e : undefined);
     }
 

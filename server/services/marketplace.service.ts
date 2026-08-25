@@ -452,7 +452,6 @@ export class MarketplaceService {
 
     const fromSemver = existing.importedSemver;
     const now = new Date();
-    let rowsAdded = 0;
     let rowsDeleted = 0;
     let rowsPreserved = 0;
 
@@ -473,7 +472,7 @@ export class MarketplaceService {
 
     // Insert the new pack's entries (all fresh UUIDs, each stamped with the
     // import hash that makes the NEXT update able to ask this same question).
-    rowsAdded = await insertLibraryComments(this.rawDb, this.tenantId, libraryId, entries);
+    const rowsAdded = await insertLibraryComments(this.rawDb, this.tenantId, libraryId, entries);
 
     // Update the marker. Replace mode resets rowCount to the new size; append
     // mode accumulates as before.

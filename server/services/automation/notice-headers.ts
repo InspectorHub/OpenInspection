@@ -73,7 +73,7 @@ export async function insertNoticeHeader(rawDb: AnyDb, input: NoticeHeaderInput)
         let muted = false;
         try {
             muted = await isPreferenceMuted(db, input.tenantId, input.classId, 'in_app', [subject]);
-        } catch { muted = false; }
+        } catch { /* leave false: a preference read failure must not silence a notice */ }
         if (muted) return null;
     }
     const id = nanoid();

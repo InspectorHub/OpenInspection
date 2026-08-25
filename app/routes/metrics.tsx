@@ -68,7 +68,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const d = (body.data ?? {}) as Record<string, unknown>;
     data = (Object.keys(d).length > 0 ? d : null) as MetricsData | null;
   } catch {
-    data = null;
+    // Leave it null: the page renders its empty state.
   }
 
   // IA-82 — the findings matrix is a second aggregation with its own endpoint.

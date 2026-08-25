@@ -308,7 +308,7 @@ export function PhotoAnnotator({
     if (!stage) return;
     // pixelRatio 1/scale maps the scaled-down display stage back to natural px.
     // konva@10 toBlob returns a Promise (callback optional).
-    let blob: Blob | null = null;
+    let blob: Blob | null;
     try {
       blob = (await stage.toBlob({ pixelRatio: 1 / scale, mimeType: "image/png" })) as Blob | null;
     } catch {

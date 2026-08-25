@@ -27,7 +27,7 @@ export function ReportVerificationBlock({ verification, baseUrl, timeZone = "UTC
   try {
     qrSvg = qrToSvg(vb.verifyUrl, { margin: 1, width: 120 });
   } catch {
-    qrSvg = null;
+    // Decorative. A QR that will not build is simply not shown.
   }
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-8">

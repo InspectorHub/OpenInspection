@@ -70,7 +70,7 @@ async function resolveIdentity(
   token: string,
 ): Promise<McpIdentity | null> {
   let role: string | undefined;
-  let tenantSlug = "";
+  let tenantSlug: string;
   try {
     const api = createApi(context, { token });
     const res = await api.sessionContext.context.$get();

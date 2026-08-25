@@ -203,7 +203,7 @@ export class PortalService {
                 { completed: 0, total: 0 },
             );
         } catch {
-            progress = { completed: 0, total: 0 };
+            // Leave the zeroed progress: it is a display value, not a gate.
         }
 
         return {

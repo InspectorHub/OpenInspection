@@ -102,7 +102,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   try {
     brand = await resolveTenantBrand(context, tenant, request);
   } catch {
-    brand = EMPTY_BRAND;
+    // Leave the empty brand: unbranded beats not rendering.
   }
 
   // Steps 1+2 (token exchange + overview) live in ~/lib/portal-exchange —

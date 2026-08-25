@@ -118,7 +118,7 @@ export async function seedStarterContent(
     await seedRoleProfiles(d, tenantId);
 
     // ── inspection templates ────────────────────────────────────────────
-    let inspectionTemplatesSeeded = 0;
+    let inspectionTemplatesSeeded: number;
     {
         const existing = await d.select({ name: templates.name }).from(templates)
             .where(eq(templates.tenantId, tenantId)).all();
@@ -157,7 +157,7 @@ export async function seedStarterContent(
     // Uniqueness key: (category, text) within tenant. The combination is
     // stable across re-seeds because both fields are immutable in the
     // fixture.
-    let cannedCommentsSeeded = 0;
+    let cannedCommentsSeeded: number;
     {
         const existing = await d.select({ category: comments.category, text: comments.text }).from(comments)
             .where(eq(comments.tenantId, tenantId)).all();
@@ -184,7 +184,7 @@ export async function seedStarterContent(
     }
 
     // ── event types ─────────────────────────────────────────────────────
-    let eventTypesSeeded = 0;
+    let eventTypesSeeded: number;
     {
         const existing = await d.select({ slug: eventTypes.slug }).from(eventTypes)
             .where(eq(eventTypes.tenantId, tenantId)).all();
@@ -211,7 +211,7 @@ export async function seedStarterContent(
     const servicesSeeded = await seedServices(d, tenantId);
 
     // ── tags ────────────────────────────────────────────────────────────
-    let tagsSeeded = 0;
+    let tagsSeeded: number;
     {
         const existing = await d.select({ name: tags.name }).from(tags)
             .where(eq(tags.tenantId, tenantId)).all();
@@ -234,7 +234,7 @@ export async function seedStarterContent(
     // repair fields (the `recommendations` table was dropped). Seed them as
     // repair-item comments — same predicate RecommendationService reads back
     // (repair_summary IS NOT NULL). Idempotent on (category, text).
-    let recommendationsSeeded = 0;
+    let recommendationsSeeded: number;
     {
         const existing = await d.select({ category: comments.category, name: comments.text })
             .from(comments).where(and(eq(comments.tenantId, tenantId), isNotNull(comments.repairSummary))).all();
@@ -255,7 +255,7 @@ export async function seedStarterContent(
     }
 
     // ── rating systems ──────────────────────────────────────────────────
-    let ratingSystemsSeeded = 0;
+    let ratingSystemsSeeded: number;
     {
         const existing = await d.select({ slug: ratingSystems.slug }).from(ratingSystems)
             .where(eq(ratingSystems.tenantId, tenantId)).all();
@@ -296,7 +296,7 @@ export async function seedStarterContent(
     // repair-item contractor dropdown. Idempotent row-by-row, but on TWO
     // different keys: canonical rows on `trade_slug`, the extras on `name`,
     // because only the canonical ones have a slug to be keyed on.
-    let contractorTypesSeeded = 0;
+    let contractorTypesSeeded: number;
     {
         const existing = await d
             .select({ name: contractorTypes.name, tradeSlug: contractorTypes.tradeSlug })
@@ -330,7 +330,7 @@ export async function seedStarterContent(
     // The marketplace_libraries table has no tenant_id — it is a shared
     // catalogue of importable content. We still idempotently insert the
     // default libraries here so a brand-new system has something to import.
-    let marketplaceLibrariesSeeded = 0;
+    let marketplaceLibrariesSeeded: number;
     {
         const existing = await d.select({ name: marketplaceLibraries.name }).from(marketplaceLibraries).all();
         const existingNames = new Set(existing.map(r => r.name as string));

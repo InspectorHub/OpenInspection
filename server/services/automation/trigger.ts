@@ -147,7 +147,7 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 { event: ctx.triggerEvent, count: logs.length });
             if (logs.length > 0) {
                 let inserted: Array<{ id: string; automationId: string | null; sendAt: Date | number;
-                    recipientContactId: string | null; recipientRoleKey: string | null }> = [];
+                    recipientContactId: string | null; recipientRoleKey: string | null }>;
                 try {
                     // .onConflictDoNothing() covers the uq_automation_logs_event partial
                     // unique index: a report.published retry produces the SAME
