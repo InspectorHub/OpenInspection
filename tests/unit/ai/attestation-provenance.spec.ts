@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -13,9 +12,6 @@ beforeEach(async () => {
     await setupSchema(fx.sqlite);
     await db.insert(schema.tenants).values({ id: TENANT, slug: 'a1', createdAt: new Date() });
 });
-
-const config = () => db.select().from(schema.tenantConfigs)
-    .where(eq(schema.tenantConfigs.tenantId, TENANT)).get();
 
 /**
  * ⚠️ A describe block stood here, and what it was doing is worth recording.
@@ -35,44 +31,29 @@ const config = () => db.select().from(schema.tenantConfigs)
  * `tests/unit/secrets/byo-ai-attestation.spec.ts`, against the save path rather
  * than against the table.
  *
- * The version-starts-at-zero case moved too, to `ai-config-save.spec.ts`, where
- * it now says what is true after the split: there is no row, and therefore no
- * version, until the first save.
+ * The version-starts-at-zero case moved too, to `ai-config-save.spec.ts` — and
+ * has since been deleted outright along with the column it described. What
+ * remains there asserts the upsert branch it used to prove incidentally: the
+ * first save creates the row, the second updates it.
  */
 
-describe('provenance answers which configuration was in force', () => {
-    it('records the configuration version alongside the backend that ran', async () => {
-        // A workspace configures one endpoint today and another tomorrow.
-        // Which destination processed THIS inspection data? `provider` answers
-        // the backend, observed off the adapter rather than inferred; the
-        // version answers under which configuration, and links the call to
-        // what was attested.
-        await db.insert(schema.aiCallProvenance).values({
-            id: 'call-1', tenantId: TENANT,
-            capability: 'assist', provider: 'api.example.test', mode: 'byo',
-            model: 'a-model', promptVersion: 'p.v1',
-            createdAt: new Date(1_700_000_000_000),
-            configVersion: 3,
-        });
-        const row = await db.select().from(schema.aiCallProvenance).get();
-        expect(row).toMatchObject({ provider: 'api.example.test', configVersion: 3 });
-    });
-
-    it('accepts a null configuration version rather than inventing one', async () => {
-        // Rows written before the column existed, and the managed path, whose
-        // destination is the deployment's and does not move per workspace. A
-        // zero here would be a claim that version 0 was in force, which is a
-        // different statement from "not recorded".
-        await db.insert(schema.aiCallProvenance).values({
-            id: 'call-2', tenantId: TENANT,
-            capability: 'assist', provider: 'api.example.test', mode: 'managed',
-            model: 'a-model', promptVersion: 'p.v1',
-            createdAt: new Date(1_700_000_000_000),
-        });
-        const row = await db.select().from(schema.aiCallProvenance).get();
-        expect(row!.configVersion).toBeNull();
-    });
-
+/**
+ * ⚠️ TWO MORE ASSERTIONS STOOD HERE, AND THEY WENT THE SAME WAY AS THE FIVE ABOVE.
+ *
+ * They inserted `config_version` with Drizzle and read it back, under the title
+ * "provenance answers which configuration was in force". It never did: the
+ * version was a pointer into a per-version history that was never kept, and no
+ * call site ever supplied one, so the column was NULL on every row for as long
+ * as it existed. The tests passed because SQLite stores what you give it —
+ * the same shape as the five attestation columns this file already records
+ * having deleted for exactly that reason.
+ *
+ * The question they were reaching for IS now answered, by
+ * `ai_call_provenance.endpoint`, observed off the adapter that ran. That is
+ * covered in `provenance.spec.ts` against the write path, which is where a
+ * value the system produces belongs — not here against the table.
+ */
+describe('provenance carries no prompt text', () => {
     it('still has no field that could carry the prompt', () => {
         // The enforcement the schema comment describes — asserted rather than
         // trusted, because this change widens the table.

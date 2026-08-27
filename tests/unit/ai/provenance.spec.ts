@@ -392,21 +392,6 @@ describe('endpoint — the destination the row was missing', () => {
         const row = rows().at(-1)!;
         expect(row.endpoint).toBe('https://api.example.test/v1');
     });
-
-    it('no longer writes config_version — the column is retired next release', async () => {
-        // Asserted as NULL rather than left unmentioned. A column that stopped
-        // being written and a column nobody looked at are the same shape in a
-        // passing test, and only one of them is the intended state.
-        const sink = buildAiProvenanceSink({
-            db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'a-model',
-        })!;
-        await sink.record({
-            capability: 'assist', promptVersion: 'v1',
-            provider: 'p', endpoint: 'https://h/v1',
-        });
-        const row = rows().at(-1)!;
-        expect(row.configVersion).toBeNull();
-    });
 });
 
 describe('the assurance export carries the destination', () => {

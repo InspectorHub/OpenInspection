@@ -1,5 +1,5 @@
 import type { drizzle } from 'drizzle-orm/d1';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { tenantAiConfigs } from '../db/schema';
 
 // Matches `server/lib/integration-test-results.ts` — the D1 handle this file's
@@ -71,12 +71,10 @@ export async function saveAiConfig(db: Db, tenantId: string, input: AiConfigInpu
     // and an UPDATE here would silently store nothing.
     await db
         .insert(tenantAiConfigs)
-        .values({ tenantId, ...settings, configVersion: 1 })
+        .values({ tenantId, ...settings })
         .onConflictDoUpdate({
             target: tenantAiConfigs.tenantId,
-            // The bump reads the STORED value, not the one being inserted --
-            // `excluded.config_version` would pin every save to 1.
-            set: { ...settings, configVersion: sql`${tenantAiConfigs.configVersion} + 1` },
+            set: { ...settings },
         });
 }
 
