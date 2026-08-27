@@ -10,6 +10,7 @@ import { paginationQuerySchema, PaginatedMetaSchema, buildMeta } from '../../lib
 import { CreateTemplateSchema, UpdateTemplateSchema } from '../../lib/validations/template.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { refuseStatutoryTemplateEdit } from '../../lib/middleware/refuse-statutory-template-edit';
 
 /**
  * GET /api/inspections/templates
@@ -162,7 +163,10 @@ const updateTemplateRoute = createRoute(withMcpMetadata({
             },
         },
     },
-    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('templateEdit')],
+    // Ahead of the body validator on purpose: a client that round-trips the
+    // whole document would otherwise be answered by `.strict()` with
+    // `unrecognized_keys`. See the middleware's own header.
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('templateEdit'), refuseStatutoryTemplateEdit()],
     responses: {
         200: {
             content: {
@@ -172,7 +176,7 @@ const updateTemplateRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
-        403: { description: "Missing the 'templateEdit' capability" },
+        403: { description: "Missing the 'templateEdit' capability, or the template produces an official form and is structurally read-only" },
     },
     operationId: "updateInspectionTemplate",
     description: "Auto-generated placeholder for updateInspectionTemplate (PUT /templates/{id}, inspections domain). TODO: replace with a real description sourced from the handler."

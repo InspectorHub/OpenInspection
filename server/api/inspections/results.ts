@@ -27,6 +27,7 @@ import { applyResultsBatch } from '../../services/inspection-results.service';
 import { inspectionResults } from '../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { refuseStatutorySnapshotEdit } from '../../lib/middleware/refuse-statutory-template-edit';
 import { getDrizzle } from '../../lib/route-helpers';
 
 /**
@@ -197,7 +198,10 @@ const updateTemplateSnapshotRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Replace the per-inspection template snapshot',
     description: 'Replaces the templateSnapshot JSON wholesale. Validated against TemplateSchemaV2. Used by the inspection editor for inline structural edits (rating system swap, add/remove section/item).',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    // Ahead of the body validator: the editor round-trips the whole snapshot,
+    // and `stripRuntimeKeys` does not filter top-level keys, so a statutory
+    // declaration would otherwise be answered by `.strict()` as an unknown key.
+    middleware: [requireRole('owner', 'manager', 'inspector'), refuseStatutorySnapshotEdit()] as const,
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('Inspection ID') }),
         body: { content: { 'application/json': { schema: PatchTemplateSnapshotBodySchema } } },
