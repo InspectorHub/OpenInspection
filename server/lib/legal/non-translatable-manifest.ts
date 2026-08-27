@@ -353,4 +353,15 @@ export const NON_TRANSLATABLE_MANIFEST: NonTranslatableEntry[] = [
         locator: 'object_key',
         reason: 'The stored artifact the form is rendered from. Where a form is prescribed, its spacing, borders and field placement are prescribed with it; a translation pass has nowhere to put the result that would still be the prescribed document.',
     },
+    {
+        id: 'statutory-form-notice',
+        category: 'statutory_certification',
+        source: 'server/lib/statutory/disclaimer.ts',
+        // The load-bearing closing sentence, by a fragment of itself. Locating
+        // the entry on THAT clause rather than on the module name is the point:
+        // the guardrail then fails if somebody trims the sentence for length,
+        // which is the realistic way it would be lost.
+        locator: 'not made the inspector’s responsibility merely by this notice',
+        reason: 'An allocation statement carried with a rendered statutory form: it says the authority published the form, this software implemented it, and the inspector performed and certified the inspection. Translating it would make the allocation arrive in a language nobody agreed to be bound in, and the closing sentence -- which stops the notice becoming an ineffective attempt to shift a rendering fault onto the inspector -- is exactly the kind of clause a summarising translation drops.',
+    },
 ];
