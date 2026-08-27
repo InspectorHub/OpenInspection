@@ -7836,6 +7836,34 @@
     "description": "Auto-generated placeholder for getInspectionRequestByInspection (GET /by-inspection/{inspectionId}, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "getInspectionStatutoryForm",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/statutory-form.pdf",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection ID",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection ID"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Download the statutory form this inspection produces",
+    "description": "Renders the authority's own published form for this inspection. 404 when the template declares none; 409 while no report version is published."
+  },
+  {
     "operationId": "getInspectionTemplate",
     "method": "GET",
     "pathTemplate": "/api/inspections/templates/{id}",
