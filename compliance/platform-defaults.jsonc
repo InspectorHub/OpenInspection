@@ -264,17 +264,6 @@
       "note": "⚠ THIS ENTRY PREVIOUSLY SAID NOTHING IN THE PRODUCT COULD CHANGE IT, AND THAT IS NO LONGER TRUE. The switch it asked for exists: a checkbox in AiFeaturesPanel, read by the settings-advanced action as `fd.get('aiEnabled')` and written through `saveAiConfig` to `tenant_ai_configs.is_enabled`. Verified end to end rather than inferred from the panel rendering a control. The old note instructed whoever built those controls to move this to 'available' and name the surface; that is what this edit does. Read as a PROVISIONING answer (may this workspace be offered AI) and not as a permission — the runtime permission is decided in resolveAi, where a provider is actually built. The two are separate on purpose: resolveRuntimeAiSource repaints another repository's console from this value with no deploy, so a value that meant 'permitted' would let a console edit grant a capability. MOVED to `tenant_ai_configs` with the rest of the AI subsystem; the default and its basis are unchanged."
     },
     {
-      "column": "config_version",
-      "property": "configVersion",
-      "default_value": "0",
-      "default_owner": "engine",
-      "decision_type": "technical",
-      "basis": "A counter, starting where no configuration has been saved. A non-zero default would claim a revision that never happened.",
-      "controller_override": "none",
-      "override_surface": null,
-      "note": "Bumped when the AI provider configuration is saved, so a cached client can tell its resolved endpoint is stale. Carries no subject data and answers no question about a person. MOVED to `tenant_ai_configs`. ⚠ Its READER was never built: no call site passes a version to recordProvenance, so ai_call_provenance.config_version is NULL on every row and the join that would answer 'which configuration was in force when this data was processed' still has no left-hand side. The counter is real; the question it exists to answer is not yet answerable."
-    },
-    {
       "column": "is_customer_repair_export_enabled",
       "property": "enableCustomerRepairExport",
       "default_value": "false",

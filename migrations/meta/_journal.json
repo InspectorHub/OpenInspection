@@ -281,6 +281,13 @@
       "when": 1787666396261,
       "tag": "0039_ai_call_provenance_endpoint",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1787672564471,
+      "tag": "0040_drop_ai_config_version",
+      "breakpoints": true
     }
   ]
 }

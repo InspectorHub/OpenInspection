@@ -60,20 +60,6 @@ export const aiCallProvenance = sqliteTable('ai_call_provenance', {
     promptVersion: text('prompt_version').notNull(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     /**
-     * `tenant_ai_configs.config_version` at the moment of the call.
-     *
-     * ⚠️ SUPERSEDED by `endpoint` below, and retired in the next release. It
-     * was a pointer into a history that was never kept: `tenant_ai_configs` has
-     * one row per tenant, updated in place, so the configuration a version
-     * names is overwritten the moment the next save happens. Writing the number
-     * would have turned an unresolvable pointer from NULL into an integer that
-     * looks like an answer.
-     *
-     * Nothing writes it as of this release. The column goes when the worker
-     * that still declares it is no longer serving.
-     */
-    configVersion: integer('config_version'),
-    /**
      * Where the call actually went: scheme, host, port and path, normalised by
      * `normaliseEndpoint` so credentials, query and fragment are structurally
      * absent.

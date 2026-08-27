@@ -88,20 +88,6 @@ export const tenantAiConfigs = sqliteTable('tenant_ai_configs', {
      *  default (`AI_MODEL`). No value is compiled in at either level. */
     model: text('model'),
     /**
-     * Monotonic version of this workspace's AI configuration. Bumped on every
-     * saved change to endpoint or model.
-     *
-     * ⚠️ Nothing reads it yet — see the note on unwired fields above. It exists
-     * to answer "which destination was in force when this inspection data was
-     * processed?", and answering that needs `recordProvenance` to be given the
-     * version, which no call site does.
-     *
-     * Starts at 0 so an untouched workspace still has a version to cite; a call
-     * recorded against no version records NULL, which is a different statement
-     * from "version 0".
-     */
-    configVersion: integer('config_version').notNull().default(0),
-    /**
      * Whether this workspace may PRODUCE courtesy translations of a report.
      *
      * ⚠️ It gates production and never consumption. Switching it off must not

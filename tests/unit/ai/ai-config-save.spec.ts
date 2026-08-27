@@ -45,24 +45,23 @@ describe('saveAiConfig', () => {
     });
 
     /**
-     * The version is what lets a caller holding a resolved endpoint know it is
-     * holding a stale one. Without the bump the column is a number that never
-     * moves, and every consumer of it is reading a value that cannot answer the
-     * question it exists to answer.
+     * The FIRST save creates the row, and a second save must update it rather
+     * than insert a second one. That is the part of the upsert worth asserting
+     * now that the version counter is gone: it was the counter that used to
+     * prove the conflict branch had been taken, so without a replacement this
+     * file would stop covering the branch entirely.
      */
-    it('bumps the config version on every save', async () => {
-        // No row before the first save, so there is no version 0 to observe on
-        // this path any more — the column's default now describes a row created
-        // by something other than `saveAiConfig`, and nothing creates one.
+    it('creates the row on the first save and updates it on the second', async () => {
         expect(config()).toBeUndefined();
         await saveAiConfig(d1, TENANT, { aiEnabled: true, aiBaseUrl: 'https://a/v1', aiModel: 'm', courtesyTranslationEnabled: false });
-        expect(config()!.configVersion).toBe(1);
+        expect(config()!.baseUrl).toBe('https://a/v1');
         await saveAiConfig(d1, TENANT, { aiEnabled: true, aiBaseUrl: 'https://b/v1', aiModel: 'm', courtesyTranslationEnabled: false });
-        // The second save takes the upsert's conflict branch, where the bump
-        // reads the STORED value. Reading `excluded.config_version` instead
-        // would pin every save after the first to 1 and still pass the
-        // assertion above — which is why the second one is here.
-        expect(config()!.configVersion).toBe(2);
+        // One row, carrying the SECOND value: an upsert that inserted again
+        // would leave two, and one that ignored the conflict would leave the
+        // first value in place. Both are asserted, because either alone passes
+        // for the wrong reason.
+        expect(db.select().from(schema.tenantAiConfigs).all()).toHaveLength(1);
+        expect(config()!.baseUrl).toBe('https://b/v1');
     });
 
     /**
@@ -156,7 +155,6 @@ describe('saveAiConfig', () => {
         const untouched = db.select().from(schema.tenantAiConfigs)
             .where(eq(schema.tenantAiConfigs.tenantId, other)).get()!;
         expect(untouched.baseUrl).toBeNull();
-        expect(untouched.configVersion).toBe(0);
         expect(untouched.isEnabled).toBe(true);
     });
 });

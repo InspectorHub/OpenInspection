@@ -1,0 +1,28 @@
+-- Retire `config_version` from both tables it lived on.
+--
+-- It was a pointer into a history that was never kept. `tenant_ai_configs` has
+-- one row per tenant, updated in place, so the configuration a version names is
+-- overwritten by the next save; there is no per-version history table and never
+-- was. Writing the number would have turned an unresolvable pointer from NULL
+-- into an integer that reads as an answer.
+--
+-- What it was reaching for -- where a call was sent -- is now recorded directly
+-- on `ai_call_provenance.endpoint`, observed off the adapter that ran
+-- (the migration immediately before this one). A destination that is observed
+-- needs no history to resolve against, which is the whole reason this column
+-- can go rather than gaining a history table to point into.
+--
+-- Measured before writing this: one writer (`saveAiConfig` bumped it), zero
+-- readers anywhere in the tree.
+--
+-- SEQUENCING. This may only run once the worker that stopped writing
+-- `ai_call_provenance.config_version` is live, verified via `/status?cb=`
+-- rather than a deploy's exit code. Migrations apply BEFORE `wrangler deploy`,
+-- and provenance is fail-closed before the send: an INSERT that hits a missing
+-- column is a REFUSED AI call, not a degraded one.
+--
+-- Additive-free and rebuild-free. Verified with the four-token grep the Schema
+-- Rules in CLAUDE.md spell out, which is deliberately not quoted here because
+-- quoting it makes the file fail its own check.
+ALTER TABLE `ai_call_provenance` DROP COLUMN `config_version`;--> statement-breakpoint
+ALTER TABLE `tenant_ai_configs` DROP COLUMN `config_version`;
