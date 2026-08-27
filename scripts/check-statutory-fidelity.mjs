@@ -177,6 +177,104 @@ if (admissionUses < 2) {
         + 'it must be both defined and applied, or selection admits an unpublished revision.');
 }
 
+// ---------------------------------------------------------------------------
+// UTC-midnight arm
+// ---------------------------------------------------------------------------
+
+/**
+ * Every date on a published revision must land exactly on a UTC midnight.
+ *
+ * The reason is the cutover. `inspections.date` is a calendar day and the
+ * selector takes epoch ms; `utcMidnightOf` bridges them in UTC, so a version
+ * whose own dates were built in LOCAL time sits a few hours off and the
+ * comparison at the boundary picks the wrong revision. That failure renders a
+ * real, official, superseded document -- nothing looks broken.
+ *
+ * 86,400,000 divides every UTC midnight, so the check is arithmetic rather than
+ * a parse. A `Date.UTC(y, m, d)` call is accepted on sight: three arguments to
+ * Date.UTC IS a UTC midnight by construction.
+ */
+const MS_PER_UTC_DAY = 86400000;
+const DATE_FIELDS = ['effectiveFrom', 'mandatoryFrom', 'effectiveUntil'];
+
+/** Classify one source expression for a date field. Never guesses: an
+ *  expression it cannot read is a failure, not a pass. */
+export function utcMidnightVerdict(expr) {
+    const raw = String(expr ?? '').trim().replace(/,$/, '');
+    if (raw === '' ) return { kind: 'unreadable', raw };
+    if (raw === 'null') return { kind: 'skip', raw };
+    // Date.UTC(y, m, d) with exactly three arguments is midnight by definition.
+    if (/^Date\.UTC\(\s*-?\d+\s*,\s*-?\d+\s*,\s*-?\d+\s*\)$/.test(raw)) {
+        return { kind: 'ok', raw };
+    }
+    if (/^-?\d+$/.test(raw)) {
+        const ms = Number(raw);
+        if (ms % MS_PER_UTC_DAY === 0) return { kind: 'ok', raw };
+        const offHours = ((ms % MS_PER_UTC_DAY) / 3600000).toFixed(2);
+        return { kind: 'off', raw, offHours };
+    }
+    return { kind: 'unreadable', raw };
+}
+
+if (process.argv.includes('--self-test')) {
+    // A gate nobody can see fail is a gate nobody can trust on the day it is
+    // quiet -- and today the catalogue is empty, so the arm above examines
+    // nothing on every deployment. These are its only exercise.
+    const cases = [
+        ['Date.UTC(2026, 3, 1)', 'ok'],
+        [String(Date.UTC(2026, 3, 1)), 'ok'],
+        [String(Date.UTC(2026, 3, 1) - 8 * 3600000), 'off'],
+        ['null', 'skip'],
+        ['someVariable', 'unreadable'],
+        ['', 'unreadable'],
+    ];
+    let bad = 0;
+    for (const [input, want] of cases) {
+        const got = utcMidnightVerdict(input).kind;
+        if (got !== want) {
+            bad += 1;
+            console.log(`  ✘ self-test: "${input}" -> ${got}, expected ${want}`);
+        }
+    }
+    console.log(`statutory-fidelity --self-test: ${cases.length} case(s) / ${cases.length - bad} as expected.`);
+    if (bad > 0) {
+        console.log('  The arm cannot be trusted on real data if it misreads its own fixtures.');
+        process.exit(1);
+    }
+    console.log('✅ self-test passed — the UTC-midnight arm fails on a local-time date and passes on a UTC one.');
+    process.exit(0);
+}
+
+let dateFieldsSeen = 0;
+let dateFieldsUtc = 0;
+let dateFieldsSkipped = 0;
+
+for (const form of forms) {
+    const name = form.file.replace(/\.ts$/, '');
+    for (const field of DATE_FIELDS) {
+        const m = new RegExp(`${field}:\s*([^,\n]+)`).exec(form.source);
+        if (m === null) continue;
+        dateFieldsSeen += 1;
+        const verdict = utcMidnightVerdict(m[1]);
+        if (verdict.kind === 'ok') dateFieldsUtc += 1;
+        else if (verdict.kind === 'skip') dateFieldsSkipped += 1;
+        else if (verdict.kind === 'off') {
+            failures.push(`  ✘ ${name}.${field} is ${verdict.offHours}h off a UTC midnight. `
+                + 'A revision dated in local time selects the wrong document on the cutover day, '
+                + 'and the wrong document is a real official form.');
+        } else {
+            failures.push(`  ✘ ${name}.${field} could not be read as a date (${verdict.raw}). `
+                + 'Unreadable is a failure here, never a pass.');
+        }
+    }
+}
+
+// Printed on EVERY run, including the zeroes. Today the catalogue is empty on
+// every deployment, so all three of these are 0 -- and a 0 that a tick swallows
+// is how a gate comes to look healthy while examining nothing.
+console.log(`statutory-utc-dates: ${dateFieldsSeen} date field(s) examined / `
+    + `${dateFieldsUtc} on a UTC midnight · ${dateFieldsSkipped} null and skipped.`);
+
 console.log(`statutory-detection: ${detection.length}/${DETECTION_FILES.length} detection file(s) `
     + `scanned · ${adopters.length} reaching statutory_form_versions · matcher control `
     + `${controlSees ? 'sees' : 'MISSES'} the known occurrence · registry admission check applied `
