@@ -6,11 +6,7 @@ import * as schema from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { r2Keys } from '../lib/r2-keys';
-import {
-    ARTIFACT_CACHE_CONTROL,
-    ARTIFACT_STATUS_HEADER,
-    resolveArtifactStatus,
-} from '../lib/artifact-status';
+import { deliverableHeaders } from '../lib/deliverable-headers';
 
 /**
  * Pure download helpers exported for unit testing. The OpenAPIHono route
@@ -21,35 +17,11 @@ import {
  * Anything that has to be true of a served deliverable has to be true in all
  * three, and nothing in this file will tell you which one you missed — so the
  * rule itself lives in `server/lib/artifact-status.ts` and each helper reads
- * one answer from it through `deliverableHeaders` below.
+ * one answer from it through `deliverableHeaders`, which moved to
+ * `server/lib/deliverable-headers.ts` once a fourth deliverable on another
+ * route needed the same headers.
  */
 
-/**
- * The headers every live deliverable carries, whichever of the three it is.
- *
- * `x-artifact-status` says whether this object is still the current answer or
- * has been superseded by a published correction. The cache directives are part
- * of the same statement rather than a separate concern: a status header is a
- * claim about right now, and the `private, max-age=300` these three used to
- * send let a response fetched before a correction keep claiming `current` for
- * five minutes after it landed.
- */
-async function deliverableHeaders(
-    d1: D1Database,
-    tenantId: string,
-    inspectionId: string,
-    producedAt: Date | null,
-    contentType: string,
-    contentDisposition: string,
-): Promise<Record<string, string>> {
-    const status = await resolveArtifactStatus(d1, tenantId, inspectionId, producedAt);
-    return {
-        'Content-Type': contentType,
-        'Content-Disposition': contentDisposition,
-        [ARTIFACT_STATUS_HEADER]: status,
-        'Cache-Control': ARTIFACT_CACHE_CONTROL[status],
-    };
-}
 export async function downloadAgreementPdf(
     d1: D1Database,
     r2: R2Bucket | undefined,
