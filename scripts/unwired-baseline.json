@@ -87,10 +87,6 @@
     "kind": "frozen",
     "reason": "Its own header says FROZEN / DEAD CODE: superseded by the authoring-surface unification, kept deliberately rather than deleted. Not work owed."
   },
-  "server/lib/statutory/render.ts": {
-    "kind": "deferred",
-    "reason": "Writes values onto the authority's own PDF. Ledger section 52: Task 6 needs a surface that renders a statutory form and no such surface exists, so nothing on a route reaches the renderer."
-  },
   "server/lib/subtype-specials.ts": {
     "kind": "deferred",
     "reason": "Commercial PCA subtype-special chains driven by Building Profile flags. The commercial PCA surface does not consult them."

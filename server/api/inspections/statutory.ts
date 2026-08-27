@@ -32,6 +32,10 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { deliverableHeaders } from '../../lib/deliverable-headers';
 import { produceStatutoryForm } from '../../services/statutory/produce.service';
+import { versionForInspection } from '../../lib/statutory/form-registry';
+import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
+import { utcMidnightOf } from '../../lib/statutory/inspection-date';
+import { statutoryNoticeFor, formatEffectiveDate } from '../../lib/statutory/disclaimer';
 import { PeopleService } from '../../services/people.service';
 import { Errors } from '../../lib/errors';
 import * as schema from '../../lib/db/schema';
@@ -54,6 +58,35 @@ const statutoryFormRoute = createRoute(withMcpMetadata({
         409: { description: 'No report version is published yet' },
     },
     operationId: 'getInspectionStatutoryForm',
+}, { scopes: ['read'], tier: 'extended' }));
+
+/**
+ * The offer route, read by the inspection hub loader.
+ *
+ * It exists so the UI can ask "is there a statutory form here, and what does
+ * the notice say" WITHOUT downloading one. The notice is rendered server-side
+ * from `lib/statutory/disclaimer.ts`, which is what keeps that module on a
+ * production path -- a notice composed in the component instead would be
+ * invisible to the copy gate and the non-translatable registry, and the
+ * unwired census would be right to call the module unreachable.
+ *
+ * `available: false` is a normal answer, not an error. A deployment that
+ * publishes no forms answers it for every inspection, which is why the control
+ * simply does not render rather than rendering and then failing.
+ */
+const statutoryOfferRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/{id}/statutory-form',
+    tags: ['inspections'],
+    summary: 'Whether this inspection produces a statutory form, and its notice',
+    description: 'Answers without rendering a PDF. available:false is the ordinary answer.',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: { params: z.object({ id: z.string().trim().min(1).describe('Inspection ID') }) },
+    responses: {
+        200: { description: 'The offer, available or not' },
+        404: { description: 'No such inspection for this workspace' },
+    },
+    operationId: 'getInspectionStatutoryFormOffer',
 }, { scopes: ['read'], tier: 'extended' }));
 
 const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) => {
@@ -139,6 +172,53 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
             `inline; filename="${declaration.formId}-${produced.version.version.replace(/[^A-Za-z0-9._-]/g, '_')}.pdf"`,
         ),
     });
-});
+})
+    .openapi(statutoryOfferRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const tenantId = c.get('tenantId');
+        const db = drizzle(c.env.DB, { schema });
+
+        const inspection = await db.select()
+            .from(schema.inspections)
+            .where(and(eq(schema.inspections.id, id), eq(schema.inspections.tenantId, tenantId)))
+            .get();
+        if (!inspection) throw Errors.NotFound('Inspection not found');
+
+        const snapshot = inspection.templateSnapshot as (TemplateSchemaV2 & {
+            statutoryForm?: StatutoryFormDeclaration;
+        }) | null;
+        const declaration = snapshot?.statutoryForm;
+        const unavailable = { success: true, data: { available: false } } as const;
+        if (!declaration) return c.json(unavailable, 200);
+
+        const published = await db.select()
+            .from(schema.reports)
+            .where(and(
+                eq(schema.reports.inspectionId, id),
+                eq(schema.reports.tenantId, tenantId),
+                eq(schema.reports.status, 'published'),
+            ))
+            .orderBy(desc(schema.reports.publishedAt))
+            .get();
+        if (!published?.publishedAt) return c.json(unavailable, 200);
+
+        // Same selection the PDF route makes, so the two can never disagree
+        // about which revision this inspection is governed by.
+        const version = versionForInspection(
+            declaration.formId, utcMidnightOf(inspection.date), PUBLISHED_FORM_VERSIONS,
+        );
+        if (!version) return c.json(unavailable, 200);
+
+        return c.json({
+            success: true,
+            data: {
+                available: true,
+                formId: version.formId,
+                revision: version.version,
+                effectiveDate: formatEffectiveDate(version.effectiveFrom),
+                notice: statutoryNoticeFor(version, { softwareName: c.env.APP_NAME || 'This software' }),
+            },
+        }, 200);
+    });
 
 export default statutoryRoutes;

@@ -245,6 +245,52 @@ export function countLoadBearing(source) {
     if (typeof source !== 'string') return null;
     return source.split(LOAD_BEARING).length - 1;
 }
+// ---------------------------------------------------------------------------
+// Source-host arm
+// ---------------------------------------------------------------------------
+
+/**
+ * A published revision's `sourceUrl` must point at an authority's own site.
+ *
+ * The watcher polls whatever URL a version row carries. Point it at a mirror
+ * and "detection" is worse than absent: it reports faithfully on a copy that
+ * may be years behind, so a revision changes and nothing goes off. Version
+ * staleness bites before any other problem in this subsystem, and the mirrors
+ * are real -- one well-known legal-information site still serves the 2012 text
+ * of a form replaced in 2026.
+ *
+ * WARNING: the authority's own domain is NECESSARY, NOT SUFFICIENT. Measured
+ * 2026-08-27 on the real site: the most guessable filename under the agency's
+ * own forms directory served the SUPERSEDED revision, while the current one
+ * lived at a different path. So this arm can only catch the wrong HOST. Which
+ * document at that host is the right one is a question for the person filling
+ * in `checkedBy`, and no gate here can answer it.
+ *
+ * The list is explicit rather than pattern-matched (no `.gov` rule): plenty of
+ * mirrors sit on government-adjacent domains, and an authority outside the US
+ * has no `.gov` at all.
+ */
+const AUTHORITY_HOSTS = new Set([
+    'www.trec.texas.gov',
+    'trec.texas.gov',
+    'floir.gov',
+    'www.floir.gov',
+]);
+
+/** Verdict for one sourceUrl literal. Unreadable is a failure, never a skip. */
+export function sourceHostVerdict(expr) {
+    const raw = String(expr ?? '').trim().replace(/,$/, '').replace(/^['"`]|['"`]$/g, '');
+    if (raw === '') return { kind: 'unreadable', raw };
+    let host;
+    try {
+        host = new URL(raw).host;
+    } catch {
+        return { kind: 'unreadable', raw };
+    }
+    return AUTHORITY_HOSTS.has(host)
+        ? { kind: 'ok', host }
+        : { kind: 'mirror', host };
+}
 if (process.argv.includes('--self-test')) {
     // A gate nobody can see fail is a gate nobody can trust on the day it is
     // quiet -- and today the catalogue is empty, so the arm above examines
@@ -281,7 +327,26 @@ if (process.argv.includes('--self-test')) {
             console.log(`  ✘ self-test: countLoadBearing(${JSON.stringify(input)}) -> ${got}, expected ${want}`);
         }
     }
-    const total = cases.length + 4;
+
+    // The host arm. The mirror case is the one that matters: it is the failure
+    // this arm exists for, and a gate that cannot be seen rejecting a mirror
+    // cannot be trusted to reject one.
+    const hostCases = [
+        ["'https://www.trec.texas.gov/forms/rei-7-6.pdf'", 'ok'],
+        ["'https://floir.gov/docs-sf/x.pdf'", 'ok'],
+        ["'https://www.law.cornell.edu/mirror/1802.pdf'", 'mirror'],
+        ["'https://example.gov/1802.pdf'", 'mirror'],
+        ['someVariable', 'unreadable'],
+        ["''", 'unreadable'],
+    ];
+    for (const [input, want] of hostCases) {
+        const got = sourceHostVerdict(input).kind;
+        if (got !== want) {
+            bad += 1;
+            console.log(`  ✘ self-test: sourceHostVerdict(${input}) -> ${got}, expected ${want}`);
+        }
+    }
+    const total = cases.length + 4 + 6;
     console.log(`statutory-fidelity --self-test: ${total} case(s) / ${total - bad} as expected.`);
     if (bad > 0) {
         console.log('  The arm cannot be trusted on real data if it misreads its own fixtures.');
@@ -333,6 +398,29 @@ if (loadBearingCount === null) {
         + `${DISCLAIMER_SOURCE}. With two copies, deleting one leaves every gate green while half the `
         + 'callers render a notice that no longer allocates anything.');
 }
+
+let hostsSeen = 0;
+let hostsAuthoritative = 0;
+
+for (const form of forms) {
+    const name = form.file.replace(/\.ts$/, '');
+    const m = form.source.split(String.fromCharCode(10)).map((line) => /sourceUrl:\s*(\S+)/.exec(line)).find(Boolean);
+    if (m === null) continue;
+    hostsSeen += 1;
+    const verdict = sourceHostVerdict(m[1]);
+    if (verdict.kind === 'ok') hostsAuthoritative += 1;
+    else if (verdict.kind === 'mirror') {
+        failures.push(`  ✘ ${name}.sourceUrl points at "${verdict.host}", which is not an `
+            + 'authority host. A watcher aimed at a mirror reports faithfully on a copy that may be '
+            + 'years behind, so a revision can change with nothing going off.');
+    } else {
+        failures.push(`  ✘ ${name}.sourceUrl could not be read as a URL (${verdict.raw}). `
+            + 'Unreadable is a failure here, never a pass.');
+    }
+}
+
+console.log(`statutory-source-hosts: ${hostsSeen} sourceUrl(s) examined / ${hostsAuthoritative} on an `
+    + `authority host (${AUTHORITY_HOSTS.size} host(s) allowed).`);
 
 console.log(`statutory-notice: closing sentence found ${loadBearingCount === null ? 'UNREADABLE' : loadBearingCount} `
     + `time(s) in 1 declared source (exactly 1 required).`);
