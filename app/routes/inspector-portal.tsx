@@ -27,6 +27,7 @@ import { ClientSmsConsent } from "~/components/inspector-portal/ClientSmsConsent
 import { LifecycleCard } from "~/components/inspector-portal/LifecycleCard";
 import { SendAgreementModal, type SendAgreementPayload } from "~/components/agreements/SendAgreementModal";
 import { SigningRequests } from "~/components/inspector-portal/SigningRequests";
+import { StatutoryDeliverable } from "~/components/statutory/StatutoryDeliverable";
 import { SignaturePad } from "~/components/SignaturePad";
 import { RequestPaymentModal } from "~/components/inspector-portal/RequestPaymentModal";
 import { PublishReportModal } from "~/components/inspector-portal/PublishReportModal";
@@ -339,9 +340,24 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     catalogRows,
   );
 
+  // Its own read rather than a hub field, for the same reason as the two above:
+  // the hub is this page's ONE aggregate round trip, and this answer depends on
+  // what the deployment publishes rather than on the inspection alone.
+  // Best-effort — a failure leaves the control absent, which is also what a
+  // deployment publishing no forms sees, so the page degrades to the ordinary
+  // case rather than to a broken one.
+  let statutoryForm: {
+    available: boolean; formId?: string; revision?: string; effectiveDate?: string; notice?: string;
+  } = { available: false };
+  const sRes = await api.inspections[":id"]["statutory-form"].$get({ param: { id } }).catch(() => null);
+  if (sRes && sRes.ok) {
+    const sBody = (await sRes.json()) as { data?: typeof statutoryForm };
+    statutoryForm = sBody.data ?? { available: false };
+  }
+
   return {
     hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, documents, people, roleProfiles, isAdmin, versions,
-    members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role,
+    members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role, statutoryForm,
   };
 }
 
@@ -562,7 +578,7 @@ export function reportActions(
 export default function InspectionHubPage() {
   const {
     hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, documents, people, roleProfiles, isAdmin, versions,
-    members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role,
+    members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role, statutoryForm,
   } = useLoaderData<typeof loader>();
   // `peopleCard` is the read-only getPeopleCard() projection (client/agents/
   // inspector — still used for the header meta line + modal default emails);
@@ -1160,6 +1176,22 @@ export default function InspectionHubPage() {
       {/* Documents — shared section (unified portal ⑦). Renders regardless of
           report status (uploads are pre/intra-inspection). Inspector can upload
           with a visibility toggle and delete any document. */}
+      {/* The statutory form, if this inspection produces one and the deployment
+          publishes that revision. Absent is the ordinary case: a deployment
+          shipping no forms answers `available:false` for every inspection, so
+          the control does not render rather than rendering and then failing. */}
+      {statutoryForm.available && statutoryForm.notice ? (
+        <div className="mb-4">
+          <StatutoryDeliverable
+            formId={statutoryForm.formId ?? ""}
+            revision={statutoryForm.revision ?? ""}
+            effectiveDate={statutoryForm.effectiveDate ?? ""}
+            notice={statutoryForm.notice}
+            href={`/api/inspections/${inspection.id}/statutory-form.pdf`}
+          />
+        </div>
+      ) : null}
+
       <DocumentsSection
         items={documents}
         canUpload
