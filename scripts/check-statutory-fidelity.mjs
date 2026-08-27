@@ -216,6 +216,35 @@ export function utcMidnightVerdict(expr) {
     return { kind: 'unreadable', raw };
 }
 
+// ---------------------------------------------------------------------------
+// Load-bearing-sentence arm
+// ---------------------------------------------------------------------------
+
+/**
+ * The statutory notice's closing sentence must appear EXACTLY ONCE.
+ *
+ * Zero and two are both failures, and the two-case is the interesting one. The
+ * non-translatable registry already fails if the sentence disappears entirely,
+ * so "at least one" is covered. What nothing covered is a SECOND copy: with two
+ * in the tree, deleting one leaves every gate green while half the callers
+ * silently render a notice missing the clause that makes it an allocation
+ * statement rather than an attempt to shift a rendering fault onto the
+ * inspector.
+ *
+ * The endorsement-claim half of statutory copy is NOT checked here. It already
+ * has a gate -- `check-endorsement-copy.mjs`, which reads a wider scope than
+ * this one and evaluates negation per clause. A second implementation of it
+ * would be the copy that drifts.
+ */
+const DISCLAIMER_SOURCE = 'server/lib/statutory/disclaimer.ts';
+const LOAD_BEARING = 'not made the inspector’s responsibility merely by this notice';
+
+/** How many times the sentence occurs. `null` when the file cannot be read --
+ *  which is a failure, never a skip: unreadable and absent look identical. */
+export function countLoadBearing(source) {
+    if (typeof source !== 'string') return null;
+    return source.split(LOAD_BEARING).length - 1;
+}
 if (process.argv.includes('--self-test')) {
     // A gate nobody can see fail is a gate nobody can trust on the day it is
     // quiet -- and today the catalogue is empty, so the arm above examines
@@ -236,7 +265,24 @@ if (process.argv.includes('--self-test')) {
             console.log(`  ✘ self-test: "${input}" -> ${got}, expected ${want}`);
         }
     }
-    console.log(`statutory-fidelity --self-test: ${cases.length} case(s) / ${cases.length - bad} as expected.`);
+
+    // The load-bearing arm, exercised on strings rather than on the file, so it
+    // is checked even on a tree where the module has been moved.
+    const sentenceCases = [
+        [`x ${LOAD_BEARING} y`, 1],
+        [`${LOAD_BEARING} and again ${LOAD_BEARING}`, 2],
+        ['no such sentence here', 0],
+        [null, null],
+    ];
+    for (const [input, want] of sentenceCases) {
+        const got = countLoadBearing(input);
+        if (got !== want) {
+            bad += 1;
+            console.log(`  ✘ self-test: countLoadBearing(${JSON.stringify(input)}) -> ${got}, expected ${want}`);
+        }
+    }
+    const total = cases.length + 4;
+    console.log(`statutory-fidelity --self-test: ${total} case(s) / ${total - bad} as expected.`);
     if (bad > 0) {
         console.log('  The arm cannot be trusted on real data if it misreads its own fixtures.');
         process.exit(1);
@@ -272,6 +318,25 @@ for (const form of forms) {
 // Printed on EVERY run, including the zeroes. Today the catalogue is empty on
 // every deployment, so all three of these are 0 -- and a 0 that a tick swallows
 // is how a gate comes to look healthy while examining nothing.
+const disclaimerPath = join(root, DISCLAIMER_SOURCE);
+const disclaimerSource = existsSync(disclaimerPath) ? readFileSync(disclaimerPath, 'utf8') : null;
+const loadBearingCount = countLoadBearing(disclaimerSource);
+if (loadBearingCount === null) {
+    failures.push(`  ✘ ${DISCLAIMER_SOURCE} could not be read, so the statutory notice's `
+        + 'closing sentence is UNCHECKED. Unreadable is a failure here: it looks exactly like absent.');
+} else if (loadBearingCount === 0) {
+    failures.push(`  ✘ the statutory notice's closing sentence is missing from ${DISCLAIMER_SOURCE}. `
+        + 'Without it the notice stops being an allocation statement and becomes an ineffective '
+        + 'attempt to make a rendering fault the inspector’s problem.');
+} else if (loadBearingCount > 1) {
+    failures.push(`  ✘ the statutory notice's closing sentence occurs ${loadBearingCount} times in `
+        + `${DISCLAIMER_SOURCE}. With two copies, deleting one leaves every gate green while half the `
+        + 'callers render a notice that no longer allocates anything.');
+}
+
+console.log(`statutory-notice: closing sentence found ${loadBearingCount === null ? 'UNREADABLE' : loadBearingCount} `
+    + `time(s) in 1 declared source (exactly 1 required).`);
+
 console.log(`statutory-utc-dates: ${dateFieldsSeen} date field(s) examined / `
     + `${dateFieldsUtc} on a UTC midnight · ${dateFieldsSkipped} null and skipped.`);
 
