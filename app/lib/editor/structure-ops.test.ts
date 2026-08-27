@@ -509,3 +509,42 @@ describe('moveItem', () => {
         expect(snap.sections[0].items[0].id).toBe('item_1a');
     });
 });
+
+describe('a platform statutory declaration survives the strip — and why that matters', () => {
+    /**
+     * `stripRuntimeKeys` filters SECTIONS and ITEMS against allowlists and
+     * rebuilds them. It does NOT filter top-level keys: the `structuredClone`
+     * carries every one of them through. This test pins that, because the
+     * declaration is exactly the kind of top-level key a future top-level
+     * allowlist would silently drop — and dropping it would not fail anything
+     * here. It would fail later, as a statutory form that quietly stopped
+     * being produced for inspections whose template still says it should be.
+     */
+    it('keeps a top-level statutoryForm through a structural edit', () => {
+        const snap = {
+            schemaVersion: 2 as const,
+            statutoryForm: { formId: 'tx_trec_rei', bindings: { a: { from: 'literal', value: 'x' } } },
+            sections: [{ id: 'sec_1', title: 'Roof', items: [] }],
+        };
+        const out = addSection(snap as Parameters<typeof addSection>[0], 'Exterior');
+        expect(out.statutoryForm).toEqual(snap.statutoryForm);
+        expect(out.sections).toHaveLength(2);
+    });
+
+    it('POSITIVE CONTROL — a runtime key on an ITEM is still dropped', () => {
+        // Without this, the test above would also pass if the strip had stopped
+        // filtering anything at all, which is a different bug wearing the same
+        // green tick.
+        const snap = {
+            schemaVersion: 2 as const,
+            sections: [{
+                id: 'sec_1', title: 'Roof',
+                items: [{ id: 'itm_1', label: 'Covering', type: 'rich', rating: 'poor', _progress: 0.5 }],
+            }],
+        };
+        const out = stripRuntimeKeys(snap as Parameters<typeof stripRuntimeKeys>[0]);
+        expect(out.sections[0].items[0]).not.toHaveProperty('rating');
+        expect(out.sections[0].items[0]).not.toHaveProperty('_progress');
+        expect(out.sections[0].items[0].label).toBe('Covering');
+    });
+});

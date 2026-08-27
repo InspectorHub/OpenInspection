@@ -211,6 +211,69 @@ interface TemplateStructure {
     buildings: TemplateBuilding[];
 }
 
+/**
+ * A template's declaration that it produces an authority's own statutory form.
+ *
+ * WHY THIS IS A TOP-LEVEL KEY AND NOT A TENTH `ItemType`. Everything about it
+ * is a property of the WHOLE template, not of one row in it: which revision of
+ * the form applies is chosen from the inspection's date, whether the required
+ * values are all bound is a question about the template as a document, and the
+ * declaration governs a rendering step that happens once per inspection rather
+ * than once per item. An item type can express none of those — it can only say
+ * "this one row behaves differently", which is the wrong grain and would leave
+ * the version choice with no owner.
+ *
+ * IT NAMES A FORM, NEVER A REVISION. Which revision applies is decided by the
+ * inspection date. A revision pinned here would go stale the moment the
+ * authority republishes, and would put that choice in the hands of whoever last
+ * edited the template instead of in the date the inspection actually happened.
+ *
+ * ⚠️ THIS KEY IS PLATFORM-SUPPLIED AND NOT WRITABLE BY A WORKSPACE. The tenant
+ * validation schema is `.strict()` and deliberately does not list it, so a
+ * template carrying one cannot arrive through the tenant surface at all. That
+ * closed door is the enforcement; this comment is only the reason for it.
+ */
+
+/** The inspection-level fields a binding may read. Closed on purpose — see
+ *  `StatutoryValueSource`. Each maps to one column the inspection already has. */
+export type StatutoryInspectionField =
+    | 'client_name'
+    | 'client_email'
+    | 'client_phone'
+    | 'property_address'
+    | 'property_city'
+    | 'property_state'
+    | 'property_zip'
+    | 'inspection_date'
+    | 'inspector_name'
+    | 'inspector_license';
+
+/**
+ * Where one value on the form comes from.
+ *
+ * A CLOSED discriminated union, with `from` as the discriminant. The closure is
+ * the point: an open `from: string`, or an open field name, would defer a typo
+ * to runtime — and the entire observable output of that typo is a BLANK BOX on
+ * somebody's statutory form, which reads as an inspector who failed to answer
+ * rather than as software that failed to look. A compiler error is the only
+ * place that mistake is cheap.
+ */
+export type StatutoryValueSource =
+    | { from: 'item'; itemId: string }
+    | { from: 'item_attribute'; itemId: string; attribute: string }
+    | { from: 'inspection'; field: StatutoryInspectionField }
+    | { from: 'literal'; value: string };
+
+/** One template's statutory-form declaration. */
+export interface StatutoryFormDeclaration {
+    /** The form, not the revision (see above) — e.g. `tx_trec_rei`. */
+    formId: string;
+    /** Form field name -> where its value comes from. A field the authority's
+     *  form requires and this map omits is a gap the fidelity gate reports; it
+     *  is never silently rendered blank. */
+    bindings: Record<string, StatutoryValueSource>;
+}
+
 export interface TemplateSchemaV2 {
     schemaVersion: 2;
     sections: TemplateSection[];
@@ -224,6 +287,12 @@ export interface TemplateSchemaV2 {
     };
     itemAssignments?: Record<string, string[]>;
     propertyMetadataFields?: PropertyMetaField[];
+    /**
+     * Present only on a platform-supplied template that produces an authority's
+     * own form. Absent on every template a workspace can author, and absent is
+     * the ordinary case.
+     */
+    statutoryForm?: StatutoryFormDeclaration;
 }
 
 interface PropertyMetaField {
