@@ -36,11 +36,15 @@
  * value that did not survive the round trip was never a real day.
  */
 
-/** Milliseconds in one UTC day. Every UTC midnight is divisible by it, which is
- *  the arithmetic `check-statutory-fidelity.mjs` uses to catch a published
- *  version whose dates were built in local time. */
-export const MS_PER_UTC_DAY = 86_400_000;
-
+/**
+ * Every value this returns is an exact multiple of 86,400,000 -- one UTC day --
+ * because that is what UTC midnight means. `check-statutory-fidelity.mjs` uses
+ * the same arithmetic from the other side, to catch a published version whose
+ * dates were built in local time. The constant is not shared: a second module
+ * importing it would make this one look like the owner of a rule the gate
+ * enforces independently, and the gate has to keep working on a tree where this
+ * file has moved.
+ */
 const CALENDAR_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 function fail(reason: string): never {

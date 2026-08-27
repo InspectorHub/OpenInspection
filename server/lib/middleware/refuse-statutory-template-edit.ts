@@ -27,7 +27,7 @@ import type { HonoConfig } from '../../types/hono';
 
 /** The one sentence a workspace sees. It names the owner and the consequence,
  *  and deliberately says nothing about keys, schemas or validation. */
-export const STATUTORY_TEMPLATE_READ_ONLY =
+const STATUTORY_TEMPLATE_READ_ONLY =
     'This template produces an official form and is supplied with the software, '
     + 'so its structure is read-only. Duplicate it to build your own version.';
 
