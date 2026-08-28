@@ -363,7 +363,19 @@ let dateFieldsSkipped = 0;
 for (const form of forms) {
     const name = form.file.replace(/\.ts$/, '');
     for (const field of DATE_FIELDS) {
-        const m = new RegExp(`${field}:\s*([^,\n]+)`).exec(form.source);
+        // Doubled backslashes on purpose. This is a TEMPLATE LITERAL, so the
+        // STRING parser reads the escapes before the regex engine ever sees
+        // them: a single `\s` becomes a literal `s`, turning "skip whitespace"
+        // into "optionally match the letter s", and a single `\n` becomes a
+        // real newline. The pattern still compiled and still matched, which is
+        // why nothing noticed -- CodeQL did, as js/useless-regexp-character-escape.
+        // To end of LINE, not to the next comma. `utcMidnightVerdict` blesses
+        // `Date.UTC(y, m, d)` by name -- and that expression contains commas, so
+        // stopping at one captured `Date.UTC(2025` and the gate rejected the
+        // very spelling its own verdict function is written to accept. The two
+        // halves disagreed for as long as both existed; an empty catalogue is
+        // why nothing said so. The verdict strips one trailing comma itself.
+        const m = new RegExp(`${field}:\\s*([^\\n]+)`).exec(form.source);
         if (m === null) continue;
         dateFieldsSeen += 1;
         const verdict = utcMidnightVerdict(m[1]);
@@ -378,6 +390,19 @@ for (const form of forms) {
                 + 'Unreadable is a failure here, never a pass.');
         }
     }
+}
+
+// An empty catalogue examining nothing is honest. A POPULATED catalogue
+// examining nothing is the reading instrument having broken, and it looks
+// identical from the outside -- both print 0. The regex above was wrong for as
+// long as it existed and this line would not have caught it, because there were
+// no forms to read; the moment someone adds the first one, a still-broken
+// matcher must be loud rather than green.
+if (forms.length > 0 && dateFieldsSeen === 0) {
+    failures.push(`  ✘ ${forms.length} form module(s) present and NOT ONE date field was read. `
+        + `Every module declares at least one of ${DATE_FIELDS.join(', ')}, so zero means this `
+        + 'check stopped being able to see them -- which is a failure of the check, not a pass '
+        + 'for the forms.');
 }
 
 // Printed on EVERY run, including the zeroes. Today the catalogue is empty on
@@ -405,7 +430,13 @@ let hostsAuthoritative = 0;
 for (const form of forms) {
     const name = form.file.replace(/\.ts$/, '');
     const m = form.source.split(String.fromCharCode(10)).map((line) => /sourceUrl:\s*(\S+)/.exec(line)).find(Boolean);
-    if (m === null) continue;
+    // `!m`, not `m === null`. The guard a few blocks up reads `=== null` and is
+    // right there, because its producer is `.exec()`. This one's producer is
+    // `.find()`, which yields UNDEFINED when nothing matches -- so the copied
+    // guard never fired and `m[1]` threw a TypeError on the first form module
+    // that declared no sourceUrl. A gate that crashes still fails loudly; this
+    // one would have failed while saying nothing about the form.
+    if (!m) continue;
     hostsSeen += 1;
     const verdict = sourceHostVerdict(m[1]);
     if (verdict.kind === 'ok') hostsAuthoritative += 1;
