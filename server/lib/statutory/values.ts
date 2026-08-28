@@ -28,14 +28,21 @@
  * So it throws, and the message carries the id, because the id is what the
  * person fixing it has to search for.
  *
- * -- 3. A REPEATED BLOCK IS EXPANDED HERE, AND OVERFLOW IS REFUSED HERE ------
+ * -- 3. A REPEATED BLOCK IS EXPANDED HERE, AND OVERFLOW IS ROUTED HERE -------
  * A form's repeated blocks (`electrical_panel`, `roof`) are declared as groups
  * and become one key per slot per field, `electrical_panel[0].total_amps`. This
  * is the only place that expansion happens, and therefore the only place that
- * can refuse an inspection with more instances than the page holds -- the
- * refusal `groups.ts` exists for. An inspection with three panels and a form
- * with two slots stops here rather than arriving at the renderer as a third
- * panel with nowhere to go, which the renderer would draw as an empty column.
+ * knows an inspection recorded more instances than the page holds.
+ *
+ * The extra ones are not dropped and are no longer refused on sight. The form
+ * itself says where they go -- the Citizens four-point form prints "(use
+ * additional pages if needed)" on its Additional Comments box -- so a group may
+ * nominate that field as `overflowTo`, and the extra instances are appended to
+ * it as sentences that name themselves. The refusal is the LAST link now, not
+ * the first: no destination declared, or a destination that cannot hold the
+ * result, and the document stops. What must never happen is unchanged -- a third
+ * panel that reaches the renderer as an empty column reads exactly like an
+ * inspector who did not answer.
  *
  * -- 4. ONE REFUSAL, ONE PLACE -----------------------------------------------
  * This function does NOT check that every value it produces has somewhere to go
@@ -64,7 +71,8 @@ import type {
     TemplateItem,
 } from '../../types/template-schema';
 import {
-    expectedGroupFields, groupFieldName, refuseOverCapacity, validateGroups,
+    expectedGroupFields, groupFieldName, refuseOverCapacity,
+    refuseOverflowThatDoesNotFit, validateGroups,
 } from './groups';
 
 /** One item's stored answers. Rich items answer on `rating`, everything else on
@@ -190,7 +198,8 @@ export type StatutoryGroupInstance = Readonly<Record<string, unknown>>;
 export type StatutoryGroupInstances = Readonly<Record<string, readonly StatutoryGroupInstance[]>>;
 
 /**
- * Expand one declaration's groups into `values`, refusing an overflow.
+ * Expand one declaration's groups into `values`, refusing an overflow that has
+ * nowhere to go.
  *
  * EVERY SLOT GETS A KEY, up to `capacity`, whether or not an instance was
  * recorded for it. The slot is PRINTED on the authority's page whether or not
@@ -219,12 +228,19 @@ function expandGroups(
             + 'group instance instead.');
     }
 
-    // Every capacity is judged BEFORE any value is written. An overflow is a
-    // fact about the inspection as a whole, and refusing it halfway through
-    // would leave a caller holding a partly-populated object it has no reason
-    // to distrust.
+    // Every capacity with nowhere to overflow to is judged BEFORE any value is
+    // written. An overflow is a fact about the inspection as a whole, and
+    // refusing it halfway through would leave a caller holding a
+    // partly-populated object it has no reason to distrust.
+    //
+    // A group that nominates a destination is NOT judged here, because it has
+    // not failed yet: its extra instances are routed by `routeOverflow` once the
+    // bindings have been resolved, and only a destination that cannot hold them
+    // refuses.
     for (const group of groups) {
-        refuseOverCapacity(group, (instances[group.id] ?? []).length);
+        if (group.overflowTo === undefined) {
+            refuseOverCapacity(group, (instances[group.id] ?? []).length);
+        }
     }
 
     for (const group of groups) {
@@ -235,6 +251,86 @@ function expandGroups(
                 values[groupFieldName(group.id, index, field)] = asValue(instance?.[field]);
             }
         }
+    }
+}
+
+/**
+ * One overflowing instance, written as a sentence somebody can read.
+ *
+ * IT CARRIES ITS OWN ATTRIBUTION because nothing around it will. It lands in a
+ * comments box among the inspector's own prose, where "60" and "31" mean
+ * nothing; the reader has to be able to tell what this is and which instance it
+ * was, so the block's name and the instance's number are part of the text.
+ *
+ * The number is the position on the form counted from one — the third panel is
+ * "3" — rather than the array index, because the person reading it is counting
+ * panels in a house and not offsets in an object.
+ *
+ * A field the inspector left blank is left out. This is prose in a comments box,
+ * and "Panel age:" followed by nothing tells a reader less than silence while
+ * suggesting something went missing. An instance with no answers at all still
+ * gets a line, because the fact that a third panel EXISTS is the thing an
+ * overflow must never lose.
+ */
+function overflowLine(group: FieldGroup, index: number, instance: StatutoryGroupInstance): string {
+    const answered = group.fields
+        .map((field) => [field, asValue(instance[field])] as const)
+        .filter(([, value]) => value !== '')
+        .map(([field, value]) => `${fieldLabel(field)}: ${value}`);
+    const body = answered.length > 0 ? `${answered.join('; ')}.` : 'no answers recorded.';
+    return `${group.label} ${index + 1} — ${body}`;
+}
+
+/**
+ * `total_amps` -> `Total amps`.
+ *
+ * The declaration's own field name, tidied. A group's fields carry no printed
+ * label the way its slots do -- `slotLabels` exists because the form prints
+ * those words and this has no equivalent, so inventing one here would put
+ * wording on the page that nobody measured.
+ */
+function fieldLabel(field: string): string {
+    const words = field.replace(/_/g, ' ');
+    return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * Write the instances the slots could not hold into the field the form nominates.
+ *
+ * -- WHY THIS RUNS AFTER THE BINDINGS ----------------------------------------
+ * The destination is an ordinary bound field, so the bindings loop writes it. A
+ * routed line placed before that loop would be overwritten by the binding
+ * without a trace, and the page would come out looking exactly as if no third
+ * panel had ever been recorded.
+ *
+ * -- WHY IT APPENDS, AND WHY HIS TEXT COMES FIRST ----------------------------
+ * What he wrote is the point and this is the ledger. He is also not looking at
+ * this box while he edits the panel -- the panel's fields are in the electrical
+ * section and the comments box is printed at the end of the form -- so anything
+ * overwritten here would disappear somewhere he cannot see it.
+ */
+function routeOverflow(
+    groups: readonly FieldGroup[],
+    instances: StatutoryGroupInstances,
+    values: Record<string, string>,
+): void {
+    for (const group of groups) {
+        const destination = group.overflowTo;
+        if (destination === undefined) continue;
+        const recorded = instances[group.id] ?? [];
+        if (recorded.length <= group.capacity) continue;
+
+        const lines = recorded
+            .slice(group.capacity)
+            .map((instance, offset) => overflowLine(group, group.capacity + offset, instance));
+        // The box holds ONE text, so the existing value is part of what has to
+        // fit -- measuring only our addition would pass and still overrun.
+        const existing = values[destination] ?? '';
+        const combined = existing === ''
+            ? lines.join('\n')
+            : [existing, ...lines].join('\n');
+        refuseOverflowThatDoesNotFit(group, recorded.length, destination, combined.length);
+        values[destination] = combined;
     }
 }
 
@@ -273,6 +369,12 @@ export function collectStatutoryValues(
         // deliberately absent here rather than empty -- see StatutoryValueSource.
         if (source.from === 'signature') continue;
         values[ourField] = resolve(source, ourField, items, results, facts);
+    }
+    // Last, because an overflow is appended to a destination the loop above has
+    // just written, and because the refusal it can still raise is the END of the
+    // chain rather than the start of it.
+    if (declaration.groups !== undefined) {
+        routeOverflow(declaration.groups, instances, values);
     }
     return values;
 }

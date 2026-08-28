@@ -308,6 +308,149 @@ describe('collectStatutoryValues — repeatable groups', () => {
     });
 });
 
+/**
+ * Where the extra panel goes — and why the refusal moved to the end of the chain.
+ *
+ * The refusal is not gone; it is last. An instance the slots cannot hold is
+ * written into the field the form itself nominates, and only a destination that
+ * cannot hold it either brings the refusal back. The forms are what decided
+ * this: the Citizens four-point form prints "(use additional pages if needed)"
+ * on its Additional Comments box, so the publisher has already answered "where
+ * does the third panel go". Making the inspector retype it there by hand is the
+ * work being removed.
+ */
+describe('collectStatutoryValues — overflow goes where the form nominates', () => {
+    const PANELS_WITH_COMMENTS: FieldGroup = {
+        id: 'electrical_panel',
+        label: 'Electrical Panel',
+        capacity: 2,
+        slotLabels: ['Main Panel', 'Second Panel'],
+        fields: ['total_amps', 'panel_age'],
+        overflowTo: 'additional_comments',
+    };
+
+    /** The form's own comments box, as an item the inspector writes into. */
+    const COMMENTS_SNAPSHOT = {
+        schemaVersion: 2,
+        sections: [{
+            id: 'sec_general',
+            title: 'General',
+            items: [{ id: 'itm_comments', label: 'Additional Comments', type: 'textarea' }],
+        }],
+    } as unknown as TemplateSchemaV2;
+
+    const THREE_PANELS = {
+        electrical_panel: [
+            { total_amps: '100', panel_age: '12' },
+            { total_amps: '150', panel_age: '20' },
+            { total_amps: '60', panel_age: '31' },
+        ],
+    };
+
+    it('writes the third panel into that field instead of refusing', () => {
+        const values = collectStatutoryValues(
+            { formId: 'fl_citizens_4point', bindings: {}, groups: [PANELS_WITH_COMMENTS] },
+            COMMENTS_SNAPSHOT, {}, EMPTY_FACTS, THREE_PANELS,
+        );
+        // The line carries its own attribution: a reader of the comments box has
+        // to be able to tell WHAT this is and WHICH instance it was, because
+        // nothing around it on the page will say so.
+        expect(values['additional_comments'])
+            .toBe('Electrical Panel 3 — Total amps: 60; Panel age: 31.');
+        // The slots still hold the instances they held. An overflow that also
+        // shifted the numbered slots would put the wrong panel in the printed box.
+        expect(values['electrical_panel[0].total_amps']).toBe('100');
+        expect(values['electrical_panel[1].total_amps']).toBe('150');
+    });
+
+    it('APPENDS to what the inspector wrote, never replacing it', () => {
+        // His words are the point and ours are the ledger, so his come first and
+        // survive whole. He is also not looking at this box when he edits the
+        // panel — the two are not on the same screen — so anything overwritten
+        // here disappears where he cannot see it.
+        const values = collectStatutoryValues(
+            {
+                formId: 'fl_citizens_4point',
+                bindings: { additional_comments: { from: 'item', itemId: 'itm_comments' } },
+                groups: [PANELS_WITH_COMMENTS],
+            },
+            COMMENTS_SNAPSHOT,
+            { itm_comments: { value: 'Third panel is in the detached garage, fed from the main.' } },
+            EMPTY_FACTS, THREE_PANELS,
+        );
+        expect(values['additional_comments']).toBe(
+            'Third panel is in the detached garage, fed from the main.\n'
+            + 'Electrical Panel 3 — Total amps: 60; Panel age: 31.',
+        );
+    });
+
+    it('REGRESSION LOCK — with no destination declared it still refuses, word for word', () => {
+        // The Florida wind-mitigation form has no comments, notes, remarks or
+        // explain field anywhere on it. "No destination" is a real form, not a
+        // theoretical branch, and nothing about that path may have moved.
+        expect(() => collectStatutoryValues(
+            {
+                formId: 'fl_oir_b1_1802',
+                bindings: {},
+                groups: [{ ...PANELS_WITH_COMMENTS, overflowTo: undefined }],
+            },
+            COMMENTS_SNAPSHOT, {}, EMPTY_FACTS, THREE_PANELS,
+        )).toThrow(
+            'Electrical Panel: this inspection recorded 3, and this revision of the form '
+            + 'has 2 slots. Record the remaining 1 in the narrative report or as an attachment.',
+        );
+    });
+
+    it('REFUSES when the destination cannot hold it either, naming both numbers and the destination', () => {
+        expect(() => collectStatutoryValues(
+            {
+                formId: 'fl_citizens_4point',
+                bindings: {},
+                groups: [{ ...PANELS_WITH_COMMENTS, overflowMaxLength: 40 }],
+            },
+            COMMENTS_SNAPSHOT, {}, EMPTY_FACTS, THREE_PANELS,
+        )).toThrow(
+            'Electrical Panel: this inspection recorded 3, and this revision of the form '
+            + 'has 2 slots. The remaining 1 will not fit in "additional_comments" either: '
+            + 'that box holds about 40 characters and would receive 51. Record the remainder '
+            + 'in the narrative report or as an attachment.',
+        );
+    });
+
+    it('POSITIVE CONTROL — a destination that does hold it is not refused', () => {
+        // Without this the refusal above passes for an implementation that
+        // refuses every declared destination.
+        const values = collectStatutoryValues(
+            {
+                formId: 'fl_citizens_4point',
+                bindings: {},
+                groups: [{ ...PANELS_WITH_COMMENTS, overflowMaxLength: 80 }],
+            },
+            COMMENTS_SNAPSHOT, {}, EMPTY_FACTS, THREE_PANELS,
+        );
+        expect(values['additional_comments'])
+            .toBe('Electrical Panel 3 — Total amps: 60; Panel age: 31.');
+    });
+
+    it('an overflow instance nobody answered still says it exists', () => {
+        // The silent drop is the failure this subsystem exists to prevent, and a
+        // line with no answers on it is still the difference between "there is a
+        // third panel" and a page that never mentions one.
+        const values = collectStatutoryValues(
+            { formId: 'fl_citizens_4point', bindings: {}, groups: [PANELS_WITH_COMMENTS] },
+            COMMENTS_SNAPSHOT, {}, EMPTY_FACTS,
+            {
+                electrical_panel: [
+                    { total_amps: '100', panel_age: '12' },
+                    { total_amps: '150', panel_age: '20' },
+                    {},
+                ],
+            },
+        );
+        expect(values['additional_comments']).toBe('Electrical Panel 3 — no answers recorded.');
+    });
+});
+
 describe('collectStatutoryValues — a declaration with no groups is untouched', () => {
     it('behaves exactly as it did before groups existed', () => {
         // The ordinary case: the Florida wind-mitigation form declares no

@@ -1,3 +1,4 @@
+import type { StatutoryFormDeclaration } from './statutory-declaration';
 /**
  * Spec 5B — Defect Model + Canned Comment Library.
  *
@@ -234,119 +235,12 @@ interface TemplateStructure {
  * closed door is the enforcement; this comment is only the reason for it.
  */
 
-/**
- * The inspection-level fields a binding may read. Closed on purpose — see
- * `StatutoryValueSource`. Each maps to one column the inspection already has.
- *
- * -- MEMBERSHIP IS DECIDED BY WHETHER A REAL SOURCE EXISTS -------------------
- * A member here is a promise that the value can be resolved from a column
- * somebody already fills in. `company_name` and `company_phone` read the
- * workspace's own configuration, which is why they are here.
- *
- * Two boxes the Florida four-point form prints are deliberately NOT here, and
- * that absence was decided rather than overlooked:
- *
- *   - `Title` has no source anywhere in this repository.
- *   - `License Type` asks for a state licence class (home inspector, general
- *     contractor, building code inspector). The nearest column is an
- *     inspector credential's label, which holds an ASSOCIATION certification
- *     ("InterNACHI CPI"). Those are not the same thing, and answering a
- *     statutory licence-type box from it would print something that looks
- *     right and is wrong — the exact failure this subsystem exists to prevent.
- *
- * Both need a new source before they can be members. Do NOT add them as fields
- * hardwired to `null`: a member that can never resolve is a blank box on an
- * authority's form, which reads as an inspector who did not answer.
- *
- * New members go at the END, for the same reason new columns do — the order is
- * something readers see.
- */
-export type StatutoryInspectionField =
-    | 'client_name'
-    | 'client_email'
-    | 'client_phone'
-    | 'property_address'
-    | 'property_city'
-    | 'property_state'
-    | 'property_zip'
-    | 'inspection_date'
-    | 'inspector_name'
-    | 'inspector_license'
-    | 'company_name'
-    | 'company_phone';
-
-/**
- * One repeated block on the authority's form.
- *
- * -- WHY SLOTS ARE NAMED AND NOT NUMBERED ------------------------------------
- * The form prints a name over each one. Measured on the Citizens four-point
- * form: the electrical block is "Main Panel" / "Second Panel" and the roof block
- * is "Predominant Roof" / "Secondary Roof". Those are not "the first" and "the
- * second" -- predominant versus secondary is a property of the roof, and a
- * reader handed "Roof 2" has been told something the form does not say.
- * Addressing stays positional underneath; what a person sees is always the
- * form's own wording.
- *
- * -- WHY CAPACITY IS A MEASUREMENT -------------------------------------------
- * It is the slot count on ONE revision, established by the person who read that
- * revision, and it sits beside `checkedBy` for the same reason: no gate can
- * check it. A house with three panels overflows a form with two, and that is
- * the form's constraint rather than a bug in the count.
- */
-export interface FieldGroup {
-    /** Group id, e.g. `electrical_panel`. */
-    id: string;
-    /** Human-readable name of the block, e.g. `Electrical Panel`. */
-    label: string;
-    /** Slots on THIS revision, counted on the page. Never guessed. */
-    capacity: number;
-    /**
-     * What the form prints over each slot, in page order. MUST have exactly
-     * `capacity` entries -- `validateGroups` enforces it.
-     */
-    slotLabels: readonly string[];
-    /** Field names inside one instance, e.g. `total_amps`. */
-    fields: readonly string[];
-}
-
-/**
- * Where one value on the form comes from.
- *
- * A CLOSED discriminated union, with `from` as the discriminant. The closure is
- * the point: an open `from: string`, or an open field name, would defer a typo
- * to runtime — and the entire observable output of that typo is a BLANK BOX on
- * somebody's statutory form, which reads as an inspector who failed to answer
- * rather than as software that failed to look. A compiler error is the only
- * place that mistake is cheap.
- *
- * `signature` resolves BY REFERENCE at render time and never enters the
- * collected values. A signature image is the most tightly classified personal
- * data this repository holds, and the values object is declared to carry none;
- * routing it through there would retract that declaration in one step. `scope`
- * names WHICH PART of the form the signature stands behind, exactly as the
- * matching `signature` field mapping does -- one form can carry several
- * signatures that each answer for a different section. Use `whole_form` when
- * the form has a single signer.
- */
-export type StatutoryValueSource =
-    | { from: 'item'; itemId: string }
-    | { from: 'item_attribute'; itemId: string; attribute: string }
-    | { from: 'inspection'; field: StatutoryInspectionField }
-    | { from: 'literal'; value: string }
-    | { from: 'signature'; scope: string };
-
-/** One template's statutory-form declaration. */
-export interface StatutoryFormDeclaration {
-    /** The form, not the revision (see above) — e.g. `tx_trec_rei`. */
-    formId: string;
-    /** Form field name -> where its value comes from. A field the authority's
-     *  form requires and this map omits is a gap the fidelity gate reports; it
-     *  is never silently rendered blank. */
-    bindings: Record<string, StatutoryValueSource>;
-    /** Repeated blocks on this form. Absent when the form has none -- the
-     *  Florida wind-mitigation form has none at all. */
-    groups?: readonly FieldGroup[];
-}
+export type {
+    StatutoryInspectionField,
+    FieldGroup,
+    StatutoryValueSource,
+    StatutoryFormDeclaration,
+} from './statutory-declaration';
 
 export interface TemplateSchemaV2 {
     schemaVersion: 2;
