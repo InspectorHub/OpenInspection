@@ -183,4 +183,22 @@ describe('renderStatutoryForm — values', () => {
         await expect(renderStatutoryForm(flat.bytes, broken, { 'owner.name': 'Zoe Ng' }))
             .rejects.toThrow(/checkedBy/);
     });
+
+    it('refuses to render a signature mapping until signature support lands', async () => {
+        // A mapping kind the renderer does not recognise would fall through and
+        // be skipped, producing a form with an EMPTY signature box — which
+        // prints, looks complete, and passes every assertion in this file about
+        // its own values. Until the image is actually drawn it has to be an
+        // error, not a gap.
+        const map: FieldMap = {
+            ...flatMap(),
+            requiredFields: [],
+            mappings: [{
+                kind: 'signature', ourField: 'sig', scope: 'whole_form',
+                page: 1, x: 10, y: 10, width: 160, height: 40,
+            }],
+        };
+        await expect(renderStatutoryForm(flat.bytes, map, {}))
+            .rejects.toThrow(/signature rendering is not implemented/i);
+    });
 });

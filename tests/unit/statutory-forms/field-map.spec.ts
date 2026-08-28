@@ -13,9 +13,11 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
     validateFieldMap,
+    validateFieldMapShape,
     validateAgainstPdf,
     sha256Hex,
     type FieldMap,
+    type FieldMapping,
 } from '../../../server/lib/statutory/field-map';
 import type { StatutoryFormVersion } from '../../../server/lib/statutory/form-registry';
 import { buildFieldedPdf, buildFlatPdf, type PdfFixture } from '../helpers/statutory-pdf-fixtures';
@@ -153,6 +155,45 @@ describe('validateFieldMap', () => {
             requiredFields: [],
             mappings: [{ kind: 'overlay', ourField: 'client.name', page: -1, x: 10, y: 20, size: 9 }],
         }, VERSION(fielded.hash))).toThrow(/page/);
+    });
+});
+
+describe('signature mapping', () => {
+    it('carries the section it signs for', () => {
+        // Measured on the Citizens four-point form, page 4: a trade-specific
+        // licensee signs only their own section, so one form can carry several
+        // signatures that each answer for a different part of it. A single
+        // form-wide signer role cannot say that.
+        const mapping: FieldMapping = {
+            kind: 'signature', ourField: 'inspector_signature', scope: 'electrical',
+            page: 3, x: 72, y: 120, width: 160, height: 40,
+        };
+        expect(mapping.scope).toBe('electrical');
+    });
+
+    it('refuses a signature box with no area', () => {
+        // A box with no area draws nothing while every count of "mappings
+        // applied" still includes it — the signature is absent from the form and
+        // present in the arithmetic.
+        expect(() => validateFieldMapShape({
+            ...MAP(fielded.hash),
+            requiredFields: [],
+            mappings: [{
+                kind: 'signature', ourField: 'sig', scope: 'whole_form',
+                page: 1, x: 10, y: 10, width: 0, height: 40,
+            }],
+        })).toThrow(/signature/i);
+    });
+
+    it('refuses a signature with no scope', () => {
+        expect(() => validateFieldMapShape({
+            ...MAP(fielded.hash),
+            requiredFields: [],
+            mappings: [{
+                kind: 'signature', ourField: 'sig', scope: '',
+                page: 1, x: 10, y: 10, width: 160, height: 40,
+            }],
+        })).toThrow(/scope/i);
     });
 });
 

@@ -47,11 +47,19 @@ import { PDFDocument } from 'pdf-lib';
  * `checkbox` — draw a mark at a coordinate when our value equals `whenValue`.
  *              Several of these share one `ourField` on purpose: that is how a
  *              multiple-choice answer maps onto boxes the file does not group.
+ * `signature` — draw a stored signature image inside a measured box. `scope`
+ *              names WHICH PART of the form this signature stands behind: the
+ *              Citizens four-point form lets a trade-specific licensee sign only
+ *              their own section, so one form can carry several signatures that
+ *              each answer for a different part, and a single form-wide role
+ *              cannot say that. Use `whole_form` when the form has one signer.
  */
 export type FieldMapping =
     | { kind: 'acroform'; ourField: string; pdfField: string }
     | { kind: 'overlay'; ourField: string; page: number; x: number; y: number; size: number; maxWidth?: number }
-    | { kind: 'checkbox'; ourField: string; whenValue: string; page: number; x: number; y: number; size?: number };
+    | { kind: 'checkbox'; ourField: string; whenValue: string; page: number; x: number; y: number; size?: number }
+    | { kind: 'signature'; ourField: string; scope: string;
+        page: number; x: number; y: number; width: number; height: number };
 
 /** The complete map for one (formId, version), bound to one `sourceHash`. */
 export interface FieldMap {
@@ -166,6 +174,16 @@ function validateMappingShapes(mappings: readonly FieldMapping[]): void {
             }
             if (m.maxWidth !== undefined && (!Number.isFinite(m.maxWidth) || m.maxWidth <= 0)) {
                 fail(`"${m.ourField}" has maxWidth ${m.maxWidth}`);
+            }
+        } else if (m.kind === 'signature') {
+            if (!(m.width > 0) || !(m.height > 0)) {
+                fail(`signature "${m.ourField}" has width ${m.width} and height `
+                    + `${m.height}; a signature needs a box with area, and a zero one `
+                    + 'renders as nothing at all rather than as an error');
+            }
+            if (m.scope.trim() === '') {
+                fail(`signature "${m.ourField}" declares no scope; use "whole_form" `
+                    + 'when the form has a single signer');
             }
         } else {
             if (m.whenValue.trim() === '') {

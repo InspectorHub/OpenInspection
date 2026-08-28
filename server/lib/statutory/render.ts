@@ -91,6 +91,20 @@ export async function renderStatutoryForm(
     };
 
     for (const mapping of map.mappings) {
+        if (mapping.kind === 'signature') {
+            // The mapping kind exists so a field map can be authored against a
+            // form that has signature boxes; drawing the image is not built yet.
+            // Skipping it silently would produce a form with an empty signature
+            // box — which prints, looks complete, and passes every assertion
+            // about its own values. Fail instead.
+            //
+            // The refusal is BEFORE the value lookup on purpose: a signature
+            // resolves by reference and never arrives through `values`, so a
+            // check placed after it would find nothing to skip and skip anyway.
+            fail(`signature rendering is not implemented; "${mapping.ourField}" `
+                + 'cannot be produced yet');
+        }
+
         const value = supplied.get(mapping.ourField);
         if (value === undefined) continue;
 
