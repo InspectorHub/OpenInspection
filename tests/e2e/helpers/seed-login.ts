@@ -31,7 +31,7 @@ export async function loginAsSeedUser(page: Page, email: string): Promise<void> 
  * context" that reads like an authorization bug and is really a lost session.
  * So the auth cookie is read back out of the jar and re-sent alongside.
  */
-async function authedWriteHeaders(page: Page): Promise<Record<string, string>> {
+export async function authedWriteHeaders(page: Page): Promise<Record<string, string>> {
     const token = Array.from(crypto.getRandomValues(new Uint8Array(16)))
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('');
