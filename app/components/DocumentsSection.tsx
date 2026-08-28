@@ -5,10 +5,10 @@
  * presentational + helpers — NO data fetching inside. All upload / delete /
  * download actions are passed in as callbacks/hrefs by the host route.
  *
- * Helpers (`isAcceptedDocument`, `formatSize`, `groupByCategory`) mirror the
- * server allowlist in `server/services/client-document.service.ts` so the UI can
- * reject obviously-invalid files BEFORE streaming them (the server still
- * re-validates by construction).
+ * Helpers (`isAcceptedDocument`, `formatSize`, `groupByCategory`) let the UI
+ * reject obviously-invalid files BEFORE streaming them; the server re-validates
+ * by construction, so this check is a courtesy and never a control. The
+ * allowlist it reads is the one the server reads — imported, not copied.
  *
  * lint:ds — literal colors are forbidden; only `ih-*` design tokens are used.
  */
@@ -17,27 +17,11 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { formatDate } from "~/lib/format";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
-
-/* ------------------------------------------------------------------ */
-/* Allowlist (mirrors server/services/client-document.service.ts) */
-/* ------------------------------------------------------------------ */
-
-const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
-
-const ACCEPTED_EXTENSIONS = new Set([
-  "pdf", "jpg", "jpeg", "png", "heic", "heif", "webp",
-  "doc", "docx", "xls", "xlsx", "csv", "dwg", "dxf",
-]);
-const CAD_EXTENSIONS = new Set(["dwg", "dxf"]);
-const ACCEPTED_CONTENT_TYPES = new Set([
-  "application/pdf",
-  "image/jpeg", "image/png", "image/heic", "image/heif", "image/webp",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "text/csv",
-]);
+// Values only. This module is deliberately free of I/O so importing it does not
+// pull anything server-side into the browser bundle.
+import {
+  ALLOWED_CONTENT_TYPES, ALLOWED_EXTENSIONS, CAD_EXTENSIONS, MAX_UPLOAD_BYTES,
+} from "../../server/lib/upload-allowlist";
 
 const extOf = (name: string) => (name.split(".").pop() ?? "").toLowerCase();
 
@@ -49,9 +33,9 @@ const extOf = (name: string) => (name.split(".").pop() ?? "").toLowerCase();
  */
 export function isAcceptedDocument(file: { name: string; type: string; size: number }): boolean {
   const ext = extOf(file.name);
-  if (!ACCEPTED_EXTENSIONS.has(ext)) return false;
-  if (!CAD_EXTENSIONS.has(ext) && !ACCEPTED_CONTENT_TYPES.has(file.type)) return false;
-  if (file.size > MAX_BYTES) return false;
+  if (!ALLOWED_EXTENSIONS.has(ext)) return false;
+  if (!CAD_EXTENSIONS.has(ext) && !ALLOWED_CONTENT_TYPES.has(file.type)) return false;
+  if (file.size > MAX_UPLOAD_BYTES) return false;
   return true;
 }
 
@@ -124,7 +108,7 @@ export function groupByCategory(items: DocumentItem[]): DocumentGroup[] {
 /* Component */
 /* ------------------------------------------------------------------ */
 
-const ACCEPT_ATTR = Array.from(ACCEPTED_EXTENSIONS).map((e) => `.${e}`).join(",");
+const ACCEPT_ATTR = Array.from(ALLOWED_EXTENSIONS).map((e) => `.${e}`).join(",");
 
 export interface DocumentsSectionProps {
   items: DocumentItem[];
