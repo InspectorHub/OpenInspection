@@ -61,8 +61,14 @@ export function isVectorImage(file: File): boolean {
   return file.type === "image/svg+xml";
 }
 
-/** Read a File to a data URI, or null when it cannot be read. */
-export function readAsDataUri(file: File): Promise<string | null> {
+/**
+ * Read a File to a data URI, or null when it cannot be read.
+ *
+ * Module-private since the signature uploader stopped storing SVGs verbatim --
+ * `blobToDataUri` below is the only caller left, and a re-export would invite
+ * another path that skips the cropper.
+ */
+function readAsDataUri(file: File): Promise<string | null> {
   return new Promise((resolve) => {
     const r = new FileReader();
     r.onload = () => resolve(typeof r.result === "string" ? r.result : null);

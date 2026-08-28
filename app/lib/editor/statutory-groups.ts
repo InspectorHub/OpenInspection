@@ -28,7 +28,7 @@ import type {
 } from '../../../server/types/template-schema';
 
 /** One slot the authority's page actually prints. */
-export interface EditorGroupSlot {
+interface EditorGroupSlot {
     /** 0-based position. Slot 0 is the first the form prints, not "the first one found". */
     index: number;
     /** What the form prints over it, verbatim -- "Main Panel", not "Panel 1". */

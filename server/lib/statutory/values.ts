@@ -184,7 +184,7 @@ function resolve(
  * is the position in the array, because that is what the form's own slot order
  * means, and duplicating it into the key would let the two disagree.
  */
-export type StatutoryGroupInstance = Readonly<Record<string, unknown>>;
+type StatutoryGroupInstance = Readonly<Record<string, unknown>>;
 
 /**
  * Everything the inspection recorded for each repeated block, group id ->

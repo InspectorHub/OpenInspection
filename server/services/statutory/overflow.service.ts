@@ -117,7 +117,14 @@ export class StatutoryOverflowService {
         if (row) {
             await this.db.update(statutoryFormEntries)
                 .set({ values, updatedAt: now })
-                .where(eq(statutoryFormEntries.id, row.id));
+                // Scoped by tenant as well as by id. The id came from a fetch
+                // that was already tenant-scoped, so this is belt and braces --
+                // but the next reader should not have to trace where `row` came
+                // from to satisfy themselves of that.
+                .where(and(
+                    eq(statutoryFormEntries.id, row.id),
+                    eq(statutoryFormEntries.tenantId, tenantId),
+                ));
             return;
         }
         await this.db.insert(statutoryFormEntries).values({
