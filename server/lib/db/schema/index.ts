@@ -130,3 +130,7 @@ export { statutoryFormSightings } from './statutory-form-sightings';
 export type {
     StatutoryFormSightingRow, NewStatutoryFormSightingRow,
 } from './statutory-form-sightings';
+
+// One inspection's answers to one statutory form — keyed by form as well as
+// inspection, because a single visit commonly produces more than one form.
+export * from './inspection/statutory';
