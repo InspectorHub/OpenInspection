@@ -294,6 +294,30 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  // They cannot diverge in the common case (the editor only loads for an
  // authorized user), but if the collab ping is refused we must NOT report a
  // clean convergence over a drifted doc — see the status check below.
+ if (intent === "add-statutory-instance") {
+  // An instance the authority's page has no slot to print. Printed slots are
+  // ordinary items and save through the normal results path; only what the item
+  // model cannot hold comes through here.
+  const id = params.id;
+  const res = await (api.inspections[":id"] as unknown as {
+   "statutory-form": { instances: { $post: (a: unknown) => Promise<Response> } };
+  })["statutory-form"].instances.$post({
+   param: { id },
+   json: {
+    groupId: String(formData.get("groupId") ?? ""),
+    index: Number(formData.get("index") ?? 0),
+    fields: JSON.parse(String(formData.get("fields") ?? "{}")),
+   },
+  });
+  if (!res.ok) {
+   // Surfaced rather than swallowed: the one refusal this can raise names a
+   // slot the form prints, and that is something the person needs to read.
+   const body = await res.json().catch(() => null) as { error?: { message?: string } } | null;
+   return { error: body?.error?.message ?? "Could not record that instance." };
+  }
+  return { ok: true };
+ }
+
  if (intent === "restructure") {
   const id = params.id;
   const snapshot = JSON.parse(String(formData.get("snapshot") ?? "{}"));

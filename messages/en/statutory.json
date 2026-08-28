@@ -1,0 +1,7 @@
+{
+  "statutory_group_instance_cancel": "Cancel",
+  "statutory_group_instance_save": "Record it",
+  "statutory_group_instance_no_slot": "This form prints {count} {group} slots, and this is one more.",
+  "statutory_group_instance_goes_to": "It will be written into {destination} instead. Nothing is lost, but it will read as a note rather than a filled box.",
+  "statutory_form_completeness": "{answered} of {total} form fields answered"
+}

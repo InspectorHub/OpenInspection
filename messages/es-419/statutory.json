@@ -1,0 +1,7 @@
+{
+  "statutory_group_instance_cancel": "Cancelar",
+  "statutory_group_instance_save": "Registrar",
+  "statutory_group_instance_no_slot": "Este formulario imprime {count} espacios de {group}, y este es uno más.",
+  "statutory_group_instance_goes_to": "Se escribirá en {destination}. No se pierde nada, pero se leerá como una nota y no como una casilla.",
+  "statutory_form_completeness": "{answered} de {total} campos del formulario respondidos"
+}
