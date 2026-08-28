@@ -75,3 +75,29 @@ export function readAsDataUri(file: File): Promise<string | null> {
 export function blobToDataUri(blob: Blob): Promise<string | null> {
   return readAsDataUri(new File([blob], "image", { type: blob.type }));
 }
+
+/** What a PDF can carry. pdf-lib embeds PNG and JPEG; there is no third. */
+const SIGNATURE_UPLOAD_TYPES = ["image/png", "image/jpeg"] as const;
+
+/**
+ * Why this file cannot be a signature, or null if it can.
+ *
+ * Narrower than `validateImageFile` on purpose, and the narrowing has a reason
+ * the general one does not share: a signature is embedded into a PDF, and
+ * pdf-lib embeds PNG and JPEG only. The picker used to offer SVG and WebP --
+ * one the server never accepted, the other it accepted and nothing could draw,
+ * so an inspector could store a signature that failed silently at the moment he
+ * pressed send.
+ *
+ * Refusing here rather than rasterising says so at the control that caused it.
+ * Quietly converting an SVG would also work and would be worse: the file he
+ * chose is not the file we kept, and he would never learn that.
+ */
+export function validateSignatureFile(file: File): string | null {
+  const general = validateImageFile(file);
+  if (general) return general;
+  if (!(SIGNATURE_UPLOAD_TYPES as readonly string[]).includes(file.type)) {
+    return m.settings_profile_signature_upload_needs_raster();
+  }
+  return null;
+}

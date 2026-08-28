@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useFetcher } from "react-router";
 import { SignaturePad } from "~/components/SignaturePad";
 import { PhotoCropper } from "~/components/media-studio/PhotoCropper";
-import { blobToDataUri, readAsDataUri, validateImageFile, isVectorImage, SIGNATURE_MAX_LONG_EDGE } from "~/lib/image-upload";
+import { blobToDataUri, validateSignatureFile, SIGNATURE_MAX_LONG_EDGE } from "~/lib/image-upload";
 import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
@@ -155,15 +155,13 @@ export function SavedSignatureCard({ savedSignature }: { savedSignature: string 
    * crooked mark on a sheet of A4 was what every agreement recipient got.
    */
   const onFileChosen = async (file: File) => {
-    const invalid = validateImageFile(file);
+    // Narrower than the general image check: a signature is embedded into a PDF,
+    // and only PNG and JPEG can be. The vector branch that used to live here
+    // stored the SVG verbatim, which the server now refuses -- and before it
+    // refused, the failure surfaced when an inspector pressed send.
+    const invalid = validateSignatureFile(file);
     if (invalid) { setUploadError(invalid); return; }
     setUploadError(null);
-    if (isVectorImage(file)) {
-      const dataUri = await readAsDataUri(file);
-      if (!dataUri) { setUploadError(m.settings_profile_signature_upload_unreadable()); return; }
-      submit(dataUri);
-      return;
-    }
     setCropSource(URL.createObjectURL(file));
   };
 
@@ -223,7 +221,7 @@ export function SavedSignatureCard({ savedSignature }: { savedSignature: string 
                   to say so — the control simply does not respond. */}
               <input
                 type="file"
-                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                accept="image/png,image/jpeg"
                 className="sr-only"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
