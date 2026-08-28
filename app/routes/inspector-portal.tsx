@@ -349,10 +349,21 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   let statutoryForm: {
     available: boolean; formId?: string; revision?: string; effectiveDate?: string; notice?: string;
   } = { available: false };
-  const sRes = await api.inspections[":id"]["statutory-form"].$get({ param: { id } }).catch(() => null);
-  if (sRes && sRes.ok) {
-    const sBody = (await sRes.json()) as { data?: typeof statutoryForm };
-    statutoryForm = sBody.data ?? { available: false };
+  // `.catch()` alone did not deliver what the paragraph above promises. It
+  // handles a REJECTED promise, and the way this reaches for the route --
+  // `api.inspections[":id"]["statutory-form"].$get` -- throws SYNCHRONOUSLY when
+  // any link in that chain is absent, before a promise exists for anything to
+  // catch. A client that does not expose this route therefore took the whole
+  // page down, which is the opposite of the degradation described above.
+  try {
+    const sRes = await api.inspections[":id"]["statutory-form"].$get({ param: { id } });
+    if (sRes.ok) {
+      const sBody = (await sRes.json()) as { data?: typeof statutoryForm };
+      statutoryForm = sBody.data ?? { available: false };
+    }
+  } catch {
+    // Absent control, ordinary page -- the same thing a deployment that
+    // publishes no forms sees.
   }
 
   return {
