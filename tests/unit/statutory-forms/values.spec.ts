@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { collectStatutoryValues } from '../../../server/lib/statutory/values';
-import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../../server/types/template-schema';
+import type { FieldGroup, StatutoryFormDeclaration, TemplateSchemaV2 } from '../../../server/types/template-schema';
 
 const SNAPSHOT = {
     schemaVersion: 2,
@@ -205,5 +205,125 @@ describe('collectStatutoryValues — a signature never travels through the value
         // Assert the KEY is absent, not that it is empty: an empty string would
         // still have travelled through the values object.
         expect('inspector_signature' in values).toBe(false);
+    });
+});
+
+/**
+ * Repeatable blocks — the half of the group design the product could not reach.
+ *
+ * `groups.ts` was built, unit-tested and never called: nothing read
+ * `declaration.groups`, so the over-capacity refusal — the reason groups exist
+ * at all — could not happen to anybody. These tests are about the WIRING, which
+ * is why they assert on values the collector produces rather than on the
+ * helpers it delegates to.
+ */
+describe('collectStatutoryValues — repeatable groups', () => {
+    const PANELS: FieldGroup = {
+        id: 'electrical_panel',
+        label: 'Electrical Panel',
+        capacity: 2,
+        slotLabels: ['Main Panel', 'Second Panel'],
+        fields: ['total_amps'],
+    };
+
+    const EMPTY_SNAPSHOT = { schemaVersion: 2, sections: [] } as unknown as TemplateSchemaV2;
+
+    it('expands one recorded instance per slot, in the order the form prints them', () => {
+        // Distinguishable values on purpose. Equal ones would pass just as well
+        // for a collector that wrote both slots from instance 0.
+        const values = collectStatutoryValues(
+            { formId: 'fl_citizens_4point', bindings: {}, groups: [PANELS] },
+            EMPTY_SNAPSHOT, {}, EMPTY_FACTS,
+            { electrical_panel: [{ total_amps: '100' }, { total_amps: '200' }] },
+        );
+        expect(values).toEqual({
+            'electrical_panel[0].total_amps': '100',
+            'electrical_panel[1].total_amps': '200',
+        });
+    });
+
+    it('a slot nobody recorded still yields an explicit empty key', () => {
+        // Same discipline as an unanswered item: the slot is PRINTED on the
+        // form whether or not the house has a second panel, so the key exists
+        // and the answer is empty. A missing key is what the renderer refuses
+        // on for a required field, and that refusal is meant for a broken map.
+        const values = collectStatutoryValues(
+            { formId: 'fl_citizens_4point', bindings: {}, groups: [PANELS] },
+            EMPTY_SNAPSHOT, {}, EMPTY_FACTS,
+            { electrical_panel: [{ total_amps: '100' }] },
+        );
+        expect(Object.prototype.hasOwnProperty.call(values, 'electrical_panel[1].total_amps'))
+            .toBe(true);
+        expect(values['electrical_panel[1].total_amps']).toBe('');
+    });
+
+    it('REFUSES more instances than the form holds, naming both numbers and the destination', () => {
+        expect(() => collectStatutoryValues(
+            { formId: 'fl_citizens_4point', bindings: {}, groups: [PANELS] },
+            EMPTY_SNAPSHOT, {}, EMPTY_FACTS,
+            {
+                electrical_panel: [
+                    { total_amps: '100' }, { total_amps: '200' }, { total_amps: '300' },
+                ],
+            },
+        )).toThrow(
+            'Electrical Panel: this inspection recorded 3, and this revision of the form '
+            + 'has 2 slots. Record the remaining 1 in the narrative report or as an attachment.',
+        );
+    });
+
+    it('POSITIVE CONTROL — exactly capacity is accepted', () => {
+        // Without this the refusal above passes for a collector that refuses
+        // every group it is handed.
+        expect(() => collectStatutoryValues(
+            { formId: 'fl_citizens_4point', bindings: {}, groups: [PANELS] },
+            EMPTY_SNAPSHOT, {}, EMPTY_FACTS,
+            { electrical_panel: [{ total_amps: '100' }, { total_amps: '200' }] },
+        )).not.toThrow();
+    });
+
+    it('REFUSES a group whose slot names a binding also claims', () => {
+        // Both routes write into one object, so the loser disappears without a
+        // trace and the form carries whichever ran last.
+        expect(() => collectStatutoryValues(
+            {
+                formId: 'fl_citizens_4point',
+                bindings: { 'electrical_panel[0].total_amps': { from: 'literal', value: '150' } },
+                groups: [PANELS],
+            },
+            EMPTY_SNAPSHOT, {}, EMPTY_FACTS,
+            { electrical_panel: [{ total_amps: '100' }] },
+        )).toThrow(/electrical_panel\[0\]\.total_amps/);
+    });
+
+    it('a malformed group is refused before any value is collected', () => {
+        expect(() => collectStatutoryValues(
+            {
+                formId: 'fl_citizens_4point',
+                bindings: {},
+                groups: [{ ...PANELS, slotLabels: ['Main Panel'] }],
+            },
+            EMPTY_SNAPSHOT, {}, EMPTY_FACTS, { electrical_panel: [] },
+        )).toThrow(/electrical_panel/);
+    });
+});
+
+describe('collectStatutoryValues — a declaration with no groups is untouched', () => {
+    it('behaves exactly as it did before groups existed', () => {
+        // The ordinary case: the Florida wind-mitigation form declares no
+        // repeated blocks at all. Nothing about this call may change.
+        const values = collectStatutoryValues(DECL, SNAPSHOT, { itm_roof: { rating: 'D' } }, FACTS);
+        expect(values).toEqual({ 'roof.covering': 'D' });
+    });
+
+    it('ignores recorded instances when the declaration declares no groups', () => {
+        // Instances arrive from the inspection; groups are declared by the
+        // template. A form with no repeated block has nowhere to put them, and
+        // inventing keys here would produce values the map cannot place.
+        const values = collectStatutoryValues(
+            DECL, SNAPSHOT, { itm_roof: { rating: 'D' } }, FACTS,
+            { electrical_panel: [{ total_amps: '100' }] },
+        );
+        expect(values).toEqual({ 'roof.covering': 'D' });
     });
 });

@@ -28,7 +28,16 @@
  * So it throws, and the message carries the id, because the id is what the
  * person fixing it has to search for.
  *
- * -- 3. ONE REFUSAL, ONE PLACE -----------------------------------------------
+ * -- 3. A REPEATED BLOCK IS EXPANDED HERE, AND OVERFLOW IS REFUSED HERE ------
+ * A form's repeated blocks (`electrical_panel`, `roof`) are declared as groups
+ * and become one key per slot per field, `electrical_panel[0].total_amps`. This
+ * is the only place that expansion happens, and therefore the only place that
+ * can refuse an inspection with more instances than the page holds -- the
+ * refusal `groups.ts` exists for. An inspection with three panels and a form
+ * with two slots stops here rather than arriving at the renderer as a third
+ * panel with nowhere to go, which the renderer would draw as an empty column.
+ *
+ * -- 4. ONE REFUSAL, ONE PLACE -----------------------------------------------
  * This function does NOT check that every value it produces has somewhere to go
  * on the form, and it does not check that every field the form requires has
  * been produced. `checkValuesAgainstMap` in `render.ts` owns both. A second
@@ -47,12 +56,16 @@
  * add `.trim()`, and doing so would look like tidying.
  */
 import type {
+    FieldGroup,
     StatutoryFormDeclaration,
     StatutoryInspectionField,
     StatutoryValueSource,
     TemplateSchemaV2,
     TemplateItem,
 } from '../../types/template-schema';
+import {
+    expectedGroupFields, groupFieldName, refuseOverCapacity, validateGroups,
+} from './groups';
 
 /** One item's stored answers. Rich items answer on `rating`, everything else on
  *  `value`; attribute answers are keyed by attribute id. */
@@ -158,6 +171,74 @@ function resolve(
 }
 
 /**
+ * What ONE instance of a repeated block answered, keyed by the group's own
+ * field names (`total_amps`) -- never by the expanded slot name. The slot index
+ * is the position in the array, because that is what the form's own slot order
+ * means, and duplicating it into the key would let the two disagree.
+ */
+export type StatutoryGroupInstance = Readonly<Record<string, unknown>>;
+
+/**
+ * Everything the inspection recorded for each repeated block, group id ->
+ * instances in the order the form prints its slots.
+ *
+ * How many arrived is the fact the capacity refusal is made against, which is
+ * why the array is passed whole rather than pre-truncated to `capacity`: a
+ * caller that trimmed it first would hand this function a form that fits and
+ * lose the overflow it was supposed to report.
+ */
+export type StatutoryGroupInstances = Readonly<Record<string, readonly StatutoryGroupInstance[]>>;
+
+/**
+ * Expand one declaration's groups into `values`, refusing an overflow.
+ *
+ * EVERY SLOT GETS A KEY, up to `capacity`, whether or not an instance was
+ * recorded for it. The slot is PRINTED on the authority's page whether or not
+ * the house has a second panel, so an unrecorded slot is the same fact as an
+ * item nobody answered: the key exists and the answer is empty. Emitting no key
+ * would instead read as "this field was never bound", which is what the renderer
+ * refuses on for a required field -- a refusal meant for a broken map, never for
+ * a house with one electrical panel.
+ */
+function expandGroups(
+    groups: readonly FieldGroup[],
+    bindings: StatutoryFormDeclaration['bindings'],
+    instances: StatutoryGroupInstances,
+    values: Record<string, string>,
+): void {
+    validateGroups(groups);
+
+    // A binding and a group must not both claim one slot. They are written into
+    // the same object, so the loser vanishes without a trace and the form
+    // carries whichever happened to be written last -- a value that is wrong in
+    // a way no count of "fields supplied" can show.
+    const claimed = expectedGroupFields(groups).filter((name) => name in bindings);
+    if (claimed.length > 0) {
+        fail(`${claimed.length} field(s) are claimed by both a group and a binding: `
+            + `${claimed.join(', ')}. A slot belongs to its group; bind the value into the `
+            + 'group instance instead.');
+    }
+
+    // Every capacity is judged BEFORE any value is written. An overflow is a
+    // fact about the inspection as a whole, and refusing it halfway through
+    // would leave a caller holding a partly-populated object it has no reason
+    // to distrust.
+    for (const group of groups) {
+        refuseOverCapacity(group, (instances[group.id] ?? []).length);
+    }
+
+    for (const group of groups) {
+        const recorded = instances[group.id] ?? [];
+        for (let index = 0; index < group.capacity; index++) {
+            const instance = recorded[index];
+            for (const field of group.fields) {
+                values[groupFieldName(group.id, index, field)] = asValue(instance?.[field]);
+            }
+        }
+    }
+}
+
+/**
  * Collect every value a declaration binds.
  *
  * @param declaration the template's `statutoryForm`.
@@ -165,18 +246,28 @@ function resolve(
  *   not the current template row, which may have moved on since.
  * @param results stored answers, keyed by item id.
  * @param facts inspection-level answers, one per closed field name.
+ * @param instances what the inspection recorded for each repeated block. Empty
+ *   by default, which is the ordinary case: most forms declare no groups, and a
+ *   declaration with none behaves exactly as it did before groups existed.
  * @returns our field name -> the string to place on the form. Every binding
- *   except a signature produces a key; a binding that cannot be resolved throws
- *   instead.
+ *   except a signature produces a key, and every slot of every declared group
+ *   produces one; a binding that cannot be resolved, and a block with more
+ *   instances than the form holds, throw instead.
  */
 export function collectStatutoryValues(
     declaration: StatutoryFormDeclaration,
     snapshot: TemplateSchemaV2,
     results: Record<string, StatutoryItemResult>,
     facts: StatutoryInspectionFacts,
+    instances: StatutoryGroupInstances = {},
 ): Record<string, string> {
     const items = itemsById(snapshot);
     const values: Record<string, string> = {};
+    // Groups first, so a declaration that is broken or a house that overflows
+    // the page is refused before any value is resolved.
+    if (declaration.groups !== undefined) {
+        expandGroups(declaration.groups, declaration.bindings, instances, values);
+    }
     for (const [ourField, source] of Object.entries(declaration.bindings)) {
         // Signatures resolve by reference in the produce service. They are
         // deliberately absent here rather than empty -- see StatutoryValueSource.

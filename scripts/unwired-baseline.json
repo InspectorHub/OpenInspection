@@ -99,10 +99,6 @@
     "kind": "deferred",
     "reason": "A one-shot backfill under services/seed. Nothing schedules or exposes it, so it can only be run by editing code."
   },
-  "server/lib/statutory/groups.ts": {
-    "kind": "deferred",
-    "reason": "Expands repeatable field groups on an authority's form and refuses more instances than the page holds. Nothing declares groups yet: a group's capacity and slot names are measurements of one revision, established by a person who read that revision, so the first caller arrives with the first authored field map rather than from code."
-  },
   "server/lib/statutory/binding-policy.ts": {
     "kind": "deferred",
     "reason": "Refuses personal data bound onto a statutory form by a route that would store it. It guards a declaration the stored form values make about themselves, and the validation path that will call it runs when a form declaration is loaded -- which cannot happen until a form is published."
