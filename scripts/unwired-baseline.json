@@ -87,10 +87,6 @@
     "kind": "frozen",
     "reason": "Its own header says FROZEN / DEAD CODE: superseded by the authoring-surface unification, kept deliberately rather than deleted. Not work owed."
   },
-  "server/lib/statutory/render.ts": {
-    "kind": "deferred",
-    "reason": "Writes values onto the authority's own PDF. Ledger section 52: Task 6 needs a surface that renders a statutory form and no such surface exists, so nothing on a route reaches the renderer."
-  },
   "server/lib/subtype-specials.ts": {
     "kind": "deferred",
     "reason": "Commercial PCA subtype-special chains driven by Building Profile flags. The commercial PCA surface does not consult them."
@@ -102,5 +98,9 @@
   "server/services/seed/backfill-people.ts": {
     "kind": "deferred",
     "reason": "A one-shot backfill under services/seed. Nothing schedules or exposes it, so it can only be run by editing code."
+  },
+  "server/lib/statutory/binding-policy.ts": {
+    "kind": "deferred",
+    "reason": "Refuses personal data bound onto a statutory form by a route that would store it. It guards a declaration the stored form values make about themselves, and the validation path that will call it runs when a form declaration is loaded -- which cannot happen until a form is published."
   }
 }

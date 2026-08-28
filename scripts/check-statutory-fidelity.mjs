@@ -177,6 +177,288 @@ if (admissionUses < 2) {
         + 'it must be both defined and applied, or selection admits an unpublished revision.');
 }
 
+// ---------------------------------------------------------------------------
+// UTC-midnight arm
+// ---------------------------------------------------------------------------
+
+/**
+ * Every date on a published revision must land exactly on a UTC midnight.
+ *
+ * The reason is the cutover. `inspections.date` is a calendar day and the
+ * selector takes epoch ms; `utcMidnightOf` bridges them in UTC, so a version
+ * whose own dates were built in LOCAL time sits a few hours off and the
+ * comparison at the boundary picks the wrong revision. That failure renders a
+ * real, official, superseded document -- nothing looks broken.
+ *
+ * 86,400,000 divides every UTC midnight, so the check is arithmetic rather than
+ * a parse. A `Date.UTC(y, m, d)` call is accepted on sight: three arguments to
+ * Date.UTC IS a UTC midnight by construction.
+ */
+const MS_PER_UTC_DAY = 86400000;
+const DATE_FIELDS = ['effectiveFrom', 'mandatoryFrom', 'effectiveUntil'];
+
+/** Classify one source expression for a date field. Never guesses: an
+ *  expression it cannot read is a failure, not a pass. */
+export function utcMidnightVerdict(expr) {
+    const raw = String(expr ?? '').trim().replace(/,$/, '');
+    if (raw === '' ) return { kind: 'unreadable', raw };
+    if (raw === 'null') return { kind: 'skip', raw };
+    // Date.UTC(y, m, d) with exactly three arguments is midnight by definition.
+    if (/^Date\.UTC\(\s*-?\d+\s*,\s*-?\d+\s*,\s*-?\d+\s*\)$/.test(raw)) {
+        return { kind: 'ok', raw };
+    }
+    if (/^-?\d+$/.test(raw)) {
+        const ms = Number(raw);
+        if (ms % MS_PER_UTC_DAY === 0) return { kind: 'ok', raw };
+        const offHours = ((ms % MS_PER_UTC_DAY) / 3600000).toFixed(2);
+        return { kind: 'off', raw, offHours };
+    }
+    return { kind: 'unreadable', raw };
+}
+
+// ---------------------------------------------------------------------------
+// Load-bearing-sentence arm
+// ---------------------------------------------------------------------------
+
+/**
+ * The statutory notice's closing sentence must appear EXACTLY ONCE.
+ *
+ * Zero and two are both failures, and the two-case is the interesting one. The
+ * non-translatable registry already fails if the sentence disappears entirely,
+ * so "at least one" is covered. What nothing covered is a SECOND copy: with two
+ * in the tree, deleting one leaves every gate green while half the callers
+ * silently render a notice missing the clause that makes it an allocation
+ * statement rather than an attempt to shift a rendering fault onto the
+ * inspector.
+ *
+ * The endorsement-claim half of statutory copy is NOT checked here. It already
+ * has a gate -- `check-endorsement-copy.mjs`, which reads a wider scope than
+ * this one and evaluates negation per clause. A second implementation of it
+ * would be the copy that drifts.
+ */
+const DISCLAIMER_SOURCE = 'server/lib/statutory/disclaimer.ts';
+const LOAD_BEARING = 'not made the inspector’s responsibility merely by this notice';
+
+/** How many times the sentence occurs. `null` when the file cannot be read --
+ *  which is a failure, never a skip: unreadable and absent look identical. */
+export function countLoadBearing(source) {
+    if (typeof source !== 'string') return null;
+    return source.split(LOAD_BEARING).length - 1;
+}
+// ---------------------------------------------------------------------------
+// Source-host arm
+// ---------------------------------------------------------------------------
+
+/**
+ * A published revision's `sourceUrl` must point at an authority's own site.
+ *
+ * The watcher polls whatever URL a version row carries. Point it at a mirror
+ * and "detection" is worse than absent: it reports faithfully on a copy that
+ * may be years behind, so a revision changes and nothing goes off. Version
+ * staleness bites before any other problem in this subsystem, and the mirrors
+ * are real -- one well-known legal-information site still serves the 2012 text
+ * of a form replaced in 2026.
+ *
+ * WARNING: the authority's own domain is NECESSARY, NOT SUFFICIENT. Measured
+ * 2026-08-27 on the real site: the most guessable filename under the agency's
+ * own forms directory served the SUPERSEDED revision, while the current one
+ * lived at a different path. So this arm can only catch the wrong HOST. Which
+ * document at that host is the right one is a question for the person filling
+ * in `checkedBy`, and no gate here can answer it.
+ *
+ * The list is explicit rather than pattern-matched (no `.gov` rule): plenty of
+ * mirrors sit on government-adjacent domains, and an authority outside the US
+ * has no `.gov` at all.
+ */
+const AUTHORITY_HOSTS = new Set([
+    'www.trec.texas.gov',
+    'trec.texas.gov',
+    'floir.gov',
+    'www.floir.gov',
+]);
+
+/** Verdict for one sourceUrl literal. Unreadable is a failure, never a skip. */
+export function sourceHostVerdict(expr) {
+    const raw = String(expr ?? '').trim().replace(/,$/, '').replace(/^['"`]|['"`]$/g, '');
+    if (raw === '') return { kind: 'unreadable', raw };
+    let host;
+    try {
+        host = new URL(raw).host;
+    } catch {
+        return { kind: 'unreadable', raw };
+    }
+    return AUTHORITY_HOSTS.has(host)
+        ? { kind: 'ok', host }
+        : { kind: 'mirror', host };
+}
+if (process.argv.includes('--self-test')) {
+    // A gate nobody can see fail is a gate nobody can trust on the day it is
+    // quiet -- and today the catalogue is empty, so the arm above examines
+    // nothing on every deployment. These are its only exercise.
+    const cases = [
+        ['Date.UTC(2026, 3, 1)', 'ok'],
+        [String(Date.UTC(2026, 3, 1)), 'ok'],
+        [String(Date.UTC(2026, 3, 1) - 8 * 3600000), 'off'],
+        ['null', 'skip'],
+        ['someVariable', 'unreadable'],
+        ['', 'unreadable'],
+    ];
+    let bad = 0;
+    for (const [input, want] of cases) {
+        const got = utcMidnightVerdict(input).kind;
+        if (got !== want) {
+            bad += 1;
+            console.log(`  ✘ self-test: "${input}" -> ${got}, expected ${want}`);
+        }
+    }
+
+    // The load-bearing arm, exercised on strings rather than on the file, so it
+    // is checked even on a tree where the module has been moved.
+    const sentenceCases = [
+        [`x ${LOAD_BEARING} y`, 1],
+        [`${LOAD_BEARING} and again ${LOAD_BEARING}`, 2],
+        ['no such sentence here', 0],
+        [null, null],
+    ];
+    for (const [input, want] of sentenceCases) {
+        const got = countLoadBearing(input);
+        if (got !== want) {
+            bad += 1;
+            console.log(`  ✘ self-test: countLoadBearing(${JSON.stringify(input)}) -> ${got}, expected ${want}`);
+        }
+    }
+
+    // The host arm. The mirror case is the one that matters: it is the failure
+    // this arm exists for, and a gate that cannot be seen rejecting a mirror
+    // cannot be trusted to reject one.
+    const hostCases = [
+        ["'https://www.trec.texas.gov/forms/rei-7-6.pdf'", 'ok'],
+        ["'https://floir.gov/docs-sf/x.pdf'", 'ok'],
+        ["'https://www.law.cornell.edu/mirror/1802.pdf'", 'mirror'],
+        ["'https://example.gov/1802.pdf'", 'mirror'],
+        ['someVariable', 'unreadable'],
+        ["''", 'unreadable'],
+    ];
+    for (const [input, want] of hostCases) {
+        const got = sourceHostVerdict(input).kind;
+        if (got !== want) {
+            bad += 1;
+            console.log(`  ✘ self-test: sourceHostVerdict(${input}) -> ${got}, expected ${want}`);
+        }
+    }
+    const total = cases.length + 4 + 6;
+    console.log(`statutory-fidelity --self-test: ${total} case(s) / ${total - bad} as expected.`);
+    if (bad > 0) {
+        console.log('  The arm cannot be trusted on real data if it misreads its own fixtures.');
+        process.exit(1);
+    }
+    console.log('✅ self-test passed — the UTC-midnight arm fails on a local-time date and passes on a UTC one.');
+    process.exit(0);
+}
+
+let dateFieldsSeen = 0;
+let dateFieldsUtc = 0;
+let dateFieldsSkipped = 0;
+
+for (const form of forms) {
+    const name = form.file.replace(/\.ts$/, '');
+    for (const field of DATE_FIELDS) {
+        // Doubled backslashes on purpose. This is a TEMPLATE LITERAL, so the
+        // STRING parser reads the escapes before the regex engine ever sees
+        // them: a single `\s` becomes a literal `s`, turning "skip whitespace"
+        // into "optionally match the letter s", and a single `\n` becomes a
+        // real newline. The pattern still compiled and still matched, which is
+        // why nothing noticed -- CodeQL did, as js/useless-regexp-character-escape.
+        // To end of LINE, not to the next comma. `utcMidnightVerdict` blesses
+        // `Date.UTC(y, m, d)` by name -- and that expression contains commas, so
+        // stopping at one captured `Date.UTC(2025` and the gate rejected the
+        // very spelling its own verdict function is written to accept. The two
+        // halves disagreed for as long as both existed; an empty catalogue is
+        // why nothing said so. The verdict strips one trailing comma itself.
+        const m = new RegExp(`${field}:\\s*([^\\n]+)`).exec(form.source);
+        if (m === null) continue;
+        dateFieldsSeen += 1;
+        const verdict = utcMidnightVerdict(m[1]);
+        if (verdict.kind === 'ok') dateFieldsUtc += 1;
+        else if (verdict.kind === 'skip') dateFieldsSkipped += 1;
+        else if (verdict.kind === 'off') {
+            failures.push(`  ✘ ${name}.${field} is ${verdict.offHours}h off a UTC midnight. `
+                + 'A revision dated in local time selects the wrong document on the cutover day, '
+                + 'and the wrong document is a real official form.');
+        } else {
+            failures.push(`  ✘ ${name}.${field} could not be read as a date (${verdict.raw}). `
+                + 'Unreadable is a failure here, never a pass.');
+        }
+    }
+}
+
+// An empty catalogue examining nothing is honest. A POPULATED catalogue
+// examining nothing is the reading instrument having broken, and it looks
+// identical from the outside -- both print 0. The regex above was wrong for as
+// long as it existed and this line would not have caught it, because there were
+// no forms to read; the moment someone adds the first one, a still-broken
+// matcher must be loud rather than green.
+if (forms.length > 0 && dateFieldsSeen === 0) {
+    failures.push(`  ✘ ${forms.length} form module(s) present and NOT ONE date field was read. `
+        + `Every module declares at least one of ${DATE_FIELDS.join(', ')}, so zero means this `
+        + 'check stopped being able to see them -- which is a failure of the check, not a pass '
+        + 'for the forms.');
+}
+
+// Printed on EVERY run, including the zeroes. Today the catalogue is empty on
+// every deployment, so all three of these are 0 -- and a 0 that a tick swallows
+// is how a gate comes to look healthy while examining nothing.
+const disclaimerPath = join(root, DISCLAIMER_SOURCE);
+const disclaimerSource = existsSync(disclaimerPath) ? readFileSync(disclaimerPath, 'utf8') : null;
+const loadBearingCount = countLoadBearing(disclaimerSource);
+if (loadBearingCount === null) {
+    failures.push(`  ✘ ${DISCLAIMER_SOURCE} could not be read, so the statutory notice's `
+        + 'closing sentence is UNCHECKED. Unreadable is a failure here: it looks exactly like absent.');
+} else if (loadBearingCount === 0) {
+    failures.push(`  ✘ the statutory notice's closing sentence is missing from ${DISCLAIMER_SOURCE}. `
+        + 'Without it the notice stops being an allocation statement and becomes an ineffective '
+        + 'attempt to make a rendering fault the inspector’s problem.');
+} else if (loadBearingCount > 1) {
+    failures.push(`  ✘ the statutory notice's closing sentence occurs ${loadBearingCount} times in `
+        + `${DISCLAIMER_SOURCE}. With two copies, deleting one leaves every gate green while half the `
+        + 'callers render a notice that no longer allocates anything.');
+}
+
+let hostsSeen = 0;
+let hostsAuthoritative = 0;
+
+for (const form of forms) {
+    const name = form.file.replace(/\.ts$/, '');
+    const m = form.source.split(String.fromCharCode(10)).map((line) => /sourceUrl:\s*(\S+)/.exec(line)).find(Boolean);
+    // `!m`, not `m === null`. The guard a few blocks up reads `=== null` and is
+    // right there, because its producer is `.exec()`. This one's producer is
+    // `.find()`, which yields UNDEFINED when nothing matches -- so the copied
+    // guard never fired and `m[1]` threw a TypeError on the first form module
+    // that declared no sourceUrl. A gate that crashes still fails loudly; this
+    // one would have failed while saying nothing about the form.
+    if (!m) continue;
+    hostsSeen += 1;
+    const verdict = sourceHostVerdict(m[1]);
+    if (verdict.kind === 'ok') hostsAuthoritative += 1;
+    else if (verdict.kind === 'mirror') {
+        failures.push(`  ✘ ${name}.sourceUrl points at "${verdict.host}", which is not an `
+            + 'authority host. A watcher aimed at a mirror reports faithfully on a copy that may be '
+            + 'years behind, so a revision can change with nothing going off.');
+    } else {
+        failures.push(`  ✘ ${name}.sourceUrl could not be read as a URL (${verdict.raw}). `
+            + 'Unreadable is a failure here, never a pass.');
+    }
+}
+
+console.log(`statutory-source-hosts: ${hostsSeen} sourceUrl(s) examined / ${hostsAuthoritative} on an `
+    + `authority host (${AUTHORITY_HOSTS.size} host(s) allowed).`);
+
+console.log(`statutory-notice: closing sentence found ${loadBearingCount === null ? 'UNREADABLE' : loadBearingCount} `
+    + `time(s) in 1 declared source (exactly 1 required).`);
+
+console.log(`statutory-utc-dates: ${dateFieldsSeen} date field(s) examined / `
+    + `${dateFieldsUtc} on a UTC midnight · ${dateFieldsSkipped} null and skipped.`);
+
 console.log(`statutory-detection: ${detection.length}/${DETECTION_FILES.length} detection file(s) `
     + `scanned · ${adopters.length} reaching statutory_form_versions · matcher control `
     + `${controlSees ? 'sees' : 'MISSES'} the known occurrence · registry admission check applied `

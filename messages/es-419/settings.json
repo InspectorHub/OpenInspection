@@ -262,6 +262,7 @@
   "settings_profile_signature_empty_hint": "Todavía no hay ninguna firma. Dibuje una o suba una imagen de su firma.",
   "settings_profile_signature_upload_too_big": "Esa imagen supera los 2 MB. Pruebe con una más pequeña.",
   "settings_profile_signature_upload_bad_type": "Use una imagen PNG, JPEG, WebP o SVG.",
+  "settings_profile_signature_upload_needs_raster": "La firma debe ser PNG o JPEG: son los formatos que un PDF puede incluir.",
   "settings_profile_signature_upload_unreadable": "No se pudo leer ese archivo como imagen.",
   "settings_profile_signature_crop_aria": "Recortar firma",
   "settings_profile_signature_crop_save": "Guardar firma",

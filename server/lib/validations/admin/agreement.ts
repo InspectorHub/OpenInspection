@@ -1,5 +1,30 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from '../shared.schema';
+import { SUPPORTED_SIGNATURE_IMAGE_TYPES } from '../../statutory/signature-image';
+
+/**
+ * A stored signature must be a format EVERY surface that draws it can draw.
+ *
+ * ⚠️ WHY THIS IS NARROWER THAN WHAT SOME RENDERERS ACCEPT. The agreement copy
+ * and the report are HTML, and an `<img src="data:image/svg+xml,…">` displays
+ * there without complaint — which is why `svg+xml` sat in this pattern
+ * unnoticed. The statutory renderer is not HTML: it draws onto the authority's
+ * own PDF with pdf-lib, which embeds PNG and JPEG and nothing else. The same
+ * stored signature feeds both.
+ *
+ * ⚠️ WHY THE REFUSAL BELONGS AT STORAGE, NOT AT RENDER. A signature is saved
+ * once, in Settings, and drawn by every surface afterwards. Refusing it here
+ * puts the message in front of the inspector while they are looking at the
+ * control that produced it; refusing it at render puts it in front of them in a
+ * garage, at the moment they press send.
+ *
+ * ⚠️ THE LIST IS IMPORTED, NOT RESTATED. Two copies of one capability, only one
+ * of them ever revisited, is how the vector format got in. There is one copy
+ * now, and it lives beside the renderer that owns the constraint.
+ */
+const SIGNATURE_DATA_URI = new RegExp(
+    `^data:image/(${SUPPORTED_SIGNATURE_IMAGE_TYPES.join('|')});base64,`,
+);
 
 /**
  * Validation schema for creating/updating agreements.
@@ -109,9 +134,11 @@ export const AgreementDeleteResponseSchema = z.object({
  */
 export const InspectorSignSchema = z.object({
     signatureBase64: z.string().min(50).max(500_000)
-        .regex(/^data:image\/(png|jpeg|svg\+xml);base64,/)
+        .regex(SIGNATURE_DATA_URI)
         .openapi({ example: 'data:image/png;base64,iVBORw0KGgo...' })
-        .describe('Inspector signature as data URI with base64-encoded PNG/JPEG/SVG body.'),
+        .describe('Inspector signature as data URI with a base64-encoded PNG or JPEG body. '
+            + 'Vector formats are refused: the statutory renderer draws onto the authority\'s '
+            + 'own PDF and cannot embed one.'),
 }).openapi('InspectorSign');
 
 /**
@@ -121,7 +148,10 @@ export const InspectorSignSchema = z.object({
  */
 export const UserDefaultSignatureSchema = z.object({
     signatureBase64: z.string().min(50).max(500_000)
-        .regex(/^data:image\/(png|jpeg|svg\+xml);base64,/)
+        .regex(SIGNATURE_DATA_URI)
         .openapi({ example: 'data:image/png;base64,iVBORw0KGgo...' })
-        .describe('Inspector\'s saved signature as data URI. Reused for auto-sign on publish + as the SignaturePad default starting state.'),
+        .describe('Inspector\'s saved signature as a PNG or JPEG data URI. Reused for auto-sign '
+            + 'on publish + as the SignaturePad default starting state. Vector formats are '
+            + 'refused: the statutory renderer draws onto the authority\'s own PDF and cannot '
+            + 'embed one.'),
 }).openapi('UserDefaultSignature');

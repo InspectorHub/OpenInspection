@@ -9,11 +9,11 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 106 |
-| Columns | 1231 |
-| Indexes (excluding primary keys) | 176 |
+| Tables | 107 |
+| Columns | 1237 |
+| Indexes (excluding primary keys) | 178 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 588 (48%) |
+| Columns carrying a source comment | 590 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants`
 
-That is 13 of 106. If a table you just added appears here,
+That is 13 of 107. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 199 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 200 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -2334,6 +2334,28 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `text` | text | NN |  |  |  |
 | `published_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `content_hash` | text |  |  |  | SHA-256 of `text` at publication, lowercase hex. The consent row copies it, so a consent proves WHAT was shown rather than which row number was current at the time. **[more]** |
+
+---
+
+## `statutory_form_entries`
+
+<sub>server/lib/db/schema/inspection/statutory.ts · 6 columns · primary key `id`</sub>
+
+> One inspection's answers to one statutory form. -- WHY ONE ROW PER FORM, NOT PER FIELD ------------------------------------- A document's answers are only ever read and written whole.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `inspection_id` | text | NN UQ IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `form_id` | text | NN UQ |  |  | The form, never a revision -- which revision applies is the date's answer. |
+| `values` | text | NN |  |  | JSON `Record<string, string>`. Carries no personal data. |
+| `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
+
+**Indexes**
+
+- **UNIQUE** `uq_statutory_form_entries_subject` (tenant_id, inspection_id, form_id)
+- `idx_statutory_form_entries_inspection` (tenant_id, inspection_id)
 
 ---
 

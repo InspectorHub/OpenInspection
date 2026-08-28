@@ -23,6 +23,7 @@
       "./messages/{locale}/calendar.json",
       "./messages/{locale}/contacts.json",
       "./messages/{locale}/templates.json",
+      "./messages/{locale}/statutory.json",
       "./messages/{locale}/editor.json",
       "./messages/{locale}/editor-4.json",
       "./messages/{locale}/editor-3.json",

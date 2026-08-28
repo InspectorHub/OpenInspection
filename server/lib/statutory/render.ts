@@ -36,9 +36,21 @@
  * ⚠️ LIMIT, stated rather than discovered later: an `acroform` mapping sets a
  * TEXT field. A fillable form whose checkboxes are real widgets is not covered —
  * such a mapping throws rather than quietly leaving the box unticked.
+ *
+ * ── A value too big for its space is refused, never made to look like it fit ──
+ * The two routes fail in mirror image and both leave a document that LOOKS
+ * filled. Drawn text wraps downward with no height bound, so a long answer runs
+ * over the row beneath it; a form field clips whatever its widget cannot show.
+ * On the two forms measured, 47 of 72 overlay rows and 47 of 48 have room for a
+ * single line, so this is the ordinary case rather than the edge one.
+ *
+ * So a value is fitted, then shrunk to a floor the map declares, and then
+ * refused. The measuring, and the reasoning behind refusing rather than
+ * truncating, live in `fit.ts`.
  */
-import { PDFDocument, StandardFonts, type PDFFont } from 'pdf-lib';
+import { PDFDocument, StandardFonts, type PDFFont, type PDFTextField } from 'pdf-lib';
 import { validateAgainstPdf, validateFieldMapShape, type FieldMap, type FieldMapping } from './field-map';
+import { fitOverlay, refuseIfTheWidgetWouldClip } from './fit';
 
 /**
  * How large a checkbox mark is drawn when the map does not say.
@@ -89,23 +101,54 @@ export async function renderStatutoryForm(
         font ??= await doc.embedFont(StandardFonts.Helvetica);
         return font;
     };
+    // A font for MEASURING, embedded in a scratch document rather than in the
+    // agency's, for the same reason: needing to measure a widget is not grounds
+    // for putting an object of ours into a document we otherwise leave alone.
+    let ruler: PDFFont | null = null;
+    const measuringFont = async (): Promise<PDFFont> => {
+        ruler ??= await (await PDFDocument.create()).embedFont(StandardFonts.Helvetica);
+        return ruler;
+    };
 
     for (const mapping of map.mappings) {
+        if (mapping.kind === 'signature') {
+            // The mapping kind exists so a field map can be authored against a
+            // form that has signature boxes; drawing the image is not built yet.
+            // Skipping it silently would produce a form with an empty signature
+            // box — which prints, looks complete, and passes every assertion
+            // about its own values. Fail instead.
+            //
+            // The refusal is BEFORE the value lookup on purpose: a signature
+            // resolves by reference and never arrives through `values`, so a
+            // check placed after it would find nothing to skip and skip anyway.
+            fail(`signature rendering is not implemented; "${mapping.ourField}" `
+                + 'cannot be produced yet');
+        }
+
         const value = supplied.get(mapping.ourField);
         if (value === undefined) continue;
 
         if (mapping.kind === 'acroform') {
-            setTextField(doc, mapping.pdfField, value);
+            setTextField(doc, mapping, value, await measuringFont());
             continue;
         }
         if (mapping.kind === 'overlay') {
             if (value === '') continue;
+            const drawn = await drawingFont();
+            const fitted = fitOverlay(value, mapping, drawn);
             pages[mapping.page].drawText(value, {
                 x: mapping.x,
                 y: mapping.y,
-                size: mapping.size,
-                font: await drawingFont(),
+                size: fitted.size,
+                font: drawn,
                 ...(mapping.maxWidth === undefined ? {} : { maxWidth: mapping.maxWidth }),
+                // Passed only where a height was measured. pdf-lib's default line
+                // height is a fixed 24 points whatever the font size, so an
+                // overlay we fitted has to be drawn with the spacing it was
+                // fitted at or the measurement describes a different page than
+                // the one that comes out. An unbounded overlay keeps the old
+                // spacing, because nothing was measured to justify changing it.
+                ...(fitted.lineHeight === null ? {} : { lineHeight: fitted.lineHeight }),
             });
             continue;
         }
@@ -123,16 +166,24 @@ export async function renderStatutoryForm(
 }
 
 /** Set one named text field, refusing rather than guessing at any other kind. */
-function setTextField(doc: PDFDocument, name: string, value: string): void {
+function setTextField(
+    doc: PDFDocument,
+    mapping: Extract<FieldMapping, { kind: 'acroform' }>,
+    value: string,
+    ruler: PDFFont,
+): void {
+    let field: PDFTextField;
     try {
-        doc.getForm().getTextField(name).setText(value);
+        field = doc.getForm().getTextField(mapping.pdfField);
     } catch (cause) {
         throw new Error(
-            `statutory render: "${name}" is not a text field on this form — an acroform mapping `
-            + 'sets text, and a widget of another kind needs a mapping kind of its own',
+            `statutory render: "${mapping.pdfField}" is not a text field on this form — an acroform `
+            + 'mapping sets text, and a widget of another kind needs a mapping kind of its own',
             { cause },
         );
     }
+    refuseIfTheWidgetWouldClip(field, mapping.ourField, value, ruler);
+    field.setText(value);
 }
 
 /**

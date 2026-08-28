@@ -166,6 +166,60 @@
     "description": "Adds a service from the tenant catalog to an existing inspection, snapshotting its name and price. Optionally charges a per-inspection override price. Adding a service the inspection already has returns the existing line unchanged."
   },
   {
+    "operationId": "addInspectionStatutoryFormInstance",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/statutory-form/instances",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection ID",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection ID"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The repeated block, e.g. electrical_panel"
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Position, 0-based. Must be at or past the group capacity."
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Field name to value, in the vocabulary the group declares"
+          }
+        },
+        "required": [
+          "groupId",
+          "index",
+          "fields"
+        ]
+      }
+    },
+    "summary": "Record an instance the statutory form has no slot for",
+    "description": "Stores one repeated-block instance past the printed capacity of the form. Printed slots are ordinary items and are not recorded here."
+  },
+  {
     "operationId": "addRepairItem",
     "method": "POST",
     "pathTemplate": "/api/public/repair-builder/{tenant}/{id}/lists/{rrId}/items",
@@ -7834,6 +7888,62 @@
     },
     "summary": "Get parent request by inspection id",
     "description": "Auto-generated placeholder for getInspectionRequestByInspection (GET /by-inspection/{inspectionId}, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "getInspectionStatutoryForm",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/statutory-form.pdf",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection ID",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection ID"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Download the statutory form this inspection produces",
+    "description": "Renders the authority's own published form for this inspection. 404 when the template declares none; 409 while no report version is published."
+  },
+  {
+    "operationId": "getInspectionStatutoryFormOffer",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/statutory-form",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection ID",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection ID"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Whether this inspection produces a statutory form, and its notice",
+    "description": "Answers without rendering a PDF. available:false is the ordinary answer."
   },
   {
     "operationId": "getInspectionTemplate",

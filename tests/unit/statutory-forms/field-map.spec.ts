@@ -13,9 +13,11 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
     validateFieldMap,
+    validateFieldMapShape,
     validateAgainstPdf,
     sha256Hex,
     type FieldMap,
+    type FieldMapping,
 } from '../../../server/lib/statutory/field-map';
 import type { StatutoryFormVersion } from '../../../server/lib/statutory/form-registry';
 import { buildFieldedPdf, buildFlatPdf, type PdfFixture } from '../helpers/statutory-pdf-fixtures';
@@ -153,6 +155,99 @@ describe('validateFieldMap', () => {
             requiredFields: [],
             mappings: [{ kind: 'overlay', ourField: 'client.name', page: -1, x: 10, y: 20, size: 9 }],
         }, VERSION(fielded.hash))).toThrow(/page/);
+    });
+});
+
+describe('signature mapping', () => {
+    it('carries the section it signs for', () => {
+        // Measured on the Citizens four-point form, page 4: a trade-specific
+        // licensee signs only their own section, so one form can carry several
+        // signatures that each answer for a different part of it. A single
+        // form-wide signer role cannot say that.
+        const mapping: FieldMapping = {
+            kind: 'signature', ourField: 'inspector_signature', scope: 'electrical',
+            page: 3, x: 72, y: 120, width: 160, height: 40,
+        };
+        expect(mapping.scope).toBe('electrical');
+    });
+
+    it('refuses a signature box with no area', () => {
+        // A box with no area draws nothing while every count of "mappings
+        // applied" still includes it — the signature is absent from the form and
+        // present in the arithmetic.
+        expect(() => validateFieldMapShape({
+            ...MAP(fielded.hash),
+            requiredFields: [],
+            mappings: [{
+                kind: 'signature', ourField: 'sig', scope: 'whole_form',
+                page: 1, x: 10, y: 10, width: 0, height: 40,
+            }],
+        })).toThrow(/signature/i);
+    });
+
+    it('refuses a signature with no scope', () => {
+        expect(() => validateFieldMapShape({
+            ...MAP(fielded.hash),
+            requiredFields: [],
+            mappings: [{
+                kind: 'signature', ourField: 'sig', scope: '',
+                page: 1, x: 10, y: 10, width: 160, height: 40,
+            }],
+        })).toThrow(/scope/i);
+    });
+});
+
+describe('overlay fit declarations', () => {
+    /** A map carrying exactly one overlay, so a test states only what it measures. */
+    const withOverlay = (mapping: FieldMapping): FieldMap => ({
+        ...MAP(fielded.hash), requiredFields: [], mappings: [mapping],
+    });
+
+    it('refuses a maxHeight with no height in it', () => {
+        // Zero here does not mean "unbounded" — it would refuse every value.
+        expect(() => validateFieldMapShape(withOverlay({
+            kind: 'overlay', ourField: 'comments', page: 0, x: 10, y: 20, size: 10,
+            maxWidth: 200, maxHeight: 0,
+        }))).toThrow(/maxHeight/);
+    });
+
+    it('refuses a minSize larger than the size it shrinks from', () => {
+        // The floor is where shrinking stops, so it is never above the start.
+        expect(() => validateFieldMapShape(withOverlay({
+            kind: 'overlay', ourField: 'comments', page: 0, x: 10, y: 20, size: 10,
+            maxWidth: 200, maxHeight: 24, minSize: 12,
+        }))).toThrow(/minSize/);
+    });
+
+    it('refuses a minSize of zero', () => {
+        expect(() => validateFieldMapShape(withOverlay({
+            kind: 'overlay', ourField: 'comments', page: 0, x: 10, y: 20, size: 10,
+            maxWidth: 200, maxHeight: 24, minSize: 0,
+        }))).toThrow(/minSize/);
+    });
+
+    it('refuses a maxHeight declared without a maxWidth', () => {
+        // Without a width the text never wraps, so the height bound can never be
+        // reached — it would read as a guarantee it does not give.
+        expect(() => validateFieldMapShape(withOverlay({
+            kind: 'overlay', ourField: 'comments', page: 0, x: 10, y: 20, size: 10,
+            maxHeight: 24,
+        }))).toThrow(/maxWidth/);
+    });
+
+    it('POSITIVE CONTROL — a complete fit declaration validates', () => {
+        expect(() => validateFieldMapShape(withOverlay({
+            kind: 'overlay', ourField: 'comments', page: 0, x: 10, y: 20, size: 10,
+            maxWidth: 200, maxHeight: 24, minSize: 6,
+        }))).not.toThrow();
+    });
+
+    it('POSITIVE CONTROL — an overlay declaring neither still validates', () => {
+        // Every map authored before these two fields existed says nothing about
+        // height, and none of them may start refusing because of this change.
+        expect(() => validateFieldMapShape(withOverlay({
+            kind: 'overlay', ourField: 'comments', page: 0, x: 10, y: 20, size: 10,
+        }))).not.toThrow();
     });
 });
 

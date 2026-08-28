@@ -4,7 +4,7 @@ import { useLoaderData, Link, isRouteErrorResponse, useRouteError } from "react-
 import type { Route } from "./+types/template-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { Icon, Button, TabStrip } from "@core/shared-ui";
+import { Icon, Button, TabStrip, Banner } from "@core/shared-ui";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { RATING_PRESETS } from "~/components/template/types";
 import type { RatingLevel, RatingSystem, TemplateItem, TemplateSchema, TemplateSection, CannedComment } from "~/components/template/types";
@@ -93,7 +93,14 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     defectCategories = defectCatBody.data ?? [];
   }
   const defaultProfileId = (tpl?.defaultProfileId as string | null) ?? null;
-  return { id, name, version, schema, token, defectCategories, defaultProfileId };
+  // A platform-supplied template that produces an authority's own form. The
+  // editor must say so, because every structural control on this page is about
+  // to be refused by the server (`refuseStatutoryTemplateEdit`) and a control
+  // that fails on click teaches nothing.
+  const statutoryFormId =
+    (schema as unknown as { statutoryForm?: { formId?: string } })?.statutoryForm?.formId ?? null;
+
+  return { id, name, version, schema, token, defectCategories, defaultProfileId, statutoryFormId };
 }
 
 /* ------------------------------------------------------------------ */
@@ -134,7 +141,7 @@ function serializeCanned(c: CannedComment): Record<string, unknown> {
 }
 
 export default function TemplateEditPage() {
-  const { id, name: initialName, version: initialVersion, schema: initial, defectCategories, defaultProfileId: initialDefaultProfileId } = useLoaderData<typeof loader>();
+  const { id, name: initialName, version: initialVersion, schema: initial, defectCategories, defaultProfileId: initialDefaultProfileId, statutoryFormId } = useLoaderData<typeof loader>();
   // #106 - Save writes the whole template schema and bumps its version.
   const { fetcher, submit, busy: saving } = useGuardedSubmit();
 
@@ -480,6 +487,18 @@ export default function TemplateEditPage() {
 
   return (
     <div className="flex flex-col h-screen bg-ih-bg-app">
+      {/* A platform-supplied statutory template. Said once, at the top, rather
+          than disabling forty controls individually: the server refuses every
+          structural write on this template, so the honest thing is to tell the
+          reader why before they try, not after. `info` because nothing is
+          wrong — this is whose template it is. */}
+      {statutoryFormId ? (
+        <Banner tone="info">
+          This template produces the official form{" "}
+          <span className="font-mono">{statutoryFormId}</span> and is supplied with the
+          software. Its structure is read-only. Duplicate it to build your own version.
+        </Banner>
+      ) : null}
       {/* Toolbar */}
       <header className="flex items-center justify-between h-12 px-4 border-b border-ih-border bg-ih-bg-card shrink-0">
         <div className="flex items-center gap-3">

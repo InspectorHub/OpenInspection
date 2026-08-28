@@ -44,14 +44,41 @@ import { PDFDocument } from 'pdf-lib';
  *              form with no fields, and it has nothing that can tell you at
  *              runtime that the coordinate is wrong, which is why overlay
  *              coordinates need a regression test rather than a review.
+ *              `maxHeight` and `minSize` are what stop a long answer running
+ *              down over the row beneath it: the room measured below the
+ *              baseline, and how small the text may shrink before the value is
+ *              refused instead. Both are optional and a map that declares
+ *              neither behaves exactly as it did before they existed — most
+ *              rows on these forms hold one line, so the pair is worth
+ *              declaring wherever anyone has measured.
  * `checkbox` — draw a mark at a coordinate when our value equals `whenValue`.
  *              Several of these share one `ourField` on purpose: that is how a
  *              multiple-choice answer maps onto boxes the file does not group.
+ * `signature` — draw a stored signature image inside a measured box. `scope`
+ *              names WHICH PART of the form this signature stands behind: the
+ *              Citizens four-point form lets a trade-specific licensee sign only
+ *              their own section, so one form can carry several signatures that
+ *              each answer for a different part, and a single form-wide role
+ *              cannot say that. Use `whole_form` when the form has one signer.
  */
 export type FieldMapping =
     | { kind: 'acroform'; ourField: string; pdfField: string }
-    | { kind: 'overlay'; ourField: string; page: number; x: number; y: number; size: number; maxWidth?: number }
-    | { kind: 'checkbox'; ourField: string; whenValue: string; page: number; x: number; y: number; size?: number };
+    | { kind: 'overlay'; ourField: string; page: number; x: number; y: number; size: number;
+        maxWidth?: number;
+        /**
+         * Room measured below this baseline, in points. ABSENT MEANS UNBOUNDED,
+         * which is what every map authored before this field existed says.
+         */
+        maxHeight?: number;
+        /**
+         * How small the text may shrink before the value is refused rather than
+         * made unreadable. Absent means no shrinking at all: a floor nobody
+         * measured is not a floor.
+         */
+        minSize?: number }
+    | { kind: 'checkbox'; ourField: string; whenValue: string; page: number; x: number; y: number; size?: number }
+    | { kind: 'signature'; ourField: string; scope: string;
+        page: number; x: number; y: number; width: number; height: number };
 
 /** The complete map for one (formId, version), bound to one `sourceHash`. */
 export interface FieldMap {
@@ -167,6 +194,17 @@ function validateMappingShapes(mappings: readonly FieldMapping[]): void {
             if (m.maxWidth !== undefined && (!Number.isFinite(m.maxWidth) || m.maxWidth <= 0)) {
                 fail(`"${m.ourField}" has maxWidth ${m.maxWidth}`);
             }
+            validateOverlayFit(m);
+        } else if (m.kind === 'signature') {
+            if (!(m.width > 0) || !(m.height > 0)) {
+                fail(`signature "${m.ourField}" has width ${m.width} and height `
+                    + `${m.height}; a signature needs a box with area, and a zero one `
+                    + 'renders as nothing at all rather than as an error');
+            }
+            if (m.scope.trim() === '') {
+                fail(`signature "${m.ourField}" declares no scope; use "whole_form" `
+                    + 'when the form has a single signer');
+            }
         } else {
             if (m.whenValue.trim() === '') {
                 // A checkbox with no trigger value marks itself for every answer,
@@ -177,6 +215,36 @@ function validateMappingShapes(mappings: readonly FieldMapping[]): void {
                 fail(`checkbox for "${m.ourField}" has size ${m.size}; a mark that size is not on the form`);
             }
         }
+    }
+}
+
+/** The `overlay` member of the union, for the checks that only concern it. */
+export type OverlayMapping = Extract<FieldMapping, { kind: 'overlay' }>;
+
+/**
+ * The two optional fields that bound how much text a row may take.
+ *
+ * They are optional so that maps authored before they existed keep working, and
+ * that is exactly why each has to be checked when it IS present: an author who
+ * bothered to measure the row must not have their measurement silently ignored
+ * because it was written down wrong.
+ */
+function validateOverlayFit(m: OverlayMapping): void {
+    if (m.maxHeight !== undefined && (!Number.isFinite(m.maxHeight) || m.maxHeight <= 0)) {
+        fail(`overlay "${m.ourField}" declares maxHeight ${m.maxHeight}; a row with no height `
+            + 'cannot hold anything, and zero here would refuse every value rather than mean '
+            + '"unbounded" — which is what leaving it out means');
+    }
+    if (m.minSize !== undefined
+        && (!Number.isFinite(m.minSize) || m.minSize <= 0 || m.minSize > m.size)) {
+        fail(`overlay "${m.ourField}" declares minSize ${m.minSize} against size ${m.size}; the `
+            + 'floor is where shrinking stops, so it is never larger than the size it starts from '
+            + 'and never small enough to be unreadable');
+    }
+    if (m.maxHeight !== undefined && m.maxWidth === undefined) {
+        fail(`overlay "${m.ourField}" declares maxHeight but no maxWidth; without a width the `
+            + 'text never wraps, so a height bound can never be reached and would read as a '
+            + 'guarantee it does not give');
     }
 }
 

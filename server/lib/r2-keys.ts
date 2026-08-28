@@ -4,8 +4,33 @@
  * Object id is a stable `{mediaId}` (UUID), NEVER `{itemId}` — photos move
  * between items via the DB, so the key must not encode item membership.
  * Add a builder here rather than forming a key string inline anywhere else.
+ *
+ * -- THE ONE EXCEPTION, AND WHY IT IS ONE ------------------------------------
+ * `statutoryFormSource` is the only key here that does NOT begin with
+ * `{tenantId}/`. What it addresses is an authority's own published PDF: the
+ * same bytes of the same state government document, identical for every
+ * workspace that renders that form.
+ *
+ * Storing it per tenant would copy one state form N times, and -- the part that
+ * actually bites -- a tenant-level purge would delete it. Deleting a workspace
+ * would then quietly remove the substrate every OTHER workspace renders that
+ * form from, and the failure would surface much later as a form that cannot be
+ * produced, with nothing connecting it to the deletion.
+ *
+ * It is placed under `_platform/` because a tenant id is a UUID and `_` is not
+ * in that alphabet, so the prefix cannot collide with a real tenant root
+ * (checked rather than assumed). Anything under `_platform/` is deployment
+ * data, out of scope for per-tenant list, meter and purge by construction.
  */
 export const r2Keys = {
+  /**
+   * An authority's published form PDF. NOT tenant-scoped -- see the exception in
+   * the file header. `version` is the authority's own revision label, so the key
+   * is stable across republishes of a DIFFERENT revision and never overwrites
+   * one already in use by a delivered inspection.
+   */
+  statutoryFormSource: (formId: string, version: string) =>
+    `_platform/statutory-forms/${formId}/${encodeURIComponent(version)}.pdf`,
   inspectionPhoto: (t: string, i: string, mediaId: string, ext: string) =>
     `${t}/inspections/${i}/photos/${mediaId}.${ext}`,
   inspectionPhotoAnnotated: (t: string, i: string, mediaId: string) =>

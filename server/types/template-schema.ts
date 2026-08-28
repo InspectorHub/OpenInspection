@@ -1,3 +1,4 @@
+import type { StatutoryFormDeclaration } from './statutory-declaration';
 /**
  * Spec 5B — Defect Model + Canned Comment Library.
  *
@@ -211,6 +212,36 @@ interface TemplateStructure {
     buildings: TemplateBuilding[];
 }
 
+/**
+ * A template's declaration that it produces an authority's own statutory form.
+ *
+ * WHY THIS IS A TOP-LEVEL KEY AND NOT A TENTH `ItemType`. Everything about it
+ * is a property of the WHOLE template, not of one row in it: which revision of
+ * the form applies is chosen from the inspection's date, whether the required
+ * values are all bound is a question about the template as a document, and the
+ * declaration governs a rendering step that happens once per inspection rather
+ * than once per item. An item type can express none of those — it can only say
+ * "this one row behaves differently", which is the wrong grain and would leave
+ * the version choice with no owner.
+ *
+ * IT NAMES A FORM, NEVER A REVISION. Which revision applies is decided by the
+ * inspection date. A revision pinned here would go stale the moment the
+ * authority republishes, and would put that choice in the hands of whoever last
+ * edited the template instead of in the date the inspection actually happened.
+ *
+ * ⚠️ THIS KEY IS PLATFORM-SUPPLIED AND NOT WRITABLE BY A WORKSPACE. The tenant
+ * validation schema is `.strict()` and deliberately does not list it, so a
+ * template carrying one cannot arrive through the tenant surface at all. That
+ * closed door is the enforcement; this comment is only the reason for it.
+ */
+
+export type {
+    StatutoryInspectionField,
+    FieldGroup,
+    StatutoryValueSource,
+    StatutoryFormDeclaration,
+} from './statutory-declaration';
+
 export interface TemplateSchemaV2 {
     schemaVersion: 2;
     sections: TemplateSection[];
@@ -224,6 +255,12 @@ export interface TemplateSchemaV2 {
     };
     itemAssignments?: Record<string, string[]>;
     propertyMetadataFields?: PropertyMetaField[];
+    /**
+     * Present only on a platform-supplied template that produces an authority's
+     * own form. Absent on every template a workspace can author, and absent is
+     * the ordinary case.
+     */
+    statutoryForm?: StatutoryFormDeclaration;
 }
 
 interface PropertyMetaField {

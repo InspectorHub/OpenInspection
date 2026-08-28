@@ -4,24 +4,19 @@ import { clientUploads, type DocumentCategory, type DocumentVisibility, type Upl
 import { sanitizeFilename } from '../lib/content-disposition';
 import { Errors } from '../lib/errors';
 import { r2Keys } from '../lib/r2-keys';
+import {
+  ALLOWED_CONTENT_TYPES, ALLOWED_EXTENSIONS, CAD_EXTENSIONS, MAX_UPLOAD_BYTES,
+} from '../lib/upload-allowlist';
 
-export const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
+// The allowlist itself lives in `../lib/upload-allowlist` because the browser
+// component imports the same values; it used to be defined here and copied
+// there. Re-exported so callers that already reach for it through this service
+// keep working.
+export { ALLOWED_EXTENSIONS, CAD_EXTENSIONS };
+
+/** This service's name for the shared upload cap. */
+export const MAX_BYTES = MAX_UPLOAD_BYTES;
 export const MAX_FILES = 50;
-
-export const ALLOWED_EXTENSIONS = new Set([
-  'pdf', 'jpg', 'jpeg', 'png', 'heic', 'heif', 'webp',
-  'doc', 'docx', 'xls', 'xlsx', 'csv', 'dwg', 'dxf',
-]);
-export const CAD_EXTENSIONS = new Set(['dwg', 'dxf']);
-const ALLOWED_CONTENT_TYPES = new Set([
-  'application/pdf',
-  'image/jpeg', 'image/png', 'image/heic', 'image/heif', 'image/webp',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/csv',
-]);
 
 const extOf = (name: string) => (name.split('.').pop() ?? '').toLowerCase();
 

@@ -27,6 +27,10 @@ import { SectionRail } from "~/components/editor-shared/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
 import { FullscreenToggle } from "~/components/editor/FullscreenToggle";
 import { ItemList } from "~/components/editor-shared/ItemList";
+import { useStatutoryGroups, useStructuralEditingAllowed } from "~/hooks/useStatutoryGroups";
+import { GroupInstanceDrawer } from "~/components/statutory/GroupInstanceDrawer";
+import { formCompleteness } from "~/lib/editor/form-completeness";
+import { formBoundItemIds } from "~/lib/editor/statutory-groups";
 import { ItemEditor } from "~/components/editor/ItemEditor";
 import { TagChipRow, type TagPin } from "~/components/editor/TagChipRow";
 import type { DefectFieldsValue } from "~/components/editor/DefectFieldsRow";
@@ -741,6 +745,24 @@ export default function InspectionEditPage() {
  /* D8 — structural editing (section add/dup/delete/move)           */
  /* ---------------------------------------------------------------- */
 
+  const statutoryGroups = useStatutoryGroups(loaderData.templateSnapshot);
+  // Every structural edit is refused server-side on a statutory inspection, so
+  // the controls for them are withheld rather than offered and rejected.
+  const canEditStructure = useStructuralEditingAllowed(loaderData.templateSnapshot);
+  // Which group is having an instance added, if any. Null closes the drawer.
+  const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
+  // Guarded rather than a raw fetcher: recording an instance is a user
+  // mutation, and a second click before the first settles would write the same
+  // panel twice at the same index.
+  const instanceSubmit = useGuardedSubmit<{ ok?: boolean; error?: string }>();
+  // Visible while filling rather than at the end: an inspector who learns the
+  // form is short two answers when he presses send is already three houses away.
+  const formProgress = useMemo(() => {
+    const declaration = (loaderData.templateSnapshot as { statutoryForm?: Parameters<typeof formBoundItemIds>[0] } | null)?.statutoryForm;
+    if (!declaration) return null;
+    const done = formCompleteness(formBoundItemIds(declaration), state.results);
+    return done.total > 0 ? done : null;
+  }, [loaderData.templateSnapshot, state.results]);
  const structure = useStructureEdit({
   rawSnapshot: loaderData.templateSnapshot,
   collabEditing: loaderData.collabEditing,
@@ -1495,12 +1517,14 @@ export default function InspectionEditPage() {
  batchSelected={state.batchSelected}
  onBatchToggle={(id) => state.toggleBatchSelect(id)}
  onBatchRange={(from, to) => state.batchSelectRange(from, to)}
- onAddItem={() => structure.openAddItemPrompt(state.currentSection?.id || "")}
- onDuplicateItem={(itemId) => structure.duplicateItem(state.currentSection?.id || "", itemId)}
- onDeleteItem={(itemId) => structure.deleteItem(state.currentSection?.id || "", itemId)}
- onMoveItem={(itemId, dir) => structure.moveItem(state.currentSection?.id || "", itemId, dir)}
- onReorderItem={(fromId, toId) => reorderItemBySwap(state.currentSectionItems, fromId, toId, state.currentSection?.id || "", structure.moveItem)}
- onRenameItem={(itemId, label) => structure.renameItem(state.currentSection?.id || "", itemId, label)}
+ onAddItem={canEditStructure ? () => structure.openAddItemPrompt(state.currentSection?.id || "") : undefined}
+ onDuplicateItem={canEditStructure ? (itemId) => structure.duplicateItem(state.currentSection?.id || "", itemId) : undefined}
+ onDeleteItem={canEditStructure ? (itemId) => structure.deleteItem(state.currentSection?.id || "", itemId) : undefined}
+ onMoveItem={canEditStructure ? (itemId, dir) => structure.moveItem(state.currentSection?.id || "", itemId, dir) : undefined}
+ onReorderItem={canEditStructure ? (fromId, toId) => reorderItemBySwap(state.currentSectionItems, fromId, toId, state.currentSection?.id || "", structure.moveItem) : undefined}
+ onRenameItem={canEditStructure ? (itemId, label) => structure.renameItem(state.currentSection?.id || "", itemId, label) : undefined}
+ groups={statutoryGroups}
+ onAddGroupInstance={(groupId) => setAddingToGroup(groupId)}
  />
  );
 
@@ -2119,6 +2143,32 @@ export default function InspectionEditPage() {
   onCancel={structure.closeAddSectionPrompt}
  />
 
+ {statutoryGroups && addingToGroup ? (() => {
+   const group = statutoryGroups.find((g) => g.id === addingToGroup);
+   if (!group) return null;
+   return (
+     <GroupInstanceDrawer
+       open
+       group={group}
+       index={group.capacity}
+       saving={instanceSubmit.busy}
+       onClose={() => setAddingToGroup(null)}
+       onSave={(fields) => {
+         instanceSubmit.submit(
+           {
+             intent: "add-statutory-instance",
+             groupId: group.id,
+             index: String(group.capacity),
+             fields: JSON.stringify(fields),
+           },
+           { method: "post" },
+         );
+         setAddingToGroup(null);
+       }}
+     />
+   );
+ })() : null}
+
  {/* D8 — "Add item" type-picker. */}
  <AddItemTypeModal
   open={Boolean(structure.addItemPending)}
@@ -2350,6 +2400,11 @@ export default function InspectionEditPage() {
  ),
  }))}
  />
+ {formProgress && (
+ <span className="ml-auto text-[11px] text-ih-fg-3 whitespace-nowrap">
+ {m.statutory_form_completeness({ answered: String(formProgress.answered), total: String(formProgress.total) })}
+ </span>
+ )}
  {/* Batch mode toggle — object-scoped action, lives with the items it selects
      (moved out of the global header). */}
  <IconButton

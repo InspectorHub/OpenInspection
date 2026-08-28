@@ -234,6 +234,24 @@ const RatingSystemSchema = z.object({
 
 /**
  * Top-level template schema document. v2 only.
+ *
+ * ⚠️ `statutoryForm` IS DELIBERATELY ABSENT FROM THIS OBJECT, AND THE `.strict()`
+ * BELOW IS WHY THAT MATTERS. A template that declares it produces an
+ * authority's own form is supplied with the software; the only way one can come
+ * into being is the platform writing the row directly. This schema is the
+ * tenant-facing surface, and `.strict()` makes it a closed door: a workspace
+ * cannot smuggle a declaration in on a template it authors, and gets that for
+ * free rather than from a rule somebody has to remember to apply.
+ *
+ * ADDING THE KEY HERE OPENS THAT DOOR. It would not be a loosening of a
+ * validator — it would be a decision that workspaces may declare their own
+ * statutory forms, which is a different product.
+ *
+ * The other half of the enforcement lives in
+ * `lib/middleware/refuse-statutory-template-edit.ts`: `.strict()` alone answers
+ * an edit to an EXISTING declared template with `unrecognized_keys`, which
+ * tells an inspector the software does not recognise one of its own fields.
+ * The middleware answers first, and says who owns the template instead.
  */
 export const TemplateSchemaV2Schema = z.object({
     schemaVersion: z.literal(2).describe('TODO describe schemaVersion field for the OpenInspection MCP integration'),

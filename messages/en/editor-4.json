@@ -46,6 +46,7 @@
   "editor_shared_menu_move_up": "Move up",
   "editor_shared_menu_move_down": "Move down",
   "editor_shared_add_item": "+ Add item",
+  "editor_shared_add_group_instance": "+ Add another {group}",
   "editor_shared_add_section": "+ Add section",
   "editor_shared_inspection_details": "Inspection Details",
   "editor_shared_section_rated": "{rated} of {total} rated",
