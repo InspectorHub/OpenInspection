@@ -32,7 +32,10 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { deliverableHeaders } from '../../lib/deliverable-headers';
 import { produceStatutoryForm } from '../../services/statutory/produce.service';
-import { StatutoryOverflowService } from '../../services/statutory/overflow.service';
+import {
+    StatutoryOverflowService,
+    refuseIndexInsidePrintedRange,
+} from '../../services/statutory/overflow.service';
 import { versionForInspection } from '../../lib/statutory/form-registry';
 import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
 import { utcMidnightOf } from '../../lib/statutory/inspection-date';
@@ -90,6 +93,43 @@ const statutoryOfferRoute = createRoute(withMcpMetadata({
     },
     operationId: 'getInspectionStatutoryFormOffer',
 }, { scopes: ['read'], tier: 'extended' }));
+
+
+/**
+ * POST /api/inspections/:id/statutory-form/instances
+ *
+ * Record one repeated-block instance the authority's page has no slot to print.
+ *
+ * Printed slots do NOT come through here: they are ordinary template items and
+ * their values reach the form as bindings. This is only for what the item model
+ * cannot express, which is why an index inside the printed range is refused
+ * rather than accepted and quietly ignored.
+ */
+const AddInstanceBodySchema = z.object({
+    groupId: z.string().trim().min(1).describe('The repeated block, e.g. electrical_panel'),
+    index: z.number().int().min(0).describe('Position, 0-based. Must be at or past the group capacity.'),
+    fields: z.record(z.string(), z.string()).describe('Field name to value, in the vocabulary the group declares'),
+});
+
+const addInstanceRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/{id}/statutory-form/instances',
+    tags: ['inspections'],
+    summary: 'Record an instance the statutory form has no slot for',
+    description: 'Stores one repeated-block instance past the printed capacity of the form. '
+        + 'Printed slots are ordinary items and are not recorded here.',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection ID') }),
+        body: { content: { 'application/json': { schema: AddInstanceBodySchema } } },
+    },
+    responses: {
+        200: { description: 'Recorded' },
+        400: { description: 'The index names a slot the form prints' },
+        404: { description: 'No such inspection, or it produces no statutory form' },
+    },
+    operationId: 'addInspectionStatutoryFormInstance',
+}, { scopes: ['write'], tier: 'extended' }));
 
 const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) => {
     const { id } = c.req.valid('param');
@@ -262,6 +302,40 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
                 notice: statutoryNoticeFor(version, { softwareName: c.env.APP_NAME || 'This software' }),
             },
         }, 200);
+    })
+
+    .openapi(addInstanceRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const { groupId, index, fields } = c.req.valid('json');
+        const tenantId = c.get('tenantId');
+        const db = drizzle(c.env.DB, { schema });
+
+        const inspection = await db.select()
+            .from(schema.inspections)
+            .where(and(eq(schema.inspections.id, id), eq(schema.inspections.tenantId, tenantId)))
+            .get();
+        if (!inspection) throw Errors.NotFound('Inspection not found');
+
+        const declaration = (inspection.templateSnapshot as {
+            statutoryForm?: StatutoryFormDeclaration;
+        } | null)?.statutoryForm;
+        if (!declaration) throw Errors.NotFound('This inspection produces no statutory form');
+
+        const group = declaration.groups?.find((g) => g.id === groupId);
+        if (!group) throw Errors.NotFound(`This form declares no group "${groupId}"`);
+
+        // A printed slot's value comes from a binding, which is its authority.
+        // Accepting a second writer would give one box two sources with nothing
+        // to say which the form carried.
+        try {
+            refuseIndexInsidePrintedRange(group, index);
+        } catch (cause) {
+            throw Errors.BadRequest((cause as Error).message);
+        }
+
+        await new StatutoryOverflowService(db)
+            .addInstance(tenantId, id, declaration.formId, groupId, index, fields);
+        return c.json({ success: true, data: { recorded: true } }, 200);
     });
 
 export default statutoryRoutes;
