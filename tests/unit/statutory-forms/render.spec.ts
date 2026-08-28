@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { renderStatutoryForm } from '../../../server/lib/statutory/render';
-import type { FieldMap } from '../../../server/lib/statutory/field-map';
+import type { FieldMap, FieldMapping } from '../../../server/lib/statutory/field-map';
 import { extractPdfText } from '../../../server/lib/migration-intake/pdf-text';
 import {
     buildFieldedPdf,
@@ -200,5 +200,96 @@ describe('renderStatutoryForm — values', () => {
         };
         await expect(renderStatutoryForm(flat.bytes, map, {}))
             .rejects.toThrow(/signature rendering is not implemented/i);
+    });
+});
+
+/**
+ * A value that does not fit its row is the ordinary case on these forms, not the
+ * edge one: 47 of the 72 overlay rows on one measured form and 47 of 48 on the
+ * other have room for a single line.
+ *
+ * Both ways of getting it wrong end in the same place — a form that LOOKS
+ * filled. Drawn text wraps downward with no bound and writes over the row
+ * beneath; a form field clips whatever the widget cannot show. Neither raises
+ * anything, and neither is visible to the person who files the document.
+ */
+describe('renderStatutoryForm — text that has to fit the room measured for it', () => {
+    /** A flat map carrying exactly one mapping, so a test states only what it measures. */
+    const mapWith = (mapping: FieldMapping): FieldMap => ({
+        ...flatMap(), requiredFields: [], mappings: [mapping],
+    });
+
+    const LONG = 'a fairly long comment that will not fit on one line at ten point';
+
+    it('shrinks an overlay value to fit its stated height before giving up', async () => {
+        const bytes = await renderStatutoryForm(flat.bytes, mapWith({
+            kind: 'overlay', ourField: 'comments', page: 0,
+            x: 40, y: 700, size: 10, maxWidth: 200, maxHeight: 12, minSize: 6,
+        }), { comments: LONG });
+        // It fits at a smaller size, so it renders rather than throwing — and it
+        // is ON the page: "did not throw" would also hold for a renderer that
+        // quietly wrote nothing.
+        const before = await pageContentDigests(flat.bytes);
+        const after = await pageContentDigests(bytes);
+        expect(after[0]).not.toBe(before[0]);
+    });
+
+    it('CONTROL — the same value in the same row is refused when it may not shrink', async () => {
+        // This is what makes the test above evidence of shrinking rather than of
+        // a value that happened to fit at its declared size all along. Identical
+        // geometry, identical text; the only difference is that the floor is the
+        // starting size, so there is nowhere to go.
+        await expect(renderStatutoryForm(flat.bytes, mapWith({
+            kind: 'overlay', ourField: 'comments', page: 0,
+            x: 40, y: 700, size: 10, maxWidth: 200, maxHeight: 12, minSize: 10,
+        }), { comments: LONG })).rejects.toThrow(/comments.*fits about \d+/is);
+    });
+
+    it('refuses when the value cannot fit even at minSize, naming both numbers', async () => {
+        // Never truncate: a clipped statutory form looks like a filled one. And
+        // never shrink past the declared floor either — that produces an answer
+        // nobody can read, which is the same failure in smaller type.
+        await expect(renderStatutoryForm(flat.bytes, mapWith({
+            kind: 'overlay', ourField: 'comments', page: 0,
+            x: 40, y: 700, size: 10, maxWidth: 200, maxHeight: 12, minSize: 9,
+        }), { comments: 'x'.repeat(4000) }))
+            .rejects.toThrow(/comments.*fits about \d+.*received 4000.*additional page/is);
+    });
+
+    it('leaves an overlay with no maxHeight exactly as it renders today', async () => {
+        // Absent maxHeight is the ordinary case on a map authored before this
+        // landed. It must not start refusing.
+        const bytes = await renderStatutoryForm(flat.bytes, mapWith({
+            kind: 'overlay', ourField: 'comments', page: 0, x: 40, y: 700, size: 10,
+        }), { comments: 'short' });
+        expect(bytes.byteLength).toBeGreaterThan(0);
+
+        // Stated with the value that WOULD be refused under a height bound, so
+        // this test cannot pass merely because the string was small.
+        const unbounded = await renderStatutoryForm(flat.bytes, mapWith({
+            kind: 'overlay', ourField: 'comments', page: 0,
+            x: 40, y: 700, size: 10, maxWidth: 200,
+        }), { comments: 'x'.repeat(4000) });
+        expect(unbounded.byteLength).toBeGreaterThan(0);
+    });
+
+    it('refuses an acroform value the widget would clip', async () => {
+        // The mirror failure. `setTextField` hands the value to the widget, which
+        // shows what it can and drops the rest — same outcome as an overflow, and
+        // the only difference is which end of the answer goes missing.
+        await expect(renderStatutoryForm(fielded.bytes, {
+            ...fieldedMap(), requiredFields: [],
+            mappings: [{ kind: 'acroform', ourField: 'client.name', pdfField: 'Name of Client' }],
+        }, { 'client.name': 'x'.repeat(200) }))
+            .rejects.toThrow(/client\.name.*fits about \d+.*received 200.*additional page/is);
+    });
+
+    it('POSITIVE CONTROL — a value the widget can hold is still written', async () => {
+        // Without this, a check that refused every acroform value would pass the
+        // test above and prove nothing.
+        const filled = await renderStatutoryForm(fielded.bytes, fieldedMap(), {
+            'client.name': 'Zoe Ng', 'property.address': '12 Example St',
+        });
+        expect(await readFieldValue(filled, 'Name of Client')).toBe('Zoe Ng');
     });
 });
