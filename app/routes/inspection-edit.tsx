@@ -27,6 +27,7 @@ import { SectionRail } from "~/components/editor-shared/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
 import { FullscreenToggle } from "~/components/editor/FullscreenToggle";
 import { ItemList } from "~/components/editor-shared/ItemList";
+import { useStatutoryGroups } from "~/hooks/useStatutoryGroups";
 import { ItemEditor } from "~/components/editor/ItemEditor";
 import { TagChipRow, type TagPin } from "~/components/editor/TagChipRow";
 import type { DefectFieldsValue } from "~/components/editor/DefectFieldsRow";
@@ -741,6 +742,7 @@ export default function InspectionEditPage() {
  /* D8 — structural editing (section add/dup/delete/move)           */
  /* ---------------------------------------------------------------- */
 
+  const statutoryGroups = useStatutoryGroups(loaderData.templateSnapshot);
  const structure = useStructureEdit({
   rawSnapshot: loaderData.templateSnapshot,
   collabEditing: loaderData.collabEditing,
@@ -1501,6 +1503,7 @@ export default function InspectionEditPage() {
  onMoveItem={(itemId, dir) => structure.moveItem(state.currentSection?.id || "", itemId, dir)}
  onReorderItem={(fromId, toId) => reorderItemBySwap(state.currentSectionItems, fromId, toId, state.currentSection?.id || "", structure.moveItem)}
  onRenameItem={(itemId, label) => structure.renameItem(state.currentSection?.id || "", itemId, label)}
+ groups={statutoryGroups}
  />
  );
 

@@ -5,6 +5,7 @@ import type { EditorMode } from "./editor-mode";
 import { useSortableReorder } from "./useSortableReorder";
 import { InlineRename } from "./InlineRename";
 import { findingKey } from "~/hooks/findings/shared";
+import type { EditorGroup } from "~/lib/editor/statutory-groups";
 import { m } from "~/paraglide/messages";
 
 // Handle + ⋯ occupy reserved flex slots so they never cover the item number,
@@ -38,6 +39,55 @@ interface SharedItemListProps {
   onReorderItem?: (fromId: string, toId: string) => void;
   /** Rename an item inline (double-click / F2 / ⋯ menu). */
   onRenameItem?: (itemId: string, label: string) => void;
+  /**
+   * Repeated blocks the authority's form prints, when this template declares one.
+   *
+   * Absent is the ordinary case and changes nothing -- which is what keeps the
+   * template author's list and every narrative template exactly as they were.
+   * Present, the run of items stops being flat: each slot is announced by the
+   * name the FORM prints over it, and `+ Add item` gives way to an add that
+   * knows what it is adding. A free item would reach no binding, so whatever
+   * were typed into it would never arrive on the form and nothing would say so.
+   */
+  groups?: readonly EditorGroup[];
+  /** Add another instance of a group. Called with the group's id. */
+  onAddGroupInstance?: (groupId: string) => void;
+}
+
+/**
+ * itemId -> the slot heading to print above it, and the group it closes.
+ *
+ * Position is decided by where the items SIT IN THE LIST, never by the order the
+ * declaration happens to list a slot's fields. A declaration's bindings are a
+ * map; their insertion order says nothing about the section. Anchoring to "the
+ * slot's first field as written" puts the heading one row off, and one row off
+ * is a heading that claims the panel above it is the Second one. Found in the
+ * browser, not by a fixture whose bindings happened to be in a helpful order.
+ */
+function slotHeadings(
+  groups: readonly EditorGroup[] | undefined,
+  items: ReadonlyArray<{ id: string }>,
+) {
+  const heading = new Map<string, { slotLabel: string }>();
+  const closes = new Map<string, EditorGroup>();
+  const position = new Map(items.map((item, i) => [item.id, i]));
+  const earliest = (ids: string[]) =>
+    ids.filter((id) => position.has(id))
+       .sort((a, b) => (position.get(a) as number) - (position.get(b) as number));
+
+  for (const group of groups ?? []) {
+    let lastPresent: string | null = null;
+    for (const slot of group.slots) {
+      const present = earliest(Object.values(slot.fields));
+      if (present.length === 0) continue;
+      heading.set(present[0], { slotLabel: slot.label });
+      lastPresent = present[present.length - 1];
+    }
+    // Only the LAST printed slot closes the group: the add belongs after every
+    // slot the form prints, not after each one.
+    if (lastPresent) closes.set(lastPresent, group);
+  }
+  return { heading, closes };
 }
 
 /** Map rating to dot color for the item list */
@@ -66,7 +116,11 @@ export function ItemList({
   onReorderItem,
   onRenameItem,
   activeUnitId = null,
+  groups,
+  onAddGroupInstance,
 }: SharedItemListProps) {
+  const { heading: slotHeading, closes: groupClosedBy } = slotHeadings(groups, items);
+  const grouped = Boolean(groups?.length);
   const lastClickedRef = useRef<string | null>(null);
   const [menuItemId, setMenuItemId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -113,7 +167,15 @@ export function ItemList({
           const result = scopedResult(item.id);
           const fullIdx = items.findIndex((i) => i.id === item.id);
           const editing = editingId === item.id;
+          const openSlot = slotHeading.get(item.id);
+          const closingGroup = groupClosedBy.get(item.id);
           return (
+            <div key={`wrap-${item.id}`}>
+            {openSlot && (
+              <div className="px-2 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ih-fg-3">
+                {openSlot.slotLabel}
+              </div>
+            )}
             <div
               key={item.id}
               data-sortable-item
@@ -248,10 +310,23 @@ export function ItemList({
                 </div>
               )}
             </div>
+            {closingGroup && onAddGroupInstance && (
+              <div className="px-2 pt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onAddGroupInstance(closingGroup.id)}
+                  className="w-full h-auto py-1.5 border border-dashed border-ih-border-strong text-[12px] text-ih-fg-3 hover:bg-transparent hover:text-ih-primary-text hover:border-ih-primary"
+                >
+                  {m.editor_shared_add_group_instance({ group: closingGroup.label })}
+                </Button>
+              </div>
+            )}
+            </div>
           );
         })}
       </div>
-      {onAddItem && (
+      {onAddItem && !grouped && (
         <div className="p-2 border-t border-ih-border">
           <Button
             variant="ghost"
