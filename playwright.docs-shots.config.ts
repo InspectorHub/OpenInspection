@@ -30,12 +30,22 @@ process.env.SEED_E2E = '1';
 
 export default defineConfig({
     ...base,
+    // Clears `.docs-shots/` once per run, then delegates to the shared seed.
+    // The per-guide `beforeAll` reset it replaces ran a second time whenever a
+    // failure restarted the worker, deleting the screenshots already taken.
+    globalSetup: './tests/docs-shots/_global-setup.ts',
     testDir: './tests/docs-shots',
     testMatch: '**/*.shots.ts',
     // A capture run is a documentation build, not a test run: a retry would
     // silently publish the second attempt's screenshots, and a flaky step is
     // something to fix before it becomes a picture in the manual.
     retries: 0,
+    // A capture walk is not a unit test: one file logs in, creates what the
+    // pictures need, then walks several screens taking a shot at each. The
+    // inherited 30s budget is a TEST timeout, and it expired mid-wizard rather
+    // than reporting a broken step — a timeout that fires on a working flow
+    // teaches the author nothing.
+    timeout: 180_000,
     // One at a time. The captures share one worker and one D1 like everything
     // else here, but they also share something the specs do not: a sequence a
     // reader is going to follow. Two guides interleaving their writes can leave

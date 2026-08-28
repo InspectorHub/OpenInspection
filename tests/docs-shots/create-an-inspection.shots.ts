@@ -1,6 +1,21 @@
-import { test, shotsFor, resetGuide } from './_harness';
+import { test, shotsFor, expect } from './_harness';
+
+// Desktop only. The mobile project exists for the guides that document a phone
+// flow; running these there would overwrite every capture with a narrow one
+// under the same id, and the prose that describes a three-pane editor would be
+// illustrated by a single column.
 import { loginAsSeedUser } from '../e2e/helpers/seed-login';
 import { SEED_EMAILS, SEED_TENANT_SLUG } from '../seed-fixtures';
+import { ensureDocsTemplate, ensureDocsService, ensureDocsAvailability } from './_docs-fixtures';
+
+// Desktop only. The mobile project exists for the guides that document a phone
+// flow; running these there would overwrite every capture with a narrow one
+// under the same id — the prose that describes a three-pane editor would be
+// illustrated by a single column.
+test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'desktop captures');
+});
+
 
 /**
  * Captures for the "Creating an inspection" guide, published at
@@ -14,6 +29,14 @@ import { SEED_EMAILS, SEED_TENANT_SLUG } from '../seed-fixtures';
  * Self-sufficient by contract: it seeds nothing of its own beyond the shared
  * `SEED_E2E` fixtures, logs in itself, and never depends on another guide
  * having run. Running one guide alone has to work, or nobody will.
+ *
+ * ⚠️ IT HAS TO FILL THE FORM, not just click Next. The wizard's step gate
+ * refuses to advance off Property without an address of at least five
+ * characters AND a template, and off Services without a service ticked — so a
+ * script that only clicked would photograph the same first step four times, or
+ * (as the first version of this file did) time out on a control it never
+ * unblocked. What is typed here is fixture data on a fixture tenant; the
+ * pictures are of the wizard, so the address only has to be plausible.
  */
 
 const GUIDE = 'create-an-inspection';
@@ -34,33 +57,57 @@ const shot = shotsFor(GUIDE);
 const ADMIN = SEED_EMAILS.admin;
 const COMPANY_SLUG = SEED_TENANT_SLUG;
 
-test.beforeAll(() => {
-    // Drop last run's PNGs so a renamed or deleted step cannot leave one behind
-    // and be reported as a capture nobody asked for.
-    resetGuide(GUIDE);
-});
-
-test('the staff path: list, then the four wizard steps', async ({ page }) => {
+test('the staff path: list, then the wizard steps', async ({ page }) => {
     await loginAsSeedUser(page, ADMIN);
+    // The shared seed creates no templates on purpose, and the wizard cannot
+    // leave its first step without one — see _docs-fixtures.ts.
+    const templateId = await ensureDocsTemplate(page);
+    // Without a service catalogue the wizard is three steps and there is no
+    // Services screen to photograph — see _docs-fixtures.ts.
+    await ensureDocsService(page, templateId);
+    // The public booking page renders "Online booking isn't open yet" until an
+    // inspector has hours — and the closed page is NOT what guide 1 documents.
+    await ensureDocsAvailability(page);
 
     await page.waitForURL('**/inspections');
     await shot(page, 'inspections-list');
 
-    await page.getByRole('link', { name: 'New Inspection' }).first().click();
+    // A Button, not a link: the page-level action navigates programmatically.
+    // The first version of this file looked for a link and timed out.
+    await page.getByRole('button', { name: 'New Inspection' }).first().click();
     await page.waitForURL('**/inspections/new');
     await shot(page, 'wizard-property');
 
+    // Unblock the step gate, then photograph the NEXT step — the picture of
+    // Property above is deliberately taken empty, which is what a reader sees
+    // when they arrive.
+    await page.locator('#property-address').fill('1240 Alder Street, Springfield');
+    // BY ID, not by role: the address field's Places autocomplete is also a
+    // `role="combobox"` and it comes first in the DOM, so `.first()` focused a
+    // control that has no options and waited for one until the timeout.
+    await page.locator('#newinsp-template').click();
+    await page.getByRole('option').first().click();
+
     await page.getByRole('button', { name: 'Next' }).click();
+    await expect(page.getByRole('button', { name: 'Next' })).toBeVisible();
     await shot(page, 'wizard-people');
 
     await page.getByRole('button', { name: 'Next' }).click();
     await shot(page, 'wizard-services');
+
+    // Services refuses to advance with nothing ticked. The row is a BUTTON
+    // carrying its own tick glyph, not an <input type=checkbox>, so
+    // `getByRole('checkbox')` matched nothing and the gate stayed shut with
+    // Playwright waiting on a permanently disabled Next.
+    await page.getByRole('button', { name: 'Full Home Inspection' }).first().click();
 
     await page.getByRole('button', { name: 'Next' }).click();
     await shot(page, 'wizard-confirm');
 });
 
 test('the client path: the public booking page', async ({ page }) => {
+    // Runs after the staff test in file order, which is what puts the
+    // availability fixture in place — `bookingOpen` is derived from it.
     // Signed out on purpose — this is the page a client reaches from a link,
     // and photographing it from a staff session would show chrome they never
     // see.
