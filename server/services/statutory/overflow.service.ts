@@ -27,7 +27,27 @@
  */
 import { and, eq } from 'drizzle-orm';
 import { statutoryFormEntries } from '../../lib/db/schema';
+import type { FieldGroup } from '../../types/template-schema';
 import type { StatutoryGroupInstances } from '../../lib/statutory/values';
+
+/**
+ * Refuse a write aimed at a slot the page prints.
+ *
+ * Those slots take their value from a binding, which is the authority for them.
+ * Accepting a second writer would give one box two sources with nothing to say
+ * which the form carried -- and the losing value would not be missing, it would
+ * be invisible.
+ */
+export function refuseIndexInsidePrintedRange(group: FieldGroup, index: number): void {
+    if (index < group.capacity) {
+        const slot = group.slotLabels[index] ?? `slot ${index}`;
+        throw new Error(
+            `statutory overflow: "${slot}" is printed on this form, so its value comes from `
+            + `the inspection's own item. Only instances from ${group.capacity} upward are `
+            + 'recorded here.',
+        );
+    }
+}
 
 /** `electrical_panel[2].total_amps` -> its three parts, or null. */
 const KEY = /^([A-Za-z0-9_]+)\[(\d+)\]\.(.+)$/;
