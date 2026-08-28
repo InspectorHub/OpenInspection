@@ -234,8 +234,33 @@ interface TemplateStructure {
  * closed door is the enforcement; this comment is only the reason for it.
  */
 
-/** The inspection-level fields a binding may read. Closed on purpose — see
- *  `StatutoryValueSource`. Each maps to one column the inspection already has. */
+/**
+ * The inspection-level fields a binding may read. Closed on purpose — see
+ * `StatutoryValueSource`. Each maps to one column the inspection already has.
+ *
+ * -- MEMBERSHIP IS DECIDED BY WHETHER A REAL SOURCE EXISTS -------------------
+ * A member here is a promise that the value can be resolved from a column
+ * somebody already fills in. `company_name` and `company_phone` read the
+ * workspace's own configuration, which is why they are here.
+ *
+ * Two boxes the Florida four-point form prints are deliberately NOT here, and
+ * that absence was decided rather than overlooked:
+ *
+ *   - `Title` has no source anywhere in this repository.
+ *   - `License Type` asks for a state licence class (home inspector, general
+ *     contractor, building code inspector). The nearest column is an
+ *     inspector credential's label, which holds an ASSOCIATION certification
+ *     ("InterNACHI CPI"). Those are not the same thing, and answering a
+ *     statutory licence-type box from it would print something that looks
+ *     right and is wrong — the exact failure this subsystem exists to prevent.
+ *
+ * Both need a new source before they can be members. Do NOT add them as fields
+ * hardwired to `null`: a member that can never resolve is a blank box on an
+ * authority's form, which reads as an inspector who did not answer.
+ *
+ * New members go at the END, for the same reason new columns do — the order is
+ * something readers see.
+ */
 export type StatutoryInspectionField =
     | 'client_name'
     | 'client_email'
@@ -246,7 +271,9 @@ export type StatutoryInspectionField =
     | 'property_zip'
     | 'inspection_date'
     | 'inspector_name'
-    | 'inspector_license';
+    | 'inspector_license'
+    | 'company_name'
+    | 'company_phone';
 
 /**
  * One repeated block on the authority's form.

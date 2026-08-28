@@ -53,6 +53,26 @@ vi.mock('../../../server/lib/statutory/forms', async () => {
         __fixtureBytes: fixture.bytes,
     };
 });
+/**
+ * The facts the route hands the producer, captured on the way through.
+ *
+ * A PASS-THROUGH spy, not a replacement: the real producer still runs, so the
+ * status-code checks above keep exercising a real render rather than a stub
+ * that can never refuse anything. Only the identity half is read here, because
+ * a form's own field map decides whether an identity value is ever printed --
+ * and the fixture map binds one item, not a licence box.
+ */
+const producer = vi.hoisted(() => ({ facts: null as Record<string, string | null> | null }));
+vi.mock('../../../server/services/statutory/produce.service', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../../server/services/statutory/produce.service')>();
+    return {
+        ...actual,
+        produceStatutoryForm: async (input: Parameters<typeof actual.produceStatutoryForm>[0]) => {
+            producer.facts = input.facts;
+            return actual.produceStatutoryForm(input);
+        },
+    };
+});
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import statutoryRoutes from '../../../server/api/inspections/statutory';
 import { AppError } from '../../../server/lib/errors';
@@ -64,6 +84,8 @@ const GOOD = 'insp-good';
 const DRAFT = 'insp-draft';
 const PLAIN = 'insp-plain';
 const OTHER = 'insp-other-tenant';
+
+const INSPECTOR = 'usr-dana';
 
 const FORM = 'yy_flat_form';
 const REVISION = 'Rev. 04/26';
@@ -116,7 +138,13 @@ function buildApp(tenantId = TENANT) {
 
 const ENV = () => ({ DB: {} as D1Database, PHOTOS: bucket() } as unknown as HonoConfig['Bindings']);
 
+function producedFacts(): Record<string, string | null> {
+    if (!producer.facts) throw new Error('produceStatutoryForm was never called');
+    return producer.facts;
+}
+
 beforeEach(async () => {
+    producer.facts = null;
     const catalogue = await import('../../../server/lib/statutory/forms') as unknown as { __fixtureBytes: Uint8Array };
     flat = { bytes: catalogue.__fixtureBytes };
     const fx = createTestDb();
@@ -127,9 +155,27 @@ beforeEach(async () => {
         { id: TENANT, slug: 'e1', createdAt: new Date() },
         { id: OTHER_TENANT, slug: 'e2', createdAt: new Date() },
     ]);
+    // The four identity facts, each seeded where the route actually reads it:
+    // the name on the user row, the licence as a credential row (`users` carries
+    // no licence column), and the company pair on the workspace config.
+    await db.insert(schema.users).values([{
+        id: INSPECTOR, tenantId: TENANT, email: 'dana@example.test',
+        passwordHash: 'x', name: 'Dana Reyes', role: 'inspector', createdAt: new Date(),
+    }]);
+    await db.insert(schema.inspectorCredentials).values([{
+        id: 'cred-licence', tenantId: TENANT, userId: INSPECTOR,
+        // `sortOrder: -1` is the seat the licence occupies: "first active
+        // credential carrying a member number" is what makes it the licence.
+        label: 'State licence', memberNumber: 'HI-12345', sortOrder: -1, active: true,
+        createdAt: new Date(), updatedAt: new Date(),
+    }]);
+    await db.insert(schema.tenantConfigs).values([{
+        tenantId: TENANT, companyName: 'Acme Inspections', companyPhone: '555-0100',
+        updatedAt: new Date(),
+    }]);
     const base = { propertyAddress: '1 Main St', date: '2026-05-01', createdAt: new Date() };
     await db.insert(schema.inspections).values([
-        { ...base, id: GOOD, tenantId: TENANT, templateSnapshot: SNAPSHOT_DECLARED },
+        { ...base, id: GOOD, tenantId: TENANT, inspectorId: INSPECTOR, templateSnapshot: SNAPSHOT_DECLARED },
         { ...base, id: DRAFT, tenantId: TENANT, templateSnapshot: SNAPSHOT_DECLARED },
         { ...base, id: PLAIN, tenantId: TENANT, templateSnapshot: SNAPSHOT_PLAIN },
         { ...base, id: OTHER, tenantId: OTHER_TENANT, templateSnapshot: SNAPSHOT_DECLARED },
@@ -197,5 +243,22 @@ describe('GET /:id/statutory-form.pdf', () => {
         // which is a header with no content in it.
         const res = await get(GOOD);
         expect(res.headers.get('x-artifact-status')).toBeTruthy();
+    });
+
+    it('fills inspector and company identity from real sources', async () => {
+        // A blank licence line is not an absent value on a statutory form -- the
+        // box is preprinted, so blank reads as "this submission is invalid".
+        // These four used to be hard-coded null while the sources already
+        // existed; the licence in particular comes from the same
+        // CredentialService call the report PDF's signature block makes, so the
+        // two surfaces cannot disagree about the same inspector.
+        const res = await get(GOOD);
+        expect(res.status).toBe(200);
+
+        const facts = producedFacts();
+        expect(facts.inspector_name).toBe('Dana Reyes');
+        expect(facts.inspector_license).toBe('HI-12345');
+        expect(facts.company_name).toBe('Acme Inspections');
+        expect(facts.company_phone).toBe('555-0100');
     });
 });

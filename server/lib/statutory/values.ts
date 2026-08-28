@@ -62,8 +62,17 @@ export interface StatutoryItemResult {
     attributes?: Record<string, unknown>;
 }
 
-/** The inspection-level facts a binding may read, one per
- *  `StatutoryInspectionField`. Null where the inspection has no answer. */
+/**
+ * The inspection-level facts a binding may read, one per
+ * `StatutoryInspectionField`. Null where the inspection has no answer.
+ *
+ * DERIVED FROM THE UNION ON PURPOSE, never a hand-written list of the same
+ * names. A field added to `StatutoryInspectionField` becomes a REQUIRED key
+ * here in the same commit, so every place that builds a facts object goes
+ * type-red until it supplies the new value. A parallel list would let a new
+ * member reach the form as `undefined` — which stringifies to a blank box, and
+ * a blank box on an authority's form reads as an inspector who did not answer.
+ */
 export type StatutoryInspectionFacts = Record<StatutoryInspectionField, string | null>;
 
 function fail(reason: string): never {

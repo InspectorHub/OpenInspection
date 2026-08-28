@@ -37,6 +37,8 @@ const FACTS = {
     inspection_date: '2026-05-01',
     inspector_name: 'Sam Reed',
     inspector_license: 'TX-12345',
+    company_name: 'Reed Home Inspections',
+    company_phone: '512-555-0142',
 };
 
 /** Every inspection-level fact unanswered. Used where the assertion is about
@@ -52,6 +54,8 @@ const EMPTY_FACTS = {
     inspection_date: null,
     inspector_name: null,
     inspector_license: null,
+    company_name: null,
+    company_phone: null,
 };
 
 const DECL: StatutoryFormDeclaration = {
@@ -162,6 +166,24 @@ describe('collectStatutoryValues — one refusal, one place', () => {
         // half-check here is why the next person fixes only one of them.
         const values = collectStatutoryValues(DECL_WITH_UNMAPPED, SNAPSHOT, {}, FACTS);
         expect(values).toHaveProperty('not.on.this.form');
+    });
+});
+
+describe('collectStatutoryValues — company identity', () => {
+    it('resolves company identity from the workspace config', () => {
+        const values = collectStatutoryValues(
+            {
+                formId: 'f',
+                bindings: {
+                    company_name: { from: 'inspection', field: 'company_name' },
+                    company_phone: { from: 'inspection', field: 'company_phone' },
+                },
+            },
+            { schemaVersion: 2, sections: [] },
+            {},
+            { ...EMPTY_FACTS, company_name: 'Acme Inspections', company_phone: '555-0100' },
+        );
+        expect(values).toEqual({ company_name: 'Acme Inspections', company_phone: '555-0100' });
     });
 });
 
