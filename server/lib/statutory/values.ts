@@ -15,6 +15,11 @@
  * field, and that refusal is meant for a broken template, never for an
  * inspection somebody has not finished yet.
  *
+ * There is a third case, and it is neither: a `signature` binding emits NO key
+ * at all and throws nothing. It resolves by reference where the document is
+ * produced, because a signature image must never enter this object -- see
+ * `StatutoryValueSource`.
+ *
  * -- 2. EVERY REFUSAL NAMES THE THING ----------------------------------------
  * A binding that points at an item or an attribute the template does not have
  * is a broken template, and the tempting alternative -- yield '' and carry on --
@@ -152,7 +157,8 @@ function resolve(
  * @param results stored answers, keyed by item id.
  * @param facts inspection-level answers, one per closed field name.
  * @returns our field name -> the string to place on the form. Every binding
- *   produces a key; a binding that cannot be resolved throws instead.
+ *   except a signature produces a key; a binding that cannot be resolved throws
+ *   instead.
  */
 export function collectStatutoryValues(
     declaration: StatutoryFormDeclaration,
@@ -163,6 +169,9 @@ export function collectStatutoryValues(
     const items = itemsById(snapshot);
     const values: Record<string, string> = {};
     for (const [ourField, source] of Object.entries(declaration.bindings)) {
+        // Signatures resolve by reference in the produce service. They are
+        // deliberately absent here rather than empty -- see StatutoryValueSource.
+        if (source.from === 'signature') continue;
         values[ourField] = resolve(source, ourField, items, results, facts);
     }
     return values;

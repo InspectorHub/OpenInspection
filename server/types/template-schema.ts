@@ -291,12 +291,22 @@ export interface FieldGroup {
  * somebody's statutory form, which reads as an inspector who failed to answer
  * rather than as software that failed to look. A compiler error is the only
  * place that mistake is cheap.
+ *
+ * `signature` resolves BY REFERENCE at render time and never enters the
+ * collected values. A signature image is the most tightly classified personal
+ * data this repository holds, and the values object is declared to carry none;
+ * routing it through there would retract that declaration in one step. `scope`
+ * names WHICH PART of the form the signature stands behind, exactly as the
+ * matching `signature` field mapping does -- one form can carry several
+ * signatures that each answer for a different section. Use `whole_form` when
+ * the form has a single signer.
  */
 export type StatutoryValueSource =
     | { from: 'item'; itemId: string }
     | { from: 'item_attribute'; itemId: string; attribute: string }
     | { from: 'inspection'; field: StatutoryInspectionField }
-    | { from: 'literal'; value: string };
+    | { from: 'literal'; value: string }
+    | { from: 'signature'; scope: string };
 
 /** One template's statutory-form declaration. */
 export interface StatutoryFormDeclaration {

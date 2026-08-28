@@ -39,6 +39,21 @@ const FACTS = {
     inspector_license: 'TX-12345',
 };
 
+/** Every inspection-level fact unanswered. Used where the assertion is about
+ *  the ROUTE a binding takes rather than about any fact it reads. */
+const EMPTY_FACTS = {
+    client_name: null,
+    client_email: null,
+    client_phone: null,
+    property_address: null,
+    property_city: null,
+    property_state: null,
+    property_zip: null,
+    inspection_date: null,
+    inspector_name: null,
+    inspector_license: null,
+};
+
 const DECL: StatutoryFormDeclaration = {
     formId: 'tx_trec_rei',
     bindings: { 'roof.covering': { from: 'item', itemId: 'itm_roof' } },
@@ -147,5 +162,26 @@ describe('collectStatutoryValues — one refusal, one place', () => {
         // half-check here is why the next person fixes only one of them.
         const values = collectStatutoryValues(DECL_WITH_UNMAPPED, SNAPSHOT, {}, FACTS);
         expect(values).toHaveProperty('not.on.this.form');
+    });
+});
+
+describe('collectStatutoryValues — a signature never travels through the values', () => {
+    it('never puts a signature into the collected values', () => {
+        const values = collectStatutoryValues(
+            {
+                formId: 'f',
+                bindings: {
+                    roof_cover: { from: 'literal', value: 'Shingle' },
+                    inspector_signature: { from: 'signature', scope: 'whole_form' },
+                },
+            },
+            { schemaVersion: 2, sections: [] },
+            {},
+            EMPTY_FACTS,
+        );
+        expect(values).toEqual({ roof_cover: 'Shingle' });
+        // Assert the KEY is absent, not that it is empty: an empty string would
+        // still have travelled through the values object.
+        expect('inspector_signature' in values).toBe(false);
     });
 });
