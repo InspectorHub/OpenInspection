@@ -49,6 +49,7 @@ import { renderStatutoryForm } from '../../lib/statutory/render';
 import { utcMidnightOf } from '../../lib/statutory/inspection-date';
 import {
     collectStatutoryValues,
+    type StatutoryGroupInstances,
     type StatutoryInspectionFacts,
     type StatutoryItemResult,
 } from '../../lib/statutory/values';
@@ -65,6 +66,16 @@ export interface ProduceStatutoryFormInput {
     snapshot: TemplateSchemaV2;
     results: Record<string, StatutoryItemResult>;
     facts: StatutoryInspectionFacts;
+    /**
+     * Repeated-block instances the page has no slot to print, read from
+     * `statutory_form_entries`. Absent is the ordinary case and means the same
+     * as none: a house with two panels overflows nothing.
+     *
+     * Printed slots do NOT arrive here -- they are ordinary template items and
+     * reach the form as bindings, which is why this defaults to empty rather
+     * than being required.
+     */
+    instances?: StatutoryGroupInstances;
     bucket: R2Bucket;
     /**
      * Seams, defaulted to the published catalogue. They exist because the
@@ -127,7 +138,9 @@ export async function produceStatutoryForm(
     //    swapped object and values written into boxes nobody measured.
     await validateAgainstPdf(map, bytes);
 
-    const values = collectStatutoryValues(input.declaration, input.snapshot, input.results, input.facts);
+    const values = collectStatutoryValues(
+        input.declaration, input.snapshot, input.results, input.facts, input.instances ?? {},
+    );
     const rendered = await renderStatutoryForm(bytes, map, values);
     return { version, bytes: rendered };
 }

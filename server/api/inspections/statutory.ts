@@ -32,6 +32,7 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { deliverableHeaders } from '../../lib/deliverable-headers';
 import { produceStatutoryForm } from '../../services/statutory/produce.service';
+import { StatutoryOverflowService } from '../../services/statutory/overflow.service';
 import { versionForInspection } from '../../lib/statutory/form-registry';
 import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
 import { utcMidnightOf } from '../../lib/statutory/inspection-date';
@@ -186,6 +187,13 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
         company_phone: config?.companyPhone ?? null,
     };
 
+    // Instances the page has no slot to print. Printed slots are ordinary items
+    // and arrive through the bindings above; these are what the item model has
+    // nowhere to put, and without them a third panel would simply not exist as
+    // far as the form is concerned.
+    const instances = await new StatutoryOverflowService(db)
+        .instancesFor(tenantId, id, declaration.formId);
+
     const produced = await produceStatutoryForm({
         formId: declaration.formId,
         inspectionDate: inspection.date,
@@ -193,6 +201,7 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
         snapshot,
         results: results ?? {},
         facts,
+        instances,
         bucket: c.env.PHOTOS,
     });
 
