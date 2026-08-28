@@ -71,7 +71,7 @@ import type {
     TemplateItem,
 } from '../../types/template-schema';
 import {
-    expectedGroupFields, groupFieldName, refuseOverCapacity,
+    groupFieldName, refuseOverCapacity,
     refuseOverflowThatDoesNotFit, validateGroups,
 } from './groups';
 
@@ -211,22 +211,26 @@ export type StatutoryGroupInstances = Readonly<Record<string, readonly Statutory
  */
 function expandGroups(
     groups: readonly FieldGroup[],
-    bindings: StatutoryFormDeclaration['bindings'],
     instances: StatutoryGroupInstances,
     values: Record<string, string>,
 ): void {
     validateGroups(groups);
 
-    // A binding and a group must not both claim one slot. They are written into
-    // the same object, so the loser vanishes without a trace and the form
-    // carries whichever happened to be written last -- a value that is wrong in
-    // a way no count of "fields supplied" can show.
-    const claimed = expectedGroupFields(groups).filter((name) => name in bindings);
-    if (claimed.length > 0) {
-        fail(`${claimed.length} field(s) are claimed by both a group and a binding: `
-            + `${claimed.join(', ')}. A slot belongs to its group; bind the value into the `
-            + 'group instance instead.');
-    }
+    // A BINDING ONTO A PRINTED SLOT IS ALLOWED, AND IT WINS.
+    //
+    // This used to be refused, on the reasoning that two writers of one key make
+    // the loser vanish without a trace. The reasoning was sound and the premise
+    // expired: it was written when a statutory form was assumed to have its own
+    // entry surface, so a slot's value could only sensibly come from a group
+    // instance. Entry is now the ordinary inspection editor and the form is a
+    // projection of it, which makes a printed slot an ordinary item -- and an
+    // item's value arrives as a binding. Refusing that refused the normal case.
+    //
+    // Nothing vanishes, because the order below is load-bearing: slots are
+    // written from the instances FIRST and the binding loop overwrites them, so
+    // where both exist the binding is what the form carries. The editor reads
+    // the same bindings to know which item holds which slot, so the two agree by
+    // construction rather than by convention.
 
     // Every capacity with nowhere to overflow to is judged BEFORE any value is
     // written. An overflow is a fact about the inspection as a whole, and
@@ -362,7 +366,7 @@ export function collectStatutoryValues(
     // Groups first, so a declaration that is broken or a house that overflows
     // the page is refused before any value is resolved.
     if (declaration.groups !== undefined) {
-        expandGroups(declaration.groups, declaration.bindings, instances, values);
+        expandGroups(declaration.groups, instances, values);
     }
     for (const [ourField, source] of Object.entries(declaration.bindings)) {
         // Signatures resolve by reference in the produce service. They are

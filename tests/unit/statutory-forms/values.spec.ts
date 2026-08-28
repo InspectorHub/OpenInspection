@@ -282,10 +282,14 @@ describe('collectStatutoryValues — repeatable groups', () => {
         )).not.toThrow();
     });
 
-    it('REFUSES a group whose slot names a binding also claims', () => {
-        // Both routes write into one object, so the loser disappears without a
-        // trace and the form carries whichever ran last.
-        expect(() => collectStatutoryValues(
+    it('a binding onto a printed slot WINS over an instance, and neither is lost silently', () => {
+        // Adjudicated 2026-08-28. This used to be a refusal, on the reasoning
+        // that two writers of one key make the loser vanish. The reasoning held;
+        // the premise expired. A printed slot is an ordinary template item now,
+        // so its value arrives as a binding, and refusing that refused the
+        // normal case. The order in `collectStatutoryValues` decides it: slots
+        // are written from instances first, the binding loop overwrites them.
+        const values = collectStatutoryValues(
             {
                 formId: 'fl_citizens_4point',
                 bindings: { 'electrical_panel[0].total_amps': { from: 'literal', value: '150' } },
@@ -293,7 +297,8 @@ describe('collectStatutoryValues — repeatable groups', () => {
             },
             EMPTY_SNAPSHOT, {}, EMPTY_FACTS,
             { electrical_panel: [{ total_amps: '100' }] },
-        )).toThrow(/electrical_panel\[0\]\.total_amps/);
+        );
+        expect(values['electrical_panel[0].total_amps']).toBe('150');
     });
 
     it('a malformed group is refused before any value is collected', () => {
@@ -468,5 +473,53 @@ describe('collectStatutoryValues — a declaration with no groups is untouched',
             { electrical_panel: [{ total_amps: '100' }] },
         );
         expect(values).toEqual({ 'roof.covering': 'D' });
+    });
+});
+
+describe('printed slots come from bindings; instances carry only the overflow', () => {
+    // Adjudicated 2026-08-28. The earlier rule -- a slot field must NOT also be
+    // a binding -- was written when a statutory form was assumed to have its own
+    // entry surface. Entry is now the ordinary inspection editor and the form is
+    // a projection of it, so a printed slot necessarily comes from an item, and
+    // an item's value necessarily arrives as a binding.
+    const GROUP = {
+        id: 'electrical_panel', label: 'Electrical Panel', capacity: 2,
+        slotLabels: ['Main Panel', 'Second Panel'],
+        fields: ['total_amps'],
+        overflowTo: 'additional_comments',
+        overflowMaxLength: 400,
+    } as const;
+
+    it('accepts a binding onto a printed slot, and uses its value', () => {
+        const values = collectStatutoryValues(
+            {
+                formId: 'f',
+                groups: [GROUP],
+                bindings: {
+                    'electrical_panel[0].total_amps': { from: 'literal', value: '150' },
+                    'electrical_panel[1].total_amps': { from: 'literal', value: '100' },
+                    additional_comments: { from: 'literal', value: '' },
+                },
+            },
+            { schemaVersion: 2, sections: [] },
+            {},
+            EMPTY_FACTS,
+            {},
+        );
+        expect(values['electrical_panel[0].total_amps']).toBe('150');
+        expect(values['electrical_panel[1].total_amps']).toBe('100');
+    });
+
+    it('CONTROL — an instance still supplies a slot when no binding claims it', () => {
+        // Without this, "bindings win" could just as well mean "instances are
+        // ignored", and the overflow path would be dead while the tests passed.
+        const values = collectStatutoryValues(
+            { formId: 'f', groups: [GROUP], bindings: { additional_comments: { from: 'literal', value: '' } } },
+            { schemaVersion: 2, sections: [] },
+            {},
+            EMPTY_FACTS,
+            { electrical_panel: [{ total_amps: '150' }] },
+        );
+        expect(values['electrical_panel[0].total_amps']).toBe('150');
     });
 });
