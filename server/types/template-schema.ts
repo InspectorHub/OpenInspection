@@ -249,6 +249,40 @@ export type StatutoryInspectionField =
     | 'inspector_license';
 
 /**
+ * One repeated block on the authority's form.
+ *
+ * -- WHY SLOTS ARE NAMED AND NOT NUMBERED ------------------------------------
+ * The form prints a name over each one. Measured on the Citizens four-point
+ * form: the electrical block is "Main Panel" / "Second Panel" and the roof block
+ * is "Predominant Roof" / "Secondary Roof". Those are not "the first" and "the
+ * second" -- predominant versus secondary is a property of the roof, and a
+ * reader handed "Roof 2" has been told something the form does not say.
+ * Addressing stays positional underneath; what a person sees is always the
+ * form's own wording.
+ *
+ * -- WHY CAPACITY IS A MEASUREMENT -------------------------------------------
+ * It is the slot count on ONE revision, established by the person who read that
+ * revision, and it sits beside `checkedBy` for the same reason: no gate can
+ * check it. A house with three panels overflows a form with two, and that is
+ * the form's constraint rather than a bug in the count.
+ */
+export interface FieldGroup {
+    /** Group id, e.g. `electrical_panel`. */
+    id: string;
+    /** Human-readable name of the block, e.g. `Electrical Panel`. */
+    label: string;
+    /** Slots on THIS revision, counted on the page. Never guessed. */
+    capacity: number;
+    /**
+     * What the form prints over each slot, in page order. MUST have exactly
+     * `capacity` entries -- `validateGroups` enforces it.
+     */
+    slotLabels: readonly string[];
+    /** Field names inside one instance, e.g. `total_amps`. */
+    fields: readonly string[];
+}
+
+/**
  * Where one value on the form comes from.
  *
  * A CLOSED discriminated union, with `from` as the discriminant. The closure is
@@ -272,6 +306,9 @@ export interface StatutoryFormDeclaration {
      *  form requires and this map omits is a gap the fidelity gate reports; it
      *  is never silently rendered blank. */
     bindings: Record<string, StatutoryValueSource>;
+    /** Repeated blocks on this form. Absent when the form has none -- the
+     *  Florida wind-mitigation form has none at all. */
+    groups?: readonly FieldGroup[];
 }
 
 export interface TemplateSchemaV2 {
