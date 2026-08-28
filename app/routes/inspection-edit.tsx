@@ -27,7 +27,7 @@ import { SectionRail } from "~/components/editor-shared/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
 import { FullscreenToggle } from "~/components/editor/FullscreenToggle";
 import { ItemList } from "~/components/editor-shared/ItemList";
-import { useStatutoryGroups } from "~/hooks/useStatutoryGroups";
+import { useStatutoryGroups, useStructuralEditingAllowed } from "~/hooks/useStatutoryGroups";
 import { ItemEditor } from "~/components/editor/ItemEditor";
 import { TagChipRow, type TagPin } from "~/components/editor/TagChipRow";
 import type { DefectFieldsValue } from "~/components/editor/DefectFieldsRow";
@@ -743,6 +743,9 @@ export default function InspectionEditPage() {
  /* ---------------------------------------------------------------- */
 
   const statutoryGroups = useStatutoryGroups(loaderData.templateSnapshot);
+  // Every structural edit is refused server-side on a statutory inspection, so
+  // the controls for them are withheld rather than offered and rejected.
+  const canEditStructure = useStructuralEditingAllowed(loaderData.templateSnapshot);
  const structure = useStructureEdit({
   rawSnapshot: loaderData.templateSnapshot,
   collabEditing: loaderData.collabEditing,
@@ -1497,12 +1500,12 @@ export default function InspectionEditPage() {
  batchSelected={state.batchSelected}
  onBatchToggle={(id) => state.toggleBatchSelect(id)}
  onBatchRange={(from, to) => state.batchSelectRange(from, to)}
- onAddItem={() => structure.openAddItemPrompt(state.currentSection?.id || "")}
- onDuplicateItem={(itemId) => structure.duplicateItem(state.currentSection?.id || "", itemId)}
- onDeleteItem={(itemId) => structure.deleteItem(state.currentSection?.id || "", itemId)}
- onMoveItem={(itemId, dir) => structure.moveItem(state.currentSection?.id || "", itemId, dir)}
- onReorderItem={(fromId, toId) => reorderItemBySwap(state.currentSectionItems, fromId, toId, state.currentSection?.id || "", structure.moveItem)}
- onRenameItem={(itemId, label) => structure.renameItem(state.currentSection?.id || "", itemId, label)}
+ onAddItem={canEditStructure ? () => structure.openAddItemPrompt(state.currentSection?.id || "") : undefined}
+ onDuplicateItem={canEditStructure ? (itemId) => structure.duplicateItem(state.currentSection?.id || "", itemId) : undefined}
+ onDeleteItem={canEditStructure ? (itemId) => structure.deleteItem(state.currentSection?.id || "", itemId) : undefined}
+ onMoveItem={canEditStructure ? (itemId, dir) => structure.moveItem(state.currentSection?.id || "", itemId, dir) : undefined}
+ onReorderItem={canEditStructure ? (fromId, toId) => reorderItemBySwap(state.currentSectionItems, fromId, toId, state.currentSection?.id || "", structure.moveItem) : undefined}
+ onRenameItem={canEditStructure ? (itemId, label) => structure.renameItem(state.currentSection?.id || "", itemId, label) : undefined}
  groups={statutoryGroups}
  />
  );

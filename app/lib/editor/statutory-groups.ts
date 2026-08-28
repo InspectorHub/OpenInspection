@@ -111,3 +111,22 @@ export function formBoundItemIds(
     }
     return ids;
 }
+
+/**
+ * Does this inspection's snapshot declare a statutory form at all?
+ *
+ * Not the same question as "does it have groups". The server refuses EVERY
+ * structural edit on such an inspection -- add, rename, duplicate, delete, move,
+ * reorder, rating-system swap -- with a 403 raised ahead of the body validator,
+ * because the declaration is platform-supplied and a round-tripped snapshot
+ * would carry it back through a tenant surface that must not accept it.
+ *
+ * So the editor stops OFFERING those controls. A control that always fails is
+ * the same class of defect as one that silently does nothing: the inspector
+ * learns the hard way, mid-job, and has no idea why. The Florida
+ * wind-mitigation form declares no groups and its inspections are just as
+ * read-only, which is why this is asked separately.
+ */
+export function declaresStatutoryForm(snapshot: unknown): boolean {
+    return Boolean((snapshot as { statutoryForm?: unknown } | null | undefined)?.statutoryForm);
+}

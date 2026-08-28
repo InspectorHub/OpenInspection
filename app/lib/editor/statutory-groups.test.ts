@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     deriveEditorGroups,
     formBoundItemIds,
+    declaresStatutoryForm,
 } from '~/lib/editor/statutory-groups';
 import type { StatutoryFormDeclaration } from '../../../server/types/template-schema';
 
@@ -100,5 +101,29 @@ describe('formBoundItemIds', () => {
     it('is empty for a template that declares no form', () => {
         // Which is what keeps a narrative template's editor unchanged.
         expect(formBoundItemIds(undefined)).toEqual(new Set());
+    });
+});
+
+describe('declaresStatutoryForm', () => {
+    // The server refuses EVERY structural edit on an inspection whose snapshot
+    // declares a form -- add, rename, duplicate, delete, move, reorder, rating
+    // swap -- with a 403, ahead of the body validator. The editor therefore has
+    // to stop offering those controls, not just the one that adds. Offering a
+    // control that always fails is the same class of defect as a control that
+    // silently does nothing.
+    it('is true when the snapshot carries a declaration', () => {
+        expect(declaresStatutoryForm({ statutoryForm: { formId: 'f', bindings: {} } })).toBe(true);
+    });
+
+    it('is true even for a declaration with no groups', () => {
+        // The Florida wind-mitigation form declares none, and its inspections
+        // are just as read-only.
+        expect(declaresStatutoryForm({ statutoryForm: { formId: 'fl_oir_b1_1802', bindings: {} } })).toBe(true);
+    });
+
+    it('is false for an ordinary template, and for nothing at all', () => {
+        expect(declaresStatutoryForm({ schemaVersion: 2, sections: [] })).toBe(false);
+        expect(declaresStatutoryForm(null)).toBe(false);
+        expect(declaresStatutoryForm(undefined)).toBe(false);
     });
 });
