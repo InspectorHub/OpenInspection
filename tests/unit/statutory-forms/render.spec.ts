@@ -293,3 +293,52 @@ describe('renderStatutoryForm — text that has to fit the room measured for it'
         expect(await readFieldValue(filled, 'Name of Client')).toBe('Zoe Ng');
     });
 });
+
+describe('renderStatutoryForm — a value drawn in parts', () => {
+    /** The measured geometry of `building_code_a_permit_application_date`. */
+    const partedMap = (): FieldMap => ({
+        ...flatMap(), requiredFields: [],
+        mappings: [
+            { kind: 'overlay', ourField: 'permit_date', part: 'date_month', page: 0,
+                x: 472.20, y: 439.84, size: 9, maxWidth: 20.10, maxHeight: 11 },
+            { kind: 'overlay', ourField: 'permit_date', part: 'date_day', page: 0,
+                x: 495.12, y: 439.84, size: 9, maxWidth: 19.98, maxHeight: 11 },
+            { kind: 'overlay', ourField: 'permit_date', part: 'date_year', page: 0,
+                x: 517.80, y: 439.84, size: 9, maxWidth: 40.02, maxHeight: 11 },
+        ],
+    });
+
+    it('refuses a value that is not a calendar day, before any document exists', async () => {
+        await expect(renderStatutoryForm(flat.bytes, partedMap(), { permit_date: 'March 2026' }))
+            .rejects.toThrow(/permit_date.*not a YYYY-MM-DD.*date item/is);
+    });
+
+    it('POSITIVE CONTROL — an empty answer leaves the blanks empty and still produces', async () => {
+        // This is the control that catches a parser refusing everything. An
+        // empty string is an inspector answering "nothing", and a form somebody
+        // filled with an empty answer must still be producible.
+        const bytes = await renderStatutoryForm(flat.bytes, partedMap(), { permit_date: '' });
+        expect(bytes.byteLength).toBeGreaterThan(0);
+        const before = await pageContentDigests(flat.bytes);
+        expect((await pageContentDigests(bytes))[0]).toBe(before[0]);
+    });
+
+    it('names every unreadable value at once, not the first one', async () => {
+        const twoFields: FieldMap = {
+            ...partedMap(),
+            mappings: [
+                ...partedMap().mappings,
+                { kind: 'overlay', ourField: 'roof_permit_date', part: 'date_month', page: 0,
+                    x: 166.92, y: 591.0, size: 8, maxWidth: 18.07, maxHeight: 10.3 },
+                { kind: 'overlay', ourField: 'roof_permit_date', part: 'date_day', page: 0,
+                    x: 187.45, y: 591.0, size: 8, maxWidth: 18.07, maxHeight: 10.3 },
+                { kind: 'overlay', ourField: 'roof_permit_date', part: 'date_year', page: 0,
+                    x: 207.98, y: 591.0, size: 8, maxWidth: 18.07, maxHeight: 10.3 },
+            ],
+        };
+        // A person holding two broken bindings should be told about two.
+        await expect(renderStatutoryForm(flat.bytes, twoFields, {
+            permit_date: 'soon', roof_permit_date: '15/03/2026',
+        })).rejects.toThrow(/permit_date[\s\S]*roof_permit_date/);
+    });
+});

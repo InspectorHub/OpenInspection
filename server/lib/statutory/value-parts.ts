@@ -211,7 +211,12 @@ export function refuseUnreadableParts(
     values: ReadonlyMap<string, string>,
 ): void {
     const problems: string[] = [];
+    // One per FIELD, not one per part: a value that cannot be read is unreadable
+    // in all three of its blanks, and saying so three times would make the count
+    // in the message disagree with the number of bindings to go and fix.
+    const reported = new Set<string>();
     for (const m of partedOverlays(mappings)) {
+        if (reported.has(m.ourField)) continue;
         const value = values.get(m.ourField);
         // Absent was judged against `requiredFields`; an EMPTY STRING is an
         // explicit answer of "nothing" and leaves every blank empty, exactly as
@@ -221,6 +226,7 @@ export function refuseUnreadableParts(
         try {
             partOfValue(value, m.part, m.ourField);
         } catch (cause) {
+            reported.add(m.ourField);
             problems.push(cause instanceof Error ? cause.message : String(cause));
         }
     }

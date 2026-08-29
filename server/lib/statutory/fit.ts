@@ -69,6 +69,17 @@ function fail(reason: string): never {
 }
 
 /**
+ * What a refusal calls this overlay.
+ *
+ * One field can now have three overlays, one per printed blank. A message that
+ * named only the field would leave the reader to work out which of the three
+ * boxes on the page would not hold its answer.
+ */
+function overlayLabel(m: OverlayMapping): string {
+    return m.part === undefined ? m.ourField : `${m.ourField} (${m.part})`;
+}
+
+/**
  * Fit an overlay value to the room somebody measured, or refuse it.
  *
  * Steps down from the declared size to the declared floor and takes the first
@@ -94,7 +105,7 @@ export function fitOverlay(value: string, mapping: OverlayMapping, font: PDFFont
     const atFloor = fitAtSize(value, font, floor, maxWidth, maxHeight);
     if (atFloor !== null) return atFloor;
 
-    fail(`"${mapping.ourField}" fits about ${charactersThatFit(value, font, floor, maxWidth, maxHeight)} `
+    fail(`"${overlayLabel(mapping)}" fits about ${charactersThatFit(value, font, floor, maxWidth, maxHeight)} `
         + `characters in this row and received ${value.length}. Put the remainder on an additional `
         + 'page or as an attachment.');
 }

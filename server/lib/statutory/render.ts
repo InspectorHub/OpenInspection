@@ -51,6 +51,7 @@
 import { PDFDocument, StandardFonts, type PDFFont, type PDFTextField } from 'pdf-lib';
 import { validateAgainstPdf, validateFieldMapShape, type FieldMap, type FieldMapping } from './field-map';
 import { fitOverlay, refuseIfTheWidgetWouldClip } from './fit';
+import { partOfValue, refuseUnreadableParts } from './value-parts';
 
 /**
  * How large a checkbox mark is drawn when the map does not say.
@@ -135,8 +136,15 @@ export async function renderStatutoryForm(
         if (mapping.kind === 'overlay') {
             if (value === '') continue;
             const drawn = await drawingFont();
-            const fitted = fitOverlay(value, mapping, drawn);
-            pages[mapping.page].drawText(value, {
+            // A part draws one piece of the value into one printed blank; an
+            // unparted overlay draws all of it, exactly as it always has.
+            // `refuseUnreadableParts` already ran this over every part mapping,
+            // so it cannot fail here.
+            const text = mapping.part === undefined
+                ? value
+                : partOfValue(value, mapping.part, mapping.ourField);
+            const fitted = fitOverlay(text, mapping, drawn);
+            pages[mapping.page].drawText(text, {
                 x: mapping.x,
                 y: mapping.y,
                 size: fitted.size,
@@ -209,6 +217,11 @@ function checkValuesAgainstMap(map: FieldMap, values: ReadonlyMap<string, string
     }
 
     checkChoicesAreReachable(map.mappings, values);
+    // Judged here, before the document is loaded, for the same reason an
+    // overflow is: a person with several broken bindings should be told about
+    // all of them, not sent back once per binding. The RULE is `partOfValue`
+    // and this is a second call of it, never a second copy.
+    refuseUnreadableParts(map.mappings, values);
 }
 
 /**
