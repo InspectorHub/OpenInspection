@@ -304,6 +304,19 @@ describe('findBusyViolations — the half-converted state the compiler cannot se
         expect(findBusyViolations(src)).toEqual([]);
     });
 
+    it('honours the escape hatch on a CRLF file', () => {
+        // ⚠️ NOT a theoretical case. `core.autocrlf=true` checks the whole tree
+        // out with CRLF on Windows, and the hatch regex ends in `$` — which in
+        // JavaScript will not match past a `\r`, because `.` excludes it. The
+        // gate therefore reported `app/routes/inspection-edit.tsx` as a
+        // violation on a Windows worktree and passed on CI, from identical
+        // bytes in git. A gate whose answer depends on how the file was checked
+        // out is not reporting on the file.
+        const src = `${IMPORT}\r\n// submit-guard-allow-no-busy: the control unmounts on click.\r\n`
+            + 'const { submit } = useGuardedSubmit();\r\n';
+        expect(findBusyViolations(src)).toEqual([]);
+    });
+
     it('does NOT honour a bare escape hatch', () => {
         const src = `${IMPORT}\n// submit-guard-allow-no-busy:\nconst { submit } = useGuardedSubmit();\n`;
         expect(findBusyViolations(src)).toHaveLength(1);
