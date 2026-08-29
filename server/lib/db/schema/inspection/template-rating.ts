@@ -55,6 +55,19 @@ export const templates = sqliteTable('templates', {
     // Report Style Presets — ties a report type to a default appearance profile.
     // NULL = inherit tenant default. Appended at table end (FK-referenced).
     defaultProfileId: text('default_profile_id'),
+    /**
+     * When this template stopped being offered for NEW inspections, or null.
+     *
+     * Not a delete. `inspections.template_id` carries a legacy foreign key to
+     * this table, so D1 refuses to remove a referenced row — and the row must
+     * survive anyway, because re-issuing an old report reads the inspection's
+     * own snapshot rather than this row.
+     *
+     * ⚠️ Nothing retires a template today. This is not a general archive
+     * feature for ordinary templates — that is a separate decision, and adding
+     * a writer for it is not implied by this column existing.
+     */
+    retiredAt: integer('retired_at', { mode: 'timestamp_ms' }),
 }, (t) => [
     index('idx_templates_tenant').on(t.tenantId),
     index('idx_templates_rating_system').on(t.ratingSystemId),
