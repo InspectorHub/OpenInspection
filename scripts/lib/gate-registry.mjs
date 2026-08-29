@@ -286,6 +286,17 @@ export const SCRIPT_GATES = [
     // documents already in other people's hands. Withdrawing a revision is
     // allowed and keeps this gate green — the forbidden move is disappearing.
     { key: 'statutoryadditive', label: 'lint:statutory-additive', script: 'check-statutory-versions-additive.mjs', fix: 'npm run lint:statutory-additive', rung: PUSH },
+    // PUSH rather than PRECOMMIT, and the argument runs the same way as
+    // `consentsubjects` above rather than the price/tracking family. What this
+    // catches is not a keystroke: it is a WRITE PATH to the marketplace
+    // catalogue appearing somewhere other than the seeder, and the commit that
+    // creates the danger is usually not the commit that creates the write — a
+    // perfectly ordinary "let an admin edit a catalogue entry" endpoint is what
+    // disarms the relaxed statutory import validator, and neither commit
+    // mentions the other. PUSH is the first rung that sees the whole change.
+    // It reads ~1,039 server sources with one regex and parses the payload of
+    // the handful that name the table.
+    { key: 'cataloguewrites', label: 'lint:catalogue-writes', script: 'check-catalogue-write-points.mjs', fix: 'npm run lint:catalogue-writes', rung: PUSH },
 ];
 
 export const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup', rung: PRECOMMIT };
