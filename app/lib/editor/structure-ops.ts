@@ -65,6 +65,11 @@ const ITEM_KEYS = new Set<string>([
     // a price it found in an older stored template and get a 400 for it.
     'attributes',
     'source',
+    // Nesting. Absent here would mean stripRuntimeKeys quietly flattens every
+    // structural edit made inside an inspection -- the author's tree would
+    // survive the template editor and evaporate the first time somebody added
+    // an item on site.
+    'parentId',
 ]);
 
 // ---------------------------------------------------------------------------

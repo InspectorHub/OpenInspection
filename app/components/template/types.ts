@@ -70,6 +70,17 @@ export interface TemplateItem {
   options?: ItemOptions;
   attributes?: Attribute[];
   source?: { platform: string; externalId: string } | null;
+  /** The item this one nests under, within the same section. Null = top level. */
+  parentId?: string | null;
+  /** Author-written display number, printed beside the label. Distinct from the
+   *  outline number the item list derives from the tree.
+   *
+   *  It was absent here, and absent from the editor's save serializer, while
+   *  being present on the authority type, in the Zod base fields, in ITEM_KEYS
+   *  and in the report projection — so authoring one and saving lost it, with
+   *  nothing anywhere saying so. `lint:item-key-parity` exists because of this
+   *  key, not because of `parentId`. */
+  number?: string;
 }
 
 export interface TemplateSection {
