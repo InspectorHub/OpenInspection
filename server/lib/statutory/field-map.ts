@@ -309,6 +309,20 @@ function validateOverlayFit(m: OverlayMapping): void {
             + 'text never wraps, so a height bound can never be reached and would read as a '
             + 'guarantee it does not give');
     }
+    // The mirror, and the half that was actually being written. `fitOverlay`
+    // returns early unless BOTH are present, so a lone maxWidth is measured by
+    // nothing — not here, not in fit.ts, not at print. Measured on the Citizens
+    // four-point candidate: all 48 overlays declared a width, none declared a
+    // height, and no value was ever checked against one. Half a measurement
+    // that reads as a bound is worse than none, because it is the reason
+    // nobody looked.
+    if (m.maxWidth !== undefined && m.maxHeight === undefined) {
+        fail(`overlay "${m.ourField}" declares maxWidth ${m.maxWidth} but no maxHeight. `
+            + 'Nothing measures the width on its own: a value too long for the blank does not '
+            + 'run off the side, it wraps DOWN over the row beneath, and only a height says '
+            + 'how far down is too far. Measure the room below this baseline, or declare '
+            + 'neither and say in the map that this row was never measured.');
+    }
 }
 
 /**

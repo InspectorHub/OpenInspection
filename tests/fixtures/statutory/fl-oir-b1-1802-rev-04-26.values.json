@@ -27,9 +27,7 @@
     "year_of_home": "2003",
     "number_of_stories": "1",
     "owner_email": "b.sandoval@example.com",
-
     "fortified_certificate": "gold",
-
     "building_code": "A",
     "building_code_a_year_built": "2003",
     "building_code_b_year_built": "2003",
@@ -37,10 +35,8 @@
     "building_code_a_permit_application_date": "2003-02-18",
     "building_code_b_permit_application_date": "2003-02-18",
     "building_code_c_permit_application_date": "2003-02-18",
-
     "wind_region": "region_2",
     "roof_slope": "gte_6_12",
-
     "roof_covering_types": "asphalt_fiberglass_shingle",
     "roof_covering_asphalt_fiberglass_shingle_no_information": "true",
     "roof_covering_asphalt_fiberglass_shingle_permit_application_date": "2018-04-09",
@@ -70,12 +66,10 @@
     "roof_covering_other_permit_application_date": "2018-04-09",
     "roof_covering_other_product_approval_number": "FL29440.2",
     "roof_covering_other_year_installed": "2018",
-    "roof_covering_other_description": "Standing seam panel over the lanai",
+    "roof_covering_other_description": "Wood shake",
     "roof_covering_product_approval": "A",
-
     "roof_deck_attachment": "C",
     "roof_deck_attachment_other_description": "8d ring shank at 6 in edge, 6 in field",
-
     "roof_wall_attachment": "D",
     "roof_wall_attachment_toenail_basis": "toenail_driven_at_angle",
     "roof_wall_attachment_minimal_condition": "2",
@@ -83,17 +77,14 @@
     "roof_wall_attachment_single_wrap_basis": "single_strap_two_and_one_nails",
     "roof_wall_attachment_double_wrap_basis": "two_separate_straps",
     "roof_wall_attachment_other_description": "Simpson H10A at every truss",
-
     "roof_geometry": "A",
     "roof_geometry_non_hip_length_ft": "18",
     "roof_geometry_total_perimeter_ft": "212",
     "roof_geometry_low_slope_area_sqft": "96",
     "roof_geometry_total_roof_area_sqft": "2480",
-
     "sealed_roof_deck": "A",
     "sealed_roof_deck_method": "taped_deck_seams",
     "sealed_roof_deck_underside_fully_covered": "true",
-
     "opening_protection": "A",
     "opening_protection_non_glazed_level": "A.2",
     "opening_protection_wood_panel_type": "plywood",
@@ -103,7 +94,6 @@
     "opening_protection_chart_glass_block": "NA",
     "opening_protection_chart_entry_doors_non_glazed": "A",
     "opening_protection_chart_garage_doors_non_glazed": "A",
-
     "inspector_name": "Marcus Thibodeaux",
     "inspector_license_type": "Florida Home Inspector",
     "inspector_license_number": "HI-11406",

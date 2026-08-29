@@ -257,9 +257,13 @@ describe('renderStatutoryForm — text that has to fit the room measured for it'
             .rejects.toThrow(/comments.*fits about \d+.*received 4000.*additional page/is);
     });
 
-    it('leaves an overlay with no maxHeight exactly as it renders today', async () => {
-        // Absent maxHeight is the ordinary case on a map authored before this
-        // landed. It must not start refusing.
+    it('leaves an overlay that declares NEITHER bound exactly as it renders today', async () => {
+        // An overlay with neither bound is the ordinary case on a map authored
+        // before these fields existed. It must not start refusing.
+        //
+        // ⚠️ A width WITHOUT a height is a different case and is refused at load
+        // now — see `field-map.spec.ts`. `fitOverlay` measures nothing unless
+        // both are present, so declaring one was a bound that bound nothing.
         const bytes = await renderStatutoryForm(flat.bytes, mapWith({
             kind: 'overlay', ourField: 'comments', page: 0, x: 40, y: 700, size: 10,
         }), { comments: 'short' });
@@ -268,8 +272,7 @@ describe('renderStatutoryForm — text that has to fit the room measured for it'
         // Stated with the value that WOULD be refused under a height bound, so
         // this test cannot pass merely because the string was small.
         const unbounded = await renderStatutoryForm(flat.bytes, mapWith({
-            kind: 'overlay', ourField: 'comments', page: 0,
-            x: 40, y: 700, size: 10, maxWidth: 200,
+            kind: 'overlay', ourField: 'comments', page: 0, x: 40, y: 700, size: 10,
         }), { comments: 'x'.repeat(4000) });
         expect(unbounded.byteLength).toBeGreaterThan(0);
     });
@@ -363,7 +366,7 @@ describe('renderStatutoryForm — a value drawn in parts', () => {
         const bytes = await renderStatutoryForm(flat.bytes, {
             ...flatMap(), requiredFields: [],
             mappings: [{ kind: 'overlay', ourField: 'permit_date', page: 0,
-                x: 473.7, y: 439.84, size: 9, maxWidth: 88 }],
+                x: 473.7, y: 439.84, size: 9, maxWidth: 88, maxHeight: 11 }],
         }, { permit_date: '03/15/2026' });
 
         const [run] = (await drawnRuns(bytes, 0)).filter((r) => r.text.includes('/'));

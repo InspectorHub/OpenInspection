@@ -253,6 +253,27 @@ describe('overlay fit declarations', () => {
         }))).toThrow(/maxWidth/);
     });
 
+    it('refuses a maxWidth declared without a maxHeight', () => {
+        // The mirror, and the more common half. `fitOverlay` returns early
+        // unless BOTH are present, so a lone maxWidth measures nothing at all —
+        // not in fit.ts, and not anywhere else. Measured on the Citizens
+        // four-point candidate: all 48 of its overlays declared a width, none
+        // declared a height, and no value was ever checked against one.
+        expect(() => validateFieldMapShape(withOverlay({
+            kind: 'overlay', ourField: 'comments', page: 0, x: 10, y: 20, size: 10,
+            maxWidth: 200,
+        }))).toThrow(/maxHeight/);
+    });
+
+    it('refuses a minSize with a maxWidth and no maxHeight', () => {
+        // A floor with nothing to shrink against is the same shape of claim:
+        // three numbers that read as a measurement and bound nothing.
+        expect(() => validateFieldMapShape(withOverlay({
+            kind: 'overlay', ourField: 'comments', page: 0, x: 10, y: 20, size: 10,
+            maxWidth: 200, minSize: 6,
+        }))).toThrow(/maxHeight/);
+    });
+
     it('POSITIVE CONTROL — a complete fit declaration validates', () => {
         expect(() => validateFieldMapShape(withOverlay({
             kind: 'overlay', ourField: 'comments', page: 0, x: 10, y: 20, size: 10,
@@ -319,7 +340,7 @@ describe('validateFieldMapShape — overlays that draw one part of a value', () 
         expect(() => validateFieldMapShape(withMappings([
             ...THREE,
             { kind: 'overlay', ourField: 'permit_date', page: 0, x: 473.7, y: 439.84,
-                size: 9, maxWidth: 88 },
+                size: 9, maxWidth: 88, maxHeight: 11 },
         ]))).toThrow(/permit_date.*both in parts and as a whole value/is);
     });
 
@@ -327,7 +348,7 @@ describe('validateFieldMapShape — overlays that draw one part of a value', () 
         expect(() => validateFieldMapShape(withMappings([
             ...THREE,
             { kind: 'overlay', ourField: 'year_built', page: 0, x: 40, y: 439.84,
-                size: 9, maxWidth: 60 },
+                size: 9, maxWidth: 60, maxHeight: 11 },
         ]))).not.toThrow();
     });
 
