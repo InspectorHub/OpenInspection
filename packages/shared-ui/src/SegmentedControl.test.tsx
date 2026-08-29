@@ -86,4 +86,34 @@ describe("SegmentedControl", () => {
     );
     expect(screen.getByRole("radiogroup").className).toContain("custom-track");
   });
+
+  it('gives every segment the 44x44 floor where a finger is the pointer', () => {
+    // Measured on the mobile theme sheet before this: 27x25 CSS px per segment,
+    // 31px apart centre to centre. jsdom computes no layout, so what is asserted
+    // is the RULE that produces the size -- the class that carries the floor.
+    render(<SegmentedControl options={OPTS} value="a" onChange={() => {}} />);
+    for (const seg of screen.getAllByRole('radio')) {
+      expect(seg.className).toContain('pointer-coarse:min-h-11');
+      expect(seg.className).toContain('pointer-coarse:min-w-11');
+    }
+  });
+
+  it('leaves a segment with horizontal padding, so it is never as wide as its own word', () => {
+    // The root cause: the button carried `py-1` and NO horizontal padding, so
+    // each segment was exactly the width of its label. A four-letter option was
+    // a 27px target on every surface, mouse or finger.
+    render(<SegmentedControl options={OPTS} value="a" onChange={() => {}} />);
+    expect(screen.getAllByRole('radio')[0].className).toMatch(/(^|\s)px-2(\s|$)/);
+  });
+
+  it('does NOT change mouse density, which is why the floor is pointer-scoped', () => {
+    // The positive control for the two above: a fix that simply made every
+    // segment 44px tall would satisfy them and would also inflate ten existing
+    // desktop surfaces. The compact size classes must survive untouched.
+    render(<SegmentedControl options={OPTS} value="a" onChange={() => {}} />);
+    const cls = screen.getAllByRole('radio')[0].className;
+    expect(cls).toContain('py-1');
+    expect(cls).toContain('text-[11px]');
+    expect(cls).not.toMatch(/(^|\s)min-h-11(\s|$)/);
+  });
 });
