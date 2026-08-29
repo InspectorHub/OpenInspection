@@ -2462,6 +2462,12 @@
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
                                   },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                                  },
                                   "type": {
                                     "type": "string",
                                     "enum": [
@@ -2761,6 +2767,12 @@
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
                                   },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                                  },
                                   "type": {
                                     "type": "string",
                                     "enum": [
@@ -2948,6 +2960,12 @@
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
                                   },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                                  },
                                   "type": {
                                     "type": "string",
                                     "enum": [
@@ -3087,6 +3105,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -3275,6 +3299,12 @@
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
                                   },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                                  },
                                   "type": {
                                     "type": "string",
                                     "enum": [
@@ -3461,6 +3491,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -3649,6 +3685,12 @@
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
                                   },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                                  },
                                   "type": {
                                     "type": "string",
                                     "enum": [
@@ -3836,6 +3878,12 @@
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
                                   },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                                  },
                                   "type": {
                                     "type": "string",
                                     "enum": [
@@ -3975,6 +4023,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -13438,6 +13492,12 @@
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
                               },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                              },
                               "type": {
                                 "type": "string",
                                 "enum": [
@@ -13737,6 +13797,12 @@
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
                               },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                              },
                               "type": {
                                 "type": "string",
                                 "enum": [
@@ -13924,6 +13990,12 @@
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
                               },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                              },
                               "type": {
                                 "type": "string",
                                 "enum": [
@@ -14063,6 +14135,12 @@
                                 ],
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
+                              },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                               },
                               "type": {
                                 "type": "string",
@@ -14251,6 +14329,12 @@
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
                               },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                              },
                               "type": {
                                 "type": "string",
                                 "enum": [
@@ -14437,6 +14521,12 @@
                                 ],
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
+                              },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                               },
                               "type": {
                                 "type": "string",
@@ -14625,6 +14715,12 @@
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
                               },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                              },
                               "type": {
                                 "type": "string",
                                 "enum": [
@@ -14812,6 +14908,12 @@
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
                               },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                              },
                               "type": {
                                 "type": "string",
                                 "enum": [
@@ -14951,6 +15053,12 @@
                                 ],
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
+                              },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                               },
                               "type": {
                                 "type": "string",
@@ -19592,6 +19700,12 @@
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
                                   },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                                  },
                                   "type": {
                                     "type": "string",
                                     "enum": [
@@ -19891,6 +20005,12 @@
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
                                   },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                                  },
                                   "type": {
                                     "type": "string",
                                     "enum": [
@@ -20078,6 +20198,12 @@
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
                                   },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                                  },
                                   "type": {
                                     "type": "string",
                                     "enum": [
@@ -20217,6 +20343,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -20405,6 +20537,12 @@
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
                                   },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                                  },
                                   "type": {
                                     "type": "string",
                                     "enum": [
@@ -20591,6 +20729,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -20779,6 +20923,12 @@
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
                                   },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                                  },
                                   "type": {
                                     "type": "string",
                                     "enum": [
@@ -20966,6 +21116,12 @@
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
                                   },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
+                                  },
                                   "type": {
                                     "type": "string",
                                     "enum": [
@@ -21105,6 +21261,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
