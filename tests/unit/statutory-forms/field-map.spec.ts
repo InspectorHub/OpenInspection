@@ -320,6 +320,59 @@ describe('validateFieldMapShape — overlays that draw one part of a value', () 
             { kind: 'checkbox', ourField: 'permit_date', whenValue: 'x', page: 0, x: 40, y: 400 },
         ]))).toThrow(/permit_date.*checkbox/is);
     });
+
+    it('refuses a part family with a piece missing', () => {
+        // Two of three blanks filled prints `03 /  /2026` -- which reads as an
+        // inspector who skipped a box, and nothing anywhere would say otherwise.
+        expect(() => validateFieldMapShape(withMappings([THREE[0], THREE[2]])))
+            .toThrow(/permit_date.*date_day/is);
+    });
+
+    it('POSITIVE CONTROL — the complete family validates', () => {
+        expect(() => validateFieldMapShape(withMappings([...THREE]))).not.toThrow();
+    });
+
+    it('refuses a part with no maxHeight', () => {
+        // `fitOverlay` measures nothing unless BOTH bounds are declared, and
+        // pdf-lib's own maxWidth only breaks at spaces -- a run of digits has
+        // none, so it runs off the side of the blank in silence. A part that is
+        // not measured is worse than the single overlay it replaced, because it
+        // looks fixed.
+        expect(() => validateFieldMapShape(withMappings([
+            { ...THREE[0], maxHeight: undefined } as FieldMapping, THREE[1], THREE[2],
+        ]))).toThrow(/permit_date.*date_month.*maxWidth and maxHeight/is);
+    });
+
+    it('refuses a part with no maxWidth', () => {
+        expect(() => validateFieldMapShape(withMappings([
+            { ...THREE[0], maxWidth: undefined } as FieldMapping, THREE[1], THREE[2],
+        ]))).toThrow(/permit_date.*date_month.*maxWidth and maxHeight/is);
+    });
+
+    it('POSITIVE CONTROL — an UNPARTED overlay with neither bound is still fine', () => {
+        // The bounds are required of parts only. Every map authored before they
+        // existed declares neither, and must not start refusing.
+        expect(() => validateFieldMapShape(withMappings([
+            { kind: 'overlay', ourField: 'year_built', page: 0, x: 40, y: 400, size: 9 },
+        ]))).not.toThrow();
+    });
+
+    it('refuses a part that declares minSize', () => {
+        // A part's width is fixed (two digits or four), so a floor can only fire
+        // when maxWidth was measured too small -- and then it shrinks the year
+        // while its siblings stay put, printing a date in two sizes and hiding
+        // the mis-measurement that caused it.
+        expect(() => validateFieldMapShape(withMappings([
+            { ...THREE[2], minSize: 7 } as FieldMapping, THREE[0], THREE[1],
+        ]))).toThrow(/permit_date.*date_year.*minSize/is);
+    });
+
+    it('POSITIVE CONTROL — an UNPARTED overlay may still declare minSize', () => {
+        expect(() => validateFieldMapShape(withMappings([
+            { kind: 'overlay', ourField: 'comments', page: 0, x: 40, y: 400,
+                size: 10, maxWidth: 200, maxHeight: 24, minSize: 7 },
+        ]))).not.toThrow();
+    });
 });
 
 describe('validateAgainstPdf', () => {

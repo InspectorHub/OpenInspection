@@ -52,6 +52,18 @@ import type { FieldMapping } from './field-map';
 /** The parts of a value an overlay may draw on its own. Closed on purpose. */
 export type ValuePart = 'date_month' | 'date_day' | 'date_year';
 
+/**
+ * The whole family. A form that prints three blanks needs three overlays, so a
+ * map that declares one of these must declare all of them -- see
+ * `validatePartMappings`.
+ *
+ * There is deliberately no `date_year_2` for a form printing `__/__/__`. None of
+ * the three forms measured prints one, and a member that can never resolve is a
+ * blank box on an authority's form. Adding it later also means deciding where
+ * the century comes from, which is a decision rather than an enum value.
+ */
+const DATE_PARTS: readonly ValuePart[] = ['date_month', 'date_day', 'date_year'];
+
 /** Which capture group of `CALENDAR_DAY` each part takes. */
 const GROUP: Record<ValuePart, 1 | 2 | 3> = {
     date_year: 1,
@@ -133,6 +145,55 @@ function partedOverlays(mappings: readonly FieldMapping[]): PartedOverlay[] {
         }
     }
     return out;
+}
+
+/**
+ * The shape rules a parted overlay has to satisfy, none of which need a PDF.
+ *
+ * These live here rather than in `field-map.ts` because that file is close to
+ * its 400 permitted lines and `lint:filesize` is a ratchet, not a suggestion.
+ * The split is also the right one on its own terms: field-map.ts owns the map's
+ * identity and its arithmetic, and this owns what a part means.
+ */
+export function validatePartMappings(mappings: readonly FieldMapping[]): void {
+    const declared = new Map<string, Set<ValuePart>>();
+
+    for (const m of partedOverlays(mappings)) {
+        const known = declared.get(m.ourField) ?? new Set<ValuePart>();
+        known.add(m.part);
+        declared.set(m.ourField, known);
+
+        // `fitOverlay` returns early unless BOTH bounds are present, and
+        // pdf-lib's own maxWidth breaks only at spaces -- which a run of digits
+        // does not have. So a part missing either bound is drawn against nothing
+        // at all, and runs off the side of its blank without raising.
+        if (m.maxWidth === undefined || m.maxHeight === undefined) {
+            fail(`overlay "${m.ourField}" (${m.part}) must declare both maxWidth and maxHeight; `
+                + 'a part is drawn into one printed blank, and nothing measures it unless both '
+                + 'bounds are given — a digit run never wraps, so it would simply run off the '
+                + 'side of that blank in silence');
+        }
+
+        // A part is two digits or four, and Helvetica digits are all one width,
+        // so shrinking can only ever rescue a maxWidth that was measured too
+        // small. It would then shrink this part and not its siblings, printing a
+        // date in two sizes -- and hiding the mis-measurement behind it.
+        if (m.minSize !== undefined) {
+            fail(`overlay "${m.ourField}" (${m.part}) declares minSize ${m.minSize}; a part has a `
+                + 'fixed width, so a floor can only fire when the blank was measured wrong, and '
+                + 'shrinking one part of a date away from the other two hides that rather than '
+                + 'reporting it');
+        }
+    }
+
+    for (const [ourField, known] of declared) {
+        const missing = DATE_PARTS.filter((p) => !known.has(p));
+        if (missing.length > 0) {
+            fail(`"${ourField}" is drawn in parts but declares no ${missing.join(', ')}; the form `
+                + 'prints a blank for each part, and one left unwritten reads as a box the '
+                + 'inspector skipped. Declare every part, or draw the value whole.');
+        }
+    }
 }
 
 /**

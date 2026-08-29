@@ -35,7 +35,7 @@
  * green check is not read as more than it is.
  */
 import { PDFDocument } from 'pdf-lib';
-import type { ValuePart } from './value-parts';
+import { validatePartMappings, type ValuePart } from './value-parts';
 
 /**
  * One value's route onto the page.
@@ -174,6 +174,11 @@ export function validateFieldMapShape(map: FieldMap): void {
         fail('no mappings — an empty map validates against every PDF ever published and renders a blank form');
     }
 
+    // The part rules run FIRST because they are the more specific ones. A
+    // parted overlay missing a bound trips `validateOverlayFit` too, and that
+    // message names the field but not which of its three printed blanks —
+    // which is the whole thing the reader needs when one field has three.
+    validatePartMappings(map.mappings);
     validateMappingShapes(map.mappings);
     validateNoDuplicateTargets(map.mappings);
 
