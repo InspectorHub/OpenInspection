@@ -253,6 +253,25 @@ const HIP_CASES = {
   'empty-template': (schema) => zipOf({
     [schema.structure.entry]: javaDocument(schema.structure, { vocabulary: [], sections: [] }),
   }),
+  // A panel holding another panel.
+  //
+  // ⚠️ What this fixture asserts is that the reader still READS such a file,
+  // not that it preserves the level — it does not. `objectsOfClass` keeps
+  // scanning inside a matched object, so the inner panel is returned as its
+  // parent's sibling and one level is erased. The adapter warns when it sees
+  // this shape; the fixture exists so that warning has something to fire on.
+  'nested-panels': (schema) => {
+    const s = schema.structure;
+    const panelName = (name) => `<void property="${s.itemNameProperty}"><string>${name}</string></void>`;
+    return zipOf({
+      [s.entry]: javaDocument(s).replace(
+        `${panelName(MADE_UP.children[0])}</object>`,
+        `${panelName(MADE_UP.children[0])}<void property="savedPanels">`
+        + `<void method="add"><object class="generated.${s.itemClass}">`
+        + `${panelName(MADE_UP.entryNames[0])}</object></void></void></object>`,
+      ),
+    });
+  },
   // A property supplied as a back-reference instead of a value.
   //
   // ⚠️ What this fixture asserts is that the reader reports ABSENT, not that it
