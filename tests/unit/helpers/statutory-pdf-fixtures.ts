@@ -57,6 +57,33 @@ export async function buildFieldedPdf(): Promise<PdfFixture> {
     return { bytes, hash: await sha256Hex(bytes) };
 }
 
+/**
+ * An AcroForm PDF whose CHECKBOXES ARE REAL WIDGETS: 1 page, one text field and
+ * three `/Btn` boxes.
+ *
+ * The third shape, and the one the Texas form turned out to be: 245 fields, 81
+ * of them text and 164 of them genuine checkbox widgets. A map that draws an
+ * `X` over one of those produces a document that is right on paper and wrong in
+ * its data — every box still reads as unticked to anything that opens the file.
+ * The other two fixtures cannot reproduce that, because neither has a widget to
+ * leave unticked.
+ */
+export async function buildCheckboxPdf(): Promise<PdfFixture> {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([612, 792]);
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    page.drawText('OFFICIAL FORM — with real boxes', { x: 40, y: 750, size: 12, font });
+
+    const form = doc.getForm();
+    form.createTextField('Name of Client').addToPage(page, { x: 50, y: 700, width: 200, height: 20 });
+    for (const [i, name] of ['Box.Copper', 'Box.Aluminum', 'Box.KnobAndTube'].entries()) {
+        form.createCheckBox(name).addToPage(page, { x: 80 + i * 40, y: 400, width: 10, height: 10 });
+    }
+
+    const bytes = await doc.save();
+    return { bytes, hash: await sha256Hex(bytes) };
+}
+
 /** A flat PDF: 2 pages, printed text, and nothing fillable anywhere in it. */
 export async function buildFlatPdf(): Promise<PdfFixture> {
     const doc = await PDFDocument.create();
@@ -109,4 +136,16 @@ export async function pageContentDigests(bytes: Uint8Array): Promise<string[]> {
 export async function readFieldValue(bytes: Uint8Array, name: string): Promise<string | undefined> {
     const doc = await PDFDocument.load(bytes);
     return doc.getForm().getTextField(name).getText();
+}
+
+/**
+ * Whether one AcroForm checkbox is ticked IN THE DOCUMENT'S DATA.
+ *
+ * Deliberately not "is there an X visible there". The failure this exists to
+ * measure is a mark drawn over a widget: the printed page looks answered and
+ * every reader of the field data sees an empty box.
+ */
+export async function readCheckBox(bytes: Uint8Array, name: string): Promise<boolean> {
+    const doc = await PDFDocument.load(bytes);
+    return doc.getForm().getCheckBox(name).isChecked();
 }

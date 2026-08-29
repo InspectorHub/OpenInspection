@@ -77,7 +77,9 @@ describe('TX TREC REI 7-6', () => {
     it('every checkbox mapping names a page this six-page form has', () => {
         // `page` is 0-based. A mapping past the end draws nothing and says nothing.
         for (const m of fieldMap.mappings) {
-            if (m.kind === 'acroform') continue;
+            // Both routes into a fillable form are addressed by NAME and carry
+            // no geometry of their own; the widget's rectangle is the form's.
+            if (m.kind === 'acroform' || m.kind === 'acroform_checkbox') continue;
             expect(m.page).toBeGreaterThanOrEqual(0);
             expect(m.page).toBeLessThan(6);
         }

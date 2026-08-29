@@ -82,6 +82,17 @@ export type StatutoryValue = string | readonly string[];
  *              multiple-choice answer maps onto boxes the file does not group.
  *              A string answer names one of them; an array names every box it
  *              contains, which is what a multi-select question needs.
+ *              ⚠️ It DRAWS. On a form whose boxes are real widgets that is the
+ *              wrong route — see `acroform_checkbox` — because the printed page
+ *              comes out right and the field data still reads unticked.
+ * `acroform_checkbox` — SET a named `/Btn` widget when our answer names
+ *              `whenValue`. The mirror of `acroform` for the other kind of
+ *              field, and the only route that puts the answer in the DOCUMENT
+ *              rather than only on the page. Measured on TX TREC REI 7-6: 245
+ *              fields, 81 text and 164 genuine checkbox widgets. Nothing is
+ *              drawn, so the page's own content stream is untouched, and a
+ *              widget the answer did not choose is left exactly as published
+ *              rather than actively cleared.
  * `signature` — draw a stored signature image inside a measured box. `scope`
  *              names WHICH PART of the form this signature stands behind: the
  *              Citizens four-point form lets a trade-specific licensee sign only
@@ -118,6 +129,7 @@ export type FieldMapping =
          */
         part?: ValuePart }
     | { kind: 'checkbox'; ourField: string; whenValue: string; page: number; x: number; y: number; size?: number }
+    | { kind: 'acroform_checkbox'; ourField: string; whenValue: string; pdfField: string }
     | { kind: 'signature'; ourField: string; scope: string;
         page: number; x: number; y: number; width: number; height: number };
 
@@ -220,8 +232,13 @@ export function validateFieldMapShape(map: FieldMap): void {
 function validateMappingShapes(mappings: readonly FieldMapping[]): void {
     for (const m of mappings) {
         if (m.ourField.trim() === '') fail('a mapping has an empty ourField');
-        if (m.kind === 'acroform') {
+        if (m.kind === 'acroform' || m.kind === 'acroform_checkbox') {
+            // Both routes into a fillable form are addressed by NAME and have no
+            // geometry of their own; the widget's rectangle is the form's.
             if (m.pdfField.trim() === '') fail(`"${m.ourField}" maps to an empty pdfField name`);
+            if (m.kind === 'acroform_checkbox' && m.whenValue.trim() === '') {
+                fail(`checkbox for "${m.ourField}" has an empty whenValue`);
+            }
             continue;
         }
         if (!Number.isInteger(m.page) || m.page < 0) {
@@ -330,7 +347,7 @@ export async function validateAgainstPdf(map: FieldMap, pdfBytes: Uint8Array): P
     const missingFields: string[] = [];
     const offPage: string[] = [];
     for (const m of map.mappings) {
-        if (m.kind === 'acroform') {
+        if (m.kind === 'acroform' || m.kind === 'acroform_checkbox') {
             if (!names.has(m.pdfField)) missingFields.push(`${m.ourField} -> "${m.pdfField}"`);
         } else if (m.page >= pageCount) {
             offPage.push(`${m.ourField} -> page ${m.page}`);

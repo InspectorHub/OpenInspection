@@ -33,9 +33,16 @@
  * document can tell the two apart. The refusal below happens before a document
  * exists, which is why it is a refusal and not a warning.
  *
- * ⚠️ LIMIT, stated rather than discovered later: an `acroform` mapping sets a
- * TEXT field. A fillable form whose checkboxes are real widgets is not covered —
- * such a mapping throws rather than quietly leaving the box unticked.
+ * ⚠️ A NAMED FIELD IS SET AS THE KIND IT IS. `acroform` sets a text field and
+ * `acroform_checkbox` sets a `/Btn` widget; each refuses a field of the other
+ * kind rather than guessing, because guessing sets nothing and raises nothing.
+ *
+ * That second route exists because of what the Texas form turned out to be: 245
+ * fields, 81 text and 164 real checkbox widgets. A map that DRAWS a mark at a
+ * coordinate inside one of those produces a document that is right on paper and
+ * wrong in its data — every box still reads as unticked to anything that opens
+ * the file, and the widget's own off-state appearance is painted after page
+ * content and may cover the mark outright.
  *
  * ── A question with several boxes may have several of them ticked ───────────
  * An answer is a string OR a list of options. A string marks the one box it
@@ -60,7 +67,9 @@
  * refused. The measuring, and the reasoning behind refusing rather than
  * truncating, live in `fit.ts`.
  */
-import { PDFDocument, StandardFonts, type PDFFont, type PDFTextField } from 'pdf-lib';
+import {
+    PDFDocument, StandardFonts, type PDFCheckBox, type PDFFont, type PDFTextField,
+} from 'pdf-lib';
 import {
     validateAgainstPdf, validateFieldMapShape,
     type FieldMap, type FieldMapping, type StatutoryValue,
@@ -173,6 +182,14 @@ export async function renderStatutoryForm(
             setTextField(doc, mapping, oneAnswer(value, mapping.ourField), await measuringFont());
             continue;
         }
+        if (mapping.kind === 'acroform_checkbox') {
+            // Ticked only where the answer names it. A box the answer did not
+            // choose is LEFT AS PUBLISHED rather than actively cleared: this
+            // writes an answer onto a form, and unticking a box nobody asked
+            // about would be an answer of our own.
+            if (answerNames(value, mapping.whenValue)) checkBoxField(doc, mapping).check();
+            continue;
+        }
         if (mapping.kind === 'overlay') {
             const text = oneAnswer(value, mapping.ourField);
             if (text === '') continue;
@@ -212,6 +229,30 @@ export async function renderStatutoryForm(
     }
 
     return doc.save();
+}
+
+/**
+ * One named checkbox widget, refusing rather than guessing at any other kind.
+ *
+ * The mirror of `setTextField`'s refusal, and for the same reason: pdf-lib's
+ * getters are typed by the caller's expectation, and a name that resolves to a
+ * field of another kind would otherwise be set through an API that does not fit
+ * it — or silently not set at all.
+ */
+function checkBoxField(
+    doc: PDFDocument,
+    mapping: Extract<FieldMapping, { kind: 'acroform_checkbox' }>,
+): PDFCheckBox {
+    try {
+        return doc.getForm().getCheckBox(mapping.pdfField);
+    } catch (cause) {
+        throw new Error(
+            `statutory render: "${mapping.pdfField}" is not a checkbox on this form — an `
+            + 'acroform_checkbox mapping ticks a real widget, and a field of another kind '
+            + 'needs the mapping kind that matches it',
+            { cause },
+        );
+    }
 }
 
 /** Set one named text field, refusing rather than guessing at any other kind. */
@@ -299,7 +340,9 @@ function checkChoicesAreReachable(
 function boxesByField(mappings: readonly FieldMapping[]): Map<string, Set<string>> {
     const answers = new Map<string, Set<string>>();
     for (const m of mappings) {
-        if (m.kind !== 'checkbox') continue;
+        // Both box kinds: a drawn mark and a set widget are one question with
+        // one set of answers, and a form may only carry one of the two.
+        if (m.kind !== 'checkbox' && m.kind !== 'acroform_checkbox') continue;
         const known = answers.get(m.ourField) ?? new Set<string>();
         known.add(m.whenValue);
         answers.set(m.ourField, known);
@@ -329,7 +372,9 @@ function refuseAnswersNoBoxCanTake(
     values: ReadonlyMap<string, StatutoryValue>,
 ): void {
     const writesText = new Set(
-        mappings.filter((m) => m.kind !== 'checkbox').map((m) => m.ourField),
+        mappings
+            .filter((m) => m.kind !== 'checkbox' && m.kind !== 'acroform_checkbox')
+            .map((m) => m.ourField),
     );
     for (const [field, value] of values) {
         if (typeof value === 'string') continue;

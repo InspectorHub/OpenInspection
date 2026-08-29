@@ -35,6 +35,12 @@
  *              sets nothing and raises nothing, so the names are ALSO looked up
  *              independently, in the untouched original, rather than trusting
  *              the renderer's own check of them.
+ *   acroform_checkbox — the named widget is read back off the saved document and
+ *              has to be TICKED, and every widget this answer did not choose has
+ *              to be untouched. Read as field data rather than as ink on purpose:
+ *              a mark drawn over a widget is visible on the printed page and
+ *              leaves the box unticked in the file, which is the whole failure
+ *              this kind exists to end.
  *   overlay  — the content stream is parsed and the run has to be at the
  *              coordinate the map names, carrying the text the value produces.
  *   checkbox — the mark has to be at the coordinate, AND every box this answer
@@ -99,6 +105,17 @@ const UNSIGNED_SENTINEL = '(unsigned candidate: verify:statutory-render sentinel
 
 /** The mark `render.ts` draws into a checkbox. */
 const MARK = 'X';
+
+/**
+ * Does this answer name that box?
+ *
+ * The same rule `render.ts` applies, restated here rather than imported because
+ * this file is the INDEPENDENT reader: importing the renderer's own predicate
+ * would make a wrong one agree with itself.
+ */
+function answerNames(value, whenValue) {
+    return Array.isArray(value) ? value.includes(whenValue) : value === whenValue;
+}
 
 /** How far a run may sit from the coordinate the map names, in points. */
 const COORDINATE_TOLERANCE = 0.02;
@@ -651,7 +668,9 @@ for (const form of FORMS) {
     // ── The names, looked up independently of the code under test ──────────
     const originalDoc = await PDFDocument.load(official);
     const officialNames = new Set(originalDoc.getForm().getFields().map((f) => f.getName()));
-    const acroformMappings = map.mappings.filter((m) => m.kind === 'acroform');
+    const acroformMappings = map.mappings.filter(
+        (m) => m.kind === 'acroform' || m.kind === 'acroform_checkbox',
+    );
     const unresolved = acroformMappings.filter((m) => !officialNames.has(m.pdfField));
     if (unresolved.length) {
         failed = true;
@@ -757,8 +776,39 @@ for (const form of FORMS) {
             continue;
         }
 
+        if (mapping.kind === 'acroform_checkbox') {
+            let ticked = null;
+            try {
+                ticked = renderedForm.getCheckBox(mapping.pdfField).isChecked();
+            } catch {
+                ticked = null;
+            }
+            if (!answerNames(value, mapping.whenValue)) {
+                // The widget this answer did NOT choose. Asserted for the same
+                // reason the drawn ones are: a renderer that ticked all four
+                // boxes of a four-way rating satisfies every "it is ticked".
+                absenceChecks += 1;
+                if (ticked === true) {
+                    strayMarks.push(`${mapping.ourField} = "${mapping.whenValue}" `
+                        + `(the answer given was ${JSON.stringify(value)})`);
+                }
+                continue;
+            }
+            expectedWrites += 1;
+            if (ticked === true) {
+                verifiedWrites += 1;
+                verifiedFields.add(mapping.ourField);
+            } else {
+                findings.push(`${form.formId}: "${mapping.ourField}" answered `
+                    + `"${mapping.whenValue}" and the widget "${mapping.pdfField}" reads back `
+                    + `${ticked === null ? 'as no checkbox at all' : 'unticked'} in the saved `
+                    + 'document.');
+            }
+            continue;
+        }
+
         if (mapping.kind === 'checkbox') {
-            if (value !== mapping.whenValue) {
+            if (!answerNames(value, mapping.whenValue)) {
                 // The box this answer did NOT choose. A renderer that marks all
                 // four boxes of a four-way rating satisfies every "the mark is
                 // present" assertion ever written, so absence is asserted too.
@@ -767,7 +817,7 @@ for (const form of FORMS) {
                 absenceChecks += 1;
                 if (runsAt(added, mapping.page, mapping.x, mapping.y).some((r) => r.text === MARK)) {
                     strayMarks.push(`${mapping.ourField} = "${mapping.whenValue}" `
-                        + `(the answer given was "${value}")`);
+                        + `(the answer given was ${JSON.stringify(value)})`);
                 }
                 continue;
             }

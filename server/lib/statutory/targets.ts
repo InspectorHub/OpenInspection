@@ -49,12 +49,18 @@ function fail(reason: string): never {
     throw new Error(`statutory field map: ${reason}`);
 }
 
-/** One box that carries one answer to one question. */
-type AnswerBox = Extract<FieldMapping, { kind: 'checkbox' }>;
+/** One box that carries one answer to one question, drawn or set. */
+type AnswerBox = Extract<FieldMapping, { kind: 'checkbox' | 'acroform_checkbox' }>;
 
-/** The mapping kinds that answer a multiple-choice question by marking a box. */
+/**
+ * The mapping kinds that answer a multiple-choice question by marking a box.
+ *
+ * Two of them, because these forms come in two shapes: a box that is a drawing
+ * on the page and a box that is a widget in the file. Every rule below is about
+ * the ANSWER, so both belong to it.
+ */
 function isAnswerBox(m: FieldMapping): m is AnswerBox {
-    return m.kind === 'checkbox';
+    return m.kind === 'checkbox' || m.kind === 'acroform_checkbox';
 }
 
 /** The mapping kinds that put a whole value somewhere, one value per place. */
@@ -70,19 +76,23 @@ function isSingleValue(m: FieldMapping): boolean {
  * signature anchored where a value is already drawn is the same collision.
  */
 function targetKey(m: FieldMapping): string {
-    if (m.kind === 'acroform') return `field\u0000${m.pdfField}`;
+    if (m.kind === 'acroform' || m.kind === 'acroform_checkbox') {
+        return `field\u0000${m.pdfField}`;
+    }
     return `page ${m.page}\u0000${m.x},${m.y}`;
 }
 
 /** How a refusal names the place, in the words somebody would use to find it. */
 function targetLabel(m: FieldMapping): string {
-    if (m.kind === 'acroform') return `the form field "${m.pdfField}"`;
+    if (m.kind === 'acroform' || m.kind === 'acroform_checkbox') {
+        return `the form field "${m.pdfField}"`;
+    }
     return `(${m.x}, ${m.y}) on page ${m.page}`;
 }
 
 /** How a refusal names the mapping, including which answer or part it carries. */
 function mappingLabel(m: FieldMapping): string {
-    if (m.kind === 'checkbox') return `"${m.ourField}" = "${m.whenValue}"`;
+    if (isAnswerBox(m)) return `"${m.ourField}" = "${m.whenValue}"`;
     if (m.kind === 'overlay' && m.part !== undefined) return `"${m.ourField}" (${m.part})`;
     return `"${m.ourField}"`;
 }
