@@ -17,7 +17,14 @@ describe("item header sites (behavior-preserving)", () => {
     expect(out).toContain("<h2");
   });
 
-  it("ItemList author mode still shows the padded index + item label", () => {
+  it("ItemList author mode still shows a row marker + item label", () => {
+    // The marker used to be a padded array index (`01`, `02`). It is now the
+    // outline number derived from the item tree, so a top-level row reads `A`.
+    // That is the change, not a regression: an index describes a position in an
+    // array and says nothing about which item a nested row belongs to, and the
+    // number is the part of a row that survives the 280px column's truncation.
+    // What this test is here to protect is that a row still carries a marker
+    // AND its label, and that is asserted below.
     const out = renderToStaticMarkup(createElement(ItemList, {
       mode: "author",
       items: [{ id: "i1", label: "Roof covering", type: "text" }],
@@ -25,7 +32,7 @@ describe("item header sites (behavior-preserving)", () => {
       activeItemId: null,
       onSelect: () => {},
     } as never));
-    expect(out).toContain(">01<");
+    expect(out).toContain(">A<");
     expect(out).toContain("Roof covering");
   });
 });

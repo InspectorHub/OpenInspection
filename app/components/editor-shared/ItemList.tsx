@@ -7,6 +7,9 @@ import { InlineRename } from "./InlineRename";
 import { findingKey } from "~/hooks/findings/shared";
 import type { EditorGroup } from "~/lib/editor/statutory-groups";
 import { m } from "~/paraglide/messages";
+import { itemDepths, outlineNumbers, subtreeOf, MAX_ITEM_DEPTH } from "../../../server/lib/template-hierarchy";
+import { ItemRowIndent } from "./ItemRowIndent";
+import { ItemSubtreeDeleteModal, type PendingSubtreeDelete } from "./ItemSubtreeDeleteModal";
 
 // Handle + ⋯ occupy reserved flex slots so they never cover the item number,
 // label, or rating dot. Desktop reveals on hover; touch always shows them.
@@ -14,7 +17,15 @@ const REVEAL = "invisible group-hover:visible focus-within:visible [@media(hover
 
 interface SharedItemListProps {
   mode: EditorMode;
-  items: Array<{ id: string; label: string; type: string }>;
+  /**
+   * The section's items, in the order they are printed.
+   *
+   * `parentId` is optional and every reader fails open to top level, so a
+   * caller that has never heard of nesting keeps working byte-for-byte. The
+   * array stays one-dimensional: its order IS the pre-order walk of the tree,
+   * which is what lets this list keep rendering one row per entry.
+   */
+  items: Array<{ id: string; label: string; type: string; parentId?: string | null }>;
   sectionId: string;
   activeItemId: string | null;
   onSelect: (id: string) => void;
@@ -32,6 +43,17 @@ interface SharedItemListProps {
   onBatchRange?: (fromId: string, toId: string) => void;
   /** D8 structural editing — when provided, a per-item ⋯ menu + "+ Add item" render. */
   onAddItem?: () => void;
+  /** Add an item nested under `parentItemId`. Absent = the gesture is not offered. */
+  onAddSubItem?: (parentItemId: string) => void;
+  /**
+   * Ask before a delete that would take rows the reader cannot see with it.
+   *
+   * Opt-in, because a caller may already own a confirmation: the inspection
+   * editor routes every structural delete through StructureDeleteModal, which
+   * counts ratings, notes and photos too. Two modals for one click is worse
+   * than one.
+   */
+  confirmSubtreeDelete?: boolean;
   onDuplicateItem?: (itemId: string) => void;
   onDeleteItem?: (itemId: string) => void;
   onMoveItem?: (itemId: string, dir: -1 | 1) => void;
@@ -110,6 +132,8 @@ export function ItemList({
   onBatchToggle,
   onBatchRange,
   onAddItem,
+  onAddSubItem,
+  confirmSubtreeDelete,
   onDuplicateItem,
   onDeleteItem,
   onMoveItem,
@@ -121,6 +145,18 @@ export function ItemList({
 }: SharedItemListProps) {
   const { heading: slotHeading, closes: groupClosedBy } = slotHeadings(groups, items);
   const grouped = Boolean(groups?.length);
+  // Both derived, never stored. `itemDepths` is also where the dangling-parent
+  // and cycle defences live, so this list inherits them for free.
+  const depths = itemDepths(items);
+  const outlines = outlineNumbers(items);
+  const [pendingDelete, setPendingDelete] = useState<PendingSubtreeDelete | null>(null);
+  const requestDelete = (id: string, label: string) => {
+    // Only ASK when something invisible would go too. A confirm on every delete
+    // makes the ordinary case worse in order to protect the rare one.
+    const count = subtreeOf(items, id).length - 1;
+    if (!confirmSubtreeDelete || count === 0) { onDeleteItem?.(id); return; }
+    setPendingDelete({ id, label, count });
+  };
   const lastClickedRef = useRef<string | null>(null);
   const [menuItemId, setMenuItemId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -163,7 +199,7 @@ export function ItemList({
 
       {/* Item list */}
       <div ref={containerRef} className="flex-1 overflow-y-auto p-2 space-y-0.5">
-        {items.map((item, idx) => {
+        {items.map((item) => {
           const result = scopedResult(item.id);
           const fullIdx = items.findIndex((i) => i.id === item.id);
           const editing = editingId === item.id;
@@ -208,7 +244,7 @@ export function ItemList({
 
               {editing && onRenameItem ? (
                 <div className="min-w-0 flex-1 flex items-center gap-2 px-2 py-2">
-                  <span className="text-[10px] text-ih-fg-3 font-mono w-5 shrink-0">{String(idx + 1).padStart(2, "0")}</span>
+                  <ItemRowIndent depth={depths.get(item.id) ?? 0} outline={outlines.get(item.id) ?? ""} />
                   <InlineRename
                     value={item.label}
                     ariaLabel={m.editor_shared_item_name_aria()}
@@ -249,10 +285,11 @@ export function ItemList({
                       )}
                     </span>
                   )}
-                  {/* Number, label and rating dot are ALWAYS visible. */}
-                  <span className="text-[10px] text-ih-fg-3 font-mono w-5 shrink-0">
-                    {String(idx + 1).padStart(2, "0")}
-                  </span>
+                  {/* Indent, outline number, label and rating dot are ALWAYS
+                      visible. The number is what survives the 280px column's
+                      truncation, which is why it earns its place beside the
+                      indent rather than instead of it. */}
+                  <ItemRowIndent depth={depths.get(item.id) ?? 0} outline={outlines.get(item.id) ?? ""} />
                   <span className="flex-1 truncate">{item.label}</span>
                   {mode === "fill" && Boolean(result.rating) && (
                     <span
@@ -294,6 +331,15 @@ export function ItemList({
                         {onDuplicateItem && (
                           <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDuplicateItem(item.id); }}>{m.editor_shared_menu_duplicate()}</MenuItem>
                         )}
+                        {/* Not offered at the cap, rather than offered and
+                            refused: a control that fails on click has taught
+                            nobody anything. Hidden in a grouped template for
+                            the same reason `+ Add item` already is — a free
+                            item reaches no binding, so what is typed into it
+                            never arrives on the authority's form. */}
+                        {onAddSubItem && !grouped && (depths.get(item.id) ?? 0) < MAX_ITEM_DEPTH - 1 && (
+                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onAddSubItem(item.id); }}>{m.editor_shared_add_sub_item()}</MenuItem>
+                        )}
                         {onMoveItem && fullIdx > 0 && (
                           <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, -1); }}>{m.editor_shared_menu_move_up()}</MenuItem>
                         )}
@@ -301,7 +347,7 @@ export function ItemList({
                           <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, 1); }}>{m.editor_shared_menu_move_down()}</MenuItem>
                         )}
                         {onDeleteItem && (
-                          <MenuItem tone="danger" onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDeleteItem(item.id); }}>{m.common_delete()}</MenuItem>
+                          <MenuItem tone="danger" onClick={(e) => { e.stopPropagation(); closeItemMenu(); requestDelete(item.id, item.label); }}>{m.common_delete()}</MenuItem>
                         )}
                       </div>
                     </>,
@@ -338,6 +384,11 @@ export function ItemList({
           </Button>
         </div>
       )}
+      <ItemSubtreeDeleteModal
+        pending={pendingDelete}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={(id) => { onDeleteItem?.(id); setPendingDelete(null); }}
+      />
     </div>
   );
 }

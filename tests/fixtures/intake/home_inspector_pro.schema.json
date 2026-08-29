@@ -59,6 +59,12 @@
       "id": "empty-template",
       "kind": "structure",
       "statement": "A template may declare no sections and no items at all, and such a file is legitimate."
+    },
+    {
+      "id": "nested-panels",
+      "kind": "structure",
+      "statement": "A panel may contain another panel, so the format permits a level of structure below the item. The reader does NOT preserve it: `objectsOfClass` keeps scanning inside a matched object -- without which a section would yield one item however many it holds -- so an inner panel is returned as a sibling of its parent and the level is erased.",
+      "measuredNote": "⚠️ DECLARED, NEVER MEASURED. No template in the corpus has been checked for panel-inside-panel nesting and no depth statistic was ever recorded for any of them, so the manifest carries a null hash rather than a notObserved: nobody has looked. The adapter now emits a warning when it reads this shape, which is the honest half of the fix; preserving the level needs a real three-level file first."
     }
   ]
 }

@@ -65,4 +65,49 @@ describe("useStructureEdit — Phase U itemImpact scoping", () => {
     act(() => result.current.deleteItem("s1", "i1"));
     expect(result.current.deletePending?.impact).toEqual({ items: 1, ratings: 0, notes: 0, photos: 0 });
   });
+
+  it("counts the WHOLE SUBTREE, because that is what the delete removes", () => {
+    // deleteItem takes an item's descendants with it. A modal that says
+    // "1 item" while three go, and tallies only the parent's photos, is not a
+    // confirmation -- it is a wrong number the inspector is asked to approve.
+    const nested = {
+      sections: [{
+        id: "s1", title: "Roof",
+        items: [
+          { id: "i1", label: "Sealed Roof Deck", type: "rich" },
+          { id: "i1a", label: "Fully adhered", type: "rich", parentId: "i1" },
+          { id: "i1b", label: "entire underside", type: "rich", parentId: "i1a" },
+        ],
+      }],
+    };
+    const results = {
+      "_default:s1:i1": { rating: "x", notes: "", photos: [{}] },
+      "_default:s1:i1a": { rating: "x", notes: "hi", photos: [{}, {}] },
+      "_default:s1:i1b": { rating: "", notes: "", photos: [] },
+    };
+    const { result } = renderHook(() =>
+      useStructureEdit({ rawSnapshot: nested, collabEditing: false, results }),
+    );
+    act(() => result.current.deleteItem("s1", "i1"));
+    expect(result.current.deletePending?.impact).toEqual({ items: 3, ratings: 2, notes: 1, photos: 3 });
+  });
+
+  it("still counts exactly one for a leaf", () => {
+    // Positive control for the subtree tally: a version that counted the whole
+    // SECTION would pass the assertion above.
+    const nested = {
+      sections: [{
+        id: "s1", title: "Roof",
+        items: [
+          { id: "i1", label: "Sealed Roof Deck", type: "rich" },
+          { id: "i1a", label: "Fully adhered", type: "rich", parentId: "i1" },
+        ],
+      }],
+    };
+    const { result } = renderHook(() =>
+      useStructureEdit({ rawSnapshot: nested, collabEditing: false, results: {} }),
+    );
+    act(() => result.current.deleteItem("s1", "i1a"));
+    expect(result.current.deletePending?.impact.items).toBe(1);
+  });
 });

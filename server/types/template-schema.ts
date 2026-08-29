@@ -144,6 +144,34 @@ export interface TemplateItem {
     defaultRecommendation?: string;
     attributes?: ItemAttribute[];
     source?: ItemSource | null;
+    /**
+     * The item this one sits under; absent or null means top level.
+     *
+     * -- WHY A PARENT POINTER AND NOT AN INDENT LEVEL ---------------------
+     * An indent level draws the same picture and answers none of the
+     * questions that matter: delete the parent and its indented rows are
+     * still level 2, dangling under nothing; move the parent and nothing
+     * knows what should travel with it. A parent pointer answers both, and
+     * makes "is this document well formed" a question with an answer.
+     *
+     * -- WHY NOT A `children` ARRAY ---------------------------------------
+     * Dozens of places walk `section.items` as a flat array. Nesting the
+     * array turns every one of them into a recursion, and the ones that are
+     * missed do not throw -- they silently print less. A parent pointer keeps
+     * the array one-dimensional, so every existing walk still sees every item.
+     *
+     * -- THE ARRAY ORDER IS THE TREE ORDER --------------------------------
+     * `items` is a pre-order walk of the tree: an item's whole subtree sits
+     * immediately after it and before its next sibling. That invariant is what
+     * lets a report print A, A.1, A.1.a, A.2, B by reading the array in order,
+     * with no renderer change at all. See `server/lib/template-hierarchy.ts`.
+     *
+     * Depth is capped at three levels -- the same bound, for the same
+     * bounded-parent-walk reason, as the unit tree in `services/unit.service.ts`.
+     * A parent in another section is not a parent: sections are the report's
+     * pagination and table-of-contents unit.
+     */
+    parentId?: string | null;
 }
 
 interface SectionApplicability {

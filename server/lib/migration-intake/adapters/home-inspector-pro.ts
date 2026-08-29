@@ -107,6 +107,27 @@ async function readStructure(input: unknown): Promise<string | null> {
     return xml.includes(TOKENS.documentRoot) ? xml : null;
 }
 
+/**
+ * Panels that sit inside another panel.
+ *
+ * `objectsOfClass` deliberately keeps scanning inside a matched object's body
+ * (see `../formats/java-xml-encoder.ts`) -- without that, a section would yield
+ * one item however many it holds. The cost is that a panel nested in a panel
+ * comes back as its parent's SIBLING: the level is erased, not preserved and
+ * not reported.
+ *
+ * This does not fix that. Fixing it needs a real three-level file and nobody
+ * has one -- the vendor schema declared no nesting quirk and the manifest
+ * recorded no observation of it, which by this repository's own rules means
+ * nobody has looked, not that somebody looked and found none. What this does is
+ * turn "nobody has looked" into "we know it flattens, and it says so".
+ */
+function nestedPanelCount(xml: string): number {
+    return objectsOfClass(xml, TOKENS.itemClass)
+        .filter((panel) => objectsOfClass(panel, TOKENS.itemClass).length > 0)
+        .length;
+}
+
 /** The template's own name, or null where the file carries none. */
 function templateName(xml: string): string | null {
     const [name] = propertyStrings(xml, TOKENS.templateName);
@@ -273,6 +294,18 @@ export const homeInspectorProAdapter: MigrationAdapter<HomeInspectorProOptions> 
         // twenty-two is empty, and refusing it would tell an operator his own
         // file is wrong. It stages as a row the repair step calls out instead.
         const { schema, stats } = toSchema(readTemplate(xml), options.ratingKind);
+        const nested = nestedPanelCount(xml);
+        // A COUNT, not one warning per panel: the operator cannot act on which
+        // panel it was -- the level is gone before this reader can name it --
+        // and the number is the part that can be checked against the source.
+        const warnings = nested > 0
+            ? [{
+                code: 'NESTED_PANELS_FLATTENED',
+                message: `${nested} panel(s) contain nested panels. This reader returns a nested panel `
+                    + 'as a sibling of its parent, so one level of structure is lost on import. '
+                    + 'Re-create it in the editor after importing.',
+            }]
+            : [];
         return {
             ok: true,
             bundle: {
@@ -285,7 +318,7 @@ export const homeInspectorProAdapter: MigrationAdapter<HomeInspectorProOptions> 
                         contact: emptyEntityCounts(),
                         member: emptyEntityCounts(),
                     },
-                    warnings: [],
+                    warnings,
                 },
                 templates: [{ name: options.name, schema, stats }],
                 contacts: [],
