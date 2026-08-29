@@ -8,6 +8,7 @@ import { RELIANCE_TEMPLATES } from "../../../server/lib/pca-reliance-text";
 import { METADATA_PRESETS, type PropertyMetaField } from "../../../server/lib/commercial-subtypes";
 import type { CompliancePanelData } from "~/components/inspection-edit/CompliancePanel";
 import { getCloudflareEnv } from "~/lib/load-context";
+import { revisionStatusForInspection } from "../../../server/lib/statutory/revision-status";
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
  const token = await requireToken(context, request);
@@ -147,6 +148,18 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // with report-data) and must NOT be PATCHed to the template-snapshot endpoint.
  const templateSnapshot = ((typeof rawSchema === 'string' ? JSON.parse(rawSchema) : rawSchema) ?? { schemaVersion: 2, sections: [] }) as { schemaVersion: 2; sections: unknown[] };
 
+ // Which revision of the authority's form governs this inspection, decided
+ // HERE and never in the browser. It is a comparison of date windows, and a
+ // second implementation of it on the client would disagree with this one at
+ // some boundary -- which is the one kind of disagreement nobody notices,
+ // because nobody checks a date boundary by hand. `null` for every ordinary
+ // inspection, and for a statutory template that names no revision.
+ const revisionStatus = revisionStatusForInspection({
+ snapshot: templateSnapshot,
+ inspectionDate: String((inspection as { date?: unknown }).date ?? "").slice(0, 10),
+ now: Date.now(),
+ });
+
  // Commercial PCA Phase S — seed-resolved narrative for the editor panel.
  const pcaNarrative = resolvePcaNarrative((inspection as { pcaNarrative?: unknown }).pcaNarrative);
 
@@ -226,5 +239,5 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
    if (key.startsWith("commercial:")) commercialPresets[key] = fields;
  }
 
- return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets };
+ return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets };
 }

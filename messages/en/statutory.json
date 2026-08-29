@@ -3,5 +3,16 @@
   "statutory_group_instance_save": "Record it",
   "statutory_group_instance_no_slot": "This form prints {count} {group} slots, and this is one more.",
   "statutory_group_instance_goes_to": "It will be written into {destination} instead. Nothing is lost, but it will read as a note rather than a filled box.",
-  "statutory_form_completeness": "{answered} of {total} form fields answered"
+  "statutory_form_completeness": "{answered} of {total} form fields answered",
+  "statutory_revision_soon": "Revision {version} replaces this form on {date}. This inspection is dated {inspectionDate} and is not affected; inspections dated on or after {date} need the updated template.",
+  "statutory_revision_superseded_elsewhere": "Revision {version} took effect on {date}. This inspection is dated {inspectionDate}, so it is still produced from the earlier revision — that is correct, and nothing needs to change here.",
+  "statutory_revision_cannot_produce": "This inspection is dated {inspectionDate}, which falls under revision {applicable}. This template produces revision {template}, so this form cannot be produced for this inspection. Ask an administrator to update the template, then start this inspection again on the updated one.",
+  "statutory_template_retired_superseded": "Replaced by a newer revision on {date} — no longer available for new inspections.",
+  "statutory_template_retired_uninstalled": "Uninstalled on {date} — ask an administrator to reinstall it.",
+  "statutory_update_inflight": "{count} in-progress inspections stay on revision {version}. Their dates fall inside its window, so they still produce their form.",
+  "statutory_update_blocked": "{count} of them are dated under revision {version} and will not be able to produce the form at all. They have to be started again on the updated template.",
+  "statutory_update_none_blocked": "None of them is dated under a newer revision, so this update costs nothing that is already in progress.",
+  "statutory_update_confirm_title": "Update {name}?",
+  "statutory_update_confirm_submit": "Update the template",
+  "statutory_update_confirm_cancel": "Cancel"
 }

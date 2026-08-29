@@ -160,4 +160,28 @@ export interface StatutoryFormDeclaration {
     /** Repeated blocks on this form. Absent when the form has none -- the
      *  Florida wind-mitigation form has none at all. */
     groups?: readonly FieldGroup[];
+    /**
+     * The authority's own revision label these bindings were authored against,
+     * verbatim -- `7-6`, `Rev. 04/26`. Never the form id, which names the form.
+     *
+     * -- WHY A DECLARATION CARRIES A REVISION AFTER ALL --------------------
+     * `formId` deliberately does not, because a form id carrying a revision
+     * cannot express two revisions being usable at once. This is a different
+     * fact: not "which revision applies", which is decided by the inspection's
+     * date, but "which revision this template was BUILT FOR". Bindings are
+     * authored against one revision's field map and may not be inherited across
+     * revisions (`field-map.ts` says why at length), so without this the
+     * question "is this template still the right one for this inspection" has
+     * no answer at all -- the template would appear to produce whatever the
+     * date selects, which is precisely the wrong-document failure this
+     * subsystem exists to prevent.
+     *
+     * -- WHY OPTIONAL ------------------------------------------------------
+     * A template authored before this key existed makes no claim about which
+     * revision it was built for, and guessing one is worse than saying nothing:
+     * a guess would drive a banner that tells an inspector their correct report
+     * is wrong, or stay silent on one that is. `revisionStatus` is simply not
+     * asked where this is absent.
+     */
+    revision?: string;
 }

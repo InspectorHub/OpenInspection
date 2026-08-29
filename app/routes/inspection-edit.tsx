@@ -27,10 +27,9 @@ import { SectionRail } from "~/components/editor-shared/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
 import { FullscreenToggle } from "~/components/editor/FullscreenToggle";
 import { ItemList } from "~/components/editor-shared/ItemList";
-import { useStatutoryGroups, useStructuralEditingAllowed } from "~/hooks/useStatutoryGroups";
-import { GroupInstanceDrawer } from "~/components/statutory/GroupInstanceDrawer";
-import { formCompleteness } from "~/lib/editor/form-completeness";
-import { formBoundItemIds } from "~/lib/editor/statutory-groups";
+import { useStatutoryGroups, useStatutoryFormProgress, useStructuralEditingAllowed } from "~/hooks/useStatutoryGroups";
+import { AddGroupInstanceHost } from "~/components/statutory/AddGroupInstanceHost";
+import { RevisionBanner } from "~/components/statutory/RevisionBanner";
 import { ItemEditor } from "~/components/editor/ItemEditor";
 import { TagChipRow, type TagPin } from "~/components/editor/TagChipRow";
 import type { DefectFieldsValue } from "~/components/editor/DefectFieldsRow";
@@ -757,12 +756,15 @@ export default function InspectionEditPage() {
   const instanceSubmit = useGuardedSubmit<{ ok?: boolean; error?: string }>();
   // Visible while filling rather than at the end: an inspector who learns the
   // form is short two answers when he presses send is already three houses away.
-  const formProgress = useMemo(() => {
-    const declaration = (loaderData.templateSnapshot as { statutoryForm?: Parameters<typeof formBoundItemIds>[0] } | null)?.statutoryForm;
-    if (!declaration) return null;
-    const done = formCompleteness(formBoundItemIds(declaration), state.results);
-    return done.total > 0 ? done : null;
-  }, [loaderData.templateSnapshot, state.results]);
+  const formProgress = useStatutoryFormProgress(loaderData.templateSnapshot, state.results);
+  // Which revision governs this inspection, decided on the server and only
+  // displayed here — two implementations of a date-window question disagree at
+  // some boundary, and nobody checks a date boundary by hand. Null when there
+  // is nothing to say, which is every ordinary inspection.
+  const revisionBannerEl = loaderData.revisionStatus ? (
+    <div className="mb-4"><RevisionBanner status={loaderData.revisionStatus}
+      inspectionDate={String(state.inspection.date ?? "").slice(0, 10)} /></div>
+  ) : null;
  const structure = useStructureEdit({
   rawSnapshot: loaderData.templateSnapshot,
   collabEditing: loaderData.collabEditing,
@@ -1914,6 +1916,7 @@ export default function InspectionEditPage() {
  onMore={() => setMobileDrawer('actions')}
  />
  <main className="p-4">
+ {revisionBannerEl}
  {emptyTemplateEl ?? (state.activeItemId ? (
   itemEditorEl
  ) : (
@@ -2143,31 +2146,24 @@ export default function InspectionEditPage() {
   onCancel={structure.closeAddSectionPrompt}
  />
 
- {statutoryGroups && addingToGroup ? (() => {
-   const group = statutoryGroups.find((g) => g.id === addingToGroup);
-   if (!group) return null;
-   return (
-     <GroupInstanceDrawer
-       open
-       group={group}
-       index={group.capacity}
-       saving={instanceSubmit.busy}
-       onClose={() => setAddingToGroup(null)}
-       onSave={(fields) => {
-         instanceSubmit.submit(
-           {
-             intent: "add-statutory-instance",
-             groupId: group.id,
-             index: String(group.capacity),
-             fields: JSON.stringify(fields),
-           },
-           { method: "post" },
-         );
-         setAddingToGroup(null);
-       }}
-     />
-   );
- })() : null}
+ <AddGroupInstanceHost
+   groups={statutoryGroups}
+   groupId={addingToGroup}
+   saving={instanceSubmit.busy}
+   onClose={() => setAddingToGroup(null)}
+   onSave={(group, fields) => {
+     instanceSubmit.submit(
+       {
+         intent: "add-statutory-instance",
+         groupId: group.id,
+         index: String(group.capacity),
+         fields: JSON.stringify(fields),
+       },
+       { method: "post" },
+     );
+     setAddingToGroup(null);
+   }}
+ />
 
  {/* D8 — "Add item" type-picker. */}
  <AddItemTypeModal
@@ -2442,6 +2438,7 @@ export default function InspectionEditPage() {
   </div>
  )}
  <main className="flex-1 overflow-y-auto p-6">
+ {revisionBannerEl}
  {state.activeView === "property" ? (
   <>
   <PropertyInfoForm

@@ -40,6 +40,14 @@ export const StatutoryFormDeclarationSchema = z.object({
     bindings: z.record(z.string(), z.unknown()),
     /** Repeated blocks. Absent when the form has none. */
     groups: z.array(z.unknown()).optional(),
+    /**
+     * The authority's own revision label these bindings were authored against.
+     *
+     * Optional, because a pack published before this key existed carries no
+     * claim about it and inventing one would be worse than the silence — see
+     * the field's own comment in `server/types/statutory-declaration.ts`.
+     */
+    revision: z.string().min(1).optional(),
 }).strict();
 
 export const StatutoryTemplateSchema = TemplateSchemaV2Schema

@@ -36,6 +36,8 @@
  */
 import { versionForInspection, type StatutoryFormVersion } from './form-registry';
 import { utcMidnightOf } from './inspection-date';
+import { PUBLISHED_FORM_VERSIONS } from './forms';
+import type { StatutoryFormDeclaration } from '../../types/statutory-declaration';
 
 export type RevisionStatus =
     /** Nothing to say: this template produces the revision this inspection needs. */
@@ -117,4 +119,49 @@ export function revisionStatus(input: RevisionStatusInput): RevisionStatus {
         return { kind: 'superseding_soon', nextVersion: next.version, from };
     }
     return { kind: 'current' };
+}
+
+/**
+ * The same question, asked from an inspection rather than from loose arguments.
+ *
+ * Every surface goes through THIS, not through `revisionStatus` directly: the
+ * banner, the reschedule response and the update confirmation's counts each
+ * hold an inspection and a template snapshot, and each would otherwise have to
+ * remember to read the declaration the same way, default the catalogue the same
+ * way, and decide the same thing about a template that names no revision. Three
+ * copies of that reading is three chances to read it differently.
+ *
+ * `null` means there is nothing to say, and it covers two cases on purpose:
+ *
+ *   - the snapshot declares no statutory form at all — the ordinary inspection;
+ *   - it declares one but names no revision it was built for. A template that
+ *     makes no claim about which revision it produces cannot be measured
+ *     against the one the date selects, and a guess would either alarm an
+ *     inspector about a correct report or reassure them about a wrong one.
+ *
+ * A caller renders nothing for `null`. It must not substitute a default.
+ */
+export function revisionStatusForInspection(input: {
+    /** The inspection's OWN `templateSnapshot`, never the current template row. */
+    snapshot: unknown;
+    /** `inspections.date` — a calendar day. */
+    inspectionDate: string;
+    now: number;
+    /** Defaulted to the published catalogue; a seam for tests, as elsewhere here. */
+    versions?: readonly StatutoryFormVersion[];
+    warnWindowDays?: number;
+}): RevisionStatus | null {
+    const declaration = (input.snapshot as { statutoryForm?: StatutoryFormDeclaration } | null)
+        ?.statutoryForm;
+    if (!declaration || typeof declaration.revision !== 'string') return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.inspectionDate)) return null;
+
+    return revisionStatus({
+        formId: declaration.formId,
+        inspectionDate: input.inspectionDate,
+        installedVersion: declaration.revision,
+        versions: input.versions ?? PUBLISHED_FORM_VERSIONS,
+        now: input.now,
+        ...(input.warnWindowDays === undefined ? {} : { warnWindowDays: input.warnWindowDays }),
+    });
 }
