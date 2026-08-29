@@ -7,6 +7,7 @@ import {
     fieldMapFor,
 } from '../../../server/lib/statutory/forms';
 import { versionForInspection } from '../../../server/lib/statutory/form-registry';
+import seed from '../../../server/data/seed-templates/trec-rei-7-6.json';
 
 /**
  * The first statutory form this software publishes.
@@ -93,14 +94,22 @@ describe('TX TREC REI 7-6', () => {
         for (const f of fieldMap.requiredFields) expect(mapped).toContain(f);
     });
 
-    it('⚠️ is not yet reachable: no template declares it', () => {
-        // Publishing the revision and its map is the authority-document half.
-        // The other half is a template whose items feed these field names through
-        // a `statutoryForm` declaration, and none carries one. This assertion is
-        // here so that wiring the bindings has to come back and delete it —
-        // rather than the gap being noticed by a workspace that installed the
-        // pack and found `available: false`.
-        const ourFields = new Set(fieldMap.mappings.map((m) => m.ourField));
-        expect(ourFields.size).toBe(122);
+    it('is reachable: the seed template declares it, and binds what it must', () => {
+        // This replaced an assertion that existed to be DELETED. It read
+        // `expect(ourFields.size).toBe(122)` and was placed here so that
+        // whoever wired the bindings had to come back and remove it, rather
+        // than the gap being discovered by a workspace that installed the pack
+        // and found `available: false`. The bindings are wired now, so the
+        // marker is gone and what stands in its place is the property it was
+        // standing in for.
+        //
+        // The correspondence itself -- every binding against every field -- is
+        // asserted in `trec-seed-template.spec.ts`, beside the template. Here
+        // we only record that a template claims this form at all.
+        const decl = (seed.schema as unknown as {
+            statutoryForm?: { formId: string; revision?: string };
+        }).statutoryForm;
+        expect(decl?.formId).toBe('tx_trec_rei');
+        expect(decl?.revision).toBe('7-6');
     });
 });

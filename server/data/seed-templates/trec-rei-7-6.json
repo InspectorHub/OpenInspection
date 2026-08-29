@@ -1,109 +1,137 @@
 {
   "id": "seed_trec_rei_7_6_v1",
   "name": "Texas TREC REI 7-6",
-  "description": "Texas Real Estate Commission required residential inspection form (REI 7-6, 2024).",
+  "description": "Texas Real Estate Commission Property Inspection Report (REI 7-6, 8/9/21). Its sections, their letters and their wording are the Commission's, read off the promulgated form -- not an approximation of it.",
   "version": 2,
   "schema": {
     "schemaVersion": 2,
+    "ratingSystem": {
+      "name": "TREC (Texas REC 4-level)",
+      "levels": [
+        {
+          "id": "inspected",
+          "label": "Inspected",
+          "abbreviation": "I",
+          "color": "#10b981",
+          "severity": "good",
+          "isDefect": false,
+          "pausesAdvance": false
+        },
+        {
+          "id": "not_inspected",
+          "label": "Not Inspected",
+          "abbreviation": "NI",
+          "color": "#94a3b8",
+          "severity": "minor",
+          "isDefect": false,
+          "pausesAdvance": false
+        },
+        {
+          "id": "not_present",
+          "label": "Not Present",
+          "abbreviation": "NP",
+          "color": "#cbd5e1",
+          "severity": "minor",
+          "isDefect": false,
+          "pausesAdvance": false
+        },
+        {
+          "id": "deficient",
+          "label": "Deficient",
+          "abbreviation": "D",
+          "color": "#ef4444",
+          "severity": "significant",
+          "isDefect": true,
+          "pausesAdvance": true
+        }
+      ]
+    },
     "sections": [
       {
-        "id": "structural-systems",
+        "id": "structural",
         "title": "I. Structural Systems",
         "items": [
           {
-            "id": "foundations",
+            "id": "structural_foundations",
             "label": "A. Foundations",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_foundations_ok",
+                  "id": "i_structural_foundations",
                   "title": "Condition",
-                  "comment": "A. Foundations was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Foundations was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_foundations_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_structural_foundations",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of foundations.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_foundations_repair",
-                  "title": "Repair needed",
+                  "id": "d_structural_foundations",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "A. Foundations requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_foundations_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "A. Foundations presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
               ]
-            }
+            },
+            "attributes": [
+              {
+                "id": "foundation_type",
+                "name": "Type of Foundation(s)",
+                "type": "text"
+              }
+            ]
           },
           {
-            "id": "grading-dr",
-            "label": "B. Grading & Drainage",
+            "id": "structural_grading_and_drainage",
+            "label": "B. Grading and Drainage",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_grading_dr_ok",
+                  "id": "i_structural_grading_and_drainage",
                   "title": "Condition",
-                  "comment": "B. Grading & Drainage was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Grading and Drainage was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_grading_dr_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_structural_grading_and_drainage",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of grading and drainage.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_grading_dr_repair",
-                  "title": "Repair needed",
+                  "id": "d_structural_grading_and_drainage",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "B. Grading & Drainage requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_grading_dr_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "B. Grading & Drainage presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -111,149 +139,143 @@
             }
           },
           {
-            "id": "roof-cover",
+            "id": "structural_roof_covering_materials",
             "label": "C. Roof Covering Materials",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_roof_cover_ok",
+                  "id": "i_structural_roof_covering_materials",
                   "title": "Condition",
-                  "comment": "C. Roof Covering Materials was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Roof Covering Materials was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_roof_cover_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_structural_roof_covering_materials",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of roof covering materials.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_roof_cover_repair",
-                  "title": "Repair needed",
+                  "id": "d_structural_roof_covering_materials",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "C. Roof Covering Materials requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_roof_cover_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "C. Roof Covering Materials presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
               ]
-            }
+            },
+            "attributes": [
+              {
+                "id": "covering_type",
+                "name": "Types of Roof Covering",
+                "type": "text"
+              },
+              {
+                "id": "viewed_from",
+                "name": "Viewed From",
+                "type": "text"
+              }
+            ]
           },
           {
-            "id": "roof-struct",
-            "label": "D. Roof Structure & Attic",
+            "id": "structural_roof_structures_and_attics",
+            "label": "D. Roof Structures and Attics",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_roof_struct_ok",
+                  "id": "i_structural_roof_structures_and_attics",
                   "title": "Condition",
-                  "comment": "D. Roof Structure & Attic was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Roof Structures and Attics was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_roof_struct_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_structural_roof_structures_and_attics",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of roof structures and attics.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_roof_struct_repair",
-                  "title": "Repair needed",
+                  "id": "d_structural_roof_structures_and_attics",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "D. Roof Structure & Attic requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_roof_struct_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "D. Roof Structure & Attic presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
               ]
-            }
+            },
+            "attributes": [
+              {
+                "id": "viewed_from",
+                "name": "Viewed From",
+                "type": "text"
+              },
+              {
+                "id": "insulation_depth",
+                "name": "Approximate Average Depth of Insulation",
+                "type": "text"
+              }
+            ]
           },
           {
-            "id": "walls-ext",
-            "label": "E. Walls (Exterior)",
+            "id": "structural_walls",
+            "label": "E. Walls (Interior and Exterior)",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_walls_ext_ok",
+                  "id": "i_structural_walls",
                   "title": "Condition",
-                  "comment": "E. Walls (Exterior) was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Walls (Interior and Exterior) was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_walls_ext_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_structural_walls",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of walls (interior and exterior).",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_walls_ext_repair",
-                  "title": "Repair needed",
+                  "id": "d_structural_walls",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "E. Walls (Exterior) requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_walls_ext_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "E. Walls (Exterior) presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -261,49 +283,39 @@
             }
           },
           {
-            "id": "walls-int",
-            "label": "F. Walls (Interior)",
+            "id": "structural_ceilings_and_floors",
+            "label": "F. Ceilings and Floors",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_walls_int_ok",
+                  "id": "i_structural_ceilings_and_floors",
                   "title": "Condition",
-                  "comment": "F. Walls (Interior) was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Ceilings and Floors was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_walls_int_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_structural_ceilings_and_floors",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of ceilings and floors.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_walls_int_repair",
-                  "title": "Repair needed",
+                  "id": "d_structural_ceilings_and_floors",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "F. Walls (Interior) requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_walls_int_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "F. Walls (Interior) presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -311,49 +323,39 @@
             }
           },
           {
-            "id": "ceilings",
-            "label": "G. Ceilings & Floors",
+            "id": "structural_doors",
+            "label": "G. Doors (Interior and Exterior)",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_ceilings_ok",
+                  "id": "i_structural_doors",
                   "title": "Condition",
-                  "comment": "G. Ceilings & Floors was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Doors (Interior and Exterior) was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_ceilings_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_structural_doors",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of doors (interior and exterior).",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_ceilings_repair",
-                  "title": "Repair needed",
+                  "id": "d_structural_doors",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "G. Ceilings & Floors requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_ceilings_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "G. Ceilings & Floors presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -361,49 +363,39 @@
             }
           },
           {
-            "id": "doors-ext",
-            "label": "H. Doors (Exterior)",
+            "id": "structural_windows",
+            "label": "H. Windows",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_doors_ext_ok",
+                  "id": "i_structural_windows",
                   "title": "Condition",
-                  "comment": "H. Doors (Exterior) was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Windows was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_doors_ext_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_structural_windows",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of windows.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_doors_ext_repair",
-                  "title": "Repair needed",
+                  "id": "d_structural_windows",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "H. Doors (Exterior) requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_doors_ext_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "H. Doors (Exterior) presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -411,49 +403,39 @@
             }
           },
           {
-            "id": "doors-int",
-            "label": "I. Doors (Interior)",
+            "id": "structural_stairways",
+            "label": "I. Stairways (Interior and Exterior)",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_doors_int_ok",
+                  "id": "i_structural_stairways",
                   "title": "Condition",
-                  "comment": "I. Doors (Interior) was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Stairways (Interior and Exterior) was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_doors_int_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_structural_stairways",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of stairways (interior and exterior).",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_doors_int_repair",
-                  "title": "Repair needed",
+                  "id": "d_structural_stairways",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "I. Doors (Interior) requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_doors_int_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "I. Doors (Interior) presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -461,49 +443,39 @@
             }
           },
           {
-            "id": "windows",
-            "label": "J. Windows",
+            "id": "structural_fireplaces_and_chimneys",
+            "label": "J. Fireplaces and Chimneys",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_windows_ok",
+                  "id": "i_structural_fireplaces_and_chimneys",
                   "title": "Condition",
-                  "comment": "J. Windows was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Fireplaces and Chimneys was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_windows_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_structural_fireplaces_and_chimneys",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of fireplaces and chimneys.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_windows_repair",
-                  "title": "Repair needed",
+                  "id": "d_structural_fireplaces_and_chimneys",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "J. Windows requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_windows_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "J. Windows presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -511,49 +483,39 @@
             }
           },
           {
-            "id": "stairways",
-            "label": "K. Stairways",
+            "id": "structural_porches_balconies_decks_carports",
+            "label": "K. Porches, Balconies, Decks, and Carports",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_stairways_ok",
+                  "id": "i_structural_porches_balconies_decks_carports",
                   "title": "Condition",
-                  "comment": "K. Stairways was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Porches, Balconies, Decks, and Carports was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_stairways_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_structural_porches_balconies_decks_carports",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of porches, balconies, decks, and carports.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_stairways_repair",
-                  "title": "Repair needed",
+                  "id": "d_structural_porches_balconies_decks_carports",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "K. Stairways requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_stairways_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "K. Stairways presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -561,109 +523,44 @@
             }
           },
           {
-            "id": "fireplace",
-            "label": "L. Fireplaces & Chimneys",
+            "id": "structural_other",
+            "label": "L. Other",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_fireplace_ok",
+                  "id": "i_structural_other",
                   "title": "Condition",
-                  "comment": "L. Fireplaces & Chimneys was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Other was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_fireplace_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_structural_other",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of other.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_fireplace_repair",
-                  "title": "Repair needed",
+                  "id": "d_structural_other",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "L. Fireplaces & Chimneys requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_fireplace_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "L. Fireplaces & Chimneys presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
               ]
             }
-          },
-          {
-            "id": "porches",
-            "label": "M. Porches, Balconies, Decks & Carports",
-            "type": "rich",
-            "ratingOptions": [
-              "Inspected",
-              "Not Inspected",
-              "Not Present",
-              "Repair",
-              "Safety Hazard"
-            ],
-            "tabs": {
-              "information": [
-                {
-                  "id": "ri_porches_ok",
-                  "title": "Condition",
-                  "comment": "M. Porches, Balconies, Decks & Carports was inspected and appears in serviceable condition.",
-                  "default": true
-                }
-              ],
-              "limitations": [
-                {
-                  "id": "rl_porches_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
-                  "default": false
-                }
-              ],
-              "defects": [
-                {
-                  "id": "rd_porches_repair",
-                  "title": "Repair needed",
-                  "category": "recommendation",
-                  "location": "",
-                  "comment": "M. Porches, Balconies, Decks & Carports requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_porches_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "M. Porches, Balconies, Decks & Carports presents a safety concern; recommend immediate evaluation and correction.",
-                  "photos": [],
-                  "default": false
-                }
-              ]
-            }
-          },
-          {
-            "id": "other-str",
-            "label": "N. Other",
-            "type": "text"
           }
         ]
       },
@@ -672,49 +569,39 @@
         "title": "II. Electrical Systems",
         "items": [
           {
-            "id": "service",
-            "label": "A. Service Entrance & Panels",
+            "id": "electrical_service_entrance_and_panels",
+            "label": "A. Service Entrance and Panels",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_service_ok",
+                  "id": "i_electrical_service_entrance_and_panels",
                   "title": "Condition",
-                  "comment": "A. Service Entrance & Panels was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Service Entrance and Panels was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_service_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_electrical_service_entrance_and_panels",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of service entrance and panels.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_service_repair",
-                  "title": "Repair needed",
+                  "id": "d_electrical_service_entrance_and_panels",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "A. Service Entrance & Panels requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_service_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "A. Service Entrance & Panels presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -722,99 +609,86 @@
             }
           },
           {
-            "id": "branch",
-            "label": "B. Branch Circuits",
+            "id": "electrical_branch_circuits_devices_fixtures",
+            "label": "B. Branch Circuits, Connected Devices, and Fixtures",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_branch_ok",
+                  "id": "i_electrical_branch_circuits_devices_fixtures",
                   "title": "Condition",
-                  "comment": "B. Branch Circuits was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Branch Circuits, Connected Devices, and Fixtures was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_branch_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_electrical_branch_circuits_devices_fixtures",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of branch circuits, connected devices, and fixtures.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_branch_repair",
-                  "title": "Repair needed",
+                  "id": "d_electrical_branch_circuits_devices_fixtures",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "B. Branch Circuits requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_branch_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "B. Branch Circuits presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
               ]
-            }
+            },
+            "attributes": [
+              {
+                "id": "wiring_type",
+                "name": "Type of Wiring",
+                "type": "text"
+              }
+            ]
           },
           {
-            "id": "connected",
-            "label": "C. Connected Devices & Fixtures",
+            "id": "electrical_other",
+            "label": "C. Other",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_connected_ok",
+                  "id": "i_electrical_other",
                   "title": "Condition",
-                  "comment": "C. Connected Devices & Fixtures was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Other was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_connected_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_electrical_other",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of other.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_connected_repair",
-                  "title": "Repair needed",
+                  "id": "d_electrical_other",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "C. Connected Devices & Fixtures requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_connected_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "C. Connected Devices & Fixtures presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -824,53 +698,142 @@
         ]
       },
       {
-        "id": "hvac-trec",
-        "title": "III. HVAC Systems",
+        "id": "hvac",
+        "title": "III. Heating, Ventilation and Air Conditioning Systems",
         "items": [
           {
-            "id": "heating",
-            "label": "A. Heating",
+            "id": "hvac_heating_equipment",
+            "label": "A. Heating Equipment",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_heating_ok",
+                  "id": "i_hvac_heating_equipment",
                   "title": "Condition",
-                  "comment": "A. Heating was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Heating Equipment was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_heating_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_hvac_heating_equipment",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of heating equipment.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_heating_repair",
-                  "title": "Repair needed",
+                  "id": "d_hvac_heating_equipment",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "A. Heating requires repair or further evaluation by a qualified professional.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
-                },
+                }
+              ]
+            },
+            "attributes": [
+              {
+                "id": "system_type",
+                "name": "Type of Systems",
+                "type": "text"
+              },
+              {
+                "id": "energy_sources",
+                "name": "Energy Sources",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "hvac_cooling_equipment",
+            "label": "B. Cooling Equipment",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
                 {
-                  "id": "rd_heating_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
+                  "id": "i_hvac_cooling_equipment",
+                  "title": "Condition",
+                  "comment": "Cooling Equipment was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_hvac_cooling_equipment",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of cooling equipment.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_hvac_cooling_equipment",
+                  "title": "Deficiency",
+                  "category": "recommendation",
                   "location": "",
-                  "comment": "A. Heating presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            },
+            "attributes": [
+              {
+                "id": "system_type",
+                "name": "Type of Systems",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "hvac_duct_systems_chases_vents",
+            "label": "C. Duct Systems, Chases, and Vents",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "i_hvac_duct_systems_chases_vents",
+                  "title": "Condition",
+                  "comment": "Duct Systems, Chases, and Vents was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_hvac_duct_systems_chases_vents",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of duct systems, chases, and vents.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_hvac_duct_systems_chases_vents",
+                  "title": "Deficiency",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -878,49 +841,39 @@
             }
           },
           {
-            "id": "cooling",
-            "label": "B. Cooling",
+            "id": "hvac_other",
+            "label": "D. Other",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_cooling_ok",
+                  "id": "i_hvac_other",
                   "title": "Condition",
-                  "comment": "B. Cooling was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Other was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_cooling_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_hvac_other",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of other.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_cooling_repair",
-                  "title": "Repair needed",
+                  "id": "d_hvac_other",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "B. Cooling requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_cooling_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "B. Cooling presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -930,53 +883,204 @@
         ]
       },
       {
-        "id": "plumbing-trec",
-        "title": "IV. Plumbing System",
+        "id": "plumbing",
+        "title": "IV. Plumbing Systems",
         "items": [
           {
-            "id": "supply-p",
-            "label": "A. Plumbing Supply",
+            "id": "plumbing_supply_distribution_fixtures",
+            "label": "A. Plumbing Supply, Distribution Systems and Fixtures",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_supply_p_ok",
+                  "id": "i_plumbing_supply_distribution_fixtures",
                   "title": "Condition",
-                  "comment": "A. Plumbing Supply was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Plumbing Supply, Distribution Systems and Fixtures was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_supply_p_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_plumbing_supply_distribution_fixtures",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of plumbing supply, distribution systems and fixtures.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_supply_p_repair",
-                  "title": "Repair needed",
+                  "id": "d_plumbing_supply_distribution_fixtures",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "A. Plumbing Supply requires repair or further evaluation by a qualified professional.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
-                },
+                }
+              ]
+            },
+            "attributes": [
+              {
+                "id": "water_meter_location",
+                "name": "Location of water meter",
+                "type": "text"
+              },
+              {
+                "id": "main_water_supply_valve_location",
+                "name": "Location of main water supply valve",
+                "type": "text"
+              },
+              {
+                "id": "static_water_pressure",
+                "name": "Static water pressure reading",
+                "type": "text"
+              },
+              {
+                "id": "piping_material",
+                "name": "Type of supply piping material",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "plumbing_drains_wastes_vents",
+            "label": "B. Drains, Wastes, and Vents",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
                 {
-                  "id": "rd_supply_p_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
+                  "id": "i_plumbing_drains_wastes_vents",
+                  "title": "Condition",
+                  "comment": "Drains, Wastes, and Vents was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_plumbing_drains_wastes_vents",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of drains, wastes, and vents.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_plumbing_drains_wastes_vents",
+                  "title": "Deficiency",
+                  "category": "recommendation",
                   "location": "",
-                  "comment": "A. Plumbing Supply presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            },
+            "attributes": [
+              {
+                "id": "piping_material",
+                "name": "Type of drain piping material",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "plumbing_water_heating_equipment",
+            "label": "C. Water Heating Equipment",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "i_plumbing_water_heating_equipment",
+                  "title": "Condition",
+                  "comment": "Water Heating Equipment was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_plumbing_water_heating_equipment",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of water heating equipment.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_plumbing_water_heating_equipment",
+                  "title": "Deficiency",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            },
+            "attributes": [
+              {
+                "id": "energy_sources",
+                "name": "Energy Sources",
+                "type": "text"
+              },
+              {
+                "id": "capacity",
+                "name": "Capacity",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "plumbing_hydro_massage_therapy_equipment",
+            "label": "D. Hydro-Massage Therapy Equipment",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "i_plumbing_hydro_massage_therapy_equipment",
+                  "title": "Condition",
+                  "comment": "Hydro-Massage Therapy Equipment was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_plumbing_hydro_massage_therapy_equipment",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of hydro-massage therapy equipment.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_plumbing_hydro_massage_therapy_equipment",
+                  "title": "Deficiency",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -984,149 +1088,91 @@
             }
           },
           {
-            "id": "drain-p",
-            "label": "B. Plumbing Drains",
+            "id": "plumbing_gas_distribution_and_appliances",
+            "label": "E. Gas Distribution Systems and Gas Appliances",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_drain_p_ok",
+                  "id": "i_plumbing_gas_distribution_and_appliances",
                   "title": "Condition",
-                  "comment": "B. Plumbing Drains was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Gas Distribution Systems and Gas Appliances was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_drain_p_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_plumbing_gas_distribution_and_appliances",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of gas distribution systems and gas appliances.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_drain_p_repair",
-                  "title": "Repair needed",
+                  "id": "d_plumbing_gas_distribution_and_appliances",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "B. Plumbing Drains requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_drain_p_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "B. Plumbing Drains presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
               ]
-            }
+            },
+            "attributes": [
+              {
+                "id": "meter_location",
+                "name": "Location of gas meter",
+                "type": "text"
+              },
+              {
+                "id": "piping_material",
+                "name": "Type of gas distribution piping material",
+                "type": "text"
+              }
+            ]
           },
           {
-            "id": "wh-trec",
-            "label": "C. Water Heaters",
+            "id": "plumbing_other",
+            "label": "F. Other",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_wh_trec_ok",
+                  "id": "i_plumbing_other",
                   "title": "Condition",
-                  "comment": "C. Water Heaters was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Other was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_wh_trec_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_plumbing_other",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of other.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_wh_trec_repair",
-                  "title": "Repair needed",
+                  "id": "d_plumbing_other",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "C. Water Heaters requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_wh_trec_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "C. Water Heaters presents a safety concern; recommend immediate evaluation and correction.",
-                  "photos": [],
-                  "default": false
-                }
-              ]
-            }
-          },
-          {
-            "id": "hydro",
-            "label": "D. Hydro-Massage Therapy",
-            "type": "rich",
-            "ratingOptions": [
-              "Inspected",
-              "Not Inspected",
-              "Not Present",
-              "Repair",
-              "Safety Hazard"
-            ],
-            "tabs": {
-              "information": [
-                {
-                  "id": "ri_hydro_ok",
-                  "title": "Condition",
-                  "comment": "D. Hydro-Massage Therapy was inspected and appears in serviceable condition.",
-                  "default": true
-                }
-              ],
-              "limitations": [
-                {
-                  "id": "rl_hydro_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
-                  "default": false
-                }
-              ],
-              "defects": [
-                {
-                  "id": "rd_hydro_repair",
-                  "title": "Repair needed",
-                  "category": "recommendation",
-                  "location": "",
-                  "comment": "D. Hydro-Massage Therapy requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_hydro_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "D. Hydro-Massage Therapy presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -1136,53 +1182,43 @@
         ]
       },
       {
-        "id": "appliances-trec",
+        "id": "appliances",
         "title": "V. Appliances",
         "items": [
           {
-            "id": "dishwasher",
-            "label": "A. Dishwasher",
+            "id": "appliances_dishwashers",
+            "label": "A. Dishwashers",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_dishwasher_ok",
+                  "id": "i_appliances_dishwashers",
                   "title": "Condition",
-                  "comment": "A. Dishwasher was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Dishwashers was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_dishwasher_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_appliances_dishwashers",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of dishwashers.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_dishwasher_repair",
-                  "title": "Repair needed",
+                  "id": "d_appliances_dishwashers",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "A. Dishwasher requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_dishwasher_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "A. Dishwasher presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -1190,49 +1226,39 @@
             }
           },
           {
-            "id": "disposal",
-            "label": "B. Food Waste Disposer",
+            "id": "appliances_food_waste_disposers",
+            "label": "B. Food Waste Disposers",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_disposal_ok",
+                  "id": "i_appliances_food_waste_disposers",
                   "title": "Condition",
-                  "comment": "B. Food Waste Disposer was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Food Waste Disposers was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_disposal_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_appliances_food_waste_disposers",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of food waste disposers.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_disposal_repair",
-                  "title": "Repair needed",
+                  "id": "d_appliances_food_waste_disposers",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "B. Food Waste Disposer requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_disposal_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "B. Food Waste Disposer presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -1240,49 +1266,279 @@
             }
           },
           {
-            "id": "range",
-            "label": "C. Range/Oven/Microwave",
+            "id": "appliances_range_hood_and_exhaust_systems",
+            "label": "C. Range Hood and Exhaust Systems",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_range_ok",
+                  "id": "i_appliances_range_hood_and_exhaust_systems",
                   "title": "Condition",
-                  "comment": "C. Range/Oven/Microwave was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Range Hood and Exhaust Systems was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_range_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_appliances_range_hood_and_exhaust_systems",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of range hood and exhaust systems.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_range_repair",
-                  "title": "Repair needed",
+                  "id": "d_appliances_range_hood_and_exhaust_systems",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "C. Range/Oven/Microwave requires repair or further evaluation by a qualified professional.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
-                },
+                }
+              ]
+            }
+          },
+          {
+            "id": "appliances_ranges_cooktops_ovens",
+            "label": "D. Ranges, Cooktops, and Ovens",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
                 {
-                  "id": "rd_range_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
+                  "id": "i_appliances_ranges_cooktops_ovens",
+                  "title": "Condition",
+                  "comment": "Ranges, Cooktops, and Ovens was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_appliances_ranges_cooktops_ovens",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of ranges, cooktops, and ovens.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_appliances_ranges_cooktops_ovens",
+                  "title": "Deficiency",
+                  "category": "recommendation",
                   "location": "",
-                  "comment": "C. Range/Oven/Microwave presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "appliances_microwave_ovens",
+            "label": "E. Microwave Ovens",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "i_appliances_microwave_ovens",
+                  "title": "Condition",
+                  "comment": "Microwave Ovens was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_appliances_microwave_ovens",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of microwave ovens.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_appliances_microwave_ovens",
+                  "title": "Deficiency",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "appliances_mechanical_exhaust_vents_and_bathroom_heaters",
+            "label": "F. Mechanical Exhaust Vents and Bathroom Heaters",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "i_appliances_mechanical_exhaust_vents_and_bathroom_heaters",
+                  "title": "Condition",
+                  "comment": "Mechanical Exhaust Vents and Bathroom Heaters was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_appliances_mechanical_exhaust_vents_and_bathroom_heaters",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of mechanical exhaust vents and bathroom heaters.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_appliances_mechanical_exhaust_vents_and_bathroom_heaters",
+                  "title": "Deficiency",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "appliances_garage_door_operators",
+            "label": "G. Garage Door Operators",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "i_appliances_garage_door_operators",
+                  "title": "Condition",
+                  "comment": "Garage Door Operators was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_appliances_garage_door_operators",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of garage door operators.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_appliances_garage_door_operators",
+                  "title": "Deficiency",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "appliances_dryer_exhaust_systems",
+            "label": "H. Dryer Exhaust Systems",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "i_appliances_dryer_exhaust_systems",
+                  "title": "Condition",
+                  "comment": "Dryer Exhaust Systems was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_appliances_dryer_exhaust_systems",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of dryer exhaust systems.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_appliances_dryer_exhaust_systems",
+                  "title": "Deficiency",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "appliances_other",
+            "label": "I. Other",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "i_appliances_other",
+                  "title": "Condition",
+                  "comment": "Other was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_appliances_other",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of other.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_appliances_other",
+                  "title": "Deficiency",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -1292,53 +1548,43 @@
         ]
       },
       {
-        "id": "optional-systems",
+        "id": "optional",
         "title": "VI. Optional Systems",
         "items": [
           {
-            "id": "pool",
-            "label": "A. Lawn Sprinkler Systems",
+            "id": "optional_landscape_irrigation_systems",
+            "label": "A. Landscape Irrigation (Sprinkler) Systems",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_pool_ok",
+                  "id": "i_optional_landscape_irrigation_systems",
                   "title": "Condition",
-                  "comment": "A. Lawn Sprinkler Systems was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Landscape Irrigation (Sprinkler) Systems was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_pool_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_optional_landscape_irrigation_systems",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of landscape irrigation (sprinkler) systems.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_pool_repair",
-                  "title": "Repair needed",
+                  "id": "d_optional_landscape_irrigation_systems",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "A. Lawn Sprinkler Systems requires repair or further evaluation by a qualified professional.",
-                  "photos": [],
-                  "default": false
-                },
-                {
-                  "id": "rd_pool_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
-                  "location": "",
-                  "comment": "A. Lawn Sprinkler Systems presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -1346,49 +1592,270 @@
             }
           },
           {
-            "id": "gas",
-            "label": "B. Gas Distribution System",
+            "id": "optional_swimming_pools_spas_hot_tubs",
+            "label": "B. Swimming Pools, Spas, Hot Tubs, and Equipment",
             "type": "rich",
             "ratingOptions": [
               "Inspected",
               "Not Inspected",
               "Not Present",
-              "Repair",
-              "Safety Hazard"
+              "Deficient"
             ],
             "tabs": {
               "information": [
                 {
-                  "id": "ri_gas_ok",
+                  "id": "i_optional_swimming_pools_spas_hot_tubs",
                   "title": "Condition",
-                  "comment": "B. Gas Distribution System was inspected and appears in serviceable condition.",
-                  "default": true
+                  "comment": "Swimming Pools, Spas, Hot Tubs, and Equipment was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
                 }
               ],
               "limitations": [
                 {
-                  "id": "rl_gas_visual",
-                  "title": "Visual scope",
-                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "id": "l_optional_swimming_pools_spas_hot_tubs",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of swimming pools, spas, hot tubs, and equipment.",
                   "default": false
                 }
               ],
               "defects": [
                 {
-                  "id": "rd_gas_repair",
-                  "title": "Repair needed",
+                  "id": "d_optional_swimming_pools_spas_hot_tubs",
+                  "title": "Deficiency",
                   "category": "recommendation",
                   "location": "",
-                  "comment": "B. Gas Distribution System requires repair or further evaluation by a qualified professional.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
-                },
+                }
+              ]
+            },
+            "attributes": [
+              {
+                "id": "construction_type",
+                "name": "Type of Construction",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "optional_outbuildings",
+            "label": "C. Outbuildings",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
                 {
-                  "id": "rd_gas_safety",
-                  "title": "Safety concern",
-                  "category": "safety",
+                  "id": "i_optional_outbuildings",
+                  "title": "Condition",
+                  "comment": "Outbuildings was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_optional_outbuildings",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of outbuildings.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_optional_outbuildings",
+                  "title": "Deficiency",
+                  "category": "recommendation",
                   "location": "",
-                  "comment": "B. Gas Distribution System presents a safety concern; recommend immediate evaluation and correction.",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "optional_private_water_wells",
+            "label": "D. Private Water Wells (A coliform analysis is recommended.)",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "i_optional_private_water_wells",
+                  "title": "Condition",
+                  "comment": "Private Water Wells was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_optional_private_water_wells",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of private water wells.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_optional_private_water_wells",
+                  "title": "Deficiency",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            },
+            "attributes": [
+              {
+                "id": "pump_type",
+                "name": "Type of Pump",
+                "type": "text"
+              },
+              {
+                "id": "storage_equipment_type",
+                "name": "Type of Storage Equipment",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "optional_private_sewage_disposal_systems",
+            "label": "E. Private Sewage Disposal Systems",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "i_optional_private_sewage_disposal_systems",
+                  "title": "Condition",
+                  "comment": "Private Sewage Disposal Systems was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_optional_private_sewage_disposal_systems",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of private sewage disposal systems.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_optional_private_sewage_disposal_systems",
+                  "title": "Deficiency",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            },
+            "attributes": [
+              {
+                "id": "system_type",
+                "name": "Type of System",
+                "type": "text"
+              },
+              {
+                "id": "drain_field_location",
+                "name": "Location of Drain Field",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "optional_other_built_in_appliances",
+            "label": "F. Other Built-in Appliances",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "i_optional_other_built_in_appliances",
+                  "title": "Condition",
+                  "comment": "Other Built-in Appliances was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_optional_other_built_in_appliances",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of other built-in appliances.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_optional_other_built_in_appliances",
+                  "title": "Deficiency",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "optional_other",
+            "label": "G. Other",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Deficient"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "i_optional_other",
+                  "title": "Condition",
+                  "comment": "Other was inspected and appeared to be performing its intended function at the time of the inspection.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "l_optional_other",
+                  "title": "Scope",
+                  "comment": "This inspection was limited to the visible and readily accessible components of other.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "d_optional_other",
+                  "title": "Deficiency",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A deficiency was observed at {{location}} and further evaluation by a qualified specialist is recommended.",
                   "photos": [],
                   "default": false
                 }
@@ -1397,6 +1864,511 @@
           }
         ]
       }
-    ]
+    ],
+    "statutoryForm": {
+      "formId": "tx_trec_rei",
+      "revision": "7-6",
+      "bindings": {
+        "structural_foundations_rating": {
+          "from": "item",
+          "itemId": "structural_foundations"
+        },
+        "structural_foundations_comments": {
+          "from": "item_comments",
+          "itemId": "structural_foundations"
+        },
+        "structural_foundations_foundation_type": {
+          "from": "item_attribute",
+          "itemId": "structural_foundations",
+          "attribute": "foundation_type"
+        },
+        "structural_grading_and_drainage_rating": {
+          "from": "item",
+          "itemId": "structural_grading_and_drainage"
+        },
+        "structural_grading_and_drainage_comments": {
+          "from": "item_comments",
+          "itemId": "structural_grading_and_drainage"
+        },
+        "structural_roof_covering_materials_rating": {
+          "from": "item",
+          "itemId": "structural_roof_covering_materials"
+        },
+        "structural_roof_covering_materials_comments": {
+          "from": "item_comments",
+          "itemId": "structural_roof_covering_materials"
+        },
+        "structural_roof_covering_materials_covering_type": {
+          "from": "item_attribute",
+          "itemId": "structural_roof_covering_materials",
+          "attribute": "covering_type"
+        },
+        "structural_roof_covering_materials_viewed_from": {
+          "from": "item_attribute",
+          "itemId": "structural_roof_covering_materials",
+          "attribute": "viewed_from"
+        },
+        "structural_roof_structures_and_attics_rating": {
+          "from": "item",
+          "itemId": "structural_roof_structures_and_attics"
+        },
+        "structural_roof_structures_and_attics_comments": {
+          "from": "item_comments",
+          "itemId": "structural_roof_structures_and_attics"
+        },
+        "structural_roof_structures_and_attics_viewed_from": {
+          "from": "item_attribute",
+          "itemId": "structural_roof_structures_and_attics",
+          "attribute": "viewed_from"
+        },
+        "structural_roof_structures_and_attics_insulation_depth": {
+          "from": "item_attribute",
+          "itemId": "structural_roof_structures_and_attics",
+          "attribute": "insulation_depth"
+        },
+        "structural_walls_rating": {
+          "from": "item",
+          "itemId": "structural_walls"
+        },
+        "structural_walls_comments": {
+          "from": "item_comments",
+          "itemId": "structural_walls"
+        },
+        "structural_ceilings_and_floors_rating": {
+          "from": "item",
+          "itemId": "structural_ceilings_and_floors"
+        },
+        "structural_ceilings_and_floors_comments": {
+          "from": "item_comments",
+          "itemId": "structural_ceilings_and_floors"
+        },
+        "structural_doors_rating": {
+          "from": "item",
+          "itemId": "structural_doors"
+        },
+        "structural_doors_comments": {
+          "from": "item_comments",
+          "itemId": "structural_doors"
+        },
+        "structural_windows_rating": {
+          "from": "item",
+          "itemId": "structural_windows"
+        },
+        "structural_windows_comments": {
+          "from": "item_comments",
+          "itemId": "structural_windows"
+        },
+        "structural_stairways_rating": {
+          "from": "item",
+          "itemId": "structural_stairways"
+        },
+        "structural_stairways_comments": {
+          "from": "item_comments",
+          "itemId": "structural_stairways"
+        },
+        "structural_fireplaces_and_chimneys_rating": {
+          "from": "item",
+          "itemId": "structural_fireplaces_and_chimneys"
+        },
+        "structural_fireplaces_and_chimneys_comments": {
+          "from": "item_comments",
+          "itemId": "structural_fireplaces_and_chimneys"
+        },
+        "structural_porches_balconies_decks_carports_rating": {
+          "from": "item",
+          "itemId": "structural_porches_balconies_decks_carports"
+        },
+        "structural_porches_balconies_decks_carports_comments": {
+          "from": "item_comments",
+          "itemId": "structural_porches_balconies_decks_carports"
+        },
+        "structural_other_rating": {
+          "from": "item",
+          "itemId": "structural_other"
+        },
+        "structural_other_comments": {
+          "from": "item_comments",
+          "itemId": "structural_other"
+        },
+        "electrical_service_entrance_and_panels_rating": {
+          "from": "item",
+          "itemId": "electrical_service_entrance_and_panels"
+        },
+        "electrical_service_entrance_and_panels_comments": {
+          "from": "item_comments",
+          "itemId": "electrical_service_entrance_and_panels"
+        },
+        "electrical_branch_circuits_devices_fixtures_rating": {
+          "from": "item",
+          "itemId": "electrical_branch_circuits_devices_fixtures"
+        },
+        "electrical_branch_circuits_devices_fixtures_comments": {
+          "from": "item_comments",
+          "itemId": "electrical_branch_circuits_devices_fixtures"
+        },
+        "electrical_branch_circuits_devices_fixtures_wiring_type": {
+          "from": "item_attribute",
+          "itemId": "electrical_branch_circuits_devices_fixtures",
+          "attribute": "wiring_type"
+        },
+        "electrical_other_rating": {
+          "from": "item",
+          "itemId": "electrical_other"
+        },
+        "electrical_other_comments": {
+          "from": "item_comments",
+          "itemId": "electrical_other"
+        },
+        "hvac_heating_equipment_rating": {
+          "from": "item",
+          "itemId": "hvac_heating_equipment"
+        },
+        "hvac_heating_equipment_comments": {
+          "from": "item_comments",
+          "itemId": "hvac_heating_equipment"
+        },
+        "hvac_heating_equipment_system_type": {
+          "from": "item_attribute",
+          "itemId": "hvac_heating_equipment",
+          "attribute": "system_type"
+        },
+        "hvac_heating_equipment_energy_sources": {
+          "from": "item_attribute",
+          "itemId": "hvac_heating_equipment",
+          "attribute": "energy_sources"
+        },
+        "hvac_cooling_equipment_rating": {
+          "from": "item",
+          "itemId": "hvac_cooling_equipment"
+        },
+        "hvac_cooling_equipment_comments": {
+          "from": "item_comments",
+          "itemId": "hvac_cooling_equipment"
+        },
+        "hvac_cooling_equipment_system_type": {
+          "from": "item_attribute",
+          "itemId": "hvac_cooling_equipment",
+          "attribute": "system_type"
+        },
+        "hvac_duct_systems_chases_vents_rating": {
+          "from": "item",
+          "itemId": "hvac_duct_systems_chases_vents"
+        },
+        "hvac_duct_systems_chases_vents_comments": {
+          "from": "item_comments",
+          "itemId": "hvac_duct_systems_chases_vents"
+        },
+        "hvac_other_rating": {
+          "from": "item",
+          "itemId": "hvac_other"
+        },
+        "hvac_other_comments": {
+          "from": "item_comments",
+          "itemId": "hvac_other"
+        },
+        "plumbing_supply_distribution_fixtures_rating": {
+          "from": "item",
+          "itemId": "plumbing_supply_distribution_fixtures"
+        },
+        "plumbing_supply_distribution_fixtures_comments": {
+          "from": "item_comments",
+          "itemId": "plumbing_supply_distribution_fixtures"
+        },
+        "plumbing_supply_water_meter_location": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supply_distribution_fixtures",
+          "attribute": "water_meter_location"
+        },
+        "plumbing_supply_main_water_supply_valve_location": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supply_distribution_fixtures",
+          "attribute": "main_water_supply_valve_location"
+        },
+        "plumbing_supply_static_water_pressure": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supply_distribution_fixtures",
+          "attribute": "static_water_pressure"
+        },
+        "plumbing_supply_piping_material": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supply_distribution_fixtures",
+          "attribute": "piping_material"
+        },
+        "plumbing_drains_wastes_vents_rating": {
+          "from": "item",
+          "itemId": "plumbing_drains_wastes_vents"
+        },
+        "plumbing_drains_wastes_vents_comments": {
+          "from": "item_comments",
+          "itemId": "plumbing_drains_wastes_vents"
+        },
+        "plumbing_drains_piping_material": {
+          "from": "item_attribute",
+          "itemId": "plumbing_drains_wastes_vents",
+          "attribute": "piping_material"
+        },
+        "plumbing_water_heating_equipment_rating": {
+          "from": "item",
+          "itemId": "plumbing_water_heating_equipment"
+        },
+        "plumbing_water_heating_equipment_comments": {
+          "from": "item_comments",
+          "itemId": "plumbing_water_heating_equipment"
+        },
+        "plumbing_water_heating_equipment_energy_sources": {
+          "from": "item_attribute",
+          "itemId": "plumbing_water_heating_equipment",
+          "attribute": "energy_sources"
+        },
+        "plumbing_water_heating_equipment_capacity": {
+          "from": "item_attribute",
+          "itemId": "plumbing_water_heating_equipment",
+          "attribute": "capacity"
+        },
+        "plumbing_hydro_massage_therapy_equipment_rating": {
+          "from": "item",
+          "itemId": "plumbing_hydro_massage_therapy_equipment"
+        },
+        "plumbing_hydro_massage_therapy_equipment_comments": {
+          "from": "item_comments",
+          "itemId": "plumbing_hydro_massage_therapy_equipment"
+        },
+        "plumbing_gas_distribution_and_appliances_rating": {
+          "from": "item",
+          "itemId": "plumbing_gas_distribution_and_appliances"
+        },
+        "plumbing_gas_distribution_and_appliances_comments": {
+          "from": "item_comments",
+          "itemId": "plumbing_gas_distribution_and_appliances"
+        },
+        "plumbing_gas_meter_location": {
+          "from": "item_attribute",
+          "itemId": "plumbing_gas_distribution_and_appliances",
+          "attribute": "meter_location"
+        },
+        "plumbing_gas_distribution_piping_material": {
+          "from": "item_attribute",
+          "itemId": "plumbing_gas_distribution_and_appliances",
+          "attribute": "piping_material"
+        },
+        "plumbing_other_rating": {
+          "from": "item",
+          "itemId": "plumbing_other"
+        },
+        "plumbing_other_comments": {
+          "from": "item_comments",
+          "itemId": "plumbing_other"
+        },
+        "appliances_dishwashers_rating": {
+          "from": "item",
+          "itemId": "appliances_dishwashers"
+        },
+        "appliances_dishwashers_comments": {
+          "from": "item_comments",
+          "itemId": "appliances_dishwashers"
+        },
+        "appliances_food_waste_disposers_rating": {
+          "from": "item",
+          "itemId": "appliances_food_waste_disposers"
+        },
+        "appliances_food_waste_disposers_comments": {
+          "from": "item_comments",
+          "itemId": "appliances_food_waste_disposers"
+        },
+        "appliances_range_hood_and_exhaust_systems_rating": {
+          "from": "item",
+          "itemId": "appliances_range_hood_and_exhaust_systems"
+        },
+        "appliances_range_hood_and_exhaust_systems_comments": {
+          "from": "item_comments",
+          "itemId": "appliances_range_hood_and_exhaust_systems"
+        },
+        "appliances_ranges_cooktops_ovens_rating": {
+          "from": "item",
+          "itemId": "appliances_ranges_cooktops_ovens"
+        },
+        "appliances_ranges_cooktops_ovens_comments": {
+          "from": "item_comments",
+          "itemId": "appliances_ranges_cooktops_ovens"
+        },
+        "appliances_microwave_ovens_rating": {
+          "from": "item",
+          "itemId": "appliances_microwave_ovens"
+        },
+        "appliances_microwave_ovens_comments": {
+          "from": "item_comments",
+          "itemId": "appliances_microwave_ovens"
+        },
+        "appliances_mechanical_exhaust_vents_and_bathroom_heaters_rating": {
+          "from": "item",
+          "itemId": "appliances_mechanical_exhaust_vents_and_bathroom_heaters"
+        },
+        "appliances_mechanical_exhaust_vents_and_bathroom_heaters_comments": {
+          "from": "item_comments",
+          "itemId": "appliances_mechanical_exhaust_vents_and_bathroom_heaters"
+        },
+        "appliances_garage_door_operators_rating": {
+          "from": "item",
+          "itemId": "appliances_garage_door_operators"
+        },
+        "appliances_garage_door_operators_comments": {
+          "from": "item_comments",
+          "itemId": "appliances_garage_door_operators"
+        },
+        "appliances_dryer_exhaust_systems_rating": {
+          "from": "item",
+          "itemId": "appliances_dryer_exhaust_systems"
+        },
+        "appliances_dryer_exhaust_systems_comments": {
+          "from": "item_comments",
+          "itemId": "appliances_dryer_exhaust_systems"
+        },
+        "appliances_other_rating": {
+          "from": "item",
+          "itemId": "appliances_other"
+        },
+        "appliances_other_comments": {
+          "from": "item_comments",
+          "itemId": "appliances_other"
+        },
+        "optional_landscape_irrigation_systems_rating": {
+          "from": "item",
+          "itemId": "optional_landscape_irrigation_systems"
+        },
+        "optional_landscape_irrigation_systems_comments": {
+          "from": "item_comments",
+          "itemId": "optional_landscape_irrigation_systems"
+        },
+        "optional_swimming_pools_spas_hot_tubs_rating": {
+          "from": "item",
+          "itemId": "optional_swimming_pools_spas_hot_tubs"
+        },
+        "optional_swimming_pools_spas_hot_tubs_comments": {
+          "from": "item_comments",
+          "itemId": "optional_swimming_pools_spas_hot_tubs"
+        },
+        "optional_swimming_pools_spas_hot_tubs_construction_type": {
+          "from": "item_attribute",
+          "itemId": "optional_swimming_pools_spas_hot_tubs",
+          "attribute": "construction_type"
+        },
+        "optional_outbuildings_rating": {
+          "from": "item",
+          "itemId": "optional_outbuildings"
+        },
+        "optional_outbuildings_comments": {
+          "from": "item_comments",
+          "itemId": "optional_outbuildings"
+        },
+        "optional_private_water_wells_rating": {
+          "from": "item",
+          "itemId": "optional_private_water_wells"
+        },
+        "optional_private_water_wells_comments": {
+          "from": "item_comments",
+          "itemId": "optional_private_water_wells"
+        },
+        "optional_private_water_wells_pump_type": {
+          "from": "item_attribute",
+          "itemId": "optional_private_water_wells",
+          "attribute": "pump_type"
+        },
+        "optional_private_water_wells_storage_equipment_type": {
+          "from": "item_attribute",
+          "itemId": "optional_private_water_wells",
+          "attribute": "storage_equipment_type"
+        },
+        "optional_private_sewage_disposal_systems_rating": {
+          "from": "item",
+          "itemId": "optional_private_sewage_disposal_systems"
+        },
+        "optional_private_sewage_disposal_systems_comments": {
+          "from": "item_comments",
+          "itemId": "optional_private_sewage_disposal_systems"
+        },
+        "optional_private_sewage_disposal_systems_system_type": {
+          "from": "item_attribute",
+          "itemId": "optional_private_sewage_disposal_systems",
+          "attribute": "system_type"
+        },
+        "optional_private_sewage_disposal_systems_drain_field_location": {
+          "from": "item_attribute",
+          "itemId": "optional_private_sewage_disposal_systems",
+          "attribute": "drain_field_location"
+        },
+        "optional_other_built_in_appliances_rating": {
+          "from": "item",
+          "itemId": "optional_other_built_in_appliances"
+        },
+        "optional_other_built_in_appliances_comments": {
+          "from": "item_comments",
+          "itemId": "optional_other_built_in_appliances"
+        },
+        "optional_other_rating": {
+          "from": "item",
+          "itemId": "optional_other"
+        },
+        "optional_other_comments": {
+          "from": "item_comments",
+          "itemId": "optional_other"
+        },
+        "client_name": {
+          "from": "inspection",
+          "field": "client_name"
+        },
+        "inspection_date": {
+          "from": "inspection",
+          "field": "inspection_date"
+        },
+        "inspector_name": {
+          "from": "inspection",
+          "field": "inspector_name"
+        },
+        "inspector_license_number": {
+          "from": "inspection",
+          "field": "inspector_license"
+        },
+        "property_address": {
+          "from": "inspection",
+          "field": "property_address"
+        },
+        "report_identification_on_page_3": {
+          "from": "inspection",
+          "field": "property_address"
+        },
+        "report_identification_on_page_4": {
+          "from": "inspection",
+          "field": "property_address"
+        },
+        "report_identification_on_page_5": {
+          "from": "inspection",
+          "field": "property_address"
+        },
+        "report_identification_on_page_6": {
+          "from": "inspection",
+          "field": "property_address"
+        },
+        "page_total_on_page_2": {
+          "from": "literal",
+          "value": "6"
+        },
+        "page_total_on_page_3": {
+          "from": "literal",
+          "value": "6"
+        },
+        "page_total_on_page_4": {
+          "from": "literal",
+          "value": "6"
+        },
+        "page_total_on_page_5": {
+          "from": "literal",
+          "value": "6"
+        },
+        "page_total_on_page_6": {
+          "from": "literal",
+          "value": "6"
+        }
+      }
+    }
   }
 }
