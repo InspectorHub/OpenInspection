@@ -120,6 +120,7 @@ export default [
   route("resources/members-template", "routes/resources/members-template.ts"),
   route("resources/inspection-prefs", "routes/resources/inspection-prefs.tsx"),
   route("resources/marketplace-install", "routes/resources/marketplace-install.tsx"),
+  route("resources/marketplace-uninstall", "routes/resources/marketplace-uninstall.tsx"),
   route("resources/statutory-update", "routes/resources/statutory-update.tsx"),
   route("resources/inspection-settings-sheet", "routes/resources/inspection-settings-sheet.tsx"),
   route("resources/inspection-media", "routes/resources/inspection-media.tsx"),

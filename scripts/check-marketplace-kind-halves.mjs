@@ -15,16 +15,29 @@
  * is why the check is per kind and per half, not "there is an uninstall
  * somewhere".
  *
- * ── ⚠️ THIS GATE IS RED ON ARRIVAL, AND THAT IS THE POINT ───────────────────
- * There is no un-import path anywhere in `marketplace.service.ts` today —
- * neither existing kind has its second half. The gate is not describing a
- * mistake made while writing it; it is reporting a gap that was already there
- * and that nothing else in the tree could see. It goes green when the un-import
- * path lands.
+ * It arrived RED on purpose: no un-import path existed anywhere in
+ * `marketplace.service.ts`, so neither kind had its second half. It was not
+ * describing a mistake made while writing it; it was reporting a gap that was
+ * already there and that nothing else in the tree could see.
  *
  * Loosening the check to make it green sooner would blind it at exactly the
  * moment it matters: the next kind added is the one nobody has a mental model
  * for yet.
+ *
+ * ── ⚠️ A BRANCH THAT NOTHING CALLS IS NOT A HALF ────────────────────────────
+ * The first version of this gate counted branches inside two service members and
+ * stopped there, and it reported 6/6 GREEN over an `uninstall()` with no route,
+ * no action and no button anywhere — while both locale files already shipped the
+ * sentence an inspector reads when a template was retired BY an uninstall, a
+ * state no workspace could reach. "Both halves exist" was true of the service
+ * and false of the product.
+ *
+ * So each half is now also required to be CALLED from the API surface
+ * (`server/api/`, `server/portal/`). That is the honest limit of what this
+ * instrument can measure: it proves a request can reach the half, not that a
+ * person can — a route with no button in `app/` still passes, and a route in a
+ * file nobody mounts still passes. It closes the failure that actually happened
+ * and it does not pretend to close more.
  *
  * ── Why the halves are scoped to their own function bodies ──────────────────
  * A file-wide search for `kind === 'comments'` is satisfied by ANY mention,
@@ -37,13 +50,16 @@
  *
  *   node scripts/check-marketplace-kind-halves.mjs
  */
-import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SCHEMA_FILE = 'server/lib/db/schema/marketplace.ts';
 const SERVICE_FILE = 'server/services/marketplace.service.ts';
+
+/** Where a request can enter. A half called from nowhere here is unreachable. */
+const CALLER_DIRS = ['server/api', 'server/portal'];
 
 /**
  * The two halves, and the member each one lives in.
@@ -210,6 +226,52 @@ if (importBody === undefined) {
         + 'finding about the service.');
 }
 
+// ---------------------------------------------------------------------------
+// Reachability: is each half called from somewhere a request can arrive?
+// ---------------------------------------------------------------------------
+
+function walk(dir, out = []) {
+    if (!existsSync(dir)) return out;
+    for (const name of readdirSync(dir)) {
+        if (name === 'node_modules') continue;
+        const abs = join(dir, name);
+        if (statSync(abs).isDirectory()) walk(abs, out);
+        else if (/\.tsx?$/.test(name) && !/\.(test|spec)\.tsx?$/.test(name)) out.push(abs);
+    }
+    return out;
+}
+
+const callerFiles = CALLER_DIRS.flatMap((d) => walk(join(ROOT, d)))
+    .map((abs) => relative(ROOT, abs).replace(/\\/g, '/'));
+
+/** Files whose CODE calls `.<member>(`. Comments stripped first: every file in
+ *  this area describes the rule in prose, and a mention is not a call. */
+function callersOf(member) {
+    const call = new RegExp(`\\.${member}\\s*\\(`);
+    return callerFiles.filter((rel) => call.test(stripComments(readFileSync(join(ROOT, rel), 'utf8'))));
+}
+
+const unreachable = [];
+const reachability = [];
+for (const half of HALVES) {
+    const present = half.members.filter((m) => memberBody(service, m) !== null);
+    if (present.length === 0) continue;   // already reported as missing above
+    const callers = present.flatMap((m) => callersOf(m).map((rel) => ({ m, rel })));
+    reachability.push({ half: half.name, callers: callers.length });
+    if (callers.length === 0) {
+        unreachable.push({ half: half.name, members: present.join('/') });
+    }
+}
+
+// The import half certainly has a route today. If the reader cannot see THAT
+// call, its silence about the other half is worth nothing.
+const importReachable = reachability.find((r) => r.half === HALVES[0].name);
+if (importReachable !== undefined && importReachable.callers === 0) {
+    blind.push('  ✘ the import half reads as called from nowhere under '
+        + `${CALLER_DIRS.join(', ')}. It has a route in reality, so this is the reachability `
+        + 'reader having broken rather than a finding about the service.');
+}
+
 const total = kinds.length * HALVES.length;
 
 // Both numbers on every run, including the zeroes.
@@ -217,6 +279,9 @@ console.log(`marketplace-kinds: parser self-check ${FIXTURES.length} case(s) / `
     + `${FIXTURES.length - selfTestFailures} as expected.`);
 console.log(`marketplace-kinds: ${kinds.length} kind(s) declared (${kinds.join(', ')}) · `
     + `${total - missing.length}/${total} halves present.`);
+console.log(`marketplace-kinds: ${callerFiles.length} file(s) under ${CALLER_DIRS.join(', ')} read · `
+    + `${reachability.filter((r) => r.callers > 0).length}/${reachability.length} half/halves `
+    + `called from one (${reachability.map((r) => `${r.half}: ${r.callers}`).join(', ') || 'none'}).`);
 
 if (kinds.length === 0) {
     console.log('  ✘ the enum parsed to zero kinds, so this gate checked nothing.');
@@ -232,5 +297,12 @@ for (const { kind, half, reason } of missing) {
         + 'one.');
 }
 
-if (selfTestFailures > 0 || blind.length > 0 || missing.length > 0) process.exit(1);
+for (const { half, members } of unreachable) {
+    console.log(`  ✘ the ${half} half (${members}) exists in ${SERVICE_FILE} and nothing under `
+        + `${CALLER_DIRS.join(' or ')} calls it. A branch nothing can reach is not a half: this `
+        + 'gate reported 6/6 green over exactly that state once, while the template picker shipped '
+        + 'copy describing a situation no workspace could produce. Give it a route, or remove it.');
+}
+
+if (selfTestFailures > 0 || blind.length > 0 || missing.length > 0 || unreachable.length > 0) process.exit(1);
 process.exit(0);

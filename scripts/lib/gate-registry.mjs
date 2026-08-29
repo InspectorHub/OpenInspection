@@ -297,12 +297,18 @@ export const SCRIPT_GATES = [
     // It reads ~1,039 server sources with one regex and parses the payload of
     // the handful that name the table.
     { key: 'cataloguewrites', label: 'lint:catalogue-writes', script: 'check-catalogue-write-points.mjs', fix: 'npm run lint:catalogue-writes', rung: PUSH },
-    // ⚠️ THIS GATE IS RED TODAY, DELIBERATELY. Neither existing catalogue kind
-    // has an un-import path — there is no uninstall anywhere in
-    // marketplace.service.ts — so it reports 2 of 4 halves present on arrival.
-    // It is not describing a mistake made while writing it; it is reporting a
-    // gap that was already there and that nothing in the tree could see, and it
-    // goes green when the un-import path lands.
+    // Green since the un-import path landed: 6/6 halves across three kinds. It
+    // arrived RED on purpose — neither existing kind had a second half, which
+    // was a gap already in the tree that nothing could see — and this note used
+    // to say so. Left as history rather than deleted, because the next kind
+    // added will turn it red again and that is the gate working.
+    //
+    // ⚠️ It used to check only that the BRANCHES existed, and so reported 6/6
+    // green over an `uninstall()` with no route, no action and no button — the
+    // whole of the commit that turned it green. It now also requires each half
+    // to be called from server/api or server/portal. That is its honest limit: a
+    // request can reach the half, not a person — a route with no button still
+    // passes.
     //
     // PUSH rather than PRECOMMIT for the ordinary reason and one extra. The
     // ordinary one: a catalogue kind is added in a change, not a keystroke, and

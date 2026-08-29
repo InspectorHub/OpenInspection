@@ -12,6 +12,7 @@ import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 import { StatutoryUpdateConfirm } from "~/components/marketplace/StatutoryUpdateConfirm";
+import { UninstallConfirm } from "~/components/marketplace/UninstallConfirm";
 import type { StatutoryUpdateImpact } from "../../server/services/marketplace/statutory-update-impact";
 
 export function meta() {
@@ -101,6 +102,19 @@ export default function MarketplacePage() {
   const { fetcher: updateFetcher, submit: submitUpdate, busy: applyingUpdate } =
     useGuardedSubmit<{ ok: boolean }>();
 
+  // Un-installing. It reached the UI last of the three verbs and only after an
+  // audit: the service method existed, nothing anywhere called it, and the
+  // template picker meanwhile shipped copy for a template retired BY an
+  // uninstall — a state no workspace could reach. Guarded like the update, and
+  // confirmed for the same reason: for a comment pack it removes rows.
+  const [uninstalling, setUninstalling] = useState<{ id: string; name: string; kind: string | null } | null>(null);
+  const { fetcher: uninstallFetcher, submit: submitUninstall, busy: removing } =
+    useGuardedSubmit<{ ok: boolean }>();
+
+  useEffect(() => {
+    if (uninstallFetcher.state === "idle" && uninstallFetcher.data?.ok) setUninstalling(null);
+  }, [uninstallFetcher.state, uninstallFetcher.data]);
+
   function reviewStatutoryUpdate(id: string, name: string) {
     setUpdating({ id, name });
     impactFetcher.load(`/resources/statutory-update?libraryId=${encodeURIComponent(id)}`);
@@ -145,6 +159,14 @@ export default function MarketplacePage() {
         </div>
       )}
 
+      {uninstallFetcher.data && uninstallFetcher.data.ok === false && (
+        <div className="mt-3">
+          {/* Said out loud, and it says nothing was changed: a failed uninstall
+              that looked like nothing happening would invite a second press. */}
+          <Banner tone="danger">{m.marketplace_uninstall_error()}</Banner>
+        </div>
+      )}
+
       {templates.length === 0 ? (
         <Card>
           <EmptyState
@@ -164,6 +186,11 @@ export default function MarketplacePage() {
               // second local copy and destroys nothing.
               const reviewUpdate = t.kind === "comments" && t.hasUpdate === true;
               const statutoryUpdate = t.kind === "statutory" && t.hasUpdate === true;
+              // `importedSemver` is null for a pack this workspace does not
+              // have, INCLUDING one it uninstalled — the marker survives an
+              // un-import but the browse query no longer reads it as an
+              // install, which is what makes Install the offer on the way back.
+              const installed = typeof t.importedSemver === "string";
               return (
               <Card key={t.id} className="p-4">
                 <p className="text-[13px] font-semibold text-ih-fg-1">{t.name || t.title}</p>
@@ -179,32 +206,44 @@ export default function MarketplacePage() {
                       <span className="text-[11px] text-ih-fg-3">{t.author}</span>
                     )}
                   </div>
-                  {statutoryUpdate ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => reviewStatutoryUpdate(t.id, t.name || t.title || "")}
-                    >
-                      {m.marketplace_review_update()}
-                    </Button>
-                  ) : reviewUpdate ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => navigate(`/library/marketplace/${t.id}/update`)}
-                    >
-                      {m.marketplace_review_update()}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => handleInstall(t.id)}
-                      disabled={installing}
-                    >
-                      {installingId === t.id ? m.marketplace_installing() : m.marketplace_install()}
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {statutoryUpdate ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => reviewStatutoryUpdate(t.id, t.name || t.title || "")}
+                      >
+                        {m.marketplace_review_update()}
+                      </Button>
+                    ) : reviewUpdate ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate(`/library/marketplace/${t.id}/update`)}
+                      >
+                        {m.marketplace_review_update()}
+                      </Button>
+                    ) : !installed ? (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleInstall(t.id)}
+                        disabled={installing}
+                      >
+                        {installingId === t.id ? m.marketplace_installing() : m.marketplace_install()}
+                      </Button>
+                    ) : null}
+                    {installed && (
+                      <Button
+                        variant="danger-link"
+                        size="sm"
+                        onClick={() => setUninstalling({ id: t.id, name: t.name || t.title || "", kind: t.kind ?? null })}
+                        disabled={removing}
+                      >
+                        {m.marketplace_uninstall()}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </Card>
               );
@@ -223,6 +262,21 @@ export default function MarketplacePage() {
               submitUpdate(
                 { libraryId: updating.id },
                 { method: "post", action: "/resources/statutory-update" },
+              );
+            }}
+          />
+
+          <UninstallConfirm
+            open={uninstalling !== null}
+            name={uninstalling?.name ?? ""}
+            kind={uninstalling?.kind ?? null}
+            submitting={removing}
+            onCancel={() => setUninstalling(null)}
+            onConfirm={() => {
+              if (!uninstalling) return;
+              submitUninstall(
+                { libraryId: uninstalling.id },
+                { method: "post", action: "/resources/marketplace-uninstall" },
               );
             }}
           />

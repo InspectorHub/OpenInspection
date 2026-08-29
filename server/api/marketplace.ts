@@ -14,7 +14,7 @@ import {
     buildMeta,
 } from '../lib/validations/pagination.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
-import statutoryUpdateRoutes from './marketplace/statutory-update';
+import marketplaceSubRoutes from './marketplace/sub-routes';
 
 const marketplaceRoutes = createApiRouter()
 // GET /api/templates/marketplace
@@ -393,7 +393,7 @@ const marketplaceRoutes = createApiRouter()
     });
     return c.json({ success: true, data: result }, 200);
 })
-    .route('/', statutoryUpdateRoutes);
+    .route('/', marketplaceSubRoutes);
 
 export type MarketplaceApi = typeof marketplaceRoutes;
 export default marketplaceRoutes;
