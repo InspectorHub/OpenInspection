@@ -44,20 +44,9 @@ import type {
     ResultsProjection,
 } from '../../lib/collab/results-doc.types';
 
-/**
- * Spec 5B — v2 template-schema comment shapes. Moved here from inside
- * `getReportData` (shapes unchanged).
- *
- * @declarationEmit Exported so the emitted `.d.ts` can NAME them: they surface
- * in that method's inferred return type, and a composite project cannot
- * reference a function-local interface (TS4053/TS4055). No module imports them
- * by name — hence the tag for knip.
- */
-export interface CannedInfoComment { id: string; title: string; comment: string; default: boolean }
-/** @declarationEmit see CannedInfoComment. */
-export interface CannedDefect      { id: string; title: string; category: string; location: string; comment: string; photos: string[]; default: boolean }
-/** @declarationEmit see CannedInfoComment. */
-export interface ItemTabs          { information: CannedInfoComment[]; limitations: CannedInfoComment[]; defects: CannedDefect[] }
+import type {
+    CannedDefect, CannedInfoComment, SchemaData, SchemaItem, SchemaSection,
+} from './report-schema-types';
 
 /**
  * Authoring unification Plan-4 module K — pure decision of whether a defect's
@@ -170,19 +159,10 @@ export class InspectionReportService extends InspectionSubService {
         const renderedReportId = await resolveRenderedReportId(db, tenantId, inspectionId, reportId);
         const resultsRow = await resolveResultsRow(db, tenantId, inspectionId, renderedReportId);
 
-        // Spec 5B — v2 schema is the authoritative shape. Items are 'rich'
-        // (rating + 3 tabs of canned comments) or 'text' (free-text notes).
-        // CannedInfoComment / CannedDefect / ItemTabs are declared at module
-        // scope (top of this file) — they surface in getReportData's inferred
-        // return type, which a declaration-emitting project cannot name from a
-        // function-local declaration (TS4053/TS4055).
-        interface SchemaItem        { id: string; label: string; icon?: string; type?: string; ratingOptions?: string[]; tabs?: ItemTabs; number?: string }
-        // Track E2 (Spectora App.A) — per-section disclaimer + force-page-break
-        // are stored on the schema's section node so the editor can author
-        // them and the published report can honor them. Both are optional —
-        // legacy templates without these fields render unchanged.
-        interface SchemaSection     { id: string; title: string; icon?: string; items: SchemaItem[]; disclaimerText?: string | null; alwaysPageBreak?: boolean }
-        interface SchemaData        { schemaVersion?: number; sections: SchemaSection[]; ratingSystem?: { levels: RatingLevel[] } }
+        // Spec 5B — the v2 schema shapes now live in `./report-schema-types`.
+        // They were function-local here, which meant nothing outside this
+        // method could name what the report reads -- so no spec could assert
+        // it, and `lint:item-key-parity` had no seventh mirror to compare.
         // PhotoEntry, CannedState, DefectState, and ResultsProjection (ItemEntry)
         // are imported from '../../lib/collab/results-doc.types' — single
         // source of truth for the inspection_results.data projection shape.
@@ -424,6 +404,10 @@ export class InspectionReportService extends InspectionSubService {
                 return {
                     id: item.id,
                     label: item.label || (item as unknown as Record<string, string>).name || 'Untitled',
+                    // Carried through untouched. The renderer decides what a
+                    // parent pointer looks like; the projection only refuses to
+                    // be the place it gets lost.
+                    parentId: item.parentId ?? null,
                     type:  item.type ?? 'rich',
                     ratingOptions: item.ratingOptions ?? null,
                     // Spec 5B — pass the raw template canned tabs through so

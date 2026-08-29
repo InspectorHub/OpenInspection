@@ -35,6 +35,18 @@ export const SCRIPT_GATES = [
     // -digit milliseconds, the cheapest entry in this list.
     { key: 'chromerecord', label: 'Chrome-record judge self-test', script: 'check-chrome-record.mjs', fix: 'npm run lint:chrome-record', rung: PRECOMMIT, args: ['--self-test'] },
     { key: 'filesize', label: 'Large-file ratchet', script: 'check-file-size.mjs', fix: 'npm run lint:filesize', rung: PRECOMMIT },
+    // PRECOMMIT, not PUSH. What this catches IS a keystroke: someone adds a key
+    // to TemplateItem and does not add it to the five silent mirrors -- the ones
+    // that strip it, never serialize it, or simply do not read it, all without
+    // an error. The damage lands the moment that commit exists, and the author
+    // is the only person who will ever know which of the seven they meant to
+    // change. It reads six files with six parsers; cost is milliseconds.
+    //
+    // It was written already red: `number` was being dropped by two mirrors
+    // before this gate existed. It is registered here, not when it was written,
+    // because a gate that arrives red forces every commit in between to choose
+    // between a failing hook and --no-verify.
+    { key: 'itemkeyparity', label: 'Template item-key parity', script: 'check-item-key-parity.mjs', fix: 'npm run lint:item-key-parity', rung: PRECOMMIT },
     { key: 'tz', label: 'Calendar timezone-safety', script: 'check-tz-safety.mjs', fix: 'npm run lint:tz', rung: PRECOMMIT },
     { key: 'idempotency', label: 'Mutating-route retry safety', script: 'check-idempotency-coverage.mjs', fix: 'npm run lint:idempotency', rung: PRECOMMIT },
     // PRECOMMIT, and the rung is the point. D1 stops at 100 columns per table,
