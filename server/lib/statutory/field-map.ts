@@ -35,6 +35,7 @@
  * green check is not read as more than it is.
  */
 import { PDFDocument } from 'pdf-lib';
+import type { ValuePart } from './value-parts';
 
 /**
  * One value's route onto the page.
@@ -75,7 +76,20 @@ export type FieldMapping =
          * made unreadable. Absent means no shrinking at all: a floor nobody
          * measured is not a floor.
          */
-        minSize?: number }
+        minSize?: number;
+        /**
+         * Draw only THIS PART of the value. Absent means the whole value, which
+         * is what every map authored before this field existed says.
+         *
+         * It exists because some forms print a value's separators themselves.
+         * Measured on FL OIR-B1-1802: a date is three blanks with the form's own
+         * slashes in the two 2.8pt gaps between them, and one overlay covering
+         * all three writes the year across the wrong blank while leaving the
+         * year's own blank empty. Three overlays, one per part, is the only way
+         * to fill a form like that from a single value — and entry stays a
+         * single date box, which is the whole point.
+         */
+        part?: ValuePart }
     | { kind: 'checkbox'; ourField: string; whenValue: string; page: number; x: number; y: number; size?: number }
     | { kind: 'signature'; ourField: string; scope: string;
         page: number; x: number; y: number; width: number; height: number };
@@ -251,15 +265,19 @@ function validateOverlayFit(m: OverlayMapping): void {
 /**
  * Two mappings must not compete for one value.
  *
- * A repeated `ourField` is legitimate for checkboxes and only for checkboxes —
- * that is a multiple-choice answer spread across boxes the file does not group.
- * Anywhere else it writes one value into two places, and the second one is
- * always the one nobody meant. Two checkboxes sharing a field AND a value is a
- * coordinate that was pasted and never re-measured.
+ * A repeated `ourField` is legitimate in exactly two ways. A CHECKBOX repeats it
+ * because a multiple-choice answer maps onto boxes the file does not group. An
+ * OVERLAY repeats it only by drawing a DIFFERENT PART of it, because some forms
+ * print a value's separators themselves and the parts have to land in separate
+ * blanks. Anywhere else it writes one value into two places, and the second one
+ * is always the one nobody meant.
  */
 function validateNoDuplicateTargets(mappings: readonly FieldMapping[]): void {
-    const singleValue = new Set<string>();
+    const drawnSlots = new Set<string>();
     const checkboxAnswers = new Set<string>();
+    const wholeValueFields = new Set<string>();
+    const partedFields = new Set<string>();
+
     for (const m of mappings) {
         if (m.kind === 'checkbox') {
             const key = `${m.ourField} ${m.whenValue}`;
@@ -269,13 +287,31 @@ function validateNoDuplicateTargets(mappings: readonly FieldMapping[]): void {
             checkboxAnswers.add(key);
             continue;
         }
-        if (singleValue.has(m.ourField)) {
-            fail(`"${m.ourField}" is mapped twice; only a checkbox may repeat a field`);
+        const part = m.kind === 'overlay' ? m.part : undefined;
+        // The key carries the part, so two overlays drawing the SAME part of the
+        // same value are still a coordinate that was pasted and never re-measured.
+        const slot = `${m.ourField} ${part ?? ''}`;
+        if (drawnSlots.has(slot)) {
+            fail(part === undefined
+                ? `"${m.ourField}" is mapped twice; only a checkbox may repeat a field, and an `
+                    + 'overlay may repeat one only by drawing a different part of it'
+                : `"${m.ourField}" draws the part "${part}" twice; a repeated part is a `
+                    + 'coordinate that was pasted and never re-measured');
         }
-        singleValue.add(m.ourField);
+        drawnSlots.add(slot);
+        (part === undefined ? wholeValueFields : partedFields).add(m.ourField);
+    }
+
+    for (const field of partedFields) {
+        if (wholeValueFields.has(field)) {
+            fail(`"${field}" is drawn both in parts and as a whole value; the whole-value `
+                + 'overlay is written across the parts, which is the failure the parts exist '
+                + 'to prevent');
+        }
     }
     for (const m of mappings) {
-        if (m.kind === 'checkbox' && singleValue.has(m.ourField)) {
+        if (m.kind === 'checkbox'
+            && (wholeValueFields.has(m.ourField) || partedFields.has(m.ourField))) {
             fail(`"${m.ourField}" is mapped both as a checkbox and as a single value`);
         }
     }

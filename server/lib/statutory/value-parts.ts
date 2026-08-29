@@ -42,8 +42,12 @@
  * ⚠️ This strictness is affordable only now. `PUBLISHED_FORM_VERSIONS` and
  * `FIELD_MAPS` are both `[]`, so no workflow breaks. Loosening later is
  * possible; tightening later is not.
+ *
+ * `import type` from `field-map.ts` is erased at build time, so the only real
+ * module edge is field-map -> here. There is no cycle.
  */
 import { utcMidnightOf } from './inspection-date';
+import type { FieldMapping } from './field-map';
 
 /** The parts of a value an overlay may draw on its own. Closed on purpose. */
 export type ValuePart = 'date_month' | 'date_day' | 'date_year';
@@ -105,4 +109,61 @@ export function partOfValue(value: string, part: ValuePart, ourField: string): s
             + 'not a day that exists.');
     }
     return parsed[GROUP[part]];
+}
+
+/** One parted overlay, reduced to the fields every rule below reads. */
+interface PartedOverlay {
+    ourField: string;
+    part: ValuePart;
+    size: number;
+    maxWidth: number | undefined;
+    maxHeight: number | undefined;
+    minSize: number | undefined;
+}
+
+/** Every overlay in a map that draws a part, with its `ourField`. */
+function partedOverlays(mappings: readonly FieldMapping[]): PartedOverlay[] {
+    const out: PartedOverlay[] = [];
+    for (const m of mappings) {
+        if (m.kind === 'overlay' && m.part !== undefined) {
+            out.push({
+                ourField: m.ourField, part: m.part, size: m.size,
+                maxWidth: m.maxWidth, maxHeight: m.maxHeight, minSize: m.minSize,
+            });
+        }
+    }
+    return out;
+}
+
+/**
+ * Every value drawn in parts is readable as one, reported all at once.
+ *
+ * Called from `checkValuesAgainstMap` BEFORE the document is loaded. The rule
+ * itself is `partOfValue` and this is a second CALL of it, never a second copy:
+ * a half-implemented duplicate is exactly how the next person comes to fix only
+ * one of them. What this adds is timing and breadth -- a person with four broken
+ * bindings is told about four, not about the first.
+ */
+export function refuseUnreadableParts(
+    mappings: readonly FieldMapping[],
+    values: ReadonlyMap<string, string>,
+): void {
+    const problems: string[] = [];
+    for (const m of partedOverlays(mappings)) {
+        const value = values.get(m.ourField);
+        // Absent was judged against `requiredFields`; an EMPTY STRING is an
+        // explicit answer of "nothing" and leaves every blank empty, exactly as
+        // an unparted overlay does. Refusing it would turn "the inspector had no
+        // permit date" into a document that cannot be produced at all.
+        if (value === undefined || value === '') continue;
+        try {
+            partOfValue(value, m.part, m.ourField);
+        } catch (cause) {
+            problems.push(cause instanceof Error ? cause.message : String(cause));
+        }
+    }
+    if (problems.length > 0) {
+        fail(`${problems.length} value(s) cannot be drawn in parts:\n`
+            + problems.map((p) => `  - ${p.replace(/^statutory render: /, '')}`).join('\n'));
+    }
 }

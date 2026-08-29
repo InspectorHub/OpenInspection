@@ -252,6 +252,76 @@ describe('overlay fit declarations', () => {
     });
 });
 
+/**
+ * Three overlays share one `ourField` on purpose: the form printed three blanks
+ * and its own slashes between them, so one value has to arrive as three pieces.
+ * That is the ONE new way a field may legitimately repeat, and every other way
+ * it can repeat still writes one value over another.
+ */
+describe('validateFieldMapShape — overlays that draw one part of a value', () => {
+    const withMappings = (mappings: FieldMapping[]): FieldMap => ({
+        ...MAP('a'.repeat(64)), requiredFields: [], mappings,
+    });
+
+    /** The real geometry of `building_code_a_permit_application_date`, measured. */
+    const THREE: FieldMapping[] = [
+        { kind: 'overlay', ourField: 'permit_date', part: 'date_month', page: 0,
+            x: 472.20, y: 439.84, size: 9, maxWidth: 20.10, maxHeight: 11 },
+        { kind: 'overlay', ourField: 'permit_date', part: 'date_day', page: 0,
+            x: 495.12, y: 439.84, size: 9, maxWidth: 19.98, maxHeight: 11 },
+        { kind: 'overlay', ourField: 'permit_date', part: 'date_year', page: 0,
+            x: 517.80, y: 439.84, size: 9, maxWidth: 40.02, maxHeight: 11 },
+    ];
+
+    it('POSITIVE CONTROL — three different parts of one field validate', () => {
+        // Without this the refusals below would all pass against a validator
+        // that rejected every parted map.
+        expect(() => validateFieldMapShape(withMappings([...THREE]))).not.toThrow();
+    });
+
+    it('refuses the same part of the same field twice', () => {
+        // A pasted coordinate that was never re-measured. The second one wins
+        // and nothing says the first was overwritten.
+        expect(() => validateFieldMapShape(withMappings([
+            ...THREE, { ...THREE[0], x: 600 } as FieldMapping,
+        ]))).toThrow(/permit_date.*date_month.*twice/is);
+    });
+
+    it('refuses a whole-value overlay beside the parts of the same field', () => {
+        // 45pt of `03/15/2026` drawn across three blanks that already hold the
+        // parts -- the exact failure the parts exist to prevent, reintroduced.
+        expect(() => validateFieldMapShape(withMappings([
+            ...THREE,
+            { kind: 'overlay', ourField: 'permit_date', page: 0, x: 473.7, y: 439.84,
+                size: 9, maxWidth: 88 },
+        ]))).toThrow(/permit_date.*both in parts and as a whole value/is);
+    });
+
+    it('POSITIVE CONTROL — an unparted overlay on a DIFFERENT field is fine', () => {
+        expect(() => validateFieldMapShape(withMappings([
+            ...THREE,
+            { kind: 'overlay', ourField: 'year_built', page: 0, x: 40, y: 439.84,
+                size: 9, maxWidth: 60 },
+        ]))).not.toThrow();
+    });
+
+    it('still refuses two unparted overlays on one field', () => {
+        // The rule that existed before parts. Relaxing the key must not relax
+        // this: the second one is always the one nobody meant.
+        expect(() => validateFieldMapShape(withMappings([
+            { kind: 'overlay', ourField: 'year_built', page: 0, x: 40, y: 400, size: 9 },
+            { kind: 'overlay', ourField: 'year_built', page: 0, x: 90, y: 400, size: 9 },
+        ]))).toThrow(/year_built.*mapped twice/is);
+    });
+
+    it('still refuses a field mapped as both a checkbox and a drawn value', () => {
+        expect(() => validateFieldMapShape(withMappings([
+            ...THREE,
+            { kind: 'checkbox', ourField: 'permit_date', whenValue: 'x', page: 0, x: 40, y: 400 },
+        ]))).toThrow(/permit_date.*checkbox/is);
+    });
+});
+
 describe('validateAgainstPdf', () => {
     it('refuses an acroform mapping naming a field the PDF does not have', async () => {
         const map: FieldMap = {
