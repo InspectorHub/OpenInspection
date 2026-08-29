@@ -286,6 +286,16 @@ export const SCRIPT_GATES = [
     // and costs milliseconds; what it protects is a document somebody files
     // with a government agency, and its own output states the one thing it
     // cannot check (that a person read the form).
+    // PUSH, beside the fidelity gate and for the same reason: a form revision is
+    // published by hand, weeks apart, so there is no stream of commits for a
+    // pre-commit rung to watch. What it protects is narrow and specific -- an
+    // answer this software accepts that the authority's page has nowhere to
+    // record. Measured on the Citizens four-point: `electrical.wiring_types`
+    // offers `other`, the page prints a bare "Other", and an inspector who
+    // picks it sends an insurer a lone X.
+    // ⚠️ It reads 0 options today, because TX TREC REI 7-6 has no `other` at
+    // all, and it PRINTS that zero rather than a tick.
+    { key: 'statutoryanswerable', label: 'lint:statutory-answerable', script: 'check-statutory-answerable.mjs', fix: 'npm run lint:statutory-answerable', rung: PUSH },
     { key: 'statutoryfidelity', label: 'lint:statutory-fidelity', script: 'check-statutory-fidelity.mjs', fix: 'npm run lint:statutory-fidelity', rung: PUSH },
     // Same rung as `statutoryfidelity` beside it and for the same reason: its
     // subject is published by hand, weeks or months apart, so there is no stream

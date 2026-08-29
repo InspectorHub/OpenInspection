@@ -66,6 +66,7 @@
     "lint:columns": "node scripts/check-column-ceiling.mjs",
     "lint:converter-capability": "node scripts/check-converter-capability.mjs",
     "lint:converter-literals": "node scripts/check-converter-literals.mjs",
+    "lint:statutory-answerable": "node scripts/check-statutory-answerable.mjs",
     "lint:statutory-fidelity": "node scripts/check-statutory-fidelity.mjs",
     "lint:statutory-additive": "node scripts/check-statutory-versions-additive.mjs",
     "lint:catalogue-writes": "node scripts/check-catalogue-write-points.mjs",
