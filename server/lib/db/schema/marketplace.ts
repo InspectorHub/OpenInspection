@@ -21,7 +21,12 @@ export const marketplaceLibraries = sqliteTable('marketplace_libraries', {
   // Also the only browse axis that is an enum — property_type reuses the
   // template validator's, and the two below are bounded free text. Backed by
   // idx(kind, featured), which serves list()'s featured-then-downloads order.
-  kind:          text('kind', { enum: ['comments', 'templates'] }).notNull(),
+  // 'statutory' is a 1:1 kind like 'templates' — one catalogue row becomes one
+  // local `templates` row — but it is a separate kind rather than a flag on that
+  // one, because its import validates with a schema that admits a statutory
+  // declaration and its update retires the row it supersedes. Neither is
+  // something an ordinary template import should ever do.
+  kind:          text('kind', { enum: ['comments', 'templates', 'statutory'] }).notNull(),
   // The catalogue's current version. Never ordered or range-compared, only
   // tested for EQUALITY against tenant_library_imports.imported_semver:
   // unequal is what list() reports as `hasUpdate`, equal is what the update

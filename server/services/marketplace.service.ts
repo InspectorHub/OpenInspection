@@ -13,11 +13,12 @@ import { escapeLikePattern } from '../lib/db/like-escape';
 import {
     marketplaceLibraries,
     tenantLibraryImports,
-    tenantMarketplaceImportHistory,
 } from '../lib/db/schema/marketplace';
 import { templates } from '../lib/db/schema'; // `comments` is reached by raw SQL below, and by ./marketplace/library-replace.ts
 import { Errors } from '../lib/errors';
-import { logger } from '../lib/logger';
+import { writeImportHistory } from './marketplace/import-history';
+import { insertLocalTemplate } from './marketplace/local-template';
+import { assertStatutorySchema } from './marketplace/statutory-import';
 import { TemplateService } from './template.service';
 
 /**
@@ -137,41 +138,6 @@ export class MarketplaceService {
   }
 
   /**
-   * Sprint 2 S2-8 — write one row to tenant_marketplace_import_history.
-   * Never throws; swallows + logs so audit failure cannot break imports.
-   */
-  private async writeHistory(input: {
-    templateId?: string | null;
-    libraryId?: string | null;
-    action: 'install' | 'update' | 'replace';
-    sourceVersion?: string | null;
-    targetVersion?: string | null;
-    rowsAffected: number;
-    metadata?: Record<string, unknown>;
-    userId: string;
-  }): Promise<void> {
-    try {
-      await this.db.insert(tenantMarketplaceImportHistory).values({
-        id:            crypto.randomUUID(),
-        tenantId:      this.tenantId,
-        templateId:    input.templateId ?? null,
-        libraryId:     input.libraryId ?? null,
-        action:        input.action,
-        sourceVersion: input.sourceVersion ?? null,
-        targetVersion: input.targetVersion ?? null,
-        rowsAffected:  input.rowsAffected,
-        metadata:      input.metadata ? JSON.stringify(input.metadata) : null,
-        createdAt:     new Date(),
-        createdBy:     input.userId,
-      }).run();
-    } catch (err) {
-      logger.error('[marketplace] history insert failed', {
-        tenantId: this.tenantId, action: input.action,
-      }, err instanceof Error ? err : undefined);
-    }
-  }
-
-  /**
    * Gate a marketplace template's schema on v2 validation. Re-wraps the
    * "schema invalid" failure as a BadRequest with launch-friendly copy;
    * re-throws anything else untouched.
@@ -187,7 +153,6 @@ export class MarketplaceService {
     }
   }
 
-
   /**
    * The one import path, for every kind (#293).
    *
@@ -196,15 +161,16 @@ export class MarketplaceService {
    *
    *   'templates' (1:1) — one catalogue row becomes ONE local `templates` row,
    *                       tracked by that row's id in `local_entity_id`.
+   *   'statutory' (1:1) — the same shape, gated by the extended validator that
+   *                       admits a statutory declaration.
    *   'comments'  (1:N) — one pack becomes N `comments` rows tagged with the
    *                       catalogue id, tracked by `row_count`.
    *
-   * There is no third kind and no generic fallthrough: writing the comments
-   * table because a kind was unrecognised is precisely the failure the branch
-   * exists to prevent.
+   * There is no generic fallthrough: writing the comments table because a kind
+   * was unrecognised is precisely the failure the branch exists to prevent.
    */
   async importCatalogEntry(catalogId: string, userId: string = 'system'): Promise<{
-    kind: 'comments' | 'templates';
+    kind: 'comments' | 'templates' | 'statutory';
     localEntityId: string | null;
     rowCount: number;
   }> {
@@ -240,21 +206,18 @@ export class MarketplaceService {
     let rowCount = 0;
     let localEntityId: string | null = null;
 
-    if (entry.kind === 'templates') {
+    if (entry.kind === 'statutory') {
+      // A different validator, because the tenant-facing one refuses the
+      // declaration this row carries — and it must keep refusing it, which is
+      // why this branch does not reach for a flag on `assertV2Schema`.
+      assertStatutorySchema(entry.schema);
+      localEntityId = await insertLocalTemplate(this.db, this.tenantId, entry.name, entry.schema, now);
+    } else if (entry.kind === 'templates') {
       // Spec 5B P3 — gate imports on v2 schema validation. The catalogue can
       // technically host any JSON; without this check a v1 (legacy
       // `type: 'rating'`) template would leak into a tenant and break the editor.
       this.assertV2Schema(entry.schema);
-
-      localEntityId = crypto.randomUUID();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await this.db.insert(templates as any).values({
-        id:        localEntityId,
-        tenantId:  this.tenantId,
-        name:      entry.name,
-        schema:    entry.schema,
-        createdAt: now,
-      });
+      localEntityId = await insertLocalTemplate(this.db, this.tenantId, entry.name, entry.schema, now);
     } else if (entry.kind === 'comments') {
       const entries = parseLibraryComments(entry.schema);
       rowCount = await insertLibraryComments(this.rawDb, this.tenantId, catalogId, entries);
@@ -277,13 +240,16 @@ export class MarketplaceService {
       .set({ downloadCount: sql`${marketplaceLibraries.downloadCount} + 1`, updatedAt: now })
       .where(eq(marketplaceLibraries.id, catalogId));
 
-    await this.writeHistory({
-      templateId:    entry.kind === 'templates' ? localEntityId : null,
+    await writeImportHistory(this.db, this.tenantId, {
+      // Keyed off what the import actually produced rather than off a list of
+      // kind names: a 1:1 kind has a local row and a 1:N kind has a count, and a
+      // name list here is one more place a new kind has to be remembered.
+      templateId:    localEntityId,
       libraryId:     catalogId,
       action:        'install',
       sourceVersion: null,
       targetVersion: entry.semver,
-      rowsAffected:  entry.kind === 'templates' ? 1 : rowCount,
+      rowsAffected:  localEntityId !== null ? 1 : rowCount,
       metadata:      { name: entry.name, kind: entry.kind },
       userId,
     });
@@ -376,7 +342,7 @@ export class MarketplaceService {
       .where(eq(marketplaceLibraries.id, marketplaceId));
 
     // Sprint 2 S2-8 — record the template update event.
-    await this.writeHistory({
+    await writeImportHistory(this.db, this.tenantId, {
       templateId:    newTemplateId,
       action:        'update',
       sourceVersion: fromSemver,
@@ -495,7 +461,7 @@ export class MarketplaceService {
 
     // Sprint 2 S2-8 — write history. action='replace' surfaces the destructive
     // event distinctly from a plain 'update' (append).
-    await this.writeHistory({
+    await writeImportHistory(this.db, this.tenantId, {
       libraryId,
       action:        mode === 'replace' ? 'replace' : 'update',
       sourceVersion: fromSemver,
