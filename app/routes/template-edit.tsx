@@ -269,6 +269,9 @@ export default function TemplateEditPage() {
   const addItem = () => addAndSelect((snap) =>
     ops.addItem(snap, activeSectionId, m.templates_edit_new_item(), "rich", NEW_RICH_ITEM));
 
+  const addSubItem = (parentItemId: string) => addAndSelect((snap) =>
+    ops.addSubItem(snap, activeSectionId, parentItemId, m.templates_edit_new_item(), "rich", NEW_RICH_ITEM));
+
   function removeItem(itemId: string) {
     applyOps((snap) => ops.deleteItem(snap, activeSectionId, itemId));
     if (editingItem === itemId) setEditingItem(null);
@@ -552,6 +555,8 @@ export default function TemplateEditPage() {
                 activeItemId={editingItem}
                 onSelect={(id) => { setEditingItem(id); setRightRail("properties"); }}
                 onAddItem={addItem}
+                onAddSubItem={addSubItem}
+                confirmSubtreeDelete
                 onDuplicateItem={duplicateItem}
                 onDeleteItem={removeItem}
                 onMoveItem={moveItem}
@@ -581,6 +586,7 @@ export default function TemplateEditPage() {
               {rightRail === "properties" && (
                 <ItemPropertiesPanel
                   selectedItem={selectedItem}
+                  sectionItems={section?.items ?? []}
                   updateItem={updateItem}
                   choicesText={choicesText}
                   setChoicesText={setChoicesText}

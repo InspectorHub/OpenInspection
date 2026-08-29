@@ -1,15 +1,33 @@
 import { ITEM_TYPES } from "./types";
 import type { TemplateItem } from "./types";
+import { itemDepths, subtreeOf, MAX_ITEM_DEPTH } from "../../../server/lib/template-hierarchy";
 import { m } from "~/paraglide/messages";
 
 export interface ItemPropertiesPanelProps {
   selectedItem: TemplateItem;
+  /** Every item in the same section, so the picker can exclude illegal parents. */
+  sectionItems: TemplateItem[];
   updateItem: (itemId: string, patch: Partial<TemplateItem>) => void;
   choicesText: string;
   setChoicesText: React.Dispatch<React.SetStateAction<string>>;
 }
 
-export function ItemPropertiesPanel({ selectedItem, updateItem, choicesText, setChoicesText }: ItemPropertiesPanelProps) {
+/**
+ * Items this one may legally sit under: not itself, not one of its own
+ * descendants (that is the one choice that mints a cycle), and not one already
+ * at the depth cap.
+ *
+ * The list is filtered rather than validated on submit for the same reason the
+ * ⋯ menu hides "Add sub-item" at the cap: an option that is refused when picked
+ * has taught nobody anything.
+ */
+function eligibleParents(items: TemplateItem[], selfId: string): TemplateItem[] {
+  const forbidden = new Set(subtreeOf(items, selfId));
+  const depths = itemDepths(items);
+  return items.filter((i) => !forbidden.has(i.id) && (depths.get(i.id) ?? 0) < MAX_ITEM_DEPTH - 1);
+}
+
+export function ItemPropertiesPanel({ selectedItem, sectionItems, updateItem, choicesText, setChoicesText }: ItemPropertiesPanelProps) {
   return (
     <>
       <div>
@@ -24,6 +42,25 @@ export function ItemPropertiesPanel({ selectedItem, updateItem, choicesText, set
         <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.templates_item_type()}</label>
         <select value={selectedItem.type} onChange={(e) => updateItem(selectedItem.id, { type: e.target.value })} className="w-full h-8 px-2 rounded border border-ih-border text-[12px] bg-transparent outline-none">
           {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1" htmlFor="ih-nest-under">
+          {m.editor_shared_nest_under()}
+        </label>
+        <select
+          id="ih-nest-under"
+          value={selectedItem.parentId ?? ""}
+          /* An explicit null, never an omission: omitting the key on un-nest
+             would leave the stored parentId in place, so the author would
+             un-nest, save, reload, and find the item nested again. */
+          onChange={(e) => updateItem(selectedItem.id, { parentId: e.target.value || null })}
+          className="w-full h-8 px-2 rounded border border-ih-border text-[12px] bg-transparent outline-none"
+        >
+          <option value="">{m.editor_shared_nest_under_none()}</option>
+          {eligibleParents(sectionItems, selectedItem.id).map((it) => (
+            <option key={it.id} value={it.id}>{it.label}</option>
+          ))}
         </select>
       </div>
       <label className="flex items-center gap-2">

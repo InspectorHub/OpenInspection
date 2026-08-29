@@ -7,8 +7,9 @@ import { InlineRename } from "./InlineRename";
 import { findingKey } from "~/hooks/findings/shared";
 import type { EditorGroup } from "~/lib/editor/statutory-groups";
 import { m } from "~/paraglide/messages";
-import { itemDepths, outlineNumbers } from "../../../server/lib/template-hierarchy";
+import { itemDepths, outlineNumbers, subtreeOf, MAX_ITEM_DEPTH } from "../../../server/lib/template-hierarchy";
 import { ItemRowIndent } from "./ItemRowIndent";
+import { ItemSubtreeDeleteModal, type PendingSubtreeDelete } from "./ItemSubtreeDeleteModal";
 
 // Handle + ⋯ occupy reserved flex slots so they never cover the item number,
 // label, or rating dot. Desktop reveals on hover; touch always shows them.
@@ -42,6 +43,17 @@ interface SharedItemListProps {
   onBatchRange?: (fromId: string, toId: string) => void;
   /** D8 structural editing — when provided, a per-item ⋯ menu + "+ Add item" render. */
   onAddItem?: () => void;
+  /** Add an item nested under `parentItemId`. Absent = the gesture is not offered. */
+  onAddSubItem?: (parentItemId: string) => void;
+  /**
+   * Ask before a delete that would take rows the reader cannot see with it.
+   *
+   * Opt-in, because a caller may already own a confirmation: the inspection
+   * editor routes every structural delete through StructureDeleteModal, which
+   * counts ratings, notes and photos too. Two modals for one click is worse
+   * than one.
+   */
+  confirmSubtreeDelete?: boolean;
   onDuplicateItem?: (itemId: string) => void;
   onDeleteItem?: (itemId: string) => void;
   onMoveItem?: (itemId: string, dir: -1 | 1) => void;
@@ -120,6 +132,8 @@ export function ItemList({
   onBatchToggle,
   onBatchRange,
   onAddItem,
+  onAddSubItem,
+  confirmSubtreeDelete,
   onDuplicateItem,
   onDeleteItem,
   onMoveItem,
@@ -135,6 +149,14 @@ export function ItemList({
   // and cycle defences live, so this list inherits them for free.
   const depths = itemDepths(items);
   const outlines = outlineNumbers(items);
+  const [pendingDelete, setPendingDelete] = useState<PendingSubtreeDelete | null>(null);
+  const requestDelete = (id: string, label: string) => {
+    // Only ASK when something invisible would go too. A confirm on every delete
+    // makes the ordinary case worse in order to protect the rare one.
+    const count = subtreeOf(items, id).length - 1;
+    if (!confirmSubtreeDelete || count === 0) { onDeleteItem?.(id); return; }
+    setPendingDelete({ id, label, count });
+  };
   const lastClickedRef = useRef<string | null>(null);
   const [menuItemId, setMenuItemId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -309,6 +331,15 @@ export function ItemList({
                         {onDuplicateItem && (
                           <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDuplicateItem(item.id); }}>{m.editor_shared_menu_duplicate()}</MenuItem>
                         )}
+                        {/* Not offered at the cap, rather than offered and
+                            refused: a control that fails on click has taught
+                            nobody anything. Hidden in a grouped template for
+                            the same reason `+ Add item` already is — a free
+                            item reaches no binding, so what is typed into it
+                            never arrives on the authority's form. */}
+                        {onAddSubItem && !grouped && (depths.get(item.id) ?? 0) < MAX_ITEM_DEPTH - 1 && (
+                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onAddSubItem(item.id); }}>{m.editor_shared_add_sub_item()}</MenuItem>
+                        )}
                         {onMoveItem && fullIdx > 0 && (
                           <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, -1); }}>{m.editor_shared_menu_move_up()}</MenuItem>
                         )}
@@ -316,7 +347,7 @@ export function ItemList({
                           <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, 1); }}>{m.editor_shared_menu_move_down()}</MenuItem>
                         )}
                         {onDeleteItem && (
-                          <MenuItem tone="danger" onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDeleteItem(item.id); }}>{m.common_delete()}</MenuItem>
+                          <MenuItem tone="danger" onClick={(e) => { e.stopPropagation(); closeItemMenu(); requestDelete(item.id, item.label); }}>{m.common_delete()}</MenuItem>
                         )}
                       </div>
                     </>,
@@ -353,6 +384,11 @@ export function ItemList({
           </Button>
         </div>
       )}
+      <ItemSubtreeDeleteModal
+        pending={pendingDelete}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={(id) => { onDeleteItem?.(id); setPendingDelete(null); }}
+      />
     </div>
   );
 }
