@@ -8081,6 +8081,33 @@
     "description": "Lists the comments this tenant rewrote since importing the library, each beside the publisher's version in the pending release, so a destructive replace can be decided against the actual text rather than a count."
   },
   {
+    "operationId": "getMarketplaceStatutoryUpdateImpact",
+    "method": "GET",
+    "pathTemplate": "/api/templates/marketplace/{id}/statutory-update/impact",
+    "scopes": [
+      "read"
+    ],
+    "tag": "marketplace",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "The catalogue entry id",
+          "schema": {
+            "type": "string",
+            "description": "The catalogue entry id"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Count the in-progress inspections a statutory package update would affect",
+    "description": "How many inspections still on this workspace's copy of a statutory template keep producing their form after an update, and how many are dated under the newer revision and therefore cannot produce it at all."
+  },
+  {
     "operationId": "getMessageInspection",
     "method": "GET",
     "pathTemplate": "/api/inspections/{inspectionId}/messages",
@@ -22068,6 +22095,34 @@
     },
     "summary": "Upload inspector profile photo",
     "description": "Accepts a jpg/png/webp photo (max 2 MB) as multipart form data, stores it in R2 under a tenant-scoped key, and saves the public photoUrl on the user record."
+  },
+  {
+    "operationId": "uploadStatutoryFormSource",
+    "method": "POST",
+    "pathTemplate": "/api/admin/statutory-forms/{formId}/source",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "formId",
+          "in": "path",
+          "required": true,
+          "description": "Stable id of the statutory form itself, never one of its revisions, e.g. tx_trec_rei.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stable id of the statutory form itself, never one of its revisions, e.g. tx_trec_rei."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Upload the authority PDF for a revision",
+    "description": "Supply the issuing authority's own published PDF for one revision of one statutory form. The upload is verified against the sha256 that revision records and refused if it does not match, naming both values. The bytes are never fetched on the operator's behalf: the source URL is provenance for a human, and an authority may publish a superseded revision at its most obvious address."
   },
   {
     "operationId": "upsertInspectionCompliancePsq",
