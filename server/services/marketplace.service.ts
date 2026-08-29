@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, like, and, desc, sql } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import type { PackEntry } from '../lib/library-edit-marker';
-import { parseLibraryComments, countLibrarySchemaItems } from './marketplace/library-pack';
+import { parseLibraryComments } from './marketplace/library-pack';
 import { insertLibraryComments } from './marketplace/library-insert';
 import {
     applyReplaceMode,
@@ -9,15 +9,20 @@ import {
     resolveLibraryUpdate,
     type LibraryReplacePreview,
 } from './marketplace/library-replace';
-import { escapeLikePattern } from '../lib/db/like-escape';
 import {
     marketplaceLibraries,
     tenantLibraryImports,
 } from '../lib/db/schema/marketplace';
 import { Errors } from '../lib/errors';
+import { browseCatalogue, type CatalogueBrowseOptions } from './marketplace/catalogue-browse';
 import { writeImportHistory } from './marketplace/import-history';
 import { insertLocalTemplate, retireLocalTemplate } from './marketplace/local-template';
 import { assertStatutorySchema } from './marketplace/statutory-import';
+import {
+    deleteLibraryComments,
+    markImportUninstalled,
+    resolveUninstall,
+} from './marketplace/un-import';
 import { TemplateService } from './template.service';
 
 /**
@@ -71,69 +76,9 @@ export class MarketplaceService {
    * the point: the two mechanisms that used to sit behind one page returned
    * different shapes from different tables and only one of them was ever wired
    * to a UI.
-   *
-   * The three axes filter independently, because a jurisdiction's form standard
-   * and an inspection kind are not property types and the legacy single
-   * `category` column could only describe one of the three at a time.
    */
-  async list(opts: {
-    search?: string;
-    kind?: 'comments' | 'templates';
-    propertyType?: string;
-    jurisdiction?: string;
-    inspectionKind?: string;
-    page?: number;
-    pageSize?: number;
-  } = {}) {
-    const { search = '', page = 1, pageSize = 50 } = opts;
-    const offset = (page - 1) * pageSize;
-
-    const conditions = [];
-    if (opts.kind)           conditions.push(eq(marketplaceLibraries.kind, opts.kind));
-    if (opts.propertyType)   conditions.push(eq(marketplaceLibraries.propertyType, opts.propertyType));
-    if (opts.jurisdiction)   conditions.push(eq(marketplaceLibraries.jurisdiction, opts.jurisdiction));
-    if (opts.inspectionKind) conditions.push(eq(marketplaceLibraries.inspectionKind, opts.inspectionKind));
-    if (search)              conditions.push(like(marketplaceLibraries.name, `%${escapeLikePattern(search)}%`));
-    const where = conditions.length ? and(...conditions) : undefined;
-
-    const totalRow = await this.db
-      .select({ c: sql<number>`count(*)` })
-      .from(marketplaceLibraries)
-      .where(where)
-      .get();
-    const total = totalRow?.c ?? 0;
-
-    // Featured entries always sort first; within tier, sort by download count.
-    const rawRows = await this.db
-      .select()
-      .from(marketplaceLibraries)
-      .where(where)
-      .orderBy(desc(marketplaceLibraries.featured), desc(marketplaceLibraries.downloadCount))
-      .limit(pageSize)
-      .offset(offset);
-
-    const imports = await this.db
-      .select({
-        libraryId:      tenantLibraryImports.libraryId,
-        importedSemver: tenantLibraryImports.importedSemver,
-      })
-      .from(tenantLibraryImports)
-      .where(eq(tenantLibraryImports.tenantId, this.tenantId));
-
-    const importMap = new Map(imports.map(i => [i.libraryId, i.importedSemver]));
-
-    // `schema` is the pack ITSELF — counted here, then dropped. Spreading the
-    // whole row was free only while the starter pack was empty; filled in it is
-    // ~50KB per library at pageSize 1000. No client reads it; import and preview
-    // fetch by id.
-    const rows = rawRows.map(({ schema: packSchema, ...l }) => ({
-      ...l,
-      importedSemver: importMap.get(l.id) ?? null,
-      hasUpdate: importMap.has(l.id) && importMap.get(l.id) !== l.semver,
-      itemCount: countLibrarySchemaItems(packSchema as unknown),
-    }));
-
-    return { rows, total };
+  list(opts: CatalogueBrowseOptions = {}) {
+    return browseCatalogue(this.db, this.tenantId, opts);
   }
 
   /**
@@ -373,6 +318,62 @@ export class MarketplaceService {
     };
   }
 
+  /**
+   * The one un-import path, for every kind.
+   *
+   * ⚠️ NO GENERIC FALLTHROUGH. `marketplace_libraries` has said so since it was
+   * written -- "a silent one is how the wrong table gets written" -- and an
+   * unknown kind therefore throws rather than quietly doing nothing, which
+   * would leave a workspace looking uninstalled while its rows stayed.
+   *
+   * ⚠️ NOTHING IS DELETED FOR A 1:1 KIND, and deleting is not available anyway:
+   * `inspections.template_id` carries a legacy foreign key, so D1 refuses to
+   * remove a referenced row. It must survive regardless -- re-issuing a
+   * delivered report reads the inspection's own snapshot, and for a statutory
+   * form the rendered bytes live under a shared `_platform/` key that other
+   * tenants read. Un-installing changes what is OFFERED, not what exists.
+   */
+  async uninstall(libraryId: string, userId: string = 'system'): Promise<{
+    kind: 'comments' | 'templates' | 'statutory';
+    rowsAffected: number;
+  }> {
+    const { lib, existing } = await resolveUninstall(this.db, this.tenantId, libraryId);
+    const now = new Date();
+    // Not initialised: every arm below either assigns it or throws, so a
+    // starting value could only hide an arm that forgot to.
+    let rowsAffected: number;
+
+    if (lib.kind === 'statutory') {
+      // Visibility only, and the strongest case for it: the revision this row
+      // produces is still the right one for every inspection already dated
+      // inside its window.
+      rowsAffected = await retireLocalTemplate(this.db, this.tenantId, existing.localEntityId, now);
+    } else if (lib.kind === 'templates') {
+      rowsAffected = await retireLocalTemplate(this.db, this.tenantId, existing.localEntityId, now);
+    } else if (lib.kind === 'comments') {
+      // The 1:N half, and a real delete: a comment row is a copy of a pack
+      // entry with no other reader. Rows the workspace wrote itself carry no
+      // library_id and are out of range.
+      rowsAffected = await deleteLibraryComments(this.db, this.tenantId, libraryId);
+    } else {
+      throw new Error(`Catalogue kind '${String(lib.kind)}' has no un-import path`);
+    }
+
+    await markImportUninstalled(this.db, existing.id, now);
+    await writeImportHistory(this.db, this.tenantId, {
+      libraryId,
+      templateId:    lib.kind === 'comments' ? null : existing.localEntityId,
+      action:        'uninstall',
+      sourceVersion: existing.importedSemver,
+      targetVersion: null,
+      rowsAffected,
+      metadata:      { name: lib.name, kind: lib.kind },
+      userId,
+    });
+
+    return { kind: lib.kind, rowsAffected };
+  }
+
   // ─── The unified catalogue (marketplace_libraries) ───
 
   /**
@@ -384,7 +385,7 @@ export class MarketplaceService {
    */
   async listLibraries(opts: { kind?: string } = {}) {
     const { rows } = await this.list({
-      ...(opts.kind ? { kind: opts.kind as 'comments' | 'templates' } : {}),
+      ...(opts.kind ? { kind: opts.kind as NonNullable<CatalogueBrowseOptions['kind']> } : {}),
       page:     1,
       pageSize: 1000,
     });

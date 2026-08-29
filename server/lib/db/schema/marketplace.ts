@@ -88,6 +88,22 @@ export const tenantLibraryImports = sqliteTable('tenant_library_imports', {
   // table pretending otherwise is how one of them gets it wrong. NULL for the
   // 1:N kinds, where row_count is the tracking value instead. See #293.
   localEntityId: text('local_entity_id'),
+
+  /**
+   * When this workspace uninstalled the entry, or null.
+   *
+   * The row is kept rather than deleted: it records which version this
+   * workspace was ON, and re-issuing a report produced back then is expected to
+   * keep working. The unique index above is on (tenant_id, library_id), so a
+   * deleted row would also be the only way to reinstall — reinstalling instead
+   * clears this and runs the update path.
+   *
+   * ⚠️ Un-installing changes VISIBILITY, never content. Nothing on this path
+   * deletes a local template (a legacy foreign key from inspections.template_id
+   * forbids it, and the snapshot makes it unnecessary) and nothing deletes the
+   * shared `_platform/` form bytes, which other tenants read.
+   */
+  uninstalledAt: integer('uninstalled_at', { mode: 'timestamp_ms' }),
 }, (t) => [
   uniqueIndex('uq_tenant_library_import').on(t.tenantId, t.libraryId),
 ]);
