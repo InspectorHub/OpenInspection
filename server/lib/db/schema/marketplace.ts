@@ -65,6 +65,23 @@ export const marketplaceLibraries = sqliteTable('marketplace_libraries', {
   // either, so today they narrow nothing a user can click.
   jurisdiction:   text('jurisdiction'),
   inspectionKind: text('inspection_kind'),   // exact-match browse filter, reachable only as an API query param
+
+  /**
+   * When the platform took this entry out of the browse listing, or null.
+   *
+   * NOT a delete, and the reason is the same one that makes uninstall a flag:
+   * `tenant_library_imports.library_id` points here, so removing the row would
+   * orphan every workspace that installed the pack — the update path could no
+   * longer find what they are on, and the un-import path could no longer find
+   * what to undo. Delisting therefore changes VISIBILITY only. An entry that is
+   * delisted disappears from `browseCatalogue` for everyone, which also removes
+   * its "update available" badge (that badge is computed inside the same
+   * query), and every existing install keeps working untouched.
+   *
+   * Written only by the platform admin surface (server/portal/), never by a
+   * workspace: which entries the catalogue offers is not a tenant's decision.
+   */
+  delistedAt:     integer('delisted_at', { mode: 'timestamp_ms' }),
 }, (t) => [
   index('idx_marketplace_libraries_kind_featured').on(t.kind, t.featured),
 ]);

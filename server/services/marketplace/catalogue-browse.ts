@@ -9,7 +9,7 @@
  */
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 
-import { and, desc, eq, like, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, like, sql } from 'drizzle-orm';
 import { escapeLikePattern } from '../../lib/db/like-escape';
 import { marketplaceLibraries, tenantLibraryImports } from '../../lib/db/schema/marketplace';
 import { countLibrarySchemaItems } from './library-pack';
@@ -41,7 +41,13 @@ export async function browseCatalogue(
     const { search = '', page = 1, pageSize = 50 } = opts;
     const offset = (page - 1) * pageSize;
 
-    const conditions = [];
+    // A delisted entry is invisible to everyone, and this ONE condition is the
+    // whole of delisting: it removes the row from the listing and from the
+    // count above it, and — because `hasUpdate` is computed further down in this
+    // same query — it also stops the "update available" badge for workspaces
+    // that already installed. Their install itself is untouched; nothing here
+    // reads or writes tenant_library_imports.
+    const conditions = [isNull(marketplaceLibraries.delistedAt)];
     if (opts.kind)           conditions.push(eq(marketplaceLibraries.kind, opts.kind));
     if (opts.propertyType)   conditions.push(eq(marketplaceLibraries.propertyType, opts.propertyType));
     if (opts.jurisdiction)   conditions.push(eq(marketplaceLibraries.jurisdiction, opts.jurisdiction));
