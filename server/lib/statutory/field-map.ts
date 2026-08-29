@@ -35,7 +35,9 @@
  * green check is not read as more than it is.
  */
 import { PDFDocument } from 'pdf-lib';
-import { validatePartMappings, type ValuePart } from './value-parts';
+import {
+    refusePartsThatCannotFitTheirDigits, validatePartMappings, type ValuePart,
+} from './value-parts';
 
 /**
  * One value's route onto the page.
@@ -337,6 +339,7 @@ export async function validateAgainstPdf(map: FieldMap, pdfBytes: Uint8Array): P
         fail(`sourceHash mismatch: these bytes hash to ${actual} and the map was authored `
             + `against ${map.sourceHash}`);
     }
+    await refusePartsThatCannotFitTheirDigits(map.mappings);
 
     let doc: PDFDocument;
     try {

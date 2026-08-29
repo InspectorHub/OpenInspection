@@ -46,6 +46,7 @@
  * `import type` from `field-map.ts` is erased at build time, so the only real
  * module edge is field-map -> here. There is no cycle.
  */
+import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { utcMidnightOf } from './inspection-date';
 import type { FieldMapping } from './field-map';
 
@@ -226,5 +227,59 @@ export function refuseUnreadableParts(
     if (problems.length > 0) {
         fail(`${problems.length} value(s) cannot be drawn in parts:\n`
             + problems.map((p) => `  - ${p.replace(/^statutory render: /, '')}`).join('\n'));
+    }
+}
+
+/**
+ * A part's blank holds the digits that part draws — checked without any data.
+ *
+ * ── Why this is exact rather than an estimate ───────────────────────────────
+ * Every Helvetica digit advances 556/1000 of the em, so `'0'.repeat(n)` is not a
+ * worst case, it is THE case. A part is always two digits or four. The map
+ * therefore already contains everything needed to know how wide the text will
+ * be, which no other overlay can say.
+ *
+ * ── Why it lives on the async half ──────────────────────────────────────────
+ * It needs a FONT, and embedding one is the same class of cost as loading the
+ * document: it cannot happen in the synchronous half. The font is embedded in a
+ * scratch document rather than in the agency's, exactly as `render.ts` does for
+ * its ruler — needing to measure is not grounds for putting an object of ours
+ * into a document we otherwise leave alone.
+ *
+ * ⚠️ WHAT THIS DOES NOT REACH. `fieldMapFor()` calls only the synchronous
+ * `validateFieldMap`, so this does not run per lookup in production; the
+ * backstop there is the `fitOverlay` refusal at render time. This one runs where
+ * a map is authored and in CI, which is where a mis-measured blank is cheap.
+ *
+ * ⚠️ AND WHAT IT CANNOT SEE AT ALL. It proves the blank you measured holds these
+ * digits. It cannot prove you measured the right blank — that failure renders,
+ * prints and files with only the content wrong, and only a person reading the
+ * form catches it.
+ */
+export async function refusePartsThatCannotFitTheirDigits(
+    mappings: readonly FieldMapping[],
+): Promise<void> {
+    const parted = partedOverlays(mappings);
+    if (parted.length === 0) return;
+
+    const ruler = await (await PDFDocument.create()).embedFont(StandardFonts.Helvetica);
+    const tooNarrow: string[] = [];
+    for (const m of parted) {
+        // `validatePartMappings` already refused a part with no maxWidth; this
+        // guard keeps the type honest rather than restating that rule.
+        if (m.maxWidth === undefined) continue;
+        const widest = ruler.widthOfTextAtSize('0'.repeat(digitsInPart(m.part)), m.size);
+        if (widest > m.maxWidth) {
+            tooNarrow.push(`"${m.ourField}" (${m.part}) draws ${digitsInPart(m.part)} digits at `
+                + `size ${m.size}, which is ${widest.toFixed(3)}pt, into a blank measured `
+                + `${m.maxWidth}pt`);
+        }
+    }
+    if (tooNarrow.length > 0) {
+        fail(`${tooNarrow.length} part(s) do not fit the blank measured for them:\n`
+            + tooNarrow.map((t) => `  - ${t}`).join('\n')
+            + '\n  These blanks are cut for the form\'s own typeface. Helvetica digits are wider '
+            + 'than Times ones by about 11%, so a blank that holds four 9pt Times characters '
+            + 'holds four Helvetica ones only at 8pt.');
     }
 }

@@ -426,6 +426,52 @@ describe('validateAgainstPdf', () => {
     });
 });
 
+/**
+ * A part's drawn width is knowable from the map alone: it is always two digits
+ * or four, and every Helvetica digit advances 556/1000 of the em. So a blank too
+ * small for its own part can be refused before any inspection exists -- which is
+ * a different failure from "I measured the blank next door", and only this one
+ * is arithmetic.
+ */
+describe('validateAgainstPdf — a part that cannot fit its own digits', () => {
+    /** The real Q4.1 roof row on FL OIR-B1-1802: three 18.07pt blanks. */
+    const roofRow = (size: number): FieldMap => ({
+        ...MAP(flat.hash), requiredFields: [],
+        mappings: [
+            { kind: 'overlay', ourField: 'roof_permit_date', part: 'date_month', page: 0,
+                x: 166.92, y: 591.0, size, maxWidth: 18.07, maxHeight: 10.3 },
+            { kind: 'overlay', ourField: 'roof_permit_date', part: 'date_day', page: 0,
+                x: 187.45, y: 591.0, size, maxWidth: 18.07, maxHeight: 10.3 },
+            { kind: 'overlay', ourField: 'roof_permit_date', part: 'date_year', page: 0,
+                x: 207.98, y: 591.0, size, maxWidth: 18.07, maxHeight: 10.3 },
+        ],
+    });
+
+    it('refuses a four-digit year at 9pt in an 18.07pt blank', async () => {
+        // `2026` is 20.016pt at 9pt Helvetica. The blank is 18.07 -- it was cut
+        // for four 9pt Times underscores, which are 18.000. Drawn at 9 it
+        // overruns by 1.95pt and nothing raises today.
+        await expect(validateAgainstPdf(roofRow(9), flat.bytes))
+            .rejects.toThrow(/roof_permit_date.*date_year.*20\.0.*18\.07/is);
+    });
+
+    it('POSITIVE CONTROL — the same blank at 8pt is accepted', async () => {
+        // 17.792 <= 18.07, by 0.274pt. Without this the check above would also
+        // pass against a validator that refused every part.
+        await expect(validateAgainstPdf(roofRow(8), flat.bytes)).resolves.toBeUndefined();
+    });
+
+    it('POSITIVE CONTROL — an unparted overlay is not measured this way', async () => {
+        // The check is about a fixed-width part. A free-text overlay's width is
+        // not knowable from the map, and `fit.ts` owns it at render time.
+        await expect(validateAgainstPdf({
+            ...MAP(flat.hash), requiredFields: [],
+            mappings: [{ kind: 'overlay', ourField: 'comments', page: 0,
+                x: 40, y: 400, size: 10, maxWidth: 4 }],
+        }, flat.bytes)).resolves.toBeUndefined();
+    });
+});
+
 describe('sha256Hex', () => {
     it('is the hash the rest of the subsystem compares against', async () => {
         // Pinned to a known vector so a change of algorithm or encoding cannot
