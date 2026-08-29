@@ -55,10 +55,21 @@ function formModules() {
         .map((file) => ({ file, source: readFileSync(join(FORMS_DIR, file), 'utf8') }));
 }
 
-/** `{ kind: 'checkbox', ourField: 'x', whenValue: 'y', … }` -> its three parts. */
+/**
+ * `{ kind: 'checkbox', ourField: 'x', whenValue: 'y', … }` -> its three parts.
+ *
+ * ⚠️ THE KIND IS READ, NOT ENUMERATED. An earlier version listed
+ * `(acroform|overlay|checkbox)`, and `acroform_checkbox` -- added the same day --
+ * matched NOTHING. The count would have gone 245 -> 81 on a map that adopted it:
+ * a PARTIAL read, above the fail-closed zero, and silent. That is the exact
+ * failure this file's header warns about, in this file.
+ *
+ * So it matches any kind and REPORTS what it found. A kind nobody anticipated
+ * shows up in the printed line rather than vanishing from the count.
+ */
 function mappingsOf(source) {
     const out = [];
-    for (const m of source.matchAll(/\{[^{}]*kind:\s*'(acroform|overlay|checkbox)'[^{}]*\}/g)) {
+    for (const m of source.matchAll(/\{[^{}]*kind:\s*'([a-z_]+)'[^{}]*\}/g)) {
         const body = m[0];
         const ourField = /ourField:\s*'([^']*)'/.exec(body)?.[1];
         if (ourField === undefined) continue;
@@ -82,6 +93,25 @@ function destinationsIn(mappings) {
 // options, so the real scan can read nothing at all -- and then the only thing
 // standing between this file and a green tick that means nothing is whether its
 // reader still works.
+const KIND_FIXTURES = [
+    // One per kind the union carries today, plus one it does not, so that a new
+    // kind is caught by this list failing rather than by the count quietly
+    // shrinking. `acroform_checkbox` is here because listing kinds by hand is
+    // what broke this reader once already.
+    { src: "{ kind: 'acroform', ourField: 'a', pdfField: 'p' },", expect: 1 },
+    { src: "{ kind: 'overlay', ourField: 'b', page: 0, x: 1, y: 2 },", expect: 1 },
+    { src: "{ kind: 'checkbox', ourField: 'c', whenValue: 'v', page: 0, x: 1, y: 2 },", expect: 1 },
+    { src: "{ kind: 'acroform_checkbox', ourField: 'd', whenValue: 'v', pdfField: 'p' },", expect: 1 },
+    { src: "{ ourField: 'e' },", expect: 0 },
+];
+const kindOk = KIND_FIXTURES.filter((c) => mappingsOf(c.src).length === c.expect).length;
+console.log(`statutory-answerable: mapping-reader self-check ${kindOk} case(s) / ${KIND_FIXTURES.length} as expected.`);
+if (kindOk !== KIND_FIXTURES.length) {
+    console.log('  ✘ the mapping reader misses a kind it was shown, so any count it '
+        + 'reports below is a floor rather than a total.');
+    process.exit(1);
+}
+
 const SELF_TEST = [
     { v: 'other', expect: true },
     { v: 'other_explain', expect: true },
@@ -137,6 +167,14 @@ for (const form of forms) {
 // how a gate comes to look healthy while examining nothing.
 console.log(`statutory-answerable: ${forms.length} published form module(s) · `
     + `${optionsSeen} "other" option(s) examined / ${optionsWithSomewhere} with somewhere to say what.`);
+// The kinds actually read, so a mapping shape nobody anticipated is visible in
+// the output instead of being absent from the count.
+const kindsSeen = forms.flatMap((f) => mappingsOf(f.source)).reduce((acc, m) => {
+    acc[m.kind] = (acc[m.kind] ?? 0) + 1;
+    return acc;
+}, {});
+console.log(`statutory-answerable: mapping kinds read — ${Object.entries(kindsSeen)
+    .map(([k, n]) => `${k}:${n}`).join(' · ') || 'none'}.`);
 
 if (failures.length > 0) {
     console.log(`  ✘ Statutory-answerable gate — ${failures.length} problem(s):`);
