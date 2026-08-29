@@ -7,6 +7,8 @@ import { InlineRename } from "./InlineRename";
 import { findingKey } from "~/hooks/findings/shared";
 import type { EditorGroup } from "~/lib/editor/statutory-groups";
 import { m } from "~/paraglide/messages";
+import { itemDepths, outlineNumbers } from "../../../server/lib/template-hierarchy";
+import { ItemRowIndent } from "./ItemRowIndent";
 
 // Handle + ⋯ occupy reserved flex slots so they never cover the item number,
 // label, or rating dot. Desktop reveals on hover; touch always shows them.
@@ -14,7 +16,15 @@ const REVEAL = "invisible group-hover:visible focus-within:visible [@media(hover
 
 interface SharedItemListProps {
   mode: EditorMode;
-  items: Array<{ id: string; label: string; type: string }>;
+  /**
+   * The section's items, in the order they are printed.
+   *
+   * `parentId` is optional and every reader fails open to top level, so a
+   * caller that has never heard of nesting keeps working byte-for-byte. The
+   * array stays one-dimensional: its order IS the pre-order walk of the tree,
+   * which is what lets this list keep rendering one row per entry.
+   */
+  items: Array<{ id: string; label: string; type: string; parentId?: string | null }>;
   sectionId: string;
   activeItemId: string | null;
   onSelect: (id: string) => void;
@@ -121,6 +131,10 @@ export function ItemList({
 }: SharedItemListProps) {
   const { heading: slotHeading, closes: groupClosedBy } = slotHeadings(groups, items);
   const grouped = Boolean(groups?.length);
+  // Both derived, never stored. `itemDepths` is also where the dangling-parent
+  // and cycle defences live, so this list inherits them for free.
+  const depths = itemDepths(items);
+  const outlines = outlineNumbers(items);
   const lastClickedRef = useRef<string | null>(null);
   const [menuItemId, setMenuItemId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -163,7 +177,7 @@ export function ItemList({
 
       {/* Item list */}
       <div ref={containerRef} className="flex-1 overflow-y-auto p-2 space-y-0.5">
-        {items.map((item, idx) => {
+        {items.map((item) => {
           const result = scopedResult(item.id);
           const fullIdx = items.findIndex((i) => i.id === item.id);
           const editing = editingId === item.id;
@@ -208,7 +222,7 @@ export function ItemList({
 
               {editing && onRenameItem ? (
                 <div className="min-w-0 flex-1 flex items-center gap-2 px-2 py-2">
-                  <span className="text-[10px] text-ih-fg-3 font-mono w-5 shrink-0">{String(idx + 1).padStart(2, "0")}</span>
+                  <ItemRowIndent depth={depths.get(item.id) ?? 0} outline={outlines.get(item.id) ?? ""} />
                   <InlineRename
                     value={item.label}
                     ariaLabel={m.editor_shared_item_name_aria()}
@@ -249,10 +263,11 @@ export function ItemList({
                       )}
                     </span>
                   )}
-                  {/* Number, label and rating dot are ALWAYS visible. */}
-                  <span className="text-[10px] text-ih-fg-3 font-mono w-5 shrink-0">
-                    {String(idx + 1).padStart(2, "0")}
-                  </span>
+                  {/* Indent, outline number, label and rating dot are ALWAYS
+                      visible. The number is what survives the 280px column's
+                      truncation, which is why it earns its place beside the
+                      indent rather than instead of it. */}
+                  <ItemRowIndent depth={depths.get(item.id) ?? 0} outline={outlines.get(item.id) ?? ""} />
                   <span className="flex-1 truncate">{item.label}</span>
                   {mode === "fill" && Boolean(result.rating) && (
                     <span
