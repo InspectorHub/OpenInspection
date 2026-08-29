@@ -56,12 +56,11 @@ import { revisionStatusForInspection } from '../../lib/statutory/revision-status
 import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
 import { utcMidnightOf } from '../../lib/statutory/inspection-date';
 import { statutoryNoticeFor, formatEffectiveDate } from '../../lib/statutory/disclaimer';
-import { PeopleService } from '../../services/people.service';
-import { CredentialService } from '../../services/credential.service';
 import { Errors } from '../../lib/errors';
 import * as schema from '../../lib/db/schema';
 import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
-import type { StatutoryInspectionFacts, StatutoryItemResult } from '../../lib/statutory/values';
+import { gatherStatutoryInputs } from './statutory-inputs';
+import { logger } from '../../lib/logger';
 
 const statutoryFormRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -214,62 +213,19 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
         );
     }
 
-    const results = (await db.select()
-        .from(schema.inspectionResults)
-        .where(eq(schema.inspectionResults.inspectionId, id))
-        .get())?.data as Record<string, StatutoryItemResult> | undefined;
-
-    // The client comes from the inspection_people primary-client join, NOT from
-    // inspections.client_name/_email/_phone -- those were a frozen cache and are
-    // gone. A hard cutover with no legacy fallback, matching invoices,
-    // agreements and publish elsewhere.
-    const primaryClient = await new PeopleService({ DB: c.env.DB }).getPrimaryClient(tenantId, id);
-
-    // The inspector's name comes from `users` and the licence from the credential
-    // rows, exactly as the report PDF's signature block resolves them -- one
-    // source, so the two surfaces can never disagree about the same inspector.
-    //
-    // NOTE ON NULL: CredentialService returns null when there is no credential,
-    // and its own callers OMIT the line rather than print an empty one. That is
-    // right for a report footer and wrong here. On an authority's form the box is
-    // preprinted, so a blank is not "no such item" -- it is an invalid submission.
-    // A null therefore reaches collectStatutoryValues and is refused there by the
-    // required-field check, which is the intended behaviour.
-    const inspectorId = inspection.inspectorId;
-    const inspectorRow = inspectorId
-        ? await db.select({ name: schema.users.name })
-            .from(schema.users)
-            .where(and(eq(schema.users.id, inspectorId), eq(schema.users.tenantId, tenantId)))
-            .get()
-        : undefined;
-    const licenceNumber = inspectorId
-        ? await new CredentialService(c.env.DB).primaryLicenseNumber(tenantId, inspectorId)
-        : null;
-
-    // The company identity is the workspace config, read the same way the
-    // publish path reads its branding.
-    const config = await db.select({
-        companyName: schema.tenantConfigs.companyName,
-        companyPhone: schema.tenantConfigs.companyPhone,
-    })
-        .from(schema.tenantConfigs)
-        .where(eq(schema.tenantConfigs.tenantId, tenantId))
-        .get();
-
-    const facts: StatutoryInspectionFacts = {
-        client_name: primaryClient?.name ?? null,
-        client_email: primaryClient?.email ?? null,
-        client_phone: primaryClient?.phone ?? null,
-        property_address: inspection.propertyAddress ?? null,
-        property_city: inspection.addressCity ?? null,
-        property_state: inspection.addressState ?? null,
-        property_zip: inspection.addressZip ?? null,
-        inspection_date: inspection.date ?? null,
-        inspector_name: inspectorRow?.name ?? null,
-        inspector_license: licenceNumber,
-        company_name: config?.companyName ?? null,
-        company_phone: config?.companyPhone ?? null,
-    };
+    const { results, facts, skippedNonDefaultUnits } = await gatherStatutoryInputs(
+        db, c.env.DB, tenantId, inspection,
+    );
+    if (skippedNonDefaultUnits.length > 0) {
+        // Answered only under some other unit. This form describes one dwelling,
+        // so substituting a unit's answer would print its findings under the
+        // whole building's address.
+        logger.warn('statutory: item answered only outside the default unit', {
+            inspectionId: id,
+            items: skippedNonDefaultUnits.slice(0, 10),
+            count: skippedNonDefaultUnits.length,
+        });
+    }
 
     // Instances the page has no slot to print. Printed slots are ordinary items
     // and arrive through the bindings above; these are what the item model has
