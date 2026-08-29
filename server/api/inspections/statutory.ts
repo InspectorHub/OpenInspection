@@ -32,6 +32,7 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { deliverableHeaders } from '../../lib/deliverable-headers';
 import { produceStatutoryForm } from '../../services/statutory/produce.service';
+import { recordProduction } from '../../services/statutory/production-record';
 import {
     StatutoryOverflowService,
     refuseIndexInsidePrintedRange,
@@ -243,6 +244,19 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
         facts,
         instances,
         bucket: c.env.PHOTOS,
+    });
+
+    // Which revision this document was produced from. Written before the bytes
+    // are handed over, because a recall counts documents that LEFT and a row
+    // written after the response would be missing exactly the deliveries that
+    // failed on the way out.
+    await recordProduction(db, {
+        tenantId,
+        inspectionId: id,
+        formId: declaration.formId,
+        version: produced.version.version,
+        sourceHash: produced.version.sourceHash,
+        producedBy: c.get('user')?.sub ?? 'unknown',
     });
 
     return new Response(produced.bytes, {
