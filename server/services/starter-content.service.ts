@@ -28,7 +28,9 @@
  *   rating_systems           → (tenantId, slug)                       (enforced by uniqueIndex)
  *   contractor_types         → (tenantId, name)
  *   services                 → (tenantId, name)
- *   marketplace_libraries    → (name)                                  (global table — name unique)
+ *   marketplace_libraries    → (name)                                  (global table — name unique;
+ *                                                                       UPSERT, so a pack whose semver
+ *                                                                       moved is refreshed, not skipped)
  *
  * The function never throws on individual-row insert failure unless the
  * failure indicates a programming bug (schema mismatch, etc.). Existence
@@ -44,7 +46,6 @@ import {
     eventTypes,
     tags,
     ratingSystems,
-    marketplaceLibraries,
     contractorTypes,
 } from '../lib/db/schema';
 import { logger } from '../lib/logger';
@@ -82,7 +83,7 @@ import { batchInsert } from './starter-content/batch-insert';
 import { TAGS } from './starter-content/fixtures/tags';
 import { RECOMMENDATIONS } from './starter-content/fixtures/recommendations';
 import { RATING_SYSTEMS } from './starter-content/fixtures/rating-systems';
-import { MARKETPLACE_LIBRARIES } from './starter-content/fixtures/marketplace';
+import { seedMarketplaceLibraries } from './starter-content/seed-marketplace-libraries';
 import { seedRoleProfiles } from './seed/seed-role-profiles';
 
 import { CONTRACTOR_TYPES } from './starter-content/fixtures/contractor-types';
@@ -327,31 +328,10 @@ export async function seedStarterContent(
     }
 
     // ── marketplace libraries (GLOBAL table) ────────────────────────────
-    // The marketplace_libraries table has no tenant_id — it is a shared
-    // catalogue of importable content. We still idempotently insert the
-    // default libraries here so a brand-new system has something to import.
-    let marketplaceLibrariesSeeded: number;
-    {
-        const existing = await d.select({ name: marketplaceLibraries.name }).from(marketplaceLibraries).all();
-        const existingNames = new Set(existing.map(r => r.name as string));
-        const now = new Date();
-        const rows = MARKETPLACE_LIBRARIES.filter(lib => !existingNames.has(lib.name)).map(lib => ({
-            id:            crypto.randomUUID(),
-            name:          lib.name,
-            kind:          lib.kind,
-            semver:        lib.semver,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            schema:        lib.schema as any,
-            authorId:      'system',
-            changelog:     lib.changelog,
-            downloadCount: 0,
-            featured:      lib.featured,
-            createdAt:     now,
-            updatedAt:     now,
-        }));
-        await batchInsert(d, marketplaceLibraries, rows);
-        marketplaceLibrariesSeeded = rows.length;
-    }
+    // The one block with no tenant: `marketplace_libraries` has no `tenant_id`.
+    // It is an UPSERT, not an insert-if-missing, and the reasoning lives beside
+    // the code in `starter-content/seed-marketplace-libraries.ts`.
+    const marketplaceLibrariesSeeded = await seedMarketplaceLibraries(d);
 
     const result: StarterContentResult = {
         inspectionTemplatesSeeded,

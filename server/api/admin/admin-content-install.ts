@@ -44,10 +44,17 @@ const StarterContentInstallResponseSchema = z.object({
         tagsSeeded:                 z.number().describe('New tags inserted.'),
         recommendationsSeeded:      z.number().describe('New repair-item comments inserted.'),
         ratingSystemsSeeded:        z.number().describe('New rating systems inserted.'),
-        marketplaceLibrariesSeeded: z.number().describe('New rows in the global marketplace_libraries catalogue.'),
+        marketplaceLibrariesSeeded: z.number().describe(
+            'Rows in the global marketplace_libraries catalogue this run created OR refreshed. '
+            + 'A refresh is a pack whose semver moved in this release; the row keeps its id and '
+            + 'its download count.',
+        ),
         contractorTypesSeeded:      z.number().describe('New contractor types inserted.'),
         servicesSeeded:             z.number().describe('New sellable services inserted.'),
-    }).describe('Counts of rows ADDED. All zero means the workspace already had everything this release ships.'),
+    }).describe(
+        'Counts of rows ADDED — plus, for the global catalogue only, rows refreshed to this '
+        + 'release. All zero means the workspace already had everything this release ships.',
+    ),
 }).openapi('StarterContentInstallResponse');
 
 const installBundledContentRoute = createRoute(withMcpMetadata({
