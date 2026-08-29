@@ -33,6 +33,10 @@ export interface TemplateOption {
   id: string;
   name: string;
   itemCount?: number;
+  /** When it stopped being offered for new inspections, epoch ms, or null. */
+  retiredAt?: number | null;
+  /** Why it stopped. Retired options stay listed; see `TemplateCombobox`. */
+  retiredReason?: "superseded" | "uninstalled" | null;
 }
 
 /** Service option for the New Inspection wizard Services step (B-8). */

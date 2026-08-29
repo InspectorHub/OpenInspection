@@ -9,10 +9,15 @@
   "statutory_revision_cannot_produce": "Esta inspección tiene fecha {inspectionDate}, que corresponde a la revisión {applicable}. Esta plantilla produce la revisión {template}, así que este formulario no se puede producir para esta inspección. Pida a un administrador que actualice la plantilla y vuelva a iniciar esta inspección sobre la plantilla actualizada.",
   "statutory_template_retired_superseded": "Reemplazada por una revisión más nueva el {date} — ya no está disponible para inspecciones nuevas.",
   "statutory_template_retired_uninstalled": "Desinstalada el {date} — pida a un administrador que la vuelva a instalar.",
-  "statutory_update_inflight": "{count} inspecciones en curso permanecen en la revisión {version}. Sus fechas caen dentro de su vigencia, así que siguen produciendo su formulario.",
-  "statutory_update_blocked": "{count} de ellas tienen fecha bajo la revisión {version} y no podrán producir el formulario. Habrá que volver a iniciarlas sobre la plantilla actualizada.",
-  "statutory_update_none_blocked": "Ninguna de ellas tiene fecha bajo una revisión más nueva, así que esta actualización no cuesta nada de lo que ya está en curso.",
+  "statutory_update_none_blocked": "Ninguna tiene fecha bajo la revisión más nueva, así que esta actualización no cuesta nada de lo que ya está en curso.",
+  "statutory_update_none_inflight": "No hay inspecciones en curso sobre esta plantilla, así que esta actualización no cambia nada que ya esté en marcha.",
   "statutory_update_confirm_title": "¿Actualizar {name}?",
   "statutory_update_confirm_submit": "Actualizar la plantilla",
-  "statutory_update_confirm_cancel": "Cancelar"
+  "statutory_update_confirm_cancel": "Cancelar",
+  "statutory_update_confirm_loading": "Contando las inspecciones en curso…",
+  "statutory_update_confirm_error": "No se pudo leer a qué afectaría esta actualización. No se cambió nada.",
+  "statutory_update_inflight_one": "1 de {total} inspecciones en curso permanece en la revisión {version} y sigue produciendo su formulario — su fecha cae dentro de la vigencia de esa revisión.",
+  "statutory_update_inflight_many": "{producible} de {total} inspecciones en curso permanecen en la revisión {version} y siguen produciendo su formulario — sus fechas caen dentro de su vigencia.",
+  "statutory_update_blocked_one": "1 de ellas tiene fecha bajo la revisión {version} y no podrá producir el formulario. Habrá que volver a iniciarla sobre la plantilla actualizada.",
+  "statutory_update_blocked_many": "{count} de ellas tienen fecha bajo la revisión {version} y no podrán producir el formulario. Habrá que volver a iniciarlas sobre la plantilla actualizada."
 }

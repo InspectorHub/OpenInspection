@@ -32,6 +32,11 @@ export interface WizardTemplate {
   id: string;
   name: string;
   itemCount?: number;
+  // A retired template stays in the picker, disabled, with the reason it left:
+  // one that simply vanished would read as a lost permission or a broken
+  // product. `TemplateCombobox` holds both halves of that.
+  retiredAt?: number | null;
+  retiredReason?: "superseded" | "uninstalled" | null;
 }
 
 export interface WizardService {

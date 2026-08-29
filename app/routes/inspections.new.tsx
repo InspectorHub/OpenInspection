@@ -46,7 +46,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     let templates: TemplateOption[] = [];
     if (templatesRes && templatesRes.ok) {
       const tj = (await templatesRes.json()) as { data?: TemplateOption[] };
-      templates = (tj.data ?? []).map((t) => ({ id: t.id, name: t.name, itemCount: t.itemCount }));
+      // `retiredAt` rides along: a template nobody may start on any more stays
+      // in the picker, disabled, with the reason it left. One that simply
+      // vanished would read as a lost permission or a broken product.
+      templates = (tj.data ?? []).map((t) => ({
+        id: t.id,
+        name: t.name,
+        itemCount: t.itemCount,
+        retiredAt: t.retiredAt ?? null,
+        retiredReason: t.retiredReason ?? null,
+      }));
     }
 
     let services: ServiceOption[] = [];

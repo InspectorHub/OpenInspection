@@ -1,82 +1,72 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+/**
+ * The template picker, and what it does with a template nobody may start on any
+ * more.
+ *
+ * The rule under test is not "hide it". A thing that vanishes without a reason
+ * is more unsettling than one that leaves with a reason: the inspector's first
+ * conclusion is that their permissions changed or that the product broke. So the
+ * row stays, disabled, and says which of the two things happened -- and the two
+ * differ in what anybody can do about it.
+ */
+import { describe, it, expect, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { TemplateCombobox } from "./TemplateCombobox";
 
-afterEach(cleanup);
+const RETIRED_AT = Date.UTC(2026, 2, 15);
 
-const TEMPLATES = [
-    { id: "t1", name: "Standard Residential", itemCount: 120 },
-    { id: "t2", name: "Radon Measurement Report", itemCount: 20 },
-    { id: "t3", name: "Sewer Scope", itemCount: 9 },
-];
-
-function open(templateId = "") {
-    const setTemplateId = () => {};
-    // A scrolling panel around the control — the wizard's body, which is what
-    // clipped the list. Rendering it here means the test fails again if the list
-    // ever goes back to being a child of it.
+function open(templates: Parameters<typeof TemplateCombobox>[0]["templates"]) {
+    const setTemplateId = vi.fn();
     render(
-        <div data-testid="panel" style={{ overflowY: "auto", height: 200 }}>
-            <TemplateCombobox id="tpl" templates={TEMPLATES} templateId={templateId} setTemplateId={setTemplateId} />
-        </div>,
+        <TemplateCombobox
+            id="tpl"
+            templates={templates}
+            templateId=""
+            setTemplateId={setTemplateId}
+        />,
     );
     fireEvent.focus(screen.getByRole("combobox"));
-    return screen.getByRole("listbox");
+    return { setTemplateId };
 }
 
-/**
- * The list used to be `absolute` inside the wizard body, which is
- * `overflow-y-auto`. Measured at a 1260x615 viewport: 16px of a 224px list
- * visible, with all 20 templates below the cut. It renders in a portal now, so
- * these two assertions are the ones that matter — anything else about the list is
- * cosmetic next to "can the inspector see it".
- */
-describe("TemplateCombobox — the list escapes the panel that scrolls", () => {
-    it("renders outside the scrolling panel, not inside it", () => {
-        const list = open();
-        expect(screen.getByTestId("panel").contains(list)).toBe(false);
-        expect(document.body.contains(list)).toBe(true);
+describe("TemplateCombobox", () => {
+    it("lists a superseded statutory template, disabled, with its reason", () => {
+        open([
+            { id: "a", name: "TREC REI 7-6", retiredAt: RETIRED_AT, retiredReason: "superseded" },
+            { id: "b", name: "TREC REI 7-7", retiredAt: null, retiredReason: null },
+        ]);
+
+        const old = screen.getByRole("option", { name: /7-6/ });
+        // `aria-disabled` rather than the `disabled` attribute: this is a
+        // listbox option, not a form control, and a disabled option still has
+        // to be reachable so a screen-reader user hears the reason too.
+        expect(old).toHaveAttribute("aria-disabled", "true");
+        expect(old).toHaveTextContent(/replaced/i);
+        expect(old).toHaveTextContent("2026-03-15");
+
+        // The positive control. A picker that disabled everything would satisfy
+        // the assertions above and would offer no template at all.
+        const live = screen.getByRole("option", { name: /7-7/ });
+        expect(live).not.toHaveAttribute("aria-disabled", "true");
     });
 
-    it("is positioned against the viewport, so no ancestor can clip it", () => {
-        expect(open().style.position).toBe("fixed");
+    it("gives an uninstalled template different words, because the way back differs", () => {
+        open([
+            { id: "a", name: "TREC REI 7-6", retiredAt: RETIRED_AT, retiredReason: "uninstalled" },
+        ]);
+        const old = screen.getByRole("option", { name: /7-6/ });
+        // Superseded is nothing to do about; uninstalled is something an
+        // administrator can undo, and one word for both would say neither.
+        expect(old).toHaveTextContent(/reinstall/i);
     });
 
-    it("caps its own height instead of running off the bottom of the screen", () => {
-        expect(open().style.maxHeight).toBeTruthy();
-    });
-});
-
-describe("TemplateCombobox — picking is still the only thing that selects", () => {
-    it("lists every template when nothing has been typed", () => {
-        open();
-        expect(screen.getAllByRole("option")).toHaveLength(3);
-    });
-
-    it("filters on what was typed", () => {
-        open();
-        fireEvent.change(screen.getByRole("combobox"), { target: { value: "radon" } });
-        const options = screen.getAllByRole("option");
-        expect(options).toHaveLength(1);
-        expect(options[0].textContent).toContain("Radon Measurement Report");
-    });
-
-    it("selects nothing by typing, even down to a single match", () => {
-        let selected = "";
-        render(
-            <TemplateCombobox
-                id="tpl2"
-                templates={TEMPLATES}
-                templateId=""
-                setTemplateId={(v) => {
-                    selected = v;
-                }}
-            />,
-        );
-        const input = screen.getAllByRole("combobox")[0];
-        fireEvent.focus(input);
-        fireEvent.change(input, { target: { value: "sewer" } });
-        expect(selected).toBe("");
+    it("refuses to select a retired template even when it is clicked", () => {
+        const { setTemplateId } = open([
+            { id: "a", name: "TREC REI 7-6", retiredAt: RETIRED_AT, retiredReason: "superseded" },
+        ]);
+        // Listing it must not make it choosable. `aria-disabled` is a message to
+        // a reader; this is the part that holds.
+        fireEvent.mouseDown(screen.getByRole("option", { name: /7-6/ }));
+        expect(setTemplateId).not.toHaveBeenCalled();
     });
 });

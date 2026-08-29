@@ -9,10 +9,15 @@
   "statutory_revision_cannot_produce": "This inspection is dated {inspectionDate}, which falls under revision {applicable}. This template produces revision {template}, so this form cannot be produced for this inspection. Ask an administrator to update the template, then start this inspection again on the updated one.",
   "statutory_template_retired_superseded": "Replaced by a newer revision on {date} — no longer available for new inspections.",
   "statutory_template_retired_uninstalled": "Uninstalled on {date} — ask an administrator to reinstall it.",
-  "statutory_update_inflight": "{count} in-progress inspections stay on revision {version}. Their dates fall inside its window, so they still produce their form.",
-  "statutory_update_blocked": "{count} of them are dated under revision {version} and will not be able to produce the form at all. They have to be started again on the updated template.",
-  "statutory_update_none_blocked": "None of them is dated under a newer revision, so this update costs nothing that is already in progress.",
+  "statutory_update_none_blocked": "None of them is dated under the newer revision, so this update costs nothing that is already under way.",
+  "statutory_update_none_inflight": "No inspection is in progress on this template, so this update changes nothing already under way.",
   "statutory_update_confirm_title": "Update {name}?",
   "statutory_update_confirm_submit": "Update the template",
-  "statutory_update_confirm_cancel": "Cancel"
+  "statutory_update_confirm_cancel": "Cancel",
+  "statutory_update_confirm_loading": "Counting the inspections in progress…",
+  "statutory_update_confirm_error": "Couldn't read what this update would affect. Nothing has been changed.",
+  "statutory_update_inflight_one": "1 of {total} inspections in progress stays on revision {version} and still produces its form — its date falls inside that revision's window.",
+  "statutory_update_inflight_many": "{producible} of {total} inspections in progress stay on revision {version} and still produce their form — their dates fall inside its window.",
+  "statutory_update_blocked_one": "1 of them is dated under revision {version} and cannot produce the form at all. It has to be started again on the updated template.",
+  "statutory_update_blocked_many": "{count} of them are dated under revision {version} and cannot produce the form at all. Those have to be started again on the updated template."
 }

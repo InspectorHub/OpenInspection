@@ -4,6 +4,7 @@ import { eq, and, desc, sql, like } from 'drizzle-orm';
 import { templates, inspections, services, reports, marketplaceLibraries, tenantLibraryImports } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { TemplateSchemaV2Schema } from '../lib/validations/template.schema';
+import { readImportMarkers, retirementOf } from './template/import-markers';
 
 /**
  * What is blocking a template delete, or null.
@@ -230,7 +231,7 @@ export class TemplateService {
             .get();
         const total = totalRow?.c ?? 0;
 
-        const rows = await db.select({ id: templates.id, name: templates.name, version: templates.version, schema: templates.schema })
+        const rows = await db.select({ id: templates.id, name: templates.name, version: templates.version, schema: templates.schema, retiredAt: templates.retiredAt })
             .from(templates)
             .where(where)
             .orderBy(desc(templates.createdAt))
@@ -238,22 +239,10 @@ export class TemplateService {
             .offset((page - 1) * pageSize)
             .all();
 
-        // The unified catalogue's import marker (#293). `local_entity_id` names
-        // the ONE local row a 1:1 import produced; a 1:N import leaves it null
-        // and is tracked by row_count instead, so those markers simply never
-        // match a template id here.
-        const { tenantLibraryImports } = await import('../lib/db/schema/marketplace');
-        const imports = await db.select({
-            localEntityId: tenantLibraryImports.localEntityId,
-            libraryId:     tenantLibraryImports.libraryId,
-        })
-            .from(tenantLibraryImports)
-            .where(eq(tenantLibraryImports.tenantId, tenantId))
-            .all();
-        const catalogIdByLocalId = new Map<string, string>();
-        for (const i of imports) {
-            if (i.localEntityId) catalogIdByLocalId.set(i.localEntityId as string, i.libraryId as string);
-        }
+        // The unified catalogue's import markers (#293) — which rows came from
+        // the catalogue, and which retired rows an uninstall retired rather
+        // than an update. ./template/import-markers explains both.
+        const { catalogIdByLocalId, uninstalledLocalIds } = await readImportMarkers(db, tenantId);
         const mapped = rows.map(row => ({
             id: row.id,
             name: row.name,
@@ -261,6 +250,7 @@ export class TemplateService {
             itemCount: this.countSchemaItems(row.schema as never),
             source: catalogIdByLocalId.has(row.id as string) ? 'marketplace' as const : 'custom' as const,
             marketplaceLibraryId: catalogIdByLocalId.get(row.id as string) ?? null,
+            ...retirementOf(row.retiredAt, uninstalledLocalIds.has(row.id as string)),
         }));
         return { rows: mapped, total };
     }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLoaderData, useNavigate } from "react-router";
+import { useFetcher, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/marketplace";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -11,6 +11,8 @@ import { usePagination } from "~/hooks/usePagination";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
+import { StatutoryUpdateConfirm } from "~/components/marketplace/StatutoryUpdateConfirm";
+import type { StatutoryUpdateImpact } from "../../server/services/marketplace/statutory-update-impact";
 
 export function meta() {
   return [{ title: m.marketplace_meta_title() }];
@@ -86,6 +88,28 @@ export default function MarketplacePage() {
     useGuardedSubmit<{ ok: boolean; localTemplateId?: string | null; error?: string }>();
   const [installingId, setInstallingId] = useState<string | null>(null);
 
+  // A statutory package with a newer release is not installed again; it is
+  // UPDATED, and an update retires the workspace's current template while the
+  // inspections already under way stay on the retired one. Most of them are
+  // unaffected, so the confirmation states both numbers before the button
+  // rather than leaving the reader to discover either afterwards. It is a
+  // component, never `window.confirm`, which can carry neither.
+  const [updating, setUpdating] = useState<{ id: string; name: string } | null>(null);
+  const impactFetcher = useFetcher<{ ok: boolean; impact: StatutoryUpdateImpact | null }>();
+  // Guarded: pressing Update twice would run the update twice, and the second
+  // run retires the template the first one just minted.
+  const { fetcher: updateFetcher, submit: submitUpdate, busy: applyingUpdate } =
+    useGuardedSubmit<{ ok: boolean }>();
+
+  function reviewStatutoryUpdate(id: string, name: string) {
+    setUpdating({ id, name });
+    impactFetcher.load(`/resources/statutory-update?libraryId=${encodeURIComponent(id)}`);
+  }
+
+  useEffect(() => {
+    if (updateFetcher.state === "idle" && updateFetcher.data?.ok) setUpdating(null);
+  }, [updateFetcher.state, updateFetcher.data]);
+
   function handleInstall(id: string) {
     // Track the row only for a call the guard accepted, so a refused click
     // cannot leave a button spinning against no request.
@@ -139,6 +163,7 @@ export default function MarketplacePage() {
               // first. Templates keep their old path — updating one mints a
               // second local copy and destroys nothing.
               const reviewUpdate = t.kind === "comments" && t.hasUpdate === true;
+              const statutoryUpdate = t.kind === "statutory" && t.hasUpdate === true;
               return (
               <Card key={t.id} className="p-4">
                 <p className="text-[13px] font-semibold text-ih-fg-1">{t.name || t.title}</p>
@@ -154,7 +179,15 @@ export default function MarketplacePage() {
                       <span className="text-[11px] text-ih-fg-3">{t.author}</span>
                     )}
                   </div>
-                  {reviewUpdate ? (
+                  {statutoryUpdate ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => reviewStatutoryUpdate(t.id, t.name || t.title || "")}
+                    >
+                      {m.marketplace_review_update()}
+                    </Button>
+                  ) : reviewUpdate ? (
                     <Button
                       variant="secondary"
                       size="sm"
@@ -177,6 +210,22 @@ export default function MarketplacePage() {
               );
             })}
           </div>
+
+          <StatutoryUpdateConfirm
+            open={updating !== null}
+            name={updating?.name ?? ""}
+            impact={impactFetcher.data?.ok ? impactFetcher.data.impact : null}
+            failed={impactFetcher.state === "idle" && impactFetcher.data?.ok === false}
+            submitting={applyingUpdate}
+            onCancel={() => setUpdating(null)}
+            onConfirm={() => {
+              if (!updating) return;
+              submitUpdate(
+                { libraryId: updating.id },
+                { method: "post", action: "/resources/statutory-update" },
+              );
+            }}
+          />
 
           <Pagination
             page={meta.page}
