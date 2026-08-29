@@ -25,6 +25,7 @@
  * A revision therefore costs redoing the layout, not fetching a file.
  */
 import { validateFieldMap, type FieldMap } from '../field-map';
+import { version as trecRei76Version, fieldMap as trecRei76Map } from './tx-trec-rei-7-6';
 import type { StatutoryFormVersion } from '../form-registry';
 
 /**
@@ -34,18 +35,17 @@ import type { StatutoryFormVersion } from '../form-registry';
  * published is a stale explanation of a state that no longer holds, which is
  * why the gate treats it as a failure rather than as tidy-up.
  */
-export const EMPTY_CATALOGUE_REASON: string | null =
-    'No statutory form is published with this software. Publishing one needs the authority\'s own '
-    + 'PDF, which is that agency\'s document rather than something distributed here, and a field '
-    + 'map checked against that exact revision by a person who read the form. Until an operator '
-    + 'holds both for a given revision there is nothing to list — and it is empty by declaration '
-    + 'so that "no forms" can never be confused with "the forms did not load".';
+// ⚠️ NULL BECAUSE THE CATALOGUE IS NO LONGER EMPTY. This reason exists to make
+// "no forms" checkable rather than inferred; a reason left behind after a form
+// is published is a stale explanation of a state that no longer holds, which is
+// why the fidelity gate treats it as a failure rather than as tidy-up.
+export const EMPTY_CATALOGUE_REASON: string | null = null;
 
 /** Every revision published with this software. Selected by inspection date, never by "latest". */
-export const PUBLISHED_FORM_VERSIONS: readonly StatutoryFormVersion[] = [];
+export const PUBLISHED_FORM_VERSIONS: readonly StatutoryFormVersion[] = [trecRei76Version];
 
 /** The hand-authored map for each of those revisions, one per (formId, version). */
-export const FIELD_MAPS: readonly FieldMap[] = [];
+export const FIELD_MAPS: readonly FieldMap[] = [trecRei76Map];
 
 /**
  * The map for one revision, or `null` if this software carries none.

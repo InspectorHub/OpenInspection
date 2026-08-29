@@ -1,12 +1,15 @@
 /**
  * The catalogue is consistent with itself, and its emptiness is declared.
  *
- * ⚠️ EVERY ASSERTION BELOW THAT LOOPS OVER THE CATALOGUE IS VACUOUS WHILE IT IS
- * EMPTY, which is the state it is in today. A suite of loops over an empty list
- * is a green run that checked nothing, so the census is asserted OUT LOUD: the
- * number of forms this software publishes is itself a fact under test, and the
- * day it changes these tests start doing work instead of quietly continuing to
- * pass.
+ * ⚠️ THE CENSUS BELOW WAS 0 AND IS NOW 1 (2026-08-29, TX TREC REI 7-6). It was
+ * asserted out loud precisely so that this day would arrive as a FAILING TEST
+ * rather than as a suite of loops quietly continuing to pass over a list that
+ * had stopped being empty. It worked: publishing the first form turned this
+ * file red on exactly one line.
+ *
+ * Every loop below is now load-bearing for real — read them that way. The
+ * `checked` counters that used to prove "the loop ran zero times, and said so"
+ * now prove it ran once against a published revision.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -32,12 +35,13 @@ describe('the statutory form catalogue', () => {
         }
     });
 
-    it('publishes the number of forms it claims to — today, none', () => {
+    it('publishes the number of forms it claims to — today, one', () => {
         // The census, stated rather than looped over. When this fails because a
-        // form was published, update the number and read every test below as
-        // newly load-bearing.
-        expect(PUBLISHED_FORM_VERSIONS).toHaveLength(0);
-        expect(FIELD_MAPS).toHaveLength(0);
+        // form was published or withdrawn, update the number and re-read every
+        // test below: each one's reach changes with this line.
+        expect(PUBLISHED_FORM_VERSIONS).toHaveLength(1);
+        expect(FIELD_MAPS).toHaveLength(1);
+        expect(PUBLISHED_FORM_VERSIONS[0].formId).toBe('tx_trec_rei_7_6');
     });
 
     it('pairs every revision with exactly one field map, both ways', () => {
