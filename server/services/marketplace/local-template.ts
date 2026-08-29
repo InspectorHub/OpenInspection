@@ -31,14 +31,19 @@ export async function insertLocalTemplate(
     now: Date,
 ): Promise<string> {
     const id = crypto.randomUUID();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await db.insert(templates as any).values({
+    // Typed against the table's own insert shape rather than cast past it. The
+    // `templates as any` this replaces disabled every column check on the one
+    // write that creates a workspace's copy of a catalogue pack -- a misspelled
+    // column would have compiled, and the standing rule against `as any` exists
+    // for writes exactly like this one.
+    const row: typeof templates.$inferInsert = {
         id,
         tenantId,
         name,
         schema,
         createdAt: now,
-    });
+    };
+    await db.insert(templates).values(row);
     return id;
 }
 
@@ -64,6 +69,34 @@ export async function retireLocalTemplate(
     if (templateId === null) return 0;
     const rows = await db.update(templates)
         .set({ retiredAt: at })
+        .where(and(eq(templates.id, templateId), eq(templates.tenantId, tenantId)))
+        .returning({ id: templates.id });
+    return rows.length;
+}
+
+/**
+ * Offer a retired local template again, and return how many rows that changed.
+ *
+ * The exact inverse of `retireLocalTemplate`, and it exists because un-installing
+ * is a VISIBILITY change: it retired this row and destroyed nothing, so putting
+ * the row back is all a reinstall of the same version has to undo. Anything more
+ * would be a reinstall inventing state that the un-install never removed.
+ *
+ * ⚠️ It is deliberately NOT reached when the catalogue has moved on. Reinstalling
+ * at the version the workspace left on would put a superseded statutory revision
+ * back in the picker on purpose — see the reinstall path, which mints the current
+ * revision instead and retires this row for good.
+ *
+ * Scoped by tenant for the same reason the retire half is.
+ */
+export async function unretireLocalTemplate(
+    db: MarketplaceDb,
+    tenantId: string,
+    templateId: string | null,
+): Promise<number> {
+    if (templateId === null) return 0;
+    const rows = await db.update(templates)
+        .set({ retiredAt: null })
         .where(and(eq(templates.id, templateId), eq(templates.tenantId, tenantId)))
         .returning({ id: templates.id });
     return rows.length;

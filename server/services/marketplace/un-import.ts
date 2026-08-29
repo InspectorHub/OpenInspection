@@ -94,3 +94,37 @@ export async function markImportUninstalled(
         .set({ uninstalledAt: at })
         .where(eq(tenantLibraryImports.id, importId));
 }
+
+/**
+ * Put an uninstalled marker back into service, at whatever the reinstall
+ * produced.
+ *
+ * The counterpart of `markImportUninstalled`, and the reason the marker is a
+ * flag rather than a deleted row: `uq_tenant_library_import` is unique on
+ * (tenant_id, library_id), so with the row kept there is exactly one way back in
+ * and this is it. Without this function the flag was a one-way door — the schema
+ * said "reinstalling clears this and runs the update path" while nothing
+ * anywhere cleared it, so an uninstall was permanent and the copy in the
+ * template picker said "ask an administrator to reinstall it" about something no
+ * administrator could do.
+ *
+ * The whole marker is re-stated rather than just the flag: a reinstall may land
+ * on a different local row and a different semver, and a flag cleared beside a
+ * stale position is worse than no reinstall at all.
+ */
+export async function clearImportUninstalled(
+    db: MarketplaceDb,
+    importId: string,
+    at: Date,
+    marker: { importedSemver: string; rowCount: number; localEntityId: string | null },
+): Promise<void> {
+    await db.update(tenantLibraryImports)
+        .set({
+            uninstalledAt:  null,
+            importedAt:     at,
+            importedSemver: marker.importedSemver,
+            rowCount:       marker.rowCount,
+            localEntityId:  marker.localEntityId,
+        })
+        .where(eq(tenantLibraryImports.id, importId));
+}

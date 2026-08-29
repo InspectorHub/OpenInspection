@@ -136,6 +136,25 @@ describe('un-installing a catalogue entry', () => {
         await expect(svc.uninstall('stat-1', 'u1')).rejects.toThrow(/not installed/i);
     });
 
+    it('an uninstalled entry stops reading as installed in the catalogue listing', async () => {
+        // The marker survives an un-import on purpose -- it records which version
+        // this workspace was on. A listing that asks only "is there a marker"
+        // therefore reports every pack the workspace ever had as installed, and
+        // did: it showed the imported version, and could offer to UPDATE a pack
+        // the workspace no longer has, while the Install button that brings it
+        // back was the one control not on offer.
+        await svc.importCatalogEntry('stat-1', 'u1');
+        const installed = await svc.list();
+        expect(installed.rows.find(r => r.id === 'stat-1')?.importedSemver).toBe('1.0.0');
+
+        await svc.uninstall('stat-1', 'u1');
+
+        const after = await svc.list();
+        const row = after.rows.find(r => r.id === 'stat-1');
+        expect(row?.importedSemver).toBeNull();
+        expect(row?.hasUpdate).toBe(false);
+    });
+
     it('records the un-import in history, distinctly from an update', async () => {
         await svc.importCatalogEntry('cmt-1', 'u1');
         await svc.uninstall('cmt-1', 'u1');
@@ -147,5 +166,114 @@ describe('un-installing a catalogue entry', () => {
         const un = rows.find(r => r.action === 'uninstall');
         expect(un!.sourceVersion).toBe('1.0.0');
         expect(un!.targetVersion).toBeNull();
+    });
+
+    describe('and installing it again', () => {
+        // ⚠️ There was no way back in at all. The import path returned early on
+        // ANY existing marker, so an uninstall was permanent -- while the schema
+        // promised in prose that "reinstalling instead clears this and runs the
+        // update path", and the template picker told inspectors to ask an
+        // administrator to reinstall something no administrator could.
+
+        it('clears the marker and offers the same template again', async () => {
+            const first = await svc.importCatalogEntry('stat-1', 'u1');
+            await svc.uninstall('stat-1', 'u1');
+
+            const again = await svc.importCatalogEntry('stat-1', 'u1');
+
+            // The same local row, because un-installing at this version RETIRED
+            // it and destroyed nothing. Reinstating it is that change in reverse;
+            // minting a second copy would leave the workspace with two.
+            expect(again.localEntityId).toBe(first.localEntityId);
+            const tpl = await testDb.select().from(schema.templates)
+                .where(eq(schema.templates.id, first.localEntityId!)).get();
+            expect(tpl!.retiredAt).toBeNull();
+
+            const [marker] = await testDb.select().from(tenantLibraryImports).all();
+            expect(marker!.uninstalledAt).toBeNull();
+            expect(marker!.localEntityId).toBe(first.localEntityId);
+        });
+
+        it('lands on the current version when the catalogue moved on, retiring the old row', async () => {
+            // The one case where a reinstall is NOT a visibility change in
+            // reverse: putting back the version the workspace left on would
+            // deliberately return a superseded statutory revision to the picker,
+            // which is the trap `retired_at` exists to close.
+            const first = await svc.importCatalogEntry('stat-1', 'u1');
+            await svc.uninstall('stat-1', 'u1');
+            await testDb.update(marketplaceLibraries)
+                .set({ semver: '2.0.0' })
+                .where(eq(marketplaceLibraries.id, 'stat-1'));
+
+            const again = await svc.importCatalogEntry('stat-1', 'u1');
+
+            expect(again.localEntityId).not.toBe(first.localEntityId);
+            const old = await testDb.select().from(schema.templates)
+                .where(eq(schema.templates.id, first.localEntityId!)).get();
+            expect(old!.retiredAt).not.toBeNull();
+            const fresh = await testDb.select().from(schema.templates)
+                .where(eq(schema.templates.id, again.localEntityId!)).get();
+            expect(fresh!.retiredAt).toBeNull();
+
+            const [marker] = await testDb.select().from(tenantLibraryImports).all();
+            expect(marker!.importedSemver).toBe('2.0.0');
+            expect(marker!.uninstalledAt).toBeNull();
+        });
+
+        it('puts a comment pack\'s rows back, because its un-import deleted them', async () => {
+            // The 1:N half undoes differently, so it is reinstated differently.
+            // One branch pretending both kinds come back the same way is the
+            // failure the catalogue table's own comment warns about.
+            await svc.importCatalogEntry('cmt-1', 'u1');
+            const seeded = (await testDb.select().from(schema.comments).all()).length;
+            await svc.uninstall('cmt-1', 'u1');
+            expect(await testDb.select().from(schema.comments).all()).toHaveLength(0);
+
+            const again = await svc.importCatalogEntry('cmt-1', 'u1');
+
+            expect(again.rowCount).toBe(seeded);
+            expect(await testDb.select().from(schema.comments).all()).toHaveLength(seeded);
+            const [marker] = await testDb.select().from(tenantLibraryImports).all();
+            expect(marker!.uninstalledAt).toBeNull();
+            expect(marker!.rowCount).toBe(seeded);
+        });
+
+        it('is recorded as an install that says what it came back from', async () => {
+            await svc.importCatalogEntry('stat-1', 'u1');
+            await svc.uninstall('stat-1', 'u1');
+            await svc.importCatalogEntry('stat-1', 'u1');
+
+            const rows = await testDb.select().from(schema.tenantMarketplaceImportHistory).all();
+            const reinstall = rows.filter(r => r.action === 'install').at(-1);
+            // An install has nothing to move from; a reinstall does, and a reader
+            // asking what happened across the absence needs both ends of it.
+            expect(reinstall!.sourceVersion).toBe('1.0.0');
+            expect(reinstall!.targetVersion).toBe('1.0.0');
+        });
+
+        it('refuses to UPDATE an uninstalled entry — installing is the way back', async () => {
+            await svc.importCatalogEntry('stat-1', 'u1');
+            await svc.uninstall('stat-1', 'u1');
+            await testDb.update(marketplaceLibraries)
+                .set({ semver: '2.0.0' })
+                .where(eq(marketplaceLibraries.id, 'stat-1'));
+
+            // Updating would mint a live local template while every other
+            // surface still read the marker as uninstalled.
+            await expect(svc.updateTemplateImport('stat-1', 'u1')).rejects.toThrow(/uninstalled/i);
+        });
+
+        it('POSITIVE CONTROL — an ordinary second install of a LIVE entry still changes nothing', async () => {
+            // The idempotent path this reinstall branch sits beside. If it had
+            // swallowed that case, a double-click on Install would now mint a
+            // second template or re-insert a pack's rows twice.
+            const first = await svc.importCatalogEntry('cmt-1', 'u1');
+            const rows = (await testDb.select().from(schema.comments).all()).length;
+
+            const second = await svc.importCatalogEntry('cmt-1', 'u1');
+
+            expect(second).toEqual(first);
+            expect(await testDb.select().from(schema.comments).all()).toHaveLength(rows);
+        });
     });
 });

@@ -39,7 +39,6 @@
   "server/lib/db/schema/tenant/core.ts": 509,
   "server/services/inspection/shared.ts": 505,
   "server/services/portal-access.service.ts": 500,
-  "server/services/marketplace.service.ts": 499,
   "app/components/collab/VersionHistoryPanel.tsx": 497,
   "server/lib/compliance/erasure-orchestrator.ts": 484,
   "server/services/report-export-consumer.ts": 482,
@@ -61,6 +60,7 @@
   "server/portal/integration.routes.ts": 423,
   "server/services/template.service.ts": 420,
   "app/components/editor/InspectionSettingsSheet.tsx": 419,
+  "server/services/marketplace.service.ts": 419,
   "app/routes/calendar.tsx": 415,
   "server/lib/db/schema/inspection/core.ts": 415,
   "server/services/agreement/signer-state.ts": 413

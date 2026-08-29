@@ -1,14 +1,13 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, sql } from 'drizzle-orm';
-import type { PackEntry } from '../lib/library-edit-marker';
 import { parseLibraryComments } from './marketplace/library-pack';
 import { insertLibraryComments } from './marketplace/library-insert';
+import { previewLibraryReplace, type LibraryReplacePreview } from './marketplace/library-replace';
 import {
-    applyReplaceMode,
-    previewLibraryReplace,
-    resolveLibraryUpdate,
-    type LibraryReplacePreview,
-} from './marketplace/library-replace';
+    updateLibraryImport,
+    type UpdateLibraryImportOptions,
+    type UpdateLibraryImportResult,
+} from './marketplace/library-update';
 import {
     marketplaceLibraries,
     tenantLibraryImports,
@@ -17,45 +16,19 @@ import { Errors } from '../lib/errors';
 import { browseCatalogue, type CatalogueBrowseOptions } from './marketplace/catalogue-browse';
 import { writeImportHistory } from './marketplace/import-history';
 import { insertLocalTemplate, retireLocalTemplate } from './marketplace/local-template';
-import { assertStatutorySchema } from './marketplace/statutory-import';
+import { reinstallCatalogEntry } from './marketplace/reinstall';
+import { assertStatutoryInstallable } from './marketplace/statutory-import';
 import {
     deleteLibraryComments,
     markImportUninstalled,
     resolveUninstall,
 } from './marketplace/un-import';
+import { PUBLISHED_FORM_VERSIONS } from '../lib/statutory/forms';
 import { TemplateService } from './template.service';
 
-/**
- * Sprint 2 S2-7 — Library update mode. Append (default, legacy behavior) keeps
- * old rows alongside new. Replace deletes the prior import's rows first then
- * inserts the new pack.
- */
-type LibraryUpdateMode = 'append' | 'replace';
-
-export interface UpdateLibraryImportOptions {
-    mode?: LibraryUpdateMode;
-    /**
-     * The destructive choice, and it is now enforced rather than merely recorded
-     * (#348). Replace mode defaults to KEEPING rows the tenant rewrote; passing
-     * true is the caller stating, deliberately, that those rewrites should be
-     * deleted along with everything else. Nothing else in this codebase should
-     * default it to true.
-     */
-    confirmLossOfEdits?: boolean;
-    /** User id for the history row (S2-8). Defaults to 'system'. */
-    userId?: string;
-}
-
-export interface UpdateLibraryImportResult {
-    rowsAdded: number;
-    rowsDeleted: number;
-    /** Rows the tenant had rewritten and that this update did not delete. */
-    rowsPreserved: number;
-    fromSemver: string;
-    toSemver: string;
-    libraryName: string;
-    mode: LibraryUpdateMode;
-}
+// The 1:N update verb's own types, re-exported so importers of this service
+// keep the names they had when its body lived here.
+export type { UpdateLibraryImportOptions, UpdateLibraryImportResult };
 
 export type { LibraryReplacePreview };
 
@@ -63,11 +36,20 @@ export class MarketplaceService {
   private db: ReturnType<typeof drizzle>;
   private rawDb: D1Database;
   private tenantId: string;
+  /**
+   * Object storage, for the ONE question this service asks it: is the
+   * authority's published PDF for a statutory package already under the shared
+   * `_platform/` key. Optional because most of this class has nothing to do with
+   * statutory forms — but an absent bucket does not soften the check; a
+   * statutory install that cannot look fails closed.
+   */
+  private bucket: R2Bucket | undefined;
 
-  constructor(db: D1Database, tenantId: string) {
+  constructor(db: D1Database, tenantId: string, bucket?: R2Bucket) {
     this.db = drizzle(db);
     this.rawDb = db;
     this.tenantId = tenantId;
+    this.bucket = bucket;
   }
 
   /**
@@ -139,11 +121,25 @@ export class MarketplaceService {
       .limit(1);
 
     if (existing) {
-      return {
-        kind:          entry.kind,
-        localEntityId: existing.localEntityId,
-        rowCount:      existing.rowCount,
-      };
+      // ⚠️ An uninstalled marker is NOT an install. It is the record of one that
+      // ended, kept because it says which version this workspace was on and
+      // because the unique index on (tenant_id, library_id) leaves no other way
+      // back in. Returning it here — which is what this did — made an uninstall
+      // permanent AND made the pack read as installed: the browse page offered
+      // an update for something the workspace no longer had, and the template
+      // picker told inspectors to "ask an administrator to reinstall it" about
+      // something no administrator could do.
+      if (existing.uninstalledAt === null) {
+        return {
+          kind:          entry.kind,
+          localEntityId: existing.localEntityId,
+          rowCount:      existing.rowCount,
+        };
+      }
+      return reinstallCatalogEntry({
+        db: this.db, rawDb: this.rawDb, tenantId: this.tenantId, bucket: this.bucket,
+        entry, existing, userId, assertV2Schema: (s) => this.assertV2Schema(s),
+      });
     }
 
     const now = new Date();
@@ -153,8 +149,11 @@ export class MarketplaceService {
     if (entry.kind === 'statutory') {
       // A different validator, because the tenant-facing one refuses the
       // declaration this row carries — and it must keep refusing it, which is
-      // why this branch does not reach for a flag on `assertV2Schema`.
-      assertStatutorySchema(entry.schema);
+      // why this branch does not reach for a flag on `assertV2Schema`. Plus the
+      // half a validator cannot answer: whether the authority's own PDF is in
+      // storage. Installed-but-unable-to-produce is the failure this pair exists
+      // to prevent, and it is refused before any row is written.
+      await assertStatutoryInstallable(this.bucket, entry.schema, PUBLISHED_FORM_VERSIONS);
       localEntityId = await insertLocalTemplate(this.db, this.tenantId, entry.name, entry.schema, now);
     } else if (entry.kind === 'templates') {
       // Spec 5B P3 — gate imports on v2 schema validation. The catalogue can
@@ -248,6 +247,14 @@ export class MarketplaceService {
       throw Errors.BadRequest('Template has not been imported yet — use Import instead of Update');
     }
 
+    // Same reason as the library path: an uninstalled marker records an install
+    // that ended. Updating it would mint a live local template while the marker
+    // still read "uninstalled" — installing again is the way back, and it lands
+    // on the current version anyway.
+    if (existing.uninstalledAt !== null) {
+      throw Errors.BadRequest('This template is uninstalled — install it again rather than updating it');
+    }
+
     if (existing.importedSemver === mkt.semver) {
       throw Errors.BadRequest('No update available — already on the latest version');
     }
@@ -258,7 +265,7 @@ export class MarketplaceService {
     // extended validator, or a package could be installed and then never
     // updated because the tenant-facing schema refuses its declaration.
     if (mkt.kind === 'statutory') {
-      assertStatutorySchema(mkt.schema);
+      await assertStatutoryInstallable(this.bucket, mkt.schema, PUBLISHED_FORM_VERSIONS);
     } else {
       this.assertV2Schema(mkt.schema);
     }
@@ -399,100 +406,13 @@ export class MarketplaceService {
 
   /**
    * Sprint 2 S2-7 — Library update with explicit Append vs Replace mode.
-   *
-   * - 'append' (default, legacy behavior): adds the new pack's rows alongside
-   *   the prior import's rows. Risks duplication when the marketplace bumps a
-   *   library 248 → 248+248 entries.
-   * - 'replace': deletes every comment with the matching `library_id` for this
-   *   tenant, then inserts the new pack. Tenant-authored comments
-   *   (library_id IS NULL) are NEVER touched.
-   *
-   * Throws Errors.BadRequest if no prior import exists or the marketplace
-   * version has not advanced past the imported semver.
+   * The mechanics live in `marketplace/library-update.ts`; see there for what
+   * each mode does to the rows a previous import created.
    */
-  async updateLibraryImport(
+  updateLibraryImport(
     libraryId: string,
     options: UpdateLibraryImportOptions = {},
   ): Promise<UpdateLibraryImportResult> {
-    const mode: LibraryUpdateMode = options.mode ?? 'append';
-    const userId = options.userId ?? 'system';
-
-    const { lib, existing } = await resolveLibraryUpdate(this.db, this.tenantId, libraryId);
-
-    if (lib.kind !== 'comments') {
-      throw new Error(`Library kind '${lib.kind}' not yet supported for update`);
-    }
-
-    const fromSemver = existing.importedSemver;
-    const now = new Date();
-    let rowsDeleted = 0;
-    let rowsPreserved = 0;
-
-    let entries: PackEntry[] = parseLibraryComments(lib.schema);
-
-    // S2-7 — Replace mode clears the prior import's rows before inserting the
-    // new pack. #348 — but not the ones the inspector rewrote, unless the caller
-    // has explicitly accepted losing them.
-    if (mode === 'replace') {
-      const outcome = await applyReplaceMode(
-        this.db, this.tenantId, libraryId, entries,
-        options.confirmLossOfEdits !== true,
-      );
-      rowsDeleted   = outcome.rowsDeleted;
-      rowsPreserved = outcome.rowsPreserved;
-      entries       = outcome.entries;
-    }
-
-    // Insert the new pack's entries (all fresh UUIDs, each stamped with the
-    // import hash that makes the NEXT update able to ask this same question).
-    const rowsAdded = await insertLibraryComments(this.rawDb, this.tenantId, libraryId, entries);
-
-    // Update the marker. Replace mode resets rowCount to the new size; append
-    // mode accumulates as before.
-    const newRowCount = mode === 'replace'
-      ? rowsAdded + rowsPreserved
-      : (existing.rowCount + rowsAdded);
-    await this.db
-      .update(tenantLibraryImports)
-      .set({
-        importedSemver: lib.semver,
-        importedAt:     now,
-        rowCount:       newRowCount,
-      })
-      .where(eq(tenantLibraryImports.id, existing.id));
-
-    await this.db
-      .update(marketplaceLibraries)
-      .set({ downloadCount: sql`${marketplaceLibraries.downloadCount} + 1`, updatedAt: now })
-      .where(eq(marketplaceLibraries.id, libraryId));
-
-    // Sprint 2 S2-8 — write history. action='replace' surfaces the destructive
-    // event distinctly from a plain 'update' (append).
-    await writeImportHistory(this.db, this.tenantId, {
-      libraryId,
-      action:        mode === 'replace' ? 'replace' : 'update',
-      sourceVersion: fromSemver,
-      targetVersion: lib.semver,
-      rowsAffected:  rowsAdded,
-      metadata: {
-        libraryName: lib.name,
-        kind:        lib.kind,
-        rowsAdded,
-        rowsDeleted,
-        rowsPreserved,
-        confirmLossOfEdits: !!options.confirmLossOfEdits,
-      },
-      userId,
-    });
-
-    return {
-      rowsAdded,
-      rowsDeleted,
-      rowsPreserved,
-      fromSemver,
-      toSemver:    lib.semver,
-      libraryName: lib.name,
-      mode,
-    };
+    return updateLibraryImport(this.db, this.rawDb, this.tenantId, libraryId, options);
   }
 }

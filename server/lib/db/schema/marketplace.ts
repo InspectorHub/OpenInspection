@@ -111,9 +111,19 @@ export const tenantLibraryImports = sqliteTable('tenant_library_imports', {
    *
    * The row is kept rather than deleted: it records which version this
    * workspace was ON, and re-issuing a report produced back then is expected to
-   * keep working. The unique index above is on (tenant_id, library_id), so a
-   * deleted row would also be the only way to reinstall — reinstalling instead
-   * clears this and runs the update path.
+   * keep working. The unique index above is on (tenant_id, library_id), so with
+   * the row kept there is exactly one way back in, and it is `importCatalogEntry`
+   * — which, finding a marker in this state, clears it rather than returning
+   * early. At the same version that means un-retiring the local row this
+   * un-install retired; when the catalogue has moved on it takes the update
+   * path's shape instead, minting the current version and retiring the old row,
+   * because reinstating a superseded statutory revision is precisely the trap
+   * `templates.retired_at` exists to close.
+   *
+   * ⚠️ Every reader of this column must exclude uninstalled markers explicitly.
+   * A query that asks only "is there a marker" reports every pack a workspace
+   * ever had as installed — `browseCatalogue` did, and offered updates for packs
+   * nobody had.
    *
    * ⚠️ Un-installing changes VISIBILITY, never content. Nothing on this path
    * deletes a local template (a legacy foreign key from inspections.template_id

@@ -71,13 +71,27 @@ export async function browseCatalogue(
         .limit(pageSize)
         .offset(offset);
 
+    // ⚠️ UNINSTALLED MARKERS ARE NOT INSTALLS. The row survives an un-import on
+    // purpose — it records which version this workspace was on, and re-issuing an
+    // old report is expected to keep working — so a query that asks only "is
+    // there a marker" reports every pack the workspace ever had as installed. It
+    // did: an uninstalled pack showed its imported version and could show an
+    // "update available" badge, offering to update something the workspace no
+    // longer has, while the Install button that would actually bring it back was
+    // the one control not on offer.
+    //
+    // This file was extracted in the same commit that added the column and was
+    // never taught about it.
     const imports = await db
         .select({
             libraryId:      tenantLibraryImports.libraryId,
             importedSemver: tenantLibraryImports.importedSemver,
         })
         .from(tenantLibraryImports)
-        .where(eq(tenantLibraryImports.tenantId, tenantId));
+        .where(and(
+            eq(tenantLibraryImports.tenantId, tenantId),
+            isNull(tenantLibraryImports.uninstalledAt),
+        ));
 
     const importMap = new Map(imports.map(i => [i.libraryId, i.importedSemver]));
 
