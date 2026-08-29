@@ -112,9 +112,17 @@ function collectDefects(
  * inspected, what limited the inspection, what was deficient, then anything
  * they typed themselves.
  *
- * Entries are separated by a newline because the boxes they land in are
- * multiline and the renderer wraps within them. They are NOT trimmed, for the
- * reason `values.ts` gives about a deliberate leading space.
+ * Entries are joined by a SPACE, not a newline, and that is a measurement
+ * rather than a preference. A hard break costs a whole line whatever sits on
+ * it, and these boxes are small: four short entries joined with newlines
+ * overflowed the TREC roof-covering comments box at 144 characters in a box
+ * that holds about 176 across its lines. On paper an inspector writes that
+ * section as a paragraph and the box wraps it; a line per entry is a screen
+ * convention that does not survive contact with a fixed-height box.
+ *
+ * Entries are NOT trimmed, for the reason `values.ts` gives about a deliberate
+ * leading space. An entry that itself contains a break KEEPS it -- `fit.ts`
+ * measures per line and refuses honestly if the result does not fit.
  */
 export function composeItemComments(
     tabs: ItemCommentTabs | undefined,
@@ -128,5 +136,5 @@ export function composeItemComments(
         ...collectDefects(tabs?.defects, states?.defects, attributes),
     ];
     if (typeof notes === 'string' && notes.length > 0) parts.push(notes);
-    return parts.join('\n');
+    return parts.join(' ');
 }

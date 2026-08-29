@@ -109,7 +109,10 @@ describe('TX TREC REI 7-6', () => {
         const decl = (seed.schema as unknown as {
             statutoryForm?: { formId: string; revision?: string };
         }).statutoryForm;
-        expect(decl?.formId).toBe('tx_trec_rei');
-        expect(decl?.revision).toBe('7-6');
+        // Against `version`, never a literal: a literal here agreed with a
+        // string chosen in the same commit while the real selector matched
+        // nothing, and the form was offered as unavailable with no error.
+        expect(decl?.formId).toBe(version.formId);
+        expect(decl?.revision).toBe(version.version);
     });
 });

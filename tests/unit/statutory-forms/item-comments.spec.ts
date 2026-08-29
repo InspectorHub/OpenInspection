@@ -51,13 +51,17 @@ describe('composeItemComments', () => {
             'Recommend a roofer.',
             undefined,
         );
-        expect(out.split('\n')).toEqual([
+        // Joined by a space, because a hard break costs a whole line and these
+        // boxes are small -- see the composer's header. The ORDER is what this
+        // asserts; the separator is asserted on its own below.
+        expect(out).toBe([
             'Roof was inspected from the ground.',
             'Attic was entered.',
             'Snow limited the view.',
             'Cracked tile at north slope.',
             'Recommend a roofer.',
-        ]);
+        ].join(' '));
+        expect(out).not.toContain('\n');
     });
 
     it('renders a defect\'s Mustache variables, as the report does', () => {
@@ -67,7 +71,7 @@ describe('composeItemComments', () => {
         );
         // `i1` is a default, so it is there too -- that is the point of the
         // previous assertions and not what this one is about.
-        expect(out.split('\n').at(-1)).toBe('Cracked tile at north slope.');
+        expect(out.endsWith('Cracked tile at north slope.')).toBe(true);
         expect(out).not.toContain('{{');
     });
 

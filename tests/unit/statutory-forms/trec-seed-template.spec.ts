@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import seed from '../../../server/data/seed-templates/trec-rei-7-6.json';
-import { fieldMap } from '../../../server/lib/statutory/forms/tx-trec-rei-7-6';
+import { fieldMap, version } from '../../../server/lib/statutory/forms/tx-trec-rei-7-6';
+import { PUBLISHED_FORM_VERSIONS } from '../../../server/lib/statutory/forms';
+import { versionForInspection } from '../../../server/lib/statutory/form-registry';
 import type { StatutoryFormDeclaration } from '../../../server/types/template-schema';
 
 /**
@@ -103,8 +105,16 @@ describe('TREC REI 7-6 seed template', () => {
         }
     });
 
-    it('declares the revision its bindings were authored against', () => {
-        expect(decl.formId).toBe('tx_trec_rei');
-        expect(decl.revision).toBe('7-6');
+    it('names the form the PUBLISHED version names, not a plausible spelling of it', () => {
+        // Asserted against `version`, never against a literal. The first draft of
+        // this spec compared `decl.formId` to a string chosen in the same commit
+        // that wrote the declaration -- so it agreed with itself while the real
+        // selector, `versionForInspection`, matched nothing and the form was
+        // offered as UNAVAILABLE with no error anywhere.
+        expect(decl.formId).toBe(version.formId);
+        expect(versionForInspection(
+            decl.formId, Date.UTC(2026, 7, 20), PUBLISHED_FORM_VERSIONS,
+        )).not.toBeNull();
+        expect(decl.revision).toBe(version.version);
     });
 });

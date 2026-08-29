@@ -1866,8 +1866,8 @@
       }
     ],
     "statutoryForm": {
-      "formId": "tx_trec_rei",
-      "revision": "7-6",
+      "formId": "tx_trec_rei_7_6",
+      "revision": "REI 7-6",
       "bindings": {
         "structural_foundations_rating": {
           "from": "item",

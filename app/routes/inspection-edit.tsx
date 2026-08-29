@@ -28,6 +28,7 @@ import { EditorHeader } from "~/components/editor/EditorHeader";
 import { FullscreenToggle } from "~/components/editor/FullscreenToggle";
 import { ItemList } from "~/components/editor-shared/ItemList";
 import { useStatutoryGroups, useStatutoryFormProgress, useStructuralEditingAllowed } from "~/hooks/useStatutoryGroups";
+import { useCompletedRevalidation } from "~/hooks/useCompletedRevalidation";
 import { AddGroupInstanceHost } from "~/components/statutory/AddGroupInstanceHost";
 import { RevisionBanner } from "~/components/statutory/RevisionBanner";
 import { ItemEditor } from "~/components/editor/ItemEditor";
@@ -946,13 +947,10 @@ export default function InspectionEditPage() {
   * (see useInspectionState), so revalidation alone leaves the header badge and
   * the toolbar button stale. Patch status locally the same way structural edits
   * do, then revalidate for anything loader-derived. */
- useEffect(() => {
- if (completeFetcher.state !== "idle" || !completeFetcher.data) return;
- if (completeFetcher.data.ok) {
- state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED }));
- revalidator.revalidate();
- }
- }, [completeFetcher.state, completeFetcher.data, revalidator, state]);
+ /* One-shot: the reason, and the measurement behind it, live in the hook. */
+ useCompletedRevalidation(completeFetcher.state, completeFetcher.data,
+  () => state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED })),
+  () => revalidator.revalidate());
 
  /* ---------------------------------------------------------------- */
  /* Rating handler with auto-advance */

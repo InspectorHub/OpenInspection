@@ -36,6 +36,35 @@ import { QBO_CALLBACK_PATH } from '../qbo-oauth-paths';
 // can't trick the middleware into treating a protected route as public.
 const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|otf|json|txt|pdf)$/i;
 
+/**
+ * Is this path a static asset, and therefore outside authentication?
+ *
+ * ⚠️ AN EXTENSION IS NOT A CLASSIFICATION ON ITS OWN. The test used to be the
+ * bare regex above, and it matched `/api/...` too -- so EVERY API route whose
+ * path ends in one of those extensions skipped authentication entirely, before
+ * a token was even read.
+ *
+ * Measured on `/api/inspections/{id}/statutory-form.pdf`: the middleware
+ * returned early, `userRole` was never set, and the route's own `requireRole`
+ * answered 401 'No role found in context' -- so an inspector pressing Download
+ * on a statutory form got an error, on every workspace, always. That one failed
+ * CLOSED, which is why it read as a broken button rather than as this.
+ *
+ * The shape that does NOT fail closed is the same rule on a route that reads
+ * `tenantId` without demanding a role: in standalone the tenant resolves from
+ * the host, so such a route would have answered with real data and no session
+ * at all. Naming one is not the point -- the point is that adding a `.json`
+ * endpoint would have opened it silently, and nothing here would have said so.
+ *
+ * Static assets are served by the Cloudflare assets layer before this worker
+ * runs; what reaches here under an asset extension is either a miss or an API
+ * route wearing a file name. Neither is a reason to skip authentication.
+ */
+function isStaticAssetPath(path: string): boolean {
+    if (path.startsWith('/api/')) return false;
+    return STATIC_ASSET_EXT.test(path);
+}
+
 export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
@@ -72,7 +101,7 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
     // SameSite=Strict, so no cookie is on that request — the route is authorized
     // by a single-use, 600s, owner/manager-issued `state` instead. See
     // `server/api/qbo-oauth.ts`.
-    const isPublic = path.startsWith('/api/__test__/') || path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/invoice/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/v/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook' || path === QBO_CALLBACK_PATH || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/') || path.startsWith('/unsubscribe/') || path.startsWith('/repair-request/') || path.startsWith('/repair-builder/') || path.startsWith('/api/portal/') || path.startsWith('/portal/');
+    const isPublic = path.startsWith('/api/__test__/') || path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/invoice/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/v/') || path.startsWith('/.well-known/') || isStaticAssetPath(path) || path === '/api/integrations/qbo/webhook' || path === QBO_CALLBACK_PATH || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/') || path.startsWith('/unsubscribe/') || path.startsWith('/repair-request/') || path.startsWith('/repair-builder/') || path.startsWith('/api/portal/') || path.startsWith('/portal/');
 
     if (isAuthPublic || isPublic || isAgentPublic || isConciergePublic || path === '/setup' || path === '/login' || path === '/join') return next();
 
