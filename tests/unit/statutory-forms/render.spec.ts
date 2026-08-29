@@ -20,6 +20,7 @@ import {
     readFieldValue,
     type PdfFixture,
 } from '../helpers/statutory-pdf-fixtures';
+import { drawnRuns } from '../helpers/pdf-drawn-runs';
 
 let fielded: PdfFixture;
 let flat: PdfFixture;
@@ -340,5 +341,37 @@ describe('renderStatutoryForm — a value drawn in parts', () => {
         await expect(renderStatutoryForm(flat.bytes, twoFields, {
             permit_date: 'soon', roof_permit_date: '15/03/2026',
         })).rejects.toThrow(/permit_date[\s\S]*roof_permit_date/);
+    });
+
+    it('puts each part at the coordinate measured for its own blank', async () => {
+        const bytes = await renderStatutoryForm(flat.bytes, partedMap(), {
+            permit_date: '2026-03-15',
+        });
+        const runs = (await drawnRuns(bytes, 0)).filter((r) => /^\d+$/.test(r.text));
+        expect(runs).toEqual([
+            { text: '03',   x: 472.20, y: 439.84, size: 9 },
+            { text: '15',   x: 495.12, y: 439.84, size: 9 },
+            { text: '2026', x: 517.80, y: 439.84, size: 9 },
+        ]);
+    });
+
+    it('CONTROL — one overlay for the whole date puts the year in the WRONG blank', async () => {
+        // This is the measured bug, asserted, so the test above is evidence of
+        // placement rather than of "something was drawn". The form's blanks are
+        // MM 472.20–492.30, DD 495.12–515.10, YYYY 517.80–557.81, with the
+        // form's own slashes printed in the two gaps.
+        const bytes = await renderStatutoryForm(flat.bytes, {
+            ...flatMap(), requiredFields: [],
+            mappings: [{ kind: 'overlay', ourField: 'permit_date', page: 0,
+                x: 473.7, y: 439.84, size: 9, maxWidth: 88 }],
+        }, { permit_date: '03/15/2026' });
+
+        const [run] = (await drawnRuns(bytes, 0)).filter((r) => r.text.includes('/'));
+        expect(run.text).toBe('03/15/2026');
+        // 45.036pt from 473.7 ends at 518.736. The year blank starts at 517.80
+        // and is 40.02 wide, so 0.936pt of it is covered and 39.08 stay empty —
+        // while our own slashes are drawn beside the form's printed ones.
+        expect(run.x).toBe(473.7);
+        expect(run.x + 45.036).toBeCloseTo(518.736, 3);
     });
 });
