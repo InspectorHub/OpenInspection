@@ -133,6 +133,17 @@ export interface FieldGroup {
  * rather than as software that failed to look. A compiler error is the only
  * place that mistake is cheap.
  *
+ * `item_comments` composes ONE section's whole narrative -- the canned
+ * information, limitation and defect entries the inspector included, with the
+ * inspector's own edits applied, then their free-text notes. It exists because
+ * these forms print one "Comments:" box per section and expect all of it, while
+ * this product spreads that across several fields. Binding such a box to
+ * `item_attribute` with a hand-made "comments" attribute would work and would be
+ * wrong: it asks the inspector to retype beside a box they already filled, and
+ * the two would then disagree about the same section. The composition resolves
+ * inclusion, overrides and Mustache variables exactly as the report does, so one
+ * finding cannot read differently on the two documents.
+ *
  * `signature` resolves BY REFERENCE at render time and never enters the
  * collected values. A signature image is the most tightly classified personal
  * data this repository holds, and the values object is declared to carry none;
@@ -145,6 +156,7 @@ export interface FieldGroup {
 export type StatutoryValueSource =
     | { from: 'item'; itemId: string }
     | { from: 'item_attribute'; itemId: string; attribute: string }
+    | { from: 'item_comments'; itemId: string }
     | { from: 'inspection'; field: StatutoryInspectionField }
     | { from: 'literal'; value: string }
     | { from: 'signature'; scope: string };
