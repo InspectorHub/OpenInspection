@@ -6,6 +6,7 @@ import {
   addItem, duplicateItem, deleteItem, moveItem, renameItem,
 } from "~/lib/editor/structure-ops";
 import type { Snapshot, ItemType } from "~/lib/editor/structure-ops";
+import { subtreeOf } from "../../server/lib/template-hierarchy";
 import { m } from "~/paraglide/messages";
 
 /** Impact data shown in the StructureDeleteModal — for a section OR a single item. */
@@ -231,18 +232,17 @@ export function useStructureEdit({
   const handleDeleteItem = useCallback(
     (sectionId: string, itemId: string) => {
       const sec = snapshotRef.current.sections.find((s) => s.id === sectionId);
-      const item = (sec?.items as Array<{ id: string; label: string }> | undefined)?.find(
-        (it) => it.id === itemId,
-      );
+      const items = (sec?.items ?? []) as Array<{ id: string; label: string }>;
+      const item = items.find((it) => it.id === itemId);
       if (!item) return;
-      const i = itemImpact(sectionId, itemId);
-      setDeletePending({
-        kind: "item",
-        sectionId,
-        itemId,
-        title: item.label,
-        impact: { items: 1, ...i },
-      });
+      // Deleting a parent takes its whole subtree with it, so the modal counts
+      // the whole subtree: saying "1 item" while four go is the modal lying.
+      const gone = subtreeOf(items, itemId);
+      const impact = gone.reduce(
+        (a, id) => { const i = itemImpact(sectionId, id); return { ...a, ratings: a.ratings + i.ratings, notes: a.notes + i.notes, photos: a.photos + i.photos }; },
+        { items: gone.length, ratings: 0, notes: 0, photos: 0 },
+      );
+      setDeletePending({ kind: "item", sectionId, itemId, title: item.label, impact });
     },
     [itemImpact],
   );

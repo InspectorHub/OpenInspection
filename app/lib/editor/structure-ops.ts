@@ -15,6 +15,10 @@ import type {
     CannedInfoComment,
     CannedDefect,
 } from '../.././../server/types/template-schema';
+import {
+    subtreeOf, deleteSubtree, duplicateSubtree, moveSubtreeAmongSiblings,
+    reorderSubtree, remapParentIds,
+} from '../../../server/lib/template-hierarchy';
 
 export type { ItemType };
 
@@ -25,7 +29,10 @@ export type { ItemType };
 
 export type Snapshot = { schemaVersion: 2; sections: Section[]; ratingSystem?: unknown; [k: string]: unknown };
 type Section  = { id: string; title: string; items: Item[]; [k: string]: unknown };
-export type Item     = { id: string; label: string; type: ItemType; [k: string]: unknown };
+// `parentId` is named rather than left to the index signature: the index
+// signature types it `unknown`, and the tree ops need `string | null | undefined`
+// to accept an Item at all.
+export type Item     = { id: string; label: string; type: ItemType; parentId?: string | null; [k: string]: unknown };
 
 // ---------------------------------------------------------------------------
 // Allowlists (mirrored from template-schema.ts TemplateSection / TemplateItem)
@@ -180,10 +187,16 @@ export function duplicateSection(snapshot: Snapshot, sectionId: string): Snapsho
         return stripRuntimeKeys({ ...snapshot, sections: [...snapshot.sections] });
     }
     const source = snapshot.sections[idx];
-    const clonedItems: Item[] = source.items.map((item) => ({
+    // Fresh ids for every item, THEN re-point every parent pointer at the new
+    // ids. Spreading the source item carried its old parentId into the new
+    // section, where that id does not exist -- a pointer readers fail open on,
+    // so the copy looked flat while the original looked nested. Nothing threw.
+    const idMap = new Map(source.items.map((item) => [item.id, newId('item')]));
+    const renamed = source.items.map((item) => ({
         ...(item as Record<string, unknown>),
-        id: newId('item'),
+        id: idMap.get(item.id) as string,
     } as Item));
+    const clonedItems: Item[] = remapParentIds(renamed, idMap);
     const cloned: Section = {
         ...(source as Record<string, unknown>),
         id: newId('sec'),
@@ -249,64 +262,99 @@ export function renameSection(snapshot: Snapshot, sectionId: string, title: stri
 // Item mutators
 // ---------------------------------------------------------------------------
 
-/** Appends a new item to the section. */
+/** Rewrites one section's items; every item mutator below is this plus a tree op. */
+function mapItems(
+    snapshot: Snapshot,
+    sectionId: string,
+    fn: (items: Item[]) => Item[],
+): Snapshot {
+    const sections = snapshot.sections.map(sec =>
+        (sec.id !== sectionId ? sec : ({ ...sec, items: fn(sec.items) } as Section)));
+    return stripRuntimeKeys({ ...snapshot, sections });
+}
+
+/**
+ * Appends a new item at TOP level — the "+ Add item" control sits at the end
+ * of the list, and the end of the list is the end of the top level.
+ *
+ * `seed` merges over the minimal item `buildNewItem` produces. The template
+ * editor seeds a rich item with the five-level vocabulary its authors expect;
+ * the builder deliberately produces the smallest valid item, and an empty
+ * `ratingOptions` serializes as a single "Inspected".
+ */
 export function addItem(
     snapshot: Snapshot,
     sectionId: string,
     label: string,
     type: ItemType,
+    seed: Partial<Item> = {},
 ): Snapshot {
-    const sections = snapshot.sections.map(sec => {
-        if (sec.id !== sectionId) return sec;
-        return {
-            ...sec,
-            items: [...sec.items, buildNewItem(label, type)],
-        } as Section;
-    });
-    return stripRuntimeKeys({ ...snapshot, sections });
+    return mapItems(snapshot, sectionId, items =>
+        [...items, { ...buildNewItem(label, type), ...seed, parentId: null }]);
 }
 
 /**
- * Clones the item with a fresh id, inserts it right after the source item.
- * Runtime keys are stripped.
+ * Appends a new item UNDER `parentItemId`, at the END of that item's subtree.
+ *
+ * The end, not straight after the parent: a subtree is contiguous and starts at
+ * its root, and inserting at the front would put the new row ahead of its own
+ * older siblings — breaking the pre-order invariant every flat walk rests on.
+ */
+export function addSubItem(
+    snapshot: Snapshot,
+    sectionId: string,
+    parentItemId: string,
+    label: string,
+    type: ItemType,
+    seed: Partial<Item> = {},
+): Snapshot {
+    return mapItems(snapshot, sectionId, items => {
+        const block = subtreeOf(items, parentItemId);
+        if (block.length === 0) return items;
+        const at = items.findIndex(i => i.id === block[block.length - 1]);
+        const fresh: Item = { ...buildNewItem(label, type), ...seed, parentId: parentItemId };
+        return [...items.slice(0, at + 1), fresh, ...items.slice(at + 1)];
+    });
+}
+
+/**
+ * Clones the item AND its descendants with fresh ids, inserted right after the
+ * source subtree.
+ *
+ * Cloning the root alone leaves a copy whose children are still attached to the
+ * original — a shell that looks like a copy on screen and is not one.
  */
 export function duplicateItem(
     snapshot: Snapshot,
     sectionId: string,
     itemId: string,
 ): Snapshot {
-    const sections = snapshot.sections.map(sec => {
-        if (sec.id !== sectionId) return sec;
-        const idx = sec.items.findIndex(i => i.id === itemId);
-        if (idx === -1) return sec;
-        const source = sec.items[idx];
-        const cloned: Item = { ...(source as Record<string, unknown>), id: newId('item') } as Item;
-        const items = [
-            ...sec.items.slice(0, idx + 1),
-            cloned,
-            ...sec.items.slice(idx + 1),
-        ];
-        return { ...sec, items } as Section;
-    });
-    return stripRuntimeKeys({ ...snapshot, sections });
+    return mapItems(snapshot, sectionId, items =>
+        duplicateSubtree(items, itemId, () => newId('item')));
 }
 
-/** Removes the item from the section. No-op if not found. */
+/**
+ * Removes the item AND everything under it. No-op if not found.
+ *
+ * Promoting the children instead was considered and rejected: a qualifier that
+ * loses the thing it qualifies is a sentence with no subject, and it looks like
+ * a perfectly ordinary item.
+ */
 export function deleteItem(
     snapshot: Snapshot,
     sectionId: string,
     itemId: string,
 ): Snapshot {
-    const sections = snapshot.sections.map(sec => {
-        if (sec.id !== sectionId) return sec;
-        return { ...sec, items: sec.items.filter(i => i.id !== itemId) } as Section;
-    });
-    return stripRuntimeKeys({ ...snapshot, sections });
+    return mapItems(snapshot, sectionId, items => deleteSubtree(items, itemId));
 }
 
 /**
- * Swaps the item with its neighbor in direction `dir` (+1 = down, -1 = up).
- * Clamped at edges (no-op past first/last).
+ * Moves the item one place up/down AMONG ITS OWN SIBLINGS, subtree included.
+ *
+ * Not an adjacent array swap any more. Swapping an item with the row below it
+ * put a parent underneath its own first child, which breaks the pre-order
+ * invariant the whole flat-array design rests on. The edge is the end of the
+ * item's own sibling run, not the end of the array.
  */
 export function moveItem(
     snapshot: Snapshot,
@@ -314,17 +362,23 @@ export function moveItem(
     itemId: string,
     dir: -1 | 1,
 ): Snapshot {
-    const sections = snapshot.sections.map(sec => {
-        if (sec.id !== sectionId) return sec;
-        const idx = sec.items.findIndex(i => i.id === itemId);
-        if (idx === -1) return sec;
-        const targetIdx = idx + dir;
-        if (targetIdx < 0 || targetIdx >= sec.items.length) return sec;
-        const items = [...sec.items];
-        [items[idx], items[targetIdx]] = [items[targetIdx], items[idx]];
-        return { ...sec, items } as Section;
-    });
-    return stripRuntimeKeys({ ...snapshot, sections });
+    return mapItems(snapshot, sectionId, items =>
+        moveSubtreeAmongSiblings(items, itemId, dir));
+}
+
+/**
+ * Drag-drop reorder: `fromId`'s subtree lands at `toId`'s position.
+ *
+ * Refuses a drop inside the dragged item's own subtree — the one gesture that
+ * can mint a cycle.
+ */
+export function reorderItem(
+    snapshot: Snapshot,
+    sectionId: string,
+    fromId: string,
+    toId: string,
+): Snapshot {
+    return mapItems(snapshot, sectionId, items => reorderSubtree(items, fromId, toId));
 }
 
 /** Rename an item's label (structure only). */
