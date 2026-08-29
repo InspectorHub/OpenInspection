@@ -48,7 +48,7 @@
  */
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { utcMidnightOf } from './inspection-date';
-import type { FieldMapping } from './field-map';
+import type { FieldMapping, StatutoryValue } from './field-map';
 
 /** The parts of a value an overlay may draw on its own. Closed on purpose. */
 export type ValuePart = 'date_month' | 'date_day' | 'date_year';
@@ -208,7 +208,7 @@ export function validatePartMappings(mappings: readonly FieldMapping[]): void {
  */
 export function refuseUnreadableParts(
     mappings: readonly FieldMapping[],
-    values: ReadonlyMap<string, string>,
+    values: ReadonlyMap<string, StatutoryValue>,
 ): void {
     const problems: string[] = [];
     // One per FIELD, not one per part: a value that cannot be read is unreadable
@@ -223,6 +223,10 @@ export function refuseUnreadableParts(
         // an unparted overlay does. Refusing it would turn "the inspector had no
         // permit date" into a document that cannot be produced at all.
         if (value === undefined || value === '') continue;
+        // A list answers boxes and never a blank, and `refuseAnswersNoBoxCanTake`
+        // already refused one that reached an overlay. This keeps the type
+        // honest rather than restating that rule.
+        if (typeof value !== 'string') continue;
         try {
             partOfValue(value, m.part, m.ourField);
         } catch (cause) {

@@ -37,6 +37,18 @@
  * TEXT field. A fillable form whose checkboxes are real widgets is not covered —
  * such a mapping throws rather than quietly leaving the box unticked.
  *
+ * ── A question with several boxes may have several of them ticked ───────────
+ * An answer is a string OR a list of options. A string marks the one box it
+ * names, exactly as it always has; a list marks every box it names, which is
+ * what a multi-select question on these forms actually is — 6 boxes for the
+ * Citizens photo requirements, 13 for electrical hazards, 8 for wiring types, 8
+ * for pipe types, 8 for roof damage signs, 7 for the 1802's roof coverings.
+ *
+ * The two refusals that go with it are in `refuseAnswersNoBoxCanTake`, and both
+ * exist because the alternative prints and looks filled: an empty list (which is
+ * the empty string's job, and is what a binding that resolved nothing yields),
+ * and a list reaching a mapping that writes text.
+ *
  * ── A value too big for its space is refused, never made to look like it fit ──
  * The two routes fail in mirror image and both leave a document that LOOKS
  * filled. Drawn text wraps downward with no height bound, so a long answer runs
@@ -49,7 +61,10 @@
  * truncating, live in `fit.ts`.
  */
 import { PDFDocument, StandardFonts, type PDFFont, type PDFTextField } from 'pdf-lib';
-import { validateAgainstPdf, validateFieldMapShape, type FieldMap, type FieldMapping } from './field-map';
+import {
+    validateAgainstPdf, validateFieldMapShape,
+    type FieldMap, type FieldMapping, type StatutoryValue,
+} from './field-map';
 import { fitOverlay, refuseIfTheWidgetWouldClip } from './fit';
 import { partOfValue, refuseUnreadableParts } from './value-parts';
 
@@ -69,27 +84,52 @@ function fail(reason: string): never {
 }
 
 /**
+ * Does this answer name that box?
+ *
+ * A string names the one option it is. An array names every option in it, which
+ * is what a question with several boxes ticked looks like on the way in.
+ */
+function answerNames(value: StatutoryValue, whenValue: string): boolean {
+    return typeof value === 'string' ? value === whenValue : value.includes(whenValue);
+}
+
+/**
+ * The one string this answer is, for a mapping that writes text.
+ *
+ * `refuseAnswersNoBoxCanTake` already refused every array that reached anything
+ * but a checkbox, so this cannot fire in practice — it keeps the type honest
+ * rather than restating that rule, exactly as `value-parts.ts` does for a part
+ * with no maxWidth.
+ */
+function oneAnswer(value: StatutoryValue, ourField: string): string {
+    if (typeof value === 'string') return value;
+    fail(`"${ourField}" was answered with a list and this mapping writes text`);
+}
+
+/**
  * Render one statutory form.
  *
  * @param officialPdf the exact published bytes — their hash must be the one the
  *   map was authored against, which is checked before anything is written.
  * @param map the field map for that revision.
- * @param values our field name -> the string to put on the form. A key that is
+ * @param values our field name -> the answer to put on the form. A key that is
  *   PRESENT with an empty string is an answer of "nothing"; a key that is ABSENT
- *   is no answer at all, and for a required field that is refused.
+ *   is no answer at all, and for a required field that is refused. An ARRAY is
+ *   several options of one multi-select question and marks every box it names —
+ *   see `StatutoryValue` for why an empty one is not a third case.
  */
 export async function renderStatutoryForm(
     officialPdf: Uint8Array,
     map: FieldMap,
-    values: Readonly<Record<string, string>>,
+    values: Readonly<Record<string, StatutoryValue>>,
 ): Promise<Uint8Array> {
     validateFieldMapShape(map);
     await validateAgainstPdf(map, officialPdf);
-    // Read through a Map rather than by index: `Record<string, string>` types
-    // every lookup as present, and this whole function turns on telling an
-    // absent key from an empty one. The Map's `get` returns `string | undefined`,
-    // so the compiler agrees with what actually happens at runtime.
-    const supplied = new Map(Object.entries(values));
+    // Read through a Map rather than by index: `Record<string, ...>` types every
+    // lookup as present, and this whole function turns on telling an absent key
+    // from an empty one. The Map's `get` returns `... | undefined`, so the
+    // compiler agrees with what actually happens at runtime.
+    const supplied = new Map<string, StatutoryValue>(Object.entries(values));
     checkValuesAgainstMap(map, supplied);
 
     const doc = await PDFDocument.load(officialPdf);
@@ -130,21 +170,22 @@ export async function renderStatutoryForm(
         if (value === undefined) continue;
 
         if (mapping.kind === 'acroform') {
-            setTextField(doc, mapping, value, await measuringFont());
+            setTextField(doc, mapping, oneAnswer(value, mapping.ourField), await measuringFont());
             continue;
         }
         if (mapping.kind === 'overlay') {
-            if (value === '') continue;
+            const text = oneAnswer(value, mapping.ourField);
+            if (text === '') continue;
             const drawn = await drawingFont();
             // A part draws one piece of the value into one printed blank; an
             // unparted overlay draws all of it, exactly as it always has.
             // `refuseUnreadableParts` already ran this over every part mapping,
             // so it cannot fail here.
-            const text = mapping.part === undefined
-                ? value
-                : partOfValue(value, mapping.part, mapping.ourField);
-            const fitted = fitOverlay(text, mapping, drawn);
-            pages[mapping.page].drawText(text, {
+            const drawing = mapping.part === undefined
+                ? text
+                : partOfValue(text, mapping.part, mapping.ourField);
+            const fitted = fitOverlay(drawing, mapping, drawn);
+            pages[mapping.page].drawText(drawing, {
                 x: mapping.x,
                 y: mapping.y,
                 size: fitted.size,
@@ -160,7 +201,7 @@ export async function renderStatutoryForm(
             });
             continue;
         }
-        if (value === mapping.whenValue) {
+        if (answerNames(value, mapping.whenValue)) {
             pages[mapping.page].drawText(MARK, {
                 x: mapping.x,
                 y: mapping.y,
@@ -201,7 +242,9 @@ function setTextField(
  * silently. A value with no mapping disappears; a required field with no value
  * produces a form that looks filled and is not.
  */
-function checkValuesAgainstMap(map: FieldMap, values: ReadonlyMap<string, string>): void {
+function checkValuesAgainstMap(
+    map: FieldMap, values: ReadonlyMap<string, StatutoryValue>,
+): void {
     const mapped = new Set(map.mappings.map((m) => m.ourField));
     const unmapped = [...values.keys()].filter((k) => !mapped.has(k));
     if (unmapped.length > 0) {
@@ -216,6 +259,7 @@ function checkValuesAgainstMap(map: FieldMap, values: ReadonlyMap<string, string
             + 'not read as one somebody filled and left blank.');
     }
 
+    refuseAnswersNoBoxCanTake(map.mappings, values);
     checkChoicesAreReachable(map.mappings, values);
     // Judged here, before the document is loaded, for the same reason an
     // overflow is: a person with several broken bindings should be told about
@@ -233,8 +277,26 @@ function checkValuesAgainstMap(map: FieldMap, values: ReadonlyMap<string, string
  */
 function checkChoicesAreReachable(
     mappings: readonly FieldMapping[],
-    values: ReadonlyMap<string, string>,
+    values: ReadonlyMap<string, StatutoryValue>,
 ): void {
+    for (const [field, known] of boxesByField(mappings)) {
+        const value = values.get(field);
+        // An absent key is "not answered" and was already judged against
+        // `requiredFields`; an empty string is an explicit "none of these".
+        if (value === undefined || value === '') continue;
+        // EVERY element, not the first. Three good options and one that matches
+        // nothing is a question that comes out three-quarters answered, with
+        // every count of answered fields still reading complete.
+        for (const chosen of typeof value === 'string' ? [value] : value) {
+            if (known.has(chosen)) continue;
+            fail(`"${field}" was answered "${chosen}" and this form has no box for that answer `
+                + `(it has: ${[...known].join(', ')})`);
+        }
+    }
+}
+
+/** Which answers each multiple-choice field has a box for. */
+function boxesByField(mappings: readonly FieldMapping[]): Map<string, Set<string>> {
     const answers = new Map<string, Set<string>>();
     for (const m of mappings) {
         if (m.kind !== 'checkbox') continue;
@@ -242,14 +304,46 @@ function checkChoicesAreReachable(
         known.add(m.whenValue);
         answers.set(m.ourField, known);
     }
-    for (const [field, known] of answers) {
-        const value = values.get(field);
-        // An absent key is "not answered" and was already judged against
-        // `requiredFields`; an empty string is an explicit "none of these".
-        if (value === undefined || value === '') continue;
-        if (!known.has(value)) {
-            fail(`"${field}" was answered "${value}" and this form has no box for that answer `
-                + `(it has: ${[...known].join(', ')})`);
+    return answers;
+}
+
+/**
+ * A list of options is only an answer where the form printed a list of boxes.
+ *
+ * Two refusals, and both are about a document that would otherwise print and
+ * look filled.
+ *
+ * An EMPTY array. `StatutoryValue` says why at length: "none of these" is the
+ * empty string, and a second spelling of one answer means every reader has to
+ * know which one their producer emits. An empty list is also what a binding that
+ * resolved nothing yields, and a question with no box ticked reads exactly like
+ * a question nobody was asked.
+ *
+ * An array reaching a mapping that writes TEXT. There is no right way to draw a
+ * list onto one printed blank: joining it would put a separator of ours onto an
+ * authority's document, and these forms print their own separators — which is
+ * the whole reason `part` exists.
+ */
+function refuseAnswersNoBoxCanTake(
+    mappings: readonly FieldMapping[],
+    values: ReadonlyMap<string, StatutoryValue>,
+): void {
+    const writesText = new Set(
+        mappings.filter((m) => m.kind !== 'checkbox').map((m) => m.ourField),
+    );
+    for (const [field, value] of values) {
+        if (typeof value === 'string') continue;
+        if (value.length === 0) {
+            fail(`"${field}" was answered with an empty list. A list is the options a `
+                + 'question chose, and choosing none of them is written as an empty string, '
+                + 'which is an answer this form can carry. An empty list is what a binding '
+                + 'that resolved nothing produces, and the two must not look the same.');
+        }
+        if (writesText.has(field)) {
+            fail(`"${field}" was answered with a list of ${value.length} and is mapped to `
+                + 'something that writes text rather than to a set of boxes. Joining the list '
+                + 'would put a separator of ours onto the published form, which is '
+                + 'the failure the "part" mapping exists to prevent.');
         }
     }
 }

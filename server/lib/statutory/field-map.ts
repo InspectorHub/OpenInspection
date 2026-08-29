@@ -41,6 +41,28 @@ import {
 } from './value-parts';
 
 /**
+ * One answer, as it arrives from the inspection.
+ *
+ * A STRING is one answer: text for a blank, or the one option a single-choice
+ * question chose. An ARRAY is several options of ONE question — the shape a
+ * form's multi-select boxes actually take, and the reason it exists: counted on
+ * the three forms measured, `photo_requirements_included` prints 6 boxes,
+ * `electrical.hazards_present` 13, `electrical.wiring_types` 8,
+ * `plumbing.pipe_types` 8, `roof[*].damage_signs` 8 and the 1802's
+ * `roof_covering_types` 7, and every one of them is plainly multi-select on the
+ * page. A single string could ever mark one of them.
+ *
+ * ⚠️ AN EMPTY ARRAY IS REFUSED, and this is a decision rather than an oversight.
+ * "None of these boxes" already has a spelling here — the empty string, which
+ * every layer treats as an explicit answer of nothing — and one answer with two
+ * spellings is a permanent question at every read site about which one a given
+ * producer emits. An empty array is also exactly what a collector that resolved
+ * nothing produces, and on a statutory form a question with no box ticked reads
+ * identically to a question nobody was asked.
+ */
+export type StatutoryValue = string | readonly string[];
+
+/**
  * One value's route onto the page.
  *
  * `acroform` — set a named form field. Only possible where the form has fields.
@@ -55,9 +77,11 @@ import {
  *              neither behaves exactly as it did before they existed — most
  *              rows on these forms hold one line, so the pair is worth
  *              declaring wherever anyone has measured.
- * `checkbox` — draw a mark at a coordinate when our value equals `whenValue`.
+ * `checkbox` — draw a mark at a coordinate when our answer names `whenValue`.
  *              Several of these share one `ourField` on purpose: that is how a
  *              multiple-choice answer maps onto boxes the file does not group.
+ *              A string answer names one of them; an array names every box it
+ *              contains, which is what a multi-select question needs.
  * `signature` — draw a stored signature image inside a measured box. `scope`
  *              names WHICH PART of the form this signature stands behind: the
  *              Citizens four-point form lets a trade-specific licensee sign only
