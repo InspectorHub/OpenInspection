@@ -39,6 +39,17 @@ vi.mock('../../../server/lib/statutory/forms', async () => {
             sourceUrl: 'https://example.gov/f.pdf', sourceHash: fixture.hash,
             publishedBy: 'a.operator', publishedAt: Date.UTC(2026, 0, 1),
             withdrawnAt: null,
+        }, {
+            // The revision it superseded. Two of them are needed to have a
+            // template that produces one revision while an inspection's own date
+            // selects the other -- the only state this route refuses.
+            formId: 'yy_flat_form', version: 'Rev. 01/25',
+            effectiveFrom: Date.UTC(2025, 0, 1),
+            mandatoryFrom: Date.UTC(2025, 0, 1),
+            effectiveUntil: Date.UTC(2026, 0, 1),
+            sourceUrl: 'https://example.gov/f-old.pdf', sourceHash: '00'.repeat(32),
+            publishedBy: 'a.operator', publishedAt: Date.UTC(2025, 0, 1),
+            withdrawnAt: null,
         }],
         FIELD_MAPS: [],
         fieldMapFor: () => ({
@@ -85,6 +96,10 @@ const GOOD = 'insp-good';
 const DRAFT = 'insp-draft';
 const PLAIN = 'insp-plain';
 const OTHER = 'insp-other-tenant';
+/** Declares the revision its date selects. */
+const MATCHED = 'insp-matched-revision';
+/** Declares the revision its date does NOT select. */
+const SUPERSEDED = 'insp-superseded-revision';
 
 const INSPECTOR = 'usr-dana';
 
@@ -109,6 +124,12 @@ const SNAPSHOT_PLAIN = {
     schemaVersion: 2,
     sections: [{ id: 'sec', title: 'S', items: [{ id: 'itm_owner', label: 'Owner', type: 'rich' }] }],
 };
+
+/** The same template, saying which revision its bindings were written against. */
+const snapshotDeclaringRevision = (revision: string) => ({
+    ...SNAPSHOT_DECLARED,
+    statutoryForm: { ...DECLARATION, revision },
+});
 
 function bucket() {
     const key = `_platform/statutory-forms/${FORM}/${encodeURIComponent(REVISION)}.pdf`;
@@ -180,6 +201,14 @@ beforeEach(async () => {
         { ...base, id: DRAFT, tenantId: TENANT, templateSnapshot: SNAPSHOT_DECLARED },
         { ...base, id: PLAIN, tenantId: TENANT, templateSnapshot: SNAPSHOT_PLAIN },
         { ...base, id: OTHER, tenantId: OTHER_TENANT, templateSnapshot: SNAPSHOT_DECLARED },
+        {
+            ...base, id: MATCHED, tenantId: TENANT, inspectorId: INSPECTOR,
+            templateSnapshot: snapshotDeclaringRevision(REVISION),
+        },
+        {
+            ...base, id: SUPERSEDED, tenantId: TENANT, inspectorId: INSPECTOR,
+            templateSnapshot: snapshotDeclaringRevision('Rev. 01/25'),
+        },
     ] as never);
     await db.insert(schema.reports).values([
         {
@@ -196,6 +225,14 @@ beforeEach(async () => {
         },
         {
             id: 'rep-other', tenantId: OTHER_TENANT, inspectionId: OTHER, title: 'Report', kind: 'primary',
+            status: 'published', createdAt: new Date(), publishedAt: new Date(Date.UTC(2026, 4, 2)),
+        },
+        {
+            id: 'rep-matched', tenantId: TENANT, inspectionId: MATCHED, title: 'Report', kind: 'primary',
+            status: 'published', createdAt: new Date(), publishedAt: new Date(Date.UTC(2026, 4, 2)),
+        },
+        {
+            id: 'rep-superseded', tenantId: TENANT, inspectionId: SUPERSEDED, title: 'Report', kind: 'primary',
             status: 'published', createdAt: new Date(), publishedAt: new Date(Date.UTC(2026, 4, 2)),
         },
     ] as never);
@@ -244,6 +281,39 @@ describe('GET /:id/statutory-form.pdf', () => {
         // which is a header with no content in it.
         const res = await get(GOOD);
         expect(res.headers.get('x-artifact-status')).toBeTruthy();
+    });
+
+    it('refuses when the inspection is governed by a revision this template does not produce', async () => {
+        // The one state the design blocks. This inspection is dated 2026-05-01,
+        // which Rev. 04/26 governs, and its template was written against
+        // Rev. 01/25. Producing anyway would put the newer revision's bytes
+        // under the older revision's bindings: where the two forms' field names
+        // overlap the result is a plausible, WRONG official document, and
+        // recordProduction would file it as legitimate.
+        const res = await get(SUPERSEDED);
+        expect(res.status).toBe(409);
+
+        // Both revisions, because a refusal that names neither leaves the
+        // inspector with nothing to act on. The way out is a new inspection on
+        // the updated template -- there is no migration (see revision-status.ts).
+        const body = await res.json() as { error: { message: string } };
+        expect(body.error.message).toContain('Rev. 04/26');
+        expect(body.error.message).toContain('Rev. 01/25');
+        // Nothing was produced, so nothing may have been recorded as produced.
+        expect(producer.facts).toBeNull();
+    });
+
+    it('POSITIVE CONTROL — produces when the template declares the governing revision', async () => {
+        // Without this one, a route that refused every declared revision would
+        // satisfy the assertion above perfectly.
+        expect((await get(MATCHED)).status).toBe(200);
+    });
+
+    it('POSITIVE CONTROL — produces when the template names no revision at all', async () => {
+        // A template that makes no claim about which revision it was built for
+        // cannot be measured against the one the date selects, and a guess would
+        // refuse a correct report. GOOD declares a form and no revision.
+        expect((await get(GOOD)).status).toBe(200);
     });
 
     it('fills inspector and company identity from real sources', async () => {

@@ -3,8 +3,15 @@
  * inspection", and the only place that question is decided.
  *
  * ── WHY ONE FUNCTION ────────────────────────────────────────────────────────
- * Three surfaces ask it: the editor banner, the refusal to produce, and the
- * update confirmation's counts. Two implementations of one question disagree at
+ * Four surfaces ask it, and each is named here with the call site, because a
+ * count in a comment is the kind of claim that quietly stops being true:
+ *
+ *   - the editor banner            app/routes/inspection-edit/loader.server.ts
+ *   - the refusal to produce       server/api/inspections/statutory.ts
+ *   - the reschedule's answer      server/api/inspections/patch-revision-report.ts
+ *   - the update confirmation      server/services/marketplace/statutory-update-impact.ts
+ *
+ * Two implementations of one question disagree at
  * some boundary eventually, and every boundary here is a DATE — the one kind of
  * boundary nobody tests by hand, so the disagreement is silent and long-lived.
  * Anything that needs the answer imports this; nothing re-derives it, and in

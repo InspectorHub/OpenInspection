@@ -19,6 +19,20 @@
  * 2. The template snapshot must declare a form. Absent is the ordinary case for
  *    almost every template, so this is a 404 -- there is no such document for
  *    this inspection -- rather than an error.
+ * 3. The revision this template produces must be the revision this inspection's
+ *    own date selects. A mismatch is the one state the design blocks, and it is
+ *    blocked HERE rather than only in the editor's banner: producing anyway
+ *    would put the governing revision's bytes under the superseded revision's
+ *    bindings, and where two revisions' field names overlap that is a plausible,
+ *    WRONG official document which `recordProduction` then files as legitimate.
+ *    The judgement is `revisionStatusForInspection` -- the same call the banner,
+ *    the reschedule response and the update confirmation make, because a warning
+ *    and a refusal that each decided for themselves would disagree at some date
+ *    boundary, and the disagreement would be silent.
+ *
+ * There is deliberately NO migration out of that state (see revision-status.ts).
+ * The way out is a new inspection on the updated template, and the earlier
+ * warnings exist so nobody arrives here.
  *
  * `producedAt` is the published version's own timestamp, never `Date.now()`.
  * Passing now would make the header read `current` forever, including for a
@@ -38,6 +52,7 @@ import {
     refuseIndexInsidePrintedRange,
 } from '../../services/statutory/overflow.service';
 import { versionForInspection } from '../../lib/statutory/form-registry';
+import { revisionStatusForInspection } from '../../lib/statutory/revision-status';
 import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
 import { utcMidnightOf } from '../../lib/statutory/inspection-date';
 import { statutoryNoticeFor, formatEffectiveDate } from '../../lib/statutory/disclaimer';
@@ -55,13 +70,14 @@ const statutoryFormRoute = createRoute(withMcpMetadata({
     summary: 'Download the statutory form this inspection produces',
     description:
         'Renders the authority\'s own published form for this inspection. 404 when the template '
-        + 'declares none; 409 while no report version is published.',
+        + 'declares none; 409 while no report version is published, and 409 when the inspection\'s '
+        + 'date is governed by a revision this template does not produce.',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: z.object({ id: z.string().trim().min(1).describe('Inspection ID') }) },
     responses: {
         200: { description: 'The rendered form' },
         404: { description: 'No such inspection for this workspace, or its template declares no form' },
-        409: { description: 'No report version is published yet' },
+        409: { description: 'No report version is published yet, or the governing revision is not the one this template produces' },
     },
     operationId: 'getInspectionStatutoryForm',
 }, { scopes: ['read'], tier: 'extended' }));
@@ -168,6 +184,33 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
         throw Errors.Conflict(
             'This inspection has no published report version yet. A statutory form produced from '
             + 'editable content could not be reproduced later.',
+        );
+    }
+
+    // Precondition 3. Refused before anything is rendered and before anything is
+    // recorded: a refusal after the bytes exist is a document that was produced.
+    //
+    // `null` and the three non-blocking states pass. In particular a template
+    // that names no revision is NOT refused -- it makes no claim to measure, and
+    // guessing one would refuse a correct report. The blocking state is the only
+    // one where the template's own claim contradicts the inspection's date.
+    // Sliced the way every other caller slices it: `inspections.date` is a
+    // calendar day, and the criterion refuses anything that is not exactly one.
+    const inspectionDay = String(inspection.date ?? '').slice(0, 10);
+    const revision = revisionStatusForInspection({
+        snapshot,
+        inspectionDate: inspectionDay,
+        now: Date.now(),
+    });
+    if (revision?.kind === 'cannot_produce') {
+        throw Errors.Conflict(
+            `This inspection is dated ${inspectionDay}, which revision `
+            + `${revision.applicableVersion} of ${declaration.formId} governs. This template `
+            + `produces revision ${revision.templateVersion}, so its bindings were written `
+            + 'against a different document and cannot be printed onto this one. There is no '
+            + 'migration for an inspection already under way: once the workspace has updated its '
+            + `copy of the template, reopen this inspection on the ${revision.applicableVersion} `
+            + 'template.',
         );
     }
 
