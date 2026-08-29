@@ -14,10 +14,9 @@ import {
     marketplaceLibraries,
     tenantLibraryImports,
 } from '../lib/db/schema/marketplace';
-import { templates } from '../lib/db/schema'; // `comments` is reached by raw SQL below, and by ./marketplace/library-replace.ts
 import { Errors } from '../lib/errors';
 import { writeImportHistory } from './marketplace/import-history';
-import { insertLocalTemplate } from './marketplace/local-template';
+import { insertLocalTemplate, retireLocalTemplate } from './marketplace/local-template';
 import { assertStatutorySchema } from './marketplace/statutory-import';
 import { TemplateService } from './template.service';
 
@@ -284,8 +283,10 @@ export class MarketplaceService {
     if (!mkt) throw Errors.NotFound('Marketplace template not found');
 
     // A 1:N kind has no single local row to re-point, so this path would
-    // silently create a template out of a comment pack's schema.
-    if (mkt.kind !== 'templates') {
+    // silently create a template out of a comment pack's schema. Both 1:1 kinds
+    // are welcome; they differ in the validator below and in what happens to the
+    // row they supersede.
+    if (mkt.kind !== 'templates' && mkt.kind !== 'statutory') {
       throw Errors.BadRequest(`Catalogue entry '${mkt.name}' is not a template — use the library update path`);
     }
 
@@ -306,23 +307,20 @@ export class MarketplaceService {
       throw Errors.BadRequest('No update available — already on the latest version');
     }
 
-    // Re-validate the new schema. A v1 template should never have made it
-    // into the marketplace, but if it did we refuse to import it (same
-    // gate as importTemplate above).
-    this.assertV2Schema(mkt.schema);
+    // Re-validate the new revision with the SAME gate its install used. A v1
+    // template should never have made it into the marketplace, but if it did we
+    // refuse it here too; and a statutory revision has to go through the
+    // extended validator, or a package could be installed and then never
+    // updated because the tenant-facing schema refuses its declaration.
+    if (mkt.kind === 'statutory') {
+      assertStatutorySchema(mkt.schema);
+    } else {
+      this.assertV2Schema(mkt.schema);
+    }
 
-    const newTemplateId = crypto.randomUUID();
     const now = new Date();
     const newName = `${mkt.name} (v${mkt.semver})`;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await this.db.insert(templates as any).values({
-      id:        newTemplateId,
-      tenantId:  this.tenantId,
-      name:      newName,
-      schema:    mkt.schema,
-      createdAt: now,
-    });
+    const newTemplateId = await insertLocalTemplate(this.db, this.tenantId, newName, mkt.schema, now);
 
     const oldLocalId = existing.localEntityId;
     const fromSemver = existing.importedSemver;
@@ -335,6 +333,14 @@ export class MarketplaceService {
         importedAt:     now,
       })
       .where(eq(tenantLibraryImports.id, existing.id));
+
+    if (mkt.kind === 'statutory') {
+      // Leaving both versions on offer is a convenience for an ordinary
+      // template and a trap for a statutory one: the superseded revision is no
+      // longer the one to file, and a picker that still lists it invites
+      // exactly that. Retired, never deleted -- see retireLocalTemplate.
+      await retireLocalTemplate(this.db, this.tenantId, oldLocalId, now);
+    }
 
     await this.db
       .update(marketplaceLibraries)

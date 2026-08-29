@@ -10,6 +10,7 @@
  */
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 
+import { and, eq } from 'drizzle-orm';
 import { templates } from '../../lib/db/schema';
 
 /** The service's `drizzle(env.DB)` handle. Named so these signatures do not
@@ -39,4 +40,31 @@ export async function insertLocalTemplate(
         createdAt: now,
     });
     return id;
+}
+
+/**
+ * Stop offering a local template for NEW inspections, and return how many rows
+ * that changed (0 when there was no local row, or it belongs to someone else).
+ *
+ * ⚠️ NOT A DELETE, AND DELETING IS NOT AVAILABLE. `inspections.template_id`
+ * carries a legacy foreign key to this table, so D1 refuses to remove a
+ * referenced row — and the row has to survive regardless, because re-issuing a
+ * delivered report reads the inspection's own snapshot rather than this row.
+ *
+ * Scoped by tenant as well as by id: the id arrives from an import marker, and
+ * a write that trusted it alone would be a cross-tenant write the moment that
+ * marker was ever wrong.
+ */
+export async function retireLocalTemplate(
+    db: MarketplaceDb,
+    tenantId: string,
+    templateId: string | null,
+    at: Date,
+): Promise<number> {
+    if (templateId === null) return 0;
+    const rows = await db.update(templates)
+        .set({ retiredAt: at })
+        .where(and(eq(templates.id, templateId), eq(templates.tenantId, tenantId)))
+        .returning({ id: templates.id });
+    return rows.length;
 }
