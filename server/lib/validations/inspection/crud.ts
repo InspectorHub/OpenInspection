@@ -1,5 +1,5 @@
 import { z } from '@hono/zod-openapi';
-import { createApiResponseSchema } from '../shared.schema';
+import { createApiResponseSchema, SuccessResponseSchema } from '../shared.schema';
 import { INSPECTION_STATUSES } from '../../status/inspection-status';
 import { CANCELLATION_REASONS } from '../../cancellation-reason';
 
@@ -289,3 +289,19 @@ export const CreateReinspectionSchema = z.object({
   selectedItemIds: z.array(z.string().min(1)).min(1).describe('Item ids carried forward into the re-inspection (the still-open flagged items the inspector chose).'),
   inspectorId: z.string().optional().describe('Inspector assigned to the re-inspection; defaults to the baseline inspector.'),
 }).openapi('CreateReinspection');
+
+/**
+ * What PATCH /api/inspections/{id} answers with.
+ *
+ * `data.revisionStatus` appears only when the patch moved the date of an
+ * inspection that produces an authority's own form: the reschedule was made,
+ * and this is what it did to the revision governing it. Absent means there was
+ * nothing to say -- never that nobody looked. See
+ * `server/api/inspections/patch-revision-report.ts`.
+ */
+export const PatchInspectionResponseSchema = SuccessResponseSchema.extend({
+    data: z.object({
+        revisionStatus: z.unknown().optional()
+            .describe('How the inspection\'s new date sits against the statutory revision its template produces'),
+    }).optional(),
+});
