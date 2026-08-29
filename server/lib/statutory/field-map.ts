@@ -35,6 +35,7 @@
  * green check is not read as more than it is.
  */
 import { PDFDocument } from 'pdf-lib';
+import { validateNoDuplicateTargets } from './targets';
 import {
     refusePartsThatCannotFitTheirDigits, validatePartMappings, type ValuePart,
 } from './value-parts';
@@ -266,61 +267,6 @@ function validateOverlayFit(m: OverlayMapping): void {
         fail(`overlay "${m.ourField}" declares maxHeight but no maxWidth; without a width the `
             + 'text never wraps, so a height bound can never be reached and would read as a '
             + 'guarantee it does not give');
-    }
-}
-
-/**
- * Two mappings must not compete for one value.
- *
- * A repeated `ourField` is legitimate in exactly two ways. A CHECKBOX repeats it
- * because a multiple-choice answer maps onto boxes the file does not group. An
- * OVERLAY repeats it only by drawing a DIFFERENT PART of it, because some forms
- * print a value's separators themselves and the parts have to land in separate
- * blanks. Anywhere else it writes one value into two places, and the second one
- * is always the one nobody meant.
- */
-function validateNoDuplicateTargets(mappings: readonly FieldMapping[]): void {
-    const drawnSlots = new Set<string>();
-    const checkboxAnswers = new Set<string>();
-    const wholeValueFields = new Set<string>();
-    const partedFields = new Set<string>();
-
-    for (const m of mappings) {
-        if (m.kind === 'checkbox') {
-            const key = `${m.ourField} ${m.whenValue}`;
-            if (checkboxAnswers.has(key)) {
-                fail(`"${m.ourField}" has two checkboxes for the value "${m.whenValue}"`);
-            }
-            checkboxAnswers.add(key);
-            continue;
-        }
-        const part = m.kind === 'overlay' ? m.part : undefined;
-        // The key carries the part, so two overlays drawing the SAME part of the
-        // same value are still a coordinate that was pasted and never re-measured.
-        const slot = `${m.ourField} ${part ?? ''}`;
-        if (drawnSlots.has(slot)) {
-            fail(part === undefined
-                ? `"${m.ourField}" is mapped twice; only a checkbox may repeat a field, and an `
-                    + 'overlay may repeat one only by drawing a different part of it'
-                : `"${m.ourField}" draws the part "${part}" twice; a repeated part is a `
-                    + 'coordinate that was pasted and never re-measured');
-        }
-        drawnSlots.add(slot);
-        (part === undefined ? wholeValueFields : partedFields).add(m.ourField);
-    }
-
-    for (const field of partedFields) {
-        if (wholeValueFields.has(field)) {
-            fail(`"${field}" is drawn both in parts and as a whole value; the whole-value `
-                + 'overlay is written across the parts, which is the failure the parts exist '
-                + 'to prevent');
-        }
-    }
-    for (const m of mappings) {
-        if (m.kind === 'checkbox'
-            && (wholeValueFields.has(m.ourField) || partedFields.has(m.ourField))) {
-            fail(`"${m.ourField}" is mapped both as a checkbox and as a single value`);
-        }
     }
 }
 

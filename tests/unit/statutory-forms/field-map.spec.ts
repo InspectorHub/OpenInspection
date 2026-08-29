@@ -101,14 +101,31 @@ describe('validateFieldMap', () => {
         )).toThrow(/inspection\.date/);
     });
 
-    it('refuses two mappings writing the same value twice', () => {
+    it('refuses two mappings writing into one form field', () => {
+        // The duplicate is the TARGET, not the field. Two values sent to one
+        // widget means one of them is stored and the other is not, and the
+        // document that comes out looks filled either way.
+        expect(() => validateFieldMap({
+            ...MAP(fielded.hash),
+            mappings: [
+                { kind: 'acroform', ourField: 'client.name', pdfField: 'Text1' },
+                { kind: 'acroform', ourField: 'property.address', pdfField: 'Text1' },
+            ],
+        }, VERSION(fielded.hash))).toThrow(/Text1/);
+    });
+
+    it('ALLOWS one value written into two form fields — the form asked twice', () => {
+        // Measured on FL OIR-B1-1802, which prints the property address in the
+        // footer of all six pages. A rule keyed on `ourField` made that
+        // unmappable; the only way to satisfy it was to invent six field names
+        // for one answer.
         expect(() => validateFieldMap({
             ...MAP(fielded.hash),
             mappings: [
                 { kind: 'acroform', ourField: 'client.name', pdfField: 'Name of Client' },
                 { kind: 'acroform', ourField: 'client.name', pdfField: 'Text1' },
             ],
-        }, VERSION(fielded.hash))).toThrow(/client\.name/);
+        }, VERSION(fielded.hash))).not.toThrow();
     });
 
     it('ALLOWS several checkbox mappings for one field — that is what a rating is', () => {
@@ -279,12 +296,21 @@ describe('validateFieldMapShape — overlays that draw one part of a value', () 
         expect(() => validateFieldMapShape(withMappings([...THREE]))).not.toThrow();
     });
 
-    it('refuses the same part of the same field twice', () => {
+    it('refuses the same part drawn twice into ONE blank', () => {
         // A pasted coordinate that was never re-measured. The second one wins
         // and nothing says the first was overwritten.
         expect(() => validateFieldMapShape(withMappings([
+            ...THREE, { ...THREE[0] } as FieldMapping,
+        ]))).toThrow(/permit_date.*date_month/is);
+    });
+
+    it('ALLOWS the same part drawn into two DIFFERENT printed blanks', () => {
+        // A form that prints the month twice prints it twice. What the old rule
+        // read as a paste was the field repeating, and a field repeating is what
+        // these forms do; the paste is the COORDINATE repeating, above.
+        expect(() => validateFieldMapShape(withMappings([
             ...THREE, { ...THREE[0], x: 600 } as FieldMapping,
-        ]))).toThrow(/permit_date.*date_month.*twice/is);
+        ]))).not.toThrow();
     });
 
     it('refuses a whole-value overlay beside the parts of the same field', () => {
@@ -305,13 +331,20 @@ describe('validateFieldMapShape — overlays that draw one part of a value', () 
         ]))).not.toThrow();
     });
 
-    it('still refuses two unparted overlays on one field', () => {
-        // The rule that existed before parts. Relaxing the key must not relax
-        // this: the second one is always the one nobody meant.
+    it('refuses two unparted overlays drawn at one coordinate', () => {
+        // The rule that existed before parts, re-keyed onto the target: two
+        // values at one origin, the second painted over the first.
+        expect(() => validateFieldMapShape(withMappings([
+            { kind: 'overlay', ourField: 'year_built', page: 0, x: 40, y: 400, size: 9 },
+            { kind: 'overlay', ourField: 'stories', page: 0, x: 40, y: 400, size: 9 },
+        ]))).toThrow(/40, 400/is);
+    });
+
+    it('ALLOWS one unparted value drawn at two coordinates', () => {
         expect(() => validateFieldMapShape(withMappings([
             { kind: 'overlay', ourField: 'year_built', page: 0, x: 40, y: 400, size: 9 },
             { kind: 'overlay', ourField: 'year_built', page: 0, x: 90, y: 400, size: 9 },
-        ]))).toThrow(/year_built.*mapped twice/is);
+        ]))).not.toThrow();
     });
 
     it('still refuses a field mapped as both a checkbox and a drawn value', () => {
