@@ -19,6 +19,8 @@ import { SectionRail } from "~/components/editor-shared/SectionRail";
 import { ItemList } from "~/components/editor-shared/ItemList";
 import { TemplatePropertyTypePanel } from "~/components/template/TemplatePropertyTypePanel";
 import { serializeTemplateMeta, serializeSectionMeta } from "~/lib/editor/template-meta";
+import * as ops from "~/lib/editor/structure-ops";
+import { serializeItemForSave } from "~/lib/editor/serialize-template";
 import type { PropertyType } from "~/components/template/types";
 import { CommentLibraryDrawer } from "~/components/editor/CommentLibraryDrawer";
 import { useCannedComments } from "~/hooks/useCannedComments";
@@ -134,11 +136,19 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-// Serialize an information/limitations canned comment to its v2 wire shape.
-// (Defects carry extra fields and are serialized inline.)
-function serializeCanned(c: CannedComment): Record<string, unknown> {
-  return { id: c.id, title: c.title || "", comment: c.comment || "", default: !!c.default };
-}
+/**
+ * The template editor's rich-item default.
+ *
+ * `buildNewItem` produces the smallest VALID item, which for a rich item means
+ * an empty `ratingOptions` — and an empty one serializes below as a single
+ * "Inspected". The five-level vocabulary is what this editor's authors have
+ * always got, so the editor supplies it rather than moving it into the shared
+ * builder, where it would also land on every item the inspection editor adds.
+ */
+const NEW_RICH_ITEM = {
+  ratingOptions: ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+  options: { choices: [] as string[] },
+};
 
 export default function TemplateEditPage() {
   const { id, name: initialName, version: initialVersion, schema: initial, defectCategories, defaultProfileId: initialDefaultProfileId, statutoryFormId } = useLoaderData<typeof loader>();
@@ -237,41 +247,38 @@ export default function TemplateEditPage() {
   }
 
   /* ---- Item CRUD ---- */
-  function addItem() {
-    if (!section) return;
-    const itemId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    updateSections((s) => {
-      s[activeSection].items.push({
-        id: itemId,
-        label: m.templates_edit_new_item(),
-        type: "rich",
-        ratingOptions: ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
-        tabs: { information: [], limitations: [], defects: [] },
-        options: { choices: [] },
-      });
-      return s;
-    });
-    setEditingItem(itemId);
-    setRightRail("properties");
+  // Every structural edit below delegates to the shared tree ops. They each
+  // used to hold their own loop, which is how the inspection editor and the
+  // template editor came to disagree about what "move down" meant -- and how
+  // "delete" came to mean two different things once items could nest.
+  function applyOps(op: (snap: ops.Snapshot) => ops.Snapshot): TemplateSection[] {
+    const snap = { schemaVersion: 2, sections: structuredClone(sections) } as unknown as ops.Snapshot;
+    const next = op(snap).sections as unknown as TemplateSection[];
+    setSections(next);
+    return next;
   }
 
+  /** Runs a structural op, then selects whatever new item it produced. */
+  function addAndSelect(op: (snap: ops.Snapshot) => ops.Snapshot) {
+    if (!section) return;
+    const before = new Set(section.items.map((i) => i.id));
+    const fresh = applyOps(op)[activeSection]?.items.find((i) => !before.has(i.id));
+    if (fresh) { setEditingItem(fresh.id); setRightRail("properties"); }
+  }
+
+  const addItem = () => addAndSelect((snap) =>
+    ops.addItem(snap, activeSectionId, m.templates_edit_new_item(), "rich", NEW_RICH_ITEM));
+
   function removeItem(itemId: string) {
-    updateSections((s) => {
-      s[activeSection].items = s[activeSection].items.filter((i) => i.id !== itemId);
-      return s;
-    });
+    applyOps((snap) => ops.deleteItem(snap, activeSectionId, itemId));
     if (editingItem === itemId) setEditingItem(null);
   }
 
-  function moveItem(itemIdx: number, dir: -1 | 1) {
-    updateSections((s) => {
-      const items = s[activeSection].items;
-      const target = itemIdx + dir;
-      if (target < 0 || target >= items.length) return s;
-      [items[itemIdx], items[target]] = [items[target], items[itemIdx]];
-      return s;
-    });
-  }
+  const moveItem = (itemId: string, dir: -1 | 1) =>
+    applyOps((snap) => ops.moveItem(snap, activeSectionId, itemId, dir));
+
+  const reorderItem = (fromId: string, toId: string) =>
+    applyOps((snap) => ops.reorderItem(snap, activeSectionId, fromId, toId));
 
   function updateItem(itemId: string, patch: Partial<TemplateItem>) {
     updateSections((s) => {
@@ -282,31 +289,15 @@ export default function TemplateEditPage() {
   }
 
   function duplicateItem(itemId: string) {
-    if (!section) return;
-    const newId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    updateSections((s) => {
-      const items = s[activeSection].items;
-      const idx = items.findIndex((i) => i.id === itemId);
-      if (idx < 0) return s;
-      const clone = structuredClone(items[idx]);
-      clone.id = newId;
-      clone.label = m.templates_edit_item_copy_suffix({ label: clone.label });
-      items.splice(idx + 1, 0, clone);
-      return s;
-    });
-    setEditingItem(newId);
-    setRightRail("properties");
-  }
-
-  function reorderItem(fromId: string, toId: string) {
-    updateSections((s) => {
-      const items = s[activeSection].items;
-      const from = items.findIndex((i) => i.id === fromId);
-      const to = items.findIndex((i) => i.id === toId);
-      if (from < 0 || to < 0 || from === to) return s;
-      const [moved] = items.splice(from, 1);
-      items.splice(to, 0, moved);
-      return s;
+    const before = new Set(section?.items.map((i) => i.id) ?? []);
+    addAndSelect((snap) => {
+      const dup = ops.duplicateItem(snap, activeSectionId, itemId);
+      // Only the ROOT of the copied subtree is renamed. Suffixing every
+      // descendant would rename rows the author never pointed at.
+      const root = dup.sections.find((s) => s.id === activeSectionId)?.items
+        .find((i) => !before.has(i.id));
+      if (root) root.label = m.templates_edit_item_copy_suffix({ label: root.label as string });
+      return dup;
     });
   }
 
@@ -354,36 +345,7 @@ export default function TemplateEditPage() {
         ...(s.alwaysPageBreak ? { alwaysPageBreak: true } : {}),
         ...(s.source?.platform ? { source: s.source } : {}),
         ...serializeSectionMeta(s),
-        items: s.items.map((it) => {
-          const base: Record<string, unknown> = { id: it.id, label: it.label, type: it.type };
-          if (it.description) base.description = it.description;
-          if (it.icon) base.icon = it.icon;
-          if (typeof it.required === "boolean") base.required = it.required;
-          if (typeof it.isSafety === "boolean") base.isSafety = it.isSafety;
-          if (it.defaultRecommendation) base.defaultRecommendation = it.defaultRecommendation;
-          if (it.attributes?.length) base.attributes = it.attributes;
-          if (it.source?.platform) base.source = it.source;
-          if (it.type === "rich") {
-            base.ratingOptions = it.ratingOptions?.length ? it.ratingOptions : ["Inspected"];
-            base.tabs = {
-              information: (it.tabs?.information || []).map(serializeCanned),
-              limitations: (it.tabs?.limitations || []).map(serializeCanned),
-              defects: (it.tabs?.defects || []).map((c) => ({
-                id: c.id, title: c.title || "", category: c.category || "recommendation",
-                location: c.location || "", comment: c.comment || "",
-                photos: Array.isArray(c.photos) ? c.photos : [], default: !!c.default,
-              })),
-            };
-          } else if (it.type !== "boolean" && it.type !== "date" && it.options) {
-            const o: Record<string, unknown> = {};
-            if (it.options.choices?.length) o.choices = it.options.choices;
-            if (it.options.min != null) o.min = it.options.min;
-            if (it.options.max != null) o.max = it.options.max;
-            if (it.options.placeholder) o.placeholder = it.options.placeholder;
-            if (Object.keys(o).length) base.options = o;
-          }
-          return base;
-        }),
+        items: s.items.map(serializeItemForSave),
       })),
       ratingSystem: ratingSystem.levels.length ? {
         ...(ratingSystem.name ? { name: ratingSystem.name } : {}),
@@ -592,7 +554,7 @@ export default function TemplateEditPage() {
                 onAddItem={addItem}
                 onDuplicateItem={duplicateItem}
                 onDeleteItem={removeItem}
-                onMoveItem={(id, dir) => { const idx = section.items.findIndex((i) => i.id === id); if (idx >= 0) moveItem(idx, dir); }}
+                onMoveItem={moveItem}
                 onReorderItem={reorderItem}
               />
             )

@@ -53,7 +53,7 @@ const DECLARED_SKIPS = {
         type:          'the discriminator; declared per member',
     },
     'app/lib/editor/structure-ops.ts': {},
-    'app/routes/template-edit.tsx': {},
+    'app/lib/editor/serialize-template.ts': {},
     'app/components/template/types.ts': {},
     'app/components/form/FormField.tsx': {
         attributes:            'the field renderer draws one control; attributes are a panel',
@@ -130,9 +130,9 @@ const MIRRORS = [
         // The save serializer builds the wire object key by key. A key it does
         // not name is a key the editor silently never saves, which is the exact
         // failure this gate was written after.
-        file: 'app/routes/template-edit.tsx',
+        file: 'app/lib/editor/serialize-template.ts',
         keys: () => {
-            const src = withoutComments(read('app/routes/template-edit.tsx'));
+            const src = withoutComments(read('app/lib/editor/serialize-template.ts'));
             const fn = /export function serializeItemForSave\([\s\S]*?\n\}/.exec(src)?.[0] ?? '';
             const seeded = /const base: Record<string, unknown> = \{([^}]*)\}/.exec(fn)?.[1] ?? '';
             return [...new Set([
