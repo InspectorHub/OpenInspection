@@ -71,6 +71,7 @@
     "lint:catalogue-writes": "node scripts/check-catalogue-write-points.mjs",
     "lint:marketplace-kind-halves": "node scripts/check-marketplace-kind-halves.mjs",
     "verify:real-corpus": "node scripts/verify-real-corpus.mjs",
+    "verify:statutory-render": "tsx scripts/verify-statutory-render.mjs",
     "lint:dup": "jscpd server app packages",
     "lint:gates": "node scripts/run-gates.mjs --rung precommit",
     "lint:gate-registry": "node scripts/check-gate-registry.mjs",

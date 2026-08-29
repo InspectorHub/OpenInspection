@@ -1,271 +1,964 @@
 #!/usr/bin/env node
 /**
- * Produce ONE real statutory form and check where the values landed.
+ * Has a statutory field map ever been rendered onto the authority's own PDF?
  *
- * ## Why a script and not a unit test
+ * ⚠️ THIS GATE NEVER RUNS AUTOMATICALLY. It reads files that are not in this
+ * repository and must never be: they are the agencies' own published forms.
+ * It is a release-time manual rung, run by a person who holds them, in the same
+ * tier as `verify:real-corpus` beside it — not a CI job, because CI here runs on
+ * a public repository and the forms are those agencies' documents to publish.
  *
- * The repeatable-group helpers had nine passing unit tests and no caller. Those
- * tests proved the functions worked; they could not prove the FEATURE worked,
- * because nothing expanded a group onto an actual page. The gap between the two
- * is exactly where positional addressing fails: `electrical_panel[0]` and
- * `electrical_panel[1]` are two columns on one row of the Citizens four-point
- * form, and a form with the main panel's amperage printed in the second panel's
- * column looks completely normal. It prints. It is the right length. Every
- * assertion about its own values passes.
+ *   STATUTORY_PDF_DIR=/path/to/statutory-forms npm run verify:statutory-render
  *
- * So this walks the real path — collect values from a declaration that declares
- * groups, render onto the authority's published bytes — and then hands the
- * result to a reader that measures WHERE each value ended up. "A PDF came out
- * and its byte length is greater than zero" is not a check: a form with the two
- * panels written into each other's columns also has a byte length greater than
- * zero.
+ * Nothing is copied into this repository and nothing is written anywhere unless
+ * `STATUTORY_RENDER_OUT` names a directory outside it (see below). The only
+ * output is which values were confirmed to have reached the page, and which
+ * were not.
  *
- * ## What this script does NOT bring with it
+ * ── Why it exists at all ────────────────────────────────────────────────────
+ * Everything else in this subsystem is satisfiable without ever meeting the
+ * form. `check-statutory-fidelity.mjs` reads the map. `field-map.spec.ts` and
+ * `render.spec.ts` render onto documents this repository invented — pages built
+ * by pdf-lib, with the field names and the geometry the map already claims. A
+ * map and a test that agree with each other about a form neither of them has
+ * opened is exactly the failure this whole subsystem was built around, and it
+ * is the one shape no test in the tree can catch.
  *
- * Neither input is in this repository, and both are arguments for that reason:
+ * ── "It rendered" is an assertion the bug also satisfies ────────────────────
+ * A date written as one string onto a form that prints three separate blanks
+ * renders, prints and files, with the year sitting across the wrong blank. So
+ * nothing here is judged by the absence of an exception. Every value is read
+ * BACK out of the produced bytes:
  *
- *   --map  an authored field map for one revision. A map is a person's
- *          measurement of one revision's page, not something code can derive.
- *   --pdf  the authority's own published bytes. Their document, not ours; the
- *          renderer's whole point is that the output IS their file, so a copy
- *          vendored here would be a copy that can go stale against the source.
+ *   acroform — the named field is fetched off the saved document and its text
+ *              compared to what was supplied. A name that resolves to nothing
+ *              sets nothing and raises nothing, so the names are ALSO looked up
+ *              independently, in the untouched original, rather than trusting
+ *              the renderer's own check of them.
+ *   overlay  — the content stream is parsed and the run has to be at the
+ *              coordinate the map names, carrying the text the value produces.
+ *   checkbox — the mark has to be at the coordinate, AND every box this answer
+ *              did NOT choose has to be empty. A renderer that marks all four
+ *              boxes of a four-way rating satisfies "the mark is there".
  *
- * The map's `sourceHash` is checked against those bytes before anything is
- * written, so the pair cannot silently drift apart.
+ * The runs are compared against the SAME parse of the untouched original, so a
+ * run only counts when this render put it there. An agency's own page carries
+ * hundreds of text objects and some of them say the same words.
  *
- * ## Reading the output
+ * ── Both numbers, every run ─────────────────────────────────────────────────
+ * Fields the map names, fields the test data covers, and fields verified
+ * present on the page are printed side by side whether the run is green or red.
+ * A harness that examined nothing and a clean run look identical from outside,
+ * so a missing variable, an unreadable PDF, a missing values file, zero forms
+ * examined and zero fields verified are each an error rather than a quiet pass.
  *
- * It writes the produced PDF and a `slots.json` naming each repeated slot's own
- * coordinate and the value that belongs there. The coordinate comes from the
- * map rather than from this file, so the reader that checks placement is
- * measuring against the same measurement the renderer drew from.
+ * ── What this replaced, and what it carried forward ────────────────────────
+ * An earlier script of this name took `--map` and `--pdf`, rendered ONE form,
+ * and wrote a `slots.json` for a person to check placement against by hand. Its
+ * two arguments are now the FORMS table below, and its reader is the read-back
+ * further down, which measures the placement instead of describing it. Nothing
+ * it could do was dropped: the value collector, the positional slot names it
+ * produces, and the refusal of one instance more than the form has columns are
+ * all still exercised, in `checkTheValueCollector`, on every run.
  *
- *   node scripts/verify-statutory-render.mjs --map <candidate.json> --pdf <form.pdf> [--out <dir>]
+ * ── What it cannot see, stated so a green run is not read as more than it is ─
+ * It proves a value landed at the coordinate the map names. It cannot prove the
+ * map names the right coordinate. That failure renders, prints and files with
+ * only the content wrong, and only a person holding the form beside the output
+ * catches it — which is what `STATUTORY_RENDER_OUT` is for.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import {
+    existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync,
+} from 'node:fs';
+import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { build } from 'esbuild';
+import {
+    PDFDocument, PDFName, PDFArray, PDFRawStream, StandardFonts, decodePDFRawStream,
+} from 'pdf-lib';
+import { renderStatutoryForm } from '../server/lib/statutory/render.ts';
+import { collectStatutoryValues } from '../server/lib/statutory/values.ts';
+import { partOfValue } from '../server/lib/statutory/value-parts.ts';
+import { fieldMap as trecRei76Map } from '../server/lib/statutory/forms/tx-trec-rei-7-6.ts';
+import { drawnRuns, runsInContentStream } from '../tests/unit/helpers/pdf-drawn-runs.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-function arg(name) {
-    const at = process.argv.indexOf(`--${name}`);
-    return at === -1 ? undefined : process.argv[at + 1];
+/**
+ * The signature this harness substitutes when a candidate carries none.
+ *
+ * A map with no `checkedBy` is refused by `validateFieldMapShape` before any
+ * geometric rule runs — so ONE missing signature hides every mis-measured
+ * coordinate behind it, and the person who signs it then discovers the rest one
+ * refusal at a time. The form is still reported as FAILED; this only decides
+ * whether the failure comes with the rest of the findings attached.
+ *
+ * It is worded so it can never be read as a person having checked anything.
+ */
+const UNSIGNED_SENTINEL = '(unsigned candidate: verify:statutory-render sentinel)';
+
+/** The mark `render.ts` draws into a checkbox. */
+const MARK = 'X';
+
+/** How far a run may sit from the coordinate the map names, in points. */
+const COORDINATE_TOLERANCE = 0.02;
+
+/**
+ * Every statutory form this harness knows about — INCLUDING the one it does not
+ * render.
+ *
+ * Citizens' roof form is listed with `map: null` on purpose. When this was
+ * written only its PDF had been downloaded and there was no field map for it at
+ * all, so no value set was authored, and inventing one to make the list read as
+ * four is exactly what must not happen. A harness that quietly enumerated three
+ * would report complete coverage of a set it had silently trimmed, which is this
+ * repository's oldest failure shape.
+ *
+ * ⚠️ That is the DECISION, not a claim about the disk. A map for that form
+ * appeared beside the PDFs the same day this was written. So the run looks for
+ * one, says what it found, and there is a sweep of the whole candidates
+ * directory at the end — a table somebody typed cannot notice a file somebody
+ * else added.
+ */
+const FORMS = [
+    {
+        formId: 'tx_trec_rei_7_6',
+        label: 'TX TREC REI 7-6',
+        pdf: 'tx-trec-rei-7-6-fillable.pdf',
+        // The PUBLISHED map, imported from the module that ships it — not the
+        // candidate JSON beside the PDFs. This one is live software.
+        map: { kind: 'published', module: 'server/lib/statutory/forms/tx-trec-rei-7-6.ts', value: trecRei76Map },
+        // The candidate the published module was generated from. Named so the
+        // sweep at the end can tell "covered through the module that ships it"
+        // from "nothing has ever rendered this" — two states that look the same
+        // from a directory listing. Whether the two have since drifted apart is
+        // `lint:statutory-fidelity`'s question, not this one's.
+        candidate: 'tx-trec-rei-7-6.candidate.json',
+        values: 'tests/fixtures/statutory/tx-trec-rei-7-6.values.json',
+    },
+    {
+        formId: 'fl_oir_b1_1802',
+        label: 'FL OIR-B1-1802',
+        pdf: 'floir-oir-b1-1802-rev-04-26-CURRENT.pdf',
+        map: { kind: 'candidate', file: 'fl-oir-b1-1802-rev-04-26.candidate.json' },
+        values: 'tests/fixtures/statutory/fl-oir-b1-1802-rev-04-26.values.json',
+    },
+    {
+        formId: 'fl_citizens_4point',
+        label: 'FL Citizens 4-Point',
+        pdf: 'fl-citizens-4point-Insp4pt-03-25.pdf',
+        map: { kind: 'candidate', file: 'fl-citizens-4point-insp4pt-03-25.candidate.json' },
+        values: 'tests/fixtures/statutory/fl-citizens-4point-insp4pt-03-25.values.json',
+    },
+    {
+        formId: 'fl_citizens_roof_rcf_1',
+        label: 'FL Citizens Roof RCF-1',
+        pdf: 'fl-citizens-roof-RCF-1-03-25.pdf',
+        map: null,
+        candidate: 'fl-citizens-roof-rcf-1-03-25.candidate.json',
+        notCoveredBecause: 'when this harness was built there was no field map for this form at '
+            + 'all — only the PDF had been downloaded — so no value set was authored for it, and '
+            + 'none may be invented to make this list read as four. Whether that is still true is '
+            + 'not asserted here: the run below LOOKS, and says what it found',
+        values: null,
+    },
+];
+
+function line(text = '') {
+    console.log(text);
 }
 
-function usage(reason) {
-    console.error(`verify-statutory-render: ${reason}`);
-    console.error('  --map <candidate.json>  the authored field map for one revision');
-    console.error('  --pdf <form.pdf>        the published bytes for that same revision');
-    console.error('  --out <dir>             where to write the produced form (default: a temp dir)');
+console.log('Statutory-render verification — the PRIVATE gate.');
+console.log('  Never runs in CI. Reads the authorities\' own published PDFs, which are not, and');
+console.log('  must not be, in this repository.');
+line();
+
+const pdfDir = process.env.STATUTORY_PDF_DIR;
+if (!pdfDir) {
+    line('  STATUTORY_PDF_DIR is not set, so no form was read.');
+    line(`  ${FORMS.length} form(s) declared · ${FORMS.filter((f) => f.map).length} carry a map.`);
+    line('✘ Cannot verify without the forms. Set STATUTORY_PDF_DIR to the directory holding them.');
+    process.exit(1);
+}
+if (!existsSync(pdfDir) || !statSync(pdfDir).isDirectory()) {
+    line(`✘ STATUTORY_PDF_DIR points at ${pdfDir}, which is not a directory.`);
     process.exit(1);
 }
 
-const mapPath = arg('map');
-const pdfPath = arg('pdf');
-const outDir = arg('out') ?? join(tmpdir(), 'statutory-render-verify');
-if (!mapPath) usage('no --map given');
-if (!pdfPath) usage('no --pdf given');
-
 /**
- * Load the two server modules through a bundle.
+ * The candidate maps come from `candidates/` beside the PDFs, and there is no
+ * second variable for them.
  *
- * They are TypeScript with extensionless imports, which node resolves for
- * neither reason. Bundling with the esbuild already in this tree keeps the
- * script a plain `node` invocation, and — the part that matters — makes it the
- * REAL modules that run rather than a transcription of them.
+ * They are one downloaded corpus with one provenance record: the candidates
+ * name the sha256 of the PDFs sitting next to them, and the note recording where
+ * each file came from covers both halves. A second variable's only new power
+ * would be to point the two halves at different downloads, which is a way to be
+ * wrong that does not currently exist.
  */
-async function loadStatutoryModules() {
-    await mkdir(outDir, { recursive: true });
-    const outfile = join(outDir, '_statutory-bundle.mjs');
-    await build({
-        stdin: {
-            contents: [
-                "export { collectStatutoryValues } from './server/lib/statutory/values';",
-                "export { renderStatutoryForm } from './server/lib/statutory/render';",
-            ].join('\n'),
-            resolveDir: ROOT,
-            loader: 'ts',
-        },
-        bundle: true,
-        format: 'esm',
-        platform: 'node',
-        target: 'node22',
-        outfile,
-        logLevel: 'warning',
-    });
-    return import(pathToFileURL(outfile).href);
+const candidateDir = join(pdfDir, 'candidates');
+if (!existsSync(candidateDir)) {
+    line(`✘ No candidates/ directory beside the PDFs (looked in ${candidateDir}).`);
+    line('  The candidate field maps live there. They are not in this repository either.');
+    process.exit(1);
 }
 
-/** Inspection-level answers, one per closed field name. */
-const FACTS = {
-    client_name: 'Zoe Ng',
-    client_email: null,
-    client_phone: null,
-    property_address: '1 Main St, Miami FL 33101',
-    property_city: 'Miami',
-    property_state: 'FL',
-    property_zip: '33101',
-    inspection_date: '2026-08-28',
-    inspector_name: 'Sam Reed',
-    inspector_license: 'HI-12345',
-    company_name: 'Reed Home Inspections',
-    company_phone: '305-555-0142',
-};
-
 /**
- * What the inspection recorded for each repeated block.
+ * Where a rendered form may be written for a person to hold beside the original.
  *
- * THE TWO PANELS CARRY DIFFERENT AMPERAGES ON PURPOSE. Equal values would pass
- * just as well for a renderer that wrote slot 0 into both columns, or that
- * swapped the two.
+ * Refused inside this repository, whatever the variable says. The output is the
+ * agency's document with somebody's answers on it, and the one rule this file
+ * exists under is that neither ever lands here.
  */
-const INSTANCES = {
-    electrical_panel: [
-        { type: 'Circuit breaker', total_amps: '100', amperage_sufficient: 'Yes' },
-        { type: 'Circuit breaker', total_amps: '200', amperage_sufficient: 'Yes' },
-    ],
-    roof: [
-        {
-            covering_material: 'Shingle',
-            roof_age_years: '8',
-            remaining_useful_life_years: '12',
-            overall_condition: 'Satisfactory',
-        },
-        {},
-    ],
-};
-
-/** The non-repeating half of the form: enough to satisfy every required field. */
-const BINDINGS = {
-    insured_applicant_name: { from: 'inspection', field: 'client_name' },
-    address_inspected: { from: 'inspection', field: 'property_address' },
-    actual_year_built: { from: 'literal', value: '1998' },
-    date_inspected: { from: 'inspection', field: 'inspection_date' },
-    'electrical.general_condition': { from: 'literal', value: 'Satisfactory' },
-    'hvac.central_ac': { from: 'literal', value: 'Yes' },
-    'hvac.central_heat': { from: 'literal', value: 'Yes' },
-    'hvac.systems_in_good_working_order': { from: 'literal', value: 'Yes' },
-    'plumbing.tprv_on_water_heater': { from: 'literal', value: 'Yes' },
-    'plumbing.active_leak': { from: 'literal', value: 'No' },
-    'plumbing.prior_leak': { from: 'literal', value: 'No' },
-    // This revision prints a signature LINE and this candidate maps it as an
-    // overlay, so a name goes on it. Drawing a stored signature image is a
-    // separate mapping kind that the renderer still refuses outright.
-    inspector_signature: { from: 'literal', value: 'Sam Reed' },
-    inspector_license_number: { from: 'inspection', field: 'inspector_license' },
-    inspector_license_type: { from: 'literal', value: 'Home Inspector' },
-    inspector_company_name: { from: 'inspection', field: 'company_name' },
-    inspection_date: { from: 'inspection', field: 'inspection_date' },
-};
-
-function assert(condition, message) {
-    if (!condition) {
-        console.error(`verify-statutory-render: ${message}`);
+const outDir = process.env.STATUTORY_RENDER_OUT ?? null;
+if (outDir !== null) {
+    const abs = isAbsolute(outDir) ? outDir : resolve(process.cwd(), outDir);
+    const inside = relative(ROOT, abs);
+    if (inside === '' || (!inside.startsWith('..') && !isAbsolute(inside))) {
+        line(`✘ STATUTORY_RENDER_OUT points at ${abs}, which is inside this repository.`);
+        line('  A rendered statutory form is the authority\'s document with answers on it.');
+        line('  Name a directory outside the repository, or leave the variable unset.');
         process.exit(1);
     }
+    mkdirSync(abs, { recursive: true });
 }
 
-async function main() {
-    const { collectStatutoryValues, renderStatutoryForm } = await loadStatutoryModules();
+function sha256Hex(bytes) {
+    return createHash('sha256').update(bytes).digest('hex');
+}
 
-    const candidate = JSON.parse(await readFile(mapPath, 'utf8'));
-    const officialPdf = new Uint8Array(await readFile(pdfPath));
-    const hash = createHash('sha256').update(officialPdf).digest('hex');
-    assert(hash === candidate.sourceHash,
-        `these bytes hash to ${hash} and the map was authored against ${candidate.sourceHash}`);
-
-    // A CANDIDATE map has not been signed by a person yet — that signature is a
-    // step code cannot take. The renderer refuses a map with no `checkedBy`, so
-    // this script supplies its own name rather than borrowing somebody's: what
-    // comes out is a verification artefact, never a filing.
-    const map = {
-        ...candidate,
-        checkedBy: candidate.checkedBy ?? 'UNCHECKED CANDIDATE (scripts/verify-statutory-render.mjs)',
-        checkedAt: candidate.checkedAt ?? Date.now(),
+/** A candidate JSON turned into the shape `renderStatutoryForm` takes. */
+function candidateToFieldMap(json) {
+    const signed = typeof json.checkedBy === 'string' && json.checkedBy.trim() !== ''
+        && typeof json.checkedAt === 'string' && Number.isFinite(Date.parse(json.checkedAt));
+    return {
+        signed,
+        checkedBy: signed ? json.checkedBy : undefined,
+        checkedAt: signed ? json.checkedAt : undefined,
+        map: {
+            formId: json.formId,
+            version: json.version,
+            sourceHash: json.sourceHash,
+            checkedBy: signed ? json.checkedBy : UNSIGNED_SENTINEL,
+            // The candidate records a calendar day; the map takes epoch ms.
+            checkedAt: signed ? Date.parse(json.checkedAt) : Date.UTC(1970, 0, 2),
+            requiredFields: json.requiredFields ?? [],
+            mappings: json.mappings ?? [],
+            // Carried through rather than dropped: the repeated blocks are what
+            // the value collector is checked against, and a map that declares
+            // them is the only place positional addressing can be exercised.
+            groups: json.groups ?? [],
+        },
     };
-    assert(Array.isArray(map.groups) && map.groups.length > 0,
-        'this map declares no groups, so it cannot demonstrate the thing being verified');
+}
 
-    const declaration = { formId: map.formId, bindings: BINDINGS, groups: map.groups };
+/** Counting key for one drawn run: the text, where it sits, and how big it is. */
+function runKey(run) {
+    return `${run.text}\u0000${run.x.toFixed(2)}\u0000${run.y.toFixed(2)}\u0000${run.size}`;
+}
 
-    // -- 1. the real collector, with groups ---------------------------------
-    const values = collectStatutoryValues(
-        declaration, { schemaVersion: 2, sections: [] }, {}, FACTS, INSTANCES,
-    );
-    for (const [name, expected] of [
-        ['electrical_panel[0].total_amps', '100'],
-        ['electrical_panel[1].total_amps', '200'],
-    ]) {
-        assert(values[name] === expected,
-            `collected "${name}" as ${JSON.stringify(values[name])}, `
-            + `expected ${JSON.stringify(expected)}`);
+/**
+ * The runs THIS render added, page by page.
+ *
+ * A multiset difference rather than a set one: the agency's own page draws the
+ * same short strings many times, and treating the before-picture as a set would
+ * let the second copy of one of them stand in for a value we never wrote.
+ */
+async function addedRuns(before, after, pageCount) {
+    const pages = [];
+    for (let page = 0; page < pageCount; page += 1) {
+        const had = new Map();
+        for (const run of await drawnRuns(before, page)) {
+            had.set(runKey(run), (had.get(runKey(run)) ?? 0) + 1);
+        }
+        const added = [];
+        for (const run of await drawnRuns(after, page)) {
+            const key = runKey(run);
+            const remaining = had.get(key) ?? 0;
+            if (remaining > 0) had.set(key, remaining - 1);
+            else added.push(run);
+        }
+        pages.push(added);
     }
-    const fromGroups = map.groups.reduce((n, g) => n + g.capacity * g.fields.length, 0);
-    console.log(`collected  ${Object.keys(values).length} values, ${fromGroups} of them from groups`);
+    return pages;
+}
 
-    // -- 2. the real renderer, onto the authority's own bytes ---------------
-    const produced = await renderStatutoryForm(officialPdf, map, values);
-    const pdfOut = join(outDir, `${map.formId}.verify.pdf`);
-    await writeFile(pdfOut, produced);
+/** Runs added at one coordinate, in the order they were written. */
+function runsAt(added, page, x, y) {
+    return (added[page] ?? []).filter(
+        (r) => Math.abs(r.x - x) <= COORDINATE_TOLERANCE && Math.abs(r.y - y) <= COORDINATE_TOLERANCE,
+    );
+}
 
-    // -- 3. hand the reader each slot's OWN coordinate ----------------------
-    // Taken from the map, not retyped here: the placement check then measures
-    // against the same measurement the renderer drew from.
-    const slots = [];
-    for (const group of map.groups) {
-        for (let index = 0; index < group.capacity; index++) {
-            for (const field of group.fields) {
-                const ourField = `${group.id}[${index}].${field}`;
-                const expected = values[ourField];
-                if (expected === undefined || expected === '') continue;
-                const mapping = map.mappings.find(
-                    (m) => m.ourField === ourField && m.kind === 'overlay');
-                if (!mapping) continue;
-                slots.push({
-                    group: group.id,
-                    slotLabel: group.slotLabels[index],
-                    ourField,
-                    expected,
-                    page: mapping.page,
-                    x: mapping.x,
-                    y: mapping.y,
-                    size: mapping.size,
-                });
+/** Whitespace-insensitive comparison, reported by which form of it matched. */
+function textMatches(found, expected) {
+    const collapse = (s) => s.replace(/\s+/g, ' ').trim();
+    const strip = (s) => s.replace(/\s+/g, '');
+    if (collapse(found) === collapse(expected)) return 'exact';
+    if (strip(found) === strip(expected)) return 'rewrapped';
+    return null;
+}
+
+/**
+ * Where a filled form field's text actually landed, and whether its own box
+ * kept it.
+ *
+ * ── The failure this exists to catch ────────────────────────────────────────
+ * A form field's value is not drawn on the page. Setting it makes pdf-lib
+ * GENERATE that widget's appearance stream, and everything about whether the
+ * answer is readable happens in there: the stream carries its own BBox, its own
+ * clip path, and lines laid out from the top down. A line whose baseline falls
+ * below that clip is drawn and never seen. The field still reads back correctly,
+ * the page's own content stream is untouched, and every assertion about the
+ * value holds.
+ *
+ * `refuseIfTheWidgetWouldClip` is supposed to stop that before it happens, and
+ * it measures line height with `heightAtSize`. What pdf-lib then LAYS OUT with
+ * is a larger step — measured on the TREC form, 11.1pt per line against the
+ * 9.25pt the refusal budgeted, at the same 10pt size. So the check can pass a
+ * value the produced document clips, which is the one thing it exists to
+ * prevent. Reading the appearance back does not depend on knowing either
+ * number.
+ *
+ * Returns null when the widget carries no appearance stream to read.
+ */
+function clippedLinesInAppearance(doc, field, ruler) {
+    const problems = [];
+    for (const widget of field.acroField.getWidgets()) {
+        const ref = widget.getNormalAppearance();
+        const stream = ref instanceof PDFRawStream ? ref : doc.context.lookup(ref);
+        if (!(stream instanceof PDFRawStream)) continue;
+        const box = stream.dict.get(PDFName.of('BBox'));
+        if (!(box instanceof PDFArray) || box.size() !== 4) continue;
+        const [bx0, by0, bx1, by1] = box.asArray().map((n) => n.asNumber());
+
+        let text = '';
+        for (const byte of decodePDFRawStream(stream).decode()) text += String.fromCharCode(byte);
+        for (const run of runsInContentStream(text)) {
+            if (run.text.trim() === '') continue;
+            // Helvetica's descender is 207/1000 of the em and its ascender
+            // 718/1000. pdf-lib writes /Helvetica into the appearance it
+            // generates, whatever the form's own DA names, so these are the
+            // metrics of the glyphs actually in the stream.
+            const bottom = run.y - 0.207 * run.size;
+            const top = run.y + 0.718 * run.size;
+            const right = run.x + ruler.widthOfTextAtSize(run.text, run.size);
+            if (bottom < by0 - 0.01) {
+                problems.push(`the line ${JSON.stringify(run.text.slice(0, 40))} sits at baseline `
+                    + `${run.y.toFixed(2)} in a box whose floor is ${by0.toFixed(2)} — `
+                    + `${(by0 - bottom).toFixed(2)}pt of it is below the clip`);
+            } else if (top > by1 + 0.01) {
+                problems.push(`the line ${JSON.stringify(run.text.slice(0, 40))} rises to `
+                    + `${top.toFixed(2)} in a box whose ceiling is ${by1.toFixed(2)}`);
+            }
+            if (right > bx1 + 0.5) {
+                problems.push(`the line ${JSON.stringify(run.text.slice(0, 40))} runs to `
+                    + `${right.toFixed(2)} in a box ${bx1.toFixed(2)} wide`);
             }
         }
     }
-    const slotsOut = join(outDir, 'slots.json');
-    await writeFile(slotsOut, `${JSON.stringify({ pdf: pdfOut, slots }, null, 2)}\n`);
-
-    // -- 4. the refusal this whole design exists for, on the real path ------
-    // A house with three panels against a form with two. Until this ran through
-    // `collectStatutoryValues`, the refusal could not happen to anybody.
-    const overflowing = {
-        ...INSTANCES,
-        electrical_panel: [...INSTANCES.electrical_panel, { total_amps: '300' }],
-    };
-    let refusal = null;
-    try {
-        collectStatutoryValues(
-            declaration, { schemaVersion: 2, sections: [] }, {}, FACTS, overflowing,
-        );
-    } catch (err) {
-        refusal = err instanceof Error ? err.message : String(err);
-    }
-    assert(refusal !== null, 'three instances against a capacity of two were ACCEPTED');
-    for (const fragment of ['3', '2 slots', 'narrative report']) {
-        assert(refusal.includes(fragment),
-            `the refusal does not name ${JSON.stringify(fragment)}: ${refusal}`);
-    }
-
-    console.log(`produced   ${pdfOut} (${produced.byteLength} bytes)`);
-    console.log(`slots      ${slotsOut} (${slots.length} filled slot(s))`);
-    console.log(`refusal    ${refusal}`);
-    console.log('NOTE: a byte length is not a verification. Check placement against slots.json.');
+    return problems;
 }
 
-await main();
+/**
+ * The half of the path that happens BEFORE the renderer: a template declaration
+ * with repeated blocks, run through the real value collector.
+ *
+ * ── Why this is here and not left to the unit tests ─────────────────────────
+ * `electrical_panel[0]` and `electrical_panel[1]` are two COLUMNS of one row on
+ * the Citizens four-point form. A collector that wrote slot 0 into both, or
+ * swapped them, produces a form that prints, is the right length, and passes
+ * every assertion about its own values. Only running the real collector into
+ * the real renderer onto the real page can tell those apart, and this is the
+ * only place all three meet.
+ *
+ * ── What is asserted ────────────────────────────────────────────────────────
+ * That the collector, given a declaration built from the same data the render
+ * used, reproduces that data EXACTLY — key for key, including every positional
+ * slot name. Anything less and the page check below is verifying values this
+ * software would never actually have produced.
+ *
+ * ── And the refusal ────────────────────────────────────────────────────────
+ * A house with one more panel than the form has columns. A dropped instance
+ * comes out as an empty slot, and an empty slot reads exactly like an inspector
+ * who did not answer, so it must refuse rather than truncate. The refusal has to
+ * name BOTH counts and where the remainder goes: a person reading it is standing
+ * in a garage deciding what to do next, and "too many panels" is a wall.
+ */
+function checkTheValueCollector(map, values) {
+    const groups = map.groups ?? [];
+    if (groups.length === 0) return { ran: false, problems: [] };
+
+    const problems = [];
+    const grouped = new Set();
+    const instances = {};
+    for (const group of groups) {
+        instances[group.id] = [];
+        for (let index = 0; index < group.capacity; index += 1) {
+            const instance = {};
+            for (const field of group.fields) {
+                const ourField = `${group.id}[${index}].${field}`;
+                if (!Object.hasOwn(values, ourField)) continue;
+                grouped.add(ourField);
+                instance[field] = values[ourField];
+            }
+            instances[group.id].push(instance);
+        }
+    }
+
+    // Inspection-level facts, so the `from: 'inspection'` arm is exercised too
+    // and not only the literal one. Every member of the union gets a key: a
+    // missing one reaches the form as `undefined`, which stringifies to a blank
+    // box, and a blank box reads as an answer nobody gave.
+    const facts = {
+        client_name: values.insured_applicant_name ?? null,
+        client_email: null,
+        client_phone: null,
+        property_address: values.address_inspected ?? null,
+        property_city: null,
+        property_state: null,
+        property_zip: null,
+        inspection_date: values.date_inspected ?? null,
+        inspector_name: values.inspector_signature ?? null,
+        inspector_license: values.inspector_license_number ?? null,
+        company_name: values.inspector_company_name ?? null,
+        company_phone: values.inspector_work_phone ?? null,
+    };
+    const fromInspection = {
+        insured_applicant_name: 'client_name',
+        address_inspected: 'property_address',
+        date_inspected: 'inspection_date',
+        inspector_license_number: 'inspector_license',
+        inspector_company_name: 'company_name',
+        inspector_work_phone: 'company_phone',
+    };
+
+    const bindings = {};
+    for (const [ourField, value] of Object.entries(values)) {
+        if (grouped.has(ourField)) continue;
+        const fact = fromInspection[ourField];
+        bindings[ourField] = fact === undefined
+            ? { from: 'literal', value }
+            : { from: 'inspection', field: fact };
+    }
+
+    const declaration = { formId: map.formId, bindings, groups };
+    const snapshot = { schemaVersion: 2, sections: [] };
+
+    let collected;
+    try {
+        collected = collectStatutoryValues(declaration, snapshot, {}, facts, instances);
+    } catch (error) {
+        problems.push(`the collector refused a declaration built from this data: `
+            + `${error instanceof Error ? error.message : String(error)}`);
+        return { ran: true, problems, slots: 0 };
+    }
+
+    for (const [ourField, expected] of Object.entries(values)) {
+        if (collected[ourField] !== expected) {
+            problems.push(`the collector produced ${JSON.stringify(collected[ourField] ?? null)} `
+                + `for "${ourField}" and the render was given ${JSON.stringify(expected)}`);
+        }
+    }
+    const extra = Object.keys(collected).filter((k) => !Object.hasOwn(values, k));
+    for (const key of extra) {
+        problems.push(`the collector produced "${key}", which the render was never given`);
+    }
+
+    // One more instance than the page has columns. This map's groups nominate no
+    // destination for the remainder, so the refusal is the whole answer.
+    const overflowing = { ...instances };
+    const first = groups[0];
+    overflowing[first.id] = [
+        ...instances[first.id],
+        Object.fromEntries(first.fields.map((f) => [f, 'overflow'])),
+    ];
+    let refusal = null;
+    try {
+        collectStatutoryValues(declaration, snapshot, {}, facts, overflowing);
+    } catch (error) {
+        refusal = error instanceof Error ? error.message : String(error);
+    }
+    if (refusal === null) {
+        problems.push(`${first.capacity + 1} instance(s) of "${first.id}" were ACCEPTED against `
+            + `${first.capacity} slot(s). A dropped instance is an empty slot, and an empty slot `
+            + 'reads as an inspector who did not answer.');
+    } else {
+        for (const fragment of [String(first.capacity + 1), `${first.capacity} slots`, 'narrative report']) {
+            if (!refusal.includes(fragment)) {
+                problems.push(`the over-capacity refusal does not name ${JSON.stringify(fragment)}, `
+                    + `so it cannot be acted on: ${refusal}`);
+            }
+        }
+    }
+
+    return { ran: true, problems, slots: grouped.size, refusal };
+}
+
+/** Every annotation rectangle on one page of a document, with its field name. */
+function widgetRectangles(doc) {
+    const perPage = [];
+    for (const page of doc.getPages()) {
+        const rects = [];
+        // `Annots()` and not `get(PDFName.of('Annots'))`: on every one of these
+        // forms the entry is an indirect REFERENCE to the array, so the direct
+        // read returns a PDFRef, the `instanceof PDFArray` test fails, and the
+        // page reports zero annotations. Measured on the TREC form, which has
+        // 245 of them: the direct read found 0 on all six pages and reported
+        // nothing wrong, which is the exact shape of an empty result passing for
+        // a clean one.
+        const annots = page.node.Annots();
+        if (annots instanceof PDFArray) {
+            for (const ref of annots.asArray()) {
+                const annot = page.doc.context.lookup(ref);
+                const rect = annot?.get?.(PDFName.of('Rect'));
+                if (!(rect instanceof PDFArray) || rect.size() !== 4) continue;
+                const [x1, y1, x2, y2] = rect.asArray().map((n) => n.asNumber());
+                rects.push({
+                    x0: Math.min(x1, x2), y0: Math.min(y1, y2),
+                    x1: Math.max(x1, x2), y1: Math.max(y1, y2),
+                });
+            }
+        }
+        perPage.push(rects);
+    }
+    return perPage;
+}
+
+/** Candidate files this run actually put values through. */
+const renderedCandidates = new Set();
+
+/** Candidate file -> the published module generated from it and rendered instead. */
+const publishedCandidates = new Map();
+
+const findings = [];
+const totals = { formsWithMap: 0, formsExamined: 0, mapped: 0, covered: 0, verified: 0 };
+let failed = false;
+
+for (const form of FORMS) {
+    line(`── ${form.label} (${form.formId})`);
+
+    const pdfPath = join(pdfDir, form.pdf);
+    if (!existsSync(pdfPath)) {
+        line(`   ✘ ${form.pdf} is not in STATUTORY_PDF_DIR.`);
+        failed = true;
+        line();
+        continue;
+    }
+    const official = new Uint8Array(readFileSync(pdfPath));
+
+    if (form.map === null) {
+        // The reason is a decision and stays written down. Whether a map EXISTS
+        // is a fact about the disk, so it is read off the disk on every run —
+        // "no field map for this form exists" is exactly the kind of sentence
+        // that is true when it is typed and false the week after, and it would
+        // be printed with total confidence either way.
+        line(`   NOT COVERED — ${form.notCoveredBecause}.`);
+        const candidatePath = join(candidateDir, form.candidate);
+        if (existsSync(candidatePath)) {
+            const json = JSON.parse(readFileSync(candidatePath, 'utf8'));
+            const count = (json.mappings ?? []).length;
+            const signed = typeof json.checkedBy === 'string' && json.checkedBy.trim() !== '';
+            failed = true;
+            line(`   ⚠️ A FIELD MAP FOR THIS FORM NOW EXISTS: candidates/${form.candidate}`);
+            line(`      ${count} mapping(s), ${signed ? `signed by ${json.checkedBy}` : 'UNSIGNED'}. `
+                + 'Nothing here has ever put a value through it.');
+            findings.push(`${form.formId}: a field map has appeared (candidates/${form.candidate}, `
+                + `${count} mappings) and this harness has no value set for it, so 0 of its `
+                + 'coordinates have ever been rendered. Author one, or say in writing why not.');
+        } else {
+            line(`   Looked for candidates/${form.candidate}: still not there.`);
+        }
+        line(`   The PDF is here (${official.length} bytes, sha256 ${sha256Hex(official).slice(0, 16)}…)`);
+        line('   and nothing was rendered onto it. 0 field(s) mapped · 0 verified.');
+        line();
+        continue;
+    }
+    totals.formsWithMap += 1;
+
+    // ── The map ────────────────────────────────────────────────────────────
+    let map;
+    let signatureNote;
+    if (form.map.kind === 'published') {
+        map = form.map.value;
+        publishedCandidates.set(form.candidate, form.map.module);
+        signatureNote = `signed by ${map.checkedBy} on ${new Date(map.checkedAt).toISOString().slice(0, 10)}`;
+        line(`   map: ${form.map.module} (published)`);
+    } else {
+        const candidatePath = join(candidateDir, form.map.file);
+        if (!existsSync(candidatePath)) {
+            line(`   ✘ candidates/${form.map.file} is not beside the PDFs.`);
+            failed = true;
+            line();
+            continue;
+        }
+        const candidateBytes = readFileSync(candidatePath);
+        const loaded = candidateToFieldMap(JSON.parse(candidateBytes.toString('utf8')));
+        map = loaded.map;
+        renderedCandidates.add(form.map.file);
+        // The candidate's OWN hash, beside the PDF's. These files are authored
+        // by hand and revised while work is in flight — one of them was
+        // rewritten between two runs of this harness on 2026-08-29 — so a report
+        // of what passed has to name the bytes that passed.
+        line(`   map: candidates/${form.map.file} · sha256 `
+            + `${sha256Hex(candidateBytes).slice(0, 16)}…`);
+        if (loaded.signed) {
+            signatureNote = `signed by ${loaded.checkedBy} on ${loaded.checkedAt}`;
+        } else {
+            signatureNote = 'UNSIGNED';
+            failed = true;
+            findings.push(`${form.formId}: the candidate map carries no checkedBy/checkedAt. `
+                + 'It is refused, and cannot be published, until a person signs it.');
+            line('   ⚠️ UNSIGNED — the candidate names nobody and no date, so the real');
+            line('      validator refuses it before any geometric rule runs. A sentinel');
+            line(`      signature (${UNSIGNED_SENTINEL}) is substituted BELOW THIS LINE ONLY,`);
+            line('      so that one missing signature does not hide every mis-measured');
+            line('      coordinate behind it. This form is reported as FAILED regardless.');
+        }
+    }
+    line(`   signature: ${signatureNote}`);
+
+    const actualHash = sha256Hex(official);
+    line(`   pdf: ${form.pdf} · ${official.length} bytes · sha256 ${actualHash.slice(0, 16)}…`
+        + (actualHash === map.sourceHash ? ' (matches the map)' : ' ⚠️ DOES NOT MATCH THE MAP'));
+
+    // ── The data ───────────────────────────────────────────────────────────
+    const valuesPath = join(ROOT, form.values);
+    if (!existsSync(valuesPath)) {
+        line(`   ✘ no test data at ${form.values}. A form with no data verifies nothing.`);
+        failed = true;
+        line();
+        continue;
+    }
+    const values = JSON.parse(readFileSync(valuesPath, 'utf8')).values ?? {};
+
+    const namedFields = [...new Set(map.mappings.map((m) => m.ourField))];
+    const coveredFields = namedFields.filter((f) => Object.hasOwn(values, f));
+    const uncovered = namedFields.filter((f) => !Object.hasOwn(values, f));
+    const strayValues = Object.keys(values).filter((k) => !namedFields.includes(k));
+    totals.mapped += namedFields.length;
+    totals.covered += coveredFields.length;
+
+    for (const f of uncovered) {
+        findings.push(`${form.formId}: the map names "${f}" and the test data has no value for it. `
+            + 'A field never given a value is a coordinate this run did not exercise.');
+    }
+    for (const k of strayValues) {
+        findings.push(`${form.formId}: the test data carries "${k}", which this map does not name. `
+            + 'The renderer refuses a value with no mapping, so this stops the whole form.');
+    }
+    if (uncovered.length || strayValues.length) failed = true;
+
+    // ── The names, looked up independently of the code under test ──────────
+    const originalDoc = await PDFDocument.load(official);
+    const officialNames = new Set(originalDoc.getForm().getFields().map((f) => f.getName()));
+    const acroformMappings = map.mappings.filter((m) => m.kind === 'acroform');
+    const unresolved = acroformMappings.filter((m) => !officialNames.has(m.pdfField));
+    if (unresolved.length) {
+        failed = true;
+        for (const m of unresolved) {
+            findings.push(`${form.formId}: "${m.ourField}" maps to the field "${m.pdfField}", `
+                + 'which this PDF does not have. A name that does not resolve sets nothing '
+                + 'and raises nothing.');
+        }
+    }
+    if (acroformMappings.length) {
+        line(`   acroform: ${acroformMappings.length} mapping(s) · `
+            + `${acroformMappings.length - unresolved.length} resolve against the ${officialNames.size} `
+            + `field(s) this PDF actually has · ${unresolved.length} do not`);
+    }
+
+    // ── The value collector, where the map declares repeated blocks ────────
+    const collector = checkTheValueCollector(map, values);
+    if (!collector.ran) {
+        line('   collector: this map declares no repeated blocks, so there is nothing');
+        line('      positional to get wrong before the render.');
+    } else if (collector.problems.length === 0) {
+        line(`   collector: the real collector reproduced all ${namedFields.length} value(s) from a `
+            + `declaration with ${map.groups.length} repeated block(s), ${collector.slots} of them`);
+        line(`      positional slots, and refused one instance too many — ${collector.refusal}`);
+    } else {
+        failed = true;
+        line(`   ✘ ${collector.problems.length} problem(s) on the way IN, before the renderer:`);
+        for (const problem of collector.problems) line(`      ${problem}`);
+        for (const problem of collector.problems) findings.push(`${form.formId}: ${problem}`);
+    }
+
+    // ── The render ─────────────────────────────────────────────────────────
+    let rendered;
+    try {
+        rendered = await renderStatutoryForm(official, map, values);
+    } catch (error) {
+        failed = true;
+        const message = error instanceof Error ? error.message : String(error);
+        line('   ✘ THE RENDER REFUSED:');
+        for (const part of message.split('\n')) line(`      ${part}`);
+        line(`   ${namedFields.length} field(s) mapped · ${coveredFields.length} covered by the `
+            + 'test data · 0 verified present on the page.');
+        findings.push(`${form.formId}: the render refused — ${message.split('\n')[0]}`);
+        line();
+        continue;
+    }
+    totals.formsExamined += 1;
+
+    if (outDir !== null) {
+        const target = join(isAbsolute(outDir) ? outDir : resolve(process.cwd(), outDir),
+            `${form.formId}.rendered.pdf`);
+        writeFileSync(target, rendered);
+        line(`   wrote ${target} — hold it beside the original. Nothing here can tell you`);
+        line('      whether a coordinate names the RIGHT blank; only that page can.');
+    }
+
+    // ── Reading the values back off the page ───────────────────────────────
+    const renderedDoc = await PDFDocument.load(rendered);
+    const renderedForm = renderedDoc.getForm();
+    const pageCount = renderedDoc.getPageCount();
+    const added = await addedRuns(official, rendered, pageCount);
+    const rects = widgetRectangles(originalDoc);
+    const ruler = await (await PDFDocument.create()).embedFont(StandardFonts.Helvetica);
+
+    const verifiedFields = new Set();
+    let expectedWrites = 0;
+    let verifiedWrites = 0;
+    let absenceChecks = 0;
+    const overruns = [];
+    const clipped = [];
+    const unmeasuredWraps = [];
+    const underWidgets = [];
+    const strayMarks = [];
+    let unbounded = 0;
+
+    for (const mapping of map.mappings) {
+        const value = values[mapping.ourField];
+        if (value === undefined) continue;
+
+        if (mapping.kind === 'acroform') {
+            expectedWrites += 1;
+            let readBack;
+            let field = null;
+            try {
+                field = renderedForm.getTextField(mapping.pdfField);
+                readBack = field.getText();
+            } catch {
+                readBack = undefined;
+            }
+            if (field !== null) {
+                for (const problem of clippedLinesInAppearance(renderedDoc, field, ruler)) {
+                    clipped.push(`${mapping.ourField} -> "${mapping.pdfField}": ${problem}`);
+                }
+            }
+            if (readBack === value) {
+                verifiedWrites += 1;
+                verifiedFields.add(mapping.ourField);
+            } else {
+                findings.push(`${form.formId}: "${mapping.ourField}" was set to `
+                    + `${JSON.stringify(value)} and the saved document reads back `
+                    + `${JSON.stringify(readBack ?? null)} from "${mapping.pdfField}".`);
+            }
+            continue;
+        }
+
+        if (mapping.kind === 'checkbox') {
+            if (value !== mapping.whenValue) {
+                // The box this answer did NOT choose. A renderer that marks all
+                // four boxes of a four-way rating satisfies every "the mark is
+                // present" assertion ever written, so absence is asserted too.
+                // Counted, and the count printed, because a check that never
+                // reports anything is indistinguishable from one that never ran.
+                absenceChecks += 1;
+                if (runsAt(added, mapping.page, mapping.x, mapping.y).some((r) => r.text === MARK)) {
+                    strayMarks.push(`${mapping.ourField} = "${mapping.whenValue}" `
+                        + `(the answer given was "${value}")`);
+                }
+                continue;
+            }
+            expectedWrites += 1;
+            const marks = runsAt(added, mapping.page, mapping.x, mapping.y);
+            if (marks.some((r) => r.text === MARK)) {
+                verifiedWrites += 1;
+                verifiedFields.add(mapping.ourField);
+                const box = (rects[mapping.page] ?? []).find(
+                    (r) => mapping.x >= r.x0 && mapping.x <= r.x1 && mapping.y >= r.y0 && mapping.y <= r.y1,
+                );
+                if (box !== undefined) {
+                    underWidgets.push(`${mapping.ourField} = "${mapping.whenValue}" at `
+                        + `(${mapping.x}, ${mapping.y}) on page ${mapping.page}`);
+                }
+            } else {
+                findings.push(`${form.formId}: "${mapping.ourField}" answered `
+                    + `"${mapping.whenValue}" drew no mark at (${mapping.x}, ${mapping.y}) `
+                    + `on page ${mapping.page}.`);
+            }
+            continue;
+        }
+
+        // overlay
+        if (value === '') continue;
+        expectedWrites += 1;
+        const expected = mapping.part === undefined
+            ? value
+            : partOfValue(value, mapping.part, mapping.ourField);
+        const runs = runsAt(added, mapping.page, mapping.x, mapping.y);
+        const found = runs.map((r) => r.text).join(' ');
+        const match = runs.length === 0 ? null : textMatches(found, expected);
+        if (match !== null) {
+            verifiedWrites += 1;
+            verifiedFields.add(mapping.ourField);
+        } else {
+            findings.push(`${form.formId}: "${mapping.ourField}"`
+                + `${mapping.part === undefined ? '' : ` (${mapping.part})`} should read `
+                + `${JSON.stringify(expected)} at (${mapping.x}, ${mapping.y}) on page `
+                + `${mapping.page}; the page carries ${JSON.stringify(found)} there.`);
+        }
+
+        // Overflow that `fit.ts` could not see. It measures nothing at all
+        // unless the map declares BOTH bounds, so a row with a width and no
+        // height — or with neither — is drawn against nothing.
+        //
+        // The wrap is the half nobody can adjudicate from here. pdf-lib breaks
+        // at spaces, so a value too long for its blank does not overrun to the
+        // right; it steps DOWN, over the row beneath it, and every width
+        // measurement still passes. Whether that is right depends on whether the
+        // blank is one printed line or a comments box — which is exactly what a
+        // missing maxHeight fails to say.
+        if (mapping.maxHeight === undefined && runs.length > 1) {
+            unmeasuredWraps.push(`${mapping.ourField}: ${JSON.stringify(expected)} wrapped onto `
+                + `${runs.length} line(s) at (${mapping.x}, ${mapping.y}) on page ${mapping.page}`);
+        }
+        if (mapping.maxWidth === undefined) {
+            unbounded += 1;
+            continue;
+        }
+        for (const run of runs) {
+            const width = ruler.widthOfTextAtSize(run.text, run.size);
+            if (width > mapping.maxWidth + 0.5) {
+                overruns.push(`${mapping.ourField}`
+                    + `${mapping.part === undefined ? '' : ` (${mapping.part})`}: `
+                    + `${JSON.stringify(run.text)} is ${width.toFixed(2)}pt at size ${run.size} `
+                    + `in a blank measured ${mapping.maxWidth}pt`
+                    + `${mapping.maxHeight === undefined ? ' (no maxHeight, so nothing measured it)' : ''}`);
+            }
+        }
+    }
+
+    totals.verified += verifiedFields.size;
+
+    if (strayMarks.length) {
+        failed = true;
+        line(`   ✘ ${strayMarks.length} mark(s) in a box the answer did not choose:`);
+        for (const s of strayMarks) line(`      ${s}`);
+        findings.push(`${form.formId}: ${strayMarks.length} box(es) marked for an answer nobody gave.`);
+    }
+    if (clipped.length) {
+        failed = true;
+        line(`   ✘ ${clipped.length} line(s) fall outside the box of the field they were put in.`);
+        line('      Every one of these passed refuseIfTheWidgetWouldClip on the way in: the');
+        line('      field reads back correctly and the printed document is missing the text.');
+        for (const c of clipped) line(`      ${c}`);
+        findings.push(`${form.formId}: ${clipped.length} line(s) are clipped by the field box `
+            + 'they were written into, after the clipping check passed them.');
+    }
+    if (overruns.length) {
+        failed = true;
+        line(`   ✘ ${overruns.length} value(s) ran past the blank measured for them:`);
+        for (const o of overruns) line(`      ${o}`);
+        findings.push(`${form.formId}: ${overruns.length} overlay(s) overran their measured blank.`);
+    }
+    if (unmeasuredWraps.length) {
+        // ⚠️ Reported, never a failure. A comments box is SUPPOSED to wrap, and
+        // a map that declares no maxHeight is the reason nothing here can tell
+        // that box from a single printed line whose answer just ran over it.
+        // Failing on this would push somebody to shorten the data until the
+        // harness went quiet, which would hide the map's missing measurement
+        // rather than record it.
+        line(`   ⚠️ ${unmeasuredWraps.length} value(s) wrapped onto a second line in a row whose`);
+        line('      height nobody measured. Where that row is one printed line, the extra');
+        line('      lines are written over the row beneath it and nothing raises:');
+        for (const wrapped of unmeasuredWraps) line(`      ${wrapped}`);
+    }
+    if (underWidgets.length) {
+        // Reported on every run, and NOT a failure by itself: whether a widget's
+        // own appearance paints over the mark depends on that widget's off-state
+        // stream, which this cannot settle. What it can say is that the mark is
+        // inside an annotation rectangle, and annotations are painted after page
+        // content.
+        line(`   ⚠️ ${underWidgets.length} mark(s) drawn INSIDE an existing widget rectangle.`);
+        line('      This form has real checkbox widgets and the map draws text over them.');
+        line('      Annotations paint after page content, so the widget\'s own off-state');
+        line('      appearance may cover the mark; and the document\'s field data says');
+        line('      those boxes are unticked whatever is drawn on top. First three:');
+        for (const u of underWidgets.slice(0, 3)) line(`      ${u}`);
+    }
+    if (unbounded) {
+        line(`   ⚠️ ${unbounded} overlay(s) declare no maxWidth, so nothing measured whether`);
+        line('      their text stayed inside the blank — not here, and not in fit.ts.');
+    }
+
+    line(`   ${namedFields.length} field(s) mapped · ${coveredFields.length} covered by the test `
+        + `data · ${verifiedFields.size} verified present on the page`);
+    line(`   ${map.mappings.length} mapping(s) · ${expectedWrites} expected to write with this `
+        + `data · ${verifiedWrites} verified · ${absenceChecks} box(es) checked for the mark they `
+        + 'must NOT carry');
+    if (verifiedWrites < expectedWrites) failed = true;
+    if (expectedWrites === 0) {
+        failed = true;
+        findings.push(`${form.formId}: nothing was expected to be written. A form that wrote `
+            + 'nothing verifies nothing.');
+    }
+    line();
+}
+
+// ── Every candidate on disk, whether this harness knows about it or not ──
+// The FORMS table above is a list somebody typed. The candidates directory is
+// what is actually there. A map authored after this file was last edited is
+// invisible to the table and completely visible here, and "the forms we cover"
+// silently meaning "the forms we covered in August" is the failure this repo has
+// watched most often.
+const onDisk = readdirSync(candidateDir).filter((f) => f.endsWith('.candidate.json'));
+const viaModule = onDisk.filter((f) => publishedCandidates.has(f));
+const uncovered = onDisk.filter((f) => !renderedCandidates.has(f) && !publishedCandidates.has(f));
+line('── Candidate maps on disk');
+line(`   ${onDisk.length} candidate map(s) beside the PDFs · ${renderedCandidates.size} rendered `
+    + `from the candidate · ${viaModule.length} rendered through the published module generated `
+    + `from it · ${uncovered.length} never rendered at all`);
+for (const file of viaModule) {
+    line(`   candidates/${file} — rendered as ${publishedCandidates.get(file)}`);
+}
+for (const file of uncovered) {
+    line(`   ⚠️ candidates/${file} — nothing here has ever put a value through it`);
+}
+line();
+
+// ── The tally. Printed whether the run is green or red ─────────────────────
+line('── Totals');
+line(`   ${FORMS.length} form(s) in the table · ${totals.formsWithMap} this harness renders · `
+    + `${FORMS.length - totals.formsWithMap} listed and deliberately not rendered`);
+line(`   ${totals.formsExamined} form(s) actually rendered and read back`);
+line(`   ${totals.mapped} field(s) mapped · ${totals.covered} covered by test data · `
+    + `${totals.verified} verified present on the page`);
+line();
+
+if (findings.length) {
+    line(`${findings.length} finding(s):`);
+    for (const f of findings) line(`  ✘ ${f}`);
+    line();
+}
+
+// Zero here is a failure, not a clean sweep. An empty run satisfies "nothing was
+// wrong" vacuously, and this repository has watched exactly that read as green.
+if (totals.formsExamined === 0) {
+    line('✘ Not one form was rendered. A run over nothing is not a verification.');
+    process.exit(1);
+}
+if (totals.verified === 0) {
+    line('✘ Not one field was verified present on a page. Nothing here was measured.');
+    process.exit(1);
+}
+if (failed) {
+    line('✘ Statutory-render gate — a value that did not reach the page is a blank on an');
+    line('  official document, and a blank looks exactly like an answer nobody had.');
+    process.exit(1);
+}
+
+line(`✅ Statutory-render gate — ${totals.verified} of ${totals.mapped} mapped field(s) confirmed `
+    + `on the authorities' own pages across ${totals.formsExamined} form(s).`);
+process.exit(0);
