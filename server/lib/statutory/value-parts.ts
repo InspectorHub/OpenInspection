@@ -97,6 +97,46 @@ export function digitsInPart(part: ValuePart): number {
 }
 
 /**
+ * A stored calendar day as an authority's form prints it, whole.
+ *
+ * -- WHY THE FORM DECIDES THIS AND NOT THE WORKSPACE -------------------------
+ * `inspections.date` is `YYYY-MM-DD`, and rendered through unchanged it put
+ * "2026-08-20" in the Date of Inspection box of a Texas TREC form -- measured on
+ * page 1 of a produced REI 7-6. A Texas inspector writes 08/20/2026, and the
+ * document is read by people who will notice.
+ *
+ * The workspace's own `dateFormat` preference is deliberately NOT consulted. It
+ * governs what this software shows its own users; the box on a promulgated form
+ * is the authority's, and a workspace that prefers ISO must not be able to print
+ * ISO on somebody else's statutory document.
+ *
+ * Every form this software publishes today is a US authority's, and every one of
+ * them either prints `(MM/DD/YYYY)` beside the blank (OIR-B1-1802) or assumes it
+ * (TREC, Citizens). The day a form arrives that prints a day any other way, this
+ * stops being a property of "a statutory form" and becomes one of THAT form, and
+ * belongs on its map beside the coordinates -- not here.
+ *
+ * @param ourField named in the refusal, because it is what the person fixing the
+ *   template has to search for.
+ */
+export function calendarDayForForm(value: string, ourField: string): string {
+    const parsed = CALENDAR_DAY.exec(value);
+    if (parsed === null) {
+        fail(`"${ourField}" is drawn as a date and received "${value}", which is not a `
+            + 'YYYY-MM-DD calendar day.');
+    }
+    // The same "is this a real day" test `partOfValue` defers to, for the same
+    // reason: two parsers is how one of them ends up lenient.
+    try {
+        utcMidnightOf(value);
+    } catch {
+        fail(`"${ourField}" is drawn as a date and received "${value}", which is not a day `
+            + 'that exists.');
+    }
+    return `${parsed[GROUP.date_month]}/${parsed[GROUP.date_day]}/${parsed[GROUP.date_year]}`;
+}
+
+/**
  * The one part of `value` this overlay draws, or a refusal.
  *
  * @param ourField named in every message, because it is what the person fixing

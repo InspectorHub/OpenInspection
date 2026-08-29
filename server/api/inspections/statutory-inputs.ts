@@ -16,6 +16,7 @@ import * as schema from '../../lib/db/schema';
 import { PeopleService } from '../../services/people.service';
 import { CredentialService } from '../../services/credential.service';
 import { itemResultsFor } from '../../lib/statutory/item-results';
+import { calendarDayForForm } from '../../lib/statutory/value-parts';
 import type { StatutoryInspectionFacts } from '../../lib/statutory/values';
 import type { StatutoryItemResult } from '../../lib/statutory/resolve-source';
 
@@ -100,7 +101,17 @@ export async function gatherStatutoryInputs(
         property_city: inspection.addressCity ?? null,
         property_state: inspection.addressState ?? null,
         property_zip: inspection.addressZip ?? null,
-        inspection_date: inspection.date ?? null,
+        // Formatted for the FORM, not for this workspace -- see
+        // `calendarDayForForm`. Rendered raw it printed "2026-08-20" in a Texas
+        // TREC Date of Inspection box.
+        //
+        // ⚠️ This is the whole-field format. A map that DRAWS this fact as
+        // separate blanks would hand `partOfValue` an already-formatted string
+        // and be refused, by name, at render time. No published map does today
+        // (every parted field on the 1802 is a permit date, which comes from an
+        // item); the day one does, the format belongs on that map beside its
+        // coordinates rather than here.
+        inspection_date: inspection.date ? calendarDayForForm(inspection.date, 'inspection_date') : null,
         inspector_name: inspectorRow?.name ?? null,
         inspector_license: licenceNumber,
         company_name: config?.companyName ?? null,
