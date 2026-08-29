@@ -45,9 +45,22 @@ export interface DrawnRun {
 }
 
 const BLOCK = /BT\b([\s\S]*?)\bET\b/g;
-const SIZE = /\/\S+\s+(-?[\d.]+)\s+Tf/;
-const ORIGIN = /1 0 0 1 (-?[\d.]+) (-?[\d.]+) Tm/;
-const SHOWN = /<([0-9A-Fa-f]+)>\s*Tj/g;
+
+/**
+ * The three operators that matter, matched in the order the stream writes them.
+ *
+ * Scanned as one alternation rather than three separate searches because a text
+ * object may set the matrix again between two shown strings — which is exactly
+ * what a GENERATED FORM-FIELD APPEARANCE does: one `BT`…`ET` holding a `Tm` and
+ * a `Tj` per line. Taking the block's first `Tm` for every `Tj` in it would put
+ * all of those lines at the first line's origin, and a value whose last line
+ * falls out of the box would then measure as sitting comfortably inside it.
+ *
+ * A `T*` carries no matrix, so lines broken that way — which is how pdf-lib
+ * wraps a `drawText` with a `maxWidth` — keep sharing one origin, exactly as
+ * they always have.
+ */
+const OPERATOR = /\/\S+\s+(-?[\d.]+)\s+Tf|1 0 0 1 (-?[\d.]+) (-?[\d.]+) Tm|<([0-9A-Fa-f]+)>\s*Tj/g;
 
 /** The decoded content streams of one page, as a byte-per-character string. */
 async function contentOf(bytes: Uint8Array, page: number): Promise<string> {
@@ -71,23 +84,51 @@ async function contentOf(bytes: Uint8Array, page: number): Promise<string> {
 
 /** Every run of text drawn on one page, in the order it was written. */
 export async function drawnRuns(bytes: Uint8Array, page: number): Promise<DrawnRun[]> {
-    const stream = await contentOf(bytes, page);
+    return runsInContentStream(await contentOf(bytes, page));
+}
+
+/**
+ * The same parse, over a content stream somebody else already decoded.
+ *
+ * A page is not the only place pdf-lib writes text objects. Filling a form field
+ * makes it GENERATE that widget's appearance stream, and the lines it lays out
+ * in there are where a value too tall for its box gets clipped — the appearance
+ * carries its own BBox and its own clip path, so the overflow is invisible from
+ * the page. `scripts/verify-statutory-render.mjs` reads those, and it reads them
+ * through this function rather than a second copy of the regexes below.
+ */
+export function runsInContentStream(stream: string): DrawnRun[] {
     const runs: DrawnRun[] = [];
     for (const [, body] of stream.matchAll(BLOCK)) {
-        const origin = ORIGIN.exec(body);
-        const size = SIZE.exec(body);
-        // A block with no origin or no size draws nothing this can describe —
-        // reported as absent rather than guessed at.
-        if (origin === null || size === null) continue;
-        for (const [, hex] of body.matchAll(SHOWN)) {
-            runs.push({
-                text: (hex.match(/../g) ?? [])
-                    .map((pair) => String.fromCharCode(parseInt(pair, 16)))
-                    .join(''),
-                x: Number(origin[1]),
-                y: Number(origin[2]),
-                size: Number(size[1]),
-            });
+        let size: number | null = null;
+        let x: number | null = null;
+        let y: number | null = null;
+        for (const match of body.matchAll(OPERATOR)) {
+            // Which alternative fired is read off the operator the token ENDS
+            // with, not off which capture group came back undefined. The groups
+            // of an alternation are typed as present whichever branch matched,
+            // so testing them against `undefined` is a comparison the compiler
+            // is right to reject.
+            const token = match[0];
+            if (token.endsWith('Tf')) {
+                size = Number(match[1]);
+            } else if (token.endsWith('Tm')) {
+                x = Number(match[2]);
+                y = Number(match[3]);
+            } else {
+                // Shown before any matrix or any font: nothing here can say
+                // where it is or how big, so it is reported as absent rather
+                // than guessed at.
+                if (size === null || x === null || y === null) continue;
+                runs.push({
+                    text: (match[4].match(/../g) ?? [])
+                        .map((pair) => String.fromCharCode(parseInt(pair, 16)))
+                        .join(''),
+                    x,
+                    y,
+                    size,
+                });
+            }
         }
     }
     return runs;
