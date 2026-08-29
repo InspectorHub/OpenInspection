@@ -275,6 +275,17 @@ export const SCRIPT_GATES = [
     // with a government agency, and its own output states the one thing it
     // cannot check (that a person read the form).
     { key: 'statutoryfidelity', label: 'lint:statutory-fidelity', script: 'check-statutory-fidelity.mjs', fix: 'npm run lint:statutory-fidelity', rung: PUSH },
+    // Same rung as `statutoryfidelity` beside it and for the same reason: its
+    // subject is published by hand, weeks or months apart, so there is no stream
+    // of commits for a pre-commit rung to watch. It reads one directory and one
+    // baseline file.
+    //
+    // What it protects is narrower than the fidelity gate and harder to see: a
+    // revision REMOVED from the catalogue takes with it the ability to re-issue
+    // every report already produced from it, and those reports are official
+    // documents already in other people's hands. Withdrawing a revision is
+    // allowed and keeps this gate green — the forbidden move is disappearing.
+    { key: 'statutoryadditive', label: 'lint:statutory-additive', script: 'check-statutory-versions-additive.mjs', fix: 'npm run lint:statutory-additive', rung: PUSH },
 ];
 
 export const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup', rung: PRECOMMIT };

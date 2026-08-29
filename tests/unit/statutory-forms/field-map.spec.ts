@@ -40,6 +40,7 @@ const VERSION = (hash: string): StatutoryFormVersion => ({
     sourceHash: hash,
     publishedBy: 'u1',
     publishedAt: Date.parse('2026-08-21T00:00:00.000Z'),
+    withdrawnAt: null,
 });
 
 const MAP = (hash: string): FieldMap => ({

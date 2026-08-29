@@ -33,6 +33,7 @@ const versions = (): readonly StatutoryFormVersion[] => [
         effectiveUntil: Date.UTC(2026, 3, 1),
         sourceUrl: 'https://example.gov/old.pdf', sourceHash: flat.hash,
         publishedBy: 'a.operator', publishedAt: Date.UTC(2012, 0, 1),
+        withdrawnAt: null,
     },
     {
         formId: FORM, version: NEW_REVISION,
@@ -41,6 +42,7 @@ const versions = (): readonly StatutoryFormVersion[] => [
         effectiveUntil: null,
         sourceUrl: 'https://example.gov/new.pdf', sourceHash: flat.hash,
         publishedBy: 'a.operator', publishedAt: Date.UTC(2026, 3, 1),
+        withdrawnAt: null,
     },
 ];
 

@@ -76,6 +76,26 @@ export interface StatutoryFormVersion {
     publishedBy: string;
     /** When they published it, epoch ms. */
     publishedAt: number;
+    /**
+     * When this revision stopped being produceable, epoch ms, or null.
+     *
+     * Two different causes, and the copy a workspace reads must distinguish
+     * them: our field map was found to be wrong, or the authority withdrew the
+     * revision. What a workspace does next differs, so one word for both is a
+     * word that tells nobody what to do.
+     *
+     * A withdrawn revision STAYS in the catalogue. `lint:statutory-additive`
+     * forbids a revision DISAPPEARING, not a revision being withdrawn: removing
+     * it would break re-issuing every report already produced from it, and those
+     * reports are official documents already in other people's hands.
+     *
+     * Not optional, deliberately. A revision that never says whether it is
+     * withdrawn is one the compiler lets through with `undefined`, and
+     * `undefined` reads as "not withdrawn" in every comparison anybody writes
+     * afterwards — so the one state that must be stated explicitly would be the
+     * one you get by saying nothing.
+     */
+    withdrawnAt: number | null;
 }
 
 /** A sha256 as this subsystem spells it everywhere: lowercase hex, no separators. */
@@ -145,7 +165,13 @@ export function selectableVersions(
         // caller: this is the single door every selection goes through, and a
         // check the caller has to remember is a check that is missing from the
         // caller written next year.
-        .filter((v) => isPublishedVersion(v) && v.formId === formId && isSelectable(v, inspectedAt))
+        // `withdrawnAt` sits HERE and not on the caller for the same reason as
+        // `isPublishedVersion` above: this is the single door, and a withdrawal
+        // the caller has to remember to honour is a withdrawal the caller
+        // written next year does not honour. Filtering it in the default alone
+        // would leave a revision known to be wrong one click away in the picker.
+        .filter((v) => isPublishedVersion(v) && v.withdrawnAt === null
+            && v.formId === formId && isSelectable(v, inspectedAt))
         // Sorted here rather than trusted from the caller: the list arrives from
         // a table with no guaranteed order, and both consumers below read
         // position.

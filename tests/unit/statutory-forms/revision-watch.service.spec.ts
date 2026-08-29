@@ -39,6 +39,7 @@ const CATALOGUE: StatutoryFormVersion[] = [{
     effectiveUntil: null,
     publishedBy: 'platform',
     publishedAt: Date.parse('2026-08-21T00:00:00.000Z'),
+    withdrawnAt: null,
 }];
 
 vi.mock('../../../server/lib/statutory/forms', () => ({

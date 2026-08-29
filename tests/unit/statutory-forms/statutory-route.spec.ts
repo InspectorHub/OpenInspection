@@ -38,6 +38,7 @@ vi.mock('../../../server/lib/statutory/forms', async () => {
             effectiveUntil: null,
             sourceUrl: 'https://example.gov/f.pdf', sourceHash: fixture.hash,
             publishedBy: 'a.operator', publishedAt: Date.UTC(2026, 0, 1),
+            withdrawnAt: null,
         }],
         FIELD_MAPS: [],
         fieldMapFor: () => ({
