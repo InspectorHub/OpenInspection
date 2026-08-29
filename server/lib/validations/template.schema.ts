@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { hasCycle, itemDepths, MAX_ITEM_DEPTH } from '../template-hierarchy';
 
 /**
  * Spec 5B — Template schema (v2) validation.
@@ -114,6 +115,10 @@ const BaseItemFields = {
     // `server/services/inspection/shared.ts`.
     attributes:            z.array(ItemAttributeSchema).optional().describe('TODO describe attributes field for the OpenInspection MCP integration'),
     source:                ItemSourceSchema.nullable().optional().describe('TODO describe source field for the OpenInspection MCP integration'),
+    // `.min(1)` is not decoration. An empty string reads as "has a parent" to
+    // a truthiness check and as "no parent" to a lookup -- which is the exact
+    // definition of a dangling node, arriving through a key that looks set.
+    parentId:              z.string().min(1).nullable().optional().describe('Id of the item this one nests under, within the same section; null or absent = top level'),
 } as const;
 
 const RichItemSchema = z.object({
@@ -211,7 +216,54 @@ const TemplateSectionSchema = z.object({
     // (Phase U). Absent defaults to 'common'.
     // FROZEN (module A): Phase-U per-unit scope placeholder; not authored in UI yet.
     defaultScope: z.enum(['common', 'unit']).optional().describe('common (once) or unit (repeats per unit)'),
-}).strict();
+}).strict().superRefine((section, ctx) => {
+    // Item nesting is a property of the ITEMS ARRAY, not of any one item: a
+    // single item's schema cannot see its own parent. So it is checked here,
+    // at the only level that holds the whole list.
+    const items = section.items as ReadonlyArray<{ id: string; parentId?: string | null }>;
+
+    // ORDER IS LOAD-BEARING: cycles first.
+    //
+    // Depth is computed by walking up parent pointers, and a walk up a cycle
+    // never terminates. Checking depth first would either hang or report "too
+    // deep" -- an error that sends the author to shorten a tree that is not
+    // too deep, it is knotted.
+    if (hasCycle(items)) {
+        ctx.addIssue({
+            code: 'custom',
+            path: ['items'],
+            message: 'items contain a parentId cycle',
+        });
+        return;
+    }
+
+    const known = new Set(items.map((i) => i.id));
+    for (const item of items) {
+        const parentId = item.parentId ?? null;
+        if (parentId === null) continue;
+        // A parent in ANOTHER section is not a parent. Sections are the
+        // report's pagination and table-of-contents unit, so a cross-section
+        // parent would leave "how many items does this section have" -- a
+        // number already rendered in several places -- with no definition.
+        if (!known.has(parentId)) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['items'],
+                message: `item ${item.id} names parentId ${parentId}, which is not an item in this section`,
+            });
+        }
+    }
+
+    for (const [id, depth] of itemDepths(items)) {
+        if (depth >= MAX_ITEM_DEPTH) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['items'],
+                message: `item ${id} nests deeper than ${MAX_ITEM_DEPTH} levels`,
+            });
+        }
+    }
+});
 
 const RatingLevelSchema = z.object({
     id:           z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
