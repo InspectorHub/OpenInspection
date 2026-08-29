@@ -68,6 +68,7 @@
     "lint:statutory-fidelity": "node scripts/check-statutory-fidelity.mjs",
     "lint:statutory-additive": "node scripts/check-statutory-versions-additive.mjs",
     "lint:catalogue-writes": "node scripts/check-catalogue-write-points.mjs",
+    "lint:marketplace-kind-halves": "node scripts/check-marketplace-kind-halves.mjs",
     "verify:real-corpus": "node scripts/verify-real-corpus.mjs",
     "lint:dup": "jscpd server app packages",
     "lint:gates": "node scripts/run-gates.mjs --rung precommit",

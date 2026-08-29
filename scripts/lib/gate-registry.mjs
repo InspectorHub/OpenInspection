@@ -297,6 +297,21 @@ export const SCRIPT_GATES = [
     // It reads ~1,039 server sources with one regex and parses the payload of
     // the handful that name the table.
     { key: 'cataloguewrites', label: 'lint:catalogue-writes', script: 'check-catalogue-write-points.mjs', fix: 'npm run lint:catalogue-writes', rung: PUSH },
+    // ⚠️ THIS GATE IS RED TODAY, DELIBERATELY. Neither existing catalogue kind
+    // has an un-import path — there is no uninstall anywhere in
+    // marketplace.service.ts — so it reports 2 of 4 halves present on arrival.
+    // It is not describing a mistake made while writing it; it is reporting a
+    // gap that was already there and that nothing in the tree could see, and it
+    // goes green when the un-import path lands.
+    //
+    // PUSH rather than PRECOMMIT for the ordinary reason and one extra. The
+    // ordinary one: a catalogue kind is added in a change, not a keystroke, and
+    // the two halves are routinely written in different commits — a per-commit
+    // rung would go red on the first of the pair and blame the wrong change.
+    // The extra one: while it is legitimately red, PUSH is the rung where that
+    // is visible without standing between every commit and the person making
+    // it, which is how a red gate turns into a habit of --no-verify.
+    { key: 'marketplacekindhalves', label: 'lint:marketplace-kind-halves', script: 'check-marketplace-kind-halves.mjs', fix: 'npm run lint:marketplace-kind-halves', rung: PUSH },
 ];
 
 export const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup', rung: PRECOMMIT };
