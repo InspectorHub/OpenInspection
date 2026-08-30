@@ -36,7 +36,7 @@
     "gen-version": "node scripts/gen-version.js",
     "i18n:compile": "paraglide-js compile --project ./project.inlang --outdir ./app/paraglide --strategy cookie baseLocale --output-structure locale-modules --emit-ts-declarations",
     "type-check": "npm run i18n:compile && react-router typegen && npm run type-check:app && npm run type-check:api && npm run type-check:e2e && npm run type-check:tests",
-    "type-check:app": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -b tsconfig.json",
+    "type-check:app": "node --max-old-space-size=12288 ./node_modules/typescript/bin/tsc -b tsconfig.json",
     "type-check:api": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -b tsconfig.api.json",
     "type-check:e2e": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -b tsconfig.api.json && node --max-old-space-size=2048 ./node_modules/typescript/bin/tsc -p tsconfig.playwright.json --noEmit",
     "type-check:tests": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -b tsconfig.api.json && node --max-old-space-size=1536 ./node_modules/typescript/bin/tsc -p tsconfig.tests.json --noEmit",
