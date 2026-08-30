@@ -2322,7 +2322,7 @@
                         "title": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 50,
+                          "maxLength": 120,
                           "description": "TODO describe title field for the OpenInspection MCP integration"
                         },
                         "icon": {
@@ -7944,6 +7944,34 @@
     "description": "Auto-generated placeholder for getInspectionRequestByInspection (GET /by-inspection/{inspectionId}, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "getInspectionStatutoryDetails",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/statutory-details",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection ID",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection ID"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "The inspection-level answers this inspection's statutory form asks for",
+    "description": "Every field is null until somebody fills it in; null is a normal answer."
+  },
+  {
     "operationId": "getInspectionStatutoryForm",
     "method": "GET",
     "pathTemplate": "/api/inspections/{id}/statutory-form.pdf",
@@ -7969,7 +7997,7 @@
       "body": null
     },
     "summary": "Download the statutory form this inspection produces",
-    "description": "Renders the authority's own published form for this inspection. 404 when the template declares none; 409 while no report version is published."
+    "description": "Renders the authority's own published form for this inspection. 404 when the template declares none; 409 while no report version is published, and 409 when the inspection's date is governed by a revision this template does not produce."
   },
   {
     "operationId": "getInspectionStatutoryFormOffer",
@@ -12121,6 +12149,22 @@
     "description": "Auto-generated placeholder for listSlugCheckSlug (GET /check/slug, profile domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "listStatutoryFormSources",
+    "method": "GET",
+    "pathTemplate": "/api/admin/statutory-forms",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Published statutory revisions, and whether their PDFs are stored",
+    "description": "Every statutory revision this software publishes, and whether this deployment already holds the issuing authority's PDF for it. A revision with no stored PDF can be installed from a package but can produce nothing, so this is the read that says which uploads are still owed."
+  },
+  {
     "operationId": "listTagInspections",
     "method": "GET",
     "pathTemplate": "/api/tags/{id}/inspections",
@@ -13379,7 +13423,7 @@
                     "title": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 50,
+                      "maxLength": 120,
                       "description": "TODO describe title field for the OpenInspection MCP integration"
                     },
                     "icon": {
@@ -15437,6 +15481,16 @@
               "24h"
             ],
             "description": "Per-user clock (12h|24h). Empty string clears the override (inherit tenant)."
+          },
+          "statutoryLicenseType": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "State licence class printed on a statutory form. NOT an association certification — that is an inspector credential."
+          },
+          "statutoryQualification": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Statutory qualification category the signer declares. A different axis from the licence class."
           }
         }
       }
@@ -18933,6 +18987,34 @@
     "description": "Increment per-user usage counter for a comment library entry."
   },
   {
+    "operationId": "uninstallMarketplaceEntry",
+    "method": "POST",
+    "pathTemplate": "/api/templates/marketplace/{id}/uninstall",
+    "scopes": [
+      "write"
+    ],
+    "tag": "marketplace",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "The catalogue entry id",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The catalogue entry id"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Stop offering an installed catalogue entry",
+    "description": "Takes an installed pack out of service for this workspace. Nothing is deleted for a 1:1 kind: the local template is retired so it leaves the new-inspection picker, and inspections already using it keep producing from their own snapshot. A comment pack's imported rows ARE removed; comments the workspace wrote itself are never touched. Installing the entry again brings it back."
+  },
+  {
     "operationId": "unlockInspectionReport",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/unlock-report",
@@ -19523,6 +19605,86 @@
     "description": "Sets the per-inspection price override on one service line. Passing null clears the override so the line reverts to the catalog price snapshotted when it was added."
   },
   {
+    "operationId": "updateInspectionStatutoryDetails",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/statutory-details",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection ID",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection ID"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "inspectorSignatureDate": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^(\\d{4}-\\d{2}-\\d{2})?$",
+            "description": "The day the inspector signed — NOT the day of the visit. Empty clears it."
+          },
+          "employeePrintedName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120,
+            "description": "The second signer FL OIR-B1-1802 page 5 prints. Empty clears it."
+          },
+          "ownerName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120,
+            "description": "The property OWNER, who is frequently not the client. Empty clears it."
+          },
+          "ownerEmail": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "description": "The owner's email. Empty clears it."
+          },
+          "ownerMailingAddress": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300,
+            "description": "Where the owner receives post, which may not be the property. Empty clears it."
+          },
+          "ownerHomePhone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40,
+            "description": "The owner's home number. The form prints three separate boxes."
+          },
+          "ownerWorkPhone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40,
+            "description": "The owner's work number."
+          },
+          "ownerCellPhone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40,
+            "description": "The owner's mobile number."
+          }
+        }
+      }
+    },
+    "summary": "Record the inspection-level answers a statutory form asks for",
+    "description": "A field left out is left alone; a field sent empty is cleared."
+  },
+  {
     "operationId": "updateInspectionTemplate",
     "method": "PUT",
     "pathTemplate": "/api/inspections/templates/{id}",
@@ -19587,7 +19749,7 @@
                         "title": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 50,
+                          "maxLength": 120,
                           "description": "TODO describe title field for the OpenInspection MCP integration"
                         },
                         "icon": {
