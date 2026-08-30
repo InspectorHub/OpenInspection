@@ -35,11 +35,40 @@ import { logger } from '../logger';
  * The prefixes this subsystem throws with. A message that carries none of them
  * is NOT translated — it is an unexpected failure, and dressing it up as a
  * refusal the reader can act on would be a lie with a status code on it.
+ *
+ * -- THREE MORE, FOUND BY PRODUCING A FORM THAT USES THEM -------------------
+ * Measured 2026-08-30 on FL OIR-B1-1802: answering a question that form does
+ * not ask returned `{"error":{"message":"Internal server error"}}` — the exact
+ * swallow described above, one prefix over. `collectStatutoryValues` calls
+ * `resolve-source` (`statutory values:`), `groups.ts` (`statutory group:`) and
+ * `overflow.service.ts` (`statutory overflow:`), and none of the three was
+ * listed. All three write the same kind of sentence for the same reader: which
+ * field, what arrived, what to do about it.
+ *
+ * -- TWO PREFIXES ARE DELIBERATELY ABSENT, AND THE LINE IS "WHOSE FAULT" -----
+ * `statutory binding policy:` is thrown while a template is INSTALLED, never
+ * while a form is produced.
+ *
+ * `statutory field map:` IS on this path — `render.ts` calls
+ * `validateFieldMapShape` — and is still not translated, because it is the one
+ * refusal here that says nothing about this inspection. A published map with
+ * overlapping targets or a partial date family is broken for every inspection
+ * equally; no answer an inspector could give would change it, and a 422 would
+ * tell them their document is not ready when the truth is that this software
+ * shipped a bad map. That belongs in the logs as the failure it is.
+ *
+ * ⚠️ A new prefix in this subsystem belongs here the day it is written, unless
+ * it fails the same test. What a wrongly missing one looks like is a 500 on a
+ * request that was refused for a reason somebody could have acted on — and
+ * nothing goes red.
  */
 const REFUSAL_PREFIXES = [
     'statutory produce: ',
     'statutory render: ',
     'statutory inspection date: ',
+    'statutory values: ',
+    'statutory group: ',
+    'statutory overflow: ',
 ] as const;
 
 function refusalSentence(message: string): string | null {
