@@ -22,6 +22,7 @@
 import { CANNED_COMMENTS } from './canned-comments';
 import trecRei76 from '../../../data/seed-templates/trec-rei-7-6.json';
 import flCitizensRoof from '../../../data/seed-templates/fl-citizens-roof-rcf-1.json';
+import flCitizens4point from '../../../data/seed-templates/fl-citizens-4point-insp4pt.json';
 
 export interface StarterMarketplaceLibraryFixture {
     name:      string;
@@ -93,11 +94,11 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         // upload and where. Installing is a decision an operator makes; seeding
         // is not.
         //
-        // ⚠️ TWO OF THE FOUR PUBLISHED REVISIONS ARE DECLARED HERE, NOT FOUR.
+        // ⚠️ THREE OF THE FOUR PUBLISHED REVISIONS ARE DECLARED HERE, NOT FOUR.
         // `PUBLISHED_FORM_VERSIONS` carries `tx_trec_rei_7_6`,
         // `fl_citizens_4point`, `fl_citizens_roof` and `fl_oir_b1_1802`; this
-        // catalogue declares the first and the third. The other two are not
-        // waiting on a line in this file.
+        // catalogue declares the first three. `fl_oir_b1_1802` is not waiting on
+        // a line in this file.
         //
         // A `kind: 'statutory'` entry's `schema` IS A TEMPLATE: sections, items,
         // and a `statutoryForm` declaration binding each of the form's field
@@ -105,15 +106,15 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         // and `bindings: {}` would install a pack that produces a blank official
         // document). Publishing a revision says which PDF and where each value
         // is drawn; a catalogue entry additionally has to ask the inspector the
-        // form's questions, in the form's own printed wording — 93 of them on
+        // form's questions, in the form's own printed wording — 95 of them on
         // the four-point form and 96 on the 1802. The signed candidates carry
         // coordinates and field names; they do not carry those printed labels,
         // so a template cannot be generated from them and inventing the wording
         // would put a question to an inspector that the authority never asked.
         //
-        // So those two packs are template-authoring work with the forms in hand,
-        // not a fixture edit, and until that is done a workspace gets the correct
-        // answer for them: the revisions exist and nothing declares them.
+        // So that pack is template-authoring work with the forms in hand, not a
+        // fixture edit, and until it is done a workspace gets the correct answer
+        // for the 1802: the revision exists and nothing declares it.
         name:      trecRei76.name,
         kind:      'statutory',
         /**
@@ -181,6 +182,47 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         schema:    flCitizensRoof.schema,
         changelog: 'Binds the signature date and the licence type, and takes every damage sign '
             + 'the form asks for rather than one.',
+        featured:  false,
+        jurisdiction: 'FL',
+    },
+    {
+        // Citizens Property Insurance Corporation's 4-Point Inspection Form —
+        // the largest of the three, and the one the other two are read against.
+        // Same shape as the entries above and for the same reasons; what differs
+        // is what the form asks and how the template carries it.
+        //
+        // ⚠️ FORTY-FOUR CHOICE QUESTIONS, FIFTY-FIVE DISTINCT VALUES, AND NO
+        // AXIS BETWEEN THEM, so there is no `ratingSystem` here and there must
+        // not be one. Each question is an `item_attribute` whose stored value is
+        // the field map's own `whenValue`, character for character:
+        // `satisfactory`, `circuit_breaker`, `n_a`, `cupping_curling`.
+        // `render.ts` matches with `===` and nothing normalises, so a template
+        // storing the printed label instead produces a completely blank official
+        // form with every gate green.
+        //
+        // ⚠️ ITS ROOF BLOCK IS NOT THE ROOF FORM'S. The two Citizens forms print
+        // the same twelve roof questions and word three of them differently
+        // (`Overall condition:` here against `Overall condition` there). The
+        // WORDING is each form's own; the stored VALUES are deliberately
+        // identical, so one inspection can feed both forms without answering
+        // twice.
+        //
+        // ⚠️ ONE OF THE FORM'S 95 BLANKS IS DELIBERATELY UNBOUND —
+        // `inspector_title`, the same box the roof pack cannot fill and for the
+        // same reason: this product has no source for a job title. The reasoning,
+        // and the smaller gaps behind the blanks that ARE bound, are in
+        // `server/data/seed-templates/fl-citizens-4point-insp4pt.gaps.md`,
+        // because on a printed form "left blank on purpose" and "forgotten" look
+        // identical and only that file can tell them apart.
+        name:      flCitizens4point.name,
+        kind:      'statutory',
+        // Bump whenever `fl-citizens-4point-insp4pt.json` changes, and never
+        // otherwise — the reasoning is on the Texas entry above and applies
+        // unchanged. It is OUR version of these bindings, not Citizens' revision
+        // label, which is `Insp4pt 03 25` and lives in the declaration.
+        semver:    '1.0.0',
+        schema:    flCitizens4point.schema,
+        changelog: 'First catalogue release of the Florida Citizens 4-Point package.',
         featured:  false,
         jurisdiction: 'FL',
     },
