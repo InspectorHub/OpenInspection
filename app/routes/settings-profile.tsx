@@ -18,7 +18,7 @@ import { CredentialsEditor, type EditorCredential } from "~/components/settings/
 import { NotificationPreferencesCard } from "~/components/settings/NotificationPreferencesCard";
 import { ProfilePhotoCard } from "~/components/settings/ProfilePhotoCard";
 import { EmailSignatureCard, SavedSignatureCard } from "~/components/settings/SignatureCards";
-import { StatutoryLicenceFields } from "~/components/settings/StatutoryLicenceFields";
+import { InspectorIdentityFields } from "~/components/settings/InspectorIdentityFields";
 import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { bulkNotificationChoice, grantNotificationSms, loadNotificationScreen, saveNotificationChoice } from "~/lib/settings-notifications.server";
 import { m } from "~/paraglide/messages";
@@ -411,31 +411,14 @@ export default function SettingsProfilePage() {
       >
         {/* Identity fields */}
         <section id="profile-details" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-6 scroll-mt-12">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="space-y-2">
-              <label htmlFor={fields.name.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_name_label()}</label>
-              <input type="text" id={fields.name.id} name={fields.name.name} defaultValue={profile.name ?? ""}
-                placeholder={m.settings_profile_name_placeholder()}
-                aria-invalid={fields.name.errors ? true : undefined}
-                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
-              {fields.name.errors ? (
-                <p className="mt-1 text-xs text-ih-bad-fg">{fields.name.errors[0]}</p>
-              ) : (
-                <p className="text-[11px] text-ih-fg-3">{m.settings_profile_name_hint()}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <label htmlFor={fields.phone.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_phone_label()}</label>
-              <input type="tel" id={fields.phone.id} name={fields.phone.name} defaultValue={profile.phone ?? ""}
-                placeholder={m.settings_profile_phone_placeholder()}
-                aria-invalid={fields.phone.errors ? true : undefined}
-                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
-              {fields.phone.errors && (
-                <p className="mt-1 text-xs text-ih-bad-fg">{fields.phone.errors[0]}</p>
-              )}
-            </div>
-          </div>
-          <StatutoryLicenceFields licenseType={profile.statutoryLicenseType ?? null} qualification={profile.statutoryQualification ?? null} />
+          <InspectorIdentityFields
+            nameField={fields.name}
+            phoneField={fields.phone}
+            name={profile.name ?? null}
+            phone={profile.phone ?? null}
+            statutoryLicenseType={profile.statutoryLicenseType ?? null}
+            statutoryQualification={profile.statutoryQualification ?? null}
+          />
 
           <div className="max-w-md">
             <Select
