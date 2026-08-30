@@ -51,7 +51,7 @@ export interface StatutoryDetails {
 }
 
 /** Nothing recorded yet, which is the state every inspection starts in. */
-export const NO_STATUTORY_DETAILS: StatutoryDetails = {
+const NO_STATUTORY_DETAILS: StatutoryDetails = {
     inspectorSignatureDate: null,
     employeePrintedName: null,
     ownerName: null,

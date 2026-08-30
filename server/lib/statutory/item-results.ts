@@ -31,7 +31,7 @@ import { parseFindingKey, DEFAULT_UNIT } from '../finding-key';
 import type { StatutoryItemResult } from './resolve-source';
 
 /** What a stored answer set looks like before it is keyed by item. */
-export type StoredItemResults = Readonly<Record<string, unknown>>;
+type StoredItemResults = Readonly<Record<string, unknown>>;
 
 export interface ItemResultsReading {
     /** Answers keyed by item id, ready for `collectStatutoryValues`. */

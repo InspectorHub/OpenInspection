@@ -46,7 +46,7 @@ import { m } from "~/paraglide/messages";
  */
 
 /** The three properties of a Conform field this component actually reads. */
-export interface ConformFieldView {
+interface ConformFieldView {
     id: string;
     name: string;
     errors?: string[] | undefined;

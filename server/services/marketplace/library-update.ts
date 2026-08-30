@@ -31,7 +31,7 @@ import { writeImportHistory } from './import-history';
  *  silently narrow to the schema-less default and reject its only caller. */
 type MarketplaceDb = DrizzleD1Database<Record<string, unknown>>;
 
-export type LibraryUpdateMode = 'append' | 'replace';
+type LibraryUpdateMode = 'append' | 'replace';
 
 export interface UpdateLibraryImportOptions {
     mode?: LibraryUpdateMode;

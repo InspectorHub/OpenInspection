@@ -24,7 +24,7 @@ type MarketplaceDb = DrizzleD1Database<Record<string, unknown>>;
  * asking "when did this workspace stop using that pack" needs to be able to
  * find it without inferring it from a missing version.
  */
-export type MarketplaceHistoryAction = 'install' | 'update' | 'replace' | 'uninstall';
+type MarketplaceHistoryAction = 'install' | 'update' | 'replace' | 'uninstall';
 
 export interface ImportHistoryInput {
     templateId?: string | null;

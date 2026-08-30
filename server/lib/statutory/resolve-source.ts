@@ -90,7 +90,7 @@ export function asValue(raw: unknown): string {
  * per element. Normalising here would therefore change nothing on the document
  * while quietly editing what the inspector recorded.
  */
-export function asAnswer(raw: unknown): StatutoryValue {
+function asAnswer(raw: unknown): StatutoryValue {
     if (Array.isArray(raw)) {
         return raw.length === 0 ? '' : raw.map((one) => asValue(one));
     }
@@ -108,7 +108,7 @@ export function itemsById(snapshot: TemplateSchemaV2): Map<string, TemplateItem>
     return out;
 }
 
-export function requireItem(items: Map<string, TemplateItem>, itemId: string, ourField: string): TemplateItem {
+function requireItem(items: Map<string, TemplateItem>, itemId: string, ourField: string): TemplateItem {
     const item = items.get(itemId);
     if (!item) {
         fail(`binding "${ourField}" points at item "${itemId}", which this template does not contain`);

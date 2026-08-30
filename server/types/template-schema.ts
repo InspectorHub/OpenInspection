@@ -263,6 +263,18 @@ interface TemplateStructure {
  * closed door is the enforcement; this comment is only the reason for it.
  */
 
+/**
+ * The declaration types, re-exported COMPLETE.
+ *
+ * ⚠️ `StatutoryFieldDependencies` is baselined in `scripts/knip-baseline.json`
+ * and is the only member here with no importer of its own — the one place that
+ * needs it takes it from `statutory-declaration` directly. It stays because
+ * this list is a SURFACE rather than a collection of individually-earned
+ * exports: a reader who reaches a declaration type through this module and
+ * finds five of the six has been told something false about where the sixth
+ * lives. Dropping it would make the module's answer depend on which types
+ * happened to have a second consumer this week.
+ */
 export type {
     StatutoryInspectionField,
     FieldGroup,

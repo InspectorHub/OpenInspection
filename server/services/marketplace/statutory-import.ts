@@ -27,7 +27,7 @@ import type { StatutoryFormDeclaration } from '../../types/statutory-declaration
  * is what `lint:catalogue-writes` exists to keep true. If that gate is removed,
  * this stops being a validator and becomes a door.
  */
-export function assertStatutorySchema(schema: unknown): void {
+function assertStatutorySchema(schema: unknown): void {
     // The column is `mode: 'json'`, but a row written as a JSON string reads
     // back as one — the same thing `TemplateService.validateSchema` handles.
     let parsed: unknown = schema;
@@ -72,7 +72,7 @@ export async function assertStatutoryInstallable(
 }
 
 /** The declaration a statutory catalogue row carries, or null if it carries none. */
-export function statutoryDeclarationOf(schema: unknown): StatutoryFormDeclaration | null {
+function statutoryDeclarationOf(schema: unknown): StatutoryFormDeclaration | null {
     let parsed: unknown = schema;
     if (typeof parsed === 'string') {
         try {
@@ -115,7 +115,7 @@ export function statutoryDeclarationOf(schema: unknown): StatutoryFormDeclaratio
  * words ("this software publishes no revision …"), which is a legible failure
  * rather than the invisible one this check exists for.
  */
-export async function assertStatutorySourcePresent(input: {
+async function assertStatutorySourcePresent(input: {
     bucket: R2Bucket | undefined;
     versions: readonly StatutoryFormVersion[];
     declaration: StatutoryFormDeclaration;

@@ -35,7 +35,7 @@ import { r2Keys } from '../../lib/r2-keys';
 import type { StatutoryFormVersion } from '../../lib/statutory/form-registry';
 
 /** sha256 as this subsystem spells it everywhere: lowercase hex, no separators. */
-export async function sha256Hex(bytes: Uint8Array): Promise<string> {
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
     const digest = await crypto.subtle.digest('SHA-256', bytes as unknown as BufferSource);
     return [...new Uint8Array(digest)]
         .map((b) => b.toString(16).padStart(2, '0'))
@@ -54,7 +54,7 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
  * superseded revision at its most obvious URL is the measured normal case here
  * rather than an exotic one.
  */
-export function sourceHashMismatchMessage(
+function sourceHashMismatchMessage(
     version: StatutoryFormVersion,
     computed: string,
 ): string {
