@@ -23,6 +23,7 @@ import { CANNED_COMMENTS } from './canned-comments';
 import trecRei76 from '../../../data/seed-templates/trec-rei-7-6.json';
 import flCitizensRoof from '../../../data/seed-templates/fl-citizens-roof-rcf-1.json';
 import flCitizens4point from '../../../data/seed-templates/fl-citizens-4point-insp4pt.json';
+import flOirB11802 from '../../../data/seed-templates/fl-oir-b1-1802-rev-04-26.json';
 
 export interface StarterMarketplaceLibraryFixture {
     name:      string;
@@ -94,11 +95,10 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         // upload and where. Installing is a decision an operator makes; seeding
         // is not.
         //
-        // ⚠️ THREE OF THE FOUR PUBLISHED REVISIONS ARE DECLARED HERE, NOT FOUR.
+        // ALL FOUR PUBLISHED REVISIONS ARE NOW DECLARED HERE.
         // `PUBLISHED_FORM_VERSIONS` carries `tx_trec_rei_7_6`,
-        // `fl_citizens_4point`, `fl_citizens_roof` and `fl_oir_b1_1802`; this
-        // catalogue declares the first three. `fl_oir_b1_1802` is not waiting on
-        // a line in this file.
+        // `fl_citizens_4point`, `fl_citizens_roof` and `fl_oir_b1_1802`, and
+        // each has an entry below.
         //
         // A `kind: 'statutory'` entry's `schema` IS A TEMPLATE: sections, items,
         // and a `statutoryForm` declaration binding each of the form's field
@@ -111,10 +111,7 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         // coordinates and field names; they do not carry those printed labels,
         // so a template cannot be generated from them and inventing the wording
         // would put a question to an inspector that the authority never asked.
-        //
-        // So that pack is template-authoring work with the forms in hand, not a
-        // fixture edit, and until it is done a workspace gets the correct answer
-        // for the 1802: the revision exists and nothing declares it.
+        // Each pack was therefore authored with the form in hand.
         name:      trecRei76.name,
         kind:      'statutory',
         /**
@@ -223,6 +220,46 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         semver:    '1.0.0',
         schema:    flCitizens4point.schema,
         changelog: 'First catalogue release of the Florida Citizens 4-Point package.',
+        featured:  false,
+        jurisdiction: 'FL',
+    },
+    {
+        // The Florida Office of Insurance Regulation's Uniform Mitigation
+        // Verification Inspection Form, adopted by Rule 69O-170.0155, F.A.C.
+        // Same shape as the entries above; three things about it differ.
+        //
+        // 🔴 ITS STORED ANSWERS ARE BARE LETTERS — `A`, `B`, `C`, `D`, `X`, `Z`,
+        // `NA` — seventy distinct values over thirty-four questions, and they
+        // are the field map's own `whenValue` strings character for character.
+        // `render.ts` matches with `===` and nothing normalises, so a template
+        // storing the printed label ("A - Wood frame") instead of the value
+        // produces a COMPLETELY BLANK official form with every gate green. That
+        // has happened once already on this form. The choice lists in the
+        // schema were taken from the signed candidate rather than typed.
+        //
+        // ⚠️ IT IS THE ONLY FORM WITH `dependsOn`. Three of its questions exist
+        // only for certain answers to an earlier one, and the form says so in
+        // its own words: the minimal-condition boxes belong to answers B, C and
+        // D of question 6; "check here if entire roof deck underside covered" is
+        // printed one indent under Spray foam products; the twelve non-glazed
+        // sub-levels run A.1 to N.3 and questions 9's X and Z have none. A
+        // conditional question is deliberately absent from the field map's
+        // `requiredFields` — see `StatutoryFormDeclaration.dependsOn`.
+        //
+        // ⚠️ SEVEN OF ITS 96 BLANKS ARE DELIBERATELY UNBOUND, more than either
+        // Citizens form, because this one prints an owner contact block and a
+        // homeowner's own signature that this product has no source for. Which
+        // seven, and what would have to exist first, is in
+        // `server/data/seed-templates/fl-oir-b1-1802-rev-04-26.gaps.md`.
+        name:      flOirB11802.name,
+        kind:      'statutory',
+        // Bump whenever `fl-oir-b1-1802-rev-04-26.json` changes, and never
+        // otherwise — the reasoning is on the Texas entry above and applies
+        // unchanged. It is OUR version of these bindings, not the Office's
+        // revision label, which is `Rev. 04/26` and lives in the declaration.
+        semver:    '1.0.0',
+        schema:    flOirB11802.schema,
+        changelog: 'First catalogue release of the Florida OIR-B1-1802 wind mitigation package.',
         featured:  false,
         jurisdiction: 'FL',
     },

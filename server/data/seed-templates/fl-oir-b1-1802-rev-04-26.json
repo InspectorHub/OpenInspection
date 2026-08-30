@@ -1,0 +1,1284 @@
+{
+  "id": "seed_fl_oir_b1_1802_rev_04_26_v1",
+  "name": "Florida OIR-B1-1802 Uniform Mitigation Verification (Rev. 04/26)",
+  "description": "The Florida Office of Insurance Regulation’s Uniform Mitigation Verification Inspection Form, revision Rev. 04/26, adopted by Rule 69O-170.0155, F.A.C. Its nine questions and their wording are the Office’s, read off the published form — not an approximation of it. Its stored answers are the form’s own option letters (A, B, C, D, X, Z, NA), never their printed labels. Seven of its 96 blanks are left unbound on purpose; fl-oir-b1-1802-rev-04-26.gaps.md says which and why.",
+  "version": 1,
+  "schema": {
+    "schemaVersion": 2,
+    "sections": [
+      {
+        "id": "form_header",
+        "title": "Uniform Mitigation Verification Inspection Form",
+        "items": [
+          {
+            "id": "form_insurance_company",
+            "label": "Insurance Company:",
+            "type": "text",
+            "description": "Printed in the Owner Information block on page 1. It comes from the policy, so nothing in the inspection can supply it. The owner’s own name, mailing address, e-mail and three telephone numbers are answered from the inspection’s Statutory details panel rather than asked here."
+          },
+          {
+            "id": "form_policy_number",
+            "label": "Policy #:",
+            "type": "text",
+            "description": "Printed beside Insurance Company on page 1, and from the same place: the policy."
+          },
+          {
+            "id": "form_year_of_home",
+            "label": "Year of Home:",
+            "type": "number",
+            "description": "The year the home was built. One of the answers this form requires of every submission."
+          },
+          {
+            "id": "form_number_of_stories",
+            "label": "# of Stories:",
+            "type": "number",
+            "description": "Printed beside Year of Home on page 1, and required of every submission."
+          },
+          {
+            "id": "form_fortified_certificate",
+            "label": "FORTIFIED Home® Certificate",
+            "type": "photo_only",
+            "description": "NOTE: Any documentation used in validating the compliance or existence of each construction or mitigation attribute must accompany this form. At least one photograph or document providing proof must accompany this form to validate each attribute marked in questions 2 through 9. A FORTIFIED Home® □ Roof, □ Silver, or □ Gold Certificate may be used to validate the attributes marked in questions 4 through 6, and questions 8 through 9 (check type of certificate and attach photocopy). The insurer may ask additional questions regarding the mitigated feature(s) verified on this form.",
+            "attributes": [
+              {
+                "id": "certificate_type",
+                "name": "A FORTIFIED Home® □ Roof, □ Silver, or □ Gold Certificate may be used to validate the attributes marked in questions 4 through 6, and questions 8 through 9 (check type of certificate and attach photocopy).",
+                "type": "select",
+                "choices": [
+                  "roof",
+                  "silver",
+                  "gold"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "building_code",
+        "title": "1. Building Code",
+        "items": [
+          {
+            "id": "question_1_building_code",
+            "label": "1. Building Code",
+            "type": "photo_only",
+            "description": "What version of the Florida Building Code “FBC” (FBC 2001 & 2004 OR FBC 2007 or later) OR for homes located in the High-Velocity Hurricane Zone (“HVHZ”) (Miami-Dade or Broward counties), South Florida Building Code (SFBC-94) was in force at the time of original permit application?\n□ A. Code in force at time of permit application was the FBC 2001 & 2004: Year Built _________. For homes built in 2002/2003, provide a permit application with a date after 3/1/2002: Building Permit Application Date (MM/DD/YYYY) ____/____/________.\n□ B. Code in force at time of permit application was the FBC 2007 and later: Year Built _________. For homes built in 2007/2008, provide a permit application with a date after 12/8/2006: Building Permit Application Date (MM/DD/YYYY) ____/____/________.\n□ C. For the HVHZ Only: Code in force at time of permit application was the SFBC-94: Year Built ______. For homes built in 1994, 1995, and 1996, provide a permit application with a date after 9/1/1994: Building Permit Application Date (MM/DD/YYYY) ___/___/_______.\n□ D. Unknown or does not meet the requirements of Answer “A” or “B” or “C”.",
+            "attributes": [
+              {
+                "id": "version_in_force",
+                "name": "What version of the Florida Building Code “FBC” (FBC 2001 & 2004 OR FBC 2007 or later) OR for homes located in the High-Velocity Hurricane Zone (“HVHZ”) (Miami-Dade or Broward counties), South Florida Building Code (SFBC-94) was in force at the time of original permit application?",
+                "type": "select",
+                "choices": [
+                  "A",
+                  "B",
+                  "C",
+                  "D"
+                ]
+              },
+              {
+                "id": "a_year_built",
+                "name": "A. Code in force at time of permit application was the FBC 2001 & 2004: Year Built",
+                "type": "number"
+              },
+              {
+                "id": "a_permit_application_date",
+                "name": "A. For homes built in 2002/2003, provide a permit application with a date after 3/1/2002: Building Permit Application Date (MM/DD/YYYY)",
+                "type": "date"
+              },
+              {
+                "id": "b_year_built",
+                "name": "B. Code in force at time of permit application was the FBC 2007 and later: Year Built",
+                "type": "number"
+              },
+              {
+                "id": "b_permit_application_date",
+                "name": "B. For homes built in 2007/2008, provide a permit application with a date after 12/8/2006: Building Permit Application Date (MM/DD/YYYY)",
+                "type": "date"
+              },
+              {
+                "id": "c_year_built",
+                "name": "C. For the HVHZ Only: Code in force at time of permit application was the SFBC-94: Year Built",
+                "type": "number"
+              },
+              {
+                "id": "c_permit_application_date",
+                "name": "C. For homes built in 1994, 1995, and 1996, provide a permit application with a date after 9/1/1994: Building Permit Application Date (MM/DD/YYYY)",
+                "type": "date"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region_and_slope",
+        "title": "2. Region · 3. Roof Slope",
+        "items": [
+          {
+            "id": "question_2_region",
+            "label": "2. Region",
+            "type": "photo_only",
+            "description": "Region: Location based on design windspeed. See ASCE 7-22 (700-year MRI) Risk Category 2 (www.ascehazardtool.org).\n□ HVHZ   □ Region 1 (≥ 140 mph) □ Region 2 (130 mph – 139 mph) □ Region 3 (< 130 mph)",
+            "attributes": [
+              {
+                "id": "region",
+                "name": "Region: Location based on design windspeed. See ASCE 7-22 (700-year MRI) Risk Category 2 (www.ascehazardtool.org).",
+                "type": "select",
+                "choices": [
+                  "hvhz",
+                  "region_1",
+                  "region_2",
+                  "region_3"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "question_3_roof_slope",
+            "label": "3. Roof Slope",
+            "type": "photo_only",
+            "description": "Roof Slope: For single-family homes with multiple slopes, indicate the slope that is at least two thirds of the main roof area when determining greater than or equal to 6:12, OR less than 6:12.\n□ Greater than or equal to (≥ 6:12) □ Less than (< 6:12).",
+            "attributes": [
+              {
+                "id": "slope",
+                "name": "Roof Slope: For single-family homes with multiple slopes, indicate the slope that is at least two thirds of the main roof area when determining greater than or equal to 6:12, OR less than 6:12.",
+                "type": "select",
+                "choices": [
+                  "gte_6_12",
+                  "lt_6_12"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "roof_covering",
+        "title": "4. Roof Covering",
+        "items": [
+          {
+            "id": "question_4_1_roof_covering_types",
+            "label": "4.1 Roof Covering Type:",
+            "type": "photo_only",
+            "description": "Roof Covering: Select all roof covering types in use. Provide the permit application date OR FBC/MDC Product Approval number AND Year of Original Installation/Replacement OR indicate that no information was available to verify compliance for each roof covering identified.\n□ Asphalt/Fiberglass Shingle □ Concrete/Clay Tile □ Synthetic/Composite Tile □ Metal □ Built Up □ Membrane □ Other _____________",
+            "attributes": [
+              {
+                "id": "types_in_use",
+                "name": "Select all roof covering types in use.",
+                "type": "multi_select",
+                "choices": [
+                  "asphalt_fiberglass_shingle",
+                  "concrete_clay_tile",
+                  "synthetic_composite_tile",
+                  "metal",
+                  "built_up",
+                  "membrane",
+                  "other"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "roof_covering_asphalt_fiberglass_shingle",
+            "label": "Asphalt/Fiberglass Shingle",
+            "type": "photo_only",
+            "description": "4.1 Roof Covering Type. This row prints four blanks: Permit Application Date, FBC or MDC Product Approval #, Year of Original Installation or Replacement, and No Information Provided for Compliance. The form asks for the permit application date OR the product approval number AND the year, OR the last box — not all of them. Tick the covering itself in 4.1 Roof Covering Type above; this item carries that covering’s four blanks.",
+            "attributes": [
+              {
+                "id": "permit_application_date",
+                "name": "Permit Application Date",
+                "type": "date"
+              },
+              {
+                "id": "product_approval_number",
+                "name": "FBC or MDC Product Approval #",
+                "type": "text"
+              },
+              {
+                "id": "year_installed",
+                "name": "Year of Original Installation or Replacement",
+                "type": "number"
+              },
+              {
+                "id": "no_information",
+                "name": "No Information Provided for Compliance",
+                "type": "multi_select",
+                "choices": [
+                  "true"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "roof_covering_concrete_clay_tile",
+            "label": "Concrete/Clay Tile",
+            "type": "photo_only",
+            "description": "4.1 Roof Covering Type. This row prints four blanks: Permit Application Date, FBC or MDC Product Approval #, Year of Original Installation or Replacement, and No Information Provided for Compliance. The form asks for the permit application date OR the product approval number AND the year, OR the last box — not all of them. Tick the covering itself in 4.1 Roof Covering Type above; this item carries that covering’s four blanks.",
+            "attributes": [
+              {
+                "id": "permit_application_date",
+                "name": "Permit Application Date",
+                "type": "date"
+              },
+              {
+                "id": "product_approval_number",
+                "name": "FBC or MDC Product Approval #",
+                "type": "text"
+              },
+              {
+                "id": "year_installed",
+                "name": "Year of Original Installation or Replacement",
+                "type": "number"
+              },
+              {
+                "id": "no_information",
+                "name": "No Information Provided for Compliance",
+                "type": "multi_select",
+                "choices": [
+                  "true"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "roof_covering_synthetic_composite_tile",
+            "label": "Synthetic/Composite Tile",
+            "type": "photo_only",
+            "description": "4.1 Roof Covering Type. This row prints four blanks: Permit Application Date, FBC or MDC Product Approval #, Year of Original Installation or Replacement, and No Information Provided for Compliance. The form asks for the permit application date OR the product approval number AND the year, OR the last box — not all of them. Tick the covering itself in 4.1 Roof Covering Type above; this item carries that covering’s four blanks.",
+            "attributes": [
+              {
+                "id": "permit_application_date",
+                "name": "Permit Application Date",
+                "type": "date"
+              },
+              {
+                "id": "product_approval_number",
+                "name": "FBC or MDC Product Approval #",
+                "type": "text"
+              },
+              {
+                "id": "year_installed",
+                "name": "Year of Original Installation or Replacement",
+                "type": "number"
+              },
+              {
+                "id": "no_information",
+                "name": "No Information Provided for Compliance",
+                "type": "multi_select",
+                "choices": [
+                  "true"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "roof_covering_metal",
+            "label": "Metal",
+            "type": "photo_only",
+            "description": "4.1 Roof Covering Type. This row prints four blanks: Permit Application Date, FBC or MDC Product Approval #, Year of Original Installation or Replacement, and No Information Provided for Compliance. The form asks for the permit application date OR the product approval number AND the year, OR the last box — not all of them. Tick the covering itself in 4.1 Roof Covering Type above; this item carries that covering’s four blanks.",
+            "attributes": [
+              {
+                "id": "permit_application_date",
+                "name": "Permit Application Date",
+                "type": "date"
+              },
+              {
+                "id": "product_approval_number",
+                "name": "FBC or MDC Product Approval #",
+                "type": "text"
+              },
+              {
+                "id": "year_installed",
+                "name": "Year of Original Installation or Replacement",
+                "type": "number"
+              },
+              {
+                "id": "no_information",
+                "name": "No Information Provided for Compliance",
+                "type": "multi_select",
+                "choices": [
+                  "true"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "roof_covering_built_up",
+            "label": "Built Up",
+            "type": "photo_only",
+            "description": "4.1 Roof Covering Type. This row prints four blanks: Permit Application Date, FBC or MDC Product Approval #, Year of Original Installation or Replacement, and No Information Provided for Compliance. The form asks for the permit application date OR the product approval number AND the year, OR the last box — not all of them. Tick the covering itself in 4.1 Roof Covering Type above; this item carries that covering’s four blanks.",
+            "attributes": [
+              {
+                "id": "permit_application_date",
+                "name": "Permit Application Date",
+                "type": "date"
+              },
+              {
+                "id": "product_approval_number",
+                "name": "FBC or MDC Product Approval #",
+                "type": "text"
+              },
+              {
+                "id": "year_installed",
+                "name": "Year of Original Installation or Replacement",
+                "type": "number"
+              },
+              {
+                "id": "no_information",
+                "name": "No Information Provided for Compliance",
+                "type": "multi_select",
+                "choices": [
+                  "true"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "roof_covering_membrane",
+            "label": "Membrane",
+            "type": "photo_only",
+            "description": "4.1 Roof Covering Type. This row prints four blanks: Permit Application Date, FBC or MDC Product Approval #, Year of Original Installation or Replacement, and No Information Provided for Compliance. The form asks for the permit application date OR the product approval number AND the year, OR the last box — not all of them. Tick the covering itself in 4.1 Roof Covering Type above; this item carries that covering’s four blanks.",
+            "attributes": [
+              {
+                "id": "permit_application_date",
+                "name": "Permit Application Date",
+                "type": "date"
+              },
+              {
+                "id": "product_approval_number",
+                "name": "FBC or MDC Product Approval #",
+                "type": "text"
+              },
+              {
+                "id": "year_installed",
+                "name": "Year of Original Installation or Replacement",
+                "type": "number"
+              },
+              {
+                "id": "no_information",
+                "name": "No Information Provided for Compliance",
+                "type": "multi_select",
+                "choices": [
+                  "true"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "roof_covering_other",
+            "label": "Other _____________",
+            "type": "photo_only",
+            "description": "4.1 Roof Covering Type. This row prints four blanks: Permit Application Date, FBC or MDC Product Approval #, Year of Original Installation or Replacement, and No Information Provided for Compliance. The form asks for the permit application date OR the product approval number AND the year, OR the last box — not all of them. Tick the covering itself in 4.1 Roof Covering Type above; this item carries that covering’s four blanks.",
+            "attributes": [
+              {
+                "id": "description",
+                "name": "Other _____________",
+                "type": "text"
+              },
+              {
+                "id": "permit_application_date",
+                "name": "Permit Application Date",
+                "type": "date"
+              },
+              {
+                "id": "product_approval_number",
+                "name": "FBC or MDC Product Approval #",
+                "type": "text"
+              },
+              {
+                "id": "year_installed",
+                "name": "Year of Original Installation or Replacement",
+                "type": "number"
+              },
+              {
+                "id": "no_information",
+                "name": "No Information Provided for Compliance",
+                "type": "multi_select",
+                "choices": [
+                  "true"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "question_4_2_product_approval_listing",
+            "label": "4.2 Product Approval Listing",
+            "type": "photo_only",
+            "description": "□ A. All roof coverings listed above meet the FBC with a FBC or Miami-Dade Product Approval listing current at the time of installation OR have a roofing permit application date on or after 3/1/02 OR the roof is original and built in 2004 or later.\n□ B. All roof coverings have a Miami-Dade Product Approval listing current at time of installation OR (for the HVHZ only) a roofing permit application after 9/1/1994 and before 3/1/2002 OR the roof is original and built in 1997 or later.\n□ C. One or more roof coverings do not meet the requirements of Answer “A” or “B.”\n□ D. No roof coverings meet the requirements of Answer “A” or “B.”",
+            "attributes": [
+              {
+                "id": "listing",
+                "name": "4.2 Product Approval Listing",
+                "type": "select",
+                "choices": [
+                  "A",
+                  "B",
+                  "C",
+                  "D"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "roof_deck_attachment",
+        "title": "5. Roof Deck Attachment",
+        "items": [
+          {
+            "id": "question_5_roof_deck_attachment",
+            "label": "5. Roof Deck Attachment",
+            "type": "photo_only",
+            "description": "Roof Deck Attachment: What is the WEAKEST form of roof deck attachment?\n□ A. Plywood/Oriented strand board (OSB) roof sheathing with minimum thickness of 7/16” attached to the roof truss/rafter (spaced a maximum of 24” o.c.) by staples or 6d nails spaced at 6” along the edge and 12” in the field. OR Batten decking supporting wood shakes or wood shingles (max 24” truss/rafter spacing). OR Any system of screws, nails, adhesives, other deck fastening system or truss/rafter spacing that has an equivalent mean ultimate uplift resistance of at least 55 psf, but less than that required for Options B or C below. (NOTE: If the nailing or rafter spacing is greater than specified above, or the roof decking is less than specified above, select Answer F. Other.)\n□ B. Plywood/OSB roof sheathing with a minimum thickness of 7/16” attached to the roof truss/rafter (spaced a maximum of 24” o.c.) by 8d common nails spaced a maximum of 12” in the field. OR Any system of screws, nails, adhesives, other deck fastening system or truss/rafter spacing that is shown to have an equivalent or greater resistance than 8d nails spaced a maximum of 12” in the field (max 24” truss/rafter spacing) or has a mean ultimate uplift resistance of at least 103 psf.\n□ C. Plywood/OSB roof sheathing with a minimum thickness of 7/16” attached to the roof truss/rafter (spaced a maximum of 24” o.c.) by 8d common nails spaced a maximum of 6” in the field. OR Dimensional lumber/Tongue & Groove decking with a minimum of 2 nails per board (or 1 nail per board if each board is equal to or less than 6” in width). OR Any system of screws, nails, adhesives, other deck fastening system or truss/rafter spacing that is shown to have an equivalent or greater resistance than 8d common nails spaced a maximum of 6” in the field (max 24” truss/rafter spacing) or has a mean ultimate uplift resistance of at least 182 psf.\n□ D. Reinforced Concrete Roof Deck.\n□ E. Spray foam products with an uplift resistance of 110 PSF (FOS 1.5). (Spray foam must be installed along rafter deck intersections, all panel joints, etc.).\n□ F. Other: _______________________________________________________________\n□ G. Unknown or unidentified.\n□ H. No attic access.",
+            "attributes": [
+              {
+                "id": "weakest_form",
+                "name": "What is the WEAKEST form of roof deck attachment?",
+                "type": "select",
+                "choices": [
+                  "A",
+                  "B",
+                  "C",
+                  "D",
+                  "E",
+                  "F",
+                  "G",
+                  "H"
+                ]
+              },
+              {
+                "id": "other_description",
+                "name": "F. Other:",
+                "type": "text"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "roof_to_wall_attachment",
+        "title": "6. Roof to Wall Attachment",
+        "items": [
+          {
+            "id": "question_6_roof_to_wall_attachment",
+            "label": "6. Roof to Wall Attachment",
+            "type": "photo_only",
+            "description": "Roof to Wall Attachment: What is the WEAKEST roof to wall connection? (Do not include attachment of hip/valley jacks within five (5) feet of the inside or outside corner of the roof in determination of WEAKEST type).\n□ A. Toenails:\n□ B. Clips:\n□ C. Single Wraps:\n□ D. Double Wraps:\n□ E. Structural: Anchor bolts structurally connected or reinforced concrete roof.\n□ F. Other: _______________________________________________\n□ G. Unknown or unidentified.\n□ H. No attic access.\n□ I. Connection(s) not installed as intended.",
+            "attributes": [
+              {
+                "id": "weakest_connection",
+                "name": "What is the WEAKEST roof to wall connection?",
+                "type": "select",
+                "choices": [
+                  "A",
+                  "B",
+                  "C",
+                  "D",
+                  "E",
+                  "F",
+                  "G",
+                  "H",
+                  "I"
+                ]
+              },
+              {
+                "id": "other_description",
+                "name": "F. Other:",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "question_6_a_toenails",
+            "label": "A. Toenails:",
+            "type": "photo_only",
+            "description": "□ Truss/rafter anchored to top plate of wall using nails driven at an angle through the truss/rafter and attached to the top plate of the wall, OR\n□ Metal connectors or structural fasteners that are not installed as intended do not meet the minimal conditions or requirements of B, C, or D, OR\n□ Other connection method documented to provide a substantiated wind allowable uplift capacity of 185 lbs. or greater.",
+            "attributes": [
+              {
+                "id": "basis",
+                "name": "A. Toenails:",
+                "type": "select",
+                "choices": [
+                  "toenail_driven_at_angle",
+                  "connectors_not_installed_as_intended",
+                  "documented_185_lb_uplift"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "question_6_minimal_conditions",
+            "label": "Minimal conditions to qualify for categories B, C, or D.",
+            "type": "photo_only",
+            "description": "Minimal conditions to qualify for categories B, C, or D. All verified connections are either: (Note: All retrofit connectors, or structural fasteners, must meet option 3).\n□ 1. Metal connectors secured to truss/rafter with a minimum of three (3) nails, and attached to the side and/or bottom of the wall framing top plate, or embedded into the bond beam, with less than ½” gap from the blocking or truss/rafter, and blocked no more than 1 ½” from the truss/rater, and free of visible severe corrosion, OR\n□ 2. Metal connectors consisting of a single strap that wraps over the truss/rafter, are secured to the side of the wall and/or bottom of the top plate with a minimum of three nails on each side and free of visible severe corrosion, OR\n□ 3. Purpose-made metal connector(s) or structural fastener(s) installed per the manufacturer’s installation specifications to meet the substantiated wind allowable capacity detailed below.",
+            "attributes": [
+              {
+                "id": "condition",
+                "name": "All verified connections are either:",
+                "type": "select",
+                "choices": [
+                  "1",
+                  "2",
+                  "3"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "question_6_b_clips",
+            "label": "B. Clips:",
+            "type": "photo_only",
+            "description": "□ Metal connectors that do not wrap over the truss/rafter, OR\n□ Metal connectors with a minimum of one (1) strap that wraps over the truss/rafter and does not meet the nail position requirements of C or D but is secured with a minimum of three (3) nails, OR\n□ Purpose-made metal connector(s) or structural fastener(s) with a substantiated wind allowable uplift capacity of 386 lbs. or greater installed per the manufacturer’s installation specifications (requires site-specific documentation).",
+            "attributes": [
+              {
+                "id": "basis",
+                "name": "B. Clips:",
+                "type": "select",
+                "choices": [
+                  "no_wrap_over_truss",
+                  "one_wrap_min_three_nails",
+                  "documented_386_lb_uplift"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "question_6_c_single_wraps",
+            "label": "C. Single Wraps:",
+            "type": "photo_only",
+            "description": "□ Metal connectors consisting of a single strap that wraps over the truss/rafter and are secured with a minimum of two (2) nails on one side and a minimum of one (1) nail on the opposing side, OR\n□ Purpose-made metal connector(s) or structural fastener(s) with a substantiated wind allowable uplift capacity of 535 lbs. or greater installed per the manufacturer’s installation specifications (requires site-specific documentation.)",
+            "attributes": [
+              {
+                "id": "basis",
+                "name": "C. Single Wraps:",
+                "type": "select",
+                "choices": [
+                  "single_strap_two_and_one_nails",
+                  "documented_535_lb_uplift"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "question_6_d_double_wraps",
+            "label": "D. Double Wraps:",
+            "type": "photo_only",
+            "description": "□ Metal Connectors consisting of two (2) separate straps, one on either side of the truss/rafter where each strap wraps over the truss/rafter and is secured with a minimum of two (2) nails on one side, and a minimum of one (1) nail on the opposing side, OR\n□ Metal connectors consisting of a single strap that wraps over the truss/rafter, are secured to the side of the wall and/or bottom of the top plate with a minimum of three (3) nails on each side, OR\n□ Purpose-made metal connector(s) or structural fastener(s) with a substantiated wind allowable uplift capacity of 891 lbs. or greater installed per the manufacturer’s installation specifications (requires site-specific documentation).",
+            "attributes": [
+              {
+                "id": "basis",
+                "name": "D. Double Wraps:",
+                "type": "select",
+                "choices": [
+                  "two_separate_straps",
+                  "single_strap_three_nails_each_side",
+                  "documented_891_lb_uplift"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "roof_geometry",
+        "title": "7. Roof Geometry",
+        "items": [
+          {
+            "id": "question_7_roof_geometry",
+            "label": "7. Roof Geometry",
+            "type": "photo_only",
+            "description": "Roof Geometry: What is the roof shape? (Do not consider roofs of porches or carports that are attached only to the fascia or wall of the host structure over unenclosed space in the determination of roof perimeter or roof area for roof geometry classification).\n□ A. Hip Roof:  Hip roof with no other roof shapes greater than 10% of the total roof system perimeter. Total length of non-hip features: ______ feet; Total roof system perimeter: _______ feet.\n□ B. Flat Roof: Roof on a building with five (5) or more units where at least 90% of the main roof area has a roof slope of less than 2:12. Roof area with slope less than 2:12 ________ sq ft; Total roof area ______sq ft.\n□ C. Other Roof: Any roof that does not qualify as either (A) or (B) above.",
+            "attributes": [
+              {
+                "id": "shape",
+                "name": "What is the roof shape?",
+                "type": "select",
+                "choices": [
+                  "A",
+                  "B",
+                  "C"
+                ]
+              },
+              {
+                "id": "non_hip_length_ft",
+                "name": "A. Total length of non-hip features:",
+                "type": "number",
+                "unit": "feet"
+              },
+              {
+                "id": "total_perimeter_ft",
+                "name": "A. Total roof system perimeter:",
+                "type": "number",
+                "unit": "feet"
+              },
+              {
+                "id": "low_slope_area_sqft",
+                "name": "B. Roof area with slope less than 2:12",
+                "type": "number",
+                "unit": "sq ft"
+              },
+              {
+                "id": "total_roof_area_sqft",
+                "name": "B. Total roof area",
+                "type": "number",
+                "unit": "sq ft"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "sealed_roof_deck",
+        "title": "8. Sealed Roof Deck/Secondary Water Resistance (SWR)",
+        "items": [
+          {
+            "id": "question_8_sealed_roof_deck",
+            "label": "8. Sealed Roof Deck/Secondary Water Resistance (SWR)",
+            "type": "photo_only",
+            "description": "Sealed Roof Deck/Secondary Water Resistance (SWR): Applied as a supplemental means to protect the dwelling from water intrusion in the event of roof covering loss. Standard underlayment or hot-mopped felts do not qualify as an SWR.\n□ A. Sealed Roof Deck (also called SWR)\n□ B. No Sealed Roof Deck.\n□ C. Unknown or undetermined.\nUnder A, the form prints four methods:\n□ Fully adhered polymer-modified bitumen roofing underlayment complying with ASTM D1970.\n□ Tape over roof deck seams with felt or synthetic. (A minimum 3.75-inch-wide (95 mm) strip of self-adhering polymer-modified bitumen membrane complying with ASTM D1970 or self-adhering flexible flashing tape complying with AAMA 711, Level 3 [for exposure up to 176°F (80°C)]).\n□ Double layer of felt or synthetic with no tape. (Two layers of ASTM D226 Type II, ASTM D4869 Type III or Type IV or ASTM D8257 underlayment).\n□ Spray foam products. (Spray foam must be installed along rafter deck intersections, all panel joints, etc.).\n□ check here if entire roof deck underside covered. — printed one indent under Spray foam products, and asked only of spray foam: the other three methods are laid on top of the deck and never touch its underside.",
+            "attributes": [
+              {
+                "id": "answer",
+                "name": "8. Sealed Roof Deck/Secondary Water Resistance (SWR)",
+                "type": "select",
+                "choices": [
+                  "A",
+                  "B",
+                  "C"
+                ]
+              },
+              {
+                "id": "method",
+                "name": "A. Sealed Roof Deck (also called SWR)",
+                "type": "select",
+                "choices": [
+                  "fully_adhered_astm_d1970",
+                  "taped_deck_seams",
+                  "double_layer_no_tape",
+                  "spray_foam"
+                ]
+              },
+              {
+                "id": "spray_foam_underside_fully_covered",
+                "name": "check here if entire roof deck underside covered.",
+                "type": "multi_select",
+                "choices": [
+                  "true"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "opening_protection",
+        "title": "9. Opening Protection",
+        "items": [
+          {
+            "id": "question_9_protection_level_chart",
+            "label": "Opening Protection Level Chart",
+            "type": "photo_only",
+            "description": "Opening Protection Level Chart\nPlace an “X” in each row to identify all forms of protection in use for each opening type. Check only one answer below (N/A through Z), based on the weakest form of protection (lowest row) for any of the glazed openings and indicate the weakest form of protection (lowest row) for non-glazed openings.\nN/A Not applicable – there are no openings of this type on the structure\nA Verified cyclic pressure & large missile (9 lb. for windows, doors/4.5 lb. for skylights)\nB Verified cyclic pressure & large missile (4-8 lb. for windows, doors/2 lb. for skylights)\nC Verified plywood/OSB meeting Table 1609.1.2 of the FBC 2007\nD Verified Non-Glazed Entry or Garage Doors indicating compliance with ASTM E 330, ANSI/DASMA 108, or PA/TAS 202 for wind pressure resistance\nN Opening Protection products that appear to be A or B but are not verified\nN Other protective coverings that cannot be identified as A, B, or C\nX No Windborne Debris Protection\nZ Damaged openings in need of repair/replacement\n⚠ The D row is printed for the two non-glazed columns only; the four glazed columns take the other eight answers.",
+            "attributes": [
+              {
+                "id": "windows_or_entry_doors",
+                "name": "Glazed Openings — Windows or Entry Doors",
+                "type": "multi_select",
+                "choices": [
+                  "NA",
+                  "A",
+                  "B",
+                  "C",
+                  "N_appears_a_or_b_unverified",
+                  "N_cannot_be_identified",
+                  "X",
+                  "Z"
+                ]
+              },
+              {
+                "id": "garage_doors_glazed",
+                "name": "Glazed Openings — Garage Doors",
+                "type": "multi_select",
+                "choices": [
+                  "NA",
+                  "A",
+                  "B",
+                  "C",
+                  "N_appears_a_or_b_unverified",
+                  "N_cannot_be_identified",
+                  "X",
+                  "Z"
+                ]
+              },
+              {
+                "id": "skylights",
+                "name": "Glazed Openings — Skylights",
+                "type": "multi_select",
+                "choices": [
+                  "NA",
+                  "A",
+                  "B",
+                  "C",
+                  "N_appears_a_or_b_unverified",
+                  "N_cannot_be_identified",
+                  "X",
+                  "Z"
+                ]
+              },
+              {
+                "id": "glass_block",
+                "name": "Glazed Openings — Glass Block",
+                "type": "multi_select",
+                "choices": [
+                  "NA",
+                  "A",
+                  "B",
+                  "C",
+                  "N_appears_a_or_b_unverified",
+                  "N_cannot_be_identified",
+                  "X",
+                  "Z"
+                ]
+              },
+              {
+                "id": "entry_doors_non_glazed",
+                "name": "Non-Glazed Openings — Entry Doors",
+                "type": "multi_select",
+                "choices": [
+                  "NA",
+                  "A",
+                  "B",
+                  "C",
+                  "D",
+                  "N_appears_a_or_b_unverified",
+                  "N_cannot_be_identified",
+                  "X",
+                  "Z"
+                ]
+              },
+              {
+                "id": "garage_doors_non_glazed",
+                "name": "Non-Glazed Openings — Garage Doors",
+                "type": "multi_select",
+                "choices": [
+                  "NA",
+                  "A",
+                  "B",
+                  "C",
+                  "D",
+                  "N_appears_a_or_b_unverified",
+                  "N_cannot_be_identified",
+                  "X",
+                  "Z"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "question_9_opening_protection",
+            "label": "9. Opening Protection",
+            "type": "photo_only",
+            "description": "Opening Protection: What is the WEAKEST form of wind-borne debris protection installed on the structure? This category includes all openings in the wall and roof including windows, doors, sliding glass doors, skylights, and garage doors. Gable roof vents and other roof vents are not included. All openings (windows, doors, and skylights) must be in good condition. Buildings with openings that need replacement do not qualify for wind mitigation rate differentials, regardless of the presence/absence of other features.\n□ A. Exterior Openings Cyclic Pressure and 9-lb. Large Missile (4.5 lb. for skylights only): All glazed openings are protected, at a minimum, with impact resistant coverings or products listed as wind borne debris protection devices in the product approval system of the State of Florida or Miami-Dade County and meet the requirements of one of the following for “Cyclic Pressure and Large Missile Impact” (Level A in the table above and Hurricane in the factor table).\n□ B. Exterior Opening Protection- Cyclic Pressure and 4 to 8-lb. Large Missile (2-4.5 lb. for skylights only): All glazed openings are protected, at a minimum, with impact resistant coverings or products listed as windborne debris protection devices in the product approval system of the State of Florida or Miami-Dade County and meet the requirements of one of the following for “Cyclic Pressure and Large Missile Impact” (Level B in the table above and Hurricane in the factor table):\n□ C. Exterior Opening Protection – Wood Structural Panels meeting FBC 2007: All glazed openings are covered with: □ Plywood OR □ OSB, meeting the requirements of Table 1609.1.2 of the FBC 2007 (Level C in the table above and Plywood or OSB in secondary factors table).\n□ N. Exterior Opening Protection (unverified shutter systems with no documentation): All glazed openings are protected with protective coverings not meeting the requirements of Answer “A,” “B,” or “C” or systems that appear to meet Answer “A” or “B” with no documentation of compliance (Level N in the table above and Ordinary in secondary factors table).\n□ X. None or Some Glazed Openings: One or more glazed openings classified. (Level X or Z in the table above and None in the factor table).\n□ Z. Damaged Openings: One or more openings are damaged and in need of repair or replacement. (Any opening(s) meeting Level Z in the table above).\n□A.1 All non-glazed openings classified as A in the table above, or no non-glazed openings exist.\n□A.2 One or more non-glazed openings classified as Level D in the table above, and no non-glazed openings classified as Level B, C, N, or X in the table above.\n□A.3 One or more non-glazed openings is classified as Level B, C, N, X, or Z in the table above.\n□ B.1 All non-glazed openings classified as A or B in the table above, or no non-glazed openings exist.\n□ B.2 One or more non-glazed openings classified as Level D in the table above, and no non-glazed openings classified as Level C, N, or X in the table above.\n□ B.3 One or more non-glazed openings is classified as Level C, N, X, or Z in the table above.\n□ C.1 All non-glazed openings classified as A, B, or C in the table above, or no non-glazed openings exist.\n□ C.2 One or more non-glazed openings classified as Level D in the table above, and no non-glazed openings classified as Level N or X in the table above.\n□ C.3 One or more non-glazed openings is classified as Level N, X, or Z in the table above.\n□ N.1 All non-glazed openings classified as Level A, B, C, or N in the table above, or no non-glazed openings exist.\n□ N.2 One or more non-glazed openings classified as Level D in the table above, and no non-glazed openings classified as Level X in the table above.\n□ N.3 One or more non-glazed openings is classified as Level X or Z in the table above.",
+            "attributes": [
+              {
+                "id": "answer",
+                "name": "What is the WEAKEST form of wind-borne debris protection installed on the structure?",
+                "type": "select",
+                "choices": [
+                  "A",
+                  "B",
+                  "C",
+                  "N",
+                  "X",
+                  "Z"
+                ]
+              },
+              {
+                "id": "non_glazed_level",
+                "name": "The non-glazed sub-level printed under the answer chosen above.",
+                "type": "select",
+                "choices": [
+                  "A.1",
+                  "A.2",
+                  "A.3",
+                  "B.1",
+                  "B.2",
+                  "B.3",
+                  "C.1",
+                  "C.2",
+                  "C.3",
+                  "N.1",
+                  "N.2",
+                  "N.3"
+                ]
+              },
+              {
+                "id": "wood_panel_type",
+                "name": "C. All glazed openings are covered with: □ Plywood OR □ OSB, meeting the requirements of Table 1609.1.2 of the FBC 2007",
+                "type": "select",
+                "choices": [
+                  "plywood",
+                  "osb"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "statutoryForm": {
+      "formId": "fl_oir_b1_1802",
+      "revision": "Rev. 04/26",
+      "dependsOn": {
+        "roof_wall_attachment_minimal_condition": {
+          "field": "roof_wall_attachment",
+          "answerIsOneOf": [
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        "sealed_roof_deck_spray_foam_underside_fully_covered": {
+          "field": "sealed_roof_deck_method",
+          "answerIsOneOf": [
+            "spray_foam"
+          ]
+        },
+        "opening_protection_non_glazed_level": {
+          "field": "opening_protection",
+          "answerIsOneOf": [
+            "A",
+            "B",
+            "C",
+            "N"
+          ],
+          "labelSeparator": "."
+        }
+      },
+      "bindings": {
+        "insurance_company": {
+          "from": "item",
+          "itemId": "form_insurance_company"
+        },
+        "policy_number": {
+          "from": "item",
+          "itemId": "form_policy_number"
+        },
+        "year_of_home": {
+          "from": "item",
+          "itemId": "form_year_of_home"
+        },
+        "number_of_stories": {
+          "from": "item",
+          "itemId": "form_number_of_stories"
+        },
+        "fortified_certificate": {
+          "from": "item_attribute",
+          "itemId": "form_fortified_certificate",
+          "attribute": "certificate_type"
+        },
+        "property_address": {
+          "from": "inspection",
+          "field": "property_address"
+        },
+        "inspection_date": {
+          "from": "inspection",
+          "field": "inspection_date"
+        },
+        "owner_name": {
+          "from": "inspection",
+          "field": "owner_name"
+        },
+        "owner_email": {
+          "from": "inspection",
+          "field": "owner_email"
+        },
+        "owner_mailing_address": {
+          "from": "inspection",
+          "field": "owner_mailing_address"
+        },
+        "owner_home_phone": {
+          "from": "inspection",
+          "field": "owner_home_phone"
+        },
+        "owner_work_phone": {
+          "from": "inspection",
+          "field": "owner_work_phone"
+        },
+        "owner_cell_phone": {
+          "from": "inspection",
+          "field": "owner_cell_phone"
+        },
+        "building_code": {
+          "from": "item_attribute",
+          "itemId": "question_1_building_code",
+          "attribute": "version_in_force"
+        },
+        "building_code_a_year_built": {
+          "from": "item_attribute",
+          "itemId": "question_1_building_code",
+          "attribute": "a_year_built"
+        },
+        "building_code_a_permit_application_date": {
+          "from": "item_attribute",
+          "itemId": "question_1_building_code",
+          "attribute": "a_permit_application_date"
+        },
+        "building_code_b_year_built": {
+          "from": "item_attribute",
+          "itemId": "question_1_building_code",
+          "attribute": "b_year_built"
+        },
+        "building_code_b_permit_application_date": {
+          "from": "item_attribute",
+          "itemId": "question_1_building_code",
+          "attribute": "b_permit_application_date"
+        },
+        "building_code_c_year_built": {
+          "from": "item_attribute",
+          "itemId": "question_1_building_code",
+          "attribute": "c_year_built"
+        },
+        "building_code_c_permit_application_date": {
+          "from": "item_attribute",
+          "itemId": "question_1_building_code",
+          "attribute": "c_permit_application_date"
+        },
+        "wind_region": {
+          "from": "item_attribute",
+          "itemId": "question_2_region",
+          "attribute": "region"
+        },
+        "roof_slope": {
+          "from": "item_attribute",
+          "itemId": "question_3_roof_slope",
+          "attribute": "slope"
+        },
+        "roof_covering_asphalt_fiberglass_shingle_permit_application_date": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_asphalt_fiberglass_shingle",
+          "attribute": "permit_application_date"
+        },
+        "roof_covering_asphalt_fiberglass_shingle_product_approval_number": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_asphalt_fiberglass_shingle",
+          "attribute": "product_approval_number"
+        },
+        "roof_covering_asphalt_fiberglass_shingle_year_installed": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_asphalt_fiberglass_shingle",
+          "attribute": "year_installed"
+        },
+        "roof_covering_asphalt_fiberglass_shingle_no_information": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_asphalt_fiberglass_shingle",
+          "attribute": "no_information"
+        },
+        "roof_covering_concrete_clay_tile_permit_application_date": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_concrete_clay_tile",
+          "attribute": "permit_application_date"
+        },
+        "roof_covering_concrete_clay_tile_product_approval_number": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_concrete_clay_tile",
+          "attribute": "product_approval_number"
+        },
+        "roof_covering_concrete_clay_tile_year_installed": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_concrete_clay_tile",
+          "attribute": "year_installed"
+        },
+        "roof_covering_concrete_clay_tile_no_information": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_concrete_clay_tile",
+          "attribute": "no_information"
+        },
+        "roof_covering_synthetic_composite_tile_permit_application_date": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_synthetic_composite_tile",
+          "attribute": "permit_application_date"
+        },
+        "roof_covering_synthetic_composite_tile_product_approval_number": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_synthetic_composite_tile",
+          "attribute": "product_approval_number"
+        },
+        "roof_covering_synthetic_composite_tile_year_installed": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_synthetic_composite_tile",
+          "attribute": "year_installed"
+        },
+        "roof_covering_synthetic_composite_tile_no_information": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_synthetic_composite_tile",
+          "attribute": "no_information"
+        },
+        "roof_covering_metal_permit_application_date": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_metal",
+          "attribute": "permit_application_date"
+        },
+        "roof_covering_metal_product_approval_number": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_metal",
+          "attribute": "product_approval_number"
+        },
+        "roof_covering_metal_year_installed": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_metal",
+          "attribute": "year_installed"
+        },
+        "roof_covering_metal_no_information": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_metal",
+          "attribute": "no_information"
+        },
+        "roof_covering_built_up_permit_application_date": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_built_up",
+          "attribute": "permit_application_date"
+        },
+        "roof_covering_built_up_product_approval_number": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_built_up",
+          "attribute": "product_approval_number"
+        },
+        "roof_covering_built_up_year_installed": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_built_up",
+          "attribute": "year_installed"
+        },
+        "roof_covering_built_up_no_information": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_built_up",
+          "attribute": "no_information"
+        },
+        "roof_covering_membrane_permit_application_date": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_membrane",
+          "attribute": "permit_application_date"
+        },
+        "roof_covering_membrane_product_approval_number": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_membrane",
+          "attribute": "product_approval_number"
+        },
+        "roof_covering_membrane_year_installed": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_membrane",
+          "attribute": "year_installed"
+        },
+        "roof_covering_membrane_no_information": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_membrane",
+          "attribute": "no_information"
+        },
+        "roof_covering_other_permit_application_date": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_other",
+          "attribute": "permit_application_date"
+        },
+        "roof_covering_other_product_approval_number": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_other",
+          "attribute": "product_approval_number"
+        },
+        "roof_covering_other_year_installed": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_other",
+          "attribute": "year_installed"
+        },
+        "roof_covering_other_no_information": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_other",
+          "attribute": "no_information"
+        },
+        "roof_covering_types": {
+          "from": "item_attribute",
+          "itemId": "question_4_1_roof_covering_types",
+          "attribute": "types_in_use"
+        },
+        "roof_covering_other_description": {
+          "from": "item_attribute",
+          "itemId": "roof_covering_other",
+          "attribute": "description"
+        },
+        "roof_covering_product_approval": {
+          "from": "item_attribute",
+          "itemId": "question_4_2_product_approval_listing",
+          "attribute": "listing"
+        },
+        "roof_deck_attachment": {
+          "from": "item_attribute",
+          "itemId": "question_5_roof_deck_attachment",
+          "attribute": "weakest_form"
+        },
+        "roof_deck_attachment_other_description": {
+          "from": "item_attribute",
+          "itemId": "question_5_roof_deck_attachment",
+          "attribute": "other_description"
+        },
+        "roof_wall_attachment": {
+          "from": "item_attribute",
+          "itemId": "question_6_roof_to_wall_attachment",
+          "attribute": "weakest_connection"
+        },
+        "roof_wall_attachment_other_description": {
+          "from": "item_attribute",
+          "itemId": "question_6_roof_to_wall_attachment",
+          "attribute": "other_description"
+        },
+        "roof_wall_attachment_toenail_basis": {
+          "from": "item_attribute",
+          "itemId": "question_6_a_toenails",
+          "attribute": "basis"
+        },
+        "roof_wall_attachment_minimal_condition": {
+          "from": "item_attribute",
+          "itemId": "question_6_minimal_conditions",
+          "attribute": "condition"
+        },
+        "roof_wall_attachment_clip_basis": {
+          "from": "item_attribute",
+          "itemId": "question_6_b_clips",
+          "attribute": "basis"
+        },
+        "roof_wall_attachment_single_wrap_basis": {
+          "from": "item_attribute",
+          "itemId": "question_6_c_single_wraps",
+          "attribute": "basis"
+        },
+        "roof_wall_attachment_double_wrap_basis": {
+          "from": "item_attribute",
+          "itemId": "question_6_d_double_wraps",
+          "attribute": "basis"
+        },
+        "roof_geometry": {
+          "from": "item_attribute",
+          "itemId": "question_7_roof_geometry",
+          "attribute": "shape"
+        },
+        "roof_geometry_non_hip_length_ft": {
+          "from": "item_attribute",
+          "itemId": "question_7_roof_geometry",
+          "attribute": "non_hip_length_ft"
+        },
+        "roof_geometry_total_perimeter_ft": {
+          "from": "item_attribute",
+          "itemId": "question_7_roof_geometry",
+          "attribute": "total_perimeter_ft"
+        },
+        "roof_geometry_low_slope_area_sqft": {
+          "from": "item_attribute",
+          "itemId": "question_7_roof_geometry",
+          "attribute": "low_slope_area_sqft"
+        },
+        "roof_geometry_total_roof_area_sqft": {
+          "from": "item_attribute",
+          "itemId": "question_7_roof_geometry",
+          "attribute": "total_roof_area_sqft"
+        },
+        "sealed_roof_deck": {
+          "from": "item_attribute",
+          "itemId": "question_8_sealed_roof_deck",
+          "attribute": "answer"
+        },
+        "sealed_roof_deck_method": {
+          "from": "item_attribute",
+          "itemId": "question_8_sealed_roof_deck",
+          "attribute": "method"
+        },
+        "sealed_roof_deck_spray_foam_underside_fully_covered": {
+          "from": "item_attribute",
+          "itemId": "question_8_sealed_roof_deck",
+          "attribute": "spray_foam_underside_fully_covered"
+        },
+        "opening_protection_chart_windows_or_entry_doors": {
+          "from": "item_attribute",
+          "itemId": "question_9_protection_level_chart",
+          "attribute": "windows_or_entry_doors"
+        },
+        "opening_protection_chart_garage_doors_glazed": {
+          "from": "item_attribute",
+          "itemId": "question_9_protection_level_chart",
+          "attribute": "garage_doors_glazed"
+        },
+        "opening_protection_chart_skylights": {
+          "from": "item_attribute",
+          "itemId": "question_9_protection_level_chart",
+          "attribute": "skylights"
+        },
+        "opening_protection_chart_glass_block": {
+          "from": "item_attribute",
+          "itemId": "question_9_protection_level_chart",
+          "attribute": "glass_block"
+        },
+        "opening_protection_chart_entry_doors_non_glazed": {
+          "from": "item_attribute",
+          "itemId": "question_9_protection_level_chart",
+          "attribute": "entry_doors_non_glazed"
+        },
+        "opening_protection_chart_garage_doors_non_glazed": {
+          "from": "item_attribute",
+          "itemId": "question_9_protection_level_chart",
+          "attribute": "garage_doors_non_glazed"
+        },
+        "opening_protection": {
+          "from": "item_attribute",
+          "itemId": "question_9_opening_protection",
+          "attribute": "answer"
+        },
+        "opening_protection_non_glazed_level": {
+          "from": "item_attribute",
+          "itemId": "question_9_opening_protection",
+          "attribute": "non_glazed_level"
+        },
+        "opening_protection_wood_panel_type": {
+          "from": "item_attribute",
+          "itemId": "question_9_opening_protection",
+          "attribute": "wood_panel_type"
+        },
+        "inspector_name": {
+          "from": "inspection",
+          "field": "inspector_name"
+        },
+        "inspector_license_type": {
+          "from": "inspection",
+          "field": "inspector_license_type"
+        },
+        "inspector_license_number": {
+          "from": "inspection",
+          "field": "inspector_license"
+        },
+        "inspection_company": {
+          "from": "inspection",
+          "field": "company_name"
+        },
+        "inspector_phone": {
+          "from": "inspection",
+          "field": "company_phone"
+        },
+        "inspector_qualification": {
+          "from": "inspection",
+          "field": "inspector_qualification"
+        },
+        "inspector_printed_name": {
+          "from": "inspection",
+          "field": "inspector_name"
+        },
+        "employee_printed_name": {
+          "from": "inspection",
+          "field": "employee_printed_name"
+        },
+        "inspector_signature": {
+          "from": "signature",
+          "scope": "whole_form"
+        },
+        "inspector_signature_date": {
+          "from": "inspection",
+          "field": "inspector_signature_date"
+        }
+      }
+    }
+  }
+}
