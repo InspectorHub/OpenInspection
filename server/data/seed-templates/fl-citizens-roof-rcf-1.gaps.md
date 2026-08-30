@@ -75,11 +75,22 @@ This box is not decorative. Page 1 prints the condition of acceptance verbatim:
 row of its own, typed into the *Statutory form details* panel in the inspection editor, and
 formatted for the form by `calendarDayForForm` exactly as `inspection_date` is.
 
-⚠️ **A signing date nobody has typed is an EMPTY answer, not a missing one.** The binding
-emits its key either way, so the required-field check passes and the box prints blank —
-which is the contract every other `from: 'inspection'` fact has always had (see the note on
-NULL in `statutory-inputs.ts`). What stops a blank date reaching an insurer is somebody
-filling the panel in, not the renderer.
+⚠️ **A signing date nobody has typed no longer produces a form.** The binding emits its key
+either way — that is the contract every `from: 'inspection'` fact has, and it has not
+changed (see the note on NULL in `statutory-inputs.ts`). What changed is the required-field
+check in `render.ts`: a field named in `requiredFields` is refused when it resolves to an
+empty answer, exactly as an unbound one is, because `requiredFields` means "required of
+EVERY inspection" and a blank box on this page is the state Citizens prints its refusal
+about. Measured 2026-08-30 against these bytes and this template, running the real collector
+into the real renderer:
+
+```
+signing date cleared → REFUSED: 1 required field(s) have no answer: inspector_signature_date
+signing date typed   → RENDERED, 127,325 bytes
+```
+
+An OPTIONAL box left empty is untouched by that rule and still renders as the blank the
+inspector meant.
 
 ---
 

@@ -164,9 +164,28 @@ describe('renderStatutoryForm — values', () => {
         })).rejects.toThrow(/client\.name/);
     });
 
-    it('POSITIVE CONTROL — an explicit empty answer IS accepted and renders', async () => {
-        // ...and this is the other half: an inspector who answered "nothing" has
-        // answered, and their form must be producible.
+    it('refuses a REQUIRED field answered with nothing, exactly as an absent one', async () => {
+        // `client.name` is this map's only required field. Supplying it as an
+        // empty string is not a lesser version of leaving it out: on the
+        // authority's page both come out as the same blank box, and
+        // `requiredFields` is the map's statement that no inspection may leave
+        // that box blank.
+        //
+        // Measured on the FL Citizens roof form, which is where this rule came
+        // from: `inspector_signature_date` bound to a column nobody had filled
+        // in, resolved to '', and the form produced with the signing date blank
+        // — under a page that prints "will not be accepted without the dated
+        // signature".
+        await expect(renderStatutoryForm(fielded.bytes, fieldedMap(), {
+            'client.name': '', 'property.address': '12 Example St',
+        })).rejects.toThrow(/client\.name/);
+    });
+
+    it('POSITIVE CONTROL — an empty answer to an OPTIONAL field renders', async () => {
+        // ...and this is the other half, and the reason the rule above is
+        // scoped to `requiredFields` rather than applied to every field: an
+        // inspector who answered "nothing" to a box the form does not demand
+        // HAS answered, and their form must be producible.
         //
         // ⚠️ MEASURED, and it decides where the distinction can live: the two
         // cases are indistinguishable IN THE PDF. A text field set to an empty
@@ -176,10 +195,10 @@ describe('renderStatutoryForm — values', () => {
         // by any reader, and the only place the difference survives is the
         // refusal above, at the input boundary, before a document exists.
         const filled = await renderStatutoryForm(fielded.bytes, fieldedMap(), {
-            'client.name': '', 'property.address': '12 Example St',
+            'client.name': 'Zoe Ng', 'property.address': '',
         });
-        expect(await readFieldValue(filled, 'Name of Client') ?? '').toBe('');
-        expect(await readFieldValue(filled, 'Text1')).toBe('12 Example St');
+        expect(await readFieldValue(filled, 'Name of Client')).toBe('Zoe Ng');
+        expect(await readFieldValue(filled, 'Text1') ?? '').toBe('');
     });
 
     it('refuses bytes that are not the revision the map was authored against', async () => {

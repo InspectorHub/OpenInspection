@@ -145,9 +145,12 @@ export interface FieldMap {
     checkedAt: number;
     /**
      * Our field names that MUST be mapped, and — at render time — must be
-     * supplied. A required field left out of the values is refused rather than
-     * rendered blank: a form nobody filled must never come out looking like one
-     * somebody filled and left empty.
+     * ANSWERED. A required field left out of the values is refused rather than
+     * rendered blank, and so is one supplied with an empty answer: this list
+     * means "required of every inspection", so there is no inspection for which
+     * leaving the box empty is a legitimate answer, and on the printed page the
+     * two are the same blank. Optional fields keep the ordinary contract, where
+     * an empty string is an answer of "nothing" and renders as one.
      */
     requiredFields: readonly string[];
     mappings: readonly FieldMapping[];

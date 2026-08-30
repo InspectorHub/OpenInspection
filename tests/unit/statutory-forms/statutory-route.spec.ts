@@ -125,6 +125,8 @@ const WITHDRAWN = 'insp-withdrawn-revision';
 const TIMED = 'insp-wizard-timed';
 /** Declares the form and binds nothing the map requires. */
 const UNANSWERABLE = 'insp-unanswerable';
+/** Declares the form, binds the required field, and nobody answered it. */
+const UNANSWERED = 'insp-unanswered-required';
 
 const INSPECTOR = 'usr-dana';
 
@@ -254,12 +256,34 @@ beforeEach(async () => {
             templateSnapshot: SNAPSHOT_UNANSWERABLE,
         },
         {
+            ...base, id: UNANSWERED, tenantId: TENANT, inspectorId: INSPECTOR,
+            templateSnapshot: SNAPSHOT_DECLARED,
+        },
+        {
             ...base, id: TIMED, tenantId: TENANT, inspectorId: INSPECTOR,
             // Same calendar day as every other row, plus the wizard's suffix.
             date: '2026-05-01T09:30:00.000Z',
             templateSnapshot: SNAPSHOT_DECLARED,
         },
     ] as never);
+    // The one item the fixture map REQUIRES, actually answered.
+    //
+    // ⚠️ It used to be unanswered, and every "produces" control below still
+    // passed: the binding resolved to '' and the form came out with its only
+    // required box blank. `render.ts` refuses that now — a field in
+    // `requiredFields` is required of every inspection — so a positive control
+    // that produces has to be an inspection somebody actually answered. Keyed
+    // as `inspection_results.data` is really written (`unit:section:item`),
+    // because a flat map is the one shape the product never produces.
+    await db.insert(schema.inspectionResults).values(
+        [GOOD, MATCHED, SUPERSEDED, WITHDRAWN, TIMED, OTHER].map((inspectionId) => ({
+            id: `res-${inspectionId}`,
+            tenantId: inspectionId === OTHER ? OTHER_TENANT : TENANT,
+            inspectionId,
+            data: { '_default:sec:itm_owner': { value: 'Zoe Ng' } },
+            lastSyncedAt: new Date(),
+        })) as never,
+    );
     await db.insert(schema.reports).values([
         {
             id: 'rep-good', tenantId: TENANT, inspectionId: GOOD, title: 'Report', kind: 'primary',
@@ -295,6 +319,11 @@ beforeEach(async () => {
         },
         {
             id: 'rep-unanswerable', tenantId: TENANT, inspectionId: UNANSWERABLE, title: 'Report',
+            kind: 'primary', status: 'published', createdAt: new Date(),
+            publishedAt: new Date(Date.UTC(2026, 4, 2)),
+        },
+        {
+            id: 'rep-unanswered', tenantId: TENANT, inspectionId: UNANSWERED, title: 'Report',
             kind: 'primary', status: 'published', createdAt: new Date(),
             publishedAt: new Date(Date.UTC(2026, 4, 2)),
         },
@@ -432,6 +461,22 @@ describe('GET /:id/statutory-form.pdf', () => {
         expect(message).not.toMatch(/internal server error/i);
         // The internal stage prefix is for the log, not for the reader.
         expect(message).not.toContain('statutory render:');
+    });
+
+    it('refuses with the same 422 when the required box is ANSWERED WITH NOTHING', async () => {
+        // The shape the FL Citizens roof form was actually in: the binding is
+        // there, it resolves, and it resolves to ''. `UNANSWERABLE` above is the
+        // other shape (no binding at all), and before this rule the two ended
+        // differently — one refused, the other produced a form with a blank box
+        // over the inspector's signature.
+        //
+        // This inspection declares the form and has no answers stored, so
+        // `owner.name` reaches the renderer as an empty string.
+        const res = await get(UNANSWERED);
+        expect(res.status).toBe(422);
+        const message = (await res.json() as { error: { message: string } }).error.message;
+        expect(message).toContain('owner.name');
+        expect(message).toMatch(/required field/i);
     });
 
     it('NEGATIVE CONTROL — a refusal the ROUTE raises keeps its own status', async () => {

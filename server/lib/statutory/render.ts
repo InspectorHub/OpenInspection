@@ -23,9 +23,11 @@
  *
  * ⚠️ A value with no route onto the page is REFUSED, never dropped. A dropped
  * value is a blank on a statutory document, and a blank looks exactly like an
- * answer nobody had. Likewise a required field missing from `values`: a form
- * nobody filled must not be producible, while one filled with an empty answer
- * must be.
+ * answer nobody had. Likewise a required field with no answer in `values`: a
+ * form nobody filled must not be producible, while an OPTIONAL box filled with
+ * an empty answer must be. For a required field the two cases collapse — an
+ * absent key and an empty one both print the same blank, and `requiredFields`
+ * is the map's statement that no inspection may leave this box blank.
  *
  * ⚠️ AND THIS IS THE ONLY PLACE THAT DISTINCTION CAN LIVE. Measured against the
  * format: a form field set to an empty string is stored by storing nothing, so
@@ -75,8 +77,11 @@ import {
     type FieldMap, type FieldMapping, type StatutoryValue,
 } from './field-map';
 import { fitOverlay, refuseIfTheWidgetWouldClip } from './fit';
-import { partOfValue, refuseUnreadableParts } from './value-parts';
+import { partOfValue } from './value-parts';
 import { drawSignature, type SignatureImage } from './render-signature';
+// Every refusal made before a document exists. Its own file because it answers
+// a different question from this one -- see its header.
+import { checkValuesAgainstMap } from './value-checks';
 
 /**
  * How large a checkbox mark is drawn when the map does not say.
@@ -124,7 +129,8 @@ function oneAnswer(value: StatutoryValue, ourField: string): string {
  * @param map the field map for that revision.
  * @param values our field name -> the answer to put on the form. A key that is
  *   PRESENT with an empty string is an answer of "nothing"; a key that is ABSENT
- *   is no answer at all, and for a required field that is refused. An ARRAY is
+ *   is no answer at all. For a field named in `requiredFields` BOTH are refused,
+ *   because that list says the box is required of every inspection. An ARRAY is
  *   several options of one multi-select question and marks every box it names —
  *   see `StatutoryValue` for why an empty one is not a third case.
  * @param signatures our field name -> a decoded signature image. A SEPARATE
@@ -276,124 +282,4 @@ function setTextField(
     }
     refuseIfTheWidgetWouldClip(field, mapping.ourField, value, ruler);
     field.setText(value);
-}
-
-/**
- * Every value has somewhere to go, and every required answer is present.
- *
- * Both directions are checked because they fail differently and both fail
- * silently. A value with no mapping disappears; a required field with no value
- * produces a form that looks filled and is not.
- */
-function checkValuesAgainstMap(
-    map: FieldMap, values: ReadonlyMap<string, StatutoryValue>,
-    signatures: ReadonlyMap<string, SignatureImage>,
-): void {
-    const mapped = new Set(map.mappings.map((m) => m.ourField));
-    // Signatures too: a mark with nowhere to go is an empty signature box.
-    const unmapped = [...values.keys(), ...signatures.keys()].filter((k) => !mapped.has(k));
-    if (unmapped.length > 0) {
-        fail(`${unmapped.length} value(s) have no mapping on ${map.formId} ${map.version} and would `
-            + `be dropped: ${unmapped.join(', ')}`);
-    }
-
-    // A signature is supplied through its own channel and still fills its box.
-    const missing = map.requiredFields.filter((f) => !values.has(f) && !signatures.has(f));
-    if (missing.length > 0) {
-        fail(`${missing.length} required field(s) were never supplied: ${missing.join(', ')}. `
-            + 'An empty string is an answer; an absent key is not, and a form nobody filled must '
-            + 'not read as one somebody filled and left blank.');
-    }
-
-    refuseAnswersNoBoxCanTake(map.mappings, values);
-    checkChoicesAreReachable(map.mappings, values);
-    // Judged here, before the document is loaded, for the same reason an
-    // overflow is: a person with several broken bindings should be told about
-    // all of them, not sent back once per binding. The RULE is `partOfValue`
-    // and this is a second call of it, never a second copy.
-    refuseUnreadableParts(map.mappings, values);
-}
-
-/**
- * A choice must land in a box that exists.
- *
- * The dangerous case: the FIELD is mapped, so every count of mapped fields looks
- * complete, and the ANSWER given matches none of its boxes — so nothing is
- * marked and the form comes out with that question unanswered.
- */
-function checkChoicesAreReachable(
-    mappings: readonly FieldMapping[],
-    values: ReadonlyMap<string, StatutoryValue>,
-): void {
-    for (const [field, known] of boxesByField(mappings)) {
-        const value = values.get(field);
-        // An absent key is "not answered" and was already judged against
-        // `requiredFields`; an empty string is an explicit "none of these".
-        if (value === undefined || value === '') continue;
-        // EVERY element, not the first. Three good options and one that matches
-        // nothing is a question that comes out three-quarters answered, with
-        // every count of answered fields still reading complete.
-        for (const chosen of typeof value === 'string' ? [value] : value) {
-            if (known.has(chosen)) continue;
-            fail(`"${field}" was answered "${chosen}" and this form has no box for that answer `
-                + `(it has: ${[...known].join(', ')})`);
-        }
-    }
-}
-
-/** Which answers each multiple-choice field has a box for. */
-function boxesByField(mappings: readonly FieldMapping[]): Map<string, Set<string>> {
-    const answers = new Map<string, Set<string>>();
-    for (const m of mappings) {
-        // Both box kinds: a drawn mark and a set widget are one question with
-        // one set of answers, and a form may only carry one of the two.
-        if (m.kind !== 'checkbox' && m.kind !== 'acroform_checkbox') continue;
-        const known = answers.get(m.ourField) ?? new Set<string>();
-        known.add(m.whenValue);
-        answers.set(m.ourField, known);
-    }
-    return answers;
-}
-
-/**
- * A list of options is only an answer where the form printed a list of boxes.
- *
- * Two refusals, and both are about a document that would otherwise print and
- * look filled.
- *
- * An EMPTY array. `StatutoryValue` says why at length: "none of these" is the
- * empty string, and a second spelling of one answer means every reader has to
- * know which one their producer emits. An empty list is also what a binding that
- * resolved nothing yields, and a question with no box ticked reads exactly like
- * a question nobody was asked.
- *
- * An array reaching a mapping that writes TEXT. There is no right way to draw a
- * list onto one printed blank: joining it would put a separator of ours onto an
- * authority's document, and these forms print their own separators — which is
- * the whole reason `part` exists.
- */
-function refuseAnswersNoBoxCanTake(
-    mappings: readonly FieldMapping[],
-    values: ReadonlyMap<string, StatutoryValue>,
-): void {
-    const writesText = new Set(
-        mappings
-            .filter((m) => m.kind !== 'checkbox' && m.kind !== 'acroform_checkbox')
-            .map((m) => m.ourField),
-    );
-    for (const [field, value] of values) {
-        if (typeof value === 'string') continue;
-        if (value.length === 0) {
-            fail(`"${field}" was answered with an empty list. A list is the options a `
-                + 'question chose, and choosing none of them is written as an empty string, '
-                + 'which is an answer this form can carry. An empty list is what a binding '
-                + 'that resolved nothing produces, and the two must not look the same.');
-        }
-        if (writesText.has(field)) {
-            fail(`"${field}" was answered with a list of ${value.length} and is mapped to `
-                + 'something that writes text rather than to a set of boxes. Joining the list '
-                + 'would put a separator of ours onto the published form, which is '
-                + 'the failure the "part" mapping exists to prevent.');
-        }
-    }
 }
