@@ -19,6 +19,7 @@ import type {
     TemplateSchemaV2,
     TemplateItem,
 } from '../../types/template-schema';
+import type { StatutoryValue } from './field-map';
 import { composeItemComments } from './item-comments';
 import type { ItemCommentStates, ItemCommentTabs } from './item-comments';
 
@@ -64,6 +65,38 @@ export function asValue(raw: unknown): string {
     return String(raw);
 }
 
+/**
+ * Stringify one STORED answer, which may be several.
+ *
+ * A multi-select item attribute holds an array — "check all that apply" is
+ * printed on six of the questions the published maps carry (the Citizens photo
+ * requirements, electrical hazards, wiring types, pipe types, roof damage
+ * signs, the 1802's roof coverings) — and `render.ts` has always been able to
+ * tick every box a list names. This is the end of the pipe that was narrower:
+ * everything used to arrive through `String()`, which turns
+ * `['cracking','cupping']` into `"cracking,cupping"` and matches no box at all.
+ *
+ * ⚠️ AN EMPTY LIST BECOMES AN EMPTY STRING, and that is not tidying. `render.ts`
+ * refuses an empty array by name: "none of these" is the empty string, an empty
+ * list is what a binding that resolved nothing produces, and the two must not
+ * look the same. An inspector who opened a multi-select and ticked nothing has
+ * answered nothing, which is exactly what the empty string means everywhere
+ * else in this file.
+ *
+ * ⚠️ NOTHING IS DEDUPLICATED OR SORTED. Measured against `render.ts`: it walks
+ * the MAP's mappings and asks each one whether the answer names its box, so the
+ * order of the list cannot reach the page and a repeated element cannot tick a
+ * box twice — `check()` and `drawText` each run once per mapping, never once
+ * per element. Normalising here would therefore change nothing on the document
+ * while quietly editing what the inspector recorded.
+ */
+export function asAnswer(raw: unknown): StatutoryValue {
+    if (Array.isArray(raw)) {
+        return raw.length === 0 ? '' : raw.map((one) => asValue(one));
+    }
+    return asValue(raw);
+}
+
 /** Every item in the snapshot, flattened. Sections carry no meaning for a form
  *  binding: the declaration names an item id, and where that item sits is the
  *  template's business rather than the form's. */
@@ -89,14 +122,14 @@ export function resolve(
     items: Map<string, TemplateItem>,
     results: Record<string, StatutoryItemResult>,
     facts: StatutoryInspectionFacts,
-): string {
+): StatutoryValue {
     switch (source.from) {
         case 'item': {
             requireItem(items, source.itemId, ourField);
             const result = results[source.itemId];
             // `rating` first: a rich item answers there, and an item carrying
             // both is answering with its rating.
-            return asValue(result?.rating ?? result?.value);
+            return asAnswer(result?.rating ?? result?.value);
         }
         case 'item_comments': {
             const item = requireItem(items, source.itemId, ourField);
@@ -121,7 +154,7 @@ export function resolve(
                     + `"${source.itemId}", which does not declare it`,
                 );
             }
-            return asValue(results[source.itemId]?.attributes?.[source.attribute]);
+            return asAnswer(results[source.itemId]?.attributes?.[source.attribute]);
         }
         case 'inspection': {
             // The field union is closed, so this lookup cannot miss for any

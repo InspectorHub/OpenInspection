@@ -1,7 +1,7 @@
 {
   "id": "seed_fl_citizens_roof_rcf_1_v1",
   "name": "Florida Citizens Roof Inspection (RCF-1 03 25)",
-  "description": "Citizens Property Insurance Corporation's Roof Inspection Form, revision RCF-1 03 25. Its sections, its questions and their wording are Citizens', read off the published form -- not an approximation of it. Three of its 36 blanks are left unbound on purpose; fl-citizens-roof-rcf-1.gaps.md says which and why.",
+  "description": "Citizens Property Insurance Corporation's Roof Inspection Form, revision RCF-1 03 25. Its sections, its questions and their wording are Citizens', read off the published form -- not an approximation of it. One of its 36 blanks is left unbound on purpose; fl-citizens-roof-rcf-1.gaps.md says which and why.",
   "version": 2,
   "schema": {
     "schemaVersion": 2,
@@ -26,7 +26,7 @@
             "id": "roof_predominant",
             "label": "Predominant Roof",
             "type": "photo_only",
-            "description": "The left-hand column on the form. Photos of each roof slope showing the roof’s condition must be submitted with this form. The form asks for every damage sign that applies and this screen records one, so list any others — and anything answered Unsatisfactory (explain below) or Yes — under Additional Comments/Observations. The printed blanks are narrow: write a date as MM/DD/YY and keep the covering material short, or the form refuses rather than printing over the row beneath it.",
+            "description": "The left-hand column on the form. Photos of each roof slope showing the roof’s condition must be submitted with this form. The form asks for every damage sign that applies and this screen takes every one you tick. Anything answered Unsatisfactory or Yes still has to be explained under Additional Comments/Observations, which is where the form itself sends an explanation. The printed blanks are narrow: write a date as MM/DD/YY and keep the covering material short, or the form refuses rather than printing over the row beneath it.",
             "attributes": [
               {
                 "id": "covering_material",
@@ -78,8 +78,8 @@
               },
               {
                 "id": "damage_signs",
-                "name": "Any visible signs of damage / deterioration?",
-                "type": "select",
+                "name": "Any visible signs of damage / deterioration? (check all that apply and explain below)",
+                "type": "multi_select",
                 "choices": [
                   "cracking",
                   "cupping_curling",
@@ -124,7 +124,7 @@
             "id": "roof_secondary",
             "label": "Secondary Roof",
             "type": "photo_only",
-            "description": "The right-hand column on the form. Photos of each roof slope showing the roof’s condition must be submitted with this form. The form asks for every damage sign that applies and this screen records one, so list any others — and anything answered Unsatisfactory (explain below) or Yes — under Additional Comments/Observations. The printed blanks are narrow: write a date as MM/DD/YY and keep the covering material short, or the form refuses rather than printing over the row beneath it.",
+            "description": "The right-hand column on the form. Photos of each roof slope showing the roof’s condition must be submitted with this form. The form asks for every damage sign that applies and this screen takes every one you tick. Anything answered Unsatisfactory or Yes still has to be explained under Additional Comments/Observations, which is where the form itself sends an explanation. The printed blanks are narrow: write a date as MM/DD/YY and keep the covering material short, or the form refuses rather than printing over the row beneath it.",
             "attributes": [
               {
                 "id": "covering_material",
@@ -176,8 +176,8 @@
               },
               {
                 "id": "damage_signs",
-                "name": "Any visible signs of damage / deterioration?",
-                "type": "select",
+                "name": "Any visible signs of damage / deterioration? (check all that apply and explain below)",
+                "type": "multi_select",
                 "choices": [
                   "cracking",
                   "cupping_curling",
@@ -417,6 +417,14 @@
         "inspector_work_phone": {
           "from": "inspection",
           "field": "company_phone"
+        },
+        "inspector_license_type": {
+          "from": "inspection",
+          "field": "inspector_license_type"
+        },
+        "inspector_signature_date": {
+          "from": "inspection",
+          "field": "inspector_signature_date"
         }
       }
     }

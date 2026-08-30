@@ -1,8 +1,15 @@
 # FL Citizens Roof Inspection Form (RCF-1 03 25) — what this template does not fill in
 
-`fl-citizens-roof-rcf-1.json` binds **33 of the 36 blanks** the published field map
-(`server/lib/statutory/forms/fl-citizens-roof.ts`) names. This file is the other three,
-and the four smaller gaps that sit behind the ones that ARE bound.
+`fl-citizens-roof-rcf-1.json` binds **35 of the 36 blanks** the published field map
+(`server/lib/statutory/forms/fl-citizens-roof.ts`) names. This file is the other one,
+and the smaller gaps that sit behind the ones that ARE bound.
+
+**Updated 2026-08-30.** It used to be 33 of 36, and the two that changed did so by getting a
+COLUMN rather than by being aliased onto a column that already existed —
+`users.statutory_license_type` and
+`statutory_inspection_details.inspector_signature_date`. Their entries are kept below, marked
+CLOSED rather than deleted, because "this is blank and here is why" and "this was closed and
+here is how" are both things a reader of this file comes here for.
 
 **It exists because a blank box cannot explain itself.** On a printed statutory form,
 "we left this empty deliberately" and "we forgot" are the same picture. Every entry below
@@ -15,13 +22,13 @@ candidate beside it (`checkedBy: Nathan`).
 | | count |
 |---|---:|
 | blanks the field map names | 36 |
-| bound by this template | 33 |
-| **left unbound** | **3** |
+| bound by this template | 35 |
+| **left unbound** | **1** |
 | bindings naming a blank the form does not print | 0 |
 
 ---
 
-## 1. The three unbound blanks
+## 1. The one unbound blank, and the two that were closed
 
 ### `inspector_title` — page 2, the box printed `Title`
 
@@ -33,42 +40,56 @@ left out of the closed list rather than added and hardwired to null.
 **To close it:** a column holding the inspector's job title, then a new member on
 `StatutoryInspectionField`, then `{ from: 'inspection', field: … }` here.
 
-### `inspector_license_type` — page 2, the box printed `License Type`
+### `inspector_license_type` — page 2, the box printed `License Type` — **CLOSED 2026-08-30**
 
-**No source, and the nearest column is the wrong fact.** The form asks for a state licence
-class; page 1 prints the three it accepts — *General, residential, building or roofing
-contractor* · *Building code inspector* · *Florida-licensed home inspector*. The nearest
-column this product has is an inspector credential's label, which holds an **association
-certification** ("InterNACHI CPI"). Those are not the same thing, and answering a statutory
-licence-type box from one would print something that looks right and is wrong.
+The form asks for a state licence class; page 1 prints the three it accepts — *General,
+residential, building or roofing contractor* · *Building code inspector* ·
+*Florida-licensed home inspector*. The nearest column this product had was an inspector
+credential's label, which holds an **association certification** ("InterNACHI CPI"). Those
+are not the same thing, and answering a statutory licence-type box from one would print
+something that looks right and is wrong.
 
-`inspector_license_number` beside it IS bound, to `inspector_license`, because a licence
-NUMBER is the fact that column actually holds.
+**So the column was added rather than the wrong one read.** `users.statutory_license_type`
+holds the class, the credential label still holds the certification, and both exist. An
+inspector sets it under Settings → Profile, because it is a fact about the person and not
+about one inspection.
 
-**To close it:** a licence-class column distinct from the credential label.
+`inspector_license_number` beside it is bound to `inspector_license`, because a licence
+NUMBER is the fact the credential column actually holds. Two columns, two facts.
 
-### `inspector_signature_date` — page 2, the box printed `Date`
+### `inspector_signature_date` — page 2, the box printed `Date` — **CLOSED 2026-08-30**
 
-🔴 **No source, and the obvious substitute is wrong.** `inspection_date` is already on the
-form, in page 1's *Date of Inspection*. Signing commonly happens days after the fieldwork,
-so binding both boxes to one column would make one of the two dates false with nothing on
-the page to say which. The candidate's own notes record that this field was RENAMED from
-`inspection_date` to `inspector_signature_date` on 2026-08-30 to keep the two apart; binding
-them back together would undo that rename in effect while leaving its name in place.
+🔴 **The obvious substitute was wrong then and is wrong now.** `inspection_date` is already
+on the form, in page 1's *Date of Inspection*. Signing commonly happens days after the
+fieldwork, so binding both boxes to one column would make one of the two dates false with
+nothing on the page to say which. The candidate's own notes record that this field was
+RENAMED from `inspection_date` to `inspector_signature_date` to keep the two apart; binding
+them back together would have undone that rename in effect while leaving its name in place.
 
 This box is not decorative. Page 1 prints the condition of acceptance verbatim:
 
 > The form will not be accepted without the **dated** signature of one of the following
 > appropriately licensed inspectors:
 
-**To close it:** a signed-at timestamp on whatever records the inspector's signature for a
-statutory form. See §2.1 — the same absence blocks the box beside it.
+**Closed by** `statutory_inspection_details.inspector_signature_date` — a calendar day on a
+row of its own, typed into the *Statutory form details* panel in the inspection editor, and
+formatted for the form by `calendarDayForForm` exactly as `inspection_date` is.
+
+⚠️ **A signing date nobody has typed is an EMPTY answer, not a missing one.** The binding
+emits its key either way, so the required-field check passes and the box prints blank —
+which is the contract every other `from: 'inspection'` fact has always had (see the note on
+NULL in `statutory-inputs.ts`). What stops a blank date reaching an insurer is somebody
+filling the panel in, not the renderer.
 
 ---
 
 ## 2. Gaps behind blanks that ARE bound
 
-### 2.1 🔴 `inspector_signature` is bound, and this form still cannot be produced
+### 2.1 `inspector_signature` is bound, and this form could not be produced — **CLOSED 2026-08-30**
+
+Both halves are closed now and the measurement below is kept as the record of the state this
+template was found in. `placeSignature` got its first production caller, and the date beside
+it got the column named in §1.
 
 `inspector_signature` binds `{ from: 'signature', scope: 'whole_form' }`, which is the only
 route `binding-policy.ts` permits for a signature and the one `StatutoryValueSource`
@@ -156,7 +177,7 @@ to be read by the person holding the form; on this route they reach the log and 
 else. The 409s the route raises itself do reach the user, which is what makes the
 difference easy to miss.
 
-### 2.2 `damage_signs` asks for every sign that applies and can carry one
+### 2.2 `damage_signs` asks for every sign that applies and could carry one
 
 The form prints, in both roof columns:
 
@@ -169,13 +190,20 @@ as `"cracking,cupping_curling"`, which matches no `whenValue` and is refused by 
 attribute-editor's `multi_select` type is worse: it falls through to a plain text input, so
 the inspector would type a value the form has no box for.
 
-So each roof surface records **one** damage sign, and the item's description says so and
-sends the rest to Additional Comments/Observations — which is where the form itself sends
+So each roof surface recorded **one** damage sign, and the item's description said so and
+sent the rest to Additional Comments/Observations — which is where the form itself sends
 every "(explain below)".
 
-**To close it:** a value pipeline that can carry a list end to end (a `string | string[]`
-value type through `collectStatutoryValues`, and a real multi-select control in
-`ItemAttributesPanel`).
+**CLOSED 2026-08-30**, exactly as described. `collectStatutoryValues` returns
+`Record<string, StatutoryValue>` — the type `render.ts` always accepted — and
+`ItemAttributesPanel` draws a real checkbox group for a `multi_select` attribute.
+`damage_signs` is that type on both roof columns now, and every sign the inspector ticks
+marks its own printed box.
+
+⚠️ The stored values are still the map's own `whenValue` strings, one per element, byte for
+byte. Nothing normalises, sorts or deduplicates them, and nothing needs to: `render.ts`
+walks the MAP and asks each mapping whether the answer names its box, so the order of the
+list cannot reach the page and a repeated element cannot tick a box twice.
 
 ### 2.3 The choice questions show the inspector a slug, not the form's wording
 

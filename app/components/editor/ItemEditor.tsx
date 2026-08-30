@@ -9,7 +9,7 @@ import { AiAssistPanel } from "./AiAssistPanel";
 import { NotesFieldHeader } from "./NotesFieldHeader";
 import { CloneLastButton } from "./CloneLastButton";
 import type { DefectFieldsValue } from "./DefectFieldsRow";
-import { ItemAttributesPanel } from "./ItemAttributesPanel";
+import { ItemAttributesPanel, type ItemAttributeValue } from "./ItemAttributesPanel";
 import { RatingButtonRow } from "./RatingButtonRow";
 import {
  CannedCommentTabs,
@@ -106,7 +106,7 @@ interface ItemEditorProps {
  categoryColor?: Map<string, string>;
  /** IA-59 — tenant defect categories offered in the custom-defect dropdown. */
  defectCategories?: Array<{ id: string; name: string }>;
- onItemAttribute?: (itemId: string, attributeId: string, value: string | number | boolean | null) => void;
+ onItemAttribute?: (itemId: string, attributeId: string, value: ItemAttributeValue) => void;
  onCloneLast?: (scope: 'rating' | 'rating_notes' | 'all') => void;
  cloneDefaultScope?: 'rating' | 'rating_notes' | 'all';
  tagChipRow?: React.ReactNode;
@@ -396,7 +396,7 @@ export function ItemEditor({
  <ItemAttributesPanel
  itemId={item.id}
  attributes={item.attributes}
- values={(result.attributes as Record<string, string | number | boolean | null>) ?? {}}
+ values={(result.attributes as Record<string, ItemAttributeValue>) ?? {}}
  onChange={onItemAttribute ?? (() => {})}
  />
  )}

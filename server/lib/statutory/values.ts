@@ -57,10 +57,23 @@
  * half-implemented copy of that check here is exactly how the next person comes
  * to fix only one of them.
  *
+ * -- 5. AN ANSWER MAY BE SEVERAL OPTIONS -------------------------------------
+ * `render.ts` has always accepted `string | readonly string[]` and ticks every
+ * box a list names. This side used to return `Record<string, string>`, so the
+ * pipe was narrower at this end: an item attribute holding
+ * `['cracking','cupping_curling']` reached the renderer as
+ * `"cracking,cupping_curling"`, which matches no `whenValue` and is refused by
+ * name. The forms genuinely ask for lists — six published questions print
+ * "check all that apply", from the Citizens photo requirements (6 boxes) to the
+ * 1802's roof coverings (7) — so the collection side now carries what the
+ * renderer could always draw. `asAnswer` in `resolve-source.ts` is the one
+ * place a stored array becomes one, and its comment says why an empty array is
+ * NOT a third case.
+ *
  * -- Why a Record and not a Map ----------------------------------------------
- * `renderStatutoryForm` already takes `Record<string, string>` and it shipped
- * first. Handing it a Map would mean converting at the call site, and that is a
- * conversion which exists only because two authors disagreed.
+ * `renderStatutoryForm` already takes a `Record` and it shipped first. Handing
+ * it a Map would mean converting at the call site, and that is a conversion
+ * which exists only because two authors disagreed.
  *
  * WARNING: VALUES ARE STRINGIFIED BUT NEVER TRIMMED. Trimming would silently
  * eat a deliberate leading space, and we do not know which box on which
@@ -80,7 +93,8 @@ import {
     groupFieldName, refuseOverCapacity,
     refuseOverflowThatDoesNotFit, validateGroups,
 } from './groups';
-import { asValue, itemsById, resolve } from './resolve-source';
+import { asValue, fail, itemsById, resolve } from './resolve-source';
+import type { StatutoryValue } from './field-map';
 // Re-exported because both were declared here before `resolve-source.ts` existed,
 // and every import site names this module. Moving the declaration is a refactor;
 // moving the NAME would be a rename of a public type in the same commit.
@@ -123,7 +137,7 @@ export type StatutoryGroupInstances = Readonly<Record<string, readonly Statutory
 function expandGroups(
     groups: readonly FieldGroup[],
     instances: StatutoryGroupInstances,
-    values: Record<string, string>,
+    values: Record<string, StatutoryValue>,
 ): void {
     validateGroups(groups);
 
@@ -227,7 +241,7 @@ function fieldLabel(field: string): string {
 function routeOverflow(
     groups: readonly FieldGroup[],
     instances: StatutoryGroupInstances,
-    values: Record<string, string>,
+    values: Record<string, StatutoryValue>,
 ): void {
     for (const group of groups) {
         const destination = group.overflowTo;
@@ -240,7 +254,20 @@ function routeOverflow(
             .map((instance, offset) => overflowLine(group, group.capacity + offset, instance));
         // The box holds ONE text, so the existing value is part of what has to
         // fit -- measuring only our addition would pass and still overrun.
-        const existing = values[destination] ?? '';
+        //
+        // A LIST CANNOT BE THAT BOX. `overflowTo` names a comments field the
+        // form prints "(use additional pages if needed)" beside; a field bound
+        // to a multi-select answer is a SET OF TICKED BOXES, and appending a
+        // sentence to one has no meaning on the page. Refused by name rather
+        // than joined, for the reason `render.ts` gives in the same situation:
+        // joining would put a separator of ours onto the authority's document.
+        const held = values[destination];
+        if (Array.isArray(held)) {
+            fail(`group "${group.id}" overflows into "${destination}", which this template `
+                + 'binds to a multi-select answer. An overflowing instance is written as a '
+                + 'sentence, and a set of ticked boxes has nowhere to put one.');
+        }
+        const existing = held ?? '';
         const combined = existing === ''
             ? lines.join('\n')
             : [existing, ...lines].join('\n');
@@ -273,9 +300,9 @@ export function collectStatutoryValues(
     results: Record<string, StatutoryItemResult>,
     facts: StatutoryInspectionFacts,
     instances: StatutoryGroupInstances = {},
-): Record<string, string> {
+): Record<string, StatutoryValue> {
     const items = itemsById(snapshot);
-    const values: Record<string, string> = {};
+    const values: Record<string, StatutoryValue> = {};
     // The declaration's own shape first, so a template that is broken for EVERY
     // inspection is refused before this one's answers are read. A rule reported
     // against a particular inspection sends the reader to the inspection.

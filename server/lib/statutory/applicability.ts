@@ -64,6 +64,7 @@ import type {
     StatutoryFieldDependency,
     StatutoryFormDeclaration,
 } from '../../types/template-schema';
+import type { StatutoryValue } from './field-map';
 import { fail } from './resolve-source';
 
 /**
@@ -75,8 +76,29 @@ import { fail } from './resolve-source';
  * `values[field] === undefined` is impossible while it happens on every run —
  * the same reason `render.ts` reads its values through a Map.
  */
-function answerOf(values: Record<string, string>, field: string): string | undefined {
+function answerOf(
+    values: Record<string, StatutoryValue>,
+    field: string,
+): StatutoryValue | undefined {
     return Object.prototype.hasOwnProperty.call(values, field) ? values[field] : undefined;
+}
+
+/**
+ * One answer, written out for a person to read in a refusal.
+ *
+ * A list is joined with a comma HERE and nowhere else: this string is a
+ * sentence in an error message, never a value on the page. The renderer refuses
+ * to join one for the page precisely because a separator of ours must not be
+ * printed on an authority's document.
+ */
+function spelled(value: StatutoryValue): string {
+    return typeof value === 'string' ? value : value.join(', ');
+}
+
+/** Did the inspector answer anything at all? An empty list is the empty string's
+ *  own case and never reaches here -- see `asAnswer`. */
+function answered(value: StatutoryValue | undefined): boolean {
+    return value !== undefined && value !== '';
 }
 
 /**
@@ -116,22 +138,35 @@ export function refuseUnusableDependencies(declaration: StatutoryFormDeclaration
 /**
  * Does the form ask this question, given what has been answered so far?
  *
- * An ARRAY answer to the controlling field is deliberately not accepted here.
+ * An ARRAY answer to the controlling field is REFUSED rather than interpreted.
  * Every conditional question measured hangs off a single-choice question — the
  * 1802's questions 6, 8 and 9 each print "check only one" — and a multi-select
  * controller would have to decide whether "any of these" or "all of these"
  * opens the question, which is a reading of the form's text and not a default.
- * The values object at this point holds strings only (`collectStatutoryValues`
- * stringifies everything), so this is the whole vocabulary.
+ *
+ * ⚠️ It used to be impossible to reach: the values object held strings only, so
+ * the paragraph above was a description of the type. Multi-select answers now
+ * travel, so the rule needs teeth — and the two silent alternatives are both
+ * documents that print. Treating a list as "not answered" deletes the dependent
+ * question's key, so a box the form DID ask comes out blank; picking the first
+ * element answers a question with one of the several things the inspector said.
  */
-function applies(rule: StatutoryFieldDependency, values: Record<string, string>): boolean {
+function applies(rule: StatutoryFieldDependency, values: Record<string, StatutoryValue>): boolean {
     // An unresolved controlling field cannot be distinguished from one answered
     // with something outside the list, and both mean the same thing: the form
     // did not ask. `refuseUnusableDependencies` has already established that
     // SOMETHING is bound to it, so this is an inspection that has not reached
     // that question rather than a template that forgot it.
     const controlling = answerOf(values, rule.field);
-    return controlling !== undefined && rule.answerIsOneOf.includes(controlling);
+    if (controlling === undefined) return false;
+    if (typeof controlling !== 'string') {
+        fail(`"${rule.field}" decides whether this form asks other questions, and it was `
+            + `answered with ${controlling.length} options (${spelled(controlling)}). Every `
+            + 'conditional question on the published forms hangs off a "check only one" '
+            + 'question, and nothing here can say whether any or all of several answers opens '
+            + 'the next one. Bind that field to a single-choice answer.');
+    }
+    return rule.answerIsOneOf.includes(controlling);
 }
 
 /**
@@ -150,7 +185,7 @@ function applies(rule: StatutoryFieldDependency, values: Record<string, string>)
  */
 export function applyDependencies(
     declaration: StatutoryFormDeclaration,
-    values: Record<string, string>,
+    values: Record<string, StatutoryValue>,
 ): void {
     const dependencies = declaration.dependsOn;
     if (dependencies === undefined) return;
@@ -168,7 +203,8 @@ export function applyDependencies(
         }
         if (!bound) {
             fail(`the form asks "${ourField}" whenever "${rule.field}" is answered `
-                + `"${answerOf(values, rule.field) ?? ''}", and this template binds nothing to it. `
+                + `"${spelled(answerOf(values, rule.field) ?? '')}", and this template binds `
+                + 'nothing to it. '
                 + 'That is a question on the authority\'s page with no answer behind it, which '
                 + 'prints as a box the inspector skipped.');
         }
@@ -186,14 +222,15 @@ export function applyDependencies(
 function refuseAnswerToAQuestionNobodyAsked(
     ourField: string,
     rule: StatutoryFieldDependency,
-    values: Record<string, string>,
+    values: Record<string, StatutoryValue>,
 ): void {
     const own = answerOf(values, ourField);
-    if (own === undefined || own === '') return;
+    if (!answered(own)) return;
     const controlling = answerOf(values, rule.field);
-    fail(`"${ourField}" is answered "${own}", and this form only asks it when "${rule.field}" is `
+    fail(`"${ourField}" is answered "${spelled(own as StatutoryValue)}", and this form only asks `
+        + `it when "${rule.field}" is `
         + `${rule.answerIsOneOf.map((a) => `"${a}"`).join(' or ')} — it is answered `
-        + `${controlling === undefined || controlling === '' ? 'nothing' : `"${controlling}"`}. `
+        + `${answered(controlling) ? `"${spelled(controlling as StatutoryValue)}"` : 'nothing'}. `
         + 'One of the two answers is wrong, and printing both would tick boxes on the page that '
         + 'contradict each other.');
 }
@@ -215,20 +252,28 @@ function refuseAnswerToAQuestionNobodyAsked(
 function refuseLabelThatBelongsToAnotherAnswer(
     ourField: string,
     rule: StatutoryFieldDependency,
-    values: Record<string, string>,
+    values: Record<string, StatutoryValue>,
 ): void {
     const separator = rule.labelSeparator;
     if (separator === undefined) return;
     const own = answerOf(values, ourField);
     // Absent is a template that bound nothing, judged above; empty is a question
     // asked and not answered, which is an answer this form can carry.
-    if (own === undefined || own === '') return;
-    // Non-undefined by `applies`, which is the only path here; narrowed rather
-    // than asserted, because an assertion would survive that changing.
+    if (!answered(own)) return;
+    // Non-undefined by `applies`, which is the only path here — and never a list,
+    // because `applies` refuses one. Narrowed rather than asserted, because an
+    // assertion would survive that changing.
     const controlling = answerOf(values, rule.field);
-    if (controlling === undefined) return;
-    if (own.startsWith(`${controlling}${separator}`)) return;
-    fail(`"${rule.field}" is answered "${controlling}" and "${ourField}" is answered "${own}". `
+    if (typeof controlling !== 'string') return;
+    // EVERY chosen line, not the first. The sub-levels are the one conditional
+    // question a list can legitimately answer -- 1802 question 9 prints twelve
+    // boxes in one run -- and a set where three lines belong to the controlling
+    // letter and one does not is a page that contradicts itself while every
+    // count of answered fields still reads complete.
+    const chosen = typeof own === 'string' ? [own] : (own as readonly string[]);
+    const stray = chosen.find((one) => !one.startsWith(`${controlling}${separator}`));
+    if (stray === undefined) return;
+    fail(`"${rule.field}" is answered "${controlling}" and "${ourField}" is answered "${stray}". `
         + `The form prints those two under different letters — a "${ourField}" line belongs to `
         + `"${controlling}" only when it reads "${controlling}${separator}…". Change whichever of `
         + 'the two boxes was ticked in error.');

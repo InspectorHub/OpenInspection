@@ -161,11 +161,13 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         // so a template storing the printed label instead ("Full replacement")
         // produces a completely blank official form with every gate green.
         //
-        // ⚠️ THREE OF THE FORM'S 36 BLANKS ARE DELIBERATELY UNBOUND —
-        // `inspector_title`, `inspector_license_type` and
-        // `inspector_signature_date`, none of which this product has a source
-        // for. Two of the three are named in `StatutoryInspectionField`'s own
-        // comment as needing a column first. The reasoning for each is in
+        // ⚠️ ONE OF THE FORM'S 36 BLANKS IS DELIBERATELY UNBOUND —
+        // `inspector_title`, which this product has no source for. It was three:
+        // `inspector_license_type` and `inspector_signature_date` were unbound
+        // for the same reason and the reason was answered rather than lived
+        // with — both now read a column somebody fills in, and neither is an
+        // alias of a column that already existed. The reasoning for the one
+        // that is left is in
         // `server/data/seed-templates/fl-citizens-roof-rcf-1.gaps.md`, because
         // on a printed form "left blank on purpose" and "forgotten" look
         // identical and only that file can tell them apart.
@@ -175,9 +177,10 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         // otherwise — the reasoning is on the Texas entry above and applies
         // unchanged. It is OUR version of these bindings, not Citizens'
         // revision label, which is `RCF-1 03 25` and lives in the declaration.
-        semver:    '1.0.0',
+        semver:    '1.1.0',
         schema:    flCitizensRoof.schema,
-        changelog: 'First catalogue release of the Florida Citizens roof inspection package.',
+        changelog: 'Binds the signature date and the licence type, and takes every damage sign '
+            + 'the form asks for rather than one.',
         featured:  false,
         jurisdiction: 'FL',
     },

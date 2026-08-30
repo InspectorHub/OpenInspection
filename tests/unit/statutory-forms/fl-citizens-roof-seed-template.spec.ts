@@ -53,20 +53,19 @@ describe('FL Citizens roof RCF-1 03 25 seed template', () => {
         expect(ghosts).toEqual([]);
     });
 
-    it('leaves exactly the three fields nothing can answer unbound, and no others', () => {
+    it('leaves exactly the one field nothing can answer unbound, and no others', () => {
         // Named rather than counted: an unbound field renders blank, and a blank
         // box on an authority's form reads as an inspector who did not answer.
-        // Every one of these has a reason written down in
+        // The one that is left has its reason written down in
         // `server/data/seed-templates/fl-citizens-roof-rcf-1.gaps.md`. Adding a
-        // source for any of them means DELETING it from this list.
+        // source for it means DELETING it from this list — which is what
+        // happened to `inspector_license_type` and `inspector_signature_date`:
+        // both got a column of their own rather than an alias of one that
+        // already existed.
         const unbound = [...formFields].filter((f) => !(f in decl.bindings)).sort();
-        expect(unbound).toEqual([
-            'inspector_license_type',
-            'inspector_signature_date',
-            'inspector_title',
-        ]);
+        expect(unbound).toEqual(['inspector_title']);
         expect(formFields.size).toBe(36);
-        expect(Object.keys(decl.bindings)).toHaveLength(33);
+        expect(Object.keys(decl.bindings)).toHaveLength(35);
     });
 
     it('never names an item or attribute this template does not contain', () => {
@@ -127,17 +126,13 @@ describe('FL Citizens roof RCF-1 03 25 seed template', () => {
         )).not.toBeNull();
     });
 
-    it('cannot yet supply either field the form REQUIRES, and says so out loud', () => {
-        // ⚠️ THIS ASSERTS A GAP, NOT A FEATURE. `requiredFields` is
-        // [inspector_signature, inspector_signature_date]; the first is bound
-        // `from: 'signature'`, which deliberately emits NO key and which nothing
-        // downstream resolves (`placeSignature` has no production caller), and
-        // the second has no source at all. So the produce path refuses, and this
-        // template installs and asks every question while its PDF endpoint 500s.
-        //
-        // Written as an assertion so the day either gap is closed this test goes
-        // RED and somebody deletes the line rather than discovering the change by
-        // accident. gaps.md §1 and §2.1 carry the reasoning.
+    it('supplies the dated half of what the form REQUIRES, and routes the mark separately', () => {
+        // `requiredFields` is [inspector_signature, inspector_signature_date].
+        // The date is now an ordinary `from: 'inspection'` binding and emits a
+        // key like any other; the signature deliberately emits NONE, because a
+        // mark resolves by reference in the produce service and must never
+        // travel through this object. So exactly one of the two is missing here,
+        // and that one is supplied to the renderer through `signatures`.
         expect([...fieldMap.requiredFields].sort())
             .toEqual(['inspector_signature', 'inspector_signature_date']);
         const values = collectStatutoryValues(decl, schema, {}, {
@@ -145,18 +140,21 @@ describe('FL Citizens roof RCF-1 03 25 seed template', () => {
             property_address: 'B', property_city: null, property_state: null,
             property_zip: null, inspection_date: '08/27/2026', inspector_name: 'C',
             inspector_license: 'D', company_name: 'E', company_phone: 'F',
+            inspector_license_type: null, inspector_qualification: null,
+            inspector_signature_date: null,
+            owner_name: null, owner_email: null, owner_mailing_address: null,
+            owner_home_phone: null, owner_work_phone: null, owner_cell_phone: null,
+            employee_printed_name: null,
         }, {});
         const missing = fieldMap.requiredFields.filter((f) => !(f in values));
-        expect(missing).toEqual(['inspector_signature', 'inspector_signature_date']);
-        // Both numbers. 33 bindings less the signature, which resolves by
-        // reference and emits none, is 32 keys — so 4 of the form's 36 blanks
-        // reach the renderer with nothing at all: these two, plus the two in
-        // gaps.md §1 that are simply unbound.
-        expect(Object.keys(values)).toHaveLength(32);
+        expect(missing).toEqual(['inspector_signature']);
+        // Both numbers. 35 bindings less the signature, which resolves by
+        // reference and emits none, is 34 keys — so 2 of the form's 36 blanks
+        // reach the renderer with nothing at all: the signature, and
+        // `inspector_title` from gaps.md §1, which is simply unbound.
+        expect(Object.keys(values)).toHaveLength(34);
         expect([...formFields].filter((f) => !(f in values)).sort()).toEqual([
-            'inspector_license_type',
             'inspector_signature',
-            'inspector_signature_date',
             'inspector_title',
         ]);
     });
