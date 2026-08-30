@@ -25,6 +25,25 @@ function chosen(value: ItemAttributeValue): string[] {
     return typeof value === 'string' && value !== '' ? [value] : [];
 }
 
+/**
+ * Attribute labels are `--ih-fg-3`, and the ramp step below it is not available
+ * here.
+ *
+ * Measured in Chromium against the rendered `getComputedStyle`, on the card
+ * these panels are drawn on: `--ih-fg-4` scores **2.56:1 in light** (#94a3b8 on
+ * #ffffff) and **3.07:1 in dark** (#64748b on #1e293b), against a 4.5:1
+ * requirement. `--ih-fg-3` clears both -- 4.76:1 light, 5.71:1 dark.
+ *
+ * `lint:contrast` is green either way, and its own header says why: it only
+ * scores a class string that sets BOTH a colour and a size, and these labels
+ * set only the colour -- the 11px comes from the grid wrapper. That header
+ * counts 119 such `text-ih-fg-4`-on-a-card strings tree-wide and calls the
+ * size-independent rule a deliberately deferred extension. So this was never
+ * going to be caught by the gate; it was caught by measuring the screen.
+ *
+ * The boolean branch already said `fg-3` while its five siblings said `fg-4`,
+ * which is how a one-token drift stays invisible: nothing lines the two up.
+ */
 export function ItemAttributesPanel({ itemId, attributes, values, onChange }: ItemAttributesPanelProps) {
     if (!attributes || attributes.length === 0) return null;
     return (
@@ -35,7 +54,7 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                 if (attr.type === 'number') {
                     return (
                         <div key={key} className="col-span-6 md:col-span-3">
-                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">
+                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-0.5">
                                 {attr.name}{attr.unit ? ` (${attr.unit})` : ''}
                             </label>
                             <input
@@ -50,7 +69,7 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                 if (attr.type === 'select') {
                     return (
                         <div key={key} className="col-span-6 md:col-span-3">
-                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{attr.name}</label>
+                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-0.5">{attr.name}</label>
                             <select
                                 value={typeof v === 'string' ? v : ''}
                                 onChange={e => onChange(itemId, attr.id, e.target.value || null)}
@@ -78,7 +97,7 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                 if (attr.type === 'date') {
                     return (
                         <div key={key} className="col-span-6 md:col-span-3">
-                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{attr.name}</label>
+                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-0.5">{attr.name}</label>
                             <input
                                 type="date"
                                 value={typeof v === 'string' ? v : ''}
@@ -95,7 +114,7 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                         // boxes rather than one field, and squeezed into a
                         // quarter width every option wraps onto two lines.
                         <fieldset key={key} className="col-span-12 md:col-span-6">
-                            <legend className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">
+                            <legend className="block font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-0.5">
                                 {attr.name}
                             </legend>
                             <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -137,7 +156,7 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                 // text / fallback
                 return (
                     <div key={key} className="col-span-6 md:col-span-3">
-                        <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{attr.name}</label>
+                        <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-0.5">{attr.name}</label>
                         <input
                             type="text"
                             value={typeof v === 'string' ? v : ''}

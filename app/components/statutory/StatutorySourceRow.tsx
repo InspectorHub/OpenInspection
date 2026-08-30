@@ -141,8 +141,13 @@ export function StatutorySourceRow({
                     {m.statutory_source_ok({ revision: row.revision, formId: row.formId })}
                 </Banner>
             )}
+            {/* `overflow-wrap:anywhere` on the failure banner: it relays the
+                SERVER's sentence, which names the authority's publication URL,
+                and a URL has no spaces to wrap at. Measured at a 390px viewport
+                on the sibling marketplace refusal: the page body scrolled to
+                457px against a 390px client width. */}
             {result?.ok === false && (
-                <Banner tone="danger">
+                <Banner tone="danger" className="[overflow-wrap:anywhere]">
                     {/* Normal weight inside the banner, which is semibold by
                         default. That default is right for the one-line
                         failures it usually carries; this one is a paragraph,

@@ -168,7 +168,19 @@ export default function MarketplacePage() {
               is built in server code and is not in the message catalogue, so it
               arrives in English; a reader who cannot act is worse off than one
               reading an untranslated instruction they can. */}
-          <Banner tone="danger">{installFetcher.data.error || m.marketplace_install_error()}</Banner>
+          {/* `overflow-wrap:anywhere` because the sentence this Banner relays
+              is not ours and contains a URL. The statutory refusal ends with
+              the authority's own publication link -- a 130-character
+              citizensfla.com path with a uuid and a query string -- and a URL
+              has no spaces to wrap at. Measured at a 390px viewport: the page
+              body scrolled to 457px against a 390px client width, so the whole
+              page slid sideways to show one banner. `anywhere` rather than
+              `break-all`: it breaks the URL and leaves ordinary prose alone.
+              `StatutorySourceRow` reached for `break-all` on the hash and the
+              publisher link for the same reason. */}
+          <Banner tone="danger" className="[overflow-wrap:anywhere]">
+            {installFetcher.data.error || m.marketplace_install_error()}
+          </Banner>
           {/* BESIDE the server's sentence, never instead of it. That sentence
               is the remedy and it names an HTTP endpoint, which was the only
               way to supply the file when it was written; there is now a screen,
