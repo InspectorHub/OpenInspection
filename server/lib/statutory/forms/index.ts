@@ -1,8 +1,8 @@
 /**
- * The statutory forms this software ships with — and, today, the declaration
- * that it ships with none.
+ * The statutory forms this software ships with — today four: Texas TREC REI
+ * 7-6, and the three Florida forms published on 2026-08-30.
  *
- * ── Why this file exists while it is empty ──────────────────────────────────
+ * ── Why this file declares its own emptiness ────────────────────────────────
  * An empty list and a list that failed to load look identical to every reader
  * downstream, and "no statutory forms" is a sentence somebody has to be able to
  * check. So emptiness is DECLARED here, in `EMPTY_CATALOGUE_REASON`, and the
@@ -26,7 +26,39 @@
  */
 import { validateFieldMap, type FieldMap } from '../field-map';
 import { version as trecRei76Version, fieldMap as trecRei76Map } from './tx-trec-rei-7-6';
+import { version as flCitizens4pointVersion, fieldMap as flCitizens4pointMap } from './fl-citizens-4point';
+import { version as flCitizensRoofVersion, fieldMap as flCitizensRoofMap } from './fl-citizens-roof';
+import { version as flOirB11802Version, fieldMap as flOirB11802Map } from './fl-oir-b1-1802';
 import type { StatutoryFormVersion } from '../form-registry';
+
+/**
+ * ⚠️ THE FORM IDS BELOW ARE NOT SPELT CONSISTENTLY, AND ONE OF THEM IS WRONG.
+ *
+ * `form-registry.ts` states the rule where `formId` is declared: it NAMES A
+ * FORM, NEVER A REVISION, and its own example id is `tx_trec_rei`. The three
+ * Florida ids follow it — `fl_citizens_4point`, `fl_citizens_roof`,
+ * `fl_oir_b1_1802`, none carrying a revision. `tx_trec_rei_7_6` does not, and
+ * it is the one that is wrong.
+ *
+ * It is not a tidiness question. `versionForInspection` groups by `formId` and
+ * then picks by date, so publishing TREC's next revision under
+ * `tx_trec_rei_7_7` would produce a SECOND form id: the two revisions would
+ * never be compared with each other, and selecting a revision by inspection
+ * date — the mechanism this whole subsystem exists for — would silently stop
+ * working for that form.
+ *
+ * It is not corrected here because the id reaches four other places, and each
+ * one has to move with it: the seed template's `statutoryForm.formId`, the
+ * object-storage key `_platform/statutory-forms/tx_trec_rei_7_6/…` under which
+ * bytes have already been uploaded, the marketplace catalogue fixture, and the
+ * tests that name it. Renaming the id without migrating the stored bytes leaves
+ * a published revision whose PDF cannot be found — the deployment reports
+ * "upload the official file first" for a file it already has. So it is a change
+ * of its own, with a migration, rather than a rename dropped into this one.
+ *
+ * ⚠️ SO DO NOT COPY THE TREC ID'S SHAPE FOR A FIFTH FORM. The three Florida
+ * ones are the pattern to follow.
+ */
 
 /**
  * Why the two lists below are empty, or `null` once they are not.
@@ -42,10 +74,20 @@ import type { StatutoryFormVersion } from '../form-registry';
 export const EMPTY_CATALOGUE_REASON: string | null = null;
 
 /** Every revision published with this software. Selected by inspection date, never by "latest". */
-export const PUBLISHED_FORM_VERSIONS: readonly StatutoryFormVersion[] = [trecRei76Version];
+export const PUBLISHED_FORM_VERSIONS: readonly StatutoryFormVersion[] = [
+    trecRei76Version,
+    flCitizens4pointVersion,
+    flCitizensRoofVersion,
+    flOirB11802Version,
+];
 
 /** The hand-authored map for each of those revisions, one per (formId, version). */
-export const FIELD_MAPS: readonly FieldMap[] = [trecRei76Map];
+export const FIELD_MAPS: readonly FieldMap[] = [
+    trecRei76Map,
+    flCitizens4pointMap,
+    flCitizensRoofMap,
+    flOirB11802Map,
+];
 
 /**
  * The map for one revision, or `null` if this software carries none.

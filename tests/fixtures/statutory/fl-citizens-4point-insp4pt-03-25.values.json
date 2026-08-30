@@ -5,7 +5,9 @@
   "notes": [
     "Every ourField the candidate map names has a value here. A checkbox field takes one of the whenValue strings that field's own boxes carry — the slug vocabulary (yes / satisfactory / roof_each_slope), not the sentence the form prints. The renderer refuses an answer no box carries, so a value written the wrong way stops the form rather than producing a blank.",
     "The three supply-piping age blanks and the three drain-piping age blanks are mutually exclusive on a real submission — an inspector fills one of each. All three are filled here on purpose: this file exists to put a value through every mapping, and a blank one proves nothing about the coordinate underneath it.",
-    "The blanks on this form are narrow: the panel brand/model, the roof covering and the four roof date blanks are each about 41.5pt wide, which holds roughly eight characters at the 9pt the map declares. The values here are written to fit them, in the abbreviated form an inspector actually writes on paper. What nothing enforces is that they do: all 48 overlays declare a maxWidth and none declares a maxHeight, and fit.ts measures nothing at all unless both are given.",
+    "The blanks on this form are narrow: the panel brand/model, the roof covering and the four roof date blanks are each about 41.5pt wide, which holds roughly eight characters at the 9pt the map declares. The values here are written to fit them, in the abbreviated form an inspector actually writes on paper. All 49 overlays now declare BOTH a maxWidth and a maxHeight, so fit.ts measures every one of them — a value written too long for its blank is refused rather than wrapped down over the row beneath.",
+    "The signature block's date is inspector_signature_date, not inspection_date. Page 1 already asks 'Date Inspected:' and the software answers it with date_inspected; the date under 'I certify that the above statements are true and correct' is a second, later question, and it is dated two days after the visit here on purpose.",
+    "plumbing_fixtures_unsatisfactory_detail answers the prompt the form prints under the plumbing grid — 'If unsatisfactory, please provide comments/details'. It is a DIFFERENT box from additional_comments, which sits on the next page under its own prompt; the form prints two, so it asks two things.",
     "This is invented data about an invented property. Nothing here is a record of a real inspection, and no value is a real person, licence number, policy number or address.",
     "Read by scripts/verify-statutory-render.mjs. Correct a value in place; nothing generates this file."
   ],
@@ -70,6 +72,7 @@
     "plumbing.pipe_types": "other",
     "plumbing.pipe_year_installed": "2015",
     "plumbing.pipe_type_other_specify": "CPVC branches",
+    "plumbing_fixtures_unsatisfactory_detail": "Hall bath shower valve weeps at the escutcheon; the grout at the tub surround is cracked along the lower course and reads damp.",
     "roof[0].covering_material": "Shingle",
     "roof[0].roof_age_years": "8",
     "roof[0].remaining_useful_life_years": "12",
@@ -98,7 +101,7 @@
     "inspector_signature": "Ruth Delacroix",
     "inspector_title": "Licensed Home Inspector",
     "inspector_license_number": "HI-9042",
-    "inspection_date": "2026-08-26",
+    "inspector_signature_date": "2026-08-28",
     "inspector_company_name": "Harbor Line Inspections LLC",
     "inspector_license_type": "Florida Home Inspector",
     "inspector_work_phone": "(941) 555-0147"

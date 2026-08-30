@@ -92,11 +92,31 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         // operator which file to upload and where. Installing is a decision an
         // operator makes; seeding is not.
         //
-        // Only Texas appears here because only Texas is published. Three Florida
-        // forms have candidate field maps and no published revision, and a
-        // catalogue entry for a revision `PUBLISHED_FORM_VERSIONS` does not carry
-        // would be refused at install with "this software publishes no such
-        // revision" — a shelf entry that cannot be bought.
+        // ⚠️ ONLY TEXAS APPEARS HERE, AND IT IS NO LONGER BECAUSE ONLY TEXAS IS
+        // PUBLISHED. Since 2026-08-30 `PUBLISHED_FORM_VERSIONS` carries four
+        // revisions: this one and the three Florida forms
+        // (`fl_citizens_4point`, `fl_citizens_roof`, `fl_oir_b1_1802`). The
+        // install-time refusal those three used to hit — "this software
+        // publishes no such revision" — no longer applies to them.
+        //
+        // What is missing is the other half, and it is not a line in this file.
+        // A `kind: 'statutory'` entry's `schema` IS A TEMPLATE: sections, items,
+        // and a `statutoryForm` declaration binding each of the form's field
+        // names to one of them (`assertStatutorySchema` validates exactly that,
+        // and `bindings: {}` would install a pack that produces a blank official
+        // document). Publishing a revision says which PDF and where each value
+        // is drawn; a catalogue entry additionally has to ask the inspector the
+        // form's questions, in the form's own printed wording — 93 of them on
+        // the four-point form, 96 on the 1802, 36 on the roof form. The signed
+        // candidates carry coordinates and field names; they do not carry those
+        // printed labels, so the template cannot be generated from them and
+        // inventing the wording would put a question to an inspector that the
+        // authority never asked.
+        //
+        // So the three Florida packs are template-authoring work with the forms
+        // in hand, not a fixture edit, and until that is done a workspace gets
+        // the correct answer today: the revisions exist and nothing declares
+        // them.
         name:      trecRei76.name,
         kind:      'statutory',
         /**

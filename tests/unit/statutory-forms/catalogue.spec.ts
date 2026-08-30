@@ -35,13 +35,37 @@ describe('the statutory form catalogue', () => {
         }
     });
 
-    it('publishes the number of forms it claims to — today, one', () => {
+    it('publishes the number of forms it claims to — today, four', () => {
         // The census, stated rather than looped over. When this fails because a
         // form was published or withdrawn, update the number and re-read every
         // test below: each one's reach changes with this line.
-        expect(PUBLISHED_FORM_VERSIONS).toHaveLength(1);
-        expect(FIELD_MAPS).toHaveLength(1);
-        expect(PUBLISHED_FORM_VERSIONS[0].formId).toBe('tx_trec_rei_7_6');
+        expect(PUBLISHED_FORM_VERSIONS).toHaveLength(4);
+        expect(FIELD_MAPS).toHaveLength(4);
+        expect(PUBLISHED_FORM_VERSIONS.map((v) => v.formId)).toEqual([
+            'tx_trec_rei_7_6',
+            'fl_citizens_4point',
+            'fl_citizens_roof',
+            'fl_oir_b1_1802',
+        ]);
+    });
+
+    it('has one form id that names a revision, and it is the known one', () => {
+        // ⚠️ `tx_trec_rei_7_6` is WRONG — `form-registry.ts` says a form id
+        // names a form and never a revision, and the three Florida ids follow
+        // that. It is asserted here so the inconsistency is a recorded fact
+        // rather than a pattern the next form gets copied from; the fix is
+        // tracked separately because the id reaches the seed template, an R2
+        // key holding uploaded bytes, the catalogue fixture and these tests.
+        //
+        // Judged against each row's OWN revision label rather than a pattern
+        // chosen here: an id "carries a revision" when the label, spelt the way
+        // an id is spelt, is a substring of it. A hand-written regex would only
+        // ever agree with itself.
+        const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+        const revisionish = PUBLISHED_FORM_VERSIONS
+            .filter((v) => v.formId.includes(slug(v.version)))
+            .map((v) => v.formId);
+        expect(revisionish).toEqual(['tx_trec_rei_7_6']);
     });
 
     it('pairs every revision with exactly one field map, both ways', () => {

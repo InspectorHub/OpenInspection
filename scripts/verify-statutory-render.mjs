@@ -86,6 +86,9 @@ import { renderStatutoryForm } from '../server/lib/statutory/render.ts';
 import { collectStatutoryValues } from '../server/lib/statutory/values.ts';
 import { partOfValue } from '../server/lib/statutory/value-parts.ts';
 import { fieldMap as trecRei76Map } from '../server/lib/statutory/forms/tx-trec-rei-7-6.ts';
+import { fieldMap as flCitizens4pointMap } from '../server/lib/statutory/forms/fl-citizens-4point.ts';
+import { fieldMap as flCitizensRoofMap } from '../server/lib/statutory/forms/fl-citizens-roof.ts';
+import { fieldMap as flOirB11802Map } from '../server/lib/statutory/forms/fl-oir-b1-1802.ts';
 import { drawnRuns, runsInContentStream } from '../tests/unit/helpers/pdf-drawn-runs.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -121,35 +124,29 @@ function answerNames(value, whenValue) {
 const COORDINATE_TOLERANCE = 0.02;
 
 /**
- * Every statutory form this harness knows about — INCLUDING the one it does not
- * render.
+ * Every statutory form this harness knows about.
  *
- * Citizens' roof form is listed with `map: null` on purpose. When this was
- * written only its PDF had been downloaded and there was no field map for it at
- * all, so no value set was authored, and inventing one to make the list read as
- * four is exactly what must not happen. A harness that quietly enumerated three
- * would report complete coverage of a set it had silently trimmed, which is this
- * repository's oldest failure shape.
+ * ⚠️ ALL FOUR NOW RENDER THROUGH THE PUBLISHED MODULE, not through the
+ * candidate JSON beside the PDFs. That is the point: the candidate is the
+ * artifact a person signed, and the module is the software an inspector's
+ * document comes out of. Verifying the candidate proved something about a file
+ * nothing imports. The `candidate` key stays on every row so the sweep at the
+ * end can tell "covered through the module generated from it" from "nothing has
+ * ever rendered this" — two states that look identical in a directory listing.
+ * Whether a module has since drifted from the candidate it was generated from
+ * is `lint:statutory-fidelity`'s question, not this one's.
  *
- * ⚠️ That is the DECISION, not a claim about the disk. A map for that form
- * appeared beside the PDFs the same day this was written. So the run looks for
- * one, says what it found, and there is a sweep of the whole candidates
- * directory at the end — a table somebody typed cannot notice a file somebody
- * else added.
+ * The `map: null` arm below it is kept even though no row uses it today. It is
+ * how a form whose bytes are held but whose map does not exist yet is declared
+ * — and the declaration has to outlive the particular form that needed it, or
+ * the next one gets quietly dropped off the list instead.
  */
 const FORMS = [
     {
         formId: 'tx_trec_rei_7_6',
         label: 'TX TREC REI 7-6',
         pdf: 'tx-trec-rei-7-6-fillable.pdf',
-        // The PUBLISHED map, imported from the module that ships it — not the
-        // candidate JSON beside the PDFs. This one is live software.
         map: { kind: 'published', module: 'server/lib/statutory/forms/tx-trec-rei-7-6.ts', value: trecRei76Map },
-        // The candidate the published module was generated from. Named so the
-        // sweep at the end can tell "covered through the module that ships it"
-        // from "nothing has ever rendered this" — two states that look the same
-        // from a directory listing. Whether the two have since drifted apart is
-        // `lint:statutory-fidelity`'s question, not this one's.
         candidate: 'tx-trec-rei-7-6.candidate.json',
         values: 'tests/fixtures/statutory/tx-trec-rei-7-6.values.json',
     },
@@ -157,27 +154,29 @@ const FORMS = [
         formId: 'fl_oir_b1_1802',
         label: 'FL OIR-B1-1802',
         pdf: 'floir-oir-b1-1802-rev-04-26-CURRENT.pdf',
-        map: { kind: 'candidate', file: 'fl-oir-b1-1802-rev-04-26.candidate.json' },
+        map: { kind: 'published', module: 'server/lib/statutory/forms/fl-oir-b1-1802.ts', value: flOirB11802Map },
+        candidate: 'fl-oir-b1-1802-rev-04-26.candidate.json',
         values: 'tests/fixtures/statutory/fl-oir-b1-1802-rev-04-26.values.json',
     },
     {
         formId: 'fl_citizens_4point',
         label: 'FL Citizens 4-Point',
         pdf: 'fl-citizens-4point-Insp4pt-03-25.pdf',
-        map: { kind: 'candidate', file: 'fl-citizens-4point-insp4pt-03-25.candidate.json' },
+        map: { kind: 'published', module: 'server/lib/statutory/forms/fl-citizens-4point.ts', value: flCitizens4pointMap },
+        candidate: 'fl-citizens-4point-insp4pt-03-25.candidate.json',
         values: 'tests/fixtures/statutory/fl-citizens-4point-insp4pt-03-25.values.json',
     },
     {
-        formId: 'fl_citizens_roof_rcf_1',
+        // ⚠️ `fl_citizens_roof`, with no revision in it. This row said
+        // `fl_citizens_roof_rcf_1` while it rendered nothing, and a form id
+        // nothing selects by is a string no reader can be wrong about. It is
+        // the published id now, and the published id is what the map carries.
+        formId: 'fl_citizens_roof',
         label: 'FL Citizens Roof RCF-1',
         pdf: 'fl-citizens-roof-RCF-1-03-25.pdf',
-        map: null,
+        map: { kind: 'published', module: 'server/lib/statutory/forms/fl-citizens-roof.ts', value: flCitizensRoofMap },
         candidate: 'fl-citizens-roof-rcf-1-03-25.candidate.json',
-        notCoveredBecause: 'when this harness was built there was no field map for this form at '
-            + 'all — only the PDF had been downloaded — so no value set was authored for it, and '
-            + 'none may be invented to make this list read as four. Whether that is still true is '
-            + 'not asserted here: the run below LOOKS, and says what it found',
-        values: null,
+        values: 'tests/fixtures/statutory/fl-citizens-roof-rcf-1-03-25.values.json',
     },
 ];
 
@@ -595,11 +594,27 @@ for (const form of FORMS) {
     // ── The map ────────────────────────────────────────────────────────────
     let map;
     let signatureNote;
+    /**
+     * The repeated blocks, which the PUBLISHED map does not carry.
+     *
+     * `FieldMap` has no `groups`: a repeated block is part of the template
+     * DECLARATION, not of the map from our fields onto the page. The collector
+     * check below is the only place `electrical_panel[0]` and `[1]` can be
+     * caught being written into each other's column, so the blocks are read
+     * from the candidate the module was generated from rather than lost the day
+     * a form moved from candidate-rendering to module-rendering — which would
+     * have silently turned that check off for the two forms that have any.
+     */
+    let groups = [];
     if (form.map.kind === 'published') {
         map = form.map.value;
         publishedCandidates.set(form.candidate, form.map.module);
         signatureNote = `signed by ${map.checkedBy} on ${new Date(map.checkedAt).toISOString().slice(0, 10)}`;
         line(`   map: ${form.map.module} (published)`);
+        const candidatePath = join(candidateDir, form.candidate);
+        if (existsSync(candidatePath)) {
+            groups = JSON.parse(readFileSync(candidatePath, 'utf8')).groups ?? [];
+        }
     } else {
         const candidatePath = join(candidateDir, form.map.file);
         if (!existsSync(candidatePath)) {
@@ -611,6 +626,7 @@ for (const form of FORMS) {
         const candidateBytes = readFileSync(candidatePath);
         const loaded = candidateToFieldMap(JSON.parse(candidateBytes.toString('utf8')));
         map = loaded.map;
+        groups = map.groups ?? [];
         renderedCandidates.add(form.map.file);
         // The candidate's OWN hash, beside the PDF's. These files are authored
         // by hand and revised while work is in flight — one of them was
@@ -687,13 +703,13 @@ for (const form of FORMS) {
     }
 
     // ── The value collector, where the map declares repeated blocks ────────
-    const collector = checkTheValueCollector(map, values);
+    const collector = checkTheValueCollector({ ...map, groups }, values);
     if (!collector.ran) {
-        line('   collector: this map declares no repeated blocks, so there is nothing');
+        line('   collector: this form declares no repeated blocks, so there is nothing');
         line('      positional to get wrong before the render.');
     } else if (collector.problems.length === 0) {
         line(`   collector: the real collector reproduced all ${namedFields.length} value(s) from a `
-            + `declaration with ${map.groups.length} repeated block(s), ${collector.slots} of them`);
+            + `declaration with ${groups.length} repeated block(s), ${collector.slots} of them`);
         line(`      positional slots, and refused one instance too many — ${collector.refusal}`);
     } else {
         failed = true;
