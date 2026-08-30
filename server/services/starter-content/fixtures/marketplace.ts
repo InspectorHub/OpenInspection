@@ -20,14 +20,31 @@
  * thirteen, and called 250 entries "small".
  */
 import { CANNED_COMMENTS } from './canned-comments';
+import trecRei76 from '../../../data/seed-templates/trec-rei-7-6.json';
 
 export interface StarterMarketplaceLibraryFixture {
     name:      string;
-    kind:      'comments' | 'templates';
+    /**
+     * Which local table an import writes, and how an un-import undoes it. The
+     * database enum has carried three values since `statutory` arrived; this
+     * type carried two, so the one kind that most needed a catalogue entry was
+     * the one no fixture could express.
+     */
+    kind:      'comments' | 'templates' | 'statutory';
     semver:    string;
     schema:    unknown;
     changelog: string;
     featured:  boolean;
+    /**
+     * The state or country whose rules the pack is written to, or absent when it
+     * is written to none.
+     *
+     * An exact-match browse filter and the only column that can say a pack is
+     * not for everybody. Set on a statutory entry because a jurisdiction is what
+     * a statutory form IS: an inspector in Ohio should be able to tell at a
+     * glance, and the filter exists on the API already.
+     */
+    jurisdiction?: string;
 }
 
 /**
@@ -64,5 +81,51 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         },
         changelog: 'Initial trial-onboarding starter library.',
         featured:  true,
+    },
+    {
+        // The one statutory package this software publishes today. It is here
+        // rather than in `template-seed.service.ts`'s auto-seed list on purpose:
+        // a statutory template renders onto the Commission's own PDF, which this
+        // repository does not carry, so handing one to every new workspace would
+        // mint a template that cannot produce anything. The marketplace install
+        // path refuses exactly that (`assertStatutoryInstallable`) and tells the
+        // operator which file to upload and where. Installing is a decision an
+        // operator makes; seeding is not.
+        //
+        // Only Texas appears here because only Texas is published. Three Florida
+        // forms have candidate field maps and no published revision, and a
+        // catalogue entry for a revision `PUBLISHED_FORM_VERSIONS` does not carry
+        // would be refused at install with "this software publishes no such
+        // revision" — a shelf entry that cannot be bought.
+        name:      trecRei76.name,
+        kind:      'statutory',
+        /**
+         * ⚠️ BUMP THIS WHENEVER `trec-rei-7-6.json` CHANGES, and never otherwise.
+         *
+         * `seedMarketplaceLibraries` refreshes a row exactly when this string
+         * differs from the one already in the database, and the "update
+         * available" badge is the same equality test against what a workspace
+         * imported. So a corrected binding that ships without a bump here
+         * reaches no deployment that already installed the pack, and nobody is
+         * told: their template keeps producing the document with the old
+         * binding, and every surface reports success.
+         *
+         * It is NOT the authority's revision label — that lives in the
+         * declaration inside the schema and answers a different question (which
+         * printed form these bindings were authored against). A new TREC
+         * revision is a new field map and a new pack; a bump here is us
+         * correcting our own work against the same printed form.
+         */
+        semver:    '1.0.0',
+        // The template document itself, imported rather than restated. It is the
+        // single source both the local seed file and this catalogue entry read,
+        // because two hand-maintained copies of one 41-section form is how the
+        // last one drifted into a document with thirteen blank sections.
+        schema:    trecRei76.schema,
+        changelog: 'First catalogue release of the Texas TREC REI 7-6 package.',
+        // Not featured. Featured is the top of the shelf for everyone, and this
+        // pack is useful to inspectors in one state.
+        featured:  false,
+        jurisdiction: 'TX',
     },
 ];

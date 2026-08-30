@@ -96,13 +96,25 @@ export interface DeploymentProfile {
      *  different entitlement. */
     hasManagedCompliance: boolean;
 
-    /** Whether the content marketplace SURFACE exists in this deployment. False
-     *  in standalone: the catalogue is curated first-party and there is no path
-     *  by which anything reaches it, so the browse route 404s rather than
-     *  rendering an empty shelf. This is about the surface EXISTING, not about
-     *  entitlement — the API handlers in `server/api/marketplace.ts` stay
-     *  ungated in both modes (OI #293 reuses them). */
-    hasContentMarketplace: boolean;
+    // `hasContentMarketplace` was removed here, and the removal is the fix
+    // rather than a tidy-up. It answered two questions at once — "may this
+    // deployment BROWSE and INSTALL catalogue entries" and "may it PUBLISH
+    // them" — whose standalone answers are opposite, and it answered both with
+    // the publishing one. Its comment justified the standalone 404 with "there
+    // is no path by which anything reaches the catalogue", which was never
+    // true: `server/services/starter-content/seed-marketplace-libraries.ts`
+    // upserts the catalogue from this repository's own fixtures, and its caller
+    // `server/api/admin/admin-content-install.ts` is gated on role, not on
+    // mode. So a self-hosted deployment always had a populated catalogue and a
+    // 404 in front of it.
+    //
+    // Consumption is now unconditional, which leaves nothing mode-specific to
+    // name: a capability whose two profiles agree is not a capability, it is a
+    // constant with a table row. Publishing keeps its own name and its own
+    // reader — it rides `server/portal/`, mounted only when
+    // `hasPortalIntegrationApi` is true, and that is a fact about the topology
+    // rather than a gate: a standalone deployment has no platform on the other
+    // end and nobody who could act as one.
 
     /** Whether the PLATFORM supplies the Intuit app a tenant connects through.
      *  True in saas: one published app serves every tenant, and asking an
@@ -192,7 +204,6 @@ export const STANDALONE_PROFILE: DeploymentProfile = {
     mcpApiRoute: '/mcp',
     videoBackendManaged: false,
     hasManagedCompliance: false,
-    hasContentMarketplace: false,
     qboAppManaged: false,
     botProtectionMandatory: false,
     tenantRecordOwnedByPortal: false,
@@ -214,7 +225,6 @@ export const SAAS_PROFILE: DeploymentProfile = {
     mcpApiRoute: '/company/',
     videoBackendManaged: true,
     hasManagedCompliance: true,
-    hasContentMarketplace: true,
     qboAppManaged: true,
     botProtectionMandatory: true,
     tenantRecordOwnedByPortal: true,

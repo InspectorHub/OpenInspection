@@ -36,10 +36,27 @@ export async function insertLibraryComments(
     entries: LibraryInsertEntry[],
     firstId?: string,
 ): Promise<number> {
-    // 18 x 8 = 144 placeholders, still under the 150 this loop shipped with at
-    // six columns. Widening a row without narrowing the chunk is how it would
-    // quietly start binding past that ceiling.
-    const CHUNK = 18;
+    // D1 binds at most 100 parameters per statement. DERIVED from the column
+    // count rather than written down, because a written-down number is what
+    // this was and what it got wrong: the constant was 18, the comment beside
+    // it reasoned "18 x 8 = 144, still under the 150 this loop shipped with",
+    // and there is no 150 — `starter-content/batch-insert.ts` states the real
+    // ceiling and divides by it. So every comment-pack import failed with
+    // `D1_ERROR: too many SQL variables`, in BOTH deployment modes, for as long
+    // as the row was eight columns wide.
+    //
+    // Nothing caught it because nothing could reach it: the only comment pack in
+    // the catalogue is seeded from repository fixtures, and until this round the
+    // browse page 404'd outside saas — so the one button that runs this line had
+    // never been pressed. The unit tests around this file stub the driver and
+    // count rows, which is exactly the shape that cannot see a bind-limit fault.
+    //
+    // Keep the divisor and the placeholder list agreeing: COLUMNS is the length
+    // of the tuple built below, and adding a column now narrows the chunk by
+    // itself instead of silently overrunning the ceiling.
+    const D1_MAX_BOUND_PARAMS = 100;
+    const COLUMNS = 8;
+    const CHUNK = Math.max(1, Math.floor(D1_MAX_BOUND_PARAMS / COLUMNS));
     // The edit marker (#348). Every imported row records the hash of the text it
     // arrived with, which is the only thing that later lets a re-import tell an
     // untouched row from one the inspector rewrote. Computed here, at the single

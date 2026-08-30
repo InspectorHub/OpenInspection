@@ -186,12 +186,24 @@ const TemplateItemSchema = z.discriminatedUnion('type', [
     PhotoOnlyItemSchema,
 ]);
 
-// S3-5 — tighten section title to surface obviously-bogus imports
-// (e.g. someone pasting an entire paragraph as a "title"). Current
-// longest seed section title is 34 chars.
+// S3-5 — a section title is bounded to surface obviously-bogus imports, the
+// case being somebody pasting an entire paragraph into a "title".
+//
+// ⚠️ The bound was 50, chosen against a survey that said "current longest seed
+// section title is 34 chars". That survey went stale twice over, and the second
+// time it refused content this repository ships: the Texas TREC REI 7-6
+// template's third section is `III. Heating, Ventilation and Air Conditioning
+// Systems` — 54 characters, and the Commission's own wording read off the
+// promulgated form. Nothing caught it, because that template reaches a
+// workspace only through the marketplace and standalone could not open the
+// marketplace at all; the refusal was unreachable rather than absent.
+//
+// 120 keeps the rule's actual purpose — one heading, never a paragraph — with
+// room for an authority whose headings are longer than ours. Longest across all
+// 17 seed templates today: 54 (TREC), then 44 (InterNACHI), then 36.
 const TemplateSectionSchema = z.object({
     id:         z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-    title:      z.string().min(1).max(50).describe('TODO describe title field for the OpenInspection MCP integration'),
+    title:      z.string().min(1).max(120).describe('TODO describe title field for the OpenInspection MCP integration'),
     icon:       z.string().optional().describe('TODO describe icon field for the OpenInspection MCP integration'),
     identifier: z.string().optional().describe('TODO describe identifier field for the OpenInspection MCP integration'),
     items:      z.array(TemplateItemSchema).describe('TODO describe items field for the OpenInspection MCP integration'),

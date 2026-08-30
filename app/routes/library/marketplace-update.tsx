@@ -21,8 +21,6 @@ import { Form, redirect, useActionData, useLoaderData, useNavigate, useNavigatio
 import type { Route } from "./+types/marketplace-update";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { getCloudflareEnv } from "~/lib/load-context";
-import { getDeploymentProfile } from "../../../server/lib/deployment-profile";
 import { Banner, Button, Card, EmptyState, PageHeader, RadioCardGroup } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { EditedCommentPair, type EditedCommentPairData } from "~/components/marketplace/EditedCommentPair";
@@ -59,11 +57,10 @@ type ReplaceClient = {
 };
 
 export async function loader({ request, context, params }: Route.LoaderArgs) {
-  // Same gate as the marketplace page it is reached from: where there is no
-  // catalogue there is no update to review, and 404 is the honest answer.
-  if (!getDeploymentProfile(getCloudflareEnv(context)).hasContentMarketplace) {
-    throw new Response("Not Found", { status: 404 });
-  }
+  // No deployment gate, matching the marketplace page this is reached from: the
+  // catalogue exists in every mode, so an update to review can exist in every
+  // mode. The refusals that remain are about this workspace and this entry (not
+  // imported, already current, wrong kind) and the API answers them below.
   const token = await requireToken(context, request);
   const api = createApi(context, { token }) as unknown as { marketplace: ReplaceClient };
   const res = await api.marketplace.libraries[":libraryId"].imports.replace.preview.$get({

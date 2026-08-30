@@ -24,7 +24,27 @@ export async function action({ request, context }: Route.ActionArgs) {
   };
   const res = await marketplace[":id"].import.$post({ param: { id } });
   if (!res.ok) {
-    return { ok: false as const, error: "Couldn't install this template. Please try again." };
+    // RELAY the server's own sentence when it wrote one.
+    //
+    // The refusal a self-hosted operator hits most is a statutory package whose
+    // authority PDF is not in storage yet, and that message is the whole remedy:
+    // it names the revision, the endpoint to upload to, the sha256 it is checked
+    // against, and where the authority publishes the file. Replacing it with
+    // "Couldn't install this template. Please try again." threw all of that away
+    // and, worse, gave advice that is false — retrying installs nothing, ever,
+    // until somebody uploads a file they were never told about.
+    //
+    // A refusal that carries no message of its own (a gateway error, an
+    // unparseable body) leaves this undefined, and the page falls back to its
+    // own localised sentence.
+    const detail = await res.json()
+      .then((b) => (b as { error?: { message?: string } })?.error?.message)
+      .catch(() => undefined);
+    // No hardcoded fallback sentence here on purpose: when the server said
+    // nothing, the PAGE's own localised message is what a reader should see,
+    // and duplicating an English one in this file would put a second, untracked
+    // copy of that copy outside the message catalogue.
+    return { ok: false as const, error: detail };
   }
   const body = (await res.json()) as { data?: { localTemplateId?: string } };
   return { ok: true as const, localTemplateId: body.data?.localTemplateId ?? null };

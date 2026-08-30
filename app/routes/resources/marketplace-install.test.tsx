@@ -46,6 +46,34 @@ describe("marketplace-install action", () => {
     expect(res).toMatchObject({ ok: false });
   });
 
+  it("relays the server's own refusal instead of a generic retry sentence", async () => {
+    // The refusal that matters is a statutory package whose authority PDF is not
+    // in storage: the message names the upload endpoint, the revision and where
+    // the authority publishes the file, and it is the only place a self-hosted
+    // operator is told any of that. It also contradicts "please try again" —
+    // retrying installs nothing until the file exists.
+    importPost.mockResolvedValue(new Response(
+      JSON.stringify({ success: false, error: { message: 'This package needs the official file first. Upload it at POST /api/admin/statutory-forms/tx_trec_rei_7_6/source' } }),
+      { status: 409, headers: { 'content-type': 'application/json' } },
+    ));
+    const res = await post({ templateId: "mkt-1" });
+    expect(res).toMatchObject({ ok: false });
+    expect((res as { error: string }).error).toContain("/api/admin/statutory-forms/");
+  });
+
+  it("invents no sentence when the refusal carries no message", async () => {
+    // The control for the test above. Without it, a route that returned the
+    // relayed message for EVERY refusal — including one whose body is an HTML
+    // error page — would pass the relay test just as happily, and the reader
+    // would get "<html>502</html>" in a banner. Left undefined here on purpose:
+    // the page owns the fallback, in the message catalogue where it can be
+    // translated.
+    importPost.mockResolvedValue(new Response("<html>502</html>", { status: 502 }));
+    const res = await post({ templateId: "mkt-1" });
+    expect(res).toMatchObject({ ok: false });
+    expect((res as { error?: string }).error).toBeUndefined();
+  });
+
   it("rejects a missing template id without calling the endpoint", async () => {
     const res = await post({});
     expect(importPost).not.toHaveBeenCalled();

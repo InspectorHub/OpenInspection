@@ -55,6 +55,9 @@ export async function seedMarketplaceLibraries(
         changelog:     lib.changelog,
         downloadCount: 0,
         featured:      lib.featured,
+        // Absent on a pack written for everybody, which is most of them. The
+        // column is nullable for exactly that reason.
+        jurisdiction:  lib.jurisdiction ?? null,
         createdAt:     now,
         updatedAt:     now,
     }));
@@ -72,6 +75,10 @@ export async function seedMarketplaceLibraries(
             schema:    lib.schema,
             changelog: lib.changelog,
             featured:  lib.featured,
+            // Refreshed with the rest of the content: a pack that changes which
+            // jurisdiction it is written for and keeps the old label is worse
+            // than one that never carried a label at all.
+            jurisdiction: lib.jurisdiction ?? null,
             updatedAt: now,
         }).where(eq(marketplaceLibraries.id, row.id));
         refreshed += 1;

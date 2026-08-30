@@ -3,8 +3,6 @@ import { useFetcher, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/marketplace";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { getCloudflareEnv } from "~/lib/load-context";
-import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination, Banner } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { usePagination } from "~/hooks/usePagination";
@@ -20,25 +18,24 @@ export function meta() {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  // SaaS-only surface. In standalone the catalogue is empty and there is no
-  // path by which anything reaches it, so a 404 is the honest answer — the
-  // alternative is the "Marketplace is empty" screen this spec exists because
-  // of. Checked before auth: the page does not exist in this mode, which is
-  // true regardless of who is asking.
+  // NO DEPLOYMENT GATE, and its absence is the design rather than an omission.
   //
-  // The API handlers (`server/api/marketplace.ts`) are deliberately left
-  // ungated — harmless once nothing links to them, and the marketplace
-  // unification work (OI #293) reuses them.
+  // This loader used to 404 outside saas, on the grounds that a standalone
+  // catalogue was empty and nothing could ever reach it. The second half was
+  // false the day it was written: `seed-marketplace-libraries.ts` upserts the
+  // catalogue from this repository's own fixtures, and its caller
+  // (`server/api/admin/admin-content-install.ts`) is gated on role, not on
+  // deployment mode. So a self-hosted deployment had a populated catalogue and
+  // a locked door in front of it, and could install nothing at all.
   //
-  // Read through the capability seam rather than the raw deployment-mode var
-  // (see server/lib/deployment-profile.ts). This route and the #308 gate landed
-  // in the same round, and the first draft branched on the mode directly, which
-  // is the exact pattern that gate now forbids. The capability states what is
-  // actually being asked — does this surface exist here — instead of naming the
-  // deployment that happens to imply it today.
-  if (!getDeploymentProfile(getCloudflareEnv(context)).hasContentMarketplace) {
-    throw new Response("Not Found", { status: 404 });
-  }
+  // The line that IS mode-specific runs elsewhere: publishing a catalogue row
+  // across workspaces lives under `server/portal/`, which mounts only when
+  // `hasPortalIntegrationApi` holds. That is a fact about the topology and not
+  // a gate — a self-hosted deployment has no platform on the other end. Nothing
+  // here publishes; an operator installs what their own build already ships.
+  //
+  // The API handlers (`server/api/marketplace.ts`) were always ungated in both
+  // modes, which is why this page is all that had to change.
   const token = await requireToken(context, request);
   const url = new URL(request.url);
   const page     = url.searchParams.get("page")     ?? "1";
@@ -47,7 +44,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const api = createApi(context, { token });
     const res = await api.marketplace.index.$get({ query: { page, pageSize } });
     if (!res.ok) {
-      return { templates: [] as unknown[], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 }, loadFailed: false };
+      // A refused request is a FAILED load, not an empty catalogue. This branch
+      // said `loadFailed: false`, so an API error rendered the "Marketplace is
+      // empty" screen — the exact reading this page's own design set out to
+      // avoid, arrived at from the other direction. Observed on 2026-08-30
+      // against a database one migration behind: four catalogue rows on disk,
+      // a 500 from the query, and a page that said the shelf was bare.
+      return { templates: [] as unknown[], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 }, loadFailed: true };
     }
     const body = await res.json() as { data?: unknown[]; meta?: { total: number; page: number; pageSize: number; totalPages: number } };
     return {
@@ -155,7 +158,17 @@ export default function MarketplacePage() {
 
       {installFetcher.data && installFetcher.data.ok === false && (
         <div className="mt-3">
-          <Banner tone="danger">{m.marketplace_install_error()}</Banner>
+          {/* The SERVER's sentence when it wrote one, and only otherwise the
+              generic line. A statutory install refused for want of the
+              authority's PDF answers with the revision, the endpoint to upload
+              to and where the authority publishes the file — the entire remedy,
+              which the generic copy replaced with "Please try again", advice
+              that is not merely unhelpful but false: retrying cannot work until
+              somebody uploads a file they were never told about. That sentence
+              is built in server code and is not in the message catalogue, so it
+              arrives in English; a reader who cannot act is worse off than one
+              reading an untranslated instruction they can. */}
+          <Banner tone="danger">{installFetcher.data.error || m.marketplace_install_error()}</Banner>
         </div>
       )}
 

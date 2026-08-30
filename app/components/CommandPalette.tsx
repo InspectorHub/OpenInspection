@@ -116,18 +116,6 @@ export function CommandPalette({
   const navigate = useNavigate();
   const recentsFetcher = useFetcher<{ inspections: Array<Record<string, unknown>> }>();
   const sessionCtx = useSessionContext();
-  /**
-   * The capability, not the mode — `marketplace.tsx` enforces this same one.
-   * Reading `branding.isSaas` here was the only answer REACHABLE until the
-   * capability was put on the session-context payload.
-   *
-   * Both `?.` are load-bearing. Guarding only the context reads as fail-closed
-   * and is not: a session context WITHOUT `deployment` — which is every fixture
-   * written before that field shipped, and any cached payload from an older
-   * deploy — throws on the property access and takes the whole route down. A
-   * crash is not a closed door.
-   */
-  const hasMarketplace = sessionCtx?.deployment?.hasContentMarketplace === true;
 
   // F6 — Build booking link action dynamically from session context
   const bookingActions = useMemo(() => {
@@ -210,7 +198,7 @@ export function CommandPalette({
           to: `/inspections/${insp.id}`,
         };
       });
-      sources = [...getPages(hasMarketplace), ...recents, ...getSettings(), ...dynamicQuickActions];
+      sources = [...getPages(), ...recents, ...getSettings(), ...dynamicQuickActions];
     }
 
     if (!q) return sources;
@@ -219,7 +207,7 @@ export function CommandPalette({
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
       .map((x) => x.item);
-  }, [query, recentsFetcher.data, hasMarketplace]);
+  }, [query, recentsFetcher.data]);
 
   // Group the filtered results. No per-group truncation: every source group is
   // already bounded (Pages/Settings are fixed lists; Recents is sliced to
