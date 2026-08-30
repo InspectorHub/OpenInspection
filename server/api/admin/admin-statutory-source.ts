@@ -33,7 +33,59 @@ import { Errors } from '../../lib/errors';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
-import { storeStatutoryFormSource } from '../../services/statutory/source-upload';
+import { listStatutoryFormSources, storeStatutoryFormSource } from '../../services/statutory/source-upload';
+
+/**
+ * What an operator has to see BEFORE they can upload anything.
+ *
+ * The upload below takes a revision label the caller already knows. Nobody
+ * knows one: the labels are the authority's own, they contain characters a URL
+ * mangles, and which of them this build publishes is decided by what is
+ * compiled in. Without this read the only way to reach the upload was to open
+ * the source and copy a string out of it, which is not a product.
+ *
+ * It answers presence too, because "which revisions exist" and "which of them
+ * can actually render" are the same question asked one step apart, and a screen
+ * that had to join two responses to show one row would be a screen that shows
+ * the join wrong on the day one call fails.
+ */
+const listSourcesRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/statutory-forms',
+    tags: ['admin'],
+    summary: 'Published statutory revisions, and whether their PDFs are stored',
+    middleware: [requireRole('owner')],
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({
+                        storageBound: z.boolean().describe('Whether this deployment has object storage bound at all. False means no upload can ever succeed here, which is a different problem from an absent file.'),
+                        revisions: z.array(z.object({
+                            formId: z.string().describe('Stable id of the statutory form itself, e.g. tx_trec_rei.'),
+                            revision: z.string().describe("The authority's own revision label, verbatim."),
+                            sourceHash: z.string().describe('sha256 an upload for this revision is checked against, lowercase hex.'),
+                            sourceUrl: z.string().describe('Where the authority publishes this revision. Provenance for a human; nothing is fetched from it.'),
+                            effectiveFrom: z.number().describe('First date this revision may be used, epoch ms.'),
+                            mandatoryFrom: z.number().nullable().describe('First date this revision is required, epoch ms, or null if it was never mandated.'),
+                            effectiveUntil: z.number().nullable().describe('First date this revision may no longer be used, epoch ms, exclusive; null while it is still usable.'),
+                            withdrawn: z.object({
+                                at: z.number().describe('When new production stopped, epoch ms.'),
+                                reason: z.string().describe('field_map_incorrect (ours to fix) or authority_withdrew (the publisher\'s decision).'),
+                            }).nullable().describe('The withdrawal that stopped new production, or null while the revision is live.'),
+                            present: z.boolean().describe("Whether the authority's verified PDF is in this deployment's storage."),
+                            sizeBytes: z.number().nullable().describe('Size of the stored PDF, or null when nothing is stored.'),
+                            uploadedAt: z.number().nullable().describe('When the stored bytes were written, epoch ms, or null when nothing is stored.'),
+                        })).describe('Every revision this build publishes, in catalogue order.'),
+                    })),
+                },
+            },
+            description: 'The catalogue, with storage presence per revision',
+        },
+    },
+    operationId: 'listStatutoryFormSources',
+    description: "Every statutory revision this software publishes, and whether this deployment already holds the issuing authority's PDF for it. A revision with no stored PDF can be installed from a package but can produce nothing, so this is the read that says which uploads are still owed.",
+}, { scopes: ['admin'], tier: 'extended' }));
 
 const uploadSourceRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -78,6 +130,18 @@ const uploadSourceRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 const adminStatutorySourceRoutes = createApiRouter()
+    .openapi(listSourcesRoute, async (c) => {
+        // `c.env.PHOTOS` may be absent in a deployment that never bound a
+        // bucket. Passed through as `undefined` rather than asserted: the
+        // service reports that as `storageBound: false`, which is the honest
+        // answer, where a throw here would show the operator a broken page
+        // instead of the reason their uploads cannot land.
+        const data = await listStatutoryFormSources({
+            bucket: c.env.PHOTOS as R2Bucket | undefined,
+            versions: PUBLISHED_FORM_VERSIONS,
+        });
+        return c.json({ success: true as const, data }, 200);
+    })
     .openapi(uploadSourceRoute, async (c) => {
         const { formId } = c.req.valid('param');
         const form = await c.req.parseBody();

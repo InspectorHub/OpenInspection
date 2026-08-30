@@ -118,3 +118,80 @@ export async function storeStatutoryFormSource(
 
     return { key, formId: version.formId, revision: version.version, sha256: computed };
 }
+
+/**
+ * One published revision, and whether this deployment is actually holding the
+ * bytes it needs to render it.
+ *
+ * The catalogue fields are carried alongside on purpose. What the operator has
+ * to do next is decided by the pair -- an absent revision that is withdrawn is
+ * not worth chasing a file for, and an absent revision that is mandatory today
+ * is the one that stops work -- and a reader who has to join two screens to see
+ * that pair will read one of them and act.
+ */
+export interface StatutoryFormSourcePresence {
+    formId: string;
+    /** The authority's own revision label, verbatim. */
+    revision: string;
+    /** The sha256 an upload is checked against, lowercase hex. */
+    sourceHash: string;
+    /** Where the authority publishes it. Provenance for a human. */
+    sourceUrl: string;
+    effectiveFrom: number;
+    mandatoryFrom: number | null;
+    effectiveUntil: number | null;
+    withdrawn: { at: number; reason: string } | null;
+    /** Whether the verified bytes are in this deployment's object storage. */
+    present: boolean;
+    /** Size of the stored object, or null when nothing is stored. */
+    sizeBytes: number | null;
+    /** When the stored bytes were written, epoch ms, or null when absent. */
+    uploadedAt: number | null;
+}
+
+/**
+ * What this deployment holds for every revision it publishes.
+ *
+ * ── WHY `storageBound` IS REPORTED SEPARATELY FROM `present` ────────────────
+ * A deployment with no bucket bound and a deployment whose bucket is empty both
+ * produce `present: false` for every row, and they are not the same problem:
+ * the second is fixed by uploading a file, the first cannot be fixed by
+ * uploading anything at all. Collapsing them would put an operator in front of
+ * an upload control that can never succeed, which is the same class of fault --
+ * a door onto a wall -- that this whole surface exists to remove. So the flag
+ * travels beside the rows, and a caller that ignores it is at worst pessimistic
+ * rather than wrong.
+ *
+ * Presence is a `head`, never a `get`: the answer is one bit plus the object's
+ * own metadata, and reading a multi-megabyte PDF to learn it would put the
+ * whole catalogue's bytes through a worker on every page load.
+ */
+export async function listStatutoryFormSources(input: {
+    bucket: R2Bucket | undefined;
+    versions: readonly StatutoryFormVersion[];
+}): Promise<{ storageBound: boolean; revisions: StatutoryFormSourcePresence[] }> {
+    const rows = await Promise.all(input.versions.map(async (version) => {
+        const head = input.bucket === undefined
+            ? null
+            : await input.bucket.head(r2Keys.statutoryFormSource(version.formId, version.version));
+        return {
+            formId: version.formId,
+            revision: version.version,
+            sourceHash: version.sourceHash,
+            sourceUrl: version.sourceUrl,
+            effectiveFrom: version.effectiveFrom,
+            mandatoryFrom: version.mandatoryFrom,
+            effectiveUntil: version.effectiveUntil,
+            withdrawn: version.withdrawn === null
+                ? null
+                : { at: version.withdrawn.at, reason: version.withdrawn.reason },
+            present: head !== null,
+            sizeBytes: head?.size ?? null,
+            // `uploaded` is a Date on R2's own object. Epoch ms crosses the
+            // wire, because the surface that renders it formats in the viewer's
+            // own locale and timezone rather than in the worker's.
+            uploadedAt: head?.uploaded instanceof Date ? head.uploaded.getTime() : null,
+        };
+    }));
+    return { storageBound: input.bucket !== undefined, revisions: rows };
+}

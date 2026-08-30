@@ -71,12 +71,23 @@ async function sha256(bytes: Uint8Array): Promise<string> {
 
 let put: Array<{ key: string; size: number }>;
 
+/**
+ * Which keys the fake bucket claims to be holding. Empty by default so the
+ * upload tests below are unaffected; the listing tests fill it, and they fill
+ * it with ONE of the two revisions on purpose — see the pair in that describe.
+ */
+let stored: Map<string, { size: number; uploaded: Date }>;
+
 function bucket(): R2Bucket {
     return {
         put: async (key: string, value: ArrayBuffer | Uint8Array) => {
             put.push({ key, size: (value as Uint8Array).byteLength });
             return null;
         },
+        // `head`, never `get`: the listing needs one bit plus the object's own
+        // metadata, and a stub that served bytes would let an implementation
+        // reading whole PDFs pass unnoticed.
+        head: async (key: string) => stored.get(key) ?? null,
     } as unknown as R2Bucket;
 }
 
@@ -116,6 +127,7 @@ async function post(bytes: Uint8Array, opts: { revision?: string; role?: string 
 
 beforeEach(() => {
     put = [];
+    stored = new Map();
 });
 
 describe('POST /api/admin/statutory-forms/{formId}/source', () => {
@@ -199,5 +211,115 @@ describe('POST /api/admin/statutory-forms/{formId}/source', () => {
         const res = await post(RIGHT_BYTES, { role: 'inspector' });
         expect(res.status).toBe(403);
         expect(put).toEqual([]);
+    });
+});
+
+/**
+ * The read that has to exist before the upload above can be reached by anybody.
+ *
+ * The upload takes a revision label the caller already knows, and nobody knows
+ * one: the labels are the authority's own and which of them a build publishes
+ * is decided by what is compiled in. So this endpoint is the only thing that
+ * can put a real label in front of an operator, and the assertions below are
+ * about the two facts a screen cannot invent — WHICH revisions exist, and
+ * WHICH of them this deployment can actually render.
+ */
+describe('GET /api/admin/statutory-forms', () => {
+    interface ListedRevision {
+        formId: string;
+        revision: string;
+        sourceHash: string;
+        sourceUrl: string;
+        present: boolean;
+        sizeBytes: number | null;
+        uploadedAt: number | null;
+        withdrawn: { at: number; reason: string } | null;
+    }
+    type ListBody = {
+        data: { storageBound: boolean; revisions: ListedRevision[] };
+    };
+
+    async function list(opts: { role?: string; noBucket?: boolean } = {}) {
+        const env = (opts.noBucket ? {} : { PHOTOS: bucket() }) as unknown as HonoConfig['Bindings'];
+        return app(opts.role ?? 'owner').request('/api/admin/statutory-forms', {}, env);
+    }
+
+    it('lists every revision this software publishes, and no others', async () => {
+        // The instrument check first: the catalogue really does hold two, so
+        // "returns them all" below is not a claim about a one-element list that
+        // any implementation would satisfy.
+        expect(PUBLISHED_FORM_VERSIONS).toHaveLength(2);
+
+        const res = await list();
+        expect(res.status).toBe(200);
+        const body = await res.json() as ListBody;
+        expect(body.data.revisions.map((r) => `${r.formId} ${r.revision}`))
+            .toEqual([`${FORM} ${REVISION}`, `${FORM} ${OLD_REVISION}`]);
+    });
+
+    it('reports presence per revision, with one stored and one not', async () => {
+        // THE PAIR. A handler hardcoding `present: false` describes a fresh
+        // deployment perfectly and is useless; one hardcoding `true` hides the
+        // only fault this screen exists to show. Both halves are asserted in
+        // one run, over a bucket holding exactly one of the two keys.
+        stored.set(KEY, { size: 620865, uploaded: new Date(Date.UTC(2026, 7, 29)) });
+
+        const body = await (await list()).json() as ListBody;
+        const current = body.data.revisions.find((r) => r.revision === REVISION);
+        const old = body.data.revisions.find((r) => r.revision === OLD_REVISION);
+
+        expect(current?.present).toBe(true);
+        expect(current?.sizeBytes).toBe(620865);
+        expect(current?.uploadedAt).toBe(Date.UTC(2026, 7, 29));
+
+        expect(old?.present).toBe(false);
+        // Null rather than zero. A stored PDF of zero bytes is not a thing that
+        // happens, but "0 B, uploaded 1 Jan 1970" is what a screen prints when
+        // absence is spelled as a number.
+        expect(old?.sizeBytes).toBeNull();
+        expect(old?.uploadedAt).toBeNull();
+    });
+
+    it('carries what an upload is checked against, so the operator can check first', async () => {
+        const body = await (await list()).json() as ListBody;
+        const current = body.data.revisions.find((r) => r.revision === REVISION);
+        // The recorded hash and the authority's own address. Without these the
+        // screen can say a file is missing but not which file, and the operator
+        // is back to guessing among identically named downloads.
+        expect(current?.sourceHash).toBe(PUBLISHED_FORM_VERSIONS[0]?.sourceHash);
+        expect(current?.sourceUrl).toBe(PUBLISHED_FORM_VERSIONS[0]?.sourceUrl);
+    });
+
+    it('reports a withdrawal with its reason, and reports its absence as null', async () => {
+        // Two revisions, one withdrawn: the reason decides what the reader does
+        // next (wait for us, or move to the revision now in force), so a bare
+        // boolean here would be the one-word "withdrawn" that form-registry.ts
+        // exists to refuse.
+        const body = await (await list()).json() as ListBody;
+        expect(body.data.revisions.find((r) => r.revision === OLD_REVISION)?.withdrawn)
+            .toEqual({ at: Date.UTC(2026, 1, 1), reason: 'authority_withdrew' });
+        expect(body.data.revisions.find((r) => r.revision === REVISION)?.withdrawn).toBeNull();
+    });
+
+    it('says storage is bound when it is, and not when it is not', async () => {
+        // A deployment with no bucket and a deployment with an empty one both
+        // answer `present: false` for every row and are not the same problem:
+        // only one of them is fixed by uploading a file. Both directions
+        // asserted, because a flag that is always false reads correct on the
+        // only screenshot anybody takes.
+        expect((await (await list()).json() as ListBody).data.storageBound).toBe(true);
+
+        const unbound = await (await list({ noBucket: true })).json() as ListBody;
+        expect(unbound.data.storageBound).toBe(false);
+        // And the catalogue is still described. A deployment that cannot store
+        // anything still has to be able to see what it is missing.
+        expect(unbound.data.revisions).toHaveLength(2);
+        expect(unbound.data.revisions.every((r) => r.present === false)).toBe(true);
+    });
+
+    it('is closed to a workspace member who is not the owner', async () => {
+        // Same guard as the upload. The listing names every revision and its
+        // recorded hash, and it is the door to the write next to it.
+        expect((await list({ role: 'inspector' })).status).toBe(403);
     });
 });

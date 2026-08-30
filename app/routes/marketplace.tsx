@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFetcher, useLoaderData, useNavigate } from "react-router";
+import { Link, useFetcher, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/marketplace";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -169,6 +169,21 @@ export default function MarketplacePage() {
               arrives in English; a reader who cannot act is worse off than one
               reading an untranslated instruction they can. */}
           <Banner tone="danger">{installFetcher.data.error || m.marketplace_install_error()}</Banner>
+          {/* BESIDE the server's sentence, never instead of it. That sentence
+              is the remedy and it names an HTTP endpoint, which was the only
+              way to supply the file when it was written; there is now a screen,
+              and this is the way to it. Offered on every refusal rather than
+              matched against the message text — a link a reader did not need
+              costs a glance, and a regex over a server-composed paragraph would
+              stop matching the first time a word in it changed. */}
+          <p className="mt-2 text-[13px]">
+            <Link
+              to="/settings/statutory-forms"
+              className="font-bold text-ih-primary-text hover:underline"
+            >
+              {m.statutory_source_from_marketplace()}
+            </Link>
+          </p>
         </div>
       )}
 

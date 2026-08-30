@@ -44,6 +44,8 @@
   "settings_hub_automations_desc": "Email triggers and rules.",
   "settings_hub_compliance_title": "Compliance",
   "settings_hub_compliance_desc": "Privacy & Terms pages, GDPR retention, erasure records.",
+  "settings_hub_statutory_forms_title": "Statutory form PDFs",
+  "settings_hub_statutory_forms_desc": "The authority's own published PDF for each statutory revision this deployment renders.",
   "settings_hub_usage_title": "Usage",
   "settings_hub_usage_desc": "SMS, email, and storage this account has used.",
   "settings_error_save_failed": "Save failed",

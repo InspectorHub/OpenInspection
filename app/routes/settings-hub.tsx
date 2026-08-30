@@ -1,6 +1,6 @@
 import { HubCard, HUB_GRID_CLASS } from "~/components/HubCard";
 import { useSessionContext } from "~/hooks/useSessionContext";
-import { isAdminRole } from "~/lib/access";
+import { isAdminRole, isOwnerRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
 
 interface Tile {
@@ -164,6 +164,14 @@ const GROUPS: Group[] = [
         icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
       },
       {
+        // Owner-only — the endpoint behind it is `requireRole('owner')`, so
+        // the tile is filtered below rather than shown to every admin.
+        to: "/settings/statutory-forms",
+        title: m.settings_hub_statutory_forms_title,
+        desc: m.settings_hub_statutory_forms_desc,
+        icon: "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z M9 13h6m-6 4h6",
+      },
+      {
         to: "/settings/usage",
         title: m.settings_hub_usage_title,
         desc: m.settings_hub_usage_desc,
@@ -176,6 +184,9 @@ const GROUPS: Group[] = [
 export default function SettingsHub() {
   const session = useSessionContext();
   const admin = isAdminRole(session?.user?.role);
+  // One tile is narrower than the admin tier: its API is owner-only, and a
+  // manager who followed it would meet a 403 on every submission.
+  const owner = isOwnerRole(session?.user?.role);
   // Billing tile is SaaS-only — surface it when this deployment bills tenants.
   const showBilling = session?.deployment?.hasBilling ?? session?.branding?.isSaas ?? false;
   // MCP tile is only shown when the MCP feature flag is on for this deployment.
@@ -192,6 +203,7 @@ export default function SettingsHub() {
             {group.tiles
               .filter((t) => t.to !== "/settings/billing" || showBilling)
               .filter((t) => t.to !== "/settings/connected-apps" || showMcp)
+              .filter((t) => t.to !== "/settings/statutory-forms" || owner)
               .map((tile) => (
                 <HubCard
                   key={tile.to}

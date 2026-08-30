@@ -13,7 +13,18 @@
  * renders.
  */
 export { isAdminRole } from "../../server/lib/auth/roles";
-import { isAdminRole } from "../../server/lib/auth/roles";
+import { isAdminRole, ROLE } from "../../server/lib/auth/roles";
+
+/**
+ * The owner tier alone — narrower than `isAdminRole`, which admits managers.
+ *
+ * Reached for only where the SERVER's guard is `requireRole('owner')`. A screen
+ * gated one tier wider than its endpoint offers a manager a control that always
+ * answers 403, which reads as a broken product rather than as a permission.
+ */
+export function isOwnerRole(role: string | null | undefined): boolean {
+  return role === ROLE.OWNER;
+}
 
 /**
  * Loader-side guard: returns a serialisable flag a company-only route can
@@ -24,4 +35,11 @@ export function assertAdminOrForbidden(
   role: string | null | undefined,
 ): { forbidden: boolean } {
   return { forbidden: !isAdminRole(role) };
+}
+
+/** The same, one tier narrower — for a route whose API guard is owner-only. */
+export function assertOwnerOrForbidden(
+  role: string | null | undefined,
+): { forbidden: boolean } {
+  return { forbidden: !isOwnerRole(role) };
 }
