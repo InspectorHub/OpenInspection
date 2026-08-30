@@ -28,6 +28,7 @@ beforeAll(async () => {
 const versions = (): readonly StatutoryFormVersion[] => [
     {
         formId: FORM, version: OLD_REVISION,
+        formTitle: 'Yankee Flat Form',
         effectiveFrom: Date.UTC(2012, 0, 1),
         mandatoryFrom: Date.UTC(2012, 0, 1),
         effectiveUntil: Date.UTC(2026, 3, 1),
@@ -37,6 +38,7 @@ const versions = (): readonly StatutoryFormVersion[] => [
     },
     {
         formId: FORM, version: NEW_REVISION,
+        formTitle: 'Yankee Flat Form',
         effectiveFrom: Date.UTC(2026, 3, 1),
         mandatoryFrom: Date.UTC(2026, 3, 1),
         effectiveUntil: null,

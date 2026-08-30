@@ -92,7 +92,10 @@ export function statutoryNoticeFor(
 ): string {
     return STATUTORY_FORM_NOTICE
         .replaceAll('{software}', options.softwareName)
-        .replaceAll('{form}', version.formId)
+        // The form's own TITLE, never `formId`. The id is a database key, and
+        // this sentence is read by an inspector: "a software implementation of
+        // fl_oir_b1_1802" names nothing they have ever held.
+        .replaceAll('{form}', version.formTitle)
         .replaceAll('{revision}', version.version)
         .replaceAll('{effective}', formatEffectiveDate(version.effectiveFrom));
 }

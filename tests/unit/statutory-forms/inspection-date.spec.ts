@@ -17,6 +17,7 @@ const NEW = 'Rev. 04/26';
 const VERSIONS: readonly StatutoryFormVersion[] = [
     {
         formId: FORM, version: OLD,
+        formTitle: 'Yankee Flat Form',
         effectiveFrom: Date.UTC(2012, 0, 1),
         mandatoryFrom: Date.UTC(2012, 0, 1),
         effectiveUntil: Date.UTC(2026, 3, 1),
@@ -26,6 +27,7 @@ const VERSIONS: readonly StatutoryFormVersion[] = [
     },
     {
         formId: FORM, version: NEW,
+        formTitle: 'Yankee Flat Form',
         effectiveFrom: Date.UTC(2026, 3, 1),
         mandatoryFrom: Date.UTC(2026, 3, 1),
         effectiveUntil: null,

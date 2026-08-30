@@ -29,6 +29,7 @@ import {
 
 const base: Omit<StatutoryFormVersion, 'version' | 'withdrawn'> = {
     formId: 'tx_trec_rei',
+    formTitle: 'Yankee Flat Form',
     effectiveFrom: Date.UTC(2025, 0, 1),
     mandatoryFrom: null,
     effectiveUntil: null,

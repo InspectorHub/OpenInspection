@@ -12,6 +12,7 @@ import type { StatutoryFormVersion } from '../../../server/lib/statutory/form-re
 
 const v = (version: string, over: Partial<StatutoryFormVersion> = {}): StatutoryFormVersion => ({
     formId: 'tx_trec_rei',
+    formTitle: 'Yankee Flat Form',
     version,
     effectiveFrom: Date.UTC(2024, 0, 1),
     mandatoryFrom: null,

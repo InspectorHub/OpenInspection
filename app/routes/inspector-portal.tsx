@@ -346,7 +346,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   // Best-effort — a failure leaves the control absent, the ordinary case rather
   // than a broken one.
   let statutoryForm: {
-    available: boolean; formId?: string; revision?: string; effectiveDate?: string; notice?: string;
+    available: boolean; formTitle?: string; revision?: string; effectiveDate?: string; notice?: string;
   } = { available: false };
   // `.catch()` alone did not deliver what the paragraph above promises: it
   // handles a REJECTED promise, and `api.inspections[":id"]["statutory-form"]
@@ -1184,25 +1184,25 @@ export default function InspectionHubPage() {
 
       </div>
 
-      {/* Documents — shared section (unified portal ⑦). Renders regardless of
-          report status (uploads are pre/intra-inspection). Inspector can upload
-          with a visibility toggle and delete any document. */}
       {/* The statutory form, if this inspection produces one and the deployment
           publishes that revision. Absent is the ordinary case: a deployment
           shipping no forms answers `available:false` for every inspection, so
-          the control does not render rather than rendering and then failing. */}
+          the control does not render rather than rendering and then failing.
+          It brings its own Card, and is deliberately NOT folded into
+          DocumentsSection below — see the component for why. */}
       {statutoryForm.available && statutoryForm.notice ? (
-        <div className="mb-4">
-          <StatutoryDeliverable
-            formId={statutoryForm.formId ?? ""}
-            revision={statutoryForm.revision ?? ""}
-            effectiveDate={statutoryForm.effectiveDate ?? ""}
-            notice={statutoryForm.notice}
-            href={`/api/inspections/${inspection.id}/statutory-form.pdf`}
-          />
-        </div>
+        <StatutoryDeliverable
+          formTitle={statutoryForm.formTitle ?? ""}
+          revision={statutoryForm.revision ?? ""}
+          effectiveDate={statutoryForm.effectiveDate ?? ""}
+          notice={statutoryForm.notice}
+          href={`/api/inspections/${inspection.id}/statutory-form.pdf`}
+        />
       ) : null}
 
+      {/* Documents — shared section (unified portal ⑦). Renders regardless of
+          report status (uploads are pre/intra-inspection). Inspector can upload
+          with a visibility toggle and delete any document. */}
       <DocumentsSection
         items={documents}
         canUpload

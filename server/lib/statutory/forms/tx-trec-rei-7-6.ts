@@ -36,6 +36,8 @@ import type { FieldMap } from '../field-map';
 
 export const version: StatutoryFormVersion = {
     formId: 'tx_trec_rei_7_6',
+    // The Commission's own title for the promulgated form, as the form prints it.
+    formTitle: 'Texas Real Estate Commission Property Inspection Report',
     version: 'REI 7-6',
     // Voluntary from 2021-09-01, required from 2022-02-01 -- TREC's own wording.
     effectiveFrom: Date.UTC(2021, 8, 1),

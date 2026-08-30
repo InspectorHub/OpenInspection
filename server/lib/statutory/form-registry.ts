@@ -90,6 +90,22 @@ export interface StatutoryWithdrawal {
 export interface StatutoryFormVersion {
     /** Stable id of the form itself, e.g. `tx_trec_rei`. Never revision-specific. */
     formId: string;
+    /**
+     * What the authority calls this form, as a person would recognise it:
+     * `Texas Real Estate Commission Property Inspection Report`.
+     *
+     * It exists because `formId` is a database key and was being READ ALOUD to
+     * inspectors — the notice said "a software implementation of
+     * `fl_oir_b1_1802`", which names nothing an inspector has ever seen. The
+     * form prints its own title and its own revision label; those two are what
+     * a reader can check against the authority's site, and `formId` is neither.
+     *
+     * Not derived from `formId`, and it must not be: an id is lowercased,
+     * underscored and abbreviated, and no un-abbreviation of one produces the
+     * authority's wording. It is transcribed from the published form, like the
+     * revision label beside it.
+     */
+    formTitle: string;
     /** The authority's own revision label, verbatim: `7-6`, `Rev. 04/26`. */
     version: string;
     /** First date this revision may be used, epoch ms. */

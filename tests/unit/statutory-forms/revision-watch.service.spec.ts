@@ -31,6 +31,7 @@ const PUBLISHED_HASH = 'a'.repeat(64);
  */
 const CATALOGUE: StatutoryFormVersion[] = [{
     formId: 'tx_trec_rei',
+    formTitle: 'Yankee Flat Form',
     version: '7-6',
     sourceUrl: PAGE,
     sourceHash: PUBLISHED_HASH,

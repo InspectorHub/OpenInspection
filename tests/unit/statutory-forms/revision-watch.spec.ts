@@ -31,6 +31,7 @@ const TREC = 'https://www.trec.texas.gov/forms/rei-7-6.pdf';
 
 const base = {
     formId: 'tx_trec_rei',
+    formTitle: 'Yankee Flat Form',
     sourceUrl: TREC,
     publishedBy: 'platform',
     publishedAt: t('2026-08-21'),
@@ -155,6 +156,7 @@ describe('a sighting is not a version, and cannot be turned into one', () => {
         // out blank — and a row with them blank is not a published revision.
         const copied: StatutoryFormVersion = {
             formId: seen.formId,
+            formTitle: 'Yankee Flat Form',
             version: 'unknown',
             sourceUrl: seen.sourceUrl,
             sourceHash: seen.observedHash,
@@ -174,6 +176,7 @@ describe('a sighting is not a version, and cannot be turned into one', () => {
         // the publication decision.
         const published: StatutoryFormVersion = {
             formId: 'tx_trec_rei',
+            formTitle: 'Yankee Flat Form',
             version: '7-7',
             sourceUrl: TREC,
             sourceHash: 'c'.repeat(64),

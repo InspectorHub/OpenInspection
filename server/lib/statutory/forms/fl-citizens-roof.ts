@@ -50,6 +50,8 @@ import type { FieldMap } from '../field-map';
 
 export const version: StatutoryFormVersion = {
     formId: 'fl_citizens_roof',
+    // Citizens' own title for the form, as the form prints it.
+    formTitle: 'Citizens Property Insurance Corporation Roof Inspection Form',
     version: 'RCF-1 03 25',
     // Citizens' 2025-03-20 bulletin: begin using the updated forms immediately.
     effectiveFrom: Date.UTC(2025, 2, 20),

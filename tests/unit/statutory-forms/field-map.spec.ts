@@ -32,6 +32,7 @@ beforeAll(async () => {
 
 const VERSION = (hash: string): StatutoryFormVersion => ({
     formId: 'xx_example_form',
+    formTitle: 'Yankee Flat Form',
     version: '1-0',
     effectiveFrom: Date.parse('2026-01-01T00:00:00.000Z'),
     mandatoryFrom: Date.parse('2026-01-01T00:00:00.000Z'),

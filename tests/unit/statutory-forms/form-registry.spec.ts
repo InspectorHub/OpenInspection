@@ -35,6 +35,7 @@ const base = {
 const OLD: StatutoryFormVersion = {
     ...base,
     formId: 'fl_oir_b1_1802',
+    formTitle: 'Yankee Flat Form',
     version: 'Rev. 01/12',
     effectiveFrom: t('2012-01-01'),
     mandatoryFrom: t('2012-01-01'),
@@ -43,6 +44,7 @@ const OLD: StatutoryFormVersion = {
 const NEW: StatutoryFormVersion = {
     ...base,
     formId: 'fl_oir_b1_1802',
+    formTitle: 'Yankee Flat Form',
     version: 'Rev. 04/26',
     effectiveFrom: t('2026-04-01'),
     mandatoryFrom: t('2026-04-01'),
@@ -58,6 +60,7 @@ const NEW: StatutoryFormVersion = {
 const TX_OLD: StatutoryFormVersion = {
     ...base,
     formId: 'tx_trec_rei',
+    formTitle: 'Yankee Flat Form',
     version: '7-5',
     effectiveFrom: t('2015-02-01'),
     mandatoryFrom: t('2015-02-01'),
@@ -66,6 +69,7 @@ const TX_OLD: StatutoryFormVersion = {
 const TX_NEW: StatutoryFormVersion = {
     ...base,
     formId: 'tx_trec_rei',
+    formTitle: 'Yankee Flat Form',
     version: '7-6',
     effectiveFrom: t('2021-09-01'),
     mandatoryFrom: t('2022-02-01'),
