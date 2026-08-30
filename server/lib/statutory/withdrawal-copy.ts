@@ -81,3 +81,34 @@ export function withdrawalRefusal(input: WithdrawalRefusalInput): string {
         + `to file. Documents already produced from revision ${input.version} were correct for `
         + `their inspection dates and are not reissued for this reason. ${move}`;
 }
+
+/**
+ * The OTHER refusal this route raises, kept beside the withdrawal one.
+ *
+ * Same status code, different sentence, and the difference matters: a withdrawal
+ * says this software's map (or the authority's document) is at fault; this one
+ * says the TEMPLATE was written against a revision the inspection's date does
+ * not select. Printing anyway would put the governing revision's bytes under the
+ * superseded revision's bindings, and where two revisions' field names overlap
+ * the result is a plausible, WRONG official document.
+ *
+ * It moved out of the route when that file reached its size ceiling. The two
+ * refusals belong together anyway: they are the server's words for "this
+ * revision is not the one to produce", and a reader comparing them can see that
+ * only one of them is about a defect.
+ */
+export function supersededRefusal(input: {
+    formId: string;
+    inspectionDate: string;
+    /** The revision the inspection's own date selects. */
+    applicableVersion: string;
+    /** The revision the template says its bindings were written against. */
+    templateVersion: string;
+}): string {
+    return `This inspection is dated ${input.inspectionDate}, which revision `
+        + `${input.applicableVersion} of ${input.formId} governs. This template produces revision `
+        + `${input.templateVersion}, so its bindings were written against a different document `
+        + 'and cannot be printed onto this one. There is no migration for an inspection already '
+        + `under way: once the workspace has updated its copy of the template, reopen this `
+        + `inspection on the ${input.applicableVersion} template.`;
+}

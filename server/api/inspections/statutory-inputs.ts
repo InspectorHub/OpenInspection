@@ -17,6 +17,8 @@ import { PeopleService } from '../../services/people.service';
 import { CredentialService } from '../../services/credential.service';
 import { itemResultsFor } from '../../lib/statutory/item-results';
 import { calendarDayForForm } from '../../lib/statutory/value-parts';
+import { decodeSignatureDataUri, type SignatureImage } from '../../lib/statutory/signature-image';
+import type { StatutoryFormDeclaration } from '../../types/template-schema';
 import type { StatutoryInspectionFacts } from '../../lib/statutory/values';
 import type { StatutoryItemResult } from '../../lib/statutory/resolve-source';
 
@@ -38,8 +40,78 @@ export interface StatutoryInspectionRow {
 export interface StatutoryInputs {
     results: Record<string, StatutoryItemResult>;
     facts: StatutoryInspectionFacts;
+    /**
+     * What the declaration's `from: 'signature'` bindings resolve to, by our
+     * field name. Kept OUT of `facts` deliberately: `collectStatutoryValues`
+     * emits no key for a signature (`values.ts`) because that object is declared
+     * to carry no personal data of this class, and routing a mark through it
+     * would retract that declaration in one step.
+     */
+    signatures: Map<string, SignatureImage>;
     /** Items answered ONLY under a non-default unit; the caller reports them. */
     skippedNonDefaultUnits: string[];
+}
+
+/**
+ * The mark behind a `whole_form` signature binding: the inspector on this
+ * inspection, as they saved it under Settings > Profile.
+ *
+ * -- WHY THE SAME COLUMN AUTO-SIGN USES --------------------------------------
+ * `users.default_signature_base64` is what `lib/inspection/auto-sign.ts` puts on
+ * a published report. One stored mark feeds both surfaces, so a report and the
+ * authority's form can never carry two different signatures for one inspector on
+ * one inspection.
+ *
+ * -- WHY ONLY `whole_form` RESOLVES TODAY ------------------------------------
+ * `scope` exists because the Citizens four-point form lets a trade-specific
+ * licensee sign only their own section, so one form can carry several marks that
+ * each answer for a different part. Nothing in this product RECORDS who signed
+ * for a section, so any other scope is refused by name rather than quietly
+ * answered with the whole-form signer — which would put one person's mark under
+ * a declaration somebody else made.
+ */
+async function resolveSignatures(
+    db: DrizzleD1Database<typeof schema>,
+    tenantId: string,
+    inspectorId: string | null,
+    declaration: StatutoryFormDeclaration,
+): Promise<Map<string, SignatureImage>> {
+    const wanted = Object.entries(declaration.bindings)
+        .filter(([, source]) => source.from === 'signature') as Array<[string, { scope: string }]>;
+    const signatures = new Map<string, SignatureImage>();
+    if (wanted.length === 0) return signatures;
+
+    for (const [ourField, source] of wanted) {
+        if (source.scope !== 'whole_form') {
+            throw new Error(
+                `statutory produce: "${ourField}" is signed for scope "${source.scope}", and this `
+                + 'software records no per-section signer. Bind it to scope "whole_form", or leave '
+                + 'the box for the inspector to sign by hand.',
+            );
+        }
+    }
+    // Read once, after the scopes are agreed: several fields on one form may all
+    // stand behind the same signer, and the row is the same row for each.
+    if (!inspectorId) {
+        throw new Error(
+            'statutory produce: this form requires a signature and the inspection has no '
+            + 'inspector assigned, so there is nobody whose mark it would be.',
+        );
+    }
+    const row = await db.select({ signature: schema.users.defaultSignatureBase64 })
+        .from(schema.users)
+        .where(and(eq(schema.users.id, inspectorId), eq(schema.users.tenantId, tenantId)))
+        .get();
+    for (const [ourField] of wanted) {
+        if (!row?.signature) {
+            throw new Error(
+                `statutory produce: "${ourField}" needs the inspector's signature and none is `
+                + 'saved. Add one under Settings > Profile, then produce the form again.',
+            );
+        }
+        signatures.set(ourField, decodeSignatureDataUri(row.signature, ourField));
+    }
+    return signatures;
 }
 
 export async function gatherStatutoryInputs(
@@ -51,6 +123,8 @@ export async function gatherStatutoryInputs(
      *  `calendarDayOfStoredDate`. Passed rather than read off the row: see the
      *  note on `StatutoryInspectionRow`. */
     inspectionDay: string,
+    /** The template's declaration — read for its signature bindings only. */
+    declaration: StatutoryFormDeclaration,
 ): Promise<StatutoryInputs> {
     // Re-keyed by item id, because that is what a binding names and NOT what
     // the column stores -- see `lib/statutory/item-results.ts`. Reading the raw
@@ -124,5 +198,8 @@ export async function gatherStatutoryInputs(
         company_name: config?.companyName ?? null,
         company_phone: config?.companyPhone ?? null,
     };
-    return { results, facts, skippedNonDefaultUnits };
+    // Last, because it is the only read here that can REFUSE, and a refusal
+    // naming a missing signature is more useful once everything else resolved.
+    const signatures = await resolveSignatures(db, tenantId, inspection.inspectorId, declaration);
+    return { results, facts, signatures, skippedNonDefaultUnits };
 }

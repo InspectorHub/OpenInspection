@@ -123,6 +123,8 @@ const WITHDRAWN = 'insp-withdrawn-revision';
  * statutory endpoints, and the offer's 500 was swallowed into "no form here".
  */
 const TIMED = 'insp-wizard-timed';
+/** Declares the form and binds nothing the map requires. */
+const UNANSWERABLE = 'insp-unanswerable';
 
 const INSPECTOR = 'usr-dana';
 
@@ -141,6 +143,17 @@ const SNAPSHOT_DECLARED = {
     schemaVersion: 2,
     sections: [{ id: 'sec', title: 'S', items: [{ id: 'itm_owner', label: 'Owner', type: 'rich' }] }],
     statutoryForm: DECLARATION,
+};
+
+/**
+ * Declares the form and binds NOTHING, so the map's own required field can never
+ * be supplied. That is the shape the FL Citizens roof pack is in today for
+ * `inspector_signature_date`, and the refusal is a sentence worth reading.
+ */
+const SNAPSHOT_UNANSWERABLE = {
+    schemaVersion: 2,
+    sections: [{ id: 'sec', title: 'S', items: [{ id: 'itm_owner', label: 'Owner', type: 'rich' }] }],
+    statutoryForm: { formId: FORM, bindings: {} },
 };
 
 const SNAPSHOT_PLAIN = {
@@ -237,6 +250,10 @@ beforeEach(async () => {
             templateSnapshot: snapshotDeclaringRevision('Rev. 07/24'),
         },
         {
+            ...base, id: UNANSWERABLE, tenantId: TENANT, inspectorId: INSPECTOR,
+            templateSnapshot: SNAPSHOT_UNANSWERABLE,
+        },
+        {
             ...base, id: TIMED, tenantId: TENANT, inspectorId: INSPECTOR,
             // Same calendar day as every other row, plus the wizard's suffix.
             date: '2026-05-01T09:30:00.000Z',
@@ -275,6 +292,11 @@ beforeEach(async () => {
         {
             id: 'rep-timed', tenantId: TENANT, inspectionId: TIMED, title: 'Report', kind: 'primary',
             status: 'published', createdAt: new Date(), publishedAt: new Date(Date.UTC(2026, 4, 2)),
+        },
+        {
+            id: 'rep-unanswerable', tenantId: TENANT, inspectionId: UNANSWERABLE, title: 'Report',
+            kind: 'primary', status: 'published', createdAt: new Date(),
+            publishedAt: new Date(Date.UTC(2026, 4, 2)),
         },
     ] as never);
 });
@@ -394,6 +416,29 @@ describe('GET /:id/statutory-form.pdf', () => {
         expect(facts.inspector_license).toBe('HI-12345');
         expect(facts.company_name).toBe('Acme Inspections');
         expect(facts.company_phone).toBe('555-0100');
+    });
+
+    it('tells the inspector WHICH field the form still needs', async () => {
+        // The whole defect: this refusal is a useful sentence — it names the
+        // field the person standing in the house has to go and fill — and the
+        // browser received `{"error":{"message":"Internal server error"}}`,
+        // because only the route's OWN refusals were AppErrors.
+        const res = await get(UNANSWERABLE);
+        expect(res.status).toBe(422);
+
+        const message = (await res.json() as { error: { message: string } }).error.message;
+        expect(message).toContain('owner.name');
+        expect(message).toMatch(/required field/i);
+        expect(message).not.toMatch(/internal server error/i);
+        // The internal stage prefix is for the log, not for the reader.
+        expect(message).not.toContain('statutory render:');
+    });
+
+    it('NEGATIVE CONTROL — a refusal the ROUTE raises keeps its own status', async () => {
+        // 422 must not swallow the 409s. A translator that turned every failure
+        // into one code would be as uninformative as the 500 it replaced.
+        expect((await get(SUPERSEDED)).status).toBe(409);
+        expect((await get(DRAFT)).status).toBe(409);
     });
 
     it('produces for an inspection whose stored date carries a time', async () => {

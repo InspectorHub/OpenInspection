@@ -58,6 +58,7 @@ import {
     type StatutoryInspectionFacts,
     type StatutoryItemResult,
 } from '../../lib/statutory/values';
+import type { SignatureImage } from '../../lib/statutory/render-signature';
 import { r2Keys } from '../../lib/r2-keys';
 import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
 
@@ -81,6 +82,18 @@ export interface ProduceStatutoryFormInput {
      * than being required.
      */
     instances?: StatutoryGroupInstances;
+    /**
+     * The signatures the declaration's `from: 'signature'` bindings resolve to,
+     * keyed by our field name. Resolved by the caller, which is the layer that
+     * can read the inspector's stored mark; empty is the ordinary case, and a
+     * form that REQUIRES one then refuses by name in `renderStatutoryForm`
+     * rather than producing an unsigned document that looks signed.
+     *
+     * A separate channel from `facts` and `results` for the reason
+     * `StatutoryValueSource` gives: `collectStatutoryValues` is declared to
+     * carry no personal data of this class, and it emits no key for a signature.
+     */
+    signatures?: ReadonlyMap<string, SignatureImage>;
     bucket: R2Bucket;
     /**
      * Seams, defaulted to the published catalogue. They exist because the
@@ -182,6 +195,6 @@ export async function produceStatutoryForm(
     const values = collectStatutoryValues(
         input.declaration, input.snapshot, input.results, input.facts, input.instances ?? {},
     );
-    const rendered = await renderStatutoryForm(bytes, map, values);
+    const rendered = await renderStatutoryForm(bytes, map, values, input.signatures);
     return { version, bytes: rendered };
 }

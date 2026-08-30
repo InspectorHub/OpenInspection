@@ -45,6 +45,58 @@
  */
 export const SUPPORTED_SIGNATURE_IMAGE_TYPES = ['png', 'jpeg'] as const;
 
+export type SignatureImageType = typeof SUPPORTED_SIGNATURE_IMAGE_TYPES[number];
+
+/** A stored signature, decoded, ready for whichever embed call its type needs. */
+export interface SignatureImage {
+    type: SignatureImageType;
+    bytes: Uint8Array;
+}
+
+const SIGNATURE_DATA_URI = /^data:image\/([a-z+]+);base64,([A-Za-z0-9+/=]*)$/;
+
+/**
+ * Turn a stored `data:image/...;base64,...` signature into bytes.
+ *
+ * -- WHY IT REFUSES RATHER THAN RETURNING NULL -------------------------------
+ * Every caller of this is about to put a mark in a preprinted box on an
+ * authority's form, and on such a form a blank is not "no signature" — it is a
+ * submission the authority rejects. A null would have to be turned into a
+ * refusal at each call site, and the first site to forget produces a document
+ * that looks finished and is not signed.
+ *
+ * The type list is `SUPPORTED_SIGNATURE_IMAGE_TYPES`, which is a property of
+ * pdf-lib and not a preference (see above). `image/jpg` is deliberately NOT
+ * accepted as an alias: the upload validation writes the same list, so a stored
+ * value can only be one of these, and accepting a spelling nothing produces
+ * would make this the second, looser parser of a shape that has one.
+ *
+ * @param ourField named in every refusal, because it is the string the person
+ *   fixing the template or the profile has to search for.
+ */
+export function decodeSignatureDataUri(dataUri: string, ourField: string): SignatureImage {
+    const parsed = SIGNATURE_DATA_URI.exec(dataUri);
+    if (!parsed) {
+        fail(`"${ourField}" has a stored signature that is not a base64 image data URI, so `
+            + 'there is nothing to draw in its box.');
+    }
+    const subtype = parsed[1];
+    if (!(SUPPORTED_SIGNATURE_IMAGE_TYPES as readonly string[]).includes(subtype)) {
+        fail(`"${ourField}" has a stored signature in ${subtype} format, and a PDF can carry `
+            + `only ${SUPPORTED_SIGNATURE_IMAGE_TYPES.join(' or ')}. Draw or upload the `
+            + 'signature again under Settings > Profile.');
+    }
+    // `atob` is a WinterCG global — no Node Buffer on this runtime.
+    const binary = atob(parsed[2]);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    if (bytes.length === 0) {
+        fail(`"${ourField}" has a stored signature of zero bytes; an empty mark renders as `
+            + 'nothing at all rather than as an error.');
+    }
+    return { type: subtype as SignatureImageType, bytes };
+}
+
 /** Points per inch in PDF user space. Fixed by the format, not by us. */
 const POINTS_PER_INCH = 72;
 

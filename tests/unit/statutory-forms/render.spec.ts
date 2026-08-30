@@ -21,6 +21,16 @@ import {
     type PdfFixture,
 } from '../helpers/statutory-pdf-fixtures';
 import { drawnRuns } from '../helpers/pdf-drawn-runs';
+import { pngOf } from '../helpers/png-fixture';
+import type { SignatureImage } from '../../../server/lib/statutory/signature-image';
+
+/**
+ * A mark 400x100 pixels — enough density for a 160x40pt box (2.5 px/pt against
+ * a floor of 2) and deliberately NOT enough for a 400x400pt one, so both sides
+ * of `refuseUnreadableSignature` are reachable from one fixture.
+ */
+const signatureOf = (ourField: string): ReadonlyMap<string, SignatureImage> =>
+    new Map([[ourField, { type: 'png' as const, bytes: pngOf(400, 100) }]]);
 
 let fielded: PdfFixture;
 let flat: PdfFixture;
@@ -185,12 +195,11 @@ describe('renderStatutoryForm — values', () => {
             .rejects.toThrow(/checkedBy/);
     });
 
-    it('refuses to render a signature mapping until signature support lands', async () => {
-        // A mapping kind the renderer does not recognise would fall through and
-        // be skipped, producing a form with an EMPTY signature box — which
-        // prints, looks complete, and passes every assertion in this file about
-        // its own values. Until the image is actually drawn it has to be an
-        // error, not a gap.
+    it('refuses a signature mapping when nothing supplied the mark', async () => {
+        // A skipped signature produces a form with an EMPTY signature box —
+        // which prints, looks complete, and passes every assertion in this file
+        // about its own values. An unsigned statutory submission is refused by
+        // the authority, so it is refused here first, by name.
         const map: FieldMap = {
             ...flatMap(),
             requiredFields: [],
@@ -200,7 +209,92 @@ describe('renderStatutoryForm — values', () => {
             }],
         };
         await expect(renderStatutoryForm(flat.bytes, map, {}))
-            .rejects.toThrow(/signature rendering is not implemented/i);
+            .rejects.toThrow(/"sig".*nothing supplied one/is);
+    });
+
+    it('POSITIVE CONTROL — draws the mark when one is supplied', async () => {
+        // `placeSignature` had no production caller at all, so nothing proved
+        // this path existed. It does now, and the page it wrote to changed.
+        const map: FieldMap = {
+            ...flatMap(),
+            requiredFields: ['sig'],
+            mappings: [{
+                kind: 'signature', ourField: 'sig', scope: 'whole_form',
+                page: 1, x: 10, y: 10, width: 160, height: 40,
+            }],
+        };
+        const before = await pageContentDigests(flat.bytes);
+        const out = await renderStatutoryForm(flat.bytes, map, {}, signatureOf('sig'));
+        const after = await pageContentDigests(out);
+        expect(after[1]).not.toBe(before[1]);
+        // And ONLY that page — the rest of the authority's document is untouched.
+        expect(after[0]).toBe(before[0]);
+    });
+
+    it('counts a supplied signature as satisfying a REQUIRED field', async () => {
+        // The signature channel is separate from `values` (personal data), and
+        // the required-field check reads both. Before this, `inspector_signature`
+        // could never be supplied and the FL Citizens roof form refused every
+        // time with `2 required field(s) were never supplied`.
+        const map: FieldMap = {
+            ...flatMap(),
+            requiredFields: ['sig'],
+            mappings: [{
+                kind: 'signature', ourField: 'sig', scope: 'whole_form',
+                page: 1, x: 10, y: 10, width: 160, height: 40,
+            }],
+        };
+        await expect(renderStatutoryForm(flat.bytes, map, {}))
+            .rejects.toThrow(/required field/i);
+        await expect(renderStatutoryForm(flat.bytes, map, {}, signatureOf('sig')))
+            .resolves.toBeInstanceOf(Uint8Array);
+    });
+
+    it('draws a signature into the measured box of an OVERLAY mapping', async () => {
+        // The shape the FL Citizens roof map actually has: `inspector_signature`
+        // is an overlay on the printed rule, 135.96 x 11.0 points. A mark drawn
+        // there sits on the line, exactly where the text would have sat.
+        const map: FieldMap = {
+            ...flatMap(),
+            requiredFields: [],
+            mappings: [{
+                kind: 'overlay', ourField: 'sig', page: 1,
+                x: 43.16, y: 529.22, size: 9.0, maxWidth: 135.96, maxHeight: 11.0,
+            }],
+        };
+        const before = await pageContentDigests(flat.bytes);
+        const after = await pageContentDigests(
+            await renderStatutoryForm(flat.bytes, map, {}, signatureOf('sig')),
+        );
+        expect(after[1]).not.toBe(before[1]);
+    });
+
+    it('refuses an overlay that measured no box, rather than inventing one', async () => {
+        // A mark drawn into unmeasured space lands somewhere nobody checked, and
+        // on an authority's form that is somebody's signature in the wrong place.
+        const map: FieldMap = {
+            ...flatMap(),
+            requiredFields: [],
+            mappings: [{ kind: 'overlay', ourField: 'sig', page: 1, x: 10, y: 10, size: 9 }],
+        };
+        await expect(renderStatutoryForm(flat.bytes, map, {}, signatureOf('sig')))
+            .rejects.toThrow(/maxWidth and maxHeight/);
+    });
+
+    it('refuses a mark too coarse for the box it would fill', async () => {
+        // `refuseUnreadableSignature` also had no production caller. A blurred
+        // signature is one somebody can say is not theirs.
+        const map: FieldMap = {
+            ...flatMap(),
+            requiredFields: [],
+            mappings: [{
+                kind: 'signature', ourField: 'sig', scope: 'whole_form',
+                // A box far larger than the 4x4 fixture mark can fill.
+                page: 1, x: 10, y: 10, width: 400, height: 400,
+            }],
+        };
+        await expect(renderStatutoryForm(flat.bytes, map, {}, signatureOf('sig')))
+            .rejects.toThrow(/DPI/);
     });
 });
 

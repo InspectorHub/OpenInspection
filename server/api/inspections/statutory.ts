@@ -39,9 +39,10 @@
  *    to the revision now in force. The two sentences live in
  *    `lib/statutory/withdrawal-copy.ts`, not here.
  *
- * There is deliberately NO migration out of that state (see revision-status.ts).
- * The way out is a new inspection on the updated template, and the earlier
- * warnings exist so nobody arrives here.
+ * There is deliberately NO migration out of that state (see revision-status.ts):
+ * the way out is a new inspection on the updated template. Every OTHER refusal
+ * on this path -- the producer's and the renderer's -- reaches the reader
+ * through `refusalToUser`; see that file for why it had to be added.
  *
  * `producedAt` is the published version's own timestamp, never `Date.now()`.
  * Passing now would make the header read `current` forever, including for a
@@ -62,11 +63,12 @@ import {
 } from '../../services/statutory/overflow.service';
 import { versionForInspection } from '../../lib/statutory/form-registry';
 import { revisionStatusForInspection } from '../../lib/statutory/revision-status';
-import { withdrawalRefusal } from '../../lib/statutory/withdrawal-copy';
+import { withdrawalRefusal, supersededRefusal } from '../../lib/statutory/withdrawal-copy';
 import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
 import { utcMidnightOf, calendarDayOfStoredDate } from '../../lib/statutory/inspection-date';
 import { statutoryNoticeFor, formatEffectiveDate } from '../../lib/statutory/disclaimer';
 import { Errors } from '../../lib/errors';
+import { refusalToUser } from '../../lib/statutory/refusal-to-user';
 import * as schema from '../../lib/db/schema';
 import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
 import { gatherStatutoryInputs } from './statutory-inputs';
@@ -87,6 +89,7 @@ const statutoryFormRoute = createRoute(withMcpMetadata({
         200: { description: 'The rendered form' },
         404: { description: 'No such inspection for this workspace, or its template declares no form' },
         409: { description: 'No report version is published yet, or the governing revision is not the one this template produces' },
+        422: { description: 'The inspection cannot fill this form yet — the message names the fields' },
     },
     operationId: 'getInspectionStatutoryForm',
 }, { scopes: ['read'], tier: 'extended' }));
@@ -230,19 +233,16 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
         }));
     }
     if (revision?.kind === 'cannot_produce') {
-        throw Errors.Conflict(
-            `This inspection is dated ${inspectionDay}, which revision `
-            + `${revision.applicableVersion} of ${declaration.formId} governs. This template `
-            + `produces revision ${revision.templateVersion}, so its bindings were written `
-            + 'against a different document and cannot be printed onto this one. There is no '
-            + 'migration for an inspection already under way: once the workspace has updated its '
-            + `copy of the template, reopen this inspection on the ${revision.applicableVersion} `
-            + 'template.',
-        );
+        throw Errors.Conflict(supersededRefusal({
+            formId: declaration.formId,
+            inspectionDate: inspectionDay,
+            applicableVersion: revision.applicableVersion,
+            templateVersion: revision.templateVersion,
+        }));
     }
 
-    const { results, facts, skippedNonDefaultUnits } = await gatherStatutoryInputs(
-        db, c.env.DB, tenantId, inspection, inspectionDay,
+    const { results, facts, signatures, skippedNonDefaultUnits } = await refusalToUser(
+        () => gatherStatutoryInputs(db, c.env.DB, tenantId, inspection, inspectionDay, declaration),
     );
     if (skippedNonDefaultUnits.length > 0) {
         // Answered only under some other unit. This form describes one dwelling,
@@ -262,7 +262,7 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
     const instances = await new StatutoryOverflowService(db)
         .instancesFor(tenantId, id, declaration.formId);
 
-    const produced = await produceStatutoryForm({
+    const produced = await refusalToUser(() => produceStatutoryForm({
         formId: declaration.formId,
         inspectionDate: inspectionDay,
         declaration,
@@ -270,8 +270,9 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
         results: results ?? {},
         facts,
         instances,
+        signatures,
         bucket: c.env.PHOTOS,
-    });
+    }));
 
     // Which revision this document was produced from. Written before the bytes
     // are handed over, because a recall counts documents that LEFT and a row

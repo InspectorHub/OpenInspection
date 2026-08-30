@@ -23,9 +23,9 @@
  *
  * ⚠️ A value with no route onto the page is REFUSED, never dropped. A dropped
  * value is a blank on a statutory document, and a blank looks exactly like an
- * answer nobody had. That is also why a required field missing from `values`
- * refuses: a form nobody filled must not be producible, while a form somebody
- * filled with an empty answer must be.
+ * answer nobody had. Likewise a required field missing from `values`: a form
+ * nobody filled must not be producible, while one filled with an empty answer
+ * must be.
  *
  * ⚠️ AND THIS IS THE ONLY PLACE THAT DISTINCTION CAN LIVE. Measured against the
  * format: a form field set to an empty string is stored by storing nothing, so
@@ -76,6 +76,7 @@ import {
 } from './field-map';
 import { fitOverlay, refuseIfTheWidgetWouldClip } from './fit';
 import { partOfValue, refuseUnreadableParts } from './value-parts';
+import { drawSignature, type SignatureImage } from './render-signature';
 
 /**
  * How large a checkbox mark is drawn when the map does not say.
@@ -126,11 +127,17 @@ function oneAnswer(value: StatutoryValue, ourField: string): string {
  *   is no answer at all, and for a required field that is refused. An ARRAY is
  *   several options of one multi-select question and marks every box it names —
  *   see `StatutoryValue` for why an empty one is not a third case.
+ * @param signatures our field name -> a decoded signature image. A SEPARATE
+ *   channel on purpose: a signature is the most tightly classified personal data
+ *   this repository holds and `values` is declared to carry none. It still
+ *   counts as SUPPLIED for the required-field check, whose question is only
+ *   whether the box will be filled.
  */
 export async function renderStatutoryForm(
     officialPdf: Uint8Array,
     map: FieldMap,
     values: Readonly<Record<string, StatutoryValue>>,
+    signatures: ReadonlyMap<string, SignatureImage> = new Map(),
 ): Promise<Uint8Array> {
     validateFieldMapShape(map);
     await validateAgainstPdf(map, officialPdf);
@@ -139,7 +146,7 @@ export async function renderStatutoryForm(
     // from an empty one. The Map's `get` returns `... | undefined`, so the
     // compiler agrees with what actually happens at runtime.
     const supplied = new Map<string, StatutoryValue>(Object.entries(values));
-    checkValuesAgainstMap(map, supplied);
+    checkValuesAgainstMap(map, supplied, signatures);
 
     const doc = await PDFDocument.load(officialPdf);
     const pages = doc.getPages();
@@ -161,18 +168,13 @@ export async function renderStatutoryForm(
     };
 
     for (const mapping of map.mappings) {
-        if (mapping.kind === 'signature') {
-            // The mapping kind exists so a field map can be authored against a
-            // form that has signature boxes; drawing the image is not built yet.
-            // Skipping it silently would produce a form with an empty signature
-            // box — which prints, looks complete, and passes every assertion
-            // about its own values. Fail instead.
-            //
-            // The refusal is BEFORE the value lookup on purpose: a signature
-            // resolves by reference and never arrives through `values`, so a
-            // check placed after it would find nothing to skip and skip anyway.
-            fail(`signature rendering is not implemented; "${mapping.ourField}" `
-                + 'cannot be produced yet');
+        // BEFORE the value lookup: a signature resolves by reference and never
+        // arrives through `values`, so a check after it would find nothing to
+        // skip and skip anyway — an empty signature box on a document that
+        // prints and looks complete. See `drawSignature` for the box.
+        if (mapping.kind === 'signature' || signatures.has(mapping.ourField)) {
+            await drawSignature(doc, pages, mapping, signatures.get(mapping.ourField));
+            continue;
         }
 
         const value = supplied.get(mapping.ourField);
@@ -285,15 +287,18 @@ function setTextField(
  */
 function checkValuesAgainstMap(
     map: FieldMap, values: ReadonlyMap<string, StatutoryValue>,
+    signatures: ReadonlyMap<string, SignatureImage>,
 ): void {
     const mapped = new Set(map.mappings.map((m) => m.ourField));
-    const unmapped = [...values.keys()].filter((k) => !mapped.has(k));
+    // Signatures too: a mark with nowhere to go is an empty signature box.
+    const unmapped = [...values.keys(), ...signatures.keys()].filter((k) => !mapped.has(k));
     if (unmapped.length > 0) {
         fail(`${unmapped.length} value(s) have no mapping on ${map.formId} ${map.version} and would `
             + `be dropped: ${unmapped.join(', ')}`);
     }
 
-    const missing = map.requiredFields.filter((f) => !values.has(f));
+    // A signature is supplied through its own channel and still fills its box.
+    const missing = map.requiredFields.filter((f) => !values.has(f) && !signatures.has(f));
     if (missing.length > 0) {
         fail(`${missing.length} required field(s) were never supplied: ${missing.join(', ')}. `
             + 'An empty string is an answer; an absent key is not, and a form nobody filled must '
