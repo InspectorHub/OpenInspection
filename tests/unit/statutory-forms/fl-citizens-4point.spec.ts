@@ -38,14 +38,14 @@ describe('FL Citizens four-point Insp4pt 03 25', () => {
     });
 
     it('carries every mapping the signed candidate carried, and no more', () => {
-        expect(fieldMap.mappings).toHaveLength(187);
+        expect(fieldMap.mappings).toHaveLength(189);
         const kinds = fieldMap.mappings.reduce<Record<string, number>>((acc, m) => {
             acc[m.kind] = (acc[m.kind] ?? 0) + 1;
             return acc;
         }, {});
         // No acroform of any kind: this PDF carries no form fields at all, so
         // every value is drawn at a measured coordinate.
-        expect(kinds).toEqual({ overlay: 49, checkbox: 138 });
+        expect(kinds).toEqual({ overlay: 51, checkbox: 138 });
     });
 
     it('every overlay that measures its blank measures BOTH bounds', () => {
@@ -58,8 +58,8 @@ describe('FL Citizens four-point Insp4pt 03 25', () => {
         const bothBounds = overlays.filter(
             (m) => m.kind === 'overlay' && m.maxWidth !== undefined && m.maxHeight !== undefined,
         );
-        expect(overlays).toHaveLength(49);
-        expect(bothBounds).toHaveLength(49);
+        expect(overlays).toHaveLength(51);
+        expect(bothBounds).toHaveLength(51);
     });
 
     it('maps the page-1 detail box the form asks for when an answer is unsatisfactory', () => {
@@ -76,6 +76,30 @@ describe('FL Citizens four-point Insp4pt 03 25', () => {
         // which is a different box under a different prompt on the next page.
         expect(detail?.kind === 'overlay' && detail.page).toBe(1);
         expect(fieldMap.mappings.some((m) => m.ourField === 'additional_comments')).toBe(true);
+    });
+
+    it('gives both electrical "other" answers somewhere to say what the other thing was', () => {
+        // Both were once recorded as having no blank on the page at all. They
+        // have one: 190.6 x 15.24 pt in the hazards cell after `Other (explain)`,
+        // and 48.4 pt after the wiring row's `Other ` up to that cell's right
+        // rule. Judged absent, an inspector cannot record something this form
+        // lets him record; judged narrow, a long value is refused by name.
+        const overlays = fieldMap.mappings.filter((m) => m.kind === 'overlay');
+        const explain = overlays.find((m) => m.ourField === 'electrical.hazard_other_explain');
+        const specify = overlays.find((m) => m.ourField === 'electrical.wiring_type_other_specify');
+        expect(explain?.kind === 'overlay' && explain.maxWidth).toBe(190.6);
+        expect(specify?.kind === 'overlay' && specify.maxWidth).toBe(48.4);
+        // ⚠️ Both are ONE line. The cell rules they sit in are 15.24 and 13.86
+        // points tall; two lines at 8pt occupy 14.8, so a second line lands
+        // outside the printed cell on one of them and exactly fills the other.
+        expect(explain?.kind === 'overlay' && explain.maxHeight).toBe(10.3);
+        expect(specify?.kind === 'overlay' && specify.maxHeight).toBe(10.3);
+        // And the boxes they explain are still boxes, on the same fields.
+        const boxed = (field: string, whenValue: string) => fieldMap.mappings.some(
+            (m) => m.kind === 'checkbox' && m.ourField === field && m.whenValue === whenValue,
+        );
+        expect(boxed('electrical.hazards_present', 'other_explain')).toBe(true);
+        expect(boxed('electrical.wiring_types', 'other')).toBe(true);
     });
 
     it('asks for the SIGNING date at the signature block, not the inspection date', () => {

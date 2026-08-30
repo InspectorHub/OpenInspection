@@ -3,10 +3,41 @@
  * the published revision and the map checked against it.
  *
  * -- GENERATED FROM THE SIGNED CANDIDATE, NOT TYPED BY HAND ------------------
- * The 187 mappings below were emitted from the artifact a person signed
+ * The 189 mappings below were emitted from the artifact a person signed
  * (`checkedBy: Nathan`, 2026-08-30) rather than copied. Hand-copying would
  * introduce differences the signature does not cover, and this file exists to
  * carry that signature into the software unchanged.
+ *
+ * -- TWO BLANKS THIS MAP USED TO SAY WERE NOT THERE --------------------------
+ * The last two mappings were added on 2026-08-30, to the candidate and to this
+ * module in one batch, because nothing compares the two: a change to one alone
+ * is invisible to every gate here.
+ *
+ * Both are places the form leaves room for the inspector to say what "other"
+ * was, and both were previously recorded as having no room at all:
+ *
+ *   electrical.hazard_other_explain       the form prints `Other (explain)` and
+ *                                         then 190.6 x 15.24 pt of empty cell
+ *                                         in the same row -- about 42 characters
+ *                                         at 8pt. A form that prints "explain"
+ *                                         and leaves 190pt is asking for one.
+ *   electrical.wiring_type_other_specify  48.4 pt after the printed `Other `,
+ *                                         to the cell's own right rule at
+ *                                         576.30. Narrow -- about ten characters
+ *                                         -- but not absent.
+ *
+ * ⚠️ NARROW AND ABSENT ARE OPPOSITE PRODUCT BEHAVIOURS. Judged absent, the
+ * inspector cannot record something this form allows him to record. Judged
+ * narrow, he writes something short, and `fit.ts` refuses an over-long value by
+ * name and says how much fits. The second failure is the better one.
+ *
+ * ⚠️ `maxHeight` IS 10.3 AND NOT THE 15.24 THE CELL MEASURES. The number
+ * `fit.ts` reads is "may this value take a second line", and on both rows a
+ * second line at 8pt lands outside the printed cell -- the hazards row's own
+ * right rule is 15.24pt tall and the wiring row's is 13.86pt, against 14.8pt for
+ * two lines. 10.3 is this map's one-line height at size 8, the same value its
+ * other eight size-8 overlays carry. Measuring large is silent; measuring small
+ * is loud.
  *
  * -- WHICH PDF THIS IS ------------------------------------------------------
  * The four-page form Citizens publishes as `4-Point Inspection Form.pdf`, whose
@@ -283,5 +314,9 @@ export const fieldMap: FieldMap = {
         { kind: 'overlay', ourField: 'inspector_license_type', page: 2, x: 190.0, y: 103.9, size: 9.0, maxWidth: 112.9, maxHeight: 11.0 },
         { kind: 'overlay', ourField: 'inspector_work_phone', page: 2, x: 313.8, y: 103.9, size: 9.0, maxWidth: 131.4, maxHeight: 11.0 },
         { kind: 'overlay', ourField: 'plumbing_fixtures_unsatisfactory_detail', page: 1, x: 43.98, y: 232.8, size: 9.0, maxWidth: 530.0, maxHeight: 46.94 },
+        // The two blanks a review measured and an earlier reading called absent.
+        // See "TWO BLANKS THIS MAP USED TO SAY WERE NOT THERE" in the header.
+        { kind: 'overlay', ourField: 'electrical.hazard_other_explain', page: 0, x: 385.7, y: 216.8, size: 8.0, maxWidth: 190.6, maxHeight: 10.3 },
+        { kind: 'overlay', ourField: 'electrical.wiring_type_other_specify', page: 0, x: 527.9, y: 80.3, size: 8.0, maxWidth: 48.4, maxHeight: 10.3 },
     ],
 };

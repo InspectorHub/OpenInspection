@@ -116,6 +116,21 @@ const MARK = 'X';
  * this file is the INDEPENDENT reader: importing the renderer's own predicate
  * would make a wrong one agree with itself.
  */
+/**
+ * Two answers that mean the same thing.
+ *
+ * `===` is wrong for a list and wrong SILENTLY: two arrays of the same options
+ * are never the same object, so every multi-select answer would be reported as
+ * a mismatch and the real ones would be lost in the noise.
+ */
+function sameAnswer(a, b) {
+    if (Array.isArray(a) || Array.isArray(b)) {
+        return Array.isArray(a) && Array.isArray(b)
+            && a.length === b.length && a.every((v, i) => v === b[i]);
+    }
+    return a === b;
+}
+
 function answerNames(value, whenValue) {
     return Array.isArray(value) ? value.includes(whenValue) : value === whenValue;
 }
@@ -459,20 +474,37 @@ function checkTheValueCollector(map, values) {
     };
 
     const bindings = {};
+    // A LIST ANSWER CANNOT TRAVEL AS A LITERAL. `literal` carries one string, and
+    // the collector stringifies it -- ['copper','other'] becomes "copper,other",
+    // which matches no box on any form. That is precisely the narrow pipe
+    // multi-select answers were fixed for, and building the check on it would
+    // have this harness reproduce the bug while reporting it. So a list is bound
+    // the way the product binds one: an item's stored answer, through `asAnswer`.
+    const items = [];
+    const results = {};
     for (const [ourField, value] of Object.entries(values)) {
         if (grouped.has(ourField)) continue;
         const fact = fromInspection[ourField];
-        bindings[ourField] = fact === undefined
-            ? { from: 'literal', value }
-            : { from: 'inspection', field: fact };
+        if (fact !== undefined) {
+            bindings[ourField] = { from: 'inspection', field: fact };
+            continue;
+        }
+        if (Array.isArray(value)) {
+            const itemId = `itm_${items.length}`;
+            items.push({ id: itemId, label: ourField, type: 'multi_select' });
+            results[itemId] = { value };
+            bindings[ourField] = { from: 'item', itemId };
+            continue;
+        }
+        bindings[ourField] = { from: 'literal', value };
     }
 
     const declaration = { formId: map.formId, bindings, groups };
-    const snapshot = { schemaVersion: 2, sections: [] };
+    const snapshot = { schemaVersion: 2, sections: [{ id: 'sec', title: 'S', items }] };
 
     let collected;
     try {
-        collected = collectStatutoryValues(declaration, snapshot, {}, facts, instances);
+        collected = collectStatutoryValues(declaration, snapshot, results, facts, instances);
     } catch (error) {
         problems.push(`the collector refused a declaration built from this data: `
             + `${error instanceof Error ? error.message : String(error)}`);
@@ -480,7 +512,7 @@ function checkTheValueCollector(map, values) {
     }
 
     for (const [ourField, expected] of Object.entries(values)) {
-        if (collected[ourField] !== expected) {
+        if (!sameAnswer(collected[ourField], expected)) {
             problems.push(`the collector produced ${JSON.stringify(collected[ourField] ?? null)} `
                 + `for "${ourField}" and the render was given ${JSON.stringify(expected)}`);
         }

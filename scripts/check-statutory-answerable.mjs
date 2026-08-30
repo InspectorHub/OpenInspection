@@ -91,24 +91,18 @@ function area(ourField) {
  * still fails the gate.
  */
 const ACKNOWLEDGED = [
-    {
-        form: 'fl-citizens-4point',
-        ourField: 'electrical.wiring_types',
-        whenValue: 'other',
-        because: 'the Supplemental information table prints a bare "Other" checkbox with no rule '
-            + 'and no blank after it, and the Electrical System section carries no comments block '
-            + 'of its own. The explanation goes in the form\'s own Additional Comments/Observations '
-            + 'box on the next page, which this map names as `additional_comments` -- typed by the '
-            + 'inspector, because the page gives nothing to route it into.',
-    },
-    {
-        form: 'fl-citizens-4point',
-        ourField: 'electrical.hazards_present',
-        whenValue: 'other_explain',
-        because: 'the form prints "Other (explain)" and then prints nowhere to explain. Same '
-            + 'section, same absence, same destination as the row above: `additional_comments` on '
-            + 'the next page.',
-    },
+    // ⚠️ THE TWO CITIZENS FOUR-POINT ENTRIES WERE DELETED ON 2026-08-30, and the
+    // reason is worth keeping where the next person adds an entry. They said the
+    // page printed "Other" and "Other (explain)" with no blank beside either.
+    // Re-measured against the published bytes, both have one: 190.6 x 15.24 pt
+    // in the hazards cell, and 48.4 pt after the wiring row's "Other " up to
+    // that cell's own right rule. The map now names both blanks, so the options
+    // pass on their own merits and an entry here would forgive something that no
+    // longer needs forgiving.
+    //
+    // What went wrong the first time was a reading, not a measurement: this gate
+    // reports "this answer has no destination IN OUR MAP", and that was read as
+    // "the form prints no blank". The absence was ours.
     {
         form: 'fl-oir-b1-1802',
         ourField: 'inspector_qualification',
