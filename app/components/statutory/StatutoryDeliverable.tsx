@@ -82,7 +82,7 @@ export function StatutoryDeliverable({
     const [open, setOpen] = useState(false);
 
     return (
-        <Card className="mb-4 p-5">
+        <Card className="mb-4 p-5" data-testid="statutory-deliverable">
             <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
                 Statutory form
             </Button>
