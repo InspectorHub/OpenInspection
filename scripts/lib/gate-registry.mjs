@@ -74,6 +74,15 @@ export const SCRIPT_GATES = [
     // has pulled yet costs nothing, renaming one after it lands costs everyone a
     // merge. An fs walk of ~2765 files, no parsing; among the cheapest here.
     { key: 'extcollide', label: 'Extension collisions (files invisible to tsc)', script: 'check-extension-collisions.mjs', fix: 'npm run lint:ext-collisions', rung: PRECOMMIT },
+    // Pre-commit, and for the same reason as the gate above it: what it catches
+    // is free to fix while the line is still being typed and annoying to find
+    // later. A raw NUL byte makes the whole file BINARY to git grep, ripgrep and
+    // every review diff -- they answer "Binary file ... matches" with no line
+    // number -- while compiling and behaving exactly as intended, so nothing
+    // else here reports it. Three files had one, in three unrelated subsystems,
+    // and the oldest had been unreadable that way for months. A `git ls-files`
+    // walk with an indexOf per file; among the cheapest gates in this list.
+    { key: 'rawnul', label: 'Raw NUL bytes (files invisible to git grep)', script: 'check-raw-nul.mjs', fix: 'npm run lint:raw-nul', rung: PRECOMMIT },
     // Belongs at pre-commit rather than CI: what it catches is a CAPABILITY
     // being added -- a money column, a money field on the inspection record, a
     // money input on a new screen. By the time CI sees one it is written and

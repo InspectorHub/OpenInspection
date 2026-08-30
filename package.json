@@ -94,6 +94,7 @@
     "lint:tz": "node scripts/check-tz-safety.mjs",
     "lint:idempotency": "node scripts/check-idempotency-coverage.mjs",
     "lint:ext-collisions": "node scripts/check-extension-collisions.mjs",
+    "lint:raw-nul": "node scripts/check-raw-nul.mjs",
     "lint:i18n": "node scripts/check-i18n.mjs",
     "lint:i18n-catalog": "node scripts/check-i18n-catalog.mjs",
     "lint:i18n-glossary": "node scripts/check-i18n-glossary.mjs",
