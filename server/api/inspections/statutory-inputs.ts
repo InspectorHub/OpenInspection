@@ -155,11 +155,44 @@ export async function gatherStatutoryInputs(
     // required-field check, which is the intended behaviour.
     const inspectorId = inspection.inspectorId;
     const inspectorRow = inspectorId
-        ? await db.select({ name: schema.users.name })
+        ? await db.select({
+            name: schema.users.name,
+            // The state licence CLASS, never the credential label beside it --
+            // that one holds an association certification, and answering a
+            // statutory "License Type" box from it prints something that looks
+            // right and is wrong. See the column's own comment.
+            licenseType: schema.users.statutoryLicenseType,
+            qualification: schema.users.statutoryQualification,
+        })
             .from(schema.users)
             .where(and(eq(schema.users.id, inspectorId), eq(schema.users.tenantId, tenantId)))
             .get()
         : undefined;
+
+    // The inspection-level answers only a statutory form has ever asked for:
+    // who owns the house, how to reach them, when the inspector signed, and the
+    // second signer the 1802 prints. Absent until somebody fills the panel in,
+    // and absent is a real state -- every field below is nullable and a null
+    // reaches the required-field check exactly as a missing credential does.
+    //
+    // 🔴 NOT DEFAULTED FROM THE CLIENT. `primaryClient` is sitting right there
+    // and the owner is frequently not that person.
+    const statutoryDetails = await db.select({
+        inspectorSignatureDate: schema.statutoryInspectionDetails.inspectorSignatureDate,
+        employeePrintedName:    schema.statutoryInspectionDetails.employeePrintedName,
+        ownerName:              schema.statutoryInspectionDetails.ownerName,
+        ownerEmail:             schema.statutoryInspectionDetails.ownerEmail,
+        ownerMailingAddress:    schema.statutoryInspectionDetails.ownerMailingAddress,
+        ownerHomePhone:         schema.statutoryInspectionDetails.ownerHomePhone,
+        ownerWorkPhone:         schema.statutoryInspectionDetails.ownerWorkPhone,
+        ownerCellPhone:         schema.statutoryInspectionDetails.ownerCellPhone,
+    })
+        .from(schema.statutoryInspectionDetails)
+        .where(and(
+            eq(schema.statutoryInspectionDetails.tenantId, tenantId),
+            eq(schema.statutoryInspectionDetails.inspectionId, inspection.id),
+        ))
+        .get();
     const licenceNumber = inspectorId
         ? await new CredentialService(d1).primaryLicenseNumber(tenantId, inspectorId)
         : null;
@@ -197,6 +230,24 @@ export async function gatherStatutoryInputs(
         inspector_license: licenceNumber,
         company_name: config?.companyName ?? null,
         company_phone: config?.companyPhone ?? null,
+        inspector_license_type: inspectorRow?.licenseType ?? null,
+        inspector_qualification: inspectorRow?.qualification ?? null,
+        // Formatted the same way `inspection_date` is, and for the same reason:
+        // the form decides how a date reads, not the workspace. Null passes
+        // through UNFORMATTED -- `calendarDayForForm` refuses a value that is
+        // not a calendar day, and "nobody has signed yet" is not a bad date.
+        // It reaches the required-field check as an absent answer instead,
+        // which is what stops a form nobody dated from being produced.
+        inspector_signature_date: statutoryDetails?.inspectorSignatureDate
+            ? calendarDayForForm(statutoryDetails.inspectorSignatureDate, 'inspector_signature_date')
+            : null,
+        owner_name: statutoryDetails?.ownerName ?? null,
+        owner_email: statutoryDetails?.ownerEmail ?? null,
+        owner_mailing_address: statutoryDetails?.ownerMailingAddress ?? null,
+        owner_home_phone: statutoryDetails?.ownerHomePhone ?? null,
+        owner_work_phone: statutoryDetails?.ownerWorkPhone ?? null,
+        owner_cell_phone: statutoryDetails?.ownerCellPhone ?? null,
+        employee_printed_name: statutoryDetails?.employeePrintedName ?? null,
     };
     // Last, because it is the only read here that can REFUSE, and a refusal
     // naming a missing signature is more useful once everything else resolved.

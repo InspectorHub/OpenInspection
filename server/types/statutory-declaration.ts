@@ -23,20 +23,30 @@
  * somebody already fills in. `company_name` and `company_phone` read the
  * workspace's own configuration, which is why they are here.
  *
- * Two boxes the Florida four-point form prints are deliberately NOT here, and
- * that absence was decided rather than overlooked:
+ * One box the Florida four-point form prints is deliberately NOT here, and that
+ * absence was decided rather than overlooked: `Title` has no source anywhere in
+ * this repository. Do NOT add it as a field hardwired to `null`: a member that
+ * can never resolve is a blank box on an authority's form, which reads as an
+ * inspector who did not answer.
  *
- *   - `Title` has no source anywhere in this repository.
- *   - `License Type` asks for a state licence class (home inspector, general
- *     contractor, building code inspector). The nearest column is an
- *     inspector credential's label, which holds an ASSOCIATION certification
- *     ("InterNACHI CPI"). Those are not the same thing, and answering a
- *     statutory licence-type box from it would print something that looks
- *     right and is wrong — the exact failure this subsystem exists to prevent.
+ * -- THE TEN MEMBERS BELOW `company_phone` GOT THEIR SOURCES BUILT -----------
+ * `License Type` used to sit beside `Title` in that paragraph, on the reasoning
+ * that the nearest column is an inspector credential's label — an ASSOCIATION
+ * certification ("InterNACHI CPI") rather than the state licence class the box
+ * asks for. That reasoning stands and the conclusion changed: rather than read
+ * the wrong column, the right one was added. `users.statutory_license_type` is
+ * that column, and the credential label is still not it.
  *
- * Both need a new source before they can be members. Do NOT add them as fields
- * hardwired to `null`: a member that can never resolve is a blank box on an
- * authority's form, which reads as an inspector who did not answer.
+ * The other nine are the same story. The owner block and the second signer FL
+ * OIR-B1-1802 prints are answered from `statutory_inspection_details`, one row
+ * per inspection; the signing date is on the same row, and is NOT
+ * `inspection_date` — signing commonly happens days after the fieldwork and
+ * several of these forms print both.
+ *
+ * ⚠️ `owner_*` IS NOT `client_*`. A buyer commissions the inspection and the
+ * seller owns the house. Aliasing one onto the other prints the wrong person's
+ * name on a state form, and `binding-policy.ts` judges the ROUTE rather than
+ * the meaning, so every gate stays green while it happens.
  *
  * New members go at the END, for the same reason new columns do — the order is
  * something readers see.
@@ -53,7 +63,17 @@ export type StatutoryInspectionField =
     | 'inspector_name'
     | 'inspector_license'
     | 'company_name'
-    | 'company_phone';
+    | 'company_phone'
+    | 'inspector_license_type'
+    | 'inspector_qualification'
+    | 'inspector_signature_date'
+    | 'owner_name'
+    | 'owner_email'
+    | 'owner_mailing_address'
+    | 'owner_home_phone'
+    | 'owner_work_phone'
+    | 'owner_cell_phone'
+    | 'employee_printed_name';
 
 /**
  * One repeated block on the authority's form.

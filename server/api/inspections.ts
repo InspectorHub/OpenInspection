@@ -22,6 +22,7 @@
 import { createApiRouter } from '../lib/openapi-router';
 import templatesRoutes from './inspections/templates';
 import statutoryRoutes from './inspections/statutory';
+import statutoryDetailsRoutes from './inspections/statutory-details';
 import hierarchyRoutes from './inspections/hierarchy';
 import bulkRoutes from './inspections/bulk';
 import scheduleRoutes from './inspections/schedule';
@@ -70,6 +71,8 @@ export const inspectionsRoutes = createApiRouter()
     // After the report-delivery routes: this one serves a FOURTH deliverable and
     // shares their headers, not their file. See lib/deliverable-headers.ts.
     .route('/', statutoryRoutes)
+    // The inspection-level answers those forms ask for and nothing else does.
+    .route('/', statutoryDetailsRoutes)
     // Communication A3.4 — manual SMS via the shared sendOneSms TCPA core.
     .route('/', sendSmsRoutes)
     // Communication design §2 — messages + platform notices, two arrays.

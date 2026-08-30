@@ -69,6 +69,11 @@ const FACTS = {
     property_zip: '78701', inspection_date: '2026-05-01',
     inspector_name: 'Sam Reed', inspector_license: 'TX-1',
     company_name: 'Reed Home Inspections', company_phone: '512-555-0142',
+    inspector_license_type: null, inspector_qualification: null,
+    inspector_signature_date: null,
+    owner_name: null, owner_email: null, owner_mailing_address: null,
+    owner_home_phone: null, owner_work_phone: null, owner_cell_phone: null,
+    employee_printed_name: null,
 } satisfies StatutoryInspectionFacts;
 
 /** An R2 stand-in holding one object per key. */

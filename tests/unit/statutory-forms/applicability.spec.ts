@@ -11,6 +11,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { collectStatutoryValues } from '../../../server/lib/statutory/values';
+import type { StatutoryValue } from '../../../server/lib/statutory/field-map';
 import type {
     StatutoryFormDeclaration,
     TemplateSchemaV2,
@@ -44,6 +45,16 @@ const FACTS = {
     inspector_license: null,
     company_name: null,
     company_phone: null,
+    inspector_license_type: null,
+    inspector_qualification: null,
+    inspector_signature_date: null,
+    owner_name: null,
+    owner_email: null,
+    owner_mailing_address: null,
+    owner_home_phone: null,
+    owner_work_phone: null,
+    owner_cell_phone: null,
+    employee_printed_name: null,
 };
 
 /**
@@ -71,14 +82,14 @@ function attachmentDecl(): StatutoryFormDeclaration {
 function collect(
     declaration: StatutoryFormDeclaration,
     answers: Record<string, string>,
-): Record<string, string> {
+): Record<string, StatutoryValue> {
     const results = Object.fromEntries(
         Object.entries(answers).map(([itemId, value]) => [itemId, { value }]),
     );
     return collectStatutoryValues(declaration, SNAPSHOT, results, FACTS);
 }
 
-function has(values: Record<string, string>, key: string): boolean {
+function has(values: Record<string, StatutoryValue>, key: string): boolean {
     return Object.prototype.hasOwnProperty.call(values, key);
 }
 

@@ -145,5 +145,13 @@ export const MEMBER_EXCHANGE: ExchangeVocabulary = {
             column: 'service_origin_lng',
             reason: 'the geocode half of the routing origin above, and withheld with it',
         },
+        {
+            column: 'statutory_license_type',
+            reason: 'the state licence class this inspector holds. Not importable for the reason this whole arm exists: an invitation creates an account, and a file that could assert somebody\'s licence class would be asserting a professional qualification on their behalf. Not exported either — a team roster handed around a workspace is a different audience from the member\'s own account export, which does carry it',
+        },
+        {
+            column: 'statutory_qualification',
+            reason: 'the statutory qualification category this inspector declares for themselves — the same class as the licence above, and withheld with it',
+        },
     ],
 };

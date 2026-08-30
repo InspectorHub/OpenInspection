@@ -61,6 +61,7 @@ import {
 import { changeCount, toMs, addYearsMs } from './db-row-utils';
 import { eraseRepairRequests } from './erase-repair-requests';
 import { eraseReportViews, eraseReportTranslations } from './erase-report-artifacts';
+import { eraseStatutoryDetails } from './erase-statutory-details';
 import { holdGate, writeErasureLog } from './erasure-hold-gate';
 
 /**
@@ -401,6 +402,7 @@ export async function runErasure(
         return c;
     });
 
+    await eraseStatutoryDetails(db, { tenantId, inspectionIds: await subjectInspectionIds(), step });
     // Repair-request lists built from the published report — the one surface
     // where the CLIENT types prose. Two passes (own lists deleted, other
     // people's prose cleared); see `erase-repair-requests.ts` for why.

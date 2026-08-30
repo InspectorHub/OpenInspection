@@ -438,6 +438,16 @@ function checkTheValueCollector(map, values) {
         inspector_license: values.inspector_license_number ?? null,
         company_name: values.inspector_company_name ?? null,
         company_phone: values.inspector_work_phone ?? null,
+        inspector_license_type: null,
+        inspector_qualification: null,
+        inspector_signature_date: null,
+        owner_name: null,
+        owner_email: null,
+        owner_mailing_address: null,
+        owner_home_phone: null,
+        owner_work_phone: null,
+        owner_cell_phone: null,
+        employee_printed_name: null,
     };
     const fromInspection = {
         insured_applicant_name: 'client_name',

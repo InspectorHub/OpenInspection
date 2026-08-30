@@ -86,6 +86,13 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     // is recorded rather than inferred from the PII heuristic not matching
     // 'service_origin_address'.
     { table: 'users',               column: 'service_origin_address',    reason: 'staff routing origin (may be a home address) — staff offboarding lifecycle, not consumer-DSAR scope' },
+    // Caught by the heuristic on the word "signature", and it is not one: this
+    // is a DATE, not a mark. It records the day a member of STAFF signed an
+    // authority's form — a fact about the document, and out of consumer-DSAR
+    // scope for the same reason `users.email` two dozen lines up is. The owner
+    // contact columns beside it on that row are a different question and are
+    // answered by rules in the manifest, not here.
+    { table: 'statutory_inspection_details', column: 'inspector_signature_date', reason: 'the day a staff inspector signed a statutory form — a fact about the document, not a consumer data subject\'s personal data; staff offboarding lifecycle' },
     { table: 'users',               column: 'service_origin_lat',        reason: 'staff routing origin coordinate — not consumer-DSAR scope' },
     { table: 'users',               column: 'service_origin_lng',        reason: 'staff routing origin coordinate — not consumer-DSAR scope' },
     { table: 'tenant_invites',      column: 'email',                     reason: 'staff invite — not consumer-DSAR scope' },

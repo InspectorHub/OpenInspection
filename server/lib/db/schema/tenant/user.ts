@@ -136,6 +136,30 @@ export const users = sqliteTable('users', {
     // no origin of their own and falls back to the company coordinates.
     serviceOriginLat:     real('service_origin_lat'),
     serviceOriginLng:     real('service_origin_lng'),   // written only as a pair with _lat; a lone value is no anchor
+    /**
+     * The STATE LICENCE CLASS this inspector holds — "Florida-licensed home
+     * inspector", "General, residential, building or roofing contractor",
+     * "Building code inspector". Free text, because the list is the authority's
+     * and differs per form and per state; an enum here would be this software
+     * deciding what a state licenses.
+     *
+     * ⚠️ NOT the same fact as an `inspector_credentials` row, and the two must
+     * both exist. That table holds an ASSOCIATION certification ("InterNACHI
+     * CPI") and its licence NUMBER; this is the class of licence a statutory
+     * form's "License Type" box asks for. Answering one from the other prints
+     * something that looks right and is wrong.
+     *
+     * Appended at END — users is FK-referenced, so a mid-table insert would
+     * make drizzle rebuild the whole table.
+     */
+    statutoryLicenseType:   text('statutory_license_type'),
+    /**
+     * The qualification category FL OIR-B1-1802 asks the inspector to declare
+     * for himself. A different axis from the licence class above, on the same
+     * person: the 1802 prints its own six categories and asks which one the
+     * signer qualifies under, beside — not instead of — his licence.
+     */
+    statutoryQualification: text('statutory_qualification'),
 }, (t) => [
     index('idx_users_deleted_at').on(t.deletedAt),
     // DB-2: soft-deleted rows must not block re-inviting the same email.
