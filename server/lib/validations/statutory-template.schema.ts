@@ -48,6 +48,23 @@ export const StatutoryFormDeclarationSchema = z.object({
      * the field's own comment in `server/types/statutory-declaration.ts`.
      */
     revision: z.string().min(1).optional(),
+    /**
+     * When a question is asked at all -- see `lib/statutory/applicability.ts`.
+     *
+     * Shape only, exactly as `bindings` above, and for the same reason: the
+     * authority on whether a rule is usable is the field map that ships with
+     * the software and goes through code review, not this parse. Restating the
+     * rule shape here would create a second place for it to be wrong.
+     *
+     * ⚠️ ADDED BECAUSE ITS ABSENCE WAS A LATENT REFUSAL. `.strict()` refuses
+     * unrecognised keys, so a declaration carrying `dependsOn` was rejected at
+     * catalogue install with "Unrecognized key" -- measured. No published form
+     * used it yet, so nothing was broken today and nothing was red; the three
+     * Florida forms would have hit it the day they landed. A key added to the
+     * type in one commit and to this schema in none is exactly the seam that
+     * `.strict()` is supposed to catch, and it did -- just not until install.
+     */
+    dependsOn: z.record(z.string(), z.unknown()).optional(),
 }).strict();
 
 export const StatutoryTemplateSchema = TemplateSchemaV2Schema
