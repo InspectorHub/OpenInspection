@@ -128,7 +128,7 @@ export const fieldMap: FieldMap = {
         { kind: 'checkbox', ourField: 'electrical.conditions_present', whenValue: 'branch_circuit_aluminum_wiring', page: 0, x: 52.4, y: 360.4, size: 7.0 },
         { kind: 'checkbox', ourField: 'electrical.aluminum_remediation', whenValue: 'copalum_crimp', page: 0, x: 52.4, y: 330.0, size: 7.0 },
         { kind: 'checkbox', ourField: 'electrical.aluminum_remediation', whenValue: 'alumiconn', page: 0, x: 52.4, y: 314.8, size: 7.0 },
-        { kind: 'overlay', ourField: 'electrical.aluminum_wiring_usage', page: 0, x: 342.0, y: 359.5, size: 8.0, maxWidth: 228.0, maxHeight: 10.3 },
+        { kind: 'overlay', ourField: 'electrical.aluminum_wiring_usage', page: 0, x: 363.2, y: 359.5, size: 8.0, maxWidth: 206.8, maxHeight: 10.3 },
         { kind: 'checkbox', ourField: 'electrical.hazards_present', whenValue: 'blowing_fuses', page: 0, x: 52.7, y: 277.9, size: 7.0 },
         { kind: 'checkbox', ourField: 'electrical.hazards_present', whenValue: 'tripping_breakers', page: 0, x: 52.7, y: 262.8, size: 7.0 },
         { kind: 'checkbox', ourField: 'electrical.hazards_present', whenValue: 'empty_sockets', page: 0, x: 52.7, y: 247.6, size: 7.0 },
