@@ -113,6 +113,16 @@ const MATCHED = 'insp-matched-revision';
 const SUPERSEDED = 'insp-superseded-revision';
 /** Declares a revision that has been WITHDRAWN. */
 const WITHDRAWN = 'insp-withdrawn-revision';
+/**
+ * Created by the new-inspection WIZARD, whose `date` carries a time suffix.
+ *
+ * Not a hypothetical shape: `inspection-create-variants.service.ts` writes
+ * `${date}T${startTime}:00` on purpose, because `booking.service.ts` reads the
+ * clock back out of this column at `slice(11, 16)`. Six write paths in all
+ * store an instant here. Every one of those inspections used to 500 on both
+ * statutory endpoints, and the offer's 500 was swallowed into "no form here".
+ */
+const TIMED = 'insp-wizard-timed';
 
 const INSPECTOR = 'usr-dana';
 
@@ -226,6 +236,12 @@ beforeEach(async () => {
             ...base, id: WITHDRAWN, tenantId: TENANT, inspectorId: INSPECTOR,
             templateSnapshot: snapshotDeclaringRevision('Rev. 07/24'),
         },
+        {
+            ...base, id: TIMED, tenantId: TENANT, inspectorId: INSPECTOR,
+            // Same calendar day as every other row, plus the wizard's suffix.
+            date: '2026-05-01T09:30:00.000Z',
+            templateSnapshot: SNAPSHOT_DECLARED,
+        },
     ] as never);
     await db.insert(schema.reports).values([
         {
@@ -254,6 +270,10 @@ beforeEach(async () => {
         },
         {
             id: 'rep-withdrawn', tenantId: TENANT, inspectionId: WITHDRAWN, title: 'Report', kind: 'primary',
+            status: 'published', createdAt: new Date(), publishedAt: new Date(Date.UTC(2026, 4, 2)),
+        },
+        {
+            id: 'rep-timed', tenantId: TENANT, inspectionId: TIMED, title: 'Report', kind: 'primary',
             status: 'published', createdAt: new Date(), publishedAt: new Date(Date.UTC(2026, 4, 2)),
         },
     ] as never);
@@ -374,5 +394,49 @@ describe('GET /:id/statutory-form.pdf', () => {
         expect(facts.inspector_license).toBe('HI-12345');
         expect(facts.company_name).toBe('Acme Inspections');
         expect(facts.company_phone).toBe('555-0100');
+    });
+
+    it('produces for an inspection whose stored date carries a time', async () => {
+        // The wizard's shape. Before this, the route sliced the day for the
+        // revision check and then handed the RAW column value to the producer
+        // and to `calendarDayForForm`, both of which refuse anything that is not
+        // exactly YYYY-MM-DD -- so the response was 500.
+        expect((await get(TIMED)).status).toBe(200);
+    });
+
+    it('prints the DAY of a timed date, with the instant discarded', async () => {
+        // Not merely "it did not throw": the box on the form has to carry the
+        // civil day. A pass that only checked the status could be satisfied by
+        // printing the whole timestamp.
+        await get(TIMED);
+        expect(producedFacts().inspection_date).toBe('05/01/2026');
+    });
+});
+
+describe('GET /:id/statutory-form (the offer)', () => {
+    async function offer(id: string, tenantId = TENANT) {
+        const res = await buildApp(tenantId).request(
+            `/api/inspections/${id}/statutory-form`, {}, ENV(),
+        );
+        return { status: res.status, body: await res.json() as { data: { available: boolean } } };
+    }
+
+    it('offers the form for an inspection whose stored date carries a time', async () => {
+        // This is the one the page reads, and its failure was INVISIBLE: the
+        // loader kept `available: false` on a non-ok response, so the control
+        // simply did not render and nothing anywhere said why.
+        const { status, body } = await offer(TIMED);
+        expect(status).toBe(200);
+        expect(body.data.available).toBe(true);
+    });
+
+    it('POSITIVE CONTROL — and for a bare calendar day', async () => {
+        expect((await offer(GOOD)).body.data.available).toBe(true);
+    });
+
+    it('NEGATIVE CONTROL — a template declaring no form is still unavailable', async () => {
+        // Without this, a route that answered `available: true` unconditionally
+        // would satisfy both assertions above.
+        expect((await offer(PLAIN)).body.data.available).toBe(false);
     });
 });

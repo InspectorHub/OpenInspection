@@ -29,7 +29,10 @@ export interface StatutoryInspectionRow {
     addressCity: string | null;
     addressState: string | null;
     addressZip: string | null;
-    date: string | null;
+    // NOTE: `date` is deliberately absent. The raw column holds either a
+    // calendar day or a day plus an instant, and reading it here is what put a
+    // full ISO timestamp into `calendarDayForForm`. The already-narrowed day
+    // arrives as its own argument instead, so a caller cannot forget to narrow it.
 }
 
 export interface StatutoryInputs {
@@ -44,6 +47,10 @@ export async function gatherStatutoryInputs(
     d1: D1Database,
     tenantId: string,
     inspection: StatutoryInspectionRow,
+    /** The inspection's calendar day, already narrowed by
+     *  `calendarDayOfStoredDate`. Passed rather than read off the row: see the
+     *  note on `StatutoryInspectionRow`. */
+    inspectionDay: string,
 ): Promise<StatutoryInputs> {
     // Re-keyed by item id, because that is what a binding names and NOT what
     // the column stores -- see `lib/statutory/item-results.ts`. Reading the raw
@@ -111,7 +118,7 @@ export async function gatherStatutoryInputs(
         // (every parted field on the 1802 is a permit date, which comes from an
         // item); the day one does, the format belongs on that map beside its
         // coordinates rather than here.
-        inspection_date: inspection.date ? calendarDayForForm(inspection.date, 'inspection_date') : null,
+        inspection_date: calendarDayForForm(inspectionDay, 'inspection_date'),
         inspector_name: inspectorRow?.name ?? null,
         inspector_license: licenceNumber,
         company_name: config?.companyName ?? null,

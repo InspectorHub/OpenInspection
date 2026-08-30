@@ -64,7 +64,7 @@ import { versionForInspection } from '../../lib/statutory/form-registry';
 import { revisionStatusForInspection } from '../../lib/statutory/revision-status';
 import { withdrawalRefusal } from '../../lib/statutory/withdrawal-copy';
 import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
-import { utcMidnightOf } from '../../lib/statutory/inspection-date';
+import { utcMidnightOf, calendarDayOfStoredDate } from '../../lib/statutory/inspection-date';
 import { statutoryNoticeFor, formatEffectiveDate } from '../../lib/statutory/disclaimer';
 import { Errors } from '../../lib/errors';
 import * as schema from '../../lib/db/schema';
@@ -203,9 +203,12 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
     // that names no revision is NOT refused -- it makes no claim to measure, and
     // guessing one would refuse a correct report. The blocking state is the only
     // one where the template's own claim contradicts the inspection's date.
-    // Sliced the way every other caller slices it: `inspections.date` is a
-    // calendar day, and the criterion refuses anything that is not exactly one.
-    const inspectionDay = String(inspection.date ?? '').slice(0, 10);
+    // ONE reading of the column, handed to everything below: `inspections.date`
+    // holds a calendar day OR that day plus an instant (`calendarDayOfStoredDate`),
+    // and everything past this line takes a bare day. The hand-rolled slice that
+    // used to sit here narrowed the revision check while the RAW value still went
+    // on to the producer -- which is how every wizard-made inspection 500ed.
+    const inspectionDay = calendarDayOfStoredDate(inspection.date);
     const revision = revisionStatusForInspection({
         snapshot,
         inspectionDate: inspectionDay,
@@ -239,7 +242,7 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
     }
 
     const { results, facts, skippedNonDefaultUnits } = await gatherStatutoryInputs(
-        db, c.env.DB, tenantId, inspection,
+        db, c.env.DB, tenantId, inspection, inspectionDay,
     );
     if (skippedNonDefaultUnits.length > 0) {
         // Answered only under some other unit. This form describes one dwelling,
@@ -261,7 +264,7 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
 
     const produced = await produceStatutoryForm({
         formId: declaration.formId,
-        inspectionDate: inspection.date,
+        inspectionDate: inspectionDay,
         declaration,
         snapshot,
         results: results ?? {},
@@ -323,10 +326,26 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
             .get();
         if (!published?.publishedAt) return c.json(unavailable, 200);
 
-        // Same selection the PDF route makes, so the two can never disagree
-        // about which revision this inspection is governed by.
+        // Same reading of the column the PDF route makes, so the two can never
+        // disagree about which day -- and so which revision -- governs. A date
+        // this cannot read is a FAULT, not the ordinary absence, but the answer
+        // still has to be `available: false` so the page renders. So it says WHY
+        // on the way out: a silent degrade is how this survived the whole
+        // published life of the TREC form, the control simply never appearing.
+        let inspectionDay: string;
+        try {
+            inspectionDay = calendarDayOfStoredDate(inspection.date);
+        } catch (cause) {
+            logger.warn('statutory: offer withheld, the inspection date is unreadable', {
+                inspectionId: id,
+                formId: declaration.formId,
+                reason: cause instanceof Error ? cause.message : String(cause),
+            });
+            return c.json(unavailable, 200);
+        }
+
         const version = versionForInspection(
-            declaration.formId, utcMidnightOf(inspection.date), PUBLISHED_FORM_VERSIONS,
+            declaration.formId, utcMidnightOf(inspectionDay), PUBLISHED_FORM_VERSIONS,
         );
         if (!version) return c.json(unavailable, 200);
 

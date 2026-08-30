@@ -343,27 +343,27 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   // Its own read rather than a hub field, for the same reason as the two above:
   // the hub is this page's ONE aggregate round trip, and this answer depends on
   // what the deployment publishes rather than on the inspection alone.
-  // Best-effort — a failure leaves the control absent, which is also what a
-  // deployment publishing no forms sees, so the page degrades to the ordinary
-  // case rather than to a broken one.
+  // Best-effort — a failure leaves the control absent, the ordinary case rather
+  // than a broken one.
   let statutoryForm: {
     available: boolean; formId?: string; revision?: string; effectiveDate?: string; notice?: string;
   } = { available: false };
-  // `.catch()` alone did not deliver what the paragraph above promises. It
-  // handles a REJECTED promise, and the way this reaches for the route --
-  // `api.inspections[":id"]["statutory-form"].$get` -- throws SYNCHRONOUSLY when
-  // any link in that chain is absent, before a promise exists for anything to
-  // catch. A client that does not expose this route therefore took the whole
-  // page down, which is the opposite of the degradation described above.
+  // `.catch()` alone did not deliver what the paragraph above promises: it
+  // handles a REJECTED promise, and `api.inspections[":id"]["statutory-form"]
+  // .$get` throws SYNCHRONOUSLY when any link in that chain is absent. Both
+  // failures are LOUD now and only the RENDERING degrades — a silent degrade is
+  // indistinguishable from "this deployment publishes no forms", which is how a
+  // 500 here hid behind a control that simply never appeared.
   try {
     const sRes = await api.inspections[":id"]["statutory-form"].$get({ param: { id } });
     if (sRes.ok) {
       const sBody = (await sRes.json()) as { data?: typeof statutoryForm };
       statutoryForm = sBody.data ?? { available: false };
+    } else {
+      console.error("[statutory-offer] failed", sRes.status, await sRes.text().catch(() => ""));
     }
-  } catch {
-    // Absent control, ordinary page -- the same thing a deployment that
-    // publishes no forms sees.
+  } catch (cause) {
+    console.error("[statutory-offer] could not be requested at all", cause);
   }
 
   return {
