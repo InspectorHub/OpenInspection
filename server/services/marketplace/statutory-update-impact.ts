@@ -25,6 +25,11 @@ import { and, eq, isNull, ne } from 'drizzle-orm';
 import { inspections, templates } from '../../lib/db/schema';
 import { marketplaceLibraries, tenantLibraryImports } from '../../lib/db/schema/marketplace';
 import { revisionStatusForInspection } from '../../lib/statutory/revision-status';
+import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
+import type {
+    StatutoryFormVersion,
+    StatutoryWithdrawal,
+} from '../../lib/statutory/form-registry';
 
 /** The service's `drizzle(env.DB)` handle. Named so these signatures do not
  *  silently narrow to the schema-less default and reject their only caller. */
@@ -41,17 +46,57 @@ export interface StatutoryUpdateImpact {
     fromRevision: string | null;
     /** The revision the catalogue entry produces, or null when it names none. */
     toRevision: string | null;
+    /**
+     * The withdrawal behind `fromRevision`, when there is one.
+     *
+     * A property of the REVISION, not of any one inspection, which is why it is
+     * a single value here and not a count: if the installed revision has been
+     * withdrawn then every inspection still on it is blocked, for the same
+     * reason, and `blocked` will equal `total`. The dialog needs the reason
+     * because the two causes ask an administrator to do different things after
+     * they update — wait for a corrected map and re-issue what went out, or
+     * simply carry on with the revision now in force.
+     */
+    fromWithdrawal: StatutoryWithdrawal | null;
 }
 
 const EMPTY: StatutoryUpdateImpact = {
     total: 0, producible: 0, blocked: 0, fromRevision: null, toRevision: null,
+    fromWithdrawal: null,
 };
+
+/** The statutory form a template schema declares, if it declares one. */
+function declarationOf(schema: unknown): { formId: string; revision: string } | null {
+    const declared = (schema as {
+        statutoryForm?: { formId?: unknown; revision?: unknown };
+    } | null)?.statutoryForm;
+    if (typeof declared?.formId !== 'string' || typeof declared.revision !== 'string') return null;
+    return { formId: declared.formId, revision: declared.revision };
+}
 
 /** The revision a template schema declares it was built for, if it declares one. */
 function revisionOf(schema: unknown): string | null {
-    const declared = (schema as { statutoryForm?: { revision?: unknown } } | null)
-        ?.statutoryForm?.revision;
-    return typeof declared === 'string' ? declared : null;
+    return declarationOf(schema)?.revision ?? null;
+}
+
+/**
+ * The withdrawal on the revision the workspace's own template produces.
+ *
+ * Read from the CATALOGUE and not from the inspections, because it is a fact
+ * about the revision. Deriving it from whatever the loop below happened to see
+ * would make it disappear exactly when there are no inspections in flight — the
+ * quiet case, where an administrator presses Update having been told nothing at
+ * all about why the revision they are leaving stopped producing.
+ */
+function withdrawalOf(
+    schema: unknown,
+    versions: readonly StatutoryFormVersion[],
+): StatutoryWithdrawal | null {
+    const declared = declarationOf(schema);
+    if (declared === null) return null;
+    return versions.find(
+        (v) => v.formId === declared.formId && v.version === declared.revision,
+    )?.withdrawn ?? null;
 }
 
 export async function statutoryUpdateImpact(
@@ -101,6 +146,8 @@ export async function statutoryUpdateImpact(
         ))
         .all();
 
+    const fromWithdrawal = withdrawalOf(local?.schema, PUBLISHED_FORM_VERSIONS);
+
     let total = 0;
     let blocked = 0;
     for (const row of rows) {
@@ -114,8 +161,14 @@ export async function statutoryUpdateImpact(
         // what it produces, so it is not part of the cost being reported.
         if (status === null) continue;
         total += 1;
-        if (status.kind === 'cannot_produce') blocked += 1;
+        // A withdrawn revision produces nothing either, so it counts as blocked
+        // -- `producible` is derived from this number and a withdrawal left out
+        // of it would report inspections as still producing their form when not
+        // one of them can. What differs is the SENTENCE, not the arithmetic.
+        if (status.kind === 'cannot_produce' || status.kind === 'withdrawn') blocked += 1;
     }
 
-    return { total, producible: total - blocked, blocked, fromRevision, toRevision };
+    return {
+        total, producible: total - blocked, blocked, fromRevision, toRevision, fromWithdrawal,
+    };
 }

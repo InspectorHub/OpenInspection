@@ -35,6 +35,82 @@ describe("RevisionBanner", () => {
         expect(screen.getByRole("status")).toHaveTextContent(/still.*correct|remains/i);
     });
 
+    it("tells the two withdrawal reasons apart, and says a different thing for each", () => {
+        // §5.3. "This revision was withdrawn" is true of both causes and
+        // actionable for neither: our own field map being wrong means a
+        // correction is coming from us and the documents already issued should
+        // be issued again once it lands, while an authority's withdrawal means
+        // no correction is ever coming and the workspace has to move now.
+        const common = {
+            version: "7-6",
+            withdrawnAt: Date.UTC(2026, 3, 1),
+            replacementVersion: "7-7",
+        } as const;
+
+        const { unmount } = render(
+            <RevisionBanner
+                status={{ kind: "withdrawn", reason: "field_map_incorrect", ...common }}
+                inspectionDate="2026-05-01"
+            />,
+        );
+        const ours = screen.getByRole("alert").textContent ?? "";
+        unmount();
+
+        render(
+            <RevisionBanner
+                status={{ kind: "withdrawn", reason: "authority_withdrew", ...common }}
+                inspectionDate="2026-05-01"
+            />,
+        );
+        const theirs = screen.getByRole("alert").textContent ?? "";
+
+        // Both carry the facts, so the difference below is not one branch
+        // simply rendering less than the other.
+        for (const text of [ours, theirs]) {
+            expect(text).toContain("7-6");
+            expect(text).toContain("7-7");
+            expect(text).toContain("2026-04-01");
+        }
+        // The property under test: these two never converge. Compared to each
+        // other rather than to a literal chosen in this commit, so a copy edit
+        // that reworded both into one sentence still fails here.
+        expect(ours).not.toBe(theirs);
+        // The distinguishing instruction, stated rather than implied. What
+        // actually differs is what happens to the documents already issued: a
+        // wrong field map printed answers in the wrong boxes, so they have to
+        // go out again; an authority's withdrawal leaves them correct for the
+        // dates they were produced for.
+        expect(ours).toMatch(/produced again/i);
+        expect(theirs).not.toMatch(/produced again/i);
+        expect(theirs).toMatch(/authority/i);
+        expect(ours).not.toMatch(/authority/i);
+        // Still no migration control on either.
+        expect(screen.queryByRole("button")).toBeNull();
+    });
+
+    it("does not send the reader after a replacement revision that does not exist", () => {
+        // An authority may withdraw a revision before publishing its successor.
+        // Naming a replacement then would be an instruction to look for a form
+        // nobody has, so the null case has copy of its own.
+        render(
+            <RevisionBanner
+                status={{
+                    kind: "withdrawn",
+                    reason: "authority_withdrew",
+                    version: "7-6",
+                    withdrawnAt: Date.UTC(2026, 3, 1),
+                    replacementVersion: null,
+                }}
+                inspectionDate="2026-05-01"
+            />,
+        );
+        const alert = screen.getByRole("alert");
+        expect(alert).toHaveTextContent(/authority/i);
+        // The positive control against a message that simply omits everything:
+        // the withdrawn revision is still named.
+        expect(alert).toHaveTextContent("7-6");
+    });
+
     it("states the consequence plainly when the form cannot be produced", () => {
         render(
             <RevisionBanner

@@ -42,7 +42,7 @@ export const version: StatutoryFormVersion = {
     mandatoryFrom: Date.UTC(2022, 1, 1),
     // Still current: TREC has published no successor as of the publish date.
     effectiveUntil: null,
-    withdrawnAt: null,
+    withdrawn: null,
     sourceUrl: 'https://www.trec.texas.gov/sites/default/files/pdf-forms/REI%207-6_fillable.pdf',
     sourceHash: '5def4efc765aee953a028446596dd97b9f974cb0851153e15b07447568d3ed4c',
     publishedBy: 'InspectorHub',

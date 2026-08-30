@@ -30,7 +30,7 @@ const VERSION: StatutoryFormVersion = {
     effectiveUntil: null,
     sourceUrl: 'https://example.gov/f.pdf', sourceHash: 'a'.repeat(64),
     publishedBy: 'a.operator', publishedAt: Date.UTC(2026, 3, 1),
-    withdrawnAt: null,
+    withdrawn: null,
 };
 
 describe('the statutory form notice', () => {

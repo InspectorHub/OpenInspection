@@ -48,7 +48,7 @@ describe('TX TREC REI 7-6', () => {
         expect(version.effectiveFrom).toBe(Date.UTC(2021, 8, 1));
         expect(version.mandatoryFrom).toBe(Date.UTC(2022, 1, 1));
         expect(version.effectiveUntil).toBeNull();
-        expect(version.withdrawnAt).toBeNull();
+        expect(version.withdrawn).toBeNull();
     });
 
     it('is listed in the catalogue, and the empty-catalogue reason is gone', () => {

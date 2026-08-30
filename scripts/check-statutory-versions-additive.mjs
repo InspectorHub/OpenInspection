@@ -12,9 +12,12 @@
  *
  * So the two operations are not two spellings of one thing:
  *
- *   withdrawing — `withdrawnAt` is set. New production stops; the revision is
- *                 still in the list, so re-issuing still resolves. ALLOWED, and
- *                 this gate stays green on it.
+ *   withdrawing — `withdrawn` is set, carrying the date AND the reason (this
+ *                 software's field map was found wrong, or the authority
+ *                 withdrew the revision — they ask a workspace to do opposite
+ *                 things). New production stops; the revision is still in the
+ *                 list, so re-issuing still resolves. ALLOWED, and this gate
+ *                 stays green on it.
  *   removing    — the `(formId, version)` pair is gone from the catalogue.
  *                 REFUSED here.
  *
@@ -230,9 +233,9 @@ console.log(`statutory-additive: ${baseline.size} baselined revision(s) / ${curr
 for (const k of gone) {
     failures.push(`  ✘ ${k} is in the baseline and is no longer in the catalogue. A revision that `
         + 'disappears cannot re-issue the reports already produced from it, and those are official '
-        + 'documents in other people\'s hands. To stop NEW production, set `withdrawnAt` — '
-        + 'withdrawing is allowed, leaves the revision resolvable, and keeps this gate green. '
-        + 'Removing it is not.');
+        + 'documents in other people\'s hands. To stop NEW production, set `withdrawn` to a '
+        + '`{ at, reason }` — withdrawing is allowed, leaves the revision resolvable, and keeps '
+        + 'this gate green. Removing it is not.');
 }
 
 if (selfTestFailures > 0) {

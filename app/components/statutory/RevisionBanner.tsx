@@ -12,7 +12,18 @@ import type { RevisionStatus } from "../../../server/lib/statutory/revision-stat
  * the boundary nobody checks by hand. This component renders an answer; it does
  * not compute one, and it must not start.
  *
- * ── FOUR STATES, AND ONE OF THEM IS REASSURANCE ─────────────────────────────
+ * ── THE WITHDRAWAL COPY IS TWO SENTENCES, NOT ONE ───────────────────────────
+ * A withdrawn revision has two possible causes and they hand the reader
+ * opposite jobs. Our field map was found wrong: a correction is coming from us,
+ * the documents already produced should be produced again once it lands, and
+ * there is nothing for the workspace to chase in the meantime. The authority
+ * withdrew the revision: no correction is coming, ever, and the workspace has
+ * to move to whatever revision is now in force. "This revision was withdrawn"
+ * is true of both and answers neither, so it is not a sentence this component
+ * is able to render — `reason` picks the copy, and `replacementVersion` picks
+ * between "move to revision X" and "there is no revision to move to".
+ *
+ * ── FIVE STATES, AND ONE OF THEM IS REASSURANCE ─────────────────────────────
  * `superseded_elsewhere` means a newer revision is in force and this inspection
  * predates it, so its form is CORRECT. Saying nothing there is not neutral: an
  * inspector who has heard that the form changed, and sees nothing here, assumes
@@ -57,6 +68,33 @@ export function RevisionBanner({ status, inspectionDate }: {
                     date: day(status.from),
                     inspectionDate: on,
                 })}
+            </Banner>
+        );
+    }
+
+    if (status.kind === "withdrawn") {
+        // `warn`, the same tone as `cannot_produce`, because production is
+        // blocked and the reader has something to do. Not `danger`: nothing has
+        // failed, and an alarm colour on a state whose remedy is "wait for the
+        // next release" would read as data loss.
+        const common = {
+            version: status.version,
+            date: day(status.withdrawnAt),
+            inspectionDate: on,
+        };
+        return (
+            <Banner tone="warn">
+                {status.reason === "field_map_incorrect"
+                    ? (status.replacementVersion === null
+                        ? m.statutory_revision_withdrawn_field_map(common)
+                        : m.statutory_revision_withdrawn_field_map_replacement({
+                            ...common, replacement: status.replacementVersion,
+                        }))
+                    : (status.replacementVersion === null
+                        ? m.statutory_revision_withdrawn_authority(common)
+                        : m.statutory_revision_withdrawn_authority_replacement({
+                            ...common, replacement: status.replacementVersion,
+                        }))}
             </Banner>
         );
     }

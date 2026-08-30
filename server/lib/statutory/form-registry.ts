@@ -42,6 +42,45 @@
  */
 
 /**
+ * WHY a revision stopped being produceable. Two causes, and they are not two
+ * spellings of one thing — they demand opposite next steps from a workspace:
+ *
+ *   `field_map_incorrect` — OUR fault. The map that decides which box each
+ *       answer prints in was found wrong, so documents already produced from
+ *       this revision may say something other than what was inspected. A
+ *       corrected map is coming, in a software update, and the documents
+ *       already issued may have to be issued again once it lands. The workspace
+ *       WAITS for us.
+ *   `authority_withdrew` — the publisher's decision. The document itself is no
+ *       longer the one to file. Nothing we ship will bring it back, so there is
+ *       nothing to wait for: the workspace moves to whichever revision is now
+ *       in force. The workspace ACTS, now.
+ *
+ * One word for both ("withdrawn") is a word that tells nobody which of those to
+ * do, which is why every surface that reports a withdrawal reports the reason
+ * with it.
+ */
+export type WithdrawalReason = 'field_map_incorrect' | 'authority_withdrew';
+
+/**
+ * A withdrawal: when, and why.
+ *
+ * ⚠️ ONE OBJECT RATHER THAN TWO PARALLEL NULLABLE FIELDS, and that is the whole
+ * point of the shape. `withdrawnAt: number | null` beside `reason: Reason |
+ * null` can be written in two states that must not exist — a withdrawal with no
+ * reason, and a reason on a revision that is still live — and neither is a
+ * compile error, so both become a runtime check somebody has to remember to
+ * write and every reader has to remember to trust. Nested, the pairing is not
+ * expressible wrongly: the date and the reason arrive together or neither does,
+ * and no validation is needed because there is no invalid value to validate.
+ */
+export interface StatutoryWithdrawal {
+    /** When new production stopped, epoch ms. */
+    at: number;
+    reason: WithdrawalReason;
+}
+
+/**
  * One published revision of one statutory form.
  *
  * `formId` names the FORM, never a revision of it — a form id carrying a
@@ -77,12 +116,11 @@ export interface StatutoryFormVersion {
     /** When they published it, epoch ms. */
     publishedAt: number;
     /**
-     * When this revision stopped being produceable, epoch ms, or null.
-     *
-     * Two different causes, and the copy a workspace reads must distinguish
-     * them: our field map was found to be wrong, or the authority withdrew the
-     * revision. What a workspace does next differs, so one word for both is a
-     * word that tells nobody what to do.
+     * The withdrawal that stopped new production, or null while the revision is
+     * live. Its `reason` is not decoration — see `WithdrawalReason`: the two
+     * causes hand a workspace opposite next steps, and every surface that
+     * reports a withdrawal reads the reason from here rather than inventing a
+     * single sentence for both.
      *
      * A withdrawn revision STAYS in the catalogue. `lint:statutory-additive`
      * forbids a revision DISAPPEARING, not a revision being withdrawn: removing
@@ -95,7 +133,7 @@ export interface StatutoryFormVersion {
      * afterwards — so the one state that must be stated explicitly would be the
      * one you get by saying nothing.
      */
-    withdrawnAt: number | null;
+    withdrawn: StatutoryWithdrawal | null;
 }
 
 /** A sha256 as this subsystem spells it everywhere: lowercase hex, no separators. */
@@ -170,7 +208,7 @@ export function selectableVersions(
         // the caller has to remember to honour is a withdrawal the caller
         // written next year does not honour. Filtering it in the default alone
         // would leave a revision known to be wrong one click away in the picker.
-        .filter((v) => isPublishedVersion(v) && v.withdrawnAt === null
+        .filter((v) => isPublishedVersion(v) && v.withdrawn === null
             && v.formId === formId && isSelectable(v, inspectedAt))
         // Sorted here rather than trusted from the caller: the list arrives from
         // a table with no guaranteed order, and both consumers below read
@@ -206,4 +244,36 @@ export function versionForInspection(
         // Non-null on both sides by the filter above; compared explicitly so the
         // narrowing is visible rather than asserted.
         (v.mandatoryFrom ?? 0) > (best.mandatoryFrom ?? 0) ? v : best);
+}
+
+/**
+ * The revisions of `formId` that WOULD cover `inspectedAt` but for having been
+ * withdrawn, newest withdrawal first.
+ *
+ * This exists because "no revision covers that date" and "the revision that
+ * covers that date was withdrawn" are the same `null` out of
+ * `versionForInspection`, and they are not the same sentence to read. The first
+ * means this deployment publishes nothing for that day; the second means it
+ * published something and took it out of service, and the reason it did decides
+ * whether the reader waits for us or moves on their own. A refusal that cannot
+ * tell them apart says "no published revision covers 2026-04-01" about a
+ * revision that plainly does.
+ *
+ * The date window and the publication marks are applied by exactly the same
+ * predicates `selectableVersions` uses — the point is to change one term of the
+ * filter, not to re-derive selection somewhere a later edit can drift.
+ */
+export function withdrawnVersionsFor(
+    formId: string,
+    inspectedAt: number,
+    versions: readonly StatutoryFormVersion[],
+): readonly StatutoryFormVersion[] {
+    return versions
+        .filter((v) => isPublishedVersion(v) && v.withdrawn !== null
+            && v.formId === formId && isSelectable(v, inspectedAt))
+        .slice()
+        // Newest withdrawal first: when an authority withdrew a revision and a
+        // later one was withdrawn again for a different reason, the most recent
+        // decision is the one a reader is being asked to act on.
+        .sort((a, b) => (b.withdrawn?.at ?? 0) - (a.withdrawn?.at ?? 0));
 }

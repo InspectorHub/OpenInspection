@@ -25,23 +25,37 @@
  * `Rev. 04/26` has no order at all. The installed revision is compared for
  * equality only, never for "newer than".
  *
- * ── FOUR STATES, AND THE THIRD IS REASSURANCE ───────────────────────────────
+ * ── FIVE STATES, AND ONE OF THEM IS REASSURANCE ─────────────────────────────
  * `superseded_elsewhere` means a newer revision is in force, this inspection
  * predates it, and its form is CORRECT. That state exists so the copy can say
  * so. Silence there is not neutral: an inspector who has heard that the form
  * changed, and finds nothing said about it, assumes the worst about a report
  * that is fine. Unnecessary alarm is as much a defect as a missed warning.
  *
- * ── THERE IS NO MIGRATION, SO THERE IS NO FIFTH STATE ───────────────────────
+ * ── THERE IS NO MIGRATION, SO THERE IS NO MIGRATING STATE ───────────────────
  * `cannot_produce` is a dead end on purpose. Migrating a half-entered
  * inspection onto a newer revision would have to answer "what happens to the
  * answers already recorded", and all three answers are bad — move some and
  * things are dropped silently, void them and a completed site visit is
  * destroyed, refuse and a finished inspection is stranded. The way out is a new
  * inspection on the current template, and the earlier states exist so nobody
- * arrives here.
+ * arrives here. `withdrawn` below is a dead end for the same reason and offers
+ * no migration either; what it adds is the REASON, not a way out.
+ *
+ * ── WHY WITHDRAWAL IS A STATE AND NOT A FLAG ON THE OTHERS ──────────────────
+ * A withdrawn revision is filtered out of selection, so before this state
+ * existed a workspace whose template produced one got told either nothing at
+ * all (no revision covers this date → `current`, i.e. silence about the one
+ * fault that has already put wrong documents into other people's hands) or
+ * `cannot_produce`, whose copy explains that the template was built against a
+ * DIFFERENT document — a true sentence about the wrong problem. Neither says
+ * what to do, and the two withdrawal reasons want opposite things done.
  */
-import { versionForInspection, type StatutoryFormVersion } from './form-registry';
+import {
+    versionForInspection,
+    type StatutoryFormVersion,
+    type WithdrawalReason,
+} from './form-registry';
 import { utcMidnightOf } from './inspection-date';
 import { PUBLISHED_FORM_VERSIONS } from './forms';
 import type { StatutoryFormDeclaration } from '../../types/statutory-declaration';
@@ -54,7 +68,21 @@ export type RevisionStatus =
     /** The cutover has passed, and this inspection predates it. Its form is right. */
     | { kind: 'superseded_elsewhere'; nextVersion: string; from: number }
     /** This inspection falls under a revision the installed template does not produce. */
-    | { kind: 'cannot_produce'; applicableVersion: string; templateVersion: string };
+    | { kind: 'cannot_produce'; applicableVersion: string; templateVersion: string }
+    /**
+     * The revision this template produces has been taken out of service. Nothing
+     * new may be produced from it, and `reason` decides what the reader does
+     * about that — see `WithdrawalReason`. `replacementVersion` is the revision
+     * that governs THIS inspection's date now that the withdrawn one is out of
+     * selection, or null when this deployment publishes none for that day.
+     */
+    | {
+        kind: 'withdrawn';
+        version: string;
+        reason: WithdrawalReason;
+        withdrawnAt: number;
+        replacementVersion: string | null;
+    };
 
 const DAY_MS = 86_400_000;
 
@@ -84,6 +112,31 @@ export function revisionStatus(input: RevisionStatusInput): RevisionStatus {
         formId, utcMidnightOf(input.inspectionDate), versions,
     );
 
+    // Has the revision this template produces been taken out of service? Asked
+    // BEFORE anything else, because a withdrawal outranks every other answer
+    // here: it is the only fault in this subsystem that has already produced
+    // wrong official documents, and it is the only one whose remedy depends on
+    // WHY. Asked about the INSTALLED revision rather than the applicable one —
+    // the applicable one is by construction never withdrawn, `versionForInspection`
+    // having filtered withdrawals out, so reading it here would find nothing on
+    // every path and the state would never fire.
+    const installed = versions.find(
+        (v) => v.formId === formId && v.version === installedVersion,
+    );
+    if (installed?.withdrawn) {
+        return {
+            kind: 'withdrawn',
+            version: installedVersion,
+            reason: installed.withdrawn.reason,
+            withdrawnAt: installed.withdrawn.at,
+            // Null is a real answer, not a missing one: an authority may
+            // withdraw a revision before publishing its replacement, and telling
+            // a workspace to "move to" a revision that does not exist is worse
+            // than telling them there is none.
+            replacementVersion: applicable?.version ?? null,
+        };
+    }
+
     // No revision covers that date at all — including an inspection older than
     // every revision this deployment holds. Nothing about the template is wrong,
     // so nothing is said here: the produce path already refuses this case in its
@@ -107,7 +160,7 @@ export function revisionStatus(input: RevisionStatusInput): RevisionStatus {
     const upcoming = versions.filter((v) =>
         v.formId === formId
         && v.version !== installedVersion
-        && v.withdrawnAt === null
+        && v.withdrawn === null
         && v.mandatoryFrom !== null);
     if (upcoming.length === 0) return { kind: 'current' };
 

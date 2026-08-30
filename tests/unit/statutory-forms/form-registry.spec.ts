@@ -28,7 +28,7 @@ const base = {
     sourceHash: '0'.repeat(64),
     publishedBy: 'platform',
     publishedAt: t('2026-08-21'),
-    withdrawnAt: null,
+    withdrawn: null,
 };
 
 /** A clean cutover: the old revision stops being usable the day the new one starts. */

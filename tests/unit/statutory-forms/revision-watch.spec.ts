@@ -34,7 +34,7 @@ const base = {
     sourceUrl: TREC,
     publishedBy: 'platform',
     publishedAt: t('2026-08-21'),
-    withdrawnAt: null,
+    withdrawn: null,
 };
 
 const PUBLISHED_75: StatutoryFormVersion = {
@@ -163,7 +163,7 @@ describe('a sighting is not a version, and cannot be turned into one', () => {
             effectiveUntil: null,
             publishedBy: '',
             publishedAt: 0,
-            withdrawnAt: null,
+            withdrawn: null,
         };
         expect(versionForInspection('tx_trec_rei', t('2026-08-23'), [copied])).toBeNull();
     });
@@ -182,7 +182,7 @@ describe('a sighting is not a version, and cannot be turned into one', () => {
             effectiveUntil: null,
             publishedBy: 'platform',
             publishedAt: t('2026-08-22'),
-            withdrawnAt: null,
+            withdrawn: null,
         };
         expect(versionForInspection('tx_trec_rei', t('2026-08-23'), [published])?.version)
             .toBe('7-7');

@@ -25,6 +25,16 @@ import type { StatutoryUpdateImpact } from "../../../server/services/marketplace
  * confirmation about official documents cannot afford to read as machine
  * output. Two keys per count, the way the picker's item counter already does it.
  *
+ * ── A WITHDRAWN "FROM" REVISION IS A DIFFERENT DIALOG ───────────────────────
+ * When the revision the workspace is leaving has been WITHDRAWN, the reassuring
+ * number is zero by construction -- nothing produces from a withdrawn revision
+ * -- so the two-number copy above would state something untrue. That case gets
+ * its own body, and it names WHY the revision was withdrawn, because the two
+ * causes leave different work behind: a wrong field map means the documents
+ * already issued should be issued again once a corrected map ships, while an
+ * authority's withdrawal leaves nothing to redo. One sentence for both would
+ * either invent work or hide it.
+ *
  * ── AND THERE IS NO MIGRATION OFFERED ───────────────────────────────────────
  * The blocked inspections' way out is being started again on the updated
  * template. Moving a half-entered inspection onto a newer revision would have
@@ -78,7 +88,40 @@ export function StatutoryUpdateConfirm({
             {!failed && impact === null && (
                 <p className="text-[13px] text-ih-fg-3">{m.statutory_update_confirm_loading()}</p>
             )}
-            {ready && impact !== null && (
+            {ready && impact !== null && impact.fromWithdrawal !== null && (
+                <div className="space-y-3">
+                    {/* The ordinary two-number copy is not merely unhelpful here,
+                        it is false: "N of them stay on revision X and still
+                        produce their form" describes a revision that produces
+                        nothing at all. So the withdrawal replaces it rather than
+                        sitting beside it, and it names the reason, because the
+                        two reasons leave an administrator with different work
+                        after the update -- re-issuing what went out on a wrong
+                        field map, or nothing further at all. */}
+                    <Banner tone="warn">
+                        {impact.fromWithdrawal.reason === "field_map_incorrect"
+                            ? m.statutory_update_withdrawn_field_map({
+                                version: impact.fromRevision ?? "",
+                            })
+                            : m.statutory_update_withdrawn_authority({
+                                version: impact.fromRevision ?? "",
+                            })}
+                    </Banner>
+                    {impact.total > 0 && (
+                        <p className="text-[13px] text-ih-fg-2">
+                            {impact.total === 1
+                                ? m.statutory_update_withdrawn_inflight_one({
+                                    version: impact.fromRevision ?? "",
+                                })
+                                : m.statutory_update_withdrawn_inflight_many({
+                                    count: String(impact.total),
+                                    version: impact.fromRevision ?? "",
+                                })}
+                        </p>
+                    )}
+                </div>
+            )}
+            {ready && impact !== null && impact.fromWithdrawal === null && (
                 <div className="space-y-3">
                     {impact.total === 0 ? (
                         <p className="text-[13px] text-ih-fg-2">{m.statutory_update_none_inflight()}</p>

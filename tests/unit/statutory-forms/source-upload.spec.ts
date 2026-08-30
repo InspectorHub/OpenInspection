@@ -26,7 +26,7 @@ vi.mock('../../../server/lib/statutory/forms', () => ({
         {
             formId: 'yy_flat_form', version: 'Rev. 04/26',
             effectiveFrom: Date.UTC(2026, 0, 1), mandatoryFrom: Date.UTC(2026, 0, 1),
-            effectiveUntil: null, withdrawnAt: null,
+            effectiveUntil: null, withdrawn: null,
             sourceUrl: 'https://example.gov/forms/flat.pdf',
             // sha256 of the ASCII bytes `the authority's own document`.
             sourceHash: 'f923931bf70ee0e62d518fcd562719157b3b1fef9efe8fd4eb2b97485ad6505b',
@@ -37,7 +37,7 @@ vi.mock('../../../server/lib/statutory/forms', () => ({
             effectiveFrom: Date.UTC(2025, 0, 1), mandatoryFrom: Date.UTC(2025, 0, 1),
             effectiveUntil: Date.UTC(2026, 0, 1),
             // Withdrawn, and still uploadable on purpose -- see the pair below.
-            withdrawnAt: Date.UTC(2026, 1, 1),
+            withdrawn: { at: Date.UTC(2026, 1, 1), reason: 'authority_withdrew' },
             sourceUrl: 'https://example.gov/forms/flat-old.pdf',
             // sha256 of the ASCII bytes `the superseded revision's own document`.
             sourceHash: '18e173eaf3335547153482d233f83245f3eca0b4d7491cd4efffcab103dfaac3',

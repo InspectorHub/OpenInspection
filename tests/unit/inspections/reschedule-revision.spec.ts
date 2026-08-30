@@ -29,7 +29,7 @@ vi.mock('../../../server/lib/statutory/forms', () => {
         effectiveFrom: Date.UTC(2024, 0, 1),
         mandatoryFrom: null,
         effectiveUntil: null,
-        withdrawnAt: null,
+        withdrawn: null,
         sourceUrl: 'https://www.trec.texas.gov/x.pdf',
         sourceHash: 'a'.repeat(64),
         publishedBy: 'platform',

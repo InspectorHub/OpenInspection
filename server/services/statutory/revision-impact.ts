@@ -27,7 +27,10 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 
 import { and, eq } from 'drizzle-orm';
 import { statutoryFormProductions } from '../../lib/db/schema';
-import type { StatutoryFormVersion } from '../../lib/statutory/form-registry';
+import type {
+    StatutoryFormVersion,
+    StatutoryWithdrawal,
+} from '../../lib/statutory/form-registry';
 
 type Db = DrizzleD1Database<Record<string, unknown>>;
 
@@ -43,8 +46,17 @@ export interface RevisionImpact {
      * and the reports produced from it can no longer be re-issued.
      */
     publishedRevision: boolean;
-    /** When new production stopped, or null. Meaningless when not published. */
-    withdrawnAt: number | null;
+    /**
+     * The withdrawal, or null while the revision is live. Meaningless when not
+     * published.
+     *
+     * The `reason` travels with the number on purpose: a platform operator
+     * sizing a recall is deciding what to tell workspaces, and the two causes
+     * ask them to do opposite things — wait for a corrected map, or move to the
+     * revision now in force. A count with no reason beside it is a count nobody
+     * can write a message from.
+     */
+    withdrawn: StatutoryWithdrawal | null;
     /** Documents produced. The recall number. */
     productions: number;
     /** Workspaces that produced at least one. Who has to be told. */
@@ -95,7 +107,7 @@ export async function revisionImpact(
         formId,
         version,
         publishedRevision: published !== undefined,
-        withdrawnAt: published?.withdrawnAt ?? null,
+        withdrawn: published?.withdrawn ?? null,
         productions: rows.length,
         tenants: tenants.size,
         inspections: inspections.size,

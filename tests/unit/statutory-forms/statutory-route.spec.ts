@@ -38,7 +38,7 @@ vi.mock('../../../server/lib/statutory/forms', async () => {
             effectiveUntil: null,
             sourceUrl: 'https://example.gov/f.pdf', sourceHash: fixture.hash,
             publishedBy: 'a.operator', publishedAt: Date.UTC(2026, 0, 1),
-            withdrawnAt: null,
+            withdrawn: null,
         }, {
             // The revision it superseded. Two of them are needed to have a
             // template that produces one revision while an inspection's own date
@@ -49,7 +49,18 @@ vi.mock('../../../server/lib/statutory/forms', async () => {
             effectiveUntil: Date.UTC(2026, 0, 1),
             sourceUrl: 'https://example.gov/f-old.pdf', sourceHash: '00'.repeat(32),
             publishedBy: 'a.operator', publishedAt: Date.UTC(2025, 0, 1),
-            withdrawnAt: null,
+            withdrawn: null,
+        }, {
+            // A revision taken out of service, and for a stated reason. The
+            // route's refusal branches on that reason, so a catalogue that only
+            // recorded "withdrawn" could not exercise it.
+            formId: 'yy_flat_form', version: 'Rev. 07/24',
+            effectiveFrom: Date.UTC(2024, 0, 1),
+            mandatoryFrom: Date.UTC(2024, 0, 1),
+            effectiveUntil: Date.UTC(2025, 0, 1),
+            sourceUrl: 'https://example.gov/f-2024.pdf', sourceHash: '11'.repeat(32),
+            publishedBy: 'a.operator', publishedAt: Date.UTC(2024, 0, 1),
+            withdrawn: { at: Date.UTC(2026, 1, 1), reason: 'field_map_incorrect' },
         }],
         FIELD_MAPS: [],
         fieldMapFor: () => ({
@@ -100,6 +111,8 @@ const OTHER = 'insp-other-tenant';
 const MATCHED = 'insp-matched-revision';
 /** Declares the revision its date does NOT select. */
 const SUPERSEDED = 'insp-superseded-revision';
+/** Declares a revision that has been WITHDRAWN. */
+const WITHDRAWN = 'insp-withdrawn-revision';
 
 const INSPECTOR = 'usr-dana';
 
@@ -209,6 +222,10 @@ beforeEach(async () => {
             ...base, id: SUPERSEDED, tenantId: TENANT, inspectorId: INSPECTOR,
             templateSnapshot: snapshotDeclaringRevision('Rev. 01/25'),
         },
+        {
+            ...base, id: WITHDRAWN, tenantId: TENANT, inspectorId: INSPECTOR,
+            templateSnapshot: snapshotDeclaringRevision('Rev. 07/24'),
+        },
     ] as never);
     await db.insert(schema.reports).values([
         {
@@ -233,6 +250,10 @@ beforeEach(async () => {
         },
         {
             id: 'rep-superseded', tenantId: TENANT, inspectionId: SUPERSEDED, title: 'Report', kind: 'primary',
+            status: 'published', createdAt: new Date(), publishedAt: new Date(Date.UTC(2026, 4, 2)),
+        },
+        {
+            id: 'rep-withdrawn', tenantId: TENANT, inspectionId: WITHDRAWN, title: 'Report', kind: 'primary',
             status: 'published', createdAt: new Date(), publishedAt: new Date(Date.UTC(2026, 4, 2)),
         },
     ] as never);
@@ -281,6 +302,28 @@ describe('GET /:id/statutory-form.pdf', () => {
         // which is a header with no content in it.
         const res = await get(GOOD);
         expect(res.headers.get('x-artifact-status')).toBeTruthy();
+    });
+
+    it('refuses a WITHDRAWN revision in its own words, naming the fault', async () => {
+        // Same status code as the refusal below and a different sentence, which
+        // is the whole of spec 5.3: this template's revision was taken out of
+        // service because OUR field map for it was wrong, and the inspector's
+        // next step -- wait for a corrected map, and reissue what already went
+        // out -- is not the next step for an authority's own withdrawal.
+        const res = await get(WITHDRAWN);
+        expect(res.status).toBe(409);
+
+        const message = (await res.json() as { error: { message: string } }).error.message;
+        expect(message).toContain('Rev. 07/24');
+        // The reason, in words the reader can act on.
+        expect(message).toMatch(/field map/i);
+        // And the revision that governs the inspection now, so the sentence ends
+        // somewhere rather than merely reporting a problem.
+        expect(message).toContain('Rev. 04/26');
+        // NOT the superseded-template sentence: that one blames the template for
+        // being written against a different document, which is true here and is
+        // not the thing that needs doing.
+        expect(message).not.toMatch(/produces revision/i);
     });
 
     it('refuses when the inspection is governed by a revision this template does not produce', async () => {

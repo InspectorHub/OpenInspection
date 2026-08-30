@@ -52,7 +52,7 @@ import { MarketplaceService } from '../../../server/services/marketplace.service
 const PUBLISHED = {
     formId: FORM, version: REVISION,
     effectiveFrom: Date.UTC(2026, 0, 1), mandatoryFrom: Date.UTC(2026, 0, 1),
-    effectiveUntil: null, withdrawnAt: null,
+    effectiveUntil: null, withdrawn: null,
     sourceUrl: 'https://example.gov/forms/flat.pdf',
     sourceHash: '11'.repeat(32),
     publishedBy: 'a.operator', publishedAt: Date.UTC(2026, 0, 1),

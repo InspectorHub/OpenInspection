@@ -33,7 +33,7 @@ const versions = (): readonly StatutoryFormVersion[] => [
         effectiveUntil: Date.UTC(2026, 3, 1),
         sourceUrl: 'https://example.gov/old.pdf', sourceHash: flat.hash,
         publishedBy: 'a.operator', publishedAt: Date.UTC(2012, 0, 1),
-        withdrawnAt: null,
+        withdrawn: null,
     },
     {
         formId: FORM, version: NEW_REVISION,
@@ -42,7 +42,7 @@ const versions = (): readonly StatutoryFormVersion[] => [
         effectiveUntil: null,
         sourceUrl: 'https://example.gov/new.pdf', sourceHash: flat.hash,
         publishedBy: 'a.operator', publishedAt: Date.UTC(2026, 3, 1),
-        withdrawnAt: null,
+        withdrawn: null,
     },
 ];
 
@@ -116,6 +116,57 @@ describe('produceStatutoryForm — which revision', () => {
         // cover is a different document.
         await expect(produceStatutoryForm({ ...ctx(), inspectionDate: '2000-01-01' }))
             .rejects.toThrow(/no published revision/i);
+    });
+
+    it('a WITHDRAWN revision is refused in different words, and names the reason', async () => {
+        // Both absences leave `versionForInspection` by the same null exit, and
+        // the refusal above would tell an operator that nothing covers a date a
+        // revision plainly covers -- sending them to look for a revision that is
+        // sitting in the catalogue, withdrawn. Which fault it was decides what
+        // they do next, so the refusal has to carry it.
+        const withdrawn = versions().map((v) => (v.version === OLD_REVISION
+            ? { ...v, withdrawn: { at: Date.UTC(2026, 0, 15), reason: 'field_map_incorrect' as const } }
+            : v));
+        await expect(produceStatutoryForm({
+            ...ctx(), inspectionDate: '2026-03-31', versions: withdrawn,
+        })).rejects.toThrow(/withdrawn/i);
+        // Not the "nothing covers this date" sentence -- that is the fault this
+        // branch exists to stop being told.
+        await expect(produceStatutoryForm({
+            ...ctx(), inspectionDate: '2026-03-31', versions: withdrawn,
+        })).rejects.not.toThrow(/no published revision/i);
+        // And the reason is in the words, not merely in a flag somewhere.
+        await expect(produceStatutoryForm({
+            ...ctx(), inspectionDate: '2026-03-31', versions: withdrawn,
+        })).rejects.toThrow(/field map/i);
+    });
+
+    it('the OTHER reason produces different words from the same code path', async () => {
+        // The positive control for the assertion above: identical inputs but
+        // the authority's own withdrawal, which must not mention a defect in
+        // this software -- there is none, and nothing here is going to be fixed.
+        const withdrawn = versions().map((v) => (v.version === OLD_REVISION
+            ? { ...v, withdrawn: { at: Date.UTC(2026, 0, 15), reason: 'authority_withdrew' as const } }
+            : v));
+        await expect(produceStatutoryForm({
+            ...ctx(), inspectionDate: '2026-03-31', versions: withdrawn,
+        })).rejects.toThrow(/authority withdrew/i);
+        await expect(produceStatutoryForm({
+            ...ctx(), inspectionDate: '2026-03-31', versions: withdrawn,
+        })).rejects.not.toThrow(/field map/i);
+    });
+
+    it('POSITIVE CONTROL — a revision withdrawn elsewhere does not block this date', async () => {
+        // Withdrawing `Rev. 01/12` must not stop `Rev. 04/26` producing. Without
+        // this, a refusal that fired on "any withdrawal in the catalogue" would
+        // pass both assertions above.
+        const withdrawn = versions().map((v) => (v.version === OLD_REVISION
+            ? { ...v, withdrawn: { at: Date.UTC(2026, 0, 15), reason: 'authority_withdrew' as const } }
+            : v));
+        const out = await produceStatutoryForm({
+            ...ctx(), inspectionDate: '2026-04-01', versions: withdrawn,
+        });
+        expect(out.version.version).toBe(NEW_REVISION);
     });
 });
 

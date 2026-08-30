@@ -30,6 +30,15 @@
  *    and a refusal that each decided for themselves would disagree at some date
  *    boundary, and the disagreement would be silent.
  *
+ * 4. The revision must not have been WITHDRAWN. Checked ahead of 3, because a
+ *    withdrawal is the only fault here that has already put wrong documents in
+ *    somebody's hands, and the refusal names WHY it was withdrawn: this
+ *    software's field map was found wrong, in which case a correction is coming
+ *    from us and what already went out should go out again, or the authority
+ *    retired the document, in which case nothing is coming and the reader moves
+ *    to the revision now in force. The two sentences live in
+ *    `lib/statutory/withdrawal-copy.ts`, not here.
+ *
  * There is deliberately NO migration out of that state (see revision-status.ts).
  * The way out is a new inspection on the updated template, and the earlier
  * warnings exist so nobody arrives here.
@@ -53,6 +62,7 @@ import {
 } from '../../services/statutory/overflow.service';
 import { versionForInspection } from '../../lib/statutory/form-registry';
 import { revisionStatusForInspection } from '../../lib/statutory/revision-status';
+import { withdrawalRefusal } from '../../lib/statutory/withdrawal-copy';
 import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
 import { utcMidnightOf } from '../../lib/statutory/inspection-date';
 import { statutoryNoticeFor, formatEffectiveDate } from '../../lib/statutory/disclaimer';
@@ -201,6 +211,21 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
         inspectionDate: inspectionDay,
         now: Date.now(),
     });
+    if (revision?.kind === 'withdrawn') {
+        // Checked before `cannot_produce`, in the same order the criterion
+        // itself decides them: a withdrawal is the only fault here that has
+        // already put wrong documents into somebody's hands, and its remedy
+        // depends on WHY. Refusing with the generic "different document"
+        // sentence would be true and useless.
+        throw Errors.Conflict(withdrawalRefusal({
+            formId: declaration.formId,
+            version: revision.version,
+            reason: revision.reason,
+            at: revision.withdrawnAt,
+            replacementVersion: revision.replacementVersion,
+            inspectionDate: inspectionDay,
+        }));
+    }
     if (revision?.kind === 'cannot_produce') {
         throw Errors.Conflict(
             `This inspection is dated ${inspectionDay}, which revision `
