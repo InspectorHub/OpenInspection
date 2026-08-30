@@ -16,8 +16,8 @@ here is how" are both things a reader of this file comes here for.
 says which it is, and what would have to exist before it could be filled.
 
 Measured 2026-08-30, against the authority's own PDF
-(sha256 `96e1ad368c80915732bc8c6147839e1eff0828424c142566fde8a4ca22427025`) and the signed
-candidate beside it (`checkedBy: Nathan`).
+(sha256 `96e1ad368c80915732bc8c6147839e1eff0828424c142566fde8a4ca22427025`) and against a
+field map whose every coordinate had already been read back against that page by hand.
 
 | | count |
 |---|---:|

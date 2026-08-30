@@ -9,8 +9,8 @@ the smaller gaps that sit behind the ones that ARE bound.
 says which it is, and what would have to exist before it could be filled.
 
 Measured 2026-08-30, against the authority's own PDF
-(sha256 `5d3327663ea58cf1f073b43967004cce3205d29973aa407e200c5be1f44cc294`) and the signed
-candidate beside it (`checkedBy: Nathan`).
+(sha256 `5d3327663ea58cf1f073b43967004cce3205d29973aa407e200c5be1f44cc294`) and against a
+field map whose every coordinate had already been read back against that page by hand.
 
 | | count |
 |---|---:|
