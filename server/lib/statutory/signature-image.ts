@@ -45,7 +45,9 @@
  */
 export const SUPPORTED_SIGNATURE_IMAGE_TYPES = ['png', 'jpeg'] as const;
 
-export type SignatureImageType = typeof SUPPORTED_SIGNATURE_IMAGE_TYPES[number];
+/** Local alias for the two members above. Not exported: `SignatureImage` is
+ *  what every caller needs, and an exported alias nobody imports is dead. */
+type SignatureImageType = typeof SUPPORTED_SIGNATURE_IMAGE_TYPES[number];
 
 /** A stored signature, decoded, ready for whichever embed call its type needs. */
 export interface SignatureImage {
