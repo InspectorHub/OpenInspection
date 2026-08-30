@@ -1,11 +1,12 @@
 {
   "formId": "fl_oir_b1_1802",
   "version": "Rev. 04/26",
-  "scenario": "A uniform mitigation verification survey of a 2003 single-storey concrete block house in Cape Coral, Florida, outside the high velocity hurricane zone. Hip roof, architectural shingle laid in 2018 under permit, double wraps at the truss-to-wall connections, taped deck seams, and hurricane-rated shutters at every opening.",
+  "scenario": "A uniform mitigation verification survey of a 2003 single-storey concrete block house in Cape Coral, Florida, outside the high velocity hurricane zone. Hip roof, architectural shingle laid in 2018 under permit, double wraps at the truss-to-wall connections, spray foam sealing the deck from inside the attic with the whole underside covered, and hurricane-rated shutters at every opening.",
   "notes": [
     "Every ourField the candidate map names has a value here. A checkbox field takes one of the whenValue strings that field's own boxes carry; the date fields that the form prints as three separate blanks take a YYYY-MM-DD calendar day, which the renderer splits into month, day and year.",
     "Question 1 has three year-built blanks and three permit-application dates, one per answer, and question 4 repeats a permit date, a product approval number, a year installed and a 'no information provided' box for each of seven roof covering types. An inspector fills the row that applies. All of them are filled here on purpose: this file exists to put a value through every mapping, and a blank one proves nothing about the coordinate underneath it.",
     "inspection_date, inspector_signature_date and homeowner_signature_date are drawn whole rather than in parts, because the form prints no separators inside those three spans. They therefore carry their own slashes.",
+    "Some answers here are not free to vary independently, because the form's own text makes one question conditional on another. Question 8 prints 'check here if entire roof deck underside covered' one indent level under 'Spray foam products', and the other three sealing methods are laid ON TOP of the deck — so this scenario uses spray foam, and an earlier draft that paired the underside box with taped deck seams described a house that cannot exist. Question 6's minimal-condition answer belongs to categories B, C and D only, and question 9's non-glazed sub-level has to carry the letter of the answer above it. Those three rules are recorded as fieldDependencies on the candidate map.",
     "This is invented data about an invented property. Nothing here is a record of a real survey, and no value is a real person, licence number, policy number or address.",
     "Read by scripts/verify-statutory-render.mjs. Correct a value in place; nothing generates this file."
   ],
@@ -83,8 +84,8 @@
     "roof_geometry_low_slope_area_sqft": "96",
     "roof_geometry_total_roof_area_sqft": "2480",
     "sealed_roof_deck": "A",
-    "sealed_roof_deck_method": "taped_deck_seams",
-    "sealed_roof_deck_underside_fully_covered": "true",
+    "sealed_roof_deck_method": "spray_foam",
+    "sealed_roof_deck_spray_foam_underside_fully_covered": "true",
     "opening_protection": "A",
     "opening_protection_non_glazed_level": "A.2",
     "opening_protection_wood_panel_type": "plywood",

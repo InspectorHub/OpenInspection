@@ -161,6 +161,96 @@ export type StatutoryValueSource =
     | { from: 'literal'; value: string }
     | { from: 'signature'; scope: string };
 
+/**
+ * When one question on the form exists at all, expressed against another
+ * question's answer.
+ *
+ * -- NOT APPLICABLE IS NOT EMPTY, AND THAT IS THE WHOLE REASON THIS EXISTS ----
+ * `values.ts` opens on the distinction and it is the one this type serves.
+ * EMPTY means the inspector answered nothing — the question was asked and the
+ * box is blank. NOT APPLICABLE means the question was never asked, because the
+ * form's own text makes it conditional on an earlier answer. The two look
+ * identical on a printed page and are different facts about the inspection, so
+ * only the side holding the answers can tell them apart, and it has to.
+ *
+ * Measured on FL OIR-B1-1802 Rev. 04/26, three questions are conditional and
+ * the form says so in its own words:
+ *
+ *   - "Minimal conditions to qualify for categories B, C, or D." — the three
+ *     minimal-condition boxes exist for those three answers to question 6 and
+ *     for no other. Toenails (A) and E through I do not have them.
+ *   - "check here if entire roof deck underside covered" is printed one indent
+ *     level under "Spray foam products", and the other three sealing methods
+ *     are laid ON TOP of the deck. The question cannot be asked of them.
+ *   - The twelve non-glazed sub-levels run A.1 to N.3. Answers X and Z to
+ *     question 9 have no sub-level printed under them at all.
+ *
+ * -- WHY THIS IS A SIBLING MAP AND NOT A FIELD ON THE BINDING ----------------
+ * A rule that lived on the binding could only ever describe a field that IS
+ * bound, and the case that matters most is the other one: the question exists
+ * for this answer set and the template binds NOTHING to it. That is a template
+ * which will print an authority's form with a question the form asked and
+ * nobody answered, and it is refused in `applicability.ts` — which is only
+ * possible because a rule can outlive the absence of its binding.
+ *
+ * It also turns the commonest typo loud instead of silent. A key here naming a
+ * field that does not exist is not ignored; where the rule applies it refuses by
+ * name, because "applicable and unbound" is exactly what a misspelling looks
+ * like.
+ *
+ * ⚠️ WHAT NOTHING HERE CAN CHECK. `answerIsOneOf` holds answers to ANOTHER
+ * question, and whether those are answers that question actually has is decided
+ * by the field map — which this side never sees, because a declaration and a map
+ * meet only at render time and against different revisions. A misspelling there
+ * makes the question silently never apply, and the entire observable output is
+ * one unticked box. It is checked where the map lives instead, against the
+ * candidate's own `whenValue`s, and that check is a person's to run.
+ */
+export interface StatutoryFieldDependency {
+    /**
+     * The other field on THIS form whose answer decides. Named as one of
+     * `bindings`' own keys.
+     *
+     * It must be bound: a controlling field nothing can answer leaves the
+     * dependent question permanently not-applicable, which is a blank box that
+     * no gate reads as one.
+     */
+    field: string;
+    /**
+     * The answers to `field` for which this question EXISTS. Any other answer,
+     * including no answer at all, means the question was never asked.
+     *
+     * Never empty. A question that can never exist is a box that can never be
+     * ticked, and declaring one is indistinguishable from forgetting to.
+     */
+    answerIsOneOf: readonly string[];
+    /**
+     * Present when this question's own answers are LABELLED by the controlling
+     * answer, and the label has to agree: the separator between the two.
+     *
+     * Measured on FL OIR-B1-1802 question 9, whose twelve non-glazed sub-levels
+     * are printed `A.1`…`N.3` under the six letters of the question above them.
+     * The letter in the sub-level is not decoration — `A.2` is a line printed
+     * under A, and choosing it while answering C to the question above ticks two
+     * boxes on the page that contradict each other. With this set to `.`, the
+     * answer `C.2` under an `A` is refused by name rather than printed.
+     *
+     * Absent means the two answers share no vocabulary, which is the ordinary
+     * case. A separator that is not the one the form prints refuses every answer
+     * rather than passing quietly — the failure is loud in the direction that
+     * costs nothing.
+     */
+    labelSeparator?: string;
+}
+
+/**
+ * Every conditional question on one form, keyed exactly as `bindings` is.
+ *
+ * A field absent from here is unconditional: it is asked of every inspection,
+ * which is what every declaration written before this existed says.
+ */
+export type StatutoryFieldDependencies = Readonly<Record<string, StatutoryFieldDependency>>;
+
 /** One template's statutory-form declaration. */
 export interface StatutoryFormDeclaration {
     /** The form, not the revision (see above) — e.g. `tx_trec_rei`. */
@@ -169,6 +259,19 @@ export interface StatutoryFormDeclaration {
      *  form requires and this map omits is a gap the fidelity gate reports; it
      *  is never silently rendered blank. */
     bindings: Record<string, StatutoryValueSource>;
+    /**
+     * The questions this form only asks for some answers. Absent means none,
+     * which is what every declaration authored before this key existed says.
+     *
+     * ⚠️ A field named here must NOT also sit in the field map's
+     * `requiredFields`. That list means "required of every inspection", and a
+     * conditional question is not: the render would refuse a form whose missing
+     * key is the correct output for the answers given. The requirement is not
+     * lost, it is stated once and in the sharper place — where the rule applies
+     * and nothing is bound, `applicability.ts` refuses and names the answer that
+     * asked the question.
+     */
+    dependsOn?: StatutoryFieldDependencies;
     /** Repeated blocks on this form. Absent when the form has none -- the
      *  Florida wind-mitigation form has none at all. */
     groups?: readonly FieldGroup[];

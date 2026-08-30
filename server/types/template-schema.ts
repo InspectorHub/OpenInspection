@@ -267,6 +267,8 @@ export type {
     StatutoryInspectionField,
     FieldGroup,
     StatutoryValueSource,
+    StatutoryFieldDependency,
+    StatutoryFieldDependencies,
     StatutoryFormDeclaration,
 } from './statutory-declaration';
 

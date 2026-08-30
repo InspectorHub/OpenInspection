@@ -20,6 +20,12 @@
  * produced, because a signature image must never enter this object -- see
  * `StatutoryValueSource`.
  *
+ * And a fourth, which is the same absence for the opposite reason: a question
+ * the form DID NOT ASK of this inspection. The 1802 prints its minimal-condition
+ * boxes only under "categories B, C, or D", and for an answer of A they are not
+ * a blank the inspector left -- they are not on his page at all. That emits no
+ * key either, and `applicability.ts` owns the whole rule.
+ *
  * -- 2. EVERY REFUSAL NAMES THE THING ----------------------------------------
  * A binding that points at an item or an attribute the template does not have
  * is a broken template, and the tempting alternative -- yield '' and carry on --
@@ -67,6 +73,9 @@ import type {
     StatutoryFormDeclaration,
     TemplateSchemaV2,
 } from '../../types/template-schema';
+import {
+    applyDependencies, refuseConditionalOverflowDestination, refuseUnusableDependencies,
+} from './applicability';
 import {
     groupFieldName, refuseOverCapacity,
     refuseOverflowThatDoesNotFit, validateGroups,
@@ -254,7 +263,9 @@ function routeOverflow(
  * @returns our field name -> the string to place on the form. Every binding
  *   except a signature produces a key, and every slot of every declared group
  *   produces one; a binding that cannot be resolved, and a block with more
- *   instances than the form holds, throw instead.
+ *   instances than the form holds, throw instead. A field `dependsOn` rules out
+ *   for these answers produces NO key -- the form did not ask it, which is not
+ *   the same fact as an answer of nothing.
  */
 export function collectStatutoryValues(
     declaration: StatutoryFormDeclaration,
@@ -265,7 +276,12 @@ export function collectStatutoryValues(
 ): Record<string, string> {
     const items = itemsById(snapshot);
     const values: Record<string, string> = {};
-    // Groups first, so a declaration that is broken or a house that overflows
+    // The declaration's own shape first, so a template that is broken for EVERY
+    // inspection is refused before this one's answers are read. A rule reported
+    // against a particular inspection sends the reader to the inspection.
+    refuseUnusableDependencies(declaration);
+    refuseConditionalOverflowDestination(declaration);
+    // Groups next, so a declaration that is broken or a house that overflows
     // the page is refused before any value is resolved.
     if (declaration.groups !== undefined) {
         expandGroups(declaration.groups, instances, values);
@@ -276,6 +292,12 @@ export function collectStatutoryValues(
         if (source.from === 'signature') continue;
         values[ourField] = resolve(source, ourField, items, results, facts);
     }
+    // AFTER every binding, because a dependency reads another field's answer and
+    // no ordering of the bindings puts a controlling field first. This is the
+    // only place a key is REMOVED: a question the form did not ask emits none,
+    // while a question asked and not answered keeps its key with an empty
+    // string, and `applicability.ts` says at length why those are different.
+    applyDependencies(declaration, values);
     // Last, because an overflow is appended to a destination the loop above has
     // just written, and because the refusal it can still raise is the END of the
     // chain rather than the start of it.
