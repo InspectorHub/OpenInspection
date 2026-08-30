@@ -103,6 +103,59 @@ hand produces a correct document. Both pages were rasterised and read against th
 form on 2026-08-30 — every value in its own blank, every mark inside its own printed box.
 The two boxes that came out empty were `Title` and `License Type`, which is §1.
 
+### 2.1a 🔴 The twelve questions in each roof column cannot be ANSWERED in the editor
+
+Found by pressing the button, on 2026-08-30, and it is not this template's mistake — it is
+the whole `item_attribute` route, which TREC's 15 attribute bindings share.
+
+The inspection editor does not read the template snapshot for its items. It reads
+`GET /api/inspections/:id/report-data`, whose projection type
+(`server/services/inspection/report-schema-types.ts`) deliberately carries a handful of
+keys and **not** `attributes` or `description` — a decision that is correct for a report
+and is declared to `lint:item-key-parity` as such. `ItemAttributesPanel` renders only when
+`item.attributes` is non-empty, and its `onItemAttribute` handler is wired in
+`inspection-edit.tsx`, so the control is complete and simply never receives data.
+
+Measured in Chrome on a real inspection created from this pack: the *Predominant Roof*
+item shows its label, a Notes box and a Photos strip, and none of the twelve questions.
+Its `description` — which carries the form's own "(check all that apply and explain
+below)" and the narrow-blank warning — does not render either, on any item.
+
+So the 24 roof values reach the form correctly once they are in
+`inspection_results.data`, and today nothing in the product can put them there.
+
+**To close it:** carry `attributes` (and `description`) from the template snapshot into
+the editor's item objects. The loader already fetches the raw snapshot as
+`templateSnapshot` for structural edits, so the data is present on that page.
+
+### 2.1b 🔴 Both statutory endpoints 500 on an inspection the wizard created
+
+Also found by pressing the button, and also not this template's mistake.
+
+`inspections.date` is documented as a calendar day and the statutory subsystem asserts it:
+`utcMidnightOf` in the offer route, and `calendarDayForForm` inside `gatherStatutoryInputs`.
+The New Inspection wizard writes a **full ISO timestamp**. Measured on this deployment: seed
+rows hold `2026-06-01`, and an inspection created through the wizard today held
+`2026-08-30T09:00:00.000Z`. Both endpoints then threw:
+
+```
+GET …/statutory-form      500  statutory inspection date: "2026-08-30T09:00:00.000Z"
+                                is not a YYYY-MM-DD calendar day
+GET …/statutory-form.pdf  500  statutory render: "inspection_date" is drawn as a date and
+                                received "2026-08-30T09:00:00.000Z", …
+```
+
+The offer route failing is the quieter half: it is caught and degrades to
+`available: false`, so the control simply does not render and the inspector is told
+nothing at all. With the date corrected to `2026-08-30` the control appeared, the notice
+named `fl_citizens_roof` / `RCF-1 03 25` / effective 2025-03-20, and the render was reached.
+
+⚠️ And when it was reached, the refusal in §2.1 came back to the browser as
+`{"error":{"message":"Internal server error"}}`. The produce service's refusals are written
+to be read by the person holding the form; on this route they reach the log and nothing
+else. The 409s the route raises itself do reach the user, which is what makes the
+difference easy to miss.
+
 ### 2.2 `damage_signs` asks for every sign that applies and can carry one
 
 The form prints, in both roof columns:
