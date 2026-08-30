@@ -32,6 +32,7 @@ import { useCompletedRevalidation } from "~/hooks/useCompletedRevalidation";
 import { AddGroupInstanceHost } from "~/components/statutory/AddGroupInstanceHost";
 import { RevisionBanner } from "~/components/statutory/RevisionBanner";
 import { ItemEditor } from "~/components/editor/ItemEditor";
+import { StatutoryDetailsHost } from "~/components/statutory/StatutoryDetailsHost";
 import { TagChipRow, type TagPin } from "~/components/editor/TagChipRow";
 import type { DefectFieldsValue } from "~/components/editor/DefectFieldsRow";
 import { SideRail } from "~/components/editor/SideRail";
@@ -713,7 +714,7 @@ export default function InspectionEditPage() {
  // the only road. Every answer fell through the action's final `return { ok }`,
  // and a write that reached D1 by any other route was erased by the doc's next
  // flush. Measured 2026-08-30 on the FL Citizens roof pack.
- const handleItemAttribute = useCallback((itemId: string, attributeId: string, value: string | number | boolean | null) => {
+ const handleItemAttribute = useCallback((itemId: string, attributeId: string, value: string | number | boolean | string[] | null) => {
   const sectionId = state.sectionIdForItem(itemId);
   if (sectionId) findings.setItemAttribute(sectionId, itemId, attributeId, value);
  }, [findings, state.sectionIdForItem]);
@@ -2449,6 +2450,7 @@ export default function InspectionEditPage() {
   }}
   onCommit={savePropertyFacts}
   />
+  <StatutoryDetailsHost details={loaderData.statutoryDetails} />
   {/* Commercial PCA Phase T — subtype + report tier selectors. Gated on the
      same propertyType === 'commercial' flag section-applicability.ts uses
      to decide PCA-only sections apply. Sits above the narrative panel so

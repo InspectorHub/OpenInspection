@@ -18,6 +18,7 @@ import { CredentialsEditor, type EditorCredential } from "~/components/settings/
 import { NotificationPreferencesCard } from "~/components/settings/NotificationPreferencesCard";
 import { ProfilePhotoCard } from "~/components/settings/ProfilePhotoCard";
 import { EmailSignatureCard, SavedSignatureCard } from "~/components/settings/SignatureCards";
+import { StatutoryLicenceFields } from "~/components/settings/StatutoryLicenceFields";
 import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { bulkNotificationChoice, grantNotificationSms, loadNotificationScreen, saveNotificationChoice } from "~/lib/settings-notifications.server";
 import { m } from "~/paraglide/messages";
@@ -39,6 +40,7 @@ interface Profile {
   locale?: string | null;
   dateFormat?: string | null;
   timeFormat?: string | null;
+  statutoryLicenseType?: string | null; statutoryQualification?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -247,7 +249,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const v = submission.value;
   const body: Record<string, unknown> = {};
   // DB-12 / IA-26 — "slug" intentionally removed; inspector booking slugs frozen.
-  for (const key of ["name", "phone"] as const) {
+  for (const key of ["name", "phone", "statutoryLicenseType", "statutoryQualification"] as const) {
     if (v[key] !== undefined) body[key] = v[key];
   }
   // The four inherit-or-override <select>s. Their values come from the raw
@@ -433,6 +435,7 @@ export default function SettingsProfilePage() {
               )}
             </div>
           </div>
+          <StatutoryLicenceFields licenseType={profile.statutoryLicenseType ?? null} qualification={profile.statutoryQualification ?? null} />
 
           <div className="max-w-md">
             <Select

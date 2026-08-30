@@ -15,7 +15,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const id = params.id;
 
  const api = createApi(context, { token });
- const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, unitsRes, unitProgressRes, complianceRes] = await Promise.all([
+ const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, unitsRes, unitProgressRes, complianceRes, statutoryDetailsRes] = await Promise.all([
  api.inspections[":id"].$get({ param: { id } }),
  // Commercial PCA Phase U (Batch C-lazy) — first paint only needs the common
  // scope. The editor opens at activeUnitId = null (the '_default' scope), so
@@ -48,6 +48,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // reportTier === 'full_pca' — mirrors the existing loader convention of not
  // conditioning the parallel fetch list on client-only gates.
  api.inspections[":id"].compliance.$get({ param: { id } }).catch(() => null),
+ // The inspection-level answers a statutory form asks for. This endpoint 404s
+ // for every ordinary inspection — that is its ANSWER, not a failure — so the
+ // null it leaves behind is what decides whether the panel renders at all.
+ api.inspections[":id"]["statutory-details"].$get({ param: { id } }).catch(() => null),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
@@ -96,11 +100,25 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // that no inspector could reach either, so this was never only a statutory
  // problem. The fix merges the snapshot BACK; the projection is left alone.
  const snapshotAttributes = new Map<string, unknown[]>();
+ // `description` is the SECOND key the projection drops, and it is dropped for
+ // the same declared reason. On a statutory template it carries the
+ // authority's own instruction — the Citizens roof items print "(check all
+ // that apply and explain below)" and the warning that the roof column's rules
+ // are 41.5pt wide, and FL OIR-B1-1802's one `fieldInstructions` is the
+ // retrofit paragraph an inspector has to read verbatim. `ItemEditor` renders
+ // it whenever it is present, so carrying it costs nothing and NOT carrying it
+ // means text that is stored where nobody can see it, which is worse than text
+ // that was never written.
+ const snapshotDescriptions = new Map<string, string>();
  for (const sec of (schema.sections ?? [])) {
  for (const item of ((sec.items ?? []) as Array<Record<string, unknown>>)) {
   const attrs = item.attributes;
   if (typeof item.id === "string" && Array.isArray(attrs) && attrs.length > 0) {
   snapshotAttributes.set(item.id, attrs);
+  }
+  const description = item.description;
+  if (typeof item.id === "string" && typeof description === "string" && description !== "") {
+  snapshotDescriptions.set(item.id, description);
   }
  }
  }
@@ -121,6 +139,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  if (it.attributes === undefined && typeof it.id === "string") {
  const attrs = snapshotAttributes.get(it.id);
  if (attrs) it.attributes = attrs;
+ }
+ // Merged the same way and under the same condition, so should report-data
+ // ever start projecting descriptions its value is the newer one and wins.
+ if (it.description === undefined && typeof it.id === "string") {
+ const description = snapshotDescriptions.get(it.id);
+ if (description) it.description = description;
  }
  return it;
  });
@@ -271,5 +295,24 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
    if (key.startsWith("commercial:")) commercialPresets[key] = fields;
  }
 
- return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets };
+ // Null for every inspection whose template declares no statutory form, which
+ // is almost all of them. The editor reads the null as "there is no such panel
+ // here" rather than as "the panel is empty".
+ type StatutoryDetails = {
+   inspectorSignatureDate: string | null;
+   employeePrintedName: string | null;
+   ownerName: string | null;
+   ownerEmail: string | null;
+   ownerMailingAddress: string | null;
+   ownerHomePhone: string | null;
+   ownerWorkPhone: string | null;
+   ownerCellPhone: string | null;
+ };
+ let statutoryDetails: StatutoryDetails | null = null;
+ if (statutoryDetailsRes?.ok) {
+   const body = await statutoryDetailsRes.json() as { data?: StatutoryDetails };
+   statutoryDetails = body.data ?? null;
+ }
+
+ return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails };
 }

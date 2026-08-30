@@ -101,6 +101,11 @@ export function makeProfileSchema() {
     // the order and the clock. Constrained to <Select>s in the UI.
     dateFormat: z.string().optional(),
     timeFormat: z.string().optional(),
+    // The state licence CLASS and the qualification category a statutory form
+    // asks about the inspector. Free text: the vocabulary belongs to the
+    // authority, so the only rule is a length bound (mirrors PatchProfileSchema).
+    statutoryLicenseType: z.string().max(120).optional(),
+    statutoryQualification: z.string().max(120).optional(),
   });
 }
 

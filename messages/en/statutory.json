@@ -52,5 +52,20 @@
   "statutory_source_needs_file": "Choose the authority's PDF first.",
   "statutory_source_ok": "Stored. Revision {revision} of {formId} can be produced now.",
   "statutory_source_failed": "The upload was refused and nothing was stored.",
-  "statutory_source_from_marketplace": "Supply the authority's PDF"
+  "statutory_source_from_marketplace": "Supply the authority's PDF",
+  "statutory_details_title": "Statutory form details",
+  "statutory_details_subtitle": "These boxes are printed on the authority's form and are asked for nowhere else, so they appear only on inspections that produce one.",
+  "statutory_details_signature_date": "Date signed",
+  "statutory_details_signature_date_hint": "The day you sign the form, which is not the day of the visit — the form prints both.",
+  "statutory_details_employee_name": "Employee name (printed)",
+  "statutory_details_employee_name_hint": "The second signer some forms print beside yours. Leave it empty if the form you produce has no such box.",
+  "statutory_details_owner_group": "Property owner",
+  "statutory_details_owner_group_hint": "The person who OWNS the property, who is often not the client — a buyer commissions the inspection and the seller owns the house. Nothing here is filled in from the client on purpose.",
+  "statutory_details_owner_name": "Owner name",
+  "statutory_details_owner_email": "Owner email",
+  "statutory_details_owner_mailing_address": "Owner mailing address",
+  "statutory_details_owner_mailing_address_hint": "Where the owner receives post, which may not be the property.",
+  "statutory_details_owner_home_phone": "Home phone",
+  "statutory_details_owner_work_phone": "Work phone",
+  "statutory_details_owner_cell_phone": "Cell phone"
 }

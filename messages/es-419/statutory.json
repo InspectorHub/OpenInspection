@@ -52,5 +52,20 @@
   "statutory_source_needs_file": "Elija primero el PDF de la autoridad.",
   "statutory_source_ok": "Guardado. La revisión {revision} de {formId} ya se puede producir.",
   "statutory_source_failed": "Se rechazó la subida y no se guardó nada.",
-  "statutory_source_from_marketplace": "Suministrar el PDF de la autoridad"
+  "statutory_source_from_marketplace": "Suministrar el PDF de la autoridad",
+  "statutory_details_title": "Datos del formulario legal",
+  "statutory_details_subtitle": "Estas casillas se imprimen en el formulario de la autoridad y no se piden en ningún otro lugar, así que aparecen solo en las inspecciones que producen uno.",
+  "statutory_details_signature_date": "Fecha de firma",
+  "statutory_details_signature_date_hint": "El día en que usted firma el formulario, que no es el día de la visita — el formulario imprime ambas.",
+  "statutory_details_employee_name": "Nombre del empleado (en letra de imprenta)",
+  "statutory_details_employee_name_hint": "El segundo firmante que algunos formularios imprimen junto al suyo. Déjelo vacío si el formulario que produce no tiene esa casilla.",
+  "statutory_details_owner_group": "Propietario",
+  "statutory_details_owner_group_hint": "La persona que ES DUEÑA de la propiedad, que muchas veces no es el cliente — el comprador encarga la inspección y el vendedor es el dueño. Aquí no se completa nada a partir del cliente, a propósito.",
+  "statutory_details_owner_name": "Nombre del propietario",
+  "statutory_details_owner_email": "Correo del propietario",
+  "statutory_details_owner_mailing_address": "Dirección postal del propietario",
+  "statutory_details_owner_mailing_address_hint": "Donde el propietario recibe correspondencia, que puede no ser la propiedad.",
+  "statutory_details_owner_home_phone": "Teléfono de casa",
+  "statutory_details_owner_work_phone": "Teléfono del trabajo",
+  "statutory_details_owner_cell_phone": "Teléfono celular"
 }
