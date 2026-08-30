@@ -21,6 +21,7 @@
  */
 import { CANNED_COMMENTS } from './canned-comments';
 import trecRei76 from '../../../data/seed-templates/trec-rei-7-6.json';
+import flCitizensRoof from '../../../data/seed-templates/fl-citizens-roof-rcf-1.json';
 
 export interface StarterMarketplaceLibraryFixture {
     name:      string;
@@ -83,23 +84,21 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         featured:  true,
     },
     {
-        // The one statutory package this software publishes today. It is here
-        // rather than in `template-seed.service.ts`'s auto-seed list on purpose:
-        // a statutory template renders onto the Commission's own PDF, which this
-        // repository does not carry, so handing one to every new workspace would
-        // mint a template that cannot produce anything. The marketplace install
-        // path refuses exactly that (`assertStatutoryInstallable`) and tells the
-        // operator which file to upload and where. Installing is a decision an
-        // operator makes; seeding is not.
+        // A statutory package is here rather than in `template-seed.service.ts`'s
+        // auto-seed list on purpose: a statutory template renders onto the
+        // authority's own PDF, which this repository does not carry, so handing
+        // one to every new workspace would mint a template that cannot produce
+        // anything. The marketplace install path refuses exactly that
+        // (`assertStatutoryInstallable`) and tells the operator which file to
+        // upload and where. Installing is a decision an operator makes; seeding
+        // is not.
         //
-        // ⚠️ ONLY TEXAS APPEARS HERE, AND IT IS NO LONGER BECAUSE ONLY TEXAS IS
-        // PUBLISHED. Since 2026-08-30 `PUBLISHED_FORM_VERSIONS` carries four
-        // revisions: this one and the three Florida forms
-        // (`fl_citizens_4point`, `fl_citizens_roof`, `fl_oir_b1_1802`). The
-        // install-time refusal those three used to hit — "this software
-        // publishes no such revision" — no longer applies to them.
+        // ⚠️ TWO OF THE FOUR PUBLISHED REVISIONS ARE DECLARED HERE, NOT FOUR.
+        // `PUBLISHED_FORM_VERSIONS` carries `tx_trec_rei_7_6`,
+        // `fl_citizens_4point`, `fl_citizens_roof` and `fl_oir_b1_1802`; this
+        // catalogue declares the first and the third. The other two are not
+        // waiting on a line in this file.
         //
-        // What is missing is the other half, and it is not a line in this file.
         // A `kind: 'statutory'` entry's `schema` IS A TEMPLATE: sections, items,
         // and a `statutoryForm` declaration binding each of the form's field
         // names to one of them (`assertStatutorySchema` validates exactly that,
@@ -107,16 +106,14 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         // document). Publishing a revision says which PDF and where each value
         // is drawn; a catalogue entry additionally has to ask the inspector the
         // form's questions, in the form's own printed wording — 93 of them on
-        // the four-point form, 96 on the 1802, 36 on the roof form. The signed
-        // candidates carry coordinates and field names; they do not carry those
-        // printed labels, so the template cannot be generated from them and
-        // inventing the wording would put a question to an inspector that the
-        // authority never asked.
+        // the four-point form and 96 on the 1802. The signed candidates carry
+        // coordinates and field names; they do not carry those printed labels,
+        // so a template cannot be generated from them and inventing the wording
+        // would put a question to an inspector that the authority never asked.
         //
-        // So the three Florida packs are template-authoring work with the forms
-        // in hand, not a fixture edit, and until that is done a workspace gets
-        // the correct answer today: the revisions exist and nothing declares
-        // them.
+        // So those two packs are template-authoring work with the forms in hand,
+        // not a fixture edit, and until that is done a workspace gets the correct
+        // answer for them: the revisions exist and nothing declares them.
         name:      trecRei76.name,
         kind:      'statutory',
         /**
@@ -147,5 +144,41 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         // pack is useful to inspectors in one state.
         featured:  false,
         jurisdiction: 'TX',
+    },
+    {
+        // Citizens Property Insurance Corporation's Roof Inspection Form. Same
+        // shape as the Texas entry above and for the same reasons; what differs
+        // is what the form asks and how the template carries it.
+        //
+        // ⚠️ ITS TWELVE CHOICE QUESTIONS DO NOT SHARE ONE VOCABULARY, so there
+        // is no `ratingSystem` here and there must not be one. TREC gets away
+        // with a single embedded rating because all 41 of its items ask the same
+        // question; this form asks twelve different ones over fourteen values
+        // (`full_replacement`, `satisfactory`, `cupping_curling`, `yes`, …), and
+        // each is an `item_attribute` whose stored value is the answer. Those
+        // stored values are the field map's own `whenValue` strings, character
+        // for character: `render.ts` matches with `===` and nothing normalises,
+        // so a template storing the printed label instead ("Full replacement")
+        // produces a completely blank official form with every gate green.
+        //
+        // ⚠️ THREE OF THE FORM'S 36 BLANKS ARE DELIBERATELY UNBOUND —
+        // `inspector_title`, `inspector_license_type` and
+        // `inspector_signature_date`, none of which this product has a source
+        // for. Two of the three are named in `StatutoryInspectionField`'s own
+        // comment as needing a column first. The reasoning for each is in
+        // `server/data/seed-templates/fl-citizens-roof-rcf-1.gaps.md`, because
+        // on a printed form "left blank on purpose" and "forgotten" look
+        // identical and only that file can tell them apart.
+        name:      flCitizensRoof.name,
+        kind:      'statutory',
+        // Bump whenever `fl-citizens-roof-rcf-1.json` changes, and never
+        // otherwise — the reasoning is on the Texas entry above and applies
+        // unchanged. It is OUR version of these bindings, not Citizens'
+        // revision label, which is `RCF-1 03 25` and lives in the declaration.
+        semver:    '1.0.0',
+        schema:    flCitizensRoof.schema,
+        changelog: 'First catalogue release of the Florida Citizens roof inspection package.',
+        featured:  false,
+        jurisdiction: 'FL',
     },
 ];

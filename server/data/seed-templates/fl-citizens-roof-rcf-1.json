@@ -1,0 +1,424 @@
+{
+  "id": "seed_fl_citizens_roof_rcf_1_v1",
+  "name": "Florida Citizens Roof Inspection (RCF-1 03 25)",
+  "description": "Citizens Property Insurance Corporation's Roof Inspection Form, revision RCF-1 03 25. Its sections, its questions and their wording are Citizens', read off the published form -- not an approximation of it. Three of its 36 blanks are left unbound on purpose; fl-citizens-roof-rcf-1.gaps.md says which and why.",
+  "version": 2,
+  "schema": {
+    "schemaVersion": 2,
+    "sections": [
+      {
+        "id": "form_header",
+        "title": "Roof Inspection Form",
+        "items": [
+          {
+            "id": "form_application_policy_number",
+            "label": "Application/Policy #:",
+            "type": "text",
+            "description": "Printed at the top of page 1 beside Applicant/Insured Name. It comes from the Citizens application or policy, so nothing in the inspection can supply it."
+          }
+        ]
+      },
+      {
+        "id": "roof",
+        "title": "Roof",
+        "items": [
+          {
+            "id": "roof_predominant",
+            "label": "Predominant Roof",
+            "type": "photo_only",
+            "description": "The left-hand column on the form. Photos of each roof slope showing the roof’s condition must be submitted with this form. The form asks for every damage sign that applies and this screen records one, so list any others — and anything answered Unsatisfactory (explain below) or Yes — under Additional Comments/Observations. The printed blanks are narrow: write a date as MM/DD/YY and keep the covering material short, or the form refuses rather than printing over the row beneath it.",
+            "attributes": [
+              {
+                "id": "covering_material",
+                "name": "Covering material:",
+                "type": "text"
+              },
+              {
+                "id": "roof_age_years",
+                "name": "Roof age (years):",
+                "type": "number"
+              },
+              {
+                "id": "remaining_useful_life_years",
+                "name": "Remaining useful life (years)",
+                "type": "number"
+              },
+              {
+                "id": "date_of_last_roofing_permit",
+                "name": "Date of last roofing permit:",
+                "type": "text"
+              },
+              {
+                "id": "date_of_last_update",
+                "name": "Date of last update:",
+                "type": "text"
+              },
+              {
+                "id": "update_extent",
+                "name": "If updated (check one):",
+                "type": "select",
+                "choices": [
+                  "full_replacement",
+                  "partial_replacement"
+                ]
+              },
+              {
+                "id": "percent_of_replacement",
+                "name": "% of replacement:",
+                "type": "number"
+              },
+              {
+                "id": "overall_condition",
+                "name": "Overall condition",
+                "type": "select",
+                "choices": [
+                  "satisfactory",
+                  "unsatisfactory"
+                ]
+              },
+              {
+                "id": "damage_signs",
+                "name": "Any visible signs of damage / deterioration?",
+                "type": "select",
+                "choices": [
+                  "cracking",
+                  "cupping_curling",
+                  "excessive_granule_loss",
+                  "exposed_asphalt",
+                  "exposed_felt",
+                  "missing_loose_cracked_tabs_or_tiles",
+                  "soft_spots_in_decking",
+                  "visible_hail_damage"
+                ]
+              },
+              {
+                "id": "visible_signs_of_leaks",
+                "name": "Any visible signs of leaks?",
+                "type": "select",
+                "choices": [
+                  "yes",
+                  "no"
+                ]
+              },
+              {
+                "id": "leaks_attic_underside_of_decking",
+                "name": "Attic/underside of decking",
+                "type": "select",
+                "choices": [
+                  "yes",
+                  "no"
+                ]
+              },
+              {
+                "id": "leaks_interior_ceilings",
+                "name": "Interior ceilings",
+                "type": "select",
+                "choices": [
+                  "yes",
+                  "no"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "roof_secondary",
+            "label": "Secondary Roof",
+            "type": "photo_only",
+            "description": "The right-hand column on the form. Photos of each roof slope showing the roof’s condition must be submitted with this form. The form asks for every damage sign that applies and this screen records one, so list any others — and anything answered Unsatisfactory (explain below) or Yes — under Additional Comments/Observations. The printed blanks are narrow: write a date as MM/DD/YY and keep the covering material short, or the form refuses rather than printing over the row beneath it.",
+            "attributes": [
+              {
+                "id": "covering_material",
+                "name": "Covering material:",
+                "type": "text"
+              },
+              {
+                "id": "roof_age_years",
+                "name": "Roof age (years):",
+                "type": "number"
+              },
+              {
+                "id": "remaining_useful_life_years",
+                "name": "Remaining useful life (years)",
+                "type": "number"
+              },
+              {
+                "id": "date_of_last_roofing_permit",
+                "name": "Date of last roofing permit:",
+                "type": "text"
+              },
+              {
+                "id": "date_of_last_update",
+                "name": "Date of last update:",
+                "type": "text"
+              },
+              {
+                "id": "update_extent",
+                "name": "If updated (check one):",
+                "type": "select",
+                "choices": [
+                  "full_replacement",
+                  "partial_replacement"
+                ]
+              },
+              {
+                "id": "percent_of_replacement",
+                "name": "% of replacement:",
+                "type": "number"
+              },
+              {
+                "id": "overall_condition",
+                "name": "Overall condition",
+                "type": "select",
+                "choices": [
+                  "satisfactory",
+                  "unsatisfactory"
+                ]
+              },
+              {
+                "id": "damage_signs",
+                "name": "Any visible signs of damage / deterioration?",
+                "type": "select",
+                "choices": [
+                  "cracking",
+                  "cupping_curling",
+                  "excessive_granule_loss",
+                  "exposed_asphalt",
+                  "exposed_felt",
+                  "missing_loose_cracked_tabs_or_tiles",
+                  "soft_spots_in_decking",
+                  "visible_hail_damage"
+                ]
+              },
+              {
+                "id": "visible_signs_of_leaks",
+                "name": "Any visible signs of leaks?",
+                "type": "select",
+                "choices": [
+                  "yes",
+                  "no"
+                ]
+              },
+              {
+                "id": "leaks_attic_underside_of_decking",
+                "name": "Attic/underside of decking",
+                "type": "select",
+                "choices": [
+                  "yes",
+                  "no"
+                ]
+              },
+              {
+                "id": "leaks_interior_ceilings",
+                "name": "Interior ceilings",
+                "type": "select",
+                "choices": [
+                  "yes",
+                  "no"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "additional_comments",
+        "title": "Additional Comments/Observations",
+        "items": [
+          {
+            "id": "form_additional_comments",
+            "label": "Additional Comments/Observations (use additional pages as needed):",
+            "type": "textarea",
+            "description": "This section of the Roof Inspection Form must be completed with full details/descriptions if any of the following are noted on the inspection: Updates: Identify the types of updates, dates completed and by whom; Any visible hazards or deficiencies; Any roof determined not to be in good working order."
+          }
+        ]
+      }
+    ],
+    "statutoryForm": {
+      "formId": "fl_citizens_roof",
+      "revision": "RCF-1 03 25",
+      "groups": [
+        {
+          "id": "roof",
+          "label": "Roof",
+          "capacity": 2,
+          "slotLabels": [
+            "Predominant Roof",
+            "Secondary Roof"
+          ],
+          "fields": [
+            "covering_material",
+            "roof_age_years",
+            "remaining_useful_life_years",
+            "date_of_last_roofing_permit",
+            "date_of_last_update",
+            "update_extent",
+            "percent_of_replacement",
+            "overall_condition",
+            "damage_signs",
+            "visible_signs_of_leaks",
+            "leaks_attic_underside_of_decking",
+            "leaks_interior_ceilings"
+          ]
+        }
+      ],
+      "bindings": {
+        "insured_applicant_name": {
+          "from": "inspection",
+          "field": "client_name"
+        },
+        "application_policy_number": {
+          "from": "item",
+          "itemId": "form_application_policy_number"
+        },
+        "address_inspected": {
+          "from": "inspection",
+          "field": "property_address"
+        },
+        "date_inspected": {
+          "from": "inspection",
+          "field": "inspection_date"
+        },
+        "roof[0].covering_material": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "covering_material"
+        },
+        "roof[0].roof_age_years": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "roof_age_years"
+        },
+        "roof[0].remaining_useful_life_years": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "remaining_useful_life_years"
+        },
+        "roof[0].date_of_last_roofing_permit": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "date_of_last_roofing_permit"
+        },
+        "roof[0].date_of_last_update": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "date_of_last_update"
+        },
+        "roof[0].update_extent": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "update_extent"
+        },
+        "roof[0].percent_of_replacement": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "percent_of_replacement"
+        },
+        "roof[0].overall_condition": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "overall_condition"
+        },
+        "roof[0].damage_signs": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "damage_signs"
+        },
+        "roof[0].visible_signs_of_leaks": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "visible_signs_of_leaks"
+        },
+        "roof[0].leaks_attic_underside_of_decking": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "leaks_attic_underside_of_decking"
+        },
+        "roof[0].leaks_interior_ceilings": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "leaks_interior_ceilings"
+        },
+        "roof[1].covering_material": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "covering_material"
+        },
+        "roof[1].roof_age_years": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "roof_age_years"
+        },
+        "roof[1].remaining_useful_life_years": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "remaining_useful_life_years"
+        },
+        "roof[1].date_of_last_roofing_permit": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "date_of_last_roofing_permit"
+        },
+        "roof[1].date_of_last_update": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "date_of_last_update"
+        },
+        "roof[1].update_extent": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "update_extent"
+        },
+        "roof[1].percent_of_replacement": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "percent_of_replacement"
+        },
+        "roof[1].overall_condition": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "overall_condition"
+        },
+        "roof[1].damage_signs": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "damage_signs"
+        },
+        "roof[1].visible_signs_of_leaks": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "visible_signs_of_leaks"
+        },
+        "roof[1].leaks_attic_underside_of_decking": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "leaks_attic_underside_of_decking"
+        },
+        "roof[1].leaks_interior_ceilings": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "leaks_interior_ceilings"
+        },
+        "additional_comments": {
+          "from": "item",
+          "itemId": "form_additional_comments"
+        },
+        "inspector_signature": {
+          "from": "signature",
+          "scope": "whole_form"
+        },
+        "inspector_license_number": {
+          "from": "inspection",
+          "field": "inspector_license"
+        },
+        "inspector_company_name": {
+          "from": "inspection",
+          "field": "company_name"
+        },
+        "inspector_work_phone": {
+          "from": "inspection",
+          "field": "company_phone"
+        }
+      }
+    }
+  }
+}
