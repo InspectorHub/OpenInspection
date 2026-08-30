@@ -16,18 +16,54 @@ import { withoutRepairPriceDeep } from '../lib/repair-price-keys';
  * mixing single + batch writes is safe. It is exposed as an MCP tool and can be
  * driven by any bulk caller, not one specific UI.
  *
- * Conflict adjudication and compound `defectFields` / `itemAttribute`
- * shape-folding live in InspectionService.patchItem — the
- * batch service is intentionally simpler: forced last-writer-wins on each
- * scalar field. A caller that needs batch + conflict resolution should funnel
- * through patchItem in a loop instead.
+ * Conflict adjudication is not done here: every scalar field is forced
+ * last-writer-wins.
+ *
+ * ⚠️ `itemAttribute` IS FOLDED HERE, and used not to be. This comment used to
+ * send that shape to `InspectionService.patchItem`, a method that no longer
+ * exists anywhere in the repository, so the enum member fell through to the
+ * scalar branch below and wrote `entry.itemAttribute = <whatever>`. Nothing
+ * reads that key: the editor, the report and every statutory `item_attribute`
+ * binding read `entry.attributes[<attributeId>]`. So the answer was accepted,
+ * stored, and invisible to every reader of it — an inspector could pick a value
+ * from a dropdown and the box on the authority's form stayed empty.
  */
 
 export interface ResultPatch {
     itemId:    string;
     sectionId: string;
     field:     'rating' | 'notes' | 'value' | 'canned' | 'defectFields' | 'itemAttribute';
+    /**
+     * The new value. For every field but `itemAttribute` it is written whole;
+     * for `itemAttribute` it must be `{ attributeId, value }`, because an item
+     * has many attributes and a whole-object write would erase the others.
+     */
     value:     unknown;
+}
+
+/** The `itemAttribute` payload, named so the fold below reads as one thing. */
+interface ItemAttributePatchValue {
+    attributeId: string;
+    value:       unknown;
+}
+
+/**
+ * Narrow an `itemAttribute` payload, or say exactly what arrived instead.
+ *
+ * Checked here rather than trusted, even though the request schema checks the
+ * same thing: this function is also reachable from the MCP tool and from any
+ * other bulk caller, and a payload that slipped through would otherwise write a
+ * key nobody reads and report itself as applied.
+ */
+function itemAttributePatch(raw: unknown, itemId: string): ItemAttributePatchValue {
+    const v = raw as Partial<ItemAttributePatchValue> | null;
+    if (!v || typeof v !== 'object' || typeof v.attributeId !== 'string' || v.attributeId === '') {
+        throw new Error(
+            `itemAttribute patch for item "${itemId}" must carry { attributeId, value }; `
+            + 'an attribute cannot be written without knowing which one it is.',
+        );
+    }
+    return { attributeId: v.attributeId, value: v.value };
 }
 
 export interface ResultsBatchOutcome {
@@ -73,6 +109,21 @@ export async function applyResultsBatch(
         if (data[p.itemId] && key !== p.itemId) delete data[p.itemId];
 
         const next: Record<string, unknown> = { ...cur };
+        if (p.field === 'itemAttribute') {
+            // MERGED, never replaced. One dropdown on the attributes panel sends
+            // one attribute, and an item carries up to a dozen of them; writing
+            // the object whole would clear every answer beside the one just given.
+            const attr = itemAttributePatch(p.value, p.itemId);
+            const held = (cur.attributes ?? {}) as Record<string, unknown>;
+            next.attributes = {
+                ...held,
+                [attr.attributeId]: withoutRepairPriceDeep(attr.value),
+            };
+            next._lastWriter = userId;
+            next._lastWriteAt = now;
+            data[key] = next;
+            continue;
+        }
         // `value` is `z.any()` and is folded onto the entry verbatim, which
         // makes this the widest hand-writable door into a finding: an MCP
         // `extended` tool with `write` scope, no shape validation, and no UI

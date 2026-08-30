@@ -79,6 +79,32 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  sections: Array<Record<string, unknown>>;
  }) || { sections: [] };
 
+ // The snapshot's own item attributes, captured BEFORE the overlay below
+ // replaces `schema.sections` wholesale.
+ //
+ // report-data's projection drops `attributes` ON PURPOSE — a DECLARED skip in
+ // `scripts/check-item-key-parity.mjs` ("projected separately by the attributes
+ // resolver"), and the report genuinely does not need them. The EDITOR does:
+ // `ItemEditor` only renders `ItemAttributesPanel` when `item.attributes` is a
+ // non-empty array, so replacing the sections with the projection turned the
+ // panel off everywhere while the panel, its handler and `onItemAttribute` were
+ // all built and wired. Nothing failed; the control simply was not there.
+ //
+ // Measured 2026-08-30 across the seed templates: 47 statutory bindings read
+ // `item_attribute` — TREC 23, FL Citizens roof 24 — and not one of them could
+ // be answered. `residential.json` carries a further 21 attribute definitions
+ // that no inspector could reach either, so this was never only a statutory
+ // problem. The fix merges the snapshot BACK; the projection is left alone.
+ const snapshotAttributes = new Map<string, unknown[]>();
+ for (const sec of (schema.sections ?? [])) {
+ for (const item of ((sec.items ?? []) as Array<Record<string, unknown>>)) {
+  const attrs = item.attributes;
+  if (typeof item.id === "string" && Array.isArray(attrs) && attrs.length > 0) {
+  snapshotAttributes.set(item.id, attrs);
+  }
+ }
+ }
+
  // Normalize sections from report-data (which has rating levels + section data)
  const rdData = ((reportBody as Record<string, unknown>).data ?? {}) as Record<string, unknown> | undefined;
  const reportSections = (rdData?.sections || []) as Array<Record<string, unknown>>;
@@ -90,6 +116,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  s.items = (s.items as Array<Record<string, unknown>>).map((item) => {
  const it = { ...item };
  if (!it.label && it.name) it.label = it.name;
+ // Only when the projection carried none: should report-data ever start
+ // projecting them, its value is the newer one and wins.
+ if (it.attributes === undefined && typeof it.id === "string") {
+ const attrs = snapshotAttributes.get(it.id);
+ if (attrs) it.attributes = attrs;
+ }
  return it;
  });
  }

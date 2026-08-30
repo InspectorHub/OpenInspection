@@ -707,17 +707,16 @@ export default function InspectionEditPage() {
  /* Item attribute handler */
  /* ---------------------------------------------------------------- */
 
+ // Through `findings`, exactly like a rating or a note. This used to submit a
+ // `set-item-attribute` fetcher intent — an intent NO action ever handled, left
+ // behind when Phase 5 retired the fetcher write path and made the collab doc
+ // the only road. Every answer fell through the action's final `return { ok }`,
+ // and a write that reached D1 by any other route was erased by the doc's next
+ // flush. Measured 2026-08-30 on the FL Citizens roof pack.
  const handleItemAttribute = useCallback((itemId: string, attributeId: string, value: string | number | boolean | null) => {
-  fetcher.submit(
-   {
-    intent: 'set-item-attribute',
-    itemId,
-    attributeId,
-    value: JSON.stringify(value),
-   },
-   { method: 'POST' },
-  );
- }, [fetcher]);
+  const sectionId = state.sectionIdForItem(itemId);
+  if (sectionId) findings.setItemAttribute(sectionId, itemId, attributeId, value);
+ }, [findings, state.sectionIdForItem]);
 
  /* Photo studio state */
  const [photoStudioOpen, setPhotoStudioOpen] = useState(false);
