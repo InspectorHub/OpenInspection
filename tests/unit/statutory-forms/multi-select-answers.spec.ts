@@ -25,7 +25,11 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { renderStatutoryForm } from '../../../server/lib/statutory/render';
+import { collectStatutoryValues } from '../../../server/lib/statutory/values';
+import type { StatutoryInspectionFacts } from '../../../server/lib/statutory/values';
 import type { FieldMap } from '../../../server/lib/statutory/field-map';
+import type { FieldGroup, StatutoryFormDeclaration, TemplateSchemaV2 }
+    from '../../../server/types/template-schema';
 import { buildFlatPdf, type PdfFixture } from '../helpers/statutory-pdf-fixtures';
 import { drawnRuns } from '../helpers/pdf-drawn-runs';
 
@@ -88,6 +92,75 @@ describe('an answer that ticks several boxes', () => {
             wiring_types: ['copper', 'aluminum', 'knob_and_tube', 'nm_bx_or_conduit'],
         });
         expect(await markedAt(filled)).toEqual([80, 120, 160, 200]);
+    });
+});
+
+describe('a repeated block whose instance answered several boxes', () => {
+    /**
+     * The one place the narrow pipe survived, exercised through the real
+     * collector rather than against the helper it calls.
+     *
+     * `expandGroups` stringified every instance value with `String()`, so a slot
+     * holding ['cracking','cupping_curling'] reached the renderer as
+     * "cracking,cupping_curling" and ticked no box at all. Asserting on
+     * `asAnswer` in isolation would not have caught it: the helper was already
+     * right, and nothing called it here.
+     */
+    const ROOF: FieldGroup = {
+        id: 'roof',
+        label: 'Roof',
+        capacity: 1,
+        slotLabels: ['Predominant Roof'],
+        fields: ['damage_signs'],
+    };
+    const DECLARATION: StatutoryFormDeclaration = {
+        formId: 'yy_flat_form', bindings: {}, groups: [ROOF],
+    };
+    // The declaration binds nothing, so no inspection fact is ever read. Spelled
+    // as an empty object rather than a copy of the fact list, which would be a
+    // second copy to keep in step for no benefit.
+    const NO_FACTS = {} as StatutoryInspectionFacts;
+    const EMPTY_SNAPSHOT = { schemaVersion: 2, sections: [] } as unknown as TemplateSchemaV2;
+
+    /** Four boxes for the one printed slot's damage-signs question. */
+    const slotMap = (): FieldMap => ({
+        ...multiSelectMap(),
+        mappings: [
+            { kind: 'checkbox', ourField: 'roof[0].damage_signs', whenValue: 'cracking', page: 1, x: 80, y: 300 },
+            { kind: 'checkbox', ourField: 'roof[0].damage_signs', whenValue: 'cupping_curling', page: 1, x: 120, y: 300 },
+            { kind: 'checkbox', ourField: 'roof[0].damage_signs', whenValue: 'granule_loss', page: 1, x: 160, y: 300 },
+            { kind: 'checkbox', ourField: 'roof[0].damage_signs', whenValue: 'missing_tabs', page: 1, x: 200, y: 300 },
+        ],
+    });
+
+    const collect = (instance: Record<string, unknown>) => collectStatutoryValues(
+        DECLARATION, EMPTY_SNAPSHOT, {}, NO_FACTS, { roof: [instance] },
+    );
+
+    it('ticks every box the recorded instance names', async () => {
+        const filled = await renderStatutoryForm(
+            flat.bytes, slotMap(), collect({ damage_signs: ['cracking', 'granule_loss'] }),
+        );
+        expect(await markedAt(filled)).toEqual([80, 160]);
+    });
+
+    it('ticks NO box the instance does not name', async () => {
+        const filled = await renderStatutoryForm(
+            flat.bytes, slotMap(), collect({ damage_signs: ['missing_tabs'] }),
+        );
+        expect(await markedAt(filled)).toEqual([200]);
+    });
+
+    it('POSITIVE CONTROL — a slot answered with one value still ticks its own box', async () => {
+        const filled = await renderStatutoryForm(
+            flat.bytes, slotMap(), collect({ damage_signs: 'cupping_curling' }),
+        );
+        expect(await markedAt(filled)).toEqual([120]);
+    });
+
+    it('POSITIVE CONTROL — a slot nobody answered ticks nothing and still renders', async () => {
+        const filled = await renderStatutoryForm(flat.bytes, slotMap(), collect({}));
+        expect(await markedAt(filled)).toEqual([]);
     });
 });
 

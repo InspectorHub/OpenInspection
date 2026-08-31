@@ -90,7 +90,7 @@ export function asValue(raw: unknown): string {
  * per element. Normalising here would therefore change nothing on the document
  * while quietly editing what the inspector recorded.
  */
-function asAnswer(raw: unknown): StatutoryValue {
+export function asAnswer(raw: unknown): StatutoryValue {
     if (Array.isArray(raw)) {
         return raw.length === 0 ? '' : raw.map((one) => asValue(one));
     }

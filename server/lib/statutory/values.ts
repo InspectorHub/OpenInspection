@@ -93,7 +93,7 @@ import {
     groupFieldName, refuseOverCapacity,
     refuseOverflowThatDoesNotFit, validateGroups,
 } from './groups';
-import { asValue, fail, itemsById, resolve } from './resolve-source';
+import { asAnswer, asValue, fail, itemsById, resolve } from './resolve-source';
 import type { StatutoryValue } from './field-map';
 // Re-exported because both were declared here before `resolve-source.ts` existed,
 // and every import site names this module. Moving the declaration is a refactor;
@@ -172,12 +172,20 @@ function expandGroups(
         }
     }
 
+    // `asAnswer`, not `asValue`. A group's field is an ordinary question and a
+    // group's slot is an ordinary printed slot, so an instance may hold a list
+    // exactly as an item attribute may -- the roof block's damage signs are a
+    // "check all that apply" on the form itself. `asValue` is `String()`, which
+    // turns ['cracking','cupping'] into "cracking,cupping": a value that names
+    // no box, ticks nothing, and is refused by name at render time. That is the
+    // narrow pipe the collection side was widened to remove, and this was the
+    // one place still holding it.
     for (const group of groups) {
         const recorded = instances[group.id] ?? [];
         for (let index = 0; index < group.capacity; index++) {
             const instance = recorded[index];
             for (const field of group.fields) {
-                values[groupFieldName(group.id, index, field)] = asValue(instance?.[field]);
+                values[groupFieldName(group.id, index, field)] = asAnswer(instance?.[field]);
             }
         }
     }
@@ -202,6 +210,11 @@ function expandGroups(
  * overflow must never lose.
  */
 function overflowLine(group: FieldGroup, index: number, instance: StatutoryGroupInstance): string {
+    // `asValue` here is deliberate and is NOT the narrow pipe `expandGroups`
+    // fixed. This composes a SENTENCE for a comments box -- our prose around the
+    // inspector's answers -- rather than a value a mapping compares against a
+    // `whenValue`, so a list has to become readable text somewhere and there is
+    // no box for it to miss.
     const answered = group.fields
         .map((field) => [field, asValue(instance[field])] as const)
         .filter(([, value]) => value !== '')
