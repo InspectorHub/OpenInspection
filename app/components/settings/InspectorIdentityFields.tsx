@@ -1,3 +1,7 @@
+import {
+    FL_1802_QUALIFICATION_CATEGORIES,
+    FL_1802_QUALIFICATION_PROMPT,
+} from "../../../server/lib/statutory/qualification-categories";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -43,6 +47,18 @@ import { m } from "~/paraglide/messages";
  * off the raw FormData. Nothing validates client-side because there is nothing
  * to validate — the vocabulary is the authority's, so the only server rule is a
  * length bound.
+ *
+ * ── 🔴 ONE OF THE TWO IS A LIST OF BOXES AND THE OTHER IS A LINE ────────────
+ * The QUALIFICATION is six printed checkboxes with "(check one)" beside them,
+ * so it is a radio group over the authority's own six categories
+ * (`server/lib/statutory/qualification-categories.ts`). It used to be a text
+ * box whose placeholder read "e.g. Building code inspector" — the form stores
+ * `building_code_inspector`, so the field was teaching a value that could never
+ * tick a box, and the inspector met the refusal after the fieldwork.
+ *
+ * The LICENCE CLASS beside it stays free text, and that is not an oversight:
+ * the Citizens forms draw it as a line to write on, not as boxes, so there is
+ * no closed vocabulary to offer. Converting it would invent one.
  */
 
 /** The three properties of a Conform field this component actually reads. */
@@ -68,6 +84,16 @@ const INPUT =
     + "focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] "
     + "placeholder:text-ih-fg-4 text-ih-fg-1";
 const HINT = "text-[11px] text-ih-fg-3";
+// `items-start`, not `items-center`: these labels are the authority's whole
+// sentences and two of the six wrap, so a centred control floats mid-paragraph.
+// That is also why shared-ui's `Radio` is not used here — it hardcodes
+// `items-center` for one-line labels and offers no way past it.
+const CHOICE = "flex items-start gap-2 cursor-pointer";
+const RADIO = "accent-ih-primary h-4 w-4 mt-0.5 shrink-0";
+const CHOICE_TEXT = "text-[13px] text-ih-fg-2 leading-relaxed";
+
+/** The values a box exists for. Anything else means nothing is ticked. */
+const declaredCategories = new Set(FL_1802_QUALIFICATION_CATEGORIES.map((c) => c.value));
 
 export function InspectorIdentityFields({
     nameField,
@@ -129,21 +155,49 @@ export function InspectorIdentityFields({
                     />
                     <p className={HINT}>{m.settings_profile_statutory_licence_hint()}</p>
                 </div>
-                <div className="space-y-2">
-                    <label htmlFor="statutoryQualification" className={LABEL}>
-                        {m.settings_profile_statutory_qualification_label()}
-                    </label>
-                    <input
-                        type="text"
-                        id="statutoryQualification"
-                        name="statutoryQualification"
-                        defaultValue={statutoryQualification ?? ""}
-                        placeholder={m.settings_profile_statutory_qualification_placeholder()}
-                        className={INPUT}
-                    />
-                    <p className={HINT}>{m.settings_profile_statutory_qualification_hint()}</p>
-                </div>
             </div>
+
+            <fieldset className="space-y-2">
+                <legend className={LABEL}>
+                    {m.settings_profile_statutory_qualification_label()}
+                </legend>
+                {/* The authority's own prompt, above the authority's own six
+                    categories. Presenting the choice the way the page presents
+                    it is what lets somebody recognise his line. */}
+                <p className={HINT}>{FL_1802_QUALIFICATION_PROMPT}</p>
+                <div className="space-y-1.5">
+                    {/* Declaring nothing is a real answer: only one of the four
+                        published forms asks, so most inspectors never fill this
+                        in. It is FIRST and it is a radio like the rest, because
+                        the alternative — no way back to empty once a box is
+                        ticked — is how a wrong category becomes permanent. */}
+                    <label className={CHOICE}>
+                        <input
+                            type="radio"
+                            name="statutoryQualification"
+                            value=""
+                            defaultChecked={!declaredCategories.has(statutoryQualification ?? "")}
+                            className={RADIO}
+                        />
+                        <span className={CHOICE_TEXT}>
+                            {m.settings_profile_statutory_qualification_none()}
+                        </span>
+                    </label>
+                    {FL_1802_QUALIFICATION_CATEGORIES.map((category) => (
+                        <label key={category.value} className={CHOICE}>
+                            <input
+                                type="radio"
+                                name="statutoryQualification"
+                                value={category.value}
+                                defaultChecked={statutoryQualification === category.value}
+                                className={RADIO}
+                            />
+                            <span className={CHOICE_TEXT}>{category.printedAs}</span>
+                        </label>
+                    ))}
+                </div>
+                <p className={HINT}>{m.settings_profile_statutory_qualification_hint()}</p>
+            </fieldset>
         </>
     );
 }

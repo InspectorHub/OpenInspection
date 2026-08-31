@@ -280,6 +280,6 @@
   "settings_profile_statutory_licence_placeholder": "p. ej. Inspector de viviendas con licencia de Florida",
   "settings_profile_statutory_licence_hint": "Se imprime en la casilla “License Type” de los formularios legales. Escriba la clase tal como la nombra la autoridad. No es una certificación de asociación — esas viven en Licencias y afiliaciones.",
   "settings_profile_statutory_qualification_label": "Calificación legal",
-  "settings_profile_statutory_qualification_placeholder": "p. ej. Inspector de código de construcción",
-  "settings_profile_statutory_qualification_hint": "La categoría que algunos formularios le piden declarar sobre usted mismo, junto a su licencia y no en su lugar. Déjela vacía si ningún formulario que produce la pide."
+  "settings_profile_statutory_qualification_none": "Sin declarar",
+  "settings_profile_statutory_qualification_hint": "La categoría que algunos formularios le piden declarar sobre usted mismo, junto a su licencia y no en su lugar. El texto junto a cada casilla es el del propio formulario; déjela en “Sin declarar” si ningún formulario que produce la pide."
 }

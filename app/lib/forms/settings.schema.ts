@@ -104,6 +104,13 @@ export function makeProfileSchema() {
     // The state licence CLASS and the qualification category a statutory form
     // asks about the inspector. Free text: the vocabulary belongs to the
     // authority, so the only rule is a length bound (mirrors PatchProfileSchema).
+    //
+    // The QUALIFICATION is nonetheless offered as a closed list of radios in the
+    // UI, because one published form prints its six categories as boxes and a
+    // value outside them can only ever be refused at render time. The bound here
+    // stays a length rather than an enum on purpose: the column belongs to the
+    // person, not to one authority's form, and a second authority printing its
+    // own list is a schema question rather than a wider enum here.
     statutoryLicenseType: z.string().max(120).optional(),
     statutoryQualification: z.string().max(120).optional(),
   });
