@@ -48,6 +48,7 @@ vi.mock('../../../server/lib/statutory/forms', () => ({
 
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { MarketplaceService } from '../../../server/services/marketplace.service';
+import { r2Keys } from '../../../server/lib/r2-keys';
 
 const PUBLISHED = {
     formId: FORM, version: REVISION,
@@ -59,7 +60,10 @@ const PUBLISHED = {
 };
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
-const KEY = `_platform/statutory-forms/${FORM}/${encodeURIComponent(REVISION)}.pdf`;
+// Built by `r2Keys.statutoryFormSource`, never spelt out again here: a test
+// that re-derives the key agrees with the shape it was copied from, so it goes
+// on passing after the builder changes and production stops finding the object.
+const KEY = r2Keys.statutoryFormSource(FORM, REVISION);
 
 const packFor = (revision?: string) => ({
     schemaVersion: 2,

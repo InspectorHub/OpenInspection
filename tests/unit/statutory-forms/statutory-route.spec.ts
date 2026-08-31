@@ -13,6 +13,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
+import { r2Keys } from '../../../server/lib/r2-keys';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
@@ -170,7 +171,11 @@ const snapshotDeclaringRevision = (revision: string) => ({
 });
 
 function bucket() {
-    const key = `_platform/statutory-forms/${FORM}/${encodeURIComponent(REVISION)}.pdf`;
+    // Built by `r2Keys.statutoryFormSource`, never spelt out again here: a bucket
+    // keyed by a re-derived string agrees with the shape it was copied from, so it
+    // goes on answering after the builder changes and production stops finding the
+    // object.
+    const key = r2Keys.statutoryFormSource(FORM, REVISION);
     return {
         get: async (k: string) => (k === key
             ? { arrayBuffer: async () => flat.bytes.buffer.slice(flat.bytes.byteOffset, flat.bytes.byteOffset + flat.bytes.byteLength) }

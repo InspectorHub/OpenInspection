@@ -51,17 +51,21 @@ vi.mock('../../../server/lib/statutory/forms', () => ({
 import adminStatutorySourceRoutes from '../../../server/api/admin/admin-statutory-source';
 import { AppError } from '../../../server/lib/errors';
 import { PUBLISHED_FORM_VERSIONS } from '../../../server/lib/statutory/forms';
+import { r2Keys } from '../../../server/lib/r2-keys';
 
 const FORM = 'yy_flat_form';
 const REVISION = 'Rev. 04/26';
-const KEY = `_platform/statutory-forms/${FORM}/${encodeURIComponent(REVISION)}.pdf`;
+// Built by `r2Keys.statutoryFormSource`, never spelt out again here: a test
+// that re-derives the key agrees with the shape it was copied from, so it goes
+// on passing after the builder changes and production stops finding the object.
+const KEY = r2Keys.statutoryFormSource(FORM, REVISION);
 
 const RIGHT_BYTES = new TextEncoder().encode("the authority's own document");
 const WRONG_BYTES = new TextEncoder().encode('a superseded revision of the same form');
 
 /** The withdrawn revision, and the bytes it really does record. */
 const OLD_REVISION = 'Rev. 01/25';
-const OLD_KEY = `_platform/statutory-forms/${FORM}/${encodeURIComponent(OLD_REVISION)}.pdf`;
+const OLD_KEY = r2Keys.statutoryFormSource(FORM, OLD_REVISION);
 const OLD_BYTES = new TextEncoder().encode("the superseded revision's own document");
 
 async function sha256(bytes: Uint8Array): Promise<string> {

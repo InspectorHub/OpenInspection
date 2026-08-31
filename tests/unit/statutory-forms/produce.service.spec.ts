@@ -14,6 +14,7 @@ import type { FieldMap } from '../../../server/lib/statutory/field-map';
 import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../../server/types/template-schema';
 import type { StatutoryInspectionFacts } from '../../../server/lib/statutory/values';
 import { buildFlatPdf, type PdfFixture } from '../helpers/statutory-pdf-fixtures';
+import { r2Keys } from '../../../server/lib/r2-keys';
 
 const FORM = 'yy_flat_form';
 const OLD_REVISION = 'Rev. 01/12';
@@ -91,8 +92,12 @@ function bucketWith(entries: Record<string, Uint8Array>) {
 
 function ctx() {
     const store: Record<string, Uint8Array> = {
-        [`_platform/statutory-forms/${FORM}/${encodeURIComponent(OLD_REVISION)}.pdf`]: flat.bytes,
-        [`_platform/statutory-forms/${FORM}/${encodeURIComponent(NEW_REVISION)}.pdf`]: flat.bytes,
+        // Built by `r2Keys.statutoryFormSource`, never spelt out again here: a
+        // store keyed by a re-derived string agrees with the shape it was copied
+        // from, so it goes on answering after the builder changes and production
+        // stops finding the object.
+        [r2Keys.statutoryFormSource(FORM, OLD_REVISION)]: flat.bytes,
+        [r2Keys.statutoryFormSource(FORM, NEW_REVISION)]: flat.bytes,
     };
     return {
         formId: FORM,
@@ -183,7 +188,7 @@ describe('produceStatutoryForm — whose bytes', () => {
         // it and degrade into a form rendered from whatever was in the bucket.
         const tampered = await buildFlatPdf();
         const store = {
-            [`_platform/statutory-forms/${FORM}/${encodeURIComponent(NEW_REVISION)}.pdf`]: tampered.bytes,
+            [r2Keys.statutoryFormSource(FORM, NEW_REVISION)]: tampered.bytes,
         };
         const bad = {
             ...ctx(),
