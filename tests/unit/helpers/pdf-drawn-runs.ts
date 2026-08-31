@@ -47,6 +47,35 @@ export interface DrawnRun {
 const BLOCK = /BT\b([\s\S]*?)\bET\b/g;
 
 /**
+ * The WinAnsi codes that are NOT the Unicode code point of the same number.
+ *
+ * A shown byte is a WinAnsi code, and for 0x20-0x7E and 0xA0-0xFF that code IS
+ * the Unicode code point, so `String.fromCharCode` is right for every one of
+ * them. 0x80-0x9F is the range where it is wrong, and wrong in the direction
+ * that hides: an em dash is byte 0x97 on the page, and reading it as U+0097
+ * turns a run that says "Roof 3 — Covering material: ..." into one that
+ * matches nothing, while neither the page nor the run looks damaged.
+ *
+ * The five codes WinAnsi leaves undefined are simply ABSENT rather than given a
+ * placeholder, so a byte landing on one keeps itself. An earlier draft held all
+ * 32 in one string with a blank in each undefined slot, which is a table nobody
+ * can proofread and which landed those slots as NULs.
+ */
+const WIN_ANSI_HIGH: Readonly<Record<number, string>> = {
+    0x80: '€', 0x82: '‚', 0x83: 'ƒ', 0x84: '„', 0x85: '…',
+    0x86: '†', 0x87: '‡', 0x88: 'ˆ', 0x89: '‰', 0x8A: 'Š',
+    0x8B: '‹', 0x8C: 'Œ', 0x8E: 'Ž', 0x91: '‘', 0x92: '’',
+    0x93: '“', 0x94: '”', 0x95: '•', 0x96: '–', 0x97: '—',
+    0x98: '˜', 0x99: '™', 0x9A: 'š', 0x9B: '›', 0x9C: 'œ',
+    0x9E: 'ž', 0x9F: 'Ÿ',
+};
+
+/** One shown byte, as the character WinAnsi says it is. */
+function winAnsiChar(byte: number): string {
+    return WIN_ANSI_HIGH[byte] ?? String.fromCharCode(byte);
+}
+
+/**
  * The three operators that matter, matched in the order the stream writes them.
  *
  * Scanned as one alternation rather than three separate searches because a text
@@ -122,7 +151,7 @@ export function runsInContentStream(stream: string): DrawnRun[] {
                 if (size === null || x === null || y === null) continue;
                 runs.push({
                     text: (match[4].match(/../g) ?? [])
-                        .map((pair) => String.fromCharCode(parseInt(pair, 16)))
+                        .map((pair) => winAnsiChar(parseInt(pair, 16)))
                         .join(''),
                     x,
                     y,

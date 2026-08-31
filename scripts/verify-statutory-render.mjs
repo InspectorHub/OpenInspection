@@ -64,8 +64,10 @@
  * two arguments are now the FORMS table below, and its reader is the read-back
  * further down, which measures the placement instead of describing it. Nothing
  * it could do was dropped: the value collector, the positional slot names it
- * produces, and the refusal of one instance more than the form has columns are
- * all still exercised, in `checkTheValueCollector`, on every run.
+ * produces, and what becomes of one instance more than the form has columns —
+ * refused where the block nominates nowhere to put it, routed into the box the
+ * form does nominate and then FOUND there — are all still exercised, in
+ * `checkTheValueCollector`, on every run.
  *
  * ── What it cannot see, stated so a green run is not read as more than it is ─
  * It proves a value landed at the coordinate the map names. It cannot prove the
@@ -422,14 +424,28 @@ function clippedLinesInAppearance(doc, field, ruler) {
  * slot name. Anything less and the page check below is verifying values this
  * software would never actually have produced.
  *
- * ── And the refusal ────────────────────────────────────────────────────────
+ * ── And what happens past the last slot ────────────────────────────────────
  * A house with one more panel than the form has columns. A dropped instance
  * comes out as an empty slot, and an empty slot reads exactly like an inspector
- * who did not answer, so it must refuse rather than truncate. The refusal has to
- * name BOTH counts and where the remainder goes: a person reading it is standing
- * in a garage deciding what to do next, and "too many panels" is a wall.
+ * who did not answer, so it must never be quietly truncated. WHERE it goes is
+ * the declaration's to say, and the two halves are asserted separately:
+ *
+ *   no `overflowTo` — there is genuinely nowhere on the page, so the collector
+ *      must REFUSE, and the refusal has to name BOTH counts and where the
+ *      remainder goes: a person reading it is standing in a garage deciding what
+ *      to do next, and "too many panels" is a wall. Unchanged, and it is the
+ *      only protection such a group has.
+ *   `overflowTo` — the form itself nominates a box ("use additional pages if
+ *      needed"), so the collector must ACCEPT, and the extra instance's own text
+ *      is then read back OUT of that box and off the produced page. Accepting
+ *      without reading it back would be worse than refusing: a third panel that
+ *      disappears quietly is the same empty slot, with no refusal to notice it.
+ *      So this branch never stops looking — it looks somewhere else.
+ *
+ * Both halves run on EVERY group. This checked `groups[0]` while the Citizens
+ * four-point form declared two, so its roof block was never once exercised.
  */
-function checkTheValueCollector(map, values) {
+async function checkTheValueCollector(map, values, official) {
     const groups = map.groups ?? [];
     if (groups.length === 0) return { ran: false, problems: [] };
 
@@ -536,34 +552,213 @@ function checkTheValueCollector(map, values) {
         problems.push(`the collector produced "${key}", which the render was never given`);
     }
 
-    // One more instance than the page has columns. This map's groups nominate no
-    // destination for the remainder, so the refusal is the whole answer.
-    const overflowing = { ...instances };
-    const first = groups[0];
-    overflowing[first.id] = [
-        ...instances[first.id],
-        Object.fromEntries(first.fields.map((f) => [f, 'overflow'])),
-    ];
+    // One more instance than the page has columns, for every block the form
+    // repeats — refused where nothing can hold it, routed and then FOUND where
+    // the form nominates a box.
+    const notes = [];
+    for (const group of groups) {
+        const outcome = await checkPastTheLastSlot({
+            group, map, official, values, collected,
+            declaration, snapshot, results, facts, instances,
+        });
+        problems.push(...outcome.problems);
+        if (outcome.note !== null) notes.push(outcome.note);
+    }
+
+    return { ran: true, problems, slots: grouped.size, notes };
+}
+
+/**
+ * The answer one overflowing instance gives to every field of its block.
+ *
+ * It has to be findable in a comments box that already holds the inspector's own
+ * prose, and it has to be a string no fixture would produce by accident. The
+ * question is whether OUR extra instance reached that box — not whether the box
+ * has words in it, which it does before this harness touches anything.
+ */
+const OVERFLOW_PROBE = 'past-the-last-slot';
+
+/**
+ * The sentence the product writes for one overflowing instance, composed HERE.
+ *
+ * Deliberately NOT imported. `overflowLine` is the code under test, and a check
+ * that asks it what it wrote agrees with itself whatever it wrote — the same
+ * reason `answerNames` is restated in this file rather than taken from the
+ * renderer. So the format is stated independently: the block's printed label,
+ * the instance counted from ONE because the reader is counting panels in a
+ * house, and each answer as `Field label: value`.
+ *
+ * If the product's wording moves, this fails and prints both strings. That is
+ * the right outcome for wording that lands on an authority's document.
+ */
+function expectedOverflowLine(group, index) {
+    const answered = group.fields.map((field) => {
+        const words = field.replace(/_/g, ' ');
+        return `${words.charAt(0).toUpperCase()}${words.slice(1)}: ${OVERFLOW_PROBE}`;
+    });
+    return `${group.label} ${index + 1} — ${answered.join('; ')}.`;
+}
+
+/** Whitespace-insensitive containment: a wrapped line is still the same sentence. */
+function carries(haystack, needle) {
+    const collapse = (s) => s.replace(/\s+/g, ' ').trim();
+    return collapse(haystack).includes(collapse(needle));
+}
+
+/**
+ * What the destination field carries on the page this render actually produced.
+ *
+ * The overlay case reads the block that STARTS at the mapped coordinate — the
+ * runs at that x, at that y and below it, in the order they were drawn — rather
+ * than every run on the page. A page-wide search would be satisfied by the
+ * sentence landing anywhere at all, including on top of another answer.
+ *
+ * Returns `text: null` when the destination named a field the produced document
+ * does not have, which is a different fact from a box that came out empty.
+ */
+async function destinationTextOnThePage(official, rendered, mappings) {
+    const doc = await PDFDocument.load(rendered);
+    const acroform = mappings.find((m) => m.kind === 'acroform');
+    if (acroform !== undefined) {
+        try {
+            const text = doc.getForm().getTextField(acroform.pdfField).getText();
+            return { text: text ?? '', where: `the field "${acroform.pdfField}"` };
+        } catch {
+            return { text: null, where: `the field "${acroform.pdfField}"` };
+        }
+    }
+    const overlay = mappings.find((m) => m.kind === 'overlay');
+    if (overlay === undefined) {
+        return { text: null, where: 'no text mapping — every mapping for it is a checkbox' };
+    }
+    const added = await addedRuns(official, rendered, overlay.page + 1);
+    const block = (added[overlay.page] ?? [])
+        .filter((r) => Math.abs(r.x - overlay.x) <= COORDINATE_TOLERANCE
+            && r.y <= overlay.y + COORDINATE_TOLERANCE)
+        .sort((a, b) => b.y - a.y);
+    return {
+        text: block.map((r) => r.text).join(' '),
+        where: `(${overlay.x}, ${overlay.y}) on page ${overlay.page}`,
+    };
+}
+
+/**
+ * One block, given one instance more than the form has slots.
+ *
+ * Every arm returns a `note` for the run's own transcript or `null` where a
+ * problem was already recorded: what this checked is printed on a green run too,
+ * because a check that only speaks when it fails is indistinguishable from one
+ * that never ran.
+ */
+async function checkPastTheLastSlot(ctx) {
+    const {
+        group, map, official, values, collected,
+        declaration, snapshot, results, facts, instances,
+    } = ctx;
+    const problems = [];
+    const overflowing = {
+        ...instances,
+        [group.id]: [
+            ...(instances[group.id] ?? []),
+            Object.fromEntries(group.fields.map((f) => [f, OVERFLOW_PROBE])),
+        ],
+    };
+
+    let produced = null;
     let refusal = null;
     try {
-        collectStatutoryValues(declaration, snapshot, {}, facts, overflowing);
+        produced = collectStatutoryValues(declaration, snapshot, results, facts, overflowing);
     } catch (error) {
         refusal = error instanceof Error ? error.message : String(error);
     }
-    if (refusal === null) {
-        problems.push(`${first.capacity + 1} instance(s) of "${first.id}" were ACCEPTED against `
-            + `${first.capacity} slot(s). A dropped instance is an empty slot, and an empty slot `
-            + 'reads as an inspector who did not answer.');
-    } else {
-        for (const fragment of [String(first.capacity + 1), `${first.capacity} slots`, 'narrative report']) {
+
+    const destination = group.overflowTo;
+    if (destination === undefined) {
+        // Nowhere on this form to put it, so the refusal IS the answer.
+        if (refusal === null) {
+            problems.push(`${group.capacity + 1} instance(s) of "${group.id}" were ACCEPTED `
+                + `against ${group.capacity} slot(s), and the group nominates nowhere for the `
+                + 'extra one to go. A dropped instance is an empty slot, and an empty slot reads '
+                + 'as an inspector who did not answer.');
+            return { problems, note: null };
+        }
+        for (const fragment of [String(group.capacity + 1), `${group.capacity} slots`, 'narrative report']) {
             if (!refusal.includes(fragment)) {
-                problems.push(`the over-capacity refusal does not name ${JSON.stringify(fragment)}, `
-                    + `so it cannot be acted on: ${refusal}`);
+                problems.push(`the over-capacity refusal for "${group.id}" does not name `
+                    + `${JSON.stringify(fragment)}, so it cannot be acted on: ${refusal}`);
             }
         }
+        return { problems, note: `"${group.id}" nominates no destination and refused one instance `
+            + `too many — ${refusal}` };
     }
 
-    return { ran: true, problems, slots: grouped.size, refusal };
+    // A destination is declared, so the extra instance is not refused; it is
+    // routed. Everything below asks whether it ARRIVED.
+    if (refusal !== null) {
+        problems.push(`"${group.id}" nominates "${destination}" for an instance past its `
+            + `${group.capacity} slot(s), and the collector refused it anyway: ${refusal}`);
+        return { problems, note: null };
+    }
+    const destinationMappings = map.mappings.filter((m) => m.ourField === destination);
+    if (destinationMappings.length === 0) {
+        problems.push(`"${group.id}" overflows into "${destination}", which this map does not `
+            + 'name. Nothing puts that field on the page, so the extra instance is lost exactly '
+            + 'as quietly as a dropped one.');
+        return { problems, note: null };
+    }
+
+    const expectedLine = expectedOverflowLine(group, group.capacity);
+    const before = collected[destination];
+    const after = produced[destination];
+    if (typeof after !== 'string') {
+        problems.push(`"${group.id}" overflows into "${destination}" and the collector produced `
+            + `${JSON.stringify(after ?? null)} there. One instance was accepted past the last `
+            + 'slot and there is no text anywhere holding it.');
+        return { problems, note: null };
+    }
+    if (!after.includes(expectedLine)) {
+        problems.push(`"${group.id}" overflows into "${destination}" and the extra instance is `
+            + `not in it. Expected that value to carry ${JSON.stringify(expectedLine)}; it reads `
+            + `${JSON.stringify(after)}.`);
+        return { problems, note: null };
+    }
+    if (typeof before === 'string' && before !== '' && !after.startsWith(before)) {
+        problems.push(`"${group.id}" overflows into "${destination}" and what the inspector had `
+            + `already written there did not survive. It read ${JSON.stringify(before)} and now `
+            + `reads ${JSON.stringify(after)}.`);
+        return { problems, note: null };
+    }
+
+    // The value is right. The box still has to print it, and a box measured too
+    // small loses the extra instance one step further along than a value check
+    // can see.
+    let rendered;
+    try {
+        rendered = await renderStatutoryForm(official, map, { ...values, [destination]: after });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        problems.push(`"${group.id}" overflows into "${destination}", and the form REFUSED to `
+            + `render once the extra instance was in that box: ${message.split('\n')[0]}`);
+        return { problems, note: null };
+    }
+    const landed = await destinationTextOnThePage(official, rendered, destinationMappings);
+    if (landed.text === null) {
+        problems.push(`"${group.id}" overflows into "${destination}", and the produced document `
+            + `has ${landed.where} to read it back from.`);
+        return { problems, note: null };
+    }
+    if (!carries(landed.text, expectedLine)) {
+        problems.push(`"${group.id}" overflows into "${destination}", the collector wrote the `
+            + 'extra instance into that value, and it is NOT on the produced page. Expected '
+            + `${JSON.stringify(expectedLine)} at ${landed.where}; that carries `
+            + `${JSON.stringify(landed.text)}.`);
+        return { problems, note: null };
+    }
+
+    const kept = typeof before === 'string' ? before.length : 0;
+    return { problems, note: `"${group.id}" routed one instance past its ${group.capacity} `
+        + `slot(s) into "${destination}", after the ${kept} character(s) the inspector had `
+        + `already written there, and it was read back off ${landed.where}` };
 }
 
 /** Every annotation rectangle on one page of a document, with its field name. */
@@ -759,14 +954,15 @@ for (const form of FORMS) {
     }
 
     // ── The value collector, where the map declares repeated blocks ────────
-    const collector = checkTheValueCollector({ ...map, groups }, values);
+    const collector = await checkTheValueCollector({ ...map, groups }, values, official);
     if (!collector.ran) {
         line('   collector: this form declares no repeated blocks, so there is nothing');
         line('      positional to get wrong before the render.');
     } else if (collector.problems.length === 0) {
         line(`   collector: the real collector reproduced all ${namedFields.length} value(s) from a `
             + `declaration with ${groups.length} repeated block(s), ${collector.slots} of them`);
-        line(`      positional slots, and refused one instance too many — ${collector.refusal}`);
+        line('      positional slots. Past the last slot:');
+        for (const note of collector.notes) line(`      · ${note}`);
     } else {
         failed = true;
         line(`   ✘ ${collector.problems.length} problem(s) on the way IN, before the renderer:`);
