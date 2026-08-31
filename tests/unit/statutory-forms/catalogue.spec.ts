@@ -42,30 +42,43 @@ describe('the statutory form catalogue', () => {
         expect(PUBLISHED_FORM_VERSIONS).toHaveLength(4);
         expect(FIELD_MAPS).toHaveLength(4);
         expect(PUBLISHED_FORM_VERSIONS.map((v) => v.formId)).toEqual([
-            'tx_trec_rei_7_6',
+            'tx_trec_rei',
             'fl_citizens_4point',
             'fl_citizens_roof',
             'fl_oir_b1_1802',
         ]);
     });
 
-    it('has one form id that names a revision, and it is the known one', () => {
-        // ⚠️ `tx_trec_rei_7_6` is WRONG — `form-registry.ts` says a form id
-        // names a form and never a revision, and the three Florida ids follow
-        // that. It is asserted here so the inconsistency is a recorded fact
-        // rather than a pattern the next form gets copied from; the fix is
-        // tracked separately because the id reaches the seed template, an R2
-        // key holding uploaded bytes, the catalogue fixture and these tests.
+    it('publishes no form id that carries its own revision label', () => {
+        // `form-registry.ts` states the rule where `formId` is declared: an id
+        // names a form and never a revision. It is not tidiness —
+        // `versionForInspection` GROUPS on this field, so a revision spelt into
+        // the id becomes a separate form that the next revision of the same
+        // form can never be compared against, and selecting by inspection date
+        // stops working with nothing going red.
+        //
+        // `tx_trec_rei_7_6` was the one that broke it and is now `tx_trec_rei`.
+        // Its revision label did not move: `REI 7-6` is what the authority
+        // prints on every page, and `revisionStatus` compares it for equality.
         //
         // Judged against each row's OWN revision label rather than a pattern
         // chosen here: an id "carries a revision" when the label, spelt the way
         // an id is spelt, is a substring of it. A hand-written regex would only
         // ever agree with itself.
         const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-        const revisionish = PUBLISHED_FORM_VERSIONS
+        const carriesRevision = (rows: readonly { formId: string; version: string }[]) => rows
             .filter((v) => v.formId.includes(slug(v.version)))
             .map((v) => v.formId);
-        expect(revisionish).toEqual(['tx_trec_rei_7_6']);
+
+        // The positive control, and it runs FIRST. An empty answer is what a
+        // broken `slug`, a renamed field and an empty catalogue all produce
+        // alike, so the detector is shown catching the exact shape it exists to
+        // catch before its zero over the real catalogue is believed.
+        expect(carriesRevision([{ formId: 'tx_trec_rei_7_6', version: 'REI 7-6' }]))
+            .toEqual(['tx_trec_rei_7_6']);
+
+        expect(PUBLISHED_FORM_VERSIONS.length).toBeGreaterThan(0);
+        expect(carriesRevision(PUBLISHED_FORM_VERSIONS)).toEqual([]);
     });
 
     it('pairs every revision with exactly one field map, both ways', () => {

@@ -35,7 +35,7 @@ import type { StatutoryFormVersion } from '../form-registry';
 import type { FieldMap } from '../field-map';
 
 export const version: StatutoryFormVersion = {
-    formId: 'tx_trec_rei_7_6',
+    formId: 'tx_trec_rei',
     // The Commission's own title for the promulgated form, as the form prints it.
     formTitle: 'Texas Real Estate Commission Property Inspection Report',
     version: 'REI 7-6',
@@ -52,7 +52,7 @@ export const version: StatutoryFormVersion = {
 };
 
 export const fieldMap: FieldMap = {
-    formId: 'tx_trec_rei_7_6',
+    formId: 'tx_trec_rei',
     version: 'REI 7-6',
     sourceHash: '5def4efc765aee953a028446596dd97b9f974cb0851153e15b07447568d3ed4c',
     checkedBy: 'Nathan',

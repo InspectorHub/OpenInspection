@@ -158,7 +158,7 @@ const COORDINATE_TOLERANCE = 0.02;
  */
 const FORMS = [
     {
-        formId: 'tx_trec_rei_7_6',
+        formId: 'tx_trec_rei',
         label: 'TX TREC REI 7-6',
         pdf: 'tx-trec-rei-7-6-fillable.pdf',
         map: { kind: 'published', module: 'server/lib/statutory/forms/tx-trec-rei-7-6.ts', value: trecRei76Map },

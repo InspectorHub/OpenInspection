@@ -61,7 +61,7 @@ describe('TX TREC REI 7-6', () => {
 
     it('resolves for an inspection dated after it became usable', () => {
         const picked = versionForInspection(
-            'tx_trec_rei_7_6', Date.UTC(2026, 5, 1), PUBLISHED_FORM_VERSIONS,
+            'tx_trec_rei', Date.UTC(2026, 5, 1), PUBLISHED_FORM_VERSIONS,
         );
         expect(picked?.version).toBe(version.version);
         expect(fieldMapFor(picked!.formId, picked!.version)).toBe(fieldMap);
@@ -71,7 +71,7 @@ describe('TX TREC REI 7-6', () => {
         // The positive control for the assertion above: a selector that returned
         // this revision for any date would satisfy that one perfectly.
         expect(versionForInspection(
-            'tx_trec_rei_7_6', Date.UTC(2021, 0, 1), PUBLISHED_FORM_VERSIONS,
+            'tx_trec_rei', Date.UTC(2021, 0, 1), PUBLISHED_FORM_VERSIONS,
         )).toBeNull();
     });
 

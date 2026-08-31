@@ -53,7 +53,7 @@ describe("marketplace-install action", () => {
     // operator is told any of that. It also contradicts "please try again" —
     // retrying installs nothing until the file exists.
     importPost.mockResolvedValue(new Response(
-      JSON.stringify({ success: false, error: { message: 'This package needs the official file first. Upload it at POST /api/admin/statutory-forms/tx_trec_rei_7_6/source' } }),
+      JSON.stringify({ success: false, error: { message: 'This package needs the official file first. Upload it at POST /api/admin/statutory-forms/tx_trec_rei/source' } }),
       { status: 409, headers: { 'content-type': 'application/json' } },
     ));
     const res = await post({ templateId: "mkt-1" });

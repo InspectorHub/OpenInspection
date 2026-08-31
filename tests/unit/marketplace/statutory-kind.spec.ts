@@ -15,7 +15,13 @@ const TENANT = '00000000-0000-0000-0000-000000000001';
 const withDeclaration = {
     schemaVersion: 2,
     sections: [],
-    statutoryForm: { formId: 'tx_trec_rei', bindings: {} },
+    // A form this software does NOT publish, and that is load-bearing rather than
+    // arbitrary: these specs are about install/uninstall bookkeeping, and
+    // `assertStatutoryInstallable` demands the authority's own PDF in object storage
+    // for any revision the catalogue really does publish. Naming a published form
+    // here would make every test below depend on bytes this suite has no reason to
+    // hold. It read `tx_trec_rei` until that became the published TREC id.
+    statutoryForm: { formId: 'zz_unpublished_form', bindings: {} },
 };
 
 describe('the statutory import validator', () => {
@@ -99,7 +105,7 @@ describe('importing a kind=statutory catalogue entry', () => {
         // snapshot. An import that dropped it would install a template that
         // looks right and produces nothing.
         const stored = JSON.parse(locals[0]!.schema as string) as { statutoryForm?: { formId?: string } };
-        expect(stored.statutoryForm?.formId).toBe('tx_trec_rei');
+        expect(stored.statutoryForm?.formId).toBe('zz_unpublished_form');
 
         const [marker] = await testDb.select().from(tenantLibraryImports).all();
         expect(marker!.localEntityId).toBe(result.localEntityId);

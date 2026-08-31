@@ -14,7 +14,13 @@ const TENANT = '00000000-0000-0000-0000-000000000001';
 const statutoryDoc = {
     schemaVersion: 2,
     sections: [],
-    statutoryForm: { formId: 'tx_trec_rei', bindings: {} },
+    // A form this software does NOT publish, and that is load-bearing rather than
+    // arbitrary: these specs are about install/uninstall bookkeeping, and
+    // `assertStatutoryInstallable` demands the authority's own PDF in object storage
+    // for any revision the catalogue really does publish. Naming a published form
+    // here would make every test below depend on bytes this suite has no reason to
+    // hold. It read `tx_trec_rei` until that became the published TREC id.
+    statutoryForm: { formId: 'zz_unpublished_form', bindings: {} },
 };
 const commentsPack = { comments: [{ text: 'Roof looks fine' }, { text: 'Panel is modern' }] };
 

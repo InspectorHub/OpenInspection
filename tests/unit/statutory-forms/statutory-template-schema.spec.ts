@@ -16,7 +16,7 @@ import { StatutoryFormDeclarationSchema } from '../../../server/lib/validations/
  * still be refused -- because a fix that simply dropped `.strict()` would
  * satisfy the first half and hand workspaces a door.
  */
-const BASE = { formId: 'tx_trec_rei_7_6', bindings: {}, revision: 'REI 7-6' };
+const BASE = { formId: 'tx_trec_rei', bindings: {}, revision: 'REI 7-6' };
 
 describe('StatutoryFormDeclarationSchema', () => {
     it('accepts a declaration with nothing optional on it', () => {

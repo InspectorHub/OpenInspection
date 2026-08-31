@@ -54,8 +54,9 @@ const NEW: StatutoryFormVersion = {
 /**
  * A voluntary-use window: `7-6` is publishable from 2021-09-01 but not mandatory
  * until 2022-02-01, and `7-5` stays usable until that date. Both revisions are
- * of the SAME form, which is why the form id carries no revision number — see
- * the note in the report about the plan's `tx_trec_rei_7_6`.
+ * of the SAME form, which is why the form id carries no revision number: the
+ * selector below GROUPS on `formId`, so a revision spelt into the id would make
+ * these two rows two different forms and this window unexpressible.
  */
 const TX_OLD: StatutoryFormVersion = {
     ...base,

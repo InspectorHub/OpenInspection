@@ -96,7 +96,7 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         // is not.
         //
         // ALL FOUR PUBLISHED REVISIONS ARE NOW DECLARED HERE.
-        // `PUBLISHED_FORM_VERSIONS` carries `tx_trec_rei_7_6`,
+        // `PUBLISHED_FORM_VERSIONS` carries `tx_trec_rei`,
         // `fl_citizens_4point`, `fl_citizens_roof` and `fl_oir_b1_1802`, and
         // each has an entry below.
         //
@@ -131,13 +131,16 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
          * revision is a new field map and a new pack; a bump here is us
          * correcting our own work against the same printed form.
          */
-        semver:    '1.0.0',
+        semver:    '1.0.1',
         // The template document itself, imported rather than restated. It is the
         // single source both the local seed file and this catalogue entry read,
         // because two hand-maintained copies of one 41-section form is how the
         // last one drifted into a document with thirteen blank sections.
         schema:    trecRei76.schema,
-        changelog: 'First catalogue release of the Texas TREC REI 7-6 package.',
+        changelog: 'Declares the form as `tx_trec_rei` rather than `tx_trec_rei_7_6`. The form '
+            + 'is the same form and the revision label is unchanged; the old id named a '
+            + 'revision, which would have made TREC\'s next revision a second form that the '
+            + 'inspection date could never choose between.',
         // Not featured. Featured is the top of the shelf for everyone, and this
         // pack is useful to inspectors in one state.
         featured:  false,

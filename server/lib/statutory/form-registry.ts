@@ -106,7 +106,7 @@ export interface StatutoryFormVersion {
      * revision label beside it.
      */
     formTitle: string;
-    /** The authority's own revision label, verbatim: `7-6`, `Rev. 04/26`. */
+    /** The authority's own revision label, verbatim: `REI 7-6`, `Rev. 04/26`. */
     version: string;
     /** First date this revision may be used, epoch ms. */
     effectiveFrom: number;

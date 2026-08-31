@@ -32,32 +32,27 @@ import { version as flOirB11802Version, fieldMap as flOirB11802Map } from './fl-
 import type { StatutoryFormVersion } from '../form-registry';
 
 /**
- * ⚠️ THE FORM IDS BELOW ARE NOT SPELT CONSISTENTLY, AND ONE OF THEM IS WRONG.
+ * EVERY FORM ID BELOW NAMES A FORM. NONE OF THEM NAMES A REVISION.
  *
- * `form-registry.ts` states the rule where `formId` is declared: it NAMES A
- * FORM, NEVER A REVISION, and its own example id is `tx_trec_rei`. The three
- * Florida ids follow it — `fl_citizens_4point`, `fl_citizens_roof`,
- * `fl_oir_b1_1802`, none carrying a revision. `tx_trec_rei_7_6` does not, and
- * it is the one that is wrong.
+ * `form-registry.ts` states the rule where `formId` is declared: an id names a
+ * FORM, NEVER a revision of it, because an id carrying a revision number cannot
+ * express two revisions of one form being usable at once — which is exactly
+ * what a voluntary-use window is, and TREC REI 7-6 has one (voluntary from
+ * 2021-09-01, required from 2022-02-01).
  *
  * It is not a tidiness question. `versionForInspection` groups by `formId` and
- * then picks by date, so publishing TREC's next revision under
- * `tx_trec_rei_7_7` would produce a SECOND form id: the two revisions would
- * never be compared with each other, and selecting a revision by inspection
- * date — the mechanism this whole subsystem exists for — would silently stop
- * working for that form.
+ * then picks by date, so a TREC revision published under `tx_trec_rei_7_7`
+ * would be a SECOND form id: the two revisions would never be compared with
+ * each other, `revisionStatus` could never answer `superseded_elsewhere` for
+ * either, and selecting a revision by inspection date — the mechanism this
+ * whole subsystem exists for — would silently stop working for that form. The
+ * selector would keep returning a perfectly valid answer, and nothing would go
+ * red.
  *
- * It is not corrected here because the id reaches four other places, and each
- * one has to move with it: the seed template's `statutoryForm.formId`, the
- * object-storage key `_platform/statutory-forms/tx_trec_rei_7_6/…` under which
- * bytes have already been uploaded, the marketplace catalogue fixture, and the
- * tests that name it. Renaming the id without migrating the stored bytes leaves
- * a published revision whose PDF cannot be found — the deployment reports
- * "upload the official file first" for a file it already has. So it is a change
- * of its own, with a migration, rather than a rename dropped into this one.
- *
- * ⚠️ SO DO NOT COPY THE TREC ID'S SHAPE FOR A FIFTH FORM. The three Florida
- * ones are the pattern to follow.
+ * ⚠️ SO DO NOT PUT A REVISION LABEL IN A FIFTH FORM'S ID.
+ * `tests/unit/statutory-forms/catalogue.spec.ts` asserts this over every
+ * published row, judged against each row's OWN revision label rather than
+ * against a pattern written by hand, which would only ever agree with itself.
  */
 
 /**

@@ -83,7 +83,7 @@ describe('catalogue seeding', () => {
         // validator that only reads shape, and produce a blank document.
         const declared = (row?.schema as { statutoryForm?: { formId?: string; revision?: string } })
             ?.statutoryForm;
-        expect(declared?.formId).toBe('tx_trec_rei_7_6');
+        expect(declared?.formId).toBe('tx_trec_rei');
         expect(declared?.revision).toBe('REI 7-6');
     });
 
