@@ -43,14 +43,16 @@
  * Stating it here instead means the refusal can name the answer that asked the
  * question, which is the sentence the person fixing the template needs.
  *
- * ⚠️ A CHAIN IS NOT SUPPORTED, and that is a limit rather than a feature. Rules
- * are applied in declaration order against one values object, so a question
- * whose controlling field is ITSELF conditional would be judged against a key
- * that may or may not have been removed yet. No form measured needs one — the
- * 1802's three controlling questions (6, 8 and 9) are each asked of every
- * inspection — and the honest answer to the day one does is a dependency ORDER
- * computed from the graph, not a second pass here. Stated because the shape
- * compiles today and would be wrong in a way nothing reports.
+ * ⚠️ A CHAIN IS SUPPORTED, and it was not always. Rules used to be applied in
+ * declaration order against one values object, so a question whose controlling
+ * field is ITSELF conditional was judged against a key that may or may not have
+ * been removed yet. The 1802 turned out to need one: question 8 prints its four
+ * sealing methods under answer A, and the "entire underside covered" box under
+ * one of those methods. So the rules are applied in the order `dependency-order`
+ * computes from the graph — controllers first, at any depth — and a set of rules
+ * that gates itself in a ring is refused there by name. The order is that
+ * module's to explain; what matters here is that a rule may now read a key
+ * another rule has already removed, and that this is the point of it.
  *
  * ── And one refusal for the answer that should not exist ────────────────────
  * A question that does not apply, answered anyway, is REFUSED rather than
@@ -65,6 +67,7 @@ import type {
     StatutoryFormDeclaration,
 } from '../../types/template-schema';
 import type { StatutoryValue } from './field-map';
+import { dependencyOrder } from './dependency-order';
 import { fail } from './resolve-source';
 
 /**
@@ -133,6 +136,13 @@ export function refuseUnusableDependencies(declaration: StatutoryFormDeclaration
                 + 'the bindings.');
         }
     }
+
+    // A RING IS THE SAME KIND OF FAULT as the three above and belongs beside
+    // them: it is wrong for every inspection rather than for this one, and it is
+    // the only one of the four that no single rule can be blamed for. Raised
+    // here rather than only where the order is used, so a template carrying one
+    // is refused before anybody's answers are read.
+    dependencyOrder(dependencies);
 }
 
 /**
@@ -177,11 +187,19 @@ function applies(rule: StatutoryFieldDependency, values: Record<string, Statutor
  * when comparing two objects. The caller holds one values object throughout, and
  * what happened to it is described by the refusals rather than by a diff.
  *
- * ⚠️ ORDER. This runs AFTER every binding is resolved, because a rule reads
- * another field's answer and there is no ordering of the bindings that
- * guarantees a controlling field is resolved first. It runs BEFORE overflow is
- * routed, because a routed line is appended to a field that must still be there
- * when it lands.
+ * ⚠️ ORDER, TWICE OVER.
+ *
+ * Against the rest of the pipeline: this runs AFTER every binding is resolved,
+ * because a rule reads another field's answer and there is no ordering of the
+ * bindings that guarantees a controlling field is resolved first. It runs BEFORE
+ * overflow is routed, because a routed line is appended to a field that must
+ * still be there when it lands.
+ *
+ * Among the rules themselves: CONTROLLERS FIRST, at any depth, which is what
+ * `dependencyOrder` returns and NOT what `Object.entries` returns. A rule whose
+ * controlling field is itself conditional has to be judged after its controller
+ * has been removed, or it reads an answer to a question the form did not ask and
+ * keeps a box that should have gone with it.
  */
 export function applyDependencies(
     declaration: StatutoryFormDeclaration,
@@ -190,7 +208,8 @@ export function applyDependencies(
     const dependencies = declaration.dependsOn;
     if (dependencies === undefined) return;
 
-    for (const [ourField, rule] of Object.entries(dependencies)) {
+    for (const ourField of dependencyOrder(dependencies)) {
+        const rule = dependencies[ourField];
         const bound = ourField in declaration.bindings;
         if (!applies(rule, values)) {
             refuseAnswerToAQuestionNobodyAsked(ourField, rule, values);
