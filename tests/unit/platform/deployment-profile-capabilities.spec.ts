@@ -10,7 +10,12 @@ describe('DeploymentProfile capability surface', () => {
         expect(STANDALONE_PROFILE.videoBackendManaged).toBe(false);
         expect(STANDALONE_PROFILE.hasManagedCompliance).toBe(false);
         expect(STANDALONE_PROFILE.mcpApiRoute).toBe('/mcp');
-        expect(STANDALONE_PROFILE.hasContentMarketplace).toBe(false);
+        // There is deliberately no marketplace capability to assert on either
+        // side. It answered "may browse and install" and "may publish" at once,
+        // with the publishing answer, and standalone's two answers are
+        // opposite: it consumes a catalogue its own build seeds, and publishes
+        // nothing because there is no platform to publish to. Consumption is
+        // unconditional now; publishing rides hasPortalIntegrationApi below.
         // Owns its tenant row outright — there is no platform storing another
         // copy — and mounts no machine-to-machine surface, because there is
         // nobody on the other end to authenticate.
@@ -22,7 +27,6 @@ describe('DeploymentProfile capability surface', () => {
         expect(SAAS_PROFILE.videoBackendManaged).toBe(true);
         expect(SAAS_PROFILE.hasManagedCompliance).toBe(true);
         expect(SAAS_PROFILE.mcpApiRoute).toBe('/company/');
-        expect(SAAS_PROFILE.hasContentMarketplace).toBe(true);
         // Portal is the system of record for the tenant row and the M2M surface
         // exists for it to talk through. These two replaced the last two
         // `env.APP_MODE` comparisons outside the seam.

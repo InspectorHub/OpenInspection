@@ -120,6 +120,13 @@
       "observedOn": "2026-08-24",
       "fileSha256": "7182c2d8fdb518ed201ba9de6f7fdfee1664cb363cab932f92d3f4a0e6dc11c9",
       "note": "1 of 22, exactly as recorded. It declares no sections and no items and still carries a full five-entry vocabulary, so an empty template is not an empty document."
+    },
+    {
+      "quirk": "nested-panels",
+      "vendor": "home_inspector_pro",
+      "observedOn": "2026-08-29",
+      "fileSha256": null,
+      "note": "A NULL on purpose, and by this manifest's own rule it means nobody has checked -- not that somebody checked and found none. No template in the corpus was ever examined for panel-inside-panel nesting; the 22 real templates were measured for sections and items only, and no depth statistic was recorded for any of them. This is a gap, and `verify:real-corpus` fails on it rather than passing over it. It is entered as a null rather than a notObserved because a notObserved would claim a measurement that was never made. What IS known without the corpus is the reader's behaviour: an inner panel is returned as its parent's sibling, so the level is erased, and the adapter now warns when it reads one."
     }
   ],
   "measurementsPurpose": "How long a real import actually takes, so the source picker can state a duration instead of guessing one. Separate from `observations` because a duration is not a quirk: the observation list is checked against the schemas both ways, and an entry there for something no schema declares is an orphan. Same discipline otherwise -- a measurement names a HASH, never a path and never a filename, and records that a file was timed rather than what it said.",

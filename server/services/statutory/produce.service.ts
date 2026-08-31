@@ -42,9 +42,14 @@
  * of magnitude, the answer is still NOT a cache added here quietly: it is a
  * separate plan for a stored artifact and the four governance entries it needs.
  */
-import { versionForInspection, type StatutoryFormVersion } from '../../lib/statutory/form-registry';
+import {
+    versionForInspection,
+    withdrawnVersionsFor,
+    type StatutoryFormVersion,
+} from '../../lib/statutory/form-registry';
 import { PUBLISHED_FORM_VERSIONS, fieldMapFor as publishedFieldMapFor } from '../../lib/statutory/forms';
 import { validateAgainstPdf, type FieldMap } from '../../lib/statutory/field-map';
+import { withdrawalRefusal } from '../../lib/statutory/withdrawal-copy';
 import { renderStatutoryForm } from '../../lib/statutory/render';
 import { utcMidnightOf } from '../../lib/statutory/inspection-date';
 import {
@@ -53,6 +58,7 @@ import {
     type StatutoryInspectionFacts,
     type StatutoryItemResult,
 } from '../../lib/statutory/values';
+import type { SignatureImage } from '../../lib/statutory/render-signature';
 import { r2Keys } from '../../lib/r2-keys';
 import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
 
@@ -76,6 +82,18 @@ export interface ProduceStatutoryFormInput {
      * than being required.
      */
     instances?: StatutoryGroupInstances;
+    /**
+     * The signatures the declaration's `from: 'signature'` bindings resolve to,
+     * keyed by our field name. Resolved by the caller, which is the layer that
+     * can read the inspector's stored mark; empty is the ordinary case, and a
+     * form that REQUIRES one then refuses by name in `renderStatutoryForm`
+     * rather than producing an unsigned document that looks signed.
+     *
+     * A separate channel from `facts` and `results` for the reason
+     * `StatutoryValueSource` gives: `collectStatutoryValues` is declared to
+     * carry no personal data of this class, and it emits no key for a signature.
+     */
+    signatures?: ReadonlyMap<string, SignatureImage>;
     bucket: R2Bucket;
     /**
      * Seams, defaulted to the published catalogue. They exist because the
@@ -98,6 +116,37 @@ function fail(reason: string): never {
     throw new Error(`statutory produce: ${reason}`);
 }
 
+/**
+ * The refusal to write when the reason nothing was selected is a WITHDRAWAL,
+ * or null when it is not.
+ *
+ * Returning null rather than a fallback sentence keeps the two absences apart
+ * at the call site: this function answers only the question it can answer, and
+ * "this deployment publishes nothing for that date" stays the caller's own
+ * sentence rather than becoming a default this one quietly emits.
+ */
+function withdrawnRefusal(
+    formId: string,
+    inspectionDate: string,
+    inspectedAt: number,
+    versions: readonly StatutoryFormVersion[],
+): string | null {
+    const withdrawn = withdrawnVersionsFor(formId, inspectedAt, versions)[0];
+    // Non-null by the filter inside `withdrawnVersionsFor`; narrowed rather than
+    // asserted, because an assertion here would survive that filter changing.
+    if (withdrawn?.withdrawn == null) return null;
+    return withdrawalRefusal({
+        formId,
+        version: withdrawn.version,
+        reason: withdrawn.withdrawn.reason,
+        at: withdrawn.withdrawn.at,
+        // Nothing was selectable -- that is why this path is running -- so there
+        // is no replacement to name, and inventing one would be a guess.
+        replacementVersion: null,
+        inspectionDate,
+    });
+}
+
 export async function produceStatutoryForm(
     input: ProduceStatutoryFormInput,
 ): Promise<ProducedStatutoryForm> {
@@ -109,10 +158,15 @@ export async function produceStatutoryForm(
     const inspectedAt = utcMidnightOf(input.inspectionDate);
     const version = versionForInspection(input.formId, inspectedAt, versions);
     if (!version) {
-        fail(
-            `no published revision of "${input.formId}" covers ${input.inspectionDate}. `
-            + 'The nearest revision to a date it does not cover is a different document.',
-        );
+        // Two different absences arrive as the same `null`, and a refusal that
+        // reads them as one tells an operator to look for a revision that is
+        // sitting right there in the catalogue, withdrawn. So the withdrawn ones
+        // are asked for by name, and the reason is quoted -- it decides whether
+        // the reader is waiting on a software update or has to go and get the
+        // form the authority now requires.
+        fail(withdrawnRefusal(input.formId, input.inspectionDate, inspectedAt, versions)
+            ?? `no published revision of "${input.formId}" covers ${input.inspectionDate}. `
+            + 'The nearest revision to a date it does not cover is a different document.');
     }
 
     // 2. Its map. A revision with no map cannot be rendered at all: the map is
@@ -141,6 +195,6 @@ export async function produceStatutoryForm(
     const values = collectStatutoryValues(
         input.declaration, input.snapshot, input.results, input.facts, input.instances ?? {},
     );
-    const rendered = await renderStatutoryForm(bytes, map, values);
+    const rendered = await renderStatutoryForm(bytes, map, values, input.signatures);
     return { version, bytes: rendered };
 }

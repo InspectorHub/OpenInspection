@@ -15,7 +15,6 @@
 import { describe, it, expect } from 'vitest';
 import {
     classifySighting,
-    sha256Hex,
     watchTargets,
     type RevisionSighting,
 } from '../../../server/lib/statutory/revision-watch';
@@ -31,9 +30,11 @@ const TREC = 'https://www.trec.texas.gov/forms/rei-7-6.pdf';
 
 const base = {
     formId: 'tx_trec_rei',
+    formTitle: 'Yankee Flat Form',
     sourceUrl: TREC,
     publishedBy: 'platform',
     publishedAt: t('2026-08-21'),
+    withdrawn: null,
 };
 
 const PUBLISHED_75: StatutoryFormVersion = {
@@ -154,6 +155,7 @@ describe('a sighting is not a version, and cannot be turned into one', () => {
         // out blank — and a row with them blank is not a published revision.
         const copied: StatutoryFormVersion = {
             formId: seen.formId,
+            formTitle: 'Yankee Flat Form',
             version: 'unknown',
             sourceUrl: seen.sourceUrl,
             sourceHash: seen.observedHash,
@@ -162,6 +164,7 @@ describe('a sighting is not a version, and cannot be turned into one', () => {
             effectiveUntil: null,
             publishedBy: '',
             publishedAt: 0,
+            withdrawn: null,
         };
         expect(versionForInspection('tx_trec_rei', t('2026-08-23'), [copied])).toBeNull();
     });
@@ -172,6 +175,7 @@ describe('a sighting is not a version, and cannot be turned into one', () => {
         // the publication decision.
         const published: StatutoryFormVersion = {
             formId: 'tx_trec_rei',
+            formTitle: 'Yankee Flat Form',
             version: '7-7',
             sourceUrl: TREC,
             sourceHash: 'c'.repeat(64),
@@ -180,18 +184,9 @@ describe('a sighting is not a version, and cannot be turned into one', () => {
             effectiveUntil: null,
             publishedBy: 'platform',
             publishedAt: t('2026-08-22'),
+            withdrawn: null,
         };
         expect(versionForInspection('tx_trec_rei', t('2026-08-23'), [published])?.version)
             .toBe('7-7');
-    });
-});
-
-describe('sha256Hex', () => {
-    it('produces the published digest of "abc"', async () => {
-        // The one vector every SHA-256 implementation is checked against. An
-        // assertion that the output merely looked like 64 hex characters would
-        // pass for a function that hashed the wrong bytes.
-        expect(await sha256Hex(new TextEncoder().encode('abc')))
-            .toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
     });
 });

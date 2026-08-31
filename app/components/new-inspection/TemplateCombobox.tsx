@@ -47,10 +47,28 @@ export function TemplateCombobox({
     // Closed: the field states the selection. Open: it holds what is being typed.
     const displayValue = open ? query : selected?.name ?? "";
 
+    // A retired template is LISTED, so its absence never reads as a lost
+    // permission or a broken product -- and it is not selectable, because the
+    // reason it was retired is that nobody may start on it any more. Both
+    // halves live here: `aria-disabled` is a message to a reader, this is the
+    // part that holds.
     function pick(t: WizardTemplate) {
+        if (t.retiredAt) return;
         setTemplateId(t.id);
         setQuery("");
         setOpen(false);
+    }
+
+    /** Why a template left, in the reader's own language, or null. */
+    function retiredNote(t: WizardTemplate): string | null {
+        if (!t.retiredAt) return null;
+        const date = new Date(t.retiredAt).toISOString().slice(0, 10);
+        // Two reasons, two sentences: being replaced is nothing to do about,
+        // while an uninstall is something an administrator can undo. One word
+        // for both would tell the reader neither.
+        return t.retiredReason === "uninstalled"
+            ? m.statutory_template_retired_uninstalled({ date })
+            : m.statutory_template_retired_superseded({ date });
     }
 
     function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -152,30 +170,44 @@ export function TemplateCombobox({
                             {m.newinsp_property_no_match({ query: query.trim() })}
                         </li>
                     ) : (
-                        matches.map((t, i) => (
-                            <li key={t.id} role="option" aria-selected={t.id === templateId}>
+                        matches.map((t, i) => {
+                            const note = retiredNote(t);
+                            return (
+                            <li
+                                key={t.id}
+                                role="option"
+                                aria-selected={t.id === templateId}
+                                aria-disabled={note !== null ? true : undefined}
+                            >
                                 <button
                                     type="button"
+                                    disabled={note !== null}
                                     onMouseEnter={() => setActiveIdx(i)}
                                     onMouseDown={() => {
                                         if (blurTimer.current) clearTimeout(blurTimer.current);
                                         pick(t);
                                     }}
                                     className={`w-full text-left px-3 py-2 text-[13px] border-b border-ih-border last:border-b-0 ${
-                                        i === activeIdx ? "bg-ih-primary-tint" : "hover:bg-ih-bg-muted"
+                                        note !== null
+                                            ? "cursor-not-allowed opacity-60"
+                                            : i === activeIdx ? "bg-ih-primary-tint" : "hover:bg-ih-bg-muted"
                                     }`}
                                 >
                                     <span className={t.id === templateId ? "font-bold" : "font-medium"}>{t.name}</span>
-                                    {typeof t.itemCount === "number" && (
+                                    {note === null && typeof t.itemCount === "number" && (
                                         <span className="ml-2 text-[11px] text-ih-fg-3">
                                             {t.itemCount === 1
                                                 ? m.newinsp_property_item_one({ count: t.itemCount })
                                                 : m.newinsp_property_item_many({ count: t.itemCount })}
                                         </span>
                                     )}
+                                    {note !== null && (
+                                        <span className="block mt-0.5 text-[11px] text-ih-fg-3">{note}</span>
+                                    )}
                                 </button>
                             </li>
-                        ))
+                            );
+                        })
                     )}
                 </ul>,
                 document.body,

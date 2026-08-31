@@ -9,11 +9,11 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 107 |
-| Columns | 1237 |
-| Indexes (excluding primary keys) | 178 |
+| Tables | 109 |
+| Columns | 1262 |
+| Indexes (excluding primary keys) | 181 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 590 (48%) |
+| Columns carrying a source comment | 603 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants`
 
-That is 13 of 107. If a table you just added appears here,
+That is 13 of 109. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 200 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 205 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -1508,7 +1508,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `marketplace_libraries`
 
-<sub>server/lib/db/schema/marketplace.ts · 14 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/marketplace.ts · 15 columns · primary key `id`</sub>
 
 > The single marketplace catalogue. Every importable kind lives here, keyed by `kind`: a 1:1 kind ('templates' — one catalogue row becomes one local `templates` row) and a 1:N kind ('comments' — one pack becomes N tagged `comments` rows) share one table, one browse query and one import path.
 
@@ -1516,7 +1516,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `name` | text | NN |  |  |  |
-| `kind` | text | NN IX |  | `comments, templates` | Also the only browse axis that is an enum — property_type reuses the template validator's, and the two below are bounded free text. |
+| `kind` | text | NN IX |  | `comments, templates, statutory` | Also the only browse axis that is an enum — property_type reuses the template validator's, and the two below are bounded free text. **[more]** |
 | `semver` | text | NN |  |  | The catalogue's current version. Never ordered or range-compared, only tested for EQUALITY against tenant_library_imports.imported_semver: unequal is what list() reports as `hasUpdate`, equal is what the update paths refuse. |
 | `schema` | text | NN |  |  | The pack ITSELF, not a description of one: a v2 template document for kind='templates' (validated at import time, never on write) or the entries parseLibraryComments explodes into N rows. |
 | `author_id` | text | NN | `'system'` |  | *App-layer reference to another row — no database foreign key.* |
@@ -1528,6 +1528,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `property_type` | text |  |  |  | The legacy `category` did not survive as one column. It was free text mixing three independent concepts (a property type / a jurisdiction's form standard / an inspection kind), so a single column could only ever describe one of the three: a Texas inspector looking for the TREC form and a new-build … **[more]** |
 | `jurisdiction` | text |  |  |  | Both are exact-match conditions in list() and are reachable only as /api/marketplace query params — the browse page ships no control for either, so today they narrow nothing a user can click. |
 | `inspection_kind` | text |  |  |  | exact-match browse filter, reachable only as an API query param |
+| `delisted_at` | integer |  |  |  | When the platform took this entry out of the browse listing, or null. NOT a delete, and the reason is the same one that makes uninstall a flag: `tenant_library_imports.library_id` points here, so removing the row would orphan every workspace that installed the pack — the update path could no longer … **[more]** |
 
 **Indexes**
 
@@ -2359,6 +2360,30 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ---
 
+## `statutory_form_productions`
+
+<sub>server/lib/db/schema/statutory-productions.ts · 8 columns · primary key `id`</sub>
+
+> One row per statutory form actually produced. ── WHY THIS EXISTS ───────────────────────────────────────────────────────── `produceStatutoryForm` resolves a revision and returns it, and until this table nothing kept it.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `inspection_id` | text | NN IX |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `form_id` | text | NN IX |  |  | The FORM, never one of its revisions -- e.g. `tx_trec_rei`. |
+| `version` | text | NN IX |  |  | The authority's own revision label, verbatim -- `7-6`, `Rev. 04/26`. |
+| `source_hash` | text | NN |  |  | sha256 (lowercase hex) of the exact PDF bytes rendered onto. The revision label says which document was meant; this says which bytes were actually used, and only the second one can be checked against a field map. |
+| `produced_by` | text | NN |  |  | users.id of whoever asked for the document. Soft reference. |
+| `produced_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+
+**Indexes**
+
+- `idx_statutory_productions_form_version` (form_id, version)
+- `idx_statutory_productions_inspection` (tenant_id, inspection_id)
+
+---
+
 ## `statutory_form_sightings`
 
 <sub>server/lib/db/schema/statutory-form-sightings.ts · 7 columns · primary key `id`</sub>
@@ -2409,6 +2434,33 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ---
 
+## `statutory_inspection_details`
+
+<sub>server/lib/db/schema/inspection/statutory.ts · 12 columns · primary key `id`</sub>
+
+> The inspection-level answers an authority's form asks for and no other part of this product has ever needed.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `inspection_id` | text | NN UQ |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `inspector_signature_date` | text |  |  |  | Calendar day, `YYYY-MM-DD` — a signature is dated, never timestamped, on every form measured. |
+| `employee_printed_name` | text |  |  |  | The second signer on FL OIR-B1-1802 page 5: the employee of the entity the inspector works for, printed rather than signed. |
+| `owner_name` | text |  |  |  | *A name.* |
+| `owner_email` | text |  |  |  | *An email address.* |
+| `owner_mailing_address` | text |  |  |  | Where the owner receives post, which is NOT `property_address`: an absentee owner is exactly who a mailing address is asked for. |
+| `owner_home_phone` | text |  |  |  | Three of them, because the form prints three boxes. Collapsing them into one and splitting it later loses which number the owner gave for what. |
+| `owner_work_phone` | text |  |  |  |  |
+| `owner_cell_phone` | text |  |  |  |  |
+| `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
+
+**Indexes**
+
+- **UNIQUE** `uq_statutory_inspection_details_subject` (tenant_id, inspection_id)
+
+---
+
 ## `sync_outbox`
 
 <sub>server/lib/db/schema/tenant/integration.ts · 8 columns · primary key `id`</sub>
@@ -2455,7 +2507,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `templates`
 
-<sub>server/lib/db/schema/inspection/template-rating.ts · 12 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/inspection/template-rating.ts · 13 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2471,6 +2523,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `description` | text |  |  |  |  |
 | `is_featured` | integer | NN | `false` |  | *Boolean flag, stored as integer 0/1.* |
 | `default_profile_id` | text |  |  |  | Report Style Presets — ties a report type to a default appearance profile. NULL = inherit tenant default. |
+| `retired_at` | integer |  |  |  | When this template stopped being offered for NEW inspections, or null. Not a delete. **[more]** |
 
 **Indexes**
 
@@ -2704,7 +2757,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `tenant_library_imports`
 
-<sub>server/lib/db/schema/marketplace.ts · 7 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/marketplace.ts · 8 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2715,6 +2768,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `imported_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `row_count` | integer | NN | `0` |  | *A count.* |
 | `local_entity_id` | text |  |  |  | An import produces ONE local row for a 1:1 kind (templates, tracked by this id) or N tagged rows for a 1:N kind (comments, tracked by row_count). **[more]** |
+| `uninstalled_at` | integer |  |  |  | When this workspace uninstalled the entry, or null. The row is kept rather than deleted: it records which version this workspace was ON, and re-issuing a report produced back then is expected to keep working. **[more]** |
 
 **Indexes**
 
@@ -2816,7 +2870,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `users`
 
-<sub>server/lib/db/schema/tenant/user.ts · 28 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/tenant/user.ts · 30 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2848,6 +2902,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `service_origin_address` | text |  |  |  | Where this inspector STARTS their day, for `closest` routing. NULL on all three columns = inherit the company address coordinates (`tenant_configs.company_lat/lng`), which is the right answer for the single-office workspace and the only reason the strategy is usable without per-person setup. **[more]** |
 | `service_origin_lat` | real |  |  |  | Geocoded from the address by PUT /api/admin/booking-routing/service-origin — and NULL while the address itself is set, whenever that address did not geocode. |
 | `service_origin_lng` | real |  |  |  | written only as a pair with _lat; a lone value is no anchor |
+| `statutory_license_type` | text |  |  |  | The STATE LICENCE CLASS this inspector holds — "Florida-licensed home inspector", "General, residential, building or roofing contractor", "Building code inspector". **[more]** |
+| `statutory_qualification` | text |  |  |  | The qualification category FL OIR-B1-1802 asks the inspector to declare for himself. A different axis from the licence class above, on the same person: the 1802 prints its own six categories and asks which one the signer qualifies under, beside — not instead of — his licence. |
 
 **Indexes**
 

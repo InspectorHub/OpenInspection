@@ -1,0 +1,144 @@
+/**
+ * The two catalogue questions only the platform may ask.
+ *
+ * ── WHY THESE ARE NOT ON MarketplaceService ─────────────────────────────────
+ * Every function there is scoped to one workspace, by construction: the service
+ * is constructed with a tenantId and each query carries it. These two are the
+ * opposite — one reads ACROSS workspaces and the other writes a row no
+ * workspace owns. Putting them on that class would mean a tenant-scoped service
+ * holding methods that are not tenant-scoped, which is the shape a later reader
+ * copies by accident.
+ *
+ * Their caller is server/portal/statutory-admin.routes.ts, behind the M2M
+ * guard. There is deliberately no workspace-facing route for either.
+ */
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+
+import { and, eq, isNull } from 'drizzle-orm';
+import { marketplaceLibraries, tenantLibraryImports } from '../../lib/db/schema/marketplace';
+import { Errors } from '../../lib/errors';
+
+/** The service's `drizzle(env.DB)` handle. Named so these signatures do not
+ *  silently narrow to the schema-less default and reject their only caller. */
+type MarketplaceDb = DrizzleD1Database<Record<string, unknown>>;
+
+/** One (catalogue entry, revision) and the workspaces sitting on it. */
+export interface StatutoryInstallGroup {
+    libraryId: string;
+    name: string;
+    /** The version the catalogue currently offers. */
+    semver: string;
+    /** The version these workspaces are actually on. */
+    importedSemver: string;
+    tenants: number;
+    tenantIds: string[];
+    delistedAt: number | null;
+}
+
+/**
+ * Who is on which revision of which statutory package.
+ *
+ * ── WHY UNINSTALLED WORKSPACES ARE EXCLUDED ─────────────────────────────────
+ * The question this answers is "who would produce a document from this revision
+ * TOMORROW" — the audience for a "you are on a superseded revision" notice, and
+ * the size of the group an update has to reach. A workspace that uninstalled is
+ * not in that group.
+ *
+ * It is emphatically NOT the recall question. "How many documents already went
+ * out on this revision" is answered from `statutory_form_productions` by
+ * `revisionImpact`, because a document that left is a fact about the past that
+ * uninstalling cannot undo. Answering a recall from install rows would silently
+ * omit every workspace that has since uninstalled — the reading that looks
+ * reassuring and is wrong.
+ *
+ * ── WHY THE ROSTER AND NOT JUST A COUNT ─────────────────────────────────────
+ * A count says how big the problem is; the ids say who to tell. Nothing here
+ * contacts anybody — the platform never writes to a workspace's customers — but
+ * an operator who cannot name the workspaces cannot ask them anything either.
+ */
+export async function statutoryInstallsByRevision(
+    db: MarketplaceDb,
+): Promise<StatutoryInstallGroup[]> {
+    const rows = await db
+        .select({
+            libraryId: marketplaceLibraries.id,
+            name: marketplaceLibraries.name,
+            semver: marketplaceLibraries.semver,
+            delistedAt: marketplaceLibraries.delistedAt,
+            importedSemver: tenantLibraryImports.importedSemver,
+            tenantId: tenantLibraryImports.tenantId,
+        })
+        .from(tenantLibraryImports)
+        .innerJoin(
+            marketplaceLibraries,
+            eq(marketplaceLibraries.id, tenantLibraryImports.libraryId),
+        )
+        .where(and(
+            eq(marketplaceLibraries.kind, 'statutory'),
+            isNull(tenantLibraryImports.uninstalledAt),
+        ))
+        .all();
+
+    // Grouped here rather than in SQL: the roster is wanted alongside the count,
+    // and a GROUP BY that also carries its members is a string-concatenation
+    // trick this codebase has no reason to acquire.
+    const groups = new Map<string, StatutoryInstallGroup>();
+    for (const row of rows) {
+        const key = `${row.libraryId}\0${row.importedSemver}`;
+        const group = groups.get(key) ?? {
+            libraryId: row.libraryId,
+            name: row.name,
+            semver: row.semver,
+            importedSemver: row.importedSemver,
+            tenants: 0,
+            tenantIds: [],
+            delistedAt: row.delistedAt === null ? null : new Date(row.delistedAt).getTime(),
+        };
+        group.tenants += 1;
+        group.tenantIds.push(row.tenantId);
+        groups.set(key, group);
+    }
+
+    return [...groups.values()].sort((a, b) =>
+        a.libraryId === b.libraryId
+            ? a.importedSemver.localeCompare(b.importedSemver)
+            : a.libraryId.localeCompare(b.libraryId));
+}
+
+/**
+ * Take a catalogue entry out of the browse listing, or put it back.
+ *
+ * Delisting DELETES NOTHING, and that is the whole design rather than caution:
+ * `tenant_library_imports.library_id` points at this row, so removing it would
+ * orphan every workspace that installed — their update path could no longer see
+ * what they are on and their un-import path could no longer see what to undo.
+ * The same shape as uninstall: visibility changes, content does not.
+ *
+ * Reversible for the same reason. Nothing was destroyed, so clearing the flag
+ * genuinely restores the previous state, and an operator who delisted the wrong
+ * entry does not need anyone's help to fix it.
+ */
+export async function setCatalogueDelisted(
+    db: MarketplaceDb,
+    libraryId: string,
+    delisted: boolean,
+    now: Date = new Date(),
+): Promise<{ libraryId: string; delistedAt: number | null }> {
+    // Unscoped by id, and correctly so: `marketplace_libraries` is the published
+    // catalogue and carries no tenant_id at all.
+    const entry = await db.select({ id: marketplaceLibraries.id })
+        .from(marketplaceLibraries)
+        .where(eq(marketplaceLibraries.id, libraryId))
+        .get();
+    if (!entry) throw Errors.NotFound('Marketplace entry not found');
+
+    const delistedAt = delisted ? now : null;
+    await db.update(marketplaceLibraries)
+        // `updatedAt` moves too: delisting changes what the catalogue offers,
+        // and a row whose visibility changed while its timestamp stood still
+        // reads as untouched to anything that watches the column.
+        .set({ delistedAt, updatedAt: now })
+        .where(eq(marketplaceLibraries.id, libraryId));
+
+    return { libraryId, delistedAt: delistedAt === null ? null : delistedAt.getTime() };
+}

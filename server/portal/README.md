@@ -35,6 +35,7 @@ Detailed integration docs live in the super-project `docs/saas-ops/`.
 |---|---|
 | `integration.module.ts` | The seam: `registerPortalIntegration` + the outbox sweeper + DLQ writeback |
 | `integration.routes.ts` | portal→core M2M routes (tenant sync/update, SSO handoff, data export, purge, seat-quota sync, starter-content seed, template backfill, sync-health/redrive) |
+| `statutory-admin.routes.ts` | portal→core M2M routes for the statutory catalogue: who is on which revision, how many documents one revision produced, and delisting a catalogue entry. Separate from the file above because those routes are one tenant's lifecycle and these are the catalogue's |
 | `outbox.service.ts` | core→portal async event sync over the queue (implements `UserSyncOutbox`) |
 | `portal.provider.ts` | `IntegrationProvider` impl for SaaS |
 | `service-binding-guard.ts` | `x-portal-m2m` HMAC guard for the M2M routes |

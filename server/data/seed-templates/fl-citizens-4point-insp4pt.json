@@ -1,0 +1,1737 @@
+{
+  "id": "seed_fl_citizens_4point_insp4pt_v1",
+  "name": "Florida Citizens 4-Point Inspection (Insp4pt 03 25)",
+  "description": "Citizens Property Insurance Corporation's 4-Point Inspection Form, revision Insp4pt 03 25. Its sections, its questions and their wording are Citizens', read off the published form -- not an approximation of it. One of its 95 blanks is left unbound on purpose; fl-citizens-4point-insp4pt.gaps.md says which and why.",
+  "version": 1,
+  "schema": {
+    "schemaVersion": 2,
+    "sections": [
+      {
+        "id": "form_header",
+        "title": "4-Point Inspection Form",
+        "items": [
+          {
+            "id": "form_application_policy_number",
+            "label": "Application / Policy #:",
+            "type": "text",
+            "description": "Printed at the top of page 1 beside Insured/Applicant Name. It comes from the Citizens application or policy, so nothing in the inspection can supply it."
+          },
+          {
+            "id": "form_actual_year_built",
+            "label": "Actual Year Built:",
+            "type": "number",
+            "description": "The form asks for the year the dwelling was BUILT, not the year any system in it was updated. It is one of the four header answers the form requires of every submission."
+          },
+          {
+            "id": "form_photo_requirements",
+            "label": "Minimum Photo Requirements:",
+            "type": "photo_only",
+            "description": "The six boxes printed at the top of page 1. Tick the ones this submission carries photographs for; the form asks WHICH KINDS were taken and never how many, so \"Each side\" and \"Each slope\" are one box however many pictures a building needs. A Florida-licensed inspector must complete, sign and date this form.",
+            "attributes": [
+              {
+                "id": "included",
+                "name": "Minimum Photo Requirements:",
+                "type": "multi_select",
+                "choices": [
+                  {
+                    "value": "dwelling_each_side",
+                    "label": "Dwelling: Each side"
+                  },
+                  {
+                    "value": "roof_each_slope",
+                    "label": "Roof: Each slope"
+                  },
+                  {
+                    "value": "plumbing",
+                    "label": "Plumbing: Water heater (incl TPRV), under cabinet plumbing/drains, exposed valves"
+                  },
+                  {
+                    "value": "main_panel_with_door_label",
+                    "label": "Main electrical service panel with interior door label"
+                  },
+                  {
+                    "value": "panel_off",
+                    "label": "Electrical box with panel off"
+                  },
+                  {
+                    "value": "hazards_and_deficiencies",
+                    "label": "All hazards or deficiencies noted in this report"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "electrical",
+        "title": "Electrical System",
+        "items": [
+          {
+            "id": "electrical_main_panel",
+            "label": "Main Panel",
+            "type": "photo_only",
+            "description": "The left-hand column on page 1. The form asks for a photograph of the main electrical service panel with its interior door label, and for one with the panel off. The first three answers are printed in this panel's column near the top of page 1 and the last three in the Supplemental information table at the foot of the same page; the form splits one panel across two tables. Anything answered No still has to be explained under Additional Comments/Observations, which is where the form itself sends an explanation. The printed blanks in this block are about 41.5 points wide, which holds roughly eight characters at the size the form is filled at. Write a date as MM/DD/YY and keep the rest short, or the form refuses rather than printing over the row beneath.",
+            "attributes": [
+              {
+                "id": "type",
+                "name": "Type:",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "circuit_breaker",
+                    "label": "Circuit breaker"
+                  },
+                  {
+                    "value": "fuse",
+                    "label": "Fuse"
+                  }
+                ]
+              },
+              {
+                "id": "total_amps",
+                "name": "Total Amps:",
+                "type": "text"
+              },
+              {
+                "id": "amperage_sufficient",
+                "name": "Is amperage sufficient for current usage?",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No (explain)"
+                  }
+                ]
+              },
+              {
+                "id": "panel_age",
+                "name": "Panel age:",
+                "type": "number"
+              },
+              {
+                "id": "year_last_updated",
+                "name": "Year last updated:",
+                "type": "number"
+              },
+              {
+                "id": "brand_model",
+                "name": "Brand/Model:",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "electrical_second_panel",
+            "label": "Second Panel",
+            "type": "photo_only",
+            "description": "The right-hand column on page 1, for a second panel where the dwelling has one. The first three answers are printed in this panel's column near the top of page 1 and the last three in the Supplemental information table at the foot of the same page; the form splits one panel across two tables. Anything answered No still has to be explained under Additional Comments/Observations, which is where the form itself sends an explanation. The printed blanks in this block are about 41.5 points wide, which holds roughly eight characters at the size the form is filled at. Write a date as MM/DD/YY and keep the rest short, or the form refuses rather than printing over the row beneath.",
+            "attributes": [
+              {
+                "id": "type",
+                "name": "Type:",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "circuit_breaker",
+                    "label": "Circuit breaker"
+                  },
+                  {
+                    "value": "fuse",
+                    "label": "Fuse"
+                  }
+                ]
+              },
+              {
+                "id": "total_amps",
+                "name": "Total Amps:",
+                "type": "text"
+              },
+              {
+                "id": "amperage_sufficient",
+                "name": "Is amperage sufficient for current usage?",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No (explain)"
+                  }
+                ]
+              },
+              {
+                "id": "panel_age",
+                "name": "Panel age:",
+                "type": "number"
+              },
+              {
+                "id": "year_last_updated",
+                "name": "Year last updated:",
+                "type": "number"
+              },
+              {
+                "id": "brand_model",
+                "name": "Brand/Model:",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "electrical_conditions",
+            "label": "Indicate presence of any of the following:",
+            "type": "photo_only",
+            "description": "Printed as one block on page 1: three conditions, then the note about single strand wiring, then the two remediations. The description of the aluminium wiring's usage is written on the same printed line as its box and holds about forty characters.",
+            "attributes": [
+              {
+                "id": "conditions_present",
+                "name": "Indicate presence of any of the following:",
+                "type": "multi_select",
+                "choices": [
+                  {
+                    "value": "cloth_wiring",
+                    "label": "Cloth wiring"
+                  },
+                  {
+                    "value": "active_knob_and_tube",
+                    "label": "Active knob and tube"
+                  },
+                  {
+                    "value": "branch_circuit_aluminum_wiring",
+                    "label": "Branch circuit aluminum wiring"
+                  }
+                ]
+              },
+              {
+                "id": "aluminum_wiring_usage",
+                "name": "Branch circuit aluminum wiring (If present, describe the usage of all aluminum wiring):",
+                "type": "text"
+              },
+              {
+                "id": "aluminum_remediation",
+                "name": "* If single strand (aluminum branch) wiring, provide details of all remediation. Separate documentation of all work must be provided.",
+                "type": "multi_select",
+                "choices": [
+                  {
+                    "value": "copalum_crimp",
+                    "label": "Connections repaired via COPALUM crimp"
+                  },
+                  {
+                    "value": "alumiconn",
+                    "label": "Connections repaired via AlumiConn"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "electrical_hazards",
+            "label": "Hazards Present",
+            "type": "photo_only",
+            "description": "Thirteen boxes in two printed columns, and the form takes every one that applies. The last is Other (explain): the page leaves about forty characters beside it, and anything longer belongs under Additional Comments/Observations. The form also asks for a photograph of all hazards or deficiencies noted in this report.",
+            "attributes": [
+              {
+                "id": "hazards_present",
+                "name": "Hazards Present",
+                "type": "multi_select",
+                "choices": [
+                  {
+                    "value": "blowing_fuses",
+                    "label": "Blowing fuses"
+                  },
+                  {
+                    "value": "tripping_breakers",
+                    "label": "Tripping breakers"
+                  },
+                  {
+                    "value": "empty_sockets",
+                    "label": "Empty sockets"
+                  },
+                  {
+                    "value": "loose_wiring",
+                    "label": "Loose wiring"
+                  },
+                  {
+                    "value": "improper_grounding",
+                    "label": "Improper grounding"
+                  },
+                  {
+                    "value": "corrosion",
+                    "label": "Corrosion"
+                  },
+                  {
+                    "value": "over_fusing",
+                    "label": "Over fusing"
+                  },
+                  {
+                    "value": "double_taps",
+                    "label": "Double taps"
+                  },
+                  {
+                    "value": "exposed_wiring",
+                    "label": "Exposed wiring"
+                  },
+                  {
+                    "value": "unsafe_wiring",
+                    "label": "Unsafe wiring"
+                  },
+                  {
+                    "value": "improper_breaker_size",
+                    "label": "Improper breaker size"
+                  },
+                  {
+                    "value": "scorching",
+                    "label": "Scorching"
+                  },
+                  {
+                    "value": "other_explain",
+                    "label": "Other (explain)"
+                  }
+                ]
+              },
+              {
+                "id": "hazard_other_explain",
+                "name": "Other (explain)",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "electrical_general_condition",
+            "label": "General condition of the electrical system:",
+            "type": "photo_only",
+            "description": "The judgement the form requires of every submission. Unsatisfactory is printed \"Unsatisfactory (explain)\", and the explanation goes under Additional Comments/Observations.",
+            "attributes": [
+              {
+                "id": "general_condition",
+                "name": "General condition of the electrical system:",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory (explain)"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "electrical_wiring_types",
+            "label": "Wiring Type(s)",
+            "type": "photo_only",
+            "description": "Printed as the third column of the Supplemental information table at the foot of page 1, beside Main Panel and Second Panel but spanning both: the form prints ONE set of these boxes for the dwelling, not one per panel. Take every type that applies. The blank after Other is the narrowest on the form, about ten characters.",
+            "attributes": [
+              {
+                "id": "wiring_types",
+                "name": "Wiring Type(s)",
+                "type": "multi_select",
+                "choices": [
+                  {
+                    "value": "copper",
+                    "label": "Copper"
+                  },
+                  {
+                    "value": "copper_clad_al",
+                    "label": "Copper Clad AL"
+                  },
+                  {
+                    "value": "nm_bx_or_conduit",
+                    "label": "NM, BX or Conduit"
+                  },
+                  {
+                    "value": "single_strand_al",
+                    "label": "Single Strand AL"
+                  },
+                  {
+                    "value": "cloth_knob_and_tube",
+                    "label": "Cloth (Knob & Tube)"
+                  },
+                  {
+                    "value": "other",
+                    "label": "Other"
+                  },
+                  {
+                    "value": "multistrand_al",
+                    "label": "Multistrand AL"
+                  },
+                  {
+                    "value": "cloth_jacket_rubber_insulated",
+                    "label": "Cloth Jacket Rubber Insulated"
+                  }
+                ]
+              },
+              {
+                "id": "wiring_type_other_specify",
+                "name": "Other",
+                "type": "text"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hvac",
+        "title": "HVAC System",
+        "items": [
+          {
+            "id": "hvac_system",
+            "label": "HVAC System",
+            "type": "photo_only",
+            "description": "Please attach photo(s) of HVAC equipment, including dated manufacturer’s plate. The age and year blanks at the foot of the section hold about eleven characters each, and the servicing date about twelve: write a date as MM/DD/YY.",
+            "attributes": [
+              {
+                "id": "central_ac",
+                "name": "Central AC:",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              },
+              {
+                "id": "central_heat",
+                "name": "Central heat:",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              },
+              {
+                "id": "primary_heat_source_and_fuel_type",
+                "name": "If not central heat, indicate primary heat source and fuel type:",
+                "type": "text"
+              },
+              {
+                "id": "systems_in_good_working_order",
+                "name": "Are the heating, ventilation and air conditioning systems in good working order?",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No (explain)"
+                  }
+                ]
+              },
+              {
+                "id": "date_of_last_servicing",
+                "name": "Date of last HVAC servicing/inspection:",
+                "type": "text"
+              },
+              {
+                "id": "age_of_system",
+                "name": "Age of system:",
+                "type": "number"
+              },
+              {
+                "id": "year_last_updated",
+                "name": "Year last updated:",
+                "type": "number"
+              }
+            ]
+          },
+          {
+            "id": "hvac_hazards",
+            "label": "Hazards Present",
+            "type": "photo_only",
+            "description": "The five questions the form prints under Hazards Present in the HVAC section. Anything answered Yes that is a hazard belongs under Additional Comments/Observations as well, which is where the form sends every explanation.",
+            "attributes": [
+              {
+                "id": "wood_stove_or_gas_fireplace_present",
+                "name": "Is a wood-burning stove or central gas fireplace present?",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              },
+              {
+                "id": "professionally_installed",
+                "name": "Was it professionally installed?",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              },
+              {
+                "id": "space_heater_as_primary_source",
+                "name": "Space heater used as primary heat source?",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              },
+              {
+                "id": "source_is_portable",
+                "name": "Is the source portable?",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              },
+              {
+                "id": "air_handler_blockage_or_leakage",
+                "name": "Does the air handler/condensate line or drain pan show any signs of blockage or leakage, including water damage to the surrounding area?",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "plumbing",
+        "title": "Plumbing System",
+        "items": [
+          {
+            "id": "plumbing_system",
+            "label": "Plumbing System",
+            "type": "photo_only",
+            "description": "The form asks for a photograph of the water heater including its TPRV, of under-cabinet plumbing and drains, and of exposed valves. The three questions here are required of every submission.",
+            "attributes": [
+              {
+                "id": "tprv_on_water_heater",
+                "name": "Is there a temperature pressure relief valve on the water heater?",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              },
+              {
+                "id": "active_leak",
+                "name": "Is there any indication of an active leak?",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              },
+              {
+                "id": "prior_leak",
+                "name": "Is there any indication of a prior leak?",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              },
+              {
+                "id": "water_heater_location",
+                "name": "Water heater location:",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "plumbing_fixtures",
+            "label": "General condition of the following plumbing fixtures and connections to appliances:",
+            "type": "photo_only",
+            "description": "Ten rows in two printed columns, each judged Satisfactory, Unsatisfactory or N/A. The detail box below is the form's own: it prints \"If unsatisfactory, please provide comments/details (leaks, wet/soft spots, mold, corrosion, grout/caulk, etc.).\" over a blank area on the same page, and thirteen answers on this form can be Unsatisfactory. It is NOT Additional Comments/Observations, which is a different box under a different prompt on the next page.",
+            "attributes": [
+              {
+                "id": "dishwasher",
+                "name": "Dishwasher",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
+                ]
+              },
+              {
+                "id": "refrigerator",
+                "name": "Refrigerator",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
+                ]
+              },
+              {
+                "id": "washing_machine",
+                "name": "Washing machine",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
+                ]
+              },
+              {
+                "id": "water_heater",
+                "name": "Water heater",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
+                ]
+              },
+              {
+                "id": "showers_tubs",
+                "name": "Showers/Tubs",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
+                ]
+              },
+              {
+                "id": "toilets",
+                "name": "Toilets",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
+                ]
+              },
+              {
+                "id": "sinks",
+                "name": "Sinks",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
+                ]
+              },
+              {
+                "id": "sump_pump",
+                "name": "Sump pump",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
+                ]
+              },
+              {
+                "id": "main_shut_off_valve",
+                "name": "Main shut off valve",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
+                ]
+              },
+              {
+                "id": "all_other_visible",
+                "name": "All other visible",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
+                ]
+              },
+              {
+                "id": "unsatisfactory_detail",
+                "name": "If unsatisfactory, please provide comments/details (leaks, wet/soft spots, mold, corrosion, grout/caulk, etc.).",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "id": "plumbing_supplemental",
+            "label": "Supplemental Information",
+            "type": "photo_only",
+            "description": "The block at the foot of page 2. The form prints THREE blanks for the supply system and three for the drain system, one per state of repiping, so fill the one that describes this house and leave the others empty. Those six blanks are about four characters wide -- a year fits, a sentence does not -- and the year-installed blank about seven. Provide the year and extent of any renovation in the comments below.",
+            "attributes": [
+              {
+                "id": "supply_original_to_home",
+                "name": "Age of Piping Supply System: Original to home",
+                "type": "number"
+              },
+              {
+                "id": "supply_completely_repiped",
+                "name": "Age of Piping Supply System: Completely re-piped",
+                "type": "number"
+              },
+              {
+                "id": "supply_partially_repiped",
+                "name": "Age of Piping Supply System: Partially re-piped",
+                "type": "number"
+              },
+              {
+                "id": "drain_original_to_home",
+                "name": "Age of Piping Drain System: Original to home",
+                "type": "number"
+              },
+              {
+                "id": "drain_completely_repiped",
+                "name": "Age of Piping Drain System: Completely re-piped",
+                "type": "number"
+              },
+              {
+                "id": "drain_partially_repiped",
+                "name": "Age of Piping Drain System: Partially re-piped",
+                "type": "number"
+              },
+              {
+                "id": "water_heater_age",
+                "name": "Age of water heater",
+                "type": "number"
+              },
+              {
+                "id": "pipe_types",
+                "name": "Type of pipes (check all that apply)",
+                "type": "multi_select",
+                "choices": [
+                  {
+                    "value": "copper",
+                    "label": "Copper"
+                  },
+                  {
+                    "value": "pex",
+                    "label": "PEX"
+                  },
+                  {
+                    "value": "pvc_cpvc",
+                    "label": "PVC/CPVC"
+                  },
+                  {
+                    "value": "other",
+                    "label": "Other (specify)"
+                  },
+                  {
+                    "value": "galvanized",
+                    "label": "Galvanized"
+                  },
+                  {
+                    "value": "cast_iron",
+                    "label": "Cast Iron"
+                  },
+                  {
+                    "value": "polybutylene",
+                    "label": "Polybutylene"
+                  },
+                  {
+                    "value": "abs",
+                    "label": "ABS"
+                  }
+                ]
+              },
+              {
+                "id": "pipe_year_installed",
+                "name": "Year Installed:",
+                "type": "text"
+              },
+              {
+                "id": "pipe_type_other_specify",
+                "name": "Other (specify)",
+                "type": "text"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "roof",
+        "title": "Roof",
+        "items": [
+          {
+            "id": "roof_predominant",
+            "label": "Predominant Roof",
+            "type": "photo_only",
+            "description": "The left-hand column on page 3. Predominant is the surface that covers most of the dwelling, not simply the first one recorded. With photos of each roof slope, this section can take the place of the Roof Inspection Form. Anything answered Unsatisfactory or Yes still has to be explained under Additional Comments/Observations, which is where the form itself sends an explanation. The printed blanks in this block are about 41.5 points wide, which holds roughly eight characters at the size the form is filled at. Write a date as MM/DD/YY and keep the rest short, or the form refuses rather than printing over the row beneath.",
+            "attributes": [
+              {
+                "id": "covering_material",
+                "name": "Covering material:",
+                "type": "text"
+              },
+              {
+                "id": "roof_age_years",
+                "name": "Roof age (years):",
+                "type": "number"
+              },
+              {
+                "id": "remaining_useful_life_years",
+                "name": "Remaining useful life (years):",
+                "type": "number"
+              },
+              {
+                "id": "date_of_last_roofing_permit",
+                "name": "Date of last roofing permit:",
+                "type": "text"
+              },
+              {
+                "id": "date_of_last_update",
+                "name": "Date of last update:",
+                "type": "text"
+              },
+              {
+                "id": "update_extent",
+                "name": "If updated (check one):",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "full_replacement",
+                    "label": "Full replacement"
+                  },
+                  {
+                    "value": "partial_replacement",
+                    "label": "Partial replacement"
+                  }
+                ]
+              },
+              {
+                "id": "percent_of_replacement",
+                "name": "% of replacement:",
+                "type": "number"
+              },
+              {
+                "id": "overall_condition",
+                "name": "Overall condition:",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory (explain below)"
+                  }
+                ]
+              },
+              {
+                "id": "damage_signs",
+                "name": "Any visible signs of damage / deterioration? (check all that apply and explain below)",
+                "type": "multi_select",
+                "choices": [
+                  {
+                    "value": "cracking",
+                    "label": "Cracking"
+                  },
+                  {
+                    "value": "cupping_curling",
+                    "label": "Cupping/curling"
+                  },
+                  {
+                    "value": "excessive_granule_loss",
+                    "label": "Excessive granule loss"
+                  },
+                  {
+                    "value": "exposed_asphalt",
+                    "label": "Exposed asphalt"
+                  },
+                  {
+                    "value": "exposed_felt",
+                    "label": "Exposed felt"
+                  },
+                  {
+                    "value": "missing_loose_cracked_tabs_or_tiles",
+                    "label": "Missing/loose/cracked tabs or tiles"
+                  },
+                  {
+                    "value": "soft_spots_in_decking",
+                    "label": "Soft spots in decking"
+                  },
+                  {
+                    "value": "visible_hail_damage",
+                    "label": "Visible hail damage"
+                  }
+                ]
+              },
+              {
+                "id": "visible_signs_of_leaks",
+                "name": "Any visible signs of leaks?",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No (If \"yes\" explain below)"
+                  }
+                ]
+              },
+              {
+                "id": "leaks_attic_underside_of_decking",
+                "name": "Attic/underside of decking",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              },
+              {
+                "id": "leaks_interior_ceilings",
+                "name": "Interior ceilings",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "roof_secondary",
+            "label": "Secondary Roof",
+            "type": "photo_only",
+            "description": "The right-hand column on page 3, for a second roof surface where the dwelling has one. With photos of each roof slope, this section can take the place of the Roof Inspection Form. Anything answered Unsatisfactory or Yes still has to be explained under Additional Comments/Observations, which is where the form itself sends an explanation. The printed blanks in this block are about 41.5 points wide, which holds roughly eight characters at the size the form is filled at. Write a date as MM/DD/YY and keep the rest short, or the form refuses rather than printing over the row beneath.",
+            "attributes": [
+              {
+                "id": "covering_material",
+                "name": "Covering material:",
+                "type": "text"
+              },
+              {
+                "id": "roof_age_years",
+                "name": "Roof age (years):",
+                "type": "number"
+              },
+              {
+                "id": "remaining_useful_life_years",
+                "name": "Remaining useful life (years):",
+                "type": "number"
+              },
+              {
+                "id": "date_of_last_roofing_permit",
+                "name": "Date of last roofing permit:",
+                "type": "text"
+              },
+              {
+                "id": "date_of_last_update",
+                "name": "Date of last update:",
+                "type": "text"
+              },
+              {
+                "id": "update_extent",
+                "name": "If updated (check one):",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "full_replacement",
+                    "label": "Full replacement"
+                  },
+                  {
+                    "value": "partial_replacement",
+                    "label": "Partial replacement"
+                  }
+                ]
+              },
+              {
+                "id": "percent_of_replacement",
+                "name": "% of replacement:",
+                "type": "number"
+              },
+              {
+                "id": "overall_condition",
+                "name": "Overall condition:",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory (explain below)"
+                  }
+                ]
+              },
+              {
+                "id": "damage_signs",
+                "name": "Any visible signs of damage / deterioration? (check all that apply and explain below)",
+                "type": "multi_select",
+                "choices": [
+                  {
+                    "value": "cracking",
+                    "label": "Cracking"
+                  },
+                  {
+                    "value": "cupping_curling",
+                    "label": "Cupping/curling"
+                  },
+                  {
+                    "value": "excessive_granule_loss",
+                    "label": "Excessive granule loss"
+                  },
+                  {
+                    "value": "exposed_asphalt",
+                    "label": "Exposed asphalt"
+                  },
+                  {
+                    "value": "exposed_felt",
+                    "label": "Exposed felt"
+                  },
+                  {
+                    "value": "missing_loose_cracked_tabs_or_tiles",
+                    "label": "Missing/loose/cracked tabs or tiles"
+                  },
+                  {
+                    "value": "soft_spots_in_decking",
+                    "label": "Soft spots in decking"
+                  },
+                  {
+                    "value": "visible_hail_damage",
+                    "label": "Visible hail damage"
+                  }
+                ]
+              },
+              {
+                "id": "visible_signs_of_leaks",
+                "name": "Any visible signs of leaks?",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No (If \"yes\" explain below)"
+                  }
+                ]
+              },
+              {
+                "id": "leaks_attic_underside_of_decking",
+                "name": "Attic/underside of decking",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              },
+              {
+                "id": "leaks_interior_ceilings",
+                "name": "Interior ceilings",
+                "type": "select",
+                "choices": [
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "additional_comments",
+        "title": "Additional Comments/Observations (use additional pages if needed):",
+        "items": [
+          {
+            "id": "form_additional_comments",
+            "label": "Additional Comments/Observations (use additional pages if needed):",
+            "type": "textarea",
+            "description": "This section of the 4-Point Inspection Form must be completed with full details/descriptions if any of the following are noted on the inspection: Updates: Identify the types of updates, dates completed and by whom; Any visible hazards or deficiencies; Any system determined not to be in good working order. It is where every (explain) on this form is answered -- the pages that print those words leave no blank of their own."
+          }
+        ]
+      }
+    ],
+    "statutoryForm": {
+      "formId": "fl_citizens_4point",
+      "revision": "Insp4pt 03 25",
+      "groups": [
+        {
+          "id": "electrical_panel",
+          "label": "Electrical Panel",
+          "capacity": 2,
+          "slotLabels": [
+            "Main Panel",
+            "Second Panel"
+          ],
+          "fields": [
+            "type",
+            "total_amps",
+            "amperage_sufficient",
+            "panel_age",
+            "year_last_updated",
+            "brand_model"
+          ],
+          "overflowTo": "additional_comments",
+          "overflowMaxLength": 924
+        },
+        {
+          "id": "roof",
+          "label": "Roof",
+          "capacity": 2,
+          "slotLabels": [
+            "Predominant Roof",
+            "Secondary Roof"
+          ],
+          "fields": [
+            "covering_material",
+            "roof_age_years",
+            "remaining_useful_life_years",
+            "date_of_last_roofing_permit",
+            "date_of_last_update",
+            "update_extent",
+            "percent_of_replacement",
+            "overall_condition",
+            "damage_signs",
+            "visible_signs_of_leaks",
+            "leaks_attic_underside_of_decking",
+            "leaks_interior_ceilings"
+          ],
+          "overflowTo": "additional_comments",
+          "overflowMaxLength": 924
+        }
+      ],
+      "bindings": {
+        "insured_applicant_name": {
+          "from": "inspection",
+          "field": "client_name"
+        },
+        "application_policy_number": {
+          "from": "item",
+          "itemId": "form_application_policy_number"
+        },
+        "address_inspected": {
+          "from": "inspection",
+          "field": "property_address"
+        },
+        "actual_year_built": {
+          "from": "item",
+          "itemId": "form_actual_year_built"
+        },
+        "date_inspected": {
+          "from": "inspection",
+          "field": "inspection_date"
+        },
+        "photo_requirements_included": {
+          "from": "item_attribute",
+          "itemId": "form_photo_requirements",
+          "attribute": "included"
+        },
+        "electrical_panel[0].type": {
+          "from": "item_attribute",
+          "itemId": "electrical_main_panel",
+          "attribute": "type"
+        },
+        "electrical_panel[0].total_amps": {
+          "from": "item_attribute",
+          "itemId": "electrical_main_panel",
+          "attribute": "total_amps"
+        },
+        "electrical_panel[0].amperage_sufficient": {
+          "from": "item_attribute",
+          "itemId": "electrical_main_panel",
+          "attribute": "amperage_sufficient"
+        },
+        "electrical_panel[0].panel_age": {
+          "from": "item_attribute",
+          "itemId": "electrical_main_panel",
+          "attribute": "panel_age"
+        },
+        "electrical_panel[0].year_last_updated": {
+          "from": "item_attribute",
+          "itemId": "electrical_main_panel",
+          "attribute": "year_last_updated"
+        },
+        "electrical_panel[0].brand_model": {
+          "from": "item_attribute",
+          "itemId": "electrical_main_panel",
+          "attribute": "brand_model"
+        },
+        "electrical_panel[1].type": {
+          "from": "item_attribute",
+          "itemId": "electrical_second_panel",
+          "attribute": "type"
+        },
+        "electrical_panel[1].total_amps": {
+          "from": "item_attribute",
+          "itemId": "electrical_second_panel",
+          "attribute": "total_amps"
+        },
+        "electrical_panel[1].amperage_sufficient": {
+          "from": "item_attribute",
+          "itemId": "electrical_second_panel",
+          "attribute": "amperage_sufficient"
+        },
+        "electrical_panel[1].panel_age": {
+          "from": "item_attribute",
+          "itemId": "electrical_second_panel",
+          "attribute": "panel_age"
+        },
+        "electrical_panel[1].year_last_updated": {
+          "from": "item_attribute",
+          "itemId": "electrical_second_panel",
+          "attribute": "year_last_updated"
+        },
+        "electrical_panel[1].brand_model": {
+          "from": "item_attribute",
+          "itemId": "electrical_second_panel",
+          "attribute": "brand_model"
+        },
+        "electrical.conditions_present": {
+          "from": "item_attribute",
+          "itemId": "electrical_conditions",
+          "attribute": "conditions_present"
+        },
+        "electrical.aluminum_remediation": {
+          "from": "item_attribute",
+          "itemId": "electrical_conditions",
+          "attribute": "aluminum_remediation"
+        },
+        "electrical.aluminum_wiring_usage": {
+          "from": "item_attribute",
+          "itemId": "electrical_conditions",
+          "attribute": "aluminum_wiring_usage"
+        },
+        "electrical.hazards_present": {
+          "from": "item_attribute",
+          "itemId": "electrical_hazards",
+          "attribute": "hazards_present"
+        },
+        "electrical.hazard_other_explain": {
+          "from": "item_attribute",
+          "itemId": "electrical_hazards",
+          "attribute": "hazard_other_explain"
+        },
+        "electrical.general_condition": {
+          "from": "item_attribute",
+          "itemId": "electrical_general_condition",
+          "attribute": "general_condition"
+        },
+        "electrical.wiring_types": {
+          "from": "item_attribute",
+          "itemId": "electrical_wiring_types",
+          "attribute": "wiring_types"
+        },
+        "electrical.wiring_type_other_specify": {
+          "from": "item_attribute",
+          "itemId": "electrical_wiring_types",
+          "attribute": "wiring_type_other_specify"
+        },
+        "hvac.central_ac": {
+          "from": "item_attribute",
+          "itemId": "hvac_system",
+          "attribute": "central_ac"
+        },
+        "hvac.central_heat": {
+          "from": "item_attribute",
+          "itemId": "hvac_system",
+          "attribute": "central_heat"
+        },
+        "hvac.primary_heat_source_and_fuel_type": {
+          "from": "item_attribute",
+          "itemId": "hvac_system",
+          "attribute": "primary_heat_source_and_fuel_type"
+        },
+        "hvac.systems_in_good_working_order": {
+          "from": "item_attribute",
+          "itemId": "hvac_system",
+          "attribute": "systems_in_good_working_order"
+        },
+        "hvac.date_of_last_servicing": {
+          "from": "item_attribute",
+          "itemId": "hvac_system",
+          "attribute": "date_of_last_servicing"
+        },
+        "hvac.age_of_system": {
+          "from": "item_attribute",
+          "itemId": "hvac_system",
+          "attribute": "age_of_system"
+        },
+        "hvac.year_last_updated": {
+          "from": "item_attribute",
+          "itemId": "hvac_system",
+          "attribute": "year_last_updated"
+        },
+        "hvac.wood_stove_or_gas_fireplace_present": {
+          "from": "item_attribute",
+          "itemId": "hvac_hazards",
+          "attribute": "wood_stove_or_gas_fireplace_present"
+        },
+        "hvac.professionally_installed": {
+          "from": "item_attribute",
+          "itemId": "hvac_hazards",
+          "attribute": "professionally_installed"
+        },
+        "hvac.space_heater_as_primary_source": {
+          "from": "item_attribute",
+          "itemId": "hvac_hazards",
+          "attribute": "space_heater_as_primary_source"
+        },
+        "hvac.source_is_portable": {
+          "from": "item_attribute",
+          "itemId": "hvac_hazards",
+          "attribute": "source_is_portable"
+        },
+        "hvac.air_handler_blockage_or_leakage": {
+          "from": "item_attribute",
+          "itemId": "hvac_hazards",
+          "attribute": "air_handler_blockage_or_leakage"
+        },
+        "plumbing.tprv_on_water_heater": {
+          "from": "item_attribute",
+          "itemId": "plumbing_system",
+          "attribute": "tprv_on_water_heater"
+        },
+        "plumbing.active_leak": {
+          "from": "item_attribute",
+          "itemId": "plumbing_system",
+          "attribute": "active_leak"
+        },
+        "plumbing.prior_leak": {
+          "from": "item_attribute",
+          "itemId": "plumbing_system",
+          "attribute": "prior_leak"
+        },
+        "plumbing.water_heater_location": {
+          "from": "item_attribute",
+          "itemId": "plumbing_system",
+          "attribute": "water_heater_location"
+        },
+        "plumbing.fixtures.dishwasher": {
+          "from": "item_attribute",
+          "itemId": "plumbing_fixtures",
+          "attribute": "dishwasher"
+        },
+        "plumbing.fixtures.refrigerator": {
+          "from": "item_attribute",
+          "itemId": "plumbing_fixtures",
+          "attribute": "refrigerator"
+        },
+        "plumbing.fixtures.washing_machine": {
+          "from": "item_attribute",
+          "itemId": "plumbing_fixtures",
+          "attribute": "washing_machine"
+        },
+        "plumbing.fixtures.water_heater": {
+          "from": "item_attribute",
+          "itemId": "plumbing_fixtures",
+          "attribute": "water_heater"
+        },
+        "plumbing.fixtures.showers_tubs": {
+          "from": "item_attribute",
+          "itemId": "plumbing_fixtures",
+          "attribute": "showers_tubs"
+        },
+        "plumbing.fixtures.toilets": {
+          "from": "item_attribute",
+          "itemId": "plumbing_fixtures",
+          "attribute": "toilets"
+        },
+        "plumbing.fixtures.sinks": {
+          "from": "item_attribute",
+          "itemId": "plumbing_fixtures",
+          "attribute": "sinks"
+        },
+        "plumbing.fixtures.sump_pump": {
+          "from": "item_attribute",
+          "itemId": "plumbing_fixtures",
+          "attribute": "sump_pump"
+        },
+        "plumbing.fixtures.main_shut_off_valve": {
+          "from": "item_attribute",
+          "itemId": "plumbing_fixtures",
+          "attribute": "main_shut_off_valve"
+        },
+        "plumbing.fixtures.all_other_visible": {
+          "from": "item_attribute",
+          "itemId": "plumbing_fixtures",
+          "attribute": "all_other_visible"
+        },
+        "plumbing_fixtures_unsatisfactory_detail": {
+          "from": "item_attribute",
+          "itemId": "plumbing_fixtures",
+          "attribute": "unsatisfactory_detail"
+        },
+        "plumbing.supply_piping_age.original_to_home": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supplemental",
+          "attribute": "supply_original_to_home"
+        },
+        "plumbing.supply_piping_age.completely_repiped": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supplemental",
+          "attribute": "supply_completely_repiped"
+        },
+        "plumbing.supply_piping_age.partially_repiped": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supplemental",
+          "attribute": "supply_partially_repiped"
+        },
+        "plumbing.drain_piping_age.original_to_home": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supplemental",
+          "attribute": "drain_original_to_home"
+        },
+        "plumbing.drain_piping_age.completely_repiped": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supplemental",
+          "attribute": "drain_completely_repiped"
+        },
+        "plumbing.drain_piping_age.partially_repiped": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supplemental",
+          "attribute": "drain_partially_repiped"
+        },
+        "plumbing.water_heater_age": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supplemental",
+          "attribute": "water_heater_age"
+        },
+        "plumbing.pipe_types": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supplemental",
+          "attribute": "pipe_types"
+        },
+        "plumbing.pipe_year_installed": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supplemental",
+          "attribute": "pipe_year_installed"
+        },
+        "plumbing.pipe_type_other_specify": {
+          "from": "item_attribute",
+          "itemId": "plumbing_supplemental",
+          "attribute": "pipe_type_other_specify"
+        },
+        "roof[0].covering_material": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "covering_material"
+        },
+        "roof[0].roof_age_years": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "roof_age_years"
+        },
+        "roof[0].remaining_useful_life_years": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "remaining_useful_life_years"
+        },
+        "roof[0].date_of_last_roofing_permit": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "date_of_last_roofing_permit"
+        },
+        "roof[0].date_of_last_update": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "date_of_last_update"
+        },
+        "roof[0].update_extent": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "update_extent"
+        },
+        "roof[0].percent_of_replacement": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "percent_of_replacement"
+        },
+        "roof[0].overall_condition": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "overall_condition"
+        },
+        "roof[0].damage_signs": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "damage_signs"
+        },
+        "roof[0].visible_signs_of_leaks": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "visible_signs_of_leaks"
+        },
+        "roof[0].leaks_attic_underside_of_decking": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "leaks_attic_underside_of_decking"
+        },
+        "roof[0].leaks_interior_ceilings": {
+          "from": "item_attribute",
+          "itemId": "roof_predominant",
+          "attribute": "leaks_interior_ceilings"
+        },
+        "roof[1].covering_material": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "covering_material"
+        },
+        "roof[1].roof_age_years": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "roof_age_years"
+        },
+        "roof[1].remaining_useful_life_years": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "remaining_useful_life_years"
+        },
+        "roof[1].date_of_last_roofing_permit": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "date_of_last_roofing_permit"
+        },
+        "roof[1].date_of_last_update": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "date_of_last_update"
+        },
+        "roof[1].update_extent": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "update_extent"
+        },
+        "roof[1].percent_of_replacement": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "percent_of_replacement"
+        },
+        "roof[1].overall_condition": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "overall_condition"
+        },
+        "roof[1].damage_signs": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "damage_signs"
+        },
+        "roof[1].visible_signs_of_leaks": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "visible_signs_of_leaks"
+        },
+        "roof[1].leaks_attic_underside_of_decking": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "leaks_attic_underside_of_decking"
+        },
+        "roof[1].leaks_interior_ceilings": {
+          "from": "item_attribute",
+          "itemId": "roof_secondary",
+          "attribute": "leaks_interior_ceilings"
+        },
+        "additional_comments": {
+          "from": "item",
+          "itemId": "form_additional_comments"
+        },
+        "inspector_signature": {
+          "from": "signature",
+          "scope": "whole_form"
+        },
+        "inspector_license_number": {
+          "from": "inspection",
+          "field": "inspector_license"
+        },
+        "inspector_license_type": {
+          "from": "inspection",
+          "field": "inspector_license_type"
+        },
+        "inspector_company_name": {
+          "from": "inspection",
+          "field": "company_name"
+        },
+        "inspector_work_phone": {
+          "from": "inspection",
+          "field": "company_phone"
+        },
+        "inspector_signature_date": {
+          "from": "inspection",
+          "field": "inspector_signature_date"
+        }
+      }
+    }
+  }
+}

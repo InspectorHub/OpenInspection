@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { hasCycle, itemDepths, MAX_ITEM_DEPTH } from '../template-hierarchy';
 
 /**
  * Spec 5B — Template schema (v2) validation.
@@ -69,13 +70,35 @@ const ItemOptionsSchema = z.object({
     minPhotos:   z.number().nullable().optional().describe('TODO describe minPhotos field for the OpenInspection MCP integration'),
 }).strict();
 
+/**
+ * One option an attribute offers: either a bare token, or that token paired
+ * with the wording the authority's form prints beside its box.
+ *
+ * 🔴 THE VALUE IS WHAT GETS STORED. A statutory form is rendered by comparing
+ * the stored answer to a mapping's `whenValue` byte for byte, so a label that
+ * reached the results would print a blank official document. Widening `choices`
+ * rather than adding a parallel `choiceLabels` map is what keeps the two from
+ * being able to disagree — see `ItemChoice` in `server/types/template-schema.ts`.
+ *
+ * `.strict()` on the object half so a caller sending `{ value, title }` is
+ * refused by name rather than having the label silently dropped, which would
+ * put a raw token back on the inspector's screen with nothing to show for it.
+ */
+const ItemChoiceSchema = z.union([
+    z.string(),
+    z.object({
+        value: z.string().min(1).describe('The token stored in the results and matched against a statutory form mapping'),
+        label: z.string().min(1).describe('What the inspector reads on screen; never stored'),
+    }).strict(),
+]);
+
 /** Optional sub-fields nested under an item, e.g. tonnage on an HVAC unit. */
 const ItemAttributeTypeEnum = z.enum(['boolean', 'text', 'number', 'select', 'multi_select', 'date']);
 const ItemAttributeSchema = z.object({
     id:             z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
     name:           z.string().min(1).describe('TODO describe name field for the OpenInspection MCP integration'),
     type:           ItemAttributeTypeEnum.describe('TODO describe type field for the OpenInspection MCP integration'),
-    choices:        z.array(z.string()).optional().describe('TODO describe choices field for the OpenInspection MCP integration'),
+    choices:        z.array(ItemChoiceSchema).optional().describe('TODO describe choices field for the OpenInspection MCP integration'),
     unit:           z.string().optional().describe('TODO describe unit field for the OpenInspection MCP integration'),
     required:       z.boolean().optional().describe('TODO describe required field for the OpenInspection MCP integration'),
     isSafety:       z.boolean().optional().describe('TODO describe isSafety field for the OpenInspection MCP integration'),
@@ -114,6 +137,10 @@ const BaseItemFields = {
     // `server/services/inspection/shared.ts`.
     attributes:            z.array(ItemAttributeSchema).optional().describe('TODO describe attributes field for the OpenInspection MCP integration'),
     source:                ItemSourceSchema.nullable().optional().describe('TODO describe source field for the OpenInspection MCP integration'),
+    // `.min(1)` is not decoration. An empty string reads as "has a parent" to
+    // a truthiness check and as "no parent" to a lookup -- which is the exact
+    // definition of a dangling node, arriving through a key that looks set.
+    parentId:              z.string().min(1).nullable().optional().describe('Id of the item this one nests under, within the same section; null or absent = top level'),
 } as const;
 
 const RichItemSchema = z.object({
@@ -181,12 +208,24 @@ const TemplateItemSchema = z.discriminatedUnion('type', [
     PhotoOnlyItemSchema,
 ]);
 
-// S3-5 — tighten section title to surface obviously-bogus imports
-// (e.g. someone pasting an entire paragraph as a "title"). Current
-// longest seed section title is 34 chars.
+// S3-5 — a section title is bounded to surface obviously-bogus imports, the
+// case being somebody pasting an entire paragraph into a "title".
+//
+// ⚠️ The bound was 50, chosen against a survey that said "current longest seed
+// section title is 34 chars". That survey went stale twice over, and the second
+// time it refused content this repository ships: the Texas TREC REI 7-6
+// template's third section is `III. Heating, Ventilation and Air Conditioning
+// Systems` — 54 characters, and the Commission's own wording read off the
+// promulgated form. Nothing caught it, because that template reaches a
+// workspace only through the marketplace and standalone could not open the
+// marketplace at all; the refusal was unreachable rather than absent.
+//
+// 120 keeps the rule's actual purpose — one heading, never a paragraph — with
+// room for an authority whose headings are longer than ours. Longest across all
+// 17 seed templates today: 54 (TREC), then 44 (InterNACHI), then 36.
 const TemplateSectionSchema = z.object({
     id:         z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-    title:      z.string().min(1).max(50).describe('TODO describe title field for the OpenInspection MCP integration'),
+    title:      z.string().min(1).max(120).describe('TODO describe title field for the OpenInspection MCP integration'),
     icon:       z.string().optional().describe('TODO describe icon field for the OpenInspection MCP integration'),
     identifier: z.string().optional().describe('TODO describe identifier field for the OpenInspection MCP integration'),
     items:      z.array(TemplateItemSchema).describe('TODO describe items field for the OpenInspection MCP integration'),
@@ -211,7 +250,54 @@ const TemplateSectionSchema = z.object({
     // (Phase U). Absent defaults to 'common'.
     // FROZEN (module A): Phase-U per-unit scope placeholder; not authored in UI yet.
     defaultScope: z.enum(['common', 'unit']).optional().describe('common (once) or unit (repeats per unit)'),
-}).strict();
+}).strict().superRefine((section, ctx) => {
+    // Item nesting is a property of the ITEMS ARRAY, not of any one item: a
+    // single item's schema cannot see its own parent. So it is checked here,
+    // at the only level that holds the whole list.
+    const items = section.items as ReadonlyArray<{ id: string; parentId?: string | null }>;
+
+    // ORDER IS LOAD-BEARING: cycles first.
+    //
+    // Depth is computed by walking up parent pointers, and a walk up a cycle
+    // never terminates. Checking depth first would either hang or report "too
+    // deep" -- an error that sends the author to shorten a tree that is not
+    // too deep, it is knotted.
+    if (hasCycle(items)) {
+        ctx.addIssue({
+            code: 'custom',
+            path: ['items'],
+            message: 'items contain a parentId cycle',
+        });
+        return;
+    }
+
+    const known = new Set(items.map((i) => i.id));
+    for (const item of items) {
+        const parentId = item.parentId ?? null;
+        if (parentId === null) continue;
+        // A parent in ANOTHER section is not a parent. Sections are the
+        // report's pagination and table-of-contents unit, so a cross-section
+        // parent would leave "how many items does this section have" -- a
+        // number already rendered in several places -- with no definition.
+        if (!known.has(parentId)) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['items'],
+                message: `item ${item.id} names parentId ${parentId}, which is not an item in this section`,
+            });
+        }
+    }
+
+    for (const [id, depth] of itemDepths(items)) {
+        if (depth >= MAX_ITEM_DEPTH) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['items'],
+                message: `item ${id} nests deeper than ${MAX_ITEM_DEPTH} levels`,
+            });
+        }
+    }
+});
 
 const RatingLevelSchema = z.object({
     id:           z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),

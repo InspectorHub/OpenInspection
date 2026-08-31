@@ -7,7 +7,8 @@ import { SIGNER_TOKEN_TTL_MS } from '../../lib/token-ttl';
 import { sealToken } from '../../lib/config-crypto';
 import { PeopleService } from '../people.service';
 import { BrandingService } from '../branding.service';
-import { sha256Hex, type Constructor, type SignerInput } from './base';
+import { sha256Hex } from '../../lib/sha256';
+import type { Constructor, SignerInput } from './base';
 import type { AgreementServiceBase } from './base';
 
 /** Signer-state methods this tier depends on (cross-mixin call surface). */

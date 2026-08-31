@@ -34,6 +34,14 @@ const listTemplatesRoute = createRoute(withMcpMetadata({
                             version: z.number(),
                             itemCount: z.number(),
                             source: z.enum(['marketplace', 'custom']),
+                            // Retired rows are LISTED, not filtered out. A
+                            // template that simply vanishes reads as a broken
+                            // product or a lost permission; one that stays,
+                            // disabled, with a reason, reads as what happened.
+                            retiredAt: z.number().nullable()
+                                .describe('When this template stopped being offered for new inspections, epoch ms, or null'),
+                            retiredReason: z.enum(['superseded', 'uninstalled']).nullable()
+                                .describe('Why it stopped being offered. The two differ in what anybody can do about it'),
                         })),
                         meta: PaginatedMetaSchema,
                     }),

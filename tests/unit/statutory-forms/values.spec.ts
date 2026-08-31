@@ -39,6 +39,16 @@ const FACTS = {
     inspector_license: 'TX-12345',
     company_name: 'Reed Home Inspections',
     company_phone: '512-555-0142',
+    inspector_license_type: null,
+    inspector_qualification: null,
+    inspector_signature_date: null,
+    owner_name: null,
+    owner_email: null,
+    owner_mailing_address: null,
+    owner_home_phone: null,
+    owner_work_phone: null,
+    owner_cell_phone: null,
+    employee_printed_name: null,
 };
 
 /** Every inspection-level fact unanswered. Used where the assertion is about
@@ -56,6 +66,16 @@ const EMPTY_FACTS = {
     inspector_license: null,
     company_name: null,
     company_phone: null,
+    inspector_license_type: null,
+    inspector_qualification: null,
+    inspector_signature_date: null,
+    owner_name: null,
+    owner_email: null,
+    owner_mailing_address: null,
+    owner_home_phone: null,
+    owner_work_phone: null,
+    owner_cell_phone: null,
+    employee_printed_name: null,
 };
 
 const DECL: StatutoryFormDeclaration = {
@@ -240,6 +260,54 @@ describe('collectStatutoryValues — repeatable groups', () => {
             'electrical_panel[0].total_amps': '100',
             'electrical_panel[1].total_amps': '200',
         });
+    });
+
+    const DAMAGE: FieldGroup = {
+        id: 'roof',
+        label: 'Roof',
+        capacity: 1,
+        slotLabels: ['Predominant Roof'],
+        fields: ['damage_signs'],
+    };
+
+    it('carries a slot answered with a list, instead of flattening it to "a,b"', () => {
+        // The roof block's damage signs are a "check all that apply" on the
+        // printed page, so an instance may hold several. Expansion used to run
+        // every instance value through `String()`, which produced
+        // "cracking,cupping_curling" -- a value that names no box, ticks
+        // nothing, and is refused by name at render time.
+        const values = collectStatutoryValues(
+            { formId: 'fl_citizens_roof', bindings: {}, groups: [DAMAGE] },
+            EMPTY_SNAPSHOT, {}, EMPTY_FACTS,
+            { roof: [{ damage_signs: ['cracking', 'cupping_curling'] }] },
+        );
+        expect(values['roof[0].damage_signs']).toEqual(['cracking', 'cupping_curling']);
+        // Named explicitly: `toEqual` on the array would also be satisfied by a
+        // renderer nobody fixed if the assertion above were ever loosened.
+        expect(values['roof[0].damage_signs']).not.toBe('cracking,cupping_curling');
+    });
+
+    it('an instance that recorded an empty list answers nothing, not an empty list', () => {
+        // Same rule `asAnswer` states for an item attribute: an empty array is
+        // what a collector that found nothing produces, and "none of these" is
+        // the empty string. The renderer refuses an empty array by name.
+        const values = collectStatutoryValues(
+            { formId: 'fl_citizens_roof', bindings: {}, groups: [DAMAGE] },
+            EMPTY_SNAPSHOT, {}, EMPTY_FACTS,
+            { roof: [{ damage_signs: [] }] },
+        );
+        expect(values['roof[0].damage_signs']).toBe('');
+    });
+
+    it('POSITIVE CONTROL — a slot answered with one value is still a plain string', () => {
+        // Without this, "carries a list" would pass just as well for a change
+        // that wrapped every slot value in an array.
+        const values = collectStatutoryValues(
+            { formId: 'fl_citizens_roof', bindings: {}, groups: [DAMAGE] },
+            EMPTY_SNAPSHOT, {}, EMPTY_FACTS,
+            { roof: [{ damage_signs: 'cracking' }] },
+        );
+        expect(values['roof[0].damage_signs']).toBe('cracking');
     });
 
     it('a slot nobody recorded still yields an explicit empty key', () => {

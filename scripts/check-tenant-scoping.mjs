@@ -50,7 +50,11 @@ import {
   writeBaseline,
 } from "./lib/symbol-baseline.mjs";
 
-export { findUnscopedByIdQueries };
+// Both halves are exported, and the second one is the lesson. Only the query
+// matcher was testable when a bug in the TABLE CLASSIFIER silently widened the
+// gate onto a global table for months: every test passed, because none of them
+// could reach the function that was wrong.
+export { findUnscopedByIdQueries, buildTenantTableIdents };
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const SCHEMA_DIR = join(ROOT, "server", "lib", "db", "schema");
@@ -80,12 +84,34 @@ function buildTenantTableIdents(schemaDir) {
   for (const file of walkFiles(schemaDir)) {
     const src = readFileSync(file, "utf8");
     const lines = src.split("\n");
+    // Every table declaration in this file, in order. Collected first so each
+    // one's body can be bounded by the NEXT declaration.
+    const decls = [];
     for (let i = 0; i < lines.length; i++) {
       const m = lines[i].match(/const\s+(\w+)\s*=\s*sqliteTable/);
-      if (!m) continue;
-      // Scan forward up to 80 lines for a `tenant_id` column declaration.
-      const block = lines.slice(i, i + 80).join("\n");
-      if (/['"]tenant_id['"]/.test(block)) idents.add(m[1]);
+      if (m) decls.push({ at: i, name: m[1] });
+    }
+    for (let k = 0; k < decls.length; k++) {
+      // ⚠️ Bounded by the next declaration, NOT by a fixed lookahead. This read
+      // 80 lines forward and therefore ran PAST the end of a short table into
+      // whatever followed it: `marketplace_libraries` is 71 lines of columns and
+      // comments with no tenant_id, and `tenant_library_imports` — which starts
+      // three lines later and declares one on its second column — was inside the
+      // window. The catalogue was classified tenant-scoped by borrowing the next
+      // table's column, and every by-id read of the platform catalogue came back
+      // a cross-tenant leak.
+      //
+      // The direction of that error matters: a lookahead can only ever include
+      // too much, so this fix removes false positives and can hide nothing.
+      // Measured when it was made: 109 tables, 104 called tenant-scoped by the
+      // lookahead and 96 by this boundary — 8 borrowed (`marketplaceLibraries`,
+      // `tenants`, `syncOutbox`, `slugReservations`, `smsDisclosureVersions`,
+      // `processedWebhookEvents`, `processedCmdEvents`, `parkedCmdEvents`, all
+      // genuinely global) and ZERO newly missed.
+      const { at, name } = decls[k];
+      const end = k + 1 < decls.length ? decls[k + 1].at : lines.length;
+      const block = lines.slice(at, end).join("\n");
+      if (/['"]tenant_id['"]/.test(block)) idents.add(name);
     }
   }
   // tenant_destruction_records carries a tenant_id snapshot but is the durable

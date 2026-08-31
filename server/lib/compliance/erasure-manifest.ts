@@ -25,6 +25,7 @@
  * `tests/unit/privacy/erasure-manifest-coverage.spec.ts` (drift guard).
  */
 import { REPORT_DELIVERABLE_ERASURE_RULES } from './erasure-manifest-reports';
+import { STATUTORY_DETAIL_ERASURE_RULES } from './erasure-manifest-statutory';
 
 /**
  * A single PII-column erasure rule.
@@ -365,6 +366,7 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // standing — the same question, answered the same way rather than
     // differently by omission.
     { table: 'inspection_requests', column: 'property_address', category: 'user.address', action: 'retain', legalBasis: 'art_17_3_e', retention: 'P6Y', enforcementStatus: 'pending', enforcementDeadline: '2027-02-01' },
+    ...STATUTORY_DETAIL_ERASURE_RULES,
 
     // ── ai_call_provenance (AI governance ledger) ─────────────────────────────
     // One row per prompt sent to a model provider: which capability ran, which

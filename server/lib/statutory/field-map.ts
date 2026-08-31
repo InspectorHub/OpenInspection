@@ -35,6 +35,33 @@
  * green check is not read as more than it is.
  */
 import { PDFDocument } from 'pdf-lib';
+import { validateNoDuplicateTargets } from './targets';
+import { sha256Hex } from '../sha256';
+import {
+    refusePartsThatCannotFitTheirDigits, validatePartMappings, type ValuePart,
+} from './value-parts';
+
+/**
+ * One answer, as it arrives from the inspection.
+ *
+ * A STRING is one answer: text for a blank, or the one option a single-choice
+ * question chose. An ARRAY is several options of ONE question — the shape a
+ * form's multi-select boxes actually take, and the reason it exists: counted on
+ * the three forms measured, `photo_requirements_included` prints 6 boxes,
+ * `electrical.hazards_present` 13, `electrical.wiring_types` 8,
+ * `plumbing.pipe_types` 8, `roof[*].damage_signs` 8 and the 1802's
+ * `roof_covering_types` 7, and every one of them is plainly multi-select on the
+ * page. A single string could ever mark one of them.
+ *
+ * ⚠️ AN EMPTY ARRAY IS REFUSED, and this is a decision rather than an oversight.
+ * "None of these boxes" already has a spelling here — the empty string, which
+ * every layer treats as an explicit answer of nothing — and one answer with two
+ * spellings is a permanent question at every read site about which one a given
+ * producer emits. An empty array is also exactly what a collector that resolved
+ * nothing produces, and on a statutory form a question with no box ticked reads
+ * identically to a question nobody was asked.
+ */
+export type StatutoryValue = string | readonly string[];
 
 /**
  * One value's route onto the page.
@@ -51,9 +78,22 @@ import { PDFDocument } from 'pdf-lib';
  *              neither behaves exactly as it did before they existed — most
  *              rows on these forms hold one line, so the pair is worth
  *              declaring wherever anyone has measured.
- * `checkbox` — draw a mark at a coordinate when our value equals `whenValue`.
+ * `checkbox` — draw a mark at a coordinate when our answer names `whenValue`.
  *              Several of these share one `ourField` on purpose: that is how a
  *              multiple-choice answer maps onto boxes the file does not group.
+ *              A string answer names one of them; an array names every box it
+ *              contains, which is what a multi-select question needs.
+ *              ⚠️ It DRAWS. On a form whose boxes are real widgets that is the
+ *              wrong route — see `acroform_checkbox` — because the printed page
+ *              comes out right and the field data still reads unticked.
+ * `acroform_checkbox` — SET a named `/Btn` widget when our answer names
+ *              `whenValue`. The mirror of `acroform` for the other kind of
+ *              field, and the only route that puts the answer in the DOCUMENT
+ *              rather than only on the page. Measured on TX TREC REI 7-6: 245
+ *              fields, 81 text and 164 genuine checkbox widgets. Nothing is
+ *              drawn, so the page's own content stream is untouched, and a
+ *              widget the answer did not choose is left exactly as published
+ *              rather than actively cleared.
  * `signature` — draw a stored signature image inside a measured box. `scope`
  *              names WHICH PART of the form this signature stands behind: the
  *              Citizens four-point form lets a trade-specific licensee sign only
@@ -75,8 +115,22 @@ export type FieldMapping =
          * made unreadable. Absent means no shrinking at all: a floor nobody
          * measured is not a floor.
          */
-        minSize?: number }
+        minSize?: number;
+        /**
+         * Draw only THIS PART of the value. Absent means the whole value, which
+         * is what every map authored before this field existed says.
+         *
+         * It exists because some forms print a value's separators themselves.
+         * Measured on FL OIR-B1-1802: a date is three blanks with the form's own
+         * slashes in the two 2.8pt gaps between them, and one overlay covering
+         * all three writes the year across the wrong blank while leaving the
+         * year's own blank empty. Three overlays, one per part, is the only way
+         * to fill a form like that from a single value — and entry stays a
+         * single date box, which is the whole point.
+         */
+        part?: ValuePart }
     | { kind: 'checkbox'; ourField: string; whenValue: string; page: number; x: number; y: number; size?: number }
+    | { kind: 'acroform_checkbox'; ourField: string; whenValue: string; pdfField: string }
     | { kind: 'signature'; ourField: string; scope: string;
         page: number; x: number; y: number; width: number; height: number };
 
@@ -92,20 +146,15 @@ export interface FieldMap {
     checkedAt: number;
     /**
      * Our field names that MUST be mapped, and — at render time — must be
-     * supplied. A required field left out of the values is refused rather than
-     * rendered blank: a form nobody filled must never come out looking like one
-     * somebody filled and left empty.
+     * ANSWERED. A required field left out of the values is refused rather than
+     * rendered blank, and so is one supplied with an empty answer: this list
+     * means "required of every inspection", so there is no inspection for which
+     * leaving the box empty is a legitimate answer, and on the printed page the
+     * two are the same blank. Optional fields keep the ordinary contract, where
+     * an empty string is an answer of "nothing" and renders as one.
      */
     requiredFields: readonly string[];
     mappings: readonly FieldMapping[];
-}
-
-/** sha256 of the exact bytes, lowercase hex. Web Crypto — no Node APIs. */
-export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-    const digest = await crypto.subtle.digest('SHA-256', bytes);
-    return Array.from(new Uint8Array(digest))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
 }
 
 /** Shape of the version a map claims to target — the fields this file compares. */
@@ -160,6 +209,11 @@ export function validateFieldMapShape(map: FieldMap): void {
         fail('no mappings — an empty map validates against every PDF ever published and renders a blank form');
     }
 
+    // The part rules run FIRST because they are the more specific ones. A
+    // parted overlay missing a bound trips `validateOverlayFit` too, and that
+    // message names the field but not which of its three printed blanks —
+    // which is the whole thing the reader needs when one field has three.
+    validatePartMappings(map.mappings);
     validateMappingShapes(map.mappings);
     validateNoDuplicateTargets(map.mappings);
 
@@ -174,8 +228,13 @@ export function validateFieldMapShape(map: FieldMap): void {
 function validateMappingShapes(mappings: readonly FieldMapping[]): void {
     for (const m of mappings) {
         if (m.ourField.trim() === '') fail('a mapping has an empty ourField');
-        if (m.kind === 'acroform') {
+        if (m.kind === 'acroform' || m.kind === 'acroform_checkbox') {
+            // Both routes into a fillable form are addressed by NAME and have no
+            // geometry of their own; the widget's rectangle is the form's.
             if (m.pdfField.trim() === '') fail(`"${m.ourField}" maps to an empty pdfField name`);
+            if (m.kind === 'acroform_checkbox' && m.whenValue.trim() === '') {
+                fail(`checkbox for "${m.ourField}" has an empty whenValue`);
+            }
             continue;
         }
         if (!Number.isInteger(m.page) || m.page < 0) {
@@ -246,38 +305,19 @@ function validateOverlayFit(m: OverlayMapping): void {
             + 'text never wraps, so a height bound can never be reached and would read as a '
             + 'guarantee it does not give');
     }
-}
-
-/**
- * Two mappings must not compete for one value.
- *
- * A repeated `ourField` is legitimate for checkboxes and only for checkboxes —
- * that is a multiple-choice answer spread across boxes the file does not group.
- * Anywhere else it writes one value into two places, and the second one is
- * always the one nobody meant. Two checkboxes sharing a field AND a value is a
- * coordinate that was pasted and never re-measured.
- */
-function validateNoDuplicateTargets(mappings: readonly FieldMapping[]): void {
-    const singleValue = new Set<string>();
-    const checkboxAnswers = new Set<string>();
-    for (const m of mappings) {
-        if (m.kind === 'checkbox') {
-            const key = `${m.ourField} ${m.whenValue}`;
-            if (checkboxAnswers.has(key)) {
-                fail(`"${m.ourField}" has two checkboxes for the value "${m.whenValue}"`);
-            }
-            checkboxAnswers.add(key);
-            continue;
-        }
-        if (singleValue.has(m.ourField)) {
-            fail(`"${m.ourField}" is mapped twice; only a checkbox may repeat a field`);
-        }
-        singleValue.add(m.ourField);
-    }
-    for (const m of mappings) {
-        if (m.kind === 'checkbox' && singleValue.has(m.ourField)) {
-            fail(`"${m.ourField}" is mapped both as a checkbox and as a single value`);
-        }
+    // The mirror, and the half that was actually being written. `fitOverlay`
+    // returns early unless BOTH are present, so a lone maxWidth is measured by
+    // nothing — not here, not in fit.ts, not at print. Measured on the Citizens
+    // four-point candidate: all 48 overlays declared a width, none declared a
+    // height, and no value was ever checked against one. Half a measurement
+    // that reads as a bound is worse than none, because it is the reason
+    // nobody looked.
+    if (m.maxWidth !== undefined && m.maxHeight === undefined) {
+        fail(`overlay "${m.ourField}" declares maxWidth ${m.maxWidth} but no maxHeight. `
+            + 'Nothing measures the width on its own: a value too long for the blank does not '
+            + 'run off the side, it wraps DOWN over the row beneath, and only a height says '
+            + 'how far down is too far. Measure the room below this baseline, or declare '
+            + 'neither and say in the map that this row was never measured.');
     }
 }
 
@@ -296,6 +336,7 @@ export async function validateAgainstPdf(map: FieldMap, pdfBytes: Uint8Array): P
         fail(`sourceHash mismatch: these bytes hash to ${actual} and the map was authored `
             + `against ${map.sourceHash}`);
     }
+    await refusePartsThatCannotFitTheirDigits(map.mappings);
 
     let doc: PDFDocument;
     try {
@@ -316,7 +357,7 @@ export async function validateAgainstPdf(map: FieldMap, pdfBytes: Uint8Array): P
     const missingFields: string[] = [];
     const offPage: string[] = [];
     for (const m of map.mappings) {
-        if (m.kind === 'acroform') {
+        if (m.kind === 'acroform' || m.kind === 'acroform_checkbox') {
             if (!names.has(m.pdfField)) missingFields.push(`${m.ourField} -> "${m.pdfField}"`);
         } else if (m.page >= pageCount) {
             offPage.push(`${m.ourField} -> page ${m.page}`);

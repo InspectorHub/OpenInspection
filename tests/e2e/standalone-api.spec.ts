@@ -364,25 +364,26 @@ test.describe.serial('Standalone API Tests', () => {
         expect(res.status()).toBe(404);
     });
 
-    test('API-25: the content marketplace does not exist in standalone', async ({ request }) => {
-        // A hosted-only surface. `hasContentMarketplace` is false in
-        // STANDALONE_PROFILE and the loader throws 404 rather than redirecting,
-        // so a self-hosted deploy has no marketplace page at all.
+    test('API-25: the content marketplace IS served in standalone', async ({ request }) => {
+        // This assertion used to run the other way, and the 404 it asserted was
+        // justified by a claim that turned out to be false: that nothing could
+        // ever put a row in a standalone catalogue. The starter-content seeder
+        // had been doing exactly that from repository fixtures, in both modes,
+        // the whole time — so a self-hosted operator had a stocked catalogue and
+        // no door to it, and could install nothing at all.
         //
-        // The token is what makes this test worth having. It is a VALID admin
-        // token, so a 404 here cannot be "not signed in" or "not allowed" — the
-        // only thing left is the capability. Sending no token would have proved
-        // nothing: the parent layout bounces an anonymous request to /login
-        // before this loader ever runs, and that 302 looks like a pass to a test
-        // that only checks "not 200".
+        // The token is what makes this test worth having, in either direction.
+        // It is a VALID admin token, so a 200 here is the page and not a login
+        // bounce, and a regression to 404 cannot be explained away as "not
+        // signed in". Sending no token would prove nothing: the parent layout
+        // redirects an anonymous request to /login before this loader runs, and
+        // that 302 satisfies any test that only checks "not 404".
         //
-        // Until now NOTHING asserted this. The decision was taken twice — the
-        // gate landed with #308, and #293 Task 9 was then deliberately not built
-        // because folding the catalogue into /library/templates would have
-        // turned this 404 back into a 200 — and both times it was left resting
-        // on a mobile-layout test that asserted the opposite.
+        // What remains mode-specific is publishing a catalogue row across
+        // workspaces, which lives under /api/integration/* — asserted absent by
+        // its own test, and unaffected by this one.
         const res = await fetchPage(request, '/library/marketplace', adminToken);
-        expect(res.status(), 'standalone must not serve the marketplace').toBe(404);
+        expect(res.status(), 'standalone must serve the marketplace').toBe(200);
     });
 
     // ── Tenant Isolation ─────────────────────────────────────────────────────

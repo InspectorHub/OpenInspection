@@ -120,6 +120,8 @@ export default [
   route("resources/members-template", "routes/resources/members-template.ts"),
   route("resources/inspection-prefs", "routes/resources/inspection-prefs.tsx"),
   route("resources/marketplace-install", "routes/resources/marketplace-install.tsx"),
+  route("resources/marketplace-uninstall", "routes/resources/marketplace-uninstall.tsx"),
+  route("resources/statutory-update", "routes/resources/statutory-update.tsx"),
   route("resources/inspection-settings-sheet", "routes/resources/inspection-settings-sheet.tsx"),
   route("resources/inspection-media", "routes/resources/inspection-media.tsx"),
   route("resources/publish-readiness", "routes/resources/publish-readiness.tsx"),
@@ -210,6 +212,11 @@ export default [
       route("settings/imports", "routes/settings-imports.tsx"),
       route("settings/imports/:batchId", "routes/settings-imports-batch.tsx"),
       route("settings/compliance", "routes/settings-compliance.tsx"),
+      // The authority's own PDF for each statutory revision this build
+      // publishes. In Settings rather than Library because it is a deployment
+      // prerequisite shared by every workspace, not a workspace's own content —
+      // the route module's header has the whole argument.
+      route("settings/statutory-forms", "routes/settings-statutory-forms.tsx"),
       route("settings/account", "routes/settings-account.tsx"),
       route("settings/advanced", "routes/settings-advanced.tsx"),
       route("settings/integrations", "routes/settings-integrations.tsx"),

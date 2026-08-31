@@ -48,6 +48,8 @@ const getProfileRoute = createRoute(withMcpMetadata({
                         // same convention as timezone/locale above.
                         dateFormat: z.string().nullable(),
                         timeFormat: z.string().nullable(),
+                        statutoryLicenseType: z.string().nullable(),
+                        statutoryQualification: z.string().nullable(),
                     })),
                 },
             },
@@ -74,6 +76,13 @@ export const PatchProfileSchema = z.object({
     // asserts the KEY IS ABSENT rather than asserting its value.
     dateFormat: z.enum(['', ...DATE_FORMATS]).optional().describe('Per-user date order (us|iso|eu). Empty string clears the override (inherit tenant).'),
     timeFormat: z.enum(['', ...TIME_FORMATS]).optional().describe('Per-user clock (12h|24h). Empty string clears the override (inherit tenant).'),
+    // The state licence CLASS a statutory form's "License Type" box asks for,
+    // and the qualification category FL OIR-B1-1802 asks the signer to declare.
+    // Free text on purpose: the vocabulary is the authority's, differs per form
+    // and per state, and an enum here would be this software deciding what a
+    // state licenses. Empty string clears, the same convention as above.
+    statutoryLicenseType: z.string().max(120).optional().describe('State licence class printed on a statutory form. NOT an association certification — that is an inspector credential.'),
+    statutoryQualification: z.string().max(120).optional().describe('Statutory qualification category the signer declares. A different axis from the licence class.'),
 });
 
 const patchProfileRoute = createRoute(withMcpMetadata({
@@ -150,6 +159,8 @@ const profileRoutes = createApiRouter()
             locale: users.locale,
             dateFormat: users.dateFormat,
             timeFormat: users.timeFormat,
+            statutoryLicenseType: users.statutoryLicenseType,
+            statutoryQualification: users.statutoryQualification,
             // The drawn signature itself. Settings said "Signature saved" and
             // showed the reader nothing — so the one thing they might want to
             // check, that the right mark was captured, was the one thing the
@@ -206,6 +217,15 @@ const profileRoutes = createApiRouter()
         // #270 — per-user date/time SHAPE override, same '' = clear convention.
         if (body.dateFormat !== undefined) updates.dateFormat = body.dateFormat === '' ? null : body.dateFormat;
         if (body.timeFormat !== undefined) updates.timeFormat = body.timeFormat === '' ? null : body.timeFormat;
+        // Same '' = clear convention. Trimmed, because a licence class that is
+        // one space would print as a blank box on an authority's form while
+        // reading as answered everywhere in this software.
+        if (body.statutoryLicenseType !== undefined) {
+            updates.statutoryLicenseType = body.statutoryLicenseType.trim() || null;
+        }
+        if (body.statutoryQualification !== undefined) {
+            updates.statutoryQualification = body.statutoryQualification.trim() || null;
+        }
         // DB-12 / IA-26 — slug write removed; inspector booking slugs are frozen.
         // Agent slug writes go through POST /api/agent/profile (separate endpoint).
 

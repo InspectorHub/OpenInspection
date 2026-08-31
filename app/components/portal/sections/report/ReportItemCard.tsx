@@ -27,6 +27,15 @@ export interface ReportItemCardProps {
   renderMediaTile: (photo: ReportPhoto, alt: string, idx: number) => ReactNode;
   selectedForRepair: boolean;
   onToggleRepairItem: (itemId: string) => void;
+  /**
+   * This item sits under another one.
+   *
+   * A card of its own would tell the reader this row is as important as the
+   * ones around it, and a qualifier -- "check here if the entire deck underside
+   * is covered" -- is not. So a nested card drops its own frame and its heading
+   * drops a level: it reads as part of the row above rather than as a peer of it.
+   */
+  nested?: boolean;
 }
 
 export function ReportItemCard({
@@ -37,17 +46,22 @@ export function ReportItemCard({
   renderMediaTile,
   selectedForRepair,
   onToggleRepairItem,
+  nested = false,
 }: ReportItemCardProps) {
   return (
     <div
-      className={`bg-ih-bg-card border border-ih-border overflow-hidden ${PRINT_CARD_CLASS}`}
-      style={{ borderRadius: "var(--report-radius)", borderLeftWidth: 4, borderLeftColor: item.ratingColor }}
+      data-testid="report-item-card"
+      data-nested={nested ? "true" : undefined}
+      className={`bg-ih-bg-card overflow-hidden ${nested ? "border-l border-ih-border" : "border border-ih-border"} ${PRINT_CARD_CLASS}`}
+      style={nested
+        ? { borderInlineStartWidth: 2, borderInlineStartColor: item.ratingColor }
+        : { borderRadius: "var(--report-radius)", borderLeftWidth: 4, borderLeftColor: item.ratingColor }}
     >
-      <div className="p-4">
+      <div className={nested ? "px-4 py-3" : "p-4"}>
         <div className="flex items-start justify-between mb-2">
-          <h3 className="font-semibold text-ih-fg-1">
+          <h4 className={nested ? "font-medium text-[14px] text-ih-fg-1" : "font-semibold text-ih-fg-1"}>
             {item.label}
-          </h3>
+          </h4>
           {item.ratingLabel && (
             <span
               className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide"

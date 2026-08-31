@@ -33,6 +33,7 @@ import adminConfigRoutes from './admin/admin-config';
 import adminHolidayRoutes from './admin/admin-holidays';
 import adminServiceAreasRoutes from './admin/admin-service-areas';
 import adminBookingRoutingRoutes from './admin/admin-booking-routing';
+import adminStatutorySourceRoutes from './admin/admin-statutory-source';
 
 const adminRoutes = createApiRouter()
     .route('/', adminAgreementsRoutes)
@@ -48,7 +49,8 @@ const adminRoutes = createApiRouter()
     .route('/', adminConfigRoutes)
     .route('/', adminHolidayRoutes)
     .route('/', adminServiceAreasRoutes)
-    .route('/', adminBookingRoutingRoutes);
+    .route('/', adminBookingRoutingRoutes)
+    .route('/', adminStatutorySourceRoutes);
 
 export type AdminApi = typeof adminRoutes;
 

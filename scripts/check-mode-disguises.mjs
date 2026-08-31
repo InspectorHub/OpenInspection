@@ -161,11 +161,11 @@ function selfTest() {
             "const tenantId = c.env.SINGLE_TENANT_ID || '00000000-0000-0000-0000-000000000000';").length === 1]);
     checks.push(['P4 flags an undeclared isSaas read', p4(['x.tsx'], []).length === 1]);
     checks.push(['P4 flags a declared capability the file does not read',
-        p4(['a.tsx'], [{ file: 'a.tsx', capability: 'hasContentMarketplace' }],
+        p4(['a.tsx'], [{ file: 'a.tsx', capability: 'hasManagedCompliance' }],
             { 'a.tsx': 'const isSaas = ctx.branding.isSaas;' }).length === 1]);
     checks.push(['P4 passes when the file reads the capability it declared',
-        p4(['a.tsx'], [{ file: 'a.tsx', capability: 'hasContentMarketplace' }],
-            { 'a.tsx': 'ctx.deployment.hasContentMarketplace' }).length === 0]);
+        p4(['a.tsx'], [{ file: 'a.tsx', capability: 'hasManagedCompliance' }],
+            { 'a.tsx': 'ctx.deployment.hasManagedCompliance' }).length === 0]);
     checks.push(['zero files scanned is a failure in every pattern',
         scanIsImplausible({ p1: 0, p2: 0, p3: 0, p4: 0 })]);
 

@@ -15,7 +15,8 @@ import { reports, reportVersions, inspections, inspectionResults, inspectionUnit
 import { computeDiff, SNAPSHOT_SCHEMA_VERSION, type Snapshot, type SnapshotInspector, type DiffPayload } from '../lib/version-diff';
 import { CredentialService } from './credential.service';
 import { resolveProfile } from '../lib/report-style/resolve';
-import { SigningKeyService, sha256Hex, base64UrlEncode, base64UrlDecode } from './signing-key.service';
+import { sha256Hex } from '../lib/sha256';
+import { SigningKeyService, base64UrlEncode, base64UrlDecode } from './signing-key.service';
 
 const MAX_SNAPSHOT_BYTES = 1024 * 1024;  // 1 MB
 

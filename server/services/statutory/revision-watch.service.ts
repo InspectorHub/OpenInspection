@@ -2,8 +2,9 @@ import { drizzle } from 'drizzle-orm/d1';
 import { statutoryFormSightings } from '../../lib/db/schema/statutory-form-sightings';
 import { logger } from '../../lib/logger';
 import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
+import { sha256Hex } from '../../lib/sha256';
 import {
-    classifySighting, sha256Hex,
+    classifySighting,
     type RevisionSighting, type RevisionWatchTarget,
 } from '../../lib/statutory/revision-watch';
 

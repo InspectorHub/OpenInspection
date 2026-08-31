@@ -302,7 +302,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     );
                     break;
                 case 'marketplace':
-                    target.marketplace = new MarketplaceService(c.env.DB, c.get('tenantId'));
+                    target.marketplace = new MarketplaceService(c.env.DB, c.get('tenantId'), c.env.PHOTOS);
                     break;
                 case 'message':
                     target.message = new MessageService(c.env.DB, new NotificationService(c.env.DB));

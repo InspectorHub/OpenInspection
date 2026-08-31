@@ -28,12 +28,14 @@ const base = {
     sourceHash: '0'.repeat(64),
     publishedBy: 'platform',
     publishedAt: t('2026-08-21'),
+    withdrawn: null,
 };
 
 /** A clean cutover: the old revision stops being usable the day the new one starts. */
 const OLD: StatutoryFormVersion = {
     ...base,
     formId: 'fl_oir_b1_1802',
+    formTitle: 'Yankee Flat Form',
     version: 'Rev. 01/12',
     effectiveFrom: t('2012-01-01'),
     mandatoryFrom: t('2012-01-01'),
@@ -42,6 +44,7 @@ const OLD: StatutoryFormVersion = {
 const NEW: StatutoryFormVersion = {
     ...base,
     formId: 'fl_oir_b1_1802',
+    formTitle: 'Yankee Flat Form',
     version: 'Rev. 04/26',
     effectiveFrom: t('2026-04-01'),
     mandatoryFrom: t('2026-04-01'),
@@ -51,12 +54,14 @@ const NEW: StatutoryFormVersion = {
 /**
  * A voluntary-use window: `7-6` is publishable from 2021-09-01 but not mandatory
  * until 2022-02-01, and `7-5` stays usable until that date. Both revisions are
- * of the SAME form, which is why the form id carries no revision number — see
- * the note in the report about the plan's `tx_trec_rei_7_6`.
+ * of the SAME form, which is why the form id carries no revision number: the
+ * selector below GROUPS on `formId`, so a revision spelt into the id would make
+ * these two rows two different forms and this window unexpressible.
  */
 const TX_OLD: StatutoryFormVersion = {
     ...base,
     formId: 'tx_trec_rei',
+    formTitle: 'Yankee Flat Form',
     version: '7-5',
     effectiveFrom: t('2015-02-01'),
     mandatoryFrom: t('2015-02-01'),
@@ -65,6 +70,7 @@ const TX_OLD: StatutoryFormVersion = {
 const TX_NEW: StatutoryFormVersion = {
     ...base,
     formId: 'tx_trec_rei',
+    formTitle: 'Yankee Flat Form',
     version: '7-6',
     effectiveFrom: t('2021-09-01'),
     mandatoryFrom: t('2022-02-01'),

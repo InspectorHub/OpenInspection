@@ -8,13 +8,14 @@ import { RELIANCE_TEMPLATES } from "../../../server/lib/pca-reliance-text";
 import { METADATA_PRESETS, type PropertyMetaField } from "../../../server/lib/commercial-subtypes";
 import type { CompliancePanelData } from "~/components/inspection-edit/CompliancePanel";
 import { getCloudflareEnv } from "~/lib/load-context";
+import { revisionStatusForInspection } from "../../../server/lib/statutory/revision-status";
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
  const token = await requireToken(context, request);
  const id = params.id;
 
  const api = createApi(context, { token });
- const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, unitsRes, unitProgressRes, complianceRes] = await Promise.all([
+ const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, unitsRes, unitProgressRes, complianceRes, statutoryDetailsRes] = await Promise.all([
  api.inspections[":id"].$get({ param: { id } }),
  // Commercial PCA Phase U (Batch C-lazy) — first paint only needs the common
  // scope. The editor opens at activeUnitId = null (the '_default' scope), so
@@ -47,6 +48,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // reportTier === 'full_pca' — mirrors the existing loader convention of not
  // conditioning the parallel fetch list on client-only gates.
  api.inspections[":id"].compliance.$get({ param: { id } }).catch(() => null),
+ // The inspection-level answers a statutory form asks for. This endpoint 404s
+ // for every ordinary inspection — that is its ANSWER, not a failure — so the
+ // null it leaves behind is what decides whether the panel renders at all.
+ api.inspections[":id"]["statutory-details"].$get({ param: { id } }).catch(() => null),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
@@ -78,6 +83,46 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  sections: Array<Record<string, unknown>>;
  }) || { sections: [] };
 
+ // The snapshot's own item attributes, captured BEFORE the overlay below
+ // replaces `schema.sections` wholesale.
+ //
+ // report-data's projection drops `attributes` ON PURPOSE — a DECLARED skip in
+ // `scripts/check-item-key-parity.mjs` ("projected separately by the attributes
+ // resolver"), and the report genuinely does not need them. The EDITOR does:
+ // `ItemEditor` only renders `ItemAttributesPanel` when `item.attributes` is a
+ // non-empty array, so replacing the sections with the projection turned the
+ // panel off everywhere while the panel, its handler and `onItemAttribute` were
+ // all built and wired. Nothing failed; the control simply was not there.
+ //
+ // Measured 2026-08-30 across the seed templates: 47 statutory bindings read
+ // `item_attribute` — TREC 23, FL Citizens roof 24 — and not one of them could
+ // be answered. `residential.json` carries a further 21 attribute definitions
+ // that no inspector could reach either, so this was never only a statutory
+ // problem. The fix merges the snapshot BACK; the projection is left alone.
+ const snapshotAttributes = new Map<string, unknown[]>();
+ // `description` is the SECOND key the projection drops, and it is dropped for
+ // the same declared reason. On a statutory template it carries the
+ // authority's own instruction — the Citizens roof items print "(check all
+ // that apply and explain below)" and the warning that the roof column's rules
+ // are 41.5pt wide, and FL OIR-B1-1802's one `fieldInstructions` is the
+ // retrofit paragraph an inspector has to read verbatim. `ItemEditor` renders
+ // it whenever it is present, so carrying it costs nothing and NOT carrying it
+ // means text that is stored where nobody can see it, which is worse than text
+ // that was never written.
+ const snapshotDescriptions = new Map<string, string>();
+ for (const sec of (schema.sections ?? [])) {
+ for (const item of ((sec.items ?? []) as Array<Record<string, unknown>>)) {
+  const attrs = item.attributes;
+  if (typeof item.id === "string" && Array.isArray(attrs) && attrs.length > 0) {
+  snapshotAttributes.set(item.id, attrs);
+  }
+  const description = item.description;
+  if (typeof item.id === "string" && typeof description === "string" && description !== "") {
+  snapshotDescriptions.set(item.id, description);
+  }
+ }
+ }
+
  // Normalize sections from report-data (which has rating levels + section data)
  const rdData = ((reportBody as Record<string, unknown>).data ?? {}) as Record<string, unknown> | undefined;
  const reportSections = (rdData?.sections || []) as Array<Record<string, unknown>>;
@@ -89,6 +134,18 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  s.items = (s.items as Array<Record<string, unknown>>).map((item) => {
  const it = { ...item };
  if (!it.label && it.name) it.label = it.name;
+ // Only when the projection carried none: should report-data ever start
+ // projecting them, its value is the newer one and wins.
+ if (it.attributes === undefined && typeof it.id === "string") {
+ const attrs = snapshotAttributes.get(it.id);
+ if (attrs) it.attributes = attrs;
+ }
+ // Merged the same way and under the same condition, so should report-data
+ // ever start projecting descriptions its value is the newer one and wins.
+ if (it.description === undefined && typeof it.id === "string") {
+ const description = snapshotDescriptions.get(it.id);
+ if (description) it.description = description;
+ }
  return it;
  });
  }
@@ -146,6 +203,18 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // TemplateSchemaV2 object. The `schema` field above is NORMALIZED (overlaid
  // with report-data) and must NOT be PATCHed to the template-snapshot endpoint.
  const templateSnapshot = ((typeof rawSchema === 'string' ? JSON.parse(rawSchema) : rawSchema) ?? { schemaVersion: 2, sections: [] }) as { schemaVersion: 2; sections: unknown[] };
+
+ // Which revision of the authority's form governs this inspection, decided
+ // HERE and never in the browser. It is a comparison of date windows, and a
+ // second implementation of it on the client would disagree with this one at
+ // some boundary -- which is the one kind of disagreement nobody notices,
+ // because nobody checks a date boundary by hand. `null` for every ordinary
+ // inspection, and for a statutory template that names no revision.
+ const revisionStatus = revisionStatusForInspection({
+ snapshot: templateSnapshot,
+ inspectionDate: String((inspection as { date?: unknown }).date ?? "").slice(0, 10),
+ now: Date.now(),
+ });
 
  // Commercial PCA Phase S — seed-resolved narrative for the editor panel.
  const pcaNarrative = resolvePcaNarrative((inspection as { pcaNarrative?: unknown }).pcaNarrative);
@@ -226,5 +295,24 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
    if (key.startsWith("commercial:")) commercialPresets[key] = fields;
  }
 
- return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets };
+ // Null for every inspection whose template declares no statutory form, which
+ // is almost all of them. The editor reads the null as "there is no such panel
+ // here" rather than as "the panel is empty".
+ type StatutoryDetails = {
+   inspectorSignatureDate: string | null;
+   employeePrintedName: string | null;
+   ownerName: string | null;
+   ownerEmail: string | null;
+   ownerMailingAddress: string | null;
+   ownerHomePhone: string | null;
+   ownerWorkPhone: string | null;
+   ownerCellPhone: string | null;
+ };
+ let statutoryDetails: StatutoryDetails | null = null;
+ if (statutoryDetailsRes?.ok) {
+   const body = await statutoryDetailsRes.json() as { data?: StatutoryDetails };
+   statutoryDetails = body.data ?? null;
+ }
+
+ return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails };
 }

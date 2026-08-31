@@ -123,15 +123,16 @@ describe('the deployment payload carries every capability the chrome gates on', 
         //
         // That is not hypothetical. `library-hub.tsx` and `CommandPalette.tsx`
         // both gated the marketplace on `branding.isSaas` while
-        // `marketplace.tsx` enforced `hasContentMarketplace` — one question with
-        // two answers — because the capability was not on this payload at all.
-        // The wrong answer was the only reachable one.
+        // `marketplace.tsx` enforced a deployment capability — one question with
+        // two answers — because that capability was not on this payload at all.
+        // The wrong answer was the only reachable one. (The marketplace no
+        // longer asks the question in any mode, so it is absent from the list
+        // below; the failure the list exists for is unchanged.)
         //
         // Keep this list in step with what `app/` actually reads. A capability
         // added here that nothing consumes is the OTHER failure this repo has
         // recorded ten times over, so do not pad it.
         const GATED_IN_APP = [
-            'hasContentMarketplace',
             'videoBackendManaged',
             'hasManagedCompliance',
         ] as const;

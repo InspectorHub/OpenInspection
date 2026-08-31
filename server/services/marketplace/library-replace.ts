@@ -75,6 +75,13 @@ export async function resolveLibraryUpdate(
     if (!existing) {
         throw Errors.BadRequest('Library has not been imported yet — use Import instead of Update');
     }
+    // An uninstalled marker is a record, not an install. Updating one would put
+    // its content back while the marker still read "uninstalled", which is a
+    // workspace holding rows that every other surface believes it removed.
+    // Installing is the way back in, and installing is what reinstates it.
+    if (existing.uninstalledAt !== null) {
+        throw Errors.BadRequest('This library is uninstalled — install it again rather than updating it');
+    }
     if (existing.importedSemver === lib.semver) {
         throw Errors.BadRequest('No update available — already on the latest version');
     }

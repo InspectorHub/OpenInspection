@@ -31,6 +31,7 @@ const PUBLISHED_HASH = 'a'.repeat(64);
  */
 const CATALOGUE: StatutoryFormVersion[] = [{
     formId: 'tx_trec_rei',
+    formTitle: 'Yankee Flat Form',
     version: '7-6',
     sourceUrl: PAGE,
     sourceHash: PUBLISHED_HASH,
@@ -39,6 +40,7 @@ const CATALOGUE: StatutoryFormVersion[] = [{
     effectiveUntil: null,
     publishedBy: 'platform',
     publishedAt: Date.parse('2026-08-21T00:00:00.000Z'),
+    withdrawn: null,
 }];
 
 vi.mock('../../../server/lib/statutory/forms', () => ({
@@ -71,7 +73,7 @@ beforeEach(async () => {
     db = drizzle(sqlite, { schema });
     binding = toD1Binding(sqlite);
 
-    const { sha256Hex } = await import('../../../server/lib/statutory/revision-watch');
+    const { sha256Hex } = await import('../../../server/lib/sha256');
     publishedBytesHash = await sha256Hex(new TextEncoder().encode(PUBLISHED_BYTES));
     CATALOGUE[0]!.sourceHash = publishedBytesHash;
 

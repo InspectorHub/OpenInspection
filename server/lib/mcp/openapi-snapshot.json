@@ -2322,7 +2322,7 @@
                         "title": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 50,
+                          "maxLength": 120,
                           "description": "TODO describe title field for the OpenInspection MCP integration"
                         },
                         "icon": {
@@ -2405,7 +2405,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -2461,6 +2485,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -2704,7 +2734,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -2760,6 +2814,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -2891,7 +2951,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -2947,6 +3031,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -3031,7 +3121,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -3087,6 +3201,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -3218,7 +3338,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -3274,6 +3418,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -3405,7 +3555,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -3461,6 +3635,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -3592,7 +3772,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -3648,6 +3852,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -3779,7 +3989,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -3835,6 +4069,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -3919,7 +4159,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -3975,6 +4239,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -7890,6 +8160,34 @@
     "description": "Auto-generated placeholder for getInspectionRequestByInspection (GET /by-inspection/{inspectionId}, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "getInspectionStatutoryDetails",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/statutory-details",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection ID",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection ID"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "The inspection-level answers this inspection's statutory form asks for",
+    "description": "Every field is null until somebody fills it in; null is a normal answer."
+  },
+  {
     "operationId": "getInspectionStatutoryForm",
     "method": "GET",
     "pathTemplate": "/api/inspections/{id}/statutory-form.pdf",
@@ -7915,7 +8213,7 @@
       "body": null
     },
     "summary": "Download the statutory form this inspection produces",
-    "description": "Renders the authority's own published form for this inspection. 404 when the template declares none; 409 while no report version is published."
+    "description": "Renders the authority's own published form for this inspection. 404 when the template declares none; 409 while no report version is published, and 409 when the inspection's date is governed by a revision this template does not produce."
   },
   {
     "operationId": "getInspectionStatutoryFormOffer",
@@ -8079,6 +8377,33 @@
     },
     "summary": "Preview which imported comments a replace would overwrite",
     "description": "Lists the comments this tenant rewrote since importing the library, each beside the publisher's version in the pending release, so a destructive replace can be decided against the actual text rather than a count."
+  },
+  {
+    "operationId": "getMarketplaceStatutoryUpdateImpact",
+    "method": "GET",
+    "pathTemplate": "/api/templates/marketplace/{id}/statutory-update/impact",
+    "scopes": [
+      "read"
+    ],
+    "tag": "marketplace",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "The catalogue entry id",
+          "schema": {
+            "type": "string",
+            "description": "The catalogue entry id"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Count the in-progress inspections a statutory package update would affect",
+    "description": "How many inspections still on this workspace's copy of a statutory template keep producing their form after an update, and how many are dated under the newer revision and therefore cannot produce it at all."
   },
   {
     "operationId": "getMessageInspection",
@@ -12040,6 +12365,22 @@
     "description": "Auto-generated placeholder for listSlugCheckSlug (GET /check/slug, profile domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "listStatutoryFormSources",
+    "method": "GET",
+    "pathTemplate": "/api/admin/statutory-forms",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Published statutory revisions, and whether their PDFs are stored",
+    "description": "Every statutory revision this software publishes, and whether this deployment already holds the issuing authority's PDF for it. A revision with no stored PDF can be installed from a package but can produce nothing, so this is the read that says which uploads are still owed."
+  },
+  {
     "operationId": "listTagInspections",
     "method": "GET",
     "pathTemplate": "/api/tags/{id}/inspections",
@@ -13298,7 +13639,7 @@
                     "title": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 50,
+                      "maxLength": 120,
                       "description": "TODO describe title field for the OpenInspection MCP integration"
                     },
                     "icon": {
@@ -13381,7 +13722,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -13437,6 +13802,12 @@
                                 ],
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
+                              },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                               },
                               "type": {
                                 "type": "string",
@@ -13680,7 +14051,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -13736,6 +14131,12 @@
                                 ],
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
+                              },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                               },
                               "type": {
                                 "type": "string",
@@ -13867,7 +14268,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -13923,6 +14348,12 @@
                                 ],
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
+                              },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                               },
                               "type": {
                                 "type": "string",
@@ -14007,7 +14438,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -14063,6 +14518,12 @@
                                 ],
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
+                              },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                               },
                               "type": {
                                 "type": "string",
@@ -14194,7 +14655,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -14250,6 +14735,12 @@
                                 ],
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
+                              },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                               },
                               "type": {
                                 "type": "string",
@@ -14381,7 +14872,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -14437,6 +14952,12 @@
                                 ],
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
+                              },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                               },
                               "type": {
                                 "type": "string",
@@ -14568,7 +15089,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -14624,6 +15169,12 @@
                                 ],
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
+                              },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                               },
                               "type": {
                                 "type": "string",
@@ -14755,7 +15306,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -14811,6 +15386,12 @@
                                 ],
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
+                              },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                               },
                               "type": {
                                 "type": "string",
@@ -14895,7 +15476,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -14951,6 +15556,12 @@
                                 ],
                                 "additionalProperties": false,
                                 "description": "TODO describe source field for the OpenInspection MCP integration"
+                              },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "minLength": 1,
+                                "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                               },
                               "type": {
                                 "type": "string",
@@ -15302,6 +15913,16 @@
               "24h"
             ],
             "description": "Per-user clock (12h|24h). Empty string clears the override (inherit tenant)."
+          },
+          "statutoryLicenseType": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "State licence class printed on a statutory form. NOT an association certification — that is an inspector credential."
+          },
+          "statutoryQualification": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Statutory qualification category the signer declares. A different axis from the licence class."
           }
         }
       }
@@ -18798,6 +19419,34 @@
     "description": "Increment per-user usage counter for a comment library entry."
   },
   {
+    "operationId": "uninstallMarketplaceEntry",
+    "method": "POST",
+    "pathTemplate": "/api/templates/marketplace/{id}/uninstall",
+    "scopes": [
+      "write"
+    ],
+    "tag": "marketplace",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "The catalogue entry id",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The catalogue entry id"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Stop offering an installed catalogue entry",
+    "description": "Takes an installed pack out of service for this workspace. Nothing is deleted for a 1:1 kind: the local template is retired so it leaves the new-inspection picker, and inspections already using it keep producing from their own snapshot. A comment pack's imported rows ARE removed; comments the workspace wrote itself are never touched. Installing the entry again brings it back."
+  },
+  {
     "operationId": "unlockInspectionReport",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/unlock-report",
@@ -19388,6 +20037,86 @@
     "description": "Sets the per-inspection price override on one service line. Passing null clears the override so the line reverts to the catalog price snapshotted when it was added."
   },
   {
+    "operationId": "updateInspectionStatutoryDetails",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/statutory-details",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection ID",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection ID"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "inspectorSignatureDate": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^(\\d{4}-\\d{2}-\\d{2})?$",
+            "description": "The day the inspector signed — NOT the day of the visit. Empty clears it."
+          },
+          "employeePrintedName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120,
+            "description": "The second signer FL OIR-B1-1802 page 5 prints. Empty clears it."
+          },
+          "ownerName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120,
+            "description": "The property OWNER, who is frequently not the client. Empty clears it."
+          },
+          "ownerEmail": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "description": "The owner's email. Empty clears it."
+          },
+          "ownerMailingAddress": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300,
+            "description": "Where the owner receives post, which may not be the property. Empty clears it."
+          },
+          "ownerHomePhone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40,
+            "description": "The owner's home number. The form prints three separate boxes."
+          },
+          "ownerWorkPhone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40,
+            "description": "The owner's work number."
+          },
+          "ownerCellPhone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40,
+            "description": "The owner's mobile number."
+          }
+        }
+      }
+    },
+    "summary": "Record the inspection-level answers a statutory form asks for",
+    "description": "A field left out is left alone; a field sent empty is cleared."
+  },
+  {
     "operationId": "updateInspectionTemplate",
     "method": "PUT",
     "pathTemplate": "/api/inspections/templates/{id}",
@@ -19452,7 +20181,7 @@
                         "title": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 50,
+                          "maxLength": 120,
                           "description": "TODO describe title field for the OpenInspection MCP integration"
                         },
                         "icon": {
@@ -19535,7 +20264,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -19591,6 +20344,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -19834,7 +20593,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -19890,6 +20673,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -20021,7 +20810,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -20077,6 +20890,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -20161,7 +20980,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -20217,6 +21060,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -20348,7 +21197,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -20404,6 +21277,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -20535,7 +21414,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -20591,6 +21494,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -20722,7 +21631,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -20778,6 +21711,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -20909,7 +21848,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -20965,6 +21928,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -21049,7 +22018,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -21105,6 +22098,12 @@
                                     ],
                                     "additionalProperties": false,
                                     "description": "TODO describe source field for the OpenInspection MCP integration"
+                                  },
+                                  "parentId": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "minLength": 1,
+                                    "description": "Id of the item this one nests under, within the same section; null or absent = top level"
                                   },
                                   "type": {
                                     "type": "string",
@@ -22068,6 +23067,34 @@
     },
     "summary": "Upload inspector profile photo",
     "description": "Accepts a jpg/png/webp photo (max 2 MB) as multipart form data, stores it in R2 under a tenant-scoped key, and saves the public photoUrl on the user record."
+  },
+  {
+    "operationId": "uploadStatutoryFormSource",
+    "method": "POST",
+    "pathTemplate": "/api/admin/statutory-forms/{formId}/source",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "formId",
+          "in": "path",
+          "required": true,
+          "description": "Stable id of the statutory form itself, never one of its revisions, e.g. tx_trec_rei.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stable id of the statutory form itself, never one of its revisions, e.g. tx_trec_rei."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Upload the authority PDF for a revision",
+    "description": "Supply the issuing authority's own published PDF for one revision of one statutory form. The upload is verified against the sha256 that revision records and refused if it does not match, naming both values. The bytes are never fetched on the operator's behalf: the source URL is provenance for a human, and an authority may publish a superseded revision at its most obvious address."
   },
   {
     "operationId": "upsertInspectionCompliancePsq",

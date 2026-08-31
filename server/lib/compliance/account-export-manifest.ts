@@ -156,6 +156,11 @@ export const ACCOUNT_EXPORT_CLASSIFICATION: AccountExportFieldRule[] = [
     { field: 'serviceOriginAddress', column: 'service_origin_address', disposition: 'export', reason: 'where this subject starts their working day, possibly their home address — their own personal data, and this export is the subject asking for it' },
     { field: 'serviceOriginLat', column: 'service_origin_lat', disposition: 'export', reason: 'geocode of the subject\'s own routing origin' },
     { field: 'serviceOriginLng', column: 'service_origin_lng', disposition: 'export', reason: 'geocode of the subject\'s own routing origin' },
+    // The two statutory licensing facts. Professional qualifications the subject
+    // asserted about themselves, printed on documents they sign — as much their
+    // own data as their name is, and about nobody else.
+    { field: 'statutoryLicenseType', column: 'statutory_license_type', disposition: 'export', reason: 'the state licence class this subject holds — a professional qualification they stated about themselves' },
+    { field: 'statutoryQualification', column: 'statutory_qualification', disposition: 'export', reason: 'the statutory qualification category this subject declares for themselves; a different axis from the licence class and the same kind of fact' },
 ];
 
 /** Reason attached to a column nobody has classified yet. */

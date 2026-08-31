@@ -25,11 +25,13 @@ const LOAD_BEARING =
 
 const VERSION: StatutoryFormVersion = {
     formId: 'yy_flat_form', version: 'Rev. 04/26',
+    formTitle: 'Yankee Flat Form',
     effectiveFrom: Date.UTC(2026, 3, 1),
     mandatoryFrom: Date.UTC(2026, 3, 1),
     effectiveUntil: null,
     sourceUrl: 'https://example.gov/f.pdf', sourceHash: 'a'.repeat(64),
     publishedBy: 'a.operator', publishedAt: Date.UTC(2026, 3, 1),
+    withdrawn: null,
 };
 
 describe('the statutory form notice', () => {
@@ -43,7 +45,18 @@ describe('the statutory form notice', () => {
         const text = statutoryNoticeFor(VERSION, { softwareName: 'Acme Inspect' });
         expect(text).toContain(VERSION.version);
         expect(text).toContain(formatEffectiveDate(VERSION.effectiveFrom));
-        expect(text).toContain(VERSION.formId);
+        // The form's TITLE. This sentence is read by an inspector, and it used
+        // to interpolate `formId` -- "a software implementation of
+        // fl_oir_b1_1802", which names nothing anybody has held.
+        expect(text).toContain(VERSION.formTitle);
+    });
+
+    it('NEGATIVE CONTROL - the notice never carries our internal form id', () => {
+        // Paired with the assertion above so neither can pass alone: one proves
+        // the title arrives, this proves the id it replaced does not follow it.
+        const text = statutoryNoticeFor(VERSION, { softwareName: 'Acme Inspect' });
+        expect(text).not.toContain(VERSION.formId);
+        expect(VERSION.formId).not.toBe(VERSION.formTitle);   // the two really differ
     });
 
     it('keeps the closing sentence after interpolation', () => {

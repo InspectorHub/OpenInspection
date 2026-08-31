@@ -146,6 +146,44 @@ describe('gate registry', () => {
             // db:check compares schema against migrations and is equally happy
             // with 101 in both. Cost: reads the schema directory, ~40ms.
             'columnceiling',
+            // Added 2026-08-31, and NOT with the gate it names: `itemkeyparity`
+            // joined the rung on 2026-08-29 without this entry, so this spec had
+            // been red on the branch ever since while every pre-commit and
+            // pre-push hook stayed green. That is the third time the lock has
+            // caught exactly this, and the second where the red outlived the
+            // commit that caused it — a full `test:unit` is the only thing that
+            // runs it, and this branch had not had one.
+            //
+            // The argument is the one its registry entry already makes, quoted
+            // rather than re-invented: what it catches IS a keystroke — a key
+            // added to `TemplateItem` and not added to the six mirrors that
+            // strip it, never serialize it, or simply do not read it, none of
+            // which errors. The damage lands the moment the commit exists, and
+            // the author is the only person who will ever know which of the
+            // seven they meant to change. Six files, six parsers, milliseconds.
+            'itemkeyparity',
+            // Added 2026-08-30 with the raw-NUL gate, and the lock did its job
+            // a fourth time: registered at this rung without this entry, so the
+            // full run went red on a tree whose pre-commit and pre-push hooks
+            // were both green.
+            //
+            // It earns pre-commit on `privatereview`'s argument, which no other
+            // gate here can make: THE REPAIR STOPS BEING FREE THE MOMENT THE
+            // COMMIT EXISTS. A single NUL byte makes a whole file binary to git
+            // grep, ripgrep and every diff, and fixing the file does not fix
+            // its history — the commit that introduced it still shows
+            // `Bin 6576 -> 6577 bytes` with no line-level diff, forever, and so
+            // does every `git log -p` and `git blame` that crosses it. Caught
+            // before the commit it is one character; caught after, the fix
+            // repairs the working tree and leaves the record unreadable.
+            //
+            // It is also invisible by construction, which is why nothing else
+            // reports it: the file compiles, behaves identically and passes
+            // every other gate here. Three arrived independently in unrelated
+            // subsystems and the oldest went unnoticed for months.
+            // Cost: one `git ls-files` and an indexOf per file — 0.33s over
+            // 3,940 files, measured three times.
+            'rawnul',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);

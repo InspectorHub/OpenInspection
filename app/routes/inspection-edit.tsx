@@ -27,10 +27,10 @@ import { SectionRail } from "~/components/editor-shared/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
 import { FullscreenToggle } from "~/components/editor/FullscreenToggle";
 import { ItemList } from "~/components/editor-shared/ItemList";
-import { useStatutoryGroups, useStructuralEditingAllowed } from "~/hooks/useStatutoryGroups";
-import { GroupInstanceDrawer } from "~/components/statutory/GroupInstanceDrawer";
-import { formCompleteness } from "~/lib/editor/form-completeness";
-import { formBoundItemIds } from "~/lib/editor/statutory-groups";
+import { useStatutoryGroups, useStatutoryFormProgress, useStructuralEditingAllowed } from "~/hooks/useStatutoryGroups";
+import { useCompletedRevalidation } from "~/hooks/useCompletedRevalidation";
+import { AddGroupInstanceHost } from "~/components/statutory/AddGroupInstanceHost";
+import { RevisionBanner } from "~/components/statutory/RevisionBanner";
 import { ItemEditor } from "~/components/editor/ItemEditor";
 import { TagChipRow, type TagPin } from "~/components/editor/TagChipRow";
 import type { DefectFieldsValue } from "~/components/editor/DefectFieldsRow";
@@ -44,11 +44,7 @@ import { KeyboardHud } from "~/components/editor/KeyboardHud";
 import { InspectorToolsDock } from "~/components/editor/InspectorToolsDock";
 import { BurstCamera } from "~/components/editor/BurstCamera";
 import { PhotoAnnotator } from "~/components/media-studio/PhotoAnnotator";
-import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { resolveActivePropertyPreset } from "~/lib/property-preset";
-import { PcaNarrativePanel } from "~/components/inspection/PcaNarrativePanel";
-import { CompliancePanel } from "~/components/inspection-edit/CompliancePanel";
-import { CommercialReportControls, type ReportTier } from "~/components/editor/CommercialReportControls";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
 import { CoverCropper, coverCropFor } from "~/components/media-studio/CoverCropper";
 import { PhotoCropper } from "~/components/media-studio/PhotoCropper";
@@ -75,6 +71,7 @@ import { useIsMobile } from "~/hooks/useBreakpoint";
 import { MobileAppBar } from "~/components/editor/MobileAppBar";
 import { MobileDrawerTriggers, type MobileDrawerId } from "~/components/editor/MobileDrawerTriggers";
 import { MobileFinishDrawer } from "~/components/editor/MobileFinishDrawer";
+import { InspectionOverview } from "~/components/editor/InspectionOverview";
 import { MobileBottomDrawer } from "~/components/MobileBottomDrawer";
 import { BreadcrumbDropdown, type UnitScopeRow } from "~/components/editor/BreadcrumbDropdown";
 import { UnitsManager } from "~/components/editor/UnitsManager";
@@ -707,17 +704,16 @@ export default function InspectionEditPage() {
  /* Item attribute handler */
  /* ---------------------------------------------------------------- */
 
- const handleItemAttribute = useCallback((itemId: string, attributeId: string, value: string | number | boolean | null) => {
-  fetcher.submit(
-   {
-    intent: 'set-item-attribute',
-    itemId,
-    attributeId,
-    value: JSON.stringify(value),
-   },
-   { method: 'POST' },
-  );
- }, [fetcher]);
+ // Through `findings`, exactly like a rating or a note. This used to submit a
+ // `set-item-attribute` fetcher intent — an intent NO action ever handled, left
+ // behind when Phase 5 retired the fetcher write path and made the collab doc
+ // the only road. Every answer fell through the action's final `return { ok }`,
+ // and a write that reached D1 by any other route was erased by the doc's next
+ // flush. Measured 2026-08-30 on the FL Citizens roof pack.
+ const handleItemAttribute = useCallback((itemId: string, attributeId: string, value: string | number | boolean | string[] | null) => {
+  const sectionId = state.sectionIdForItem(itemId);
+  if (sectionId) findings.setItemAttribute(sectionId, itemId, attributeId, value);
+ }, [findings, state.sectionIdForItem]);
 
  /* Photo studio state */
  const [photoStudioOpen, setPhotoStudioOpen] = useState(false);
@@ -757,12 +753,15 @@ export default function InspectionEditPage() {
   const instanceSubmit = useGuardedSubmit<{ ok?: boolean; error?: string }>();
   // Visible while filling rather than at the end: an inspector who learns the
   // form is short two answers when he presses send is already three houses away.
-  const formProgress = useMemo(() => {
-    const declaration = (loaderData.templateSnapshot as { statutoryForm?: Parameters<typeof formBoundItemIds>[0] } | null)?.statutoryForm;
-    if (!declaration) return null;
-    const done = formCompleteness(formBoundItemIds(declaration), state.results);
-    return done.total > 0 ? done : null;
-  }, [loaderData.templateSnapshot, state.results]);
+  const formProgress = useStatutoryFormProgress(loaderData.templateSnapshot, state.results);
+  // Which revision governs this inspection, decided on the server and only
+  // displayed here — two implementations of a date-window question disagree at
+  // some boundary, and nobody checks a date boundary by hand. Null when there
+  // is nothing to say, which is every ordinary inspection.
+  const revisionBannerEl = loaderData.revisionStatus ? (
+    <div className="mb-4"><RevisionBanner status={loaderData.revisionStatus}
+      inspectionDate={String(state.inspection.date ?? "").slice(0, 10)} /></div>
+  ) : null;
  const structure = useStructureEdit({
   rawSnapshot: loaderData.templateSnapshot,
   collabEditing: loaderData.collabEditing,
@@ -944,13 +943,10 @@ export default function InspectionEditPage() {
   * (see useInspectionState), so revalidation alone leaves the header badge and
   * the toolbar button stale. Patch status locally the same way structural edits
   * do, then revalidate for anything loader-derived. */
- useEffect(() => {
- if (completeFetcher.state !== "idle" || !completeFetcher.data) return;
- if (completeFetcher.data.ok) {
- state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED }));
- revalidator.revalidate();
- }
- }, [completeFetcher.state, completeFetcher.data, revalidator, state]);
+ /* One-shot: the reason, and the measurement behind it, live in the hook. */
+ useCompletedRevalidation(completeFetcher.state, completeFetcher.data,
+  () => state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED })),
+  () => revalidator.revalidate());
 
  /* ---------------------------------------------------------------- */
  /* Rating handler with auto-advance */
@@ -1491,7 +1487,14 @@ export default function InspectionEditPage() {
  sectionProgress={state.sectionProgress}
  sectionDefectCount={state.sectionDefectCount}
  overviewActive={state.activeView === "property"}
- onSelectOverview={() => state.setActiveView("property")}
+ onSelectOverview={() => {
+ state.setActiveView("property");
+ // Mobile only, and both lines are load-bearing. The drawer does not
+ // close itself, so without the second the inspector taps the entry and
+ // keeps looking at the drawer that covers the thing they asked for —
+ // the two sibling entries in this same rail already close it.
+ if (isMobile) setMobileDrawer(null);
+ }}
  onAddSection={structure.addSection}
  onDuplicateSection={structure.duplicateSection}
  onDeleteSection={structure.deleteSection}
@@ -1732,6 +1735,37 @@ export default function InspectionEditPage() {
  </div>
  ) : null;
 
+ /* The "Inspection Details" overview, mounted by BOTH shells below. The two
+  * render trees are separate, so markup that lives in only one of them is
+  * simply absent from the other: this was inline in the desktop tree, and
+  * choosing "Inspection Details" in the mobile Sections drawer therefore
+  * rendered nothing at all -- no PROPERTY INFO, no statutory panel, at any
+  * width. Same shape as the photo-input bug the next comment records, and the
+  * same fix. */
+ const propertyOverviewEl = (
+  <InspectionOverview
+   inspection={state.inspection}
+   templateFields={activePropertyPreset}
+   onSaveField={(fieldId, value) => {
+    state.setInspection((prev) => ({ ...prev, [fieldId]: value }));
+   }}
+   onCommitFacts={savePropertyFacts}
+   statutoryDetails={loaderData.statutoryDetails}
+   pcaNarrative={loaderData.pcaNarrative}
+   complianceData={{ ...loaderData.compliance, relianceText: loaderData.relianceText }}
+   savingCommercial={subtypeBusy || tierBusy}
+   onChangeSubtype={(subtype) => {
+    // Optimistic ONLY on acceptance: a refused submit sent nothing, and
+    // moving the local value anyway would show a subtype the server does
+    // not hold. Refused means the control snaps back, which is visible.
+    if (saveSubtype(subtype)) state.setInspection((prev) => ({ ...prev, commercialSubtype: subtype }));
+   }}
+   onChangeTier={(tier) => {
+    if (saveTier(tier)) state.setInspection((prev) => ({ ...prev, reportTier: tier }));
+   }}
+  />
+ );
+
  // Task 16 — hoisted so the SAME elements mount in both the mobile and
  // desktop render trees below (they're two separate early-return JSX trees,
  // not nested). FE-2 already hit this bug once for the old single photo
@@ -1741,6 +1775,7 @@ export default function InspectionEditPage() {
  // directly; the add-media chooser (camera vs library vs video) and the
  // video-capture overlay it can open must mount on both surfaces too, since
  // onPhoto/onAddPhoto/onAddDefectPhoto now route mobile through the chooser.
+
  const photoInputsEl = (
  <>
  <input
@@ -1907,14 +1942,27 @@ export default function InspectionEditPage() {
  sectionTitle={state.currentSection?.title ?? ''}
  itemLabel={((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? m.editor_route_select_an_item()}
  onBack={() => {
-  // B-22: back from item editor → item list; back from list → inspections
+  // B-22: back from item editor → item list; back from list → inspections.
+  // The overview is a third destination on this shell and needs its own
+  // step out, or Back from it leaves the inspection entirely.
+  if (state.activeView === "property") { state.setActiveView("items"); return; }
   if (state.activeItemId) { state.setActiveItemId(null); return; }
   navigate('/inspections');
  }}
  onMore={() => setMobileDrawer('actions')}
  />
  <main className="p-4">
- {emptyTemplateEl ?? (state.activeItemId ? (
+ {revisionBannerEl}
+ {/* `activeView === "property"` is checked FIRST, exactly as the desktop
+     tree checks it, and for the reason the two must agree: choosing
+     "Inspection Details" leaves whichever item was open still open, so
+     testing `activeItemId` first would keep showing that item and the
+     overview would be unreachable from a phone — which is what it was.
+     The empty-template CTA still wins over both: an inspection with no
+     sections has no details to show either. */}
+ {emptyTemplateEl ?? (state.activeView === "property" ? (
+  propertyOverviewEl
+ ) : state.activeItemId ? (
   itemEditorEl
  ) : (
   <p className="text-center text-ih-fg-3 mt-12">{m.editor_route_mobile_begin()}</p>
@@ -2143,31 +2191,24 @@ export default function InspectionEditPage() {
   onCancel={structure.closeAddSectionPrompt}
  />
 
- {statutoryGroups && addingToGroup ? (() => {
-   const group = statutoryGroups.find((g) => g.id === addingToGroup);
-   if (!group) return null;
-   return (
-     <GroupInstanceDrawer
-       open
-       group={group}
-       index={group.capacity}
-       saving={instanceSubmit.busy}
-       onClose={() => setAddingToGroup(null)}
-       onSave={(fields) => {
-         instanceSubmit.submit(
-           {
-             intent: "add-statutory-instance",
-             groupId: group.id,
-             index: String(group.capacity),
-             fields: JSON.stringify(fields),
-           },
-           { method: "post" },
-         );
-         setAddingToGroup(null);
-       }}
-     />
-   );
- })() : null}
+ <AddGroupInstanceHost
+   groups={statutoryGroups}
+   groupId={addingToGroup}
+   saving={instanceSubmit.busy}
+   onClose={() => setAddingToGroup(null)}
+   onSave={(group, fields) => {
+     instanceSubmit.submit(
+       {
+         intent: "add-statutory-instance",
+         groupId: group.id,
+         index: String(group.capacity),
+         fields: JSON.stringify(fields),
+       },
+       { method: "post" },
+     );
+     setAddingToGroup(null);
+   }}
+ />
 
  {/* D8 — "Add item" type-picker. */}
  <AddItemTypeModal
@@ -2442,66 +2483,8 @@ export default function InspectionEditPage() {
   </div>
  )}
  <main className="flex-1 overflow-y-auto p-6">
- {state.activeView === "property" ? (
-  <>
-  <PropertyInfoForm
-  inspection={state.inspection}
-  templateFields={activePropertyPreset}
-  onSave={(fieldId, value) => {
-  state.setInspection((prev) => ({
-   ...prev,
-   [fieldId]: value,
-  }));
-  }}
-  onCommit={savePropertyFacts}
-  />
-  {/* Commercial PCA Phase T — subtype + report tier selectors. Gated on the
-     same propertyType === 'commercial' flag section-applicability.ts uses
-     to decide PCA-only sections apply. Sits above the narrative panel so
-     the subtype (which the Building Profile / cost tables key off) is set
-     before the inspector writes narrative for a specific tier. */}
-  {(state.inspection as Record<string, unknown>).propertyType === "commercial" ? (
-   <div className="mt-8 border-t border-ih-border pt-6">
-    <CommercialReportControls
-     commercialSubtype={((state.inspection as Record<string, unknown>).commercialSubtype as string | null | undefined) ?? null}
-     reportTier={((state.inspection as Record<string, unknown>).reportTier as ReportTier | null | undefined) ?? null}
-     saving={subtypeBusy || tierBusy}
-     onChangeSubtype={(subtype) => {
-      // Optimistic ONLY on acceptance: a refused submit sent nothing, and
-      // moving the local value anyway would show a subtype the server does
-      // not hold. Refused means the control snaps back, which is visible.
-      if (saveSubtype(subtype)) state.setInspection((prev) => ({ ...prev, commercialSubtype: subtype }));
-     }}
-     onChangeTier={(tier) => {
-      if (saveTier(tier)) state.setInspection((prev) => ({ ...prev, reportTier: tier }));
-     }}
-    />
-   </div>
-  ) : null}
-  {/* Commercial PCA Phase S — narrative editor panel. Gated on the same
-     propertyType === 'commercial' flag section-applicability.ts uses to
-     decide PCA-only sections apply. */}
-  {(state.inspection as Record<string, unknown>).propertyType === "commercial" ? (
-   <div className="mt-8 border-t border-ih-border pt-6">
-    <PcaNarrativePanel narrative={loaderData.pcaNarrative} />
-   </div>
-  ) : null}
-  {/* Commercial PCA Phase M Task 10 — compliance panel (dual sign-off / PSQ /
-     doc-review checklist / conformance preview). Rendered ONLY at
-     reportTier === 'full_pca' — a light_commercial report has no compliance
-     surface (the Task 6 API 409s writes at any other tier). Self-manages its
-     own fetchers/intents; the loader only supplies the read-side artifacts. */}
-  {(state.inspection as Record<string, unknown>).propertyType === "commercial" &&
-   ((state.inspection as Record<string, unknown>).reportTier as ReportTier | null | undefined) === "full_pca" ? (
-   <div className="mt-8 border-t border-ih-border pt-6">
-    <CompliancePanel
-     inspectionId={String(state.inspection.id)}
-     data={{ ...loaderData.compliance, relianceText: loaderData.relianceText }}
-    />
-   </div>
-  ) : null}
-  </>
- ) : itemEditorEl}
+ {revisionBannerEl}
+ {state.activeView === "property" ? propertyOverviewEl : itemEditorEl}
  </main>
  </div>
 

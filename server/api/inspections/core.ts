@@ -14,7 +14,7 @@ import { Errors } from '../../lib/errors';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 import { getInspectionRoster } from '../../lib/inspection/roster';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
-import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema } from '../../lib/validations/inspection.schema';
+import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema, PatchInspectionResponseSchema } from '../../lib/validations/inspection.schema';
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
 import { inspections as inspectionTable, inspectionResults } from '../../lib/db/schema';
 import { datePatchValues } from '../../services/inspection/reschedule-date';
@@ -32,6 +32,7 @@ import { noticeFor } from '../../features/plan-quota/notice';
 import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/email/build-email-service';
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import { getDrizzle } from '../../lib/route-helpers';
+import { patchRevisionReport } from './patch-revision-report';
 
 /**
  * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
@@ -165,7 +166,7 @@ const updateInspectionRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: PatchInspectionResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -359,7 +360,11 @@ const coreRoutes = createApiRouter()
                 metadata: { from: inspection.status, to: body.status },
             });
         }
-        return c.json({ success: true }, 200);
+
+        // A moved date can move which statutory revision governs this
+        // inspection. ./patch-revision-report says why that is reported rather
+        // than refused, and why the key is absent when there is nothing to say.
+        return c.json(patchRevisionReport(body, updateValues, inspection), 200);
     })
     .openapi(createInspectionRoute, async (c) => {
         const body = c.req.valid('json');

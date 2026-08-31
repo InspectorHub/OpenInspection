@@ -14,6 +14,7 @@
  * fallback had nothing left to match and the helper had nothing left to do.
  */
 import { generateRandomToken } from './random-token';
+import { sha256Hex } from './sha256';
 
 /**
  * Mint a new opaque capability token. Delegates to the canonical
@@ -24,8 +25,16 @@ export function mintToken(): string {
     return generateRandomToken();
 }
 
+/**
+ * The value stored in a `token_hash` column, for the token presented in a link.
+ *
+ * A NAME rather than a call to `sha256Hex`, because the lookup contract is what
+ * matters at the call sites: every family hashes the presented token the same
+ * way and matches on the column. The digest itself is the shared one -- this
+ * used to be its own copy of the same six lines, and two spellings of a value
+ * every stored row is matched against is two chances for one to drift.
+ */
 export async function hashToken(token: string): Promise<string> {
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
-    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+    return sha256Hex(token);
 }
 

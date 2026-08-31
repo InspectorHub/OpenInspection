@@ -19,117 +19,62 @@
  * 2. The template snapshot must declare a form. Absent is the ordinary case for
  *    almost every template, so this is a 404 -- there is no such document for
  *    this inspection -- rather than an error.
+ * 3. The revision this template produces must be the revision this inspection's
+ *    own date selects. A mismatch is the one state the design blocks, and it is
+ *    blocked HERE rather than only in the editor's banner: producing anyway
+ *    would put the governing revision's bytes under the superseded revision's
+ *    bindings, and where two revisions' field names overlap that is a plausible,
+ *    WRONG official document which `recordProduction` then files as legitimate.
+ *    The judgement is `revisionStatusForInspection` -- the same call the banner,
+ *    the reschedule response and the update confirmation make, because a warning
+ *    and a refusal that each decided for themselves would disagree at some date
+ *    boundary, and the disagreement would be silent.
+ *
+ * 4. The revision must not have been WITHDRAWN. Checked ahead of 3, because a
+ *    withdrawal is the only fault here that has already put wrong documents in
+ *    somebody's hands, and the refusal names WHY it was withdrawn: this
+ *    software's field map was found wrong, in which case a correction is coming
+ *    from us and what already went out should go out again, or the authority
+ *    retired the document, in which case nothing is coming and the reader moves
+ *    to the revision now in force. The two sentences live in
+ *    `lib/statutory/withdrawal-copy.ts`, not here.
+ *
+ * There is deliberately NO migration out of that state (see revision-status.ts):
+ * the way out is a new inspection on the updated template. Every OTHER refusal
+ * on this path -- the producer's and the renderer's -- reaches the reader
+ * through `refusalToUser`; see that file for why it had to be added.
  *
  * `producedAt` is the published version's own timestamp, never `Date.now()`.
  * Passing now would make the header read `current` forever, including for a
  * form whose report has since been corrected.
  */
-import { createRoute, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, desc } from 'drizzle-orm';
 import { createApiRouter } from '../../lib/openapi-router';
-import { requireRole } from '../../lib/middleware/rbac';
-import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { deliverableHeaders } from '../../lib/deliverable-headers';
 import { produceStatutoryForm } from '../../services/statutory/produce.service';
+import { recordProduction } from '../../services/statutory/production-record';
 import {
     StatutoryOverflowService,
     refuseIndexInsidePrintedRange,
 } from '../../services/statutory/overflow.service';
 import { versionForInspection } from '../../lib/statutory/form-registry';
+import { revisionStatusForInspection } from '../../lib/statutory/revision-status';
+import { withdrawalRefusal, supersededRefusal } from '../../lib/statutory/withdrawal-copy';
 import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
-import { utcMidnightOf } from '../../lib/statutory/inspection-date';
+import { utcMidnightOf, calendarDayOfStoredDate } from '../../lib/statutory/inspection-date';
 import { statutoryNoticeFor, formatEffectiveDate } from '../../lib/statutory/disclaimer';
-import { PeopleService } from '../../services/people.service';
-import { CredentialService } from '../../services/credential.service';
 import { Errors } from '../../lib/errors';
+import { refusalToUser } from '../../lib/statutory/refusal-to-user';
 import * as schema from '../../lib/db/schema';
 import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
-import type { StatutoryInspectionFacts, StatutoryItemResult } from '../../lib/statutory/values';
-
-const statutoryFormRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/{id}/statutory-form.pdf',
-    tags: ['inspections'],
-    summary: 'Download the statutory form this inspection produces',
-    description:
-        'Renders the authority\'s own published form for this inspection. 404 when the template '
-        + 'declares none; 409 while no report version is published.',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().trim().min(1).describe('Inspection ID') }) },
-    responses: {
-        200: { description: 'The rendered form' },
-        404: { description: 'No such inspection for this workspace, or its template declares no form' },
-        409: { description: 'No report version is published yet' },
-    },
-    operationId: 'getInspectionStatutoryForm',
-}, { scopes: ['read'], tier: 'extended' }));
-
-/**
- * The offer route, read by the inspection hub loader.
- *
- * It exists so the UI can ask "is there a statutory form here, and what does
- * the notice say" WITHOUT downloading one. The notice is rendered server-side
- * from `lib/statutory/disclaimer.ts`, which is what keeps that module on a
- * production path -- a notice composed in the component instead would be
- * invisible to the copy gate and the non-translatable registry, and the
- * unwired census would be right to call the module unreachable.
- *
- * `available: false` is a normal answer, not an error. A deployment that
- * publishes no forms answers it for every inspection, which is why the control
- * simply does not render rather than rendering and then failing.
- */
-const statutoryOfferRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/{id}/statutory-form',
-    tags: ['inspections'],
-    summary: 'Whether this inspection produces a statutory form, and its notice',
-    description: 'Answers without rendering a PDF. available:false is the ordinary answer.',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().trim().min(1).describe('Inspection ID') }) },
-    responses: {
-        200: { description: 'The offer, available or not' },
-        404: { description: 'No such inspection for this workspace' },
-    },
-    operationId: 'getInspectionStatutoryFormOffer',
-}, { scopes: ['read'], tier: 'extended' }));
-
-
-/**
- * POST /api/inspections/:id/statutory-form/instances
- *
- * Record one repeated-block instance the authority's page has no slot to print.
- *
- * Printed slots do NOT come through here: they are ordinary template items and
- * their values reach the form as bindings. This is only for what the item model
- * cannot express, which is why an index inside the printed range is refused
- * rather than accepted and quietly ignored.
- */
-const AddInstanceBodySchema = z.object({
-    groupId: z.string().trim().min(1).describe('The repeated block, e.g. electrical_panel'),
-    index: z.number().int().min(0).describe('Position, 0-based. Must be at or past the group capacity.'),
-    fields: z.record(z.string(), z.string()).describe('Field name to value, in the vocabulary the group declares'),
-});
-
-const addInstanceRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/{id}/statutory-form/instances',
-    tags: ['inspections'],
-    summary: 'Record an instance the statutory form has no slot for',
-    description: 'Stores one repeated-block instance past the printed capacity of the form. '
-        + 'Printed slots are ordinary items and are not recorded here.',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: {
-        params: z.object({ id: z.string().trim().min(1).describe('Inspection ID') }),
-        body: { content: { 'application/json': { schema: AddInstanceBodySchema } } },
-    },
-    responses: {
-        200: { description: 'Recorded' },
-        400: { description: 'The index names a slot the form prints' },
-        404: { description: 'No such inspection, or it produces no statutory form' },
-    },
-    operationId: 'addInspectionStatutoryFormInstance',
-}, { scopes: ['write'], tier: 'extended' }));
+import { gatherStatutoryInputs } from './statutory-inputs';
+import { logger } from '../../lib/logger';
+import {
+    statutoryFormRoute,
+    statutoryOfferRoute,
+    addInstanceRoute,
+} from './statutory.routes';
 
 const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) => {
     const { id } = c.req.valid('param');
@@ -170,62 +115,61 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
         );
     }
 
-    const results = (await db.select()
-        .from(schema.inspectionResults)
-        .where(eq(schema.inspectionResults.inspectionId, id))
-        .get())?.data as Record<string, StatutoryItemResult> | undefined;
-
-    // The client comes from the inspection_people primary-client join, NOT from
-    // inspections.client_name/_email/_phone -- those were a frozen cache and are
-    // gone. A hard cutover with no legacy fallback, matching invoices,
-    // agreements and publish elsewhere.
-    const primaryClient = await new PeopleService({ DB: c.env.DB }).getPrimaryClient(tenantId, id);
-
-    // The inspector's name comes from `users` and the licence from the credential
-    // rows, exactly as the report PDF's signature block resolves them -- one
-    // source, so the two surfaces can never disagree about the same inspector.
+    // Precondition 3. Refused before anything is rendered and before anything is
+    // recorded: a refusal after the bytes exist is a document that was produced.
     //
-    // NOTE ON NULL: CredentialService returns null when there is no credential,
-    // and its own callers OMIT the line rather than print an empty one. That is
-    // right for a report footer and wrong here. On an authority's form the box is
-    // preprinted, so a blank is not "no such item" -- it is an invalid submission.
-    // A null therefore reaches collectStatutoryValues and is refused there by the
-    // required-field check, which is the intended behaviour.
-    const inspectorId = inspection.inspectorId;
-    const inspectorRow = inspectorId
-        ? await db.select({ name: schema.users.name })
-            .from(schema.users)
-            .where(and(eq(schema.users.id, inspectorId), eq(schema.users.tenantId, tenantId)))
-            .get()
-        : undefined;
-    const licenceNumber = inspectorId
-        ? await new CredentialService(c.env.DB).primaryLicenseNumber(tenantId, inspectorId)
-        : null;
+    // `null` and the three non-blocking states pass. In particular a template
+    // that names no revision is NOT refused -- it makes no claim to measure, and
+    // guessing one would refuse a correct report. The blocking state is the only
+    // one where the template's own claim contradicts the inspection's date.
+    // ONE reading of the column, handed to everything below: `inspections.date`
+    // holds a calendar day OR that day plus an instant (`calendarDayOfStoredDate`),
+    // and everything past this line takes a bare day. The hand-rolled slice that
+    // used to sit here narrowed the revision check while the RAW value still went
+    // on to the producer -- which is how every wizard-made inspection 500ed.
+    const inspectionDay = calendarDayOfStoredDate(inspection.date);
+    const revision = revisionStatusForInspection({
+        snapshot,
+        inspectionDate: inspectionDay,
+        now: Date.now(),
+    });
+    if (revision?.kind === 'withdrawn') {
+        // Checked before `cannot_produce`, in the same order the criterion
+        // itself decides them: a withdrawal is the only fault here that has
+        // already put wrong documents into somebody's hands, and its remedy
+        // depends on WHY. Refusing with the generic "different document"
+        // sentence would be true and useless.
+        throw Errors.Conflict(withdrawalRefusal({
+            formId: declaration.formId,
+            version: revision.version,
+            reason: revision.reason,
+            at: revision.withdrawnAt,
+            replacementVersion: revision.replacementVersion,
+            inspectionDate: inspectionDay,
+        }));
+    }
+    if (revision?.kind === 'cannot_produce') {
+        throw Errors.Conflict(supersededRefusal({
+            formId: declaration.formId,
+            inspectionDate: inspectionDay,
+            applicableVersion: revision.applicableVersion,
+            templateVersion: revision.templateVersion,
+        }));
+    }
 
-    // The company identity is the workspace config, read the same way the
-    // publish path reads its branding.
-    const config = await db.select({
-        companyName: schema.tenantConfigs.companyName,
-        companyPhone: schema.tenantConfigs.companyPhone,
-    })
-        .from(schema.tenantConfigs)
-        .where(eq(schema.tenantConfigs.tenantId, tenantId))
-        .get();
-
-    const facts: StatutoryInspectionFacts = {
-        client_name: primaryClient?.name ?? null,
-        client_email: primaryClient?.email ?? null,
-        client_phone: primaryClient?.phone ?? null,
-        property_address: inspection.propertyAddress ?? null,
-        property_city: inspection.addressCity ?? null,
-        property_state: inspection.addressState ?? null,
-        property_zip: inspection.addressZip ?? null,
-        inspection_date: inspection.date ?? null,
-        inspector_name: inspectorRow?.name ?? null,
-        inspector_license: licenceNumber,
-        company_name: config?.companyName ?? null,
-        company_phone: config?.companyPhone ?? null,
-    };
+    const { results, facts, signatures, skippedNonDefaultUnits } = await refusalToUser(
+        () => gatherStatutoryInputs(db, c.env.DB, tenantId, inspection, inspectionDay, declaration),
+    );
+    if (skippedNonDefaultUnits.length > 0) {
+        // Answered only under some other unit. This form describes one dwelling,
+        // so substituting a unit's answer would print its findings under the
+        // whole building's address.
+        logger.warn('statutory: item answered only outside the default unit', {
+            inspectionId: id,
+            items: skippedNonDefaultUnits.slice(0, 10),
+            count: skippedNonDefaultUnits.length,
+        });
+    }
 
     // Instances the page has no slot to print. Printed slots are ordinary items
     // and arrive through the bindings above; these are what the item model has
@@ -234,15 +178,29 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
     const instances = await new StatutoryOverflowService(db)
         .instancesFor(tenantId, id, declaration.formId);
 
-    const produced = await produceStatutoryForm({
+    const produced = await refusalToUser(() => produceStatutoryForm({
         formId: declaration.formId,
-        inspectionDate: inspection.date,
+        inspectionDate: inspectionDay,
         declaration,
         snapshot,
         results: results ?? {},
         facts,
         instances,
+        signatures,
         bucket: c.env.PHOTOS,
+    }));
+
+    // Which revision this document was produced from. Written before the bytes
+    // are handed over, because a recall counts documents that LEFT and a row
+    // written after the response would be missing exactly the deliveries that
+    // failed on the way out.
+    await recordProduction(db, {
+        tenantId,
+        inspectionId: id,
+        formId: declaration.formId,
+        version: produced.version.version,
+        sourceHash: produced.version.sourceHash,
+        producedBy: c.get('user')?.sub ?? 'unknown',
     });
 
     return new Response(produced.bytes, {
@@ -285,10 +243,26 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
             .get();
         if (!published?.publishedAt) return c.json(unavailable, 200);
 
-        // Same selection the PDF route makes, so the two can never disagree
-        // about which revision this inspection is governed by.
+        // Same reading of the column the PDF route makes, so the two can never
+        // disagree about which day -- and so which revision -- governs. A date
+        // this cannot read is a FAULT, not the ordinary absence, but the answer
+        // still has to be `available: false` so the page renders. So it says WHY
+        // on the way out: a silent degrade is how this survived the whole
+        // published life of the TREC form, the control simply never appearing.
+        let inspectionDay: string;
+        try {
+            inspectionDay = calendarDayOfStoredDate(inspection.date);
+        } catch (cause) {
+            logger.warn('statutory: offer withheld, the inspection date is unreadable', {
+                inspectionId: id,
+                formId: declaration.formId,
+                reason: cause instanceof Error ? cause.message : String(cause),
+            });
+            return c.json(unavailable, 200);
+        }
+
         const version = versionForInspection(
-            declaration.formId, utcMidnightOf(inspection.date), PUBLISHED_FORM_VERSIONS,
+            declaration.formId, utcMidnightOf(inspectionDay), PUBLISHED_FORM_VERSIONS,
         );
         if (!version) return c.json(unavailable, 200);
 
@@ -296,7 +270,9 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
             success: true,
             data: {
                 available: true,
-                formId: version.formId,
+                // The TITLE, not `formId`. What the offer hands the UI is what
+                // the UI prints, and `formId` is a key rather than a name.
+                formTitle: version.formTitle,
                 revision: version.version,
                 effectiveDate: formatEffectiveDate(version.effectiveFrom),
                 notice: statutoryNoticeFor(version, { softwareName: c.env.APP_NAME || 'This software' }),

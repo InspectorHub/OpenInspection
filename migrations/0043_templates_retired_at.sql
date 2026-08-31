@@ -1,0 +1,1 @@
+ALTER TABLE `templates` ADD `retired_at` integer;

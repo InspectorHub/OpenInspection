@@ -1,12 +1,50 @@
 import type { ItemAttribute } from '../../lib/types';
+import { choiceLabel, choiceValue } from '../../../server/lib/template-choices';
+
+/**
+ * What one attribute can hold.
+ *
+ * The array is a `multi_select`, and it is here because a statutory form asks
+ * for one: six published questions print "check all that apply" — the Citizens
+ * photo requirements (6 boxes), electrical hazards (13), wiring types (8), pipe
+ * types (8), roof damage signs (8 in each of two columns) and the 1802's roof
+ * coverings (7). The renderer has always marked every box a list names; until
+ * this type widened there was no control that could produce one.
+ */
+export type ItemAttributeValue = string | number | boolean | string[] | null;
 
 export interface ItemAttributesPanelProps {
     itemId: string;
     attributes: ItemAttribute[];
-    values: Record<string, string | number | boolean | null>;
-    onChange: (itemId: string, attributeId: string, value: string | number | boolean | null) => void;
+    values: Record<string, ItemAttributeValue>;
+    onChange: (itemId: string, attributeId: string, value: ItemAttributeValue) => void;
 }
 
+/** What is already ticked, tolerating the scalar a `select` used to store. */
+function chosen(value: ItemAttributeValue): string[] {
+    if (Array.isArray(value)) return value;
+    return typeof value === 'string' && value !== '' ? [value] : [];
+}
+
+/**
+ * Attribute labels are `--ih-fg-3`, and the ramp step below it is not available
+ * here.
+ *
+ * Measured in Chromium against the rendered `getComputedStyle`, on the card
+ * these panels are drawn on: `--ih-fg-4` scores **2.56:1 in light** (#94a3b8 on
+ * #ffffff) and **3.07:1 in dark** (#64748b on #1e293b), against a 4.5:1
+ * requirement. `--ih-fg-3` clears both -- 4.76:1 light, 5.71:1 dark.
+ *
+ * `lint:contrast` is green either way, and its own header says why: it only
+ * scores a class string that sets BOTH a colour and a size, and these labels
+ * set only the colour -- the 11px comes from the grid wrapper. That header
+ * counts 119 such `text-ih-fg-4`-on-a-card strings tree-wide and calls the
+ * size-independent rule a deliberately deferred extension. So this was never
+ * going to be caught by the gate; it was caught by measuring the screen.
+ *
+ * The boolean branch already said `fg-3` while its five siblings said `fg-4`,
+ * which is how a one-token drift stays invisible: nothing lines the two up.
+ */
 export function ItemAttributesPanel({ itemId, attributes, values, onChange }: ItemAttributesPanelProps) {
     if (!attributes || attributes.length === 0) return null;
     return (
@@ -17,7 +55,7 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                 if (attr.type === 'number') {
                     return (
                         <div key={key} className="col-span-6 md:col-span-3">
-                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">
+                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-0.5">
                                 {attr.name}{attr.unit ? ` (${attr.unit})` : ''}
                             </label>
                             <input
@@ -32,14 +70,20 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                 if (attr.type === 'select') {
                     return (
                         <div key={key} className="col-span-6 md:col-span-3">
-                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{attr.name}</label>
+                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-0.5">{attr.name}</label>
                             <select
                                 value={typeof v === 'string' ? v : ''}
                                 onChange={e => onChange(itemId, attr.id, e.target.value || null)}
                                 className="w-full px-2 py-1 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
                             >
                                 <option value="">—</option>
-                                {(attr.choices ?? []).map(c => <option key={c} value={c}>{c}</option>)}
+                                {/* `value` is the option's VALUE and `label` is
+                                    only its text: what a change event carries
+                                    is `e.target.value`, so the form still
+                                    receives the token it matches on. */}
+                                {(attr.choices ?? []).map(c => (
+                                    <option key={choiceValue(c)} value={choiceValue(c)}>{choiceLabel(c)}</option>
+                                ))}
                             </select>
                         </div>
                     );
@@ -60,7 +104,7 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                 if (attr.type === 'date') {
                     return (
                         <div key={key} className="col-span-6 md:col-span-3">
-                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{attr.name}</label>
+                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-0.5">{attr.name}</label>
                             <input
                                 type="date"
                                 value={typeof v === 'string' ? v : ''}
@@ -70,10 +114,60 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                         </div>
                     );
                 }
-                // text / fallback (text + multi_select default to text input for v1)
+                if (attr.type === 'multi_select') {
+                    const ticked = chosen(v);
+                    return (
+                        // Wider than the other controls: this is a column of
+                        // boxes rather than one field, and squeezed into a
+                        // quarter width every option wraps onto two lines.
+                        <fieldset key={key} className="col-span-12 md:col-span-6">
+                            <legend className="block font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-0.5">
+                                {attr.name}
+                            </legend>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                {(attr.choices ?? []).map(c => (
+                                    <label key={choiceValue(c)} className="flex items-center gap-1.5 text-ih-fg-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={ticked.includes(choiceValue(c))}
+                                            onChange={e => {
+                                                // Rebuilt from the DECLARED choice
+                                                // order, never by appending: the
+                                                // stored value is what a form's
+                                                // `whenValue` is matched against,
+                                                // and a list whose order depends on
+                                                // the order somebody clicked is a
+                                                // value that differs between two
+                                                // inspectors who answered the same.
+                                                // VALUES, not labels: this array
+                                                // is the stored answer, and a
+                                                // label in it matches no box on
+                                                // the authority's form.
+                                                const next = (attr.choices ?? [])
+                                                    .map(choiceValue)
+                                                    .filter((option) => (option === choiceValue(c)
+                                                        ? e.target.checked
+                                                        : ticked.includes(option)));
+                                                // Empty is NOT an empty array. A form
+                                                // reader refuses one by name: "none
+                                                // of these" is the empty string, and
+                                                // an empty list is what a binding
+                                                // that resolved nothing produces.
+                                                onChange(itemId, attr.id, next.length > 0 ? next : null);
+                                            }}
+                                            className="w-3.5 h-3.5 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
+                                        />
+                                        {choiceLabel(c)}
+                                    </label>
+                                ))}
+                            </div>
+                        </fieldset>
+                    );
+                }
+                // text / fallback
                 return (
                     <div key={key} className="col-span-6 md:col-span-3">
-                        <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{attr.name}</label>
+                        <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-0.5">{attr.name}</label>
                         <input
                             type="text"
                             value={typeof v === 'string' ? v : ''}

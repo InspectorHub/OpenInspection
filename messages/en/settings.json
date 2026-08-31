@@ -44,6 +44,8 @@
   "settings_hub_automations_desc": "Email triggers and rules.",
   "settings_hub_compliance_title": "Compliance",
   "settings_hub_compliance_desc": "Privacy & Terms pages, GDPR retention, erasure records.",
+  "settings_hub_statutory_forms_title": "Statutory form PDFs",
+  "settings_hub_statutory_forms_desc": "The authority's own published PDF for each statutory revision this deployment renders.",
   "settings_hub_usage_title": "Usage",
   "settings_hub_usage_desc": "SMS, email, and storage this account has used.",
   "settings_error_save_failed": "Save failed",
@@ -273,5 +275,11 @@
   "settings_workspace_timeformat_select_label": "Time format",
   "settings_profile_dateformat_label": "Your date format",
   "settings_profile_timeformat_label": "Your clock",
-  "settings_profile_format_hint": "Applies to your own dashboards, lists, and calendar. Inspection dates, report dates, and appointment times always use the company format — you, your client, and the agent read the same one out loud on the phone."
+  "settings_profile_format_hint": "Applies to your own dashboards, lists, and calendar. Inspection dates, report dates, and appointment times always use the company format — you, your client, and the agent read the same one out loud on the phone.",
+  "settings_profile_statutory_licence_label": "State licence class",
+  "settings_profile_statutory_licence_placeholder": "e.g. Florida-licensed home inspector",
+  "settings_profile_statutory_licence_hint": "Printed in the “License Type” box on statutory forms. Write the class exactly as the authority names it. This is not an association certification — those live under Licenses & affiliations.",
+  "settings_profile_statutory_qualification_label": "Statutory qualification",
+  "settings_profile_statutory_qualification_none": "Not declared",
+  "settings_profile_statutory_qualification_hint": "The category some forms ask you to declare for yourself, beside your licence rather than instead of it. The wording beside each box is the form's own; leave it on “Not declared” if no form you produce asks for one."
 }

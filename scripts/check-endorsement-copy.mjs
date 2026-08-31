@@ -46,9 +46,58 @@
  * Usage: node scripts/check-endorsement-copy.mjs [--self-test]
  */
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, relative } from 'node:path';
 
 const ROOT = process.cwd();
+
+/**
+ * Strings that are the AUTHORITY'S OWN WORDS, transcribed from its published
+ * form, rather than copy this software wrote about itself.
+ *
+ * ── Why the rules cannot simply be narrowed instead ─────────────────────────
+ * The policy this gate enforces is about the sentence NEXT to the form: a claim
+ * that an agency approved OUR rendering. A question's `description` that is the
+ * form's own instruction text is not next to the form; it IS the form, and the
+ * rest of the statutory subsystem exists to reproduce it verbatim
+ * (`lint:statutory-fidelity`, and a signed field map behind it). Editing one to
+ * please a gate would print an instruction the authority never printed, which
+ * is the fault the whole subsystem is built to prevent.
+ *
+ * And these WILL keep arriving. An agency's own form text routinely puts an
+ * approval word beside an institution — Florida's Q9 names the "product
+ * approval system of the State of Florida", meaning the programme that approves
+ * BUILDING PRODUCTS, a different subject entirely. Four forms ship today and
+ * more are coming; a per-clause patch each time would erode the rules until
+ * they stopped catching the thing they exist for.
+ *
+ * ── Fail-closed, three ways ────────────────────────────────────────────────
+ * An exemption pinned only to a path would silently cover whatever that path
+ * later held. So each entry names the exact bytes:
+ *
+ *   1. the string must still EXIST at that path            — else FAIL (stale)
+ *   2. its sha256 must still match                         — else FAIL (edited)
+ *   3. it must still produce at least one hit              — else FAIL (moot)
+ *
+ * Rule 3 is the one that keeps this list honest: an exemption that has stopped
+ * suppressing anything is a claim about the file that is no longer true, and
+ * leaving it in place would quietly widen the next person's licence.
+ */
+const TRANSCRIPTIONS = [
+    {
+        file: 'server/data/seed-templates/fl-oir-b1-1802-rev-04-26.json',
+        path: 'schema.sections[8].items[1].description',
+        sha256: '54eafb0bb3d9c3ce9818e10853fd277594348eb4f4e81299cf86fd7c2734b18a',
+        source: 'Florida OIR-B1-1802 Rev. 04/26, question 9 (Opening Protection), transcribed '
+            + 'verbatim from the adopted form the Office publishes',
+        why: 'Answers A and B both cite the "product approval system of the State of Florida or '
+            + 'Miami-Dade County" — an approval word and an institution in one clause. The subject '
+            + 'of that approval is a building product, not this software or its output, and the '
+            + 'sentence is the authority\'s, printed on its own page.',
+    },
+];
+
+const sha256 = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 
 /**
  * Where statutory-form copy can be written today.
@@ -294,9 +343,19 @@ for (const scope of SCOPES) {
                 ? jsonStrings(JSON.parse(src), '', [])
                 : tsStrings(src);
             scopeStrings += values.length;
+            const rel = relative(ROOT, file).replace(/\\/g, '/');
             for (const { path, value } of values) {
-                for (const rule of scanValue(value)) {
-                    hits.push({ file: relative(ROOT, file).replace(/\\/g, '/'), path, value, why: rule.why, id: rule.id });
+                const found = scanValue(value);
+                if (found.length === 0) continue;
+                // An exemption applies only where BOTH the path and the exact
+                // bytes match. A path alone would cover whatever that path came
+                // to hold later.
+                const exempt = TRANSCRIPTIONS.find(
+                    (t) => t.file === rel && t.path === path && t.sha256 === sha256(value),
+                );
+                if (exempt) { exempt.suppressed = (exempt.suppressed ?? 0) + found.length; continue; }
+                for (const rule of found) {
+                    hits.push({ file: rel, path, value, why: rule.why, id: rule.id });
                 }
             }
         }
@@ -314,6 +373,8 @@ console.log(`\n[endorsement-copy] ${strings} string(s) in ${files} file(s) acros
 for (const g of groups) {
     console.log(`   ${g.files === 0 ? '✘' : '·'} ${g.name} (${g.dir}): ${g.files} file(s), ${g.strings} string(s)`);
 }
+console.log(`   · authority transcriptions exempted: ${TRANSCRIPTIONS.length} declared, `
+    + `${TRANSCRIPTIONS.reduce((n, t) => n + (t.suppressed ?? 0), 0)} match(es) suppressed`);
 
 // Zero examined is a hard failure, never a pass — and per GROUP, not only in
 // total: two healthy groups would otherwise carry a third that had moved.
@@ -333,6 +394,24 @@ if (hits.length) {
         console.error(`     ${h.why}\n`);
     }
     console.error('Name the authority and name the form. Do not attribute an approval to either.\n');
+    process.exit(1);
+}
+
+// An exemption that suppressed nothing is a statement about this repository
+// that has stopped being true. It is a failure, never a quiet pass — otherwise
+// the list only ever grows and each stale line widens the next person's licence.
+const moot = TRANSCRIPTIONS.filter((t) => !t.suppressed);
+if (moot.length) {
+    console.error(`\n${moot.length} declared transcription(s) suppressed nothing:\n`);
+    for (const t of moot) {
+        const full = join(ROOT, t.file);
+        const reason = !existsSync(full)
+            ? 'the file is gone'
+            : 'the string moved, was edited (the sha256 no longer matches), or no longer trips a rule';
+        console.error(`   ${t.file} -> ${t.path}\n     ${reason}`);
+    }
+    console.error('\nRe-point the entry at the bytes it means, or delete it. An exemption that');
+    console.error('covers nothing is a licence nobody checked.\n');
     process.exit(1);
 }
 

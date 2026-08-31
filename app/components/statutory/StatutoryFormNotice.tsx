@@ -41,8 +41,15 @@ import { Banner } from "@core/shared-ui";
  * only. Weight carries the distinction and inherits whatever the tone decided.
  */
 export interface StatutoryFormNoticeProps {
-    /** The authority's own identifier for the form, e.g. `fl_oir_b1_1802`. */
-    formId: string;
+    /**
+     * The authority's own title for the form, verbatim: `Florida Office of
+     * Insurance Regulation Uniform Mitigation Verification Inspection Form`.
+     *
+     * NOT `formId`. This trio is a citation the reader checks against the
+     * authority's own site, and `fl_oir_b1_1802` is a key in our database that
+     * appears on no form and on no agency page.
+     */
+    formTitle: string;
     /** The authority's own revision label, verbatim. */
     revision: string;
     /** `YYYY-MM-DD`, in UTC, matching how the revision was selected. */
@@ -52,7 +59,7 @@ export interface StatutoryFormNoticeProps {
 }
 
 export function StatutoryFormNotice({
-    formId,
+    formTitle,
     revision,
     effectiveDate,
     notice,
@@ -60,8 +67,10 @@ export function StatutoryFormNotice({
     return (
         <Banner tone="info" className="flex-col items-start gap-3">
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs font-normal">
+                {/* Prose, so no `font-mono`: the other two are short labels the
+                    authority prints as tokens, this one is its sentence. */}
                 <dt className="font-semibold">Form</dt>
-                <dd className="font-mono">{formId}</dd>
+                <dd>{formTitle}</dd>
                 <dt className="font-semibold">Revision</dt>
                 <dd className="font-mono">{revision}</dd>
                 <dt className="font-semibold">Effective</dt>

@@ -27,10 +27,12 @@ import type { DeploymentProfile } from '../lib/deployment-profile';
  * It is a NAMED function so a spec can assert on what ships. The list used to
  * be four fields written inline, and a capability that is not on it is not
  * merely undocumented in the client — it is UNREADABLE there. That is not a
- * hypothetical: `library-hub.tsx` and `CommandPalette.tsx` both gate the
- * marketplace on `branding.isSaas` while `marketplace.tsx` gates it on
- * `hasContentMarketplace`, and the reason is simply that the capability had
+ * hypothetical: `library-hub.tsx` and `CommandPalette.tsx` both gated the
+ * marketplace on `branding.isSaas` while `marketplace.tsx` gated it on
+ * `hasContentMarketplace`, and the reason was simply that the capability had
  * never been put on the wire. The wrong answer was the only reachable one.
+ * (That capability is gone now — the marketplace exists in every deployment,
+ * so there is no question left to ship. The lesson about the allowlist stands.)
  */
 export function deploymentPayload(
     profile: DeploymentProfile,
@@ -41,7 +43,6 @@ export function deploymentPayload(
         hasBilling: profile.hasBilling || false,
         hasSeatQuota: profile.hasSeatQuota || false,
         mcpEnabled: mcpEnabled(env),
-        hasContentMarketplace: profile.hasContentMarketplace || false,
         videoBackendManaged: profile.videoBackendManaged || false,
         hasManagedCompliance: profile.hasManagedCompliance || false,
         // The BOOLEAN only, never the three import caps beside it on the

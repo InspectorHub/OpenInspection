@@ -16,7 +16,9 @@ import {
     refuseUnreadableSignature,
     MIN_SIGNATURE_PIXELS_PER_POINT,
     SUPPORTED_SIGNATURE_IMAGE_TYPES,
+    decodeSignatureDataUri,
 } from '../../../server/lib/statutory/signature-image';
+import { pngDataUri } from '../helpers/png-fixture';
 
 /** A signature box off a real map: 160pt wide, 40pt tall, at 4:1. */
 const BOX = { x: 72, y: 120, width: 160, height: 40 };
@@ -127,5 +129,46 @@ describe('SUPPORTED_SIGNATURE_IMAGE_TYPES', () => {
         // no vector one -- an SVG that passes a data-URI check is a signature
         // that cannot be drawn at the moment somebody presses send.
         expect([...SUPPORTED_SIGNATURE_IMAGE_TYPES]).toEqual(['png', 'jpeg']);
+    });
+});
+
+/**
+ * Decoding what `users.default_signature_base64` actually holds.
+ *
+ * The column is the same one auto-sign-on-publish reads, so one stored mark
+ * feeds both a report and an authority's form. It reaches this subsystem as a
+ * data URI and has to come out as bytes a PDF can carry.
+ */
+describe('decodeSignatureDataUri', () => {
+    it('decodes a stored PNG into embeddable bytes', () => {
+        const image = decodeSignatureDataUri(pngDataUri(400, 100), 'inspector_signature');
+        expect(image.type).toBe('png');
+        // The PNG signature, so this is bytes and not a re-encoded string.
+        expect([...image.bytes.slice(0, 4)]).toEqual([0x89, 0x50, 0x4E, 0x47]);
+    });
+
+    it('refuses a format a PDF cannot carry, naming the field', () => {
+        // An SVG passes every data-URI check and displays fine on every HTML
+        // surface this product has. It is pdf-lib that cannot embed it, which is
+        // why the narrowest surface owns the list.
+        expect(() => decodeSignatureDataUri(
+            'data:image/svg+xml;base64,PHN2Zy8+', 'inspector_signature',
+        )).toThrow(/inspector_signature/);
+        expect(() => decodeSignatureDataUri(
+            'data:image/svg+xml;base64,PHN2Zy8+', 'inspector_signature',
+        )).toThrow(/svg\+xml/);
+    });
+
+    it('refuses something that is not a data URI at all', () => {
+        expect(() => decodeSignatureDataUri('', 'sig')).toThrow(/not a base64 image data URI/);
+        expect(() => decodeSignatureDataUri('https://example.test/sig.png', 'sig'))
+            .toThrow(/not a base64 image data URI/);
+    });
+
+    it('refuses an empty mark rather than drawing nothing', () => {
+        // Zero bytes renders as nothing at all rather than as an error, and a
+        // blank signature box on a statutory form is a rejected submission.
+        expect(() => decodeSignatureDataUri('data:image/png;base64,', 'sig'))
+            .toThrow(/zero bytes/);
     });
 });

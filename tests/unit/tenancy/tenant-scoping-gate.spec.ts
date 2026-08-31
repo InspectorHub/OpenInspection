@@ -4,8 +4,10 @@
  * Tests the exported `findUnscopedByIdQueries` function from
  * `scripts/check-tenant-scoping.mjs` using string fixtures.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { pathToFileURL } from 'node:url';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 // Load the exported function from the .mjs script at runtime, inside beforeAll.
@@ -13,6 +15,7 @@ import path from 'node:path';
 // ("Invalid or unexpected token"); deferring it into an async hook avoids the
 // top-level await while still letting Node natively load the .mjs via a file URL.
 let findUnscopedByIdQueries: (source: string, tables: Set<string>) => Array<{ line: number; context: string }>;
+let buildTenantTableIdents: (schemaDir: string) => Set<string>;
 
 beforeAll(async () => {
     const scriptPath = path.resolve(
@@ -21,7 +24,7 @@ beforeAll(async () => {
     );
     // @vite-ignore — load the .mjs via native Node import; vitest's transform
     // cannot process this script (esbuild target) and throws a SyntaxError.
-    ({ findUnscopedByIdQueries } = await import(/* @vite-ignore */ pathToFileURL(scriptPath).href));
+    ({ findUnscopedByIdQueries, buildTenantTableIdents } = await import(/* @vite-ignore */ pathToFileURL(scriptPath).href));
 });
 
 // A small tenant-scoped table set for fixture tests
@@ -134,5 +137,66 @@ const row = await db.select().from(schema.agreements)
 `;
         const hits = findUnscopedByIdQueries(source, TABLES);
         expect(hits).toHaveLength(1);
+    });
+});
+
+/**
+ * The classifier — which tables the gate treats as tenant-scoped at all.
+ *
+ * ⚠️ THIS IS THE HALF THAT WAS WRONG, AND THE HALF NOTHING COULD REACH. It read
+ * a fixed 80 lines forward from each `sqliteTable` declaration looking for a
+ * `tenant_id` column, which runs straight past the end of a short table into
+ * whatever is declared next. `marketplace_libraries` — the platform catalogue,
+ * which carries no tenant_id and holds the same rows for every workspace — was
+ * classified tenant-scoped by borrowing the column of the table below it, and
+ * every by-id read of the catalogue was then reported as a cross-tenant leak.
+ *
+ * Every test above passed throughout, because `findUnscopedByIdQueries` takes
+ * its table set as an argument and was always handed a correct one by hand.
+ */
+describe('buildTenantTableIdents', () => {
+    let dir: string;
+
+    beforeAll(() => { dir = mkdtempSync(path.join(tmpdir(), 'oi-scope-')); });
+    afterAll(() => { rmSync(dir, { recursive: true, force: true }); });
+
+    it('does NOT borrow the tenant_id of the table declared after a long one', () => {
+        // The regression in miniature: a global table with a long body, and a
+        // tenant-scoped one starting inside the old 80-line window.
+        const filler = Array.from({ length: 70 }, (_, i) => `  col${i}: text('col${i}'),`);
+        const source = [
+            "export const globalCatalogue = sqliteTable('global_catalogue', {",
+            "  id: text('id').primaryKey(),",
+            ...filler,
+            '});',
+            '',
+            "export const scopedThing = sqliteTable('scoped_thing', {",
+            "  id: text('id').primaryKey(),",
+            "  tenantId: text('tenant_id').notNull(),",
+            '});',
+        ].join('\n');
+        writeFileSync(path.join(dir, 'fixture.ts'), source, 'utf8');
+
+        const idents = buildTenantTableIdents(dir);
+
+        // Both directions, so neither can pass on a classifier that returns
+        // nothing at all or everything at all.
+        expect(idents.has('scopedThing')).toBe(true);
+        expect(idents.has('globalCatalogue')).toBe(false);
+    });
+
+    it('the real schema keeps the platform catalogue out and the imports in', () => {
+        // The fixture proves the shape; this proves the actual pair that was
+        // misclassified, so a future reordering of the schema file cannot
+        // reintroduce it silently.
+        const schemaDir = path.resolve(
+            import.meta.dirname ?? process.cwd(),
+            '../../../server/lib/db/schema',
+        );
+        const idents = buildTenantTableIdents(schemaDir);
+
+        expect(idents.size).toBeGreaterThan(50);          // it really read the schema
+        expect(idents.has('tenantLibraryImports')).toBe(true);
+        expect(idents.has('marketplaceLibraries')).toBe(false);
     });
 });

@@ -135,16 +135,17 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
     // there is nothing mobile-specific left to assert.
 
     // M-07 deleted (2026-08-11): it asserted that /library/marketplace renders,
-    // which stopped being true for standalone in the same round this spec last
-    // ran green. The content marketplace is a hosted-only surface — the loader
-    // throws 404 when `hasContentMarketplace` is false — so there is no
-    // standalone page whose mobile layout could overflow.
+    // which stopped being true for standalone in the round this spec last ran
+    // green, and became true again when that 404 was removed — it rested on the
+    // false claim that nothing could reach a standalone catalogue.
     //
-    // Deleted rather than rewritten for the reason M-06 was: a server-side gate
-    // is viewport-independent, so nothing about it belongs in a mobile spec. The
-    // assertion moved to standalone-api.spec.ts (API-25), where it is stronger —
-    // it sends a VALID admin token, so a 404 can only be the capability and not
-    // a permission.
+    // It stays deleted for the reason M-06 was, which never depended on either
+    // answer: whether a route is served is decided server-side and is
+    // viewport-independent, so nothing about it belongs in a mobile spec. The
+    // assertion lives in standalone-api.spec.ts (API-25), where it is stronger —
+    // it sends a VALID admin token, so the status can only be about the route
+    // and not about a permission. If this page's mobile LAYOUT ever needs
+    // covering, that is a different test and it would assert on overflow.
     //
     // Worth noting how long this hid: the run that first exposed it had 151
     // specs that never executed, because globalSetup swallowed a failed

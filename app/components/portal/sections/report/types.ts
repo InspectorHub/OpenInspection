@@ -72,6 +72,14 @@ export interface ResolvedDefect {
 export interface ReportItem {
   id: string;
   label: string;
+  /**
+   * The item this one nests under, within the same section. Absent or null =
+   * top level, and so is a pointer at an item this list does not contain — the
+   * `defects` filter drops rows, so a child can outlive its parent, and it
+   * becomes a top-level card rather than disappearing into a card that is not
+   * on the page.
+   */
+  parentId?: string | null;
   type?: string;
   rating: string | null;
   ratingColor: string;

@@ -168,6 +168,23 @@ function countNewlines(s) {
     return (s.match(/\n/g) ?? []).length;
 }
 
+/**
+ * Source split into lines with no carriage return left on the end.
+ *
+ * ⚠️ NOT tidiness. `ALLOW_NO_BUSY` ends in `$`, and in JavaScript `.` does not
+ * match `\r` — so on a worktree checked out with CRLF (`core.autocrlf=true`,
+ * the default on Windows) the escape hatch never matched and the gate reported
+ * a violation against a file that carries one. Same bytes in git, opposite
+ * answers on two machines: a gate whose verdict depends on how the file was
+ * checked out is not reporting on the file.
+ *
+ * Line NUMBERS are still counted against the unsplit source, so they stay
+ * valid for both line endings.
+ */
+function splitLines(source) {
+    return source.split(/\r?\n/);
+}
+
 /** The banned call shape. See the docblock: shape, not name. */
 const CALL_SHAPE = /\w*[Ff]etcher\.submit\s*\(/g;
 
@@ -203,7 +220,7 @@ const FETCHER_DECL = /(?:const|let|var)\s+(\w+)\s*=\s*useFetcher\b/g;
  */
 export function findSubmitCallSites(source) {
     const stripped = stripComments(source);
-    const lines = source.split('\n');
+    const lines = splitLines(source);
     /** char offset -> hit, so the two passes can never report one call twice. */
     const byIndex = new Map();
     const record = (index) => {
@@ -285,7 +302,7 @@ export function isBusyRuleConsumer(source) {
 export function findBusyViolations(source) {
     if (!isBusyRuleConsumer(source)) return [];
     const stripped = stripComments(source);
-    const lines = source.split('\n');
+    const lines = splitLines(source);
     const out = [];
     for (const m of stripped.matchAll(DESTRUCTURE)) {
         const line = countNewlines(stripped.slice(0, m.index)) + 1;

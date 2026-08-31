@@ -23,9 +23,11 @@
  *
  * ⚠️ A value with no route onto the page is REFUSED, never dropped. A dropped
  * value is a blank on a statutory document, and a blank looks exactly like an
- * answer nobody had. That is also why a required field missing from `values`
- * refuses: a form nobody filled must not be producible, while a form somebody
- * filled with an empty answer must be.
+ * answer nobody had. Likewise a required field with no answer in `values`: a
+ * form nobody filled must not be producible, while an OPTIONAL box filled with
+ * an empty answer must be. For a required field the two cases collapse — an
+ * absent key and an empty one both print the same blank, and `requiredFields`
+ * is the map's statement that no inspection may leave this box blank.
  *
  * ⚠️ AND THIS IS THE ONLY PLACE THAT DISTINCTION CAN LIVE. Measured against the
  * format: a form field set to an empty string is stored by storing nothing, so
@@ -33,9 +35,28 @@
  * document can tell the two apart. The refusal below happens before a document
  * exists, which is why it is a refusal and not a warning.
  *
- * ⚠️ LIMIT, stated rather than discovered later: an `acroform` mapping sets a
- * TEXT field. A fillable form whose checkboxes are real widgets is not covered —
- * such a mapping throws rather than quietly leaving the box unticked.
+ * ⚠️ A NAMED FIELD IS SET AS THE KIND IT IS. `acroform` sets a text field and
+ * `acroform_checkbox` sets a `/Btn` widget; each refuses a field of the other
+ * kind rather than guessing, because guessing sets nothing and raises nothing.
+ *
+ * That second route exists because of what the Texas form turned out to be: 245
+ * fields, 81 text and 164 real checkbox widgets. A map that DRAWS a mark at a
+ * coordinate inside one of those produces a document that is right on paper and
+ * wrong in its data — every box still reads as unticked to anything that opens
+ * the file, and the widget's own off-state appearance is painted after page
+ * content and may cover the mark outright.
+ *
+ * ── A question with several boxes may have several of them ticked ───────────
+ * An answer is a string OR a list of options. A string marks the one box it
+ * names, exactly as it always has; a list marks every box it names, which is
+ * what a multi-select question on these forms actually is — 6 boxes for the
+ * Citizens photo requirements, 13 for electrical hazards, 8 for wiring types, 8
+ * for pipe types, 8 for roof damage signs, 7 for the 1802's roof coverings.
+ *
+ * The two refusals that go with it are in `refuseAnswersNoBoxCanTake`, and both
+ * exist because the alternative prints and looks filled: an empty list (which is
+ * the empty string's job, and is what a binding that resolved nothing yields),
+ * and a list reaching a mapping that writes text.
  *
  * ── A value too big for its space is refused, never made to look like it fit ──
  * The two routes fail in mirror image and both leave a document that LOOKS
@@ -48,9 +69,19 @@
  * refused. The measuring, and the reasoning behind refusing rather than
  * truncating, live in `fit.ts`.
  */
-import { PDFDocument, StandardFonts, type PDFFont, type PDFTextField } from 'pdf-lib';
-import { validateAgainstPdf, validateFieldMapShape, type FieldMap, type FieldMapping } from './field-map';
+import {
+    PDFDocument, StandardFonts, type PDFCheckBox, type PDFFont, type PDFTextField,
+} from 'pdf-lib';
+import {
+    validateAgainstPdf, validateFieldMapShape,
+    type FieldMap, type FieldMapping, type StatutoryValue,
+} from './field-map';
 import { fitOverlay, refuseIfTheWidgetWouldClip } from './fit';
+import { partOfValue } from './value-parts';
+import { drawSignature, type SignatureImage } from './render-signature';
+// Every refusal made before a document exists. Its own file because it answers
+// a different question from this one -- see its header.
+import { checkValuesAgainstMap } from './value-checks';
 
 /**
  * How large a checkbox mark is drawn when the map does not say.
@@ -68,28 +99,60 @@ function fail(reason: string): never {
 }
 
 /**
+ * Does this answer name that box?
+ *
+ * A string names the one option it is. An array names every option in it, which
+ * is what a question with several boxes ticked looks like on the way in.
+ */
+function answerNames(value: StatutoryValue, whenValue: string): boolean {
+    return typeof value === 'string' ? value === whenValue : value.includes(whenValue);
+}
+
+/**
+ * The one string this answer is, for a mapping that writes text.
+ *
+ * `refuseAnswersNoBoxCanTake` already refused every array that reached anything
+ * but a checkbox, so this cannot fire in practice — it keeps the type honest
+ * rather than restating that rule, exactly as `value-parts.ts` does for a part
+ * with no maxWidth.
+ */
+function oneAnswer(value: StatutoryValue, ourField: string): string {
+    if (typeof value === 'string') return value;
+    fail(`"${ourField}" was answered with a list and this mapping writes text`);
+}
+
+/**
  * Render one statutory form.
  *
  * @param officialPdf the exact published bytes — their hash must be the one the
  *   map was authored against, which is checked before anything is written.
  * @param map the field map for that revision.
- * @param values our field name -> the string to put on the form. A key that is
+ * @param values our field name -> the answer to put on the form. A key that is
  *   PRESENT with an empty string is an answer of "nothing"; a key that is ABSENT
- *   is no answer at all, and for a required field that is refused.
+ *   is no answer at all. For a field named in `requiredFields` BOTH are refused,
+ *   because that list says the box is required of every inspection. An ARRAY is
+ *   several options of one multi-select question and marks every box it names —
+ *   see `StatutoryValue` for why an empty one is not a third case.
+ * @param signatures our field name -> a decoded signature image. A SEPARATE
+ *   channel on purpose: a signature is the most tightly classified personal data
+ *   this repository holds and `values` is declared to carry none. It still
+ *   counts as SUPPLIED for the required-field check, whose question is only
+ *   whether the box will be filled.
  */
 export async function renderStatutoryForm(
     officialPdf: Uint8Array,
     map: FieldMap,
-    values: Readonly<Record<string, string>>,
+    values: Readonly<Record<string, StatutoryValue>>,
+    signatures: ReadonlyMap<string, SignatureImage> = new Map(),
 ): Promise<Uint8Array> {
     validateFieldMapShape(map);
     await validateAgainstPdf(map, officialPdf);
-    // Read through a Map rather than by index: `Record<string, string>` types
-    // every lookup as present, and this whole function turns on telling an
-    // absent key from an empty one. The Map's `get` returns `string | undefined`,
-    // so the compiler agrees with what actually happens at runtime.
-    const supplied = new Map(Object.entries(values));
-    checkValuesAgainstMap(map, supplied);
+    // Read through a Map rather than by index: `Record<string, ...>` types every
+    // lookup as present, and this whole function turns on telling an absent key
+    // from an empty one. The Map's `get` returns `... | undefined`, so the
+    // compiler agrees with what actually happens at runtime.
+    const supplied = new Map<string, StatutoryValue>(Object.entries(values));
+    checkValuesAgainstMap(map, supplied, signatures);
 
     const doc = await PDFDocument.load(officialPdf);
     const pages = doc.getPages();
@@ -111,32 +174,43 @@ export async function renderStatutoryForm(
     };
 
     for (const mapping of map.mappings) {
-        if (mapping.kind === 'signature') {
-            // The mapping kind exists so a field map can be authored against a
-            // form that has signature boxes; drawing the image is not built yet.
-            // Skipping it silently would produce a form with an empty signature
-            // box — which prints, looks complete, and passes every assertion
-            // about its own values. Fail instead.
-            //
-            // The refusal is BEFORE the value lookup on purpose: a signature
-            // resolves by reference and never arrives through `values`, so a
-            // check placed after it would find nothing to skip and skip anyway.
-            fail(`signature rendering is not implemented; "${mapping.ourField}" `
-                + 'cannot be produced yet');
+        // BEFORE the value lookup: a signature resolves by reference and never
+        // arrives through `values`, so a check after it would find nothing to
+        // skip and skip anyway — an empty signature box on a document that
+        // prints and looks complete. See `drawSignature` for the box.
+        if (mapping.kind === 'signature' || signatures.has(mapping.ourField)) {
+            await drawSignature(doc, pages, mapping, signatures.get(mapping.ourField));
+            continue;
         }
 
         const value = supplied.get(mapping.ourField);
         if (value === undefined) continue;
 
         if (mapping.kind === 'acroform') {
-            setTextField(doc, mapping, value, await measuringFont());
+            setTextField(doc, mapping, oneAnswer(value, mapping.ourField), await measuringFont());
+            continue;
+        }
+        if (mapping.kind === 'acroform_checkbox') {
+            // Ticked only where the answer names it. A box the answer did not
+            // choose is LEFT AS PUBLISHED rather than actively cleared: this
+            // writes an answer onto a form, and unticking a box nobody asked
+            // about would be an answer of our own.
+            if (answerNames(value, mapping.whenValue)) checkBoxField(doc, mapping).check();
             continue;
         }
         if (mapping.kind === 'overlay') {
-            if (value === '') continue;
+            const text = oneAnswer(value, mapping.ourField);
+            if (text === '') continue;
             const drawn = await drawingFont();
-            const fitted = fitOverlay(value, mapping, drawn);
-            pages[mapping.page].drawText(value, {
+            // A part draws one piece of the value into one printed blank; an
+            // unparted overlay draws all of it, exactly as it always has.
+            // `refuseUnreadableParts` already ran this over every part mapping,
+            // so it cannot fail here.
+            const drawing = mapping.part === undefined
+                ? text
+                : partOfValue(text, mapping.part, mapping.ourField);
+            const fitted = fitOverlay(drawing, mapping, drawn);
+            pages[mapping.page].drawText(drawing, {
                 x: mapping.x,
                 y: mapping.y,
                 size: fitted.size,
@@ -152,7 +226,7 @@ export async function renderStatutoryForm(
             });
             continue;
         }
-        if (value === mapping.whenValue) {
+        if (answerNames(value, mapping.whenValue)) {
             pages[mapping.page].drawText(MARK, {
                 x: mapping.x,
                 y: mapping.y,
@@ -163,6 +237,30 @@ export async function renderStatutoryForm(
     }
 
     return doc.save();
+}
+
+/**
+ * One named checkbox widget, refusing rather than guessing at any other kind.
+ *
+ * The mirror of `setTextField`'s refusal, and for the same reason: pdf-lib's
+ * getters are typed by the caller's expectation, and a name that resolves to a
+ * field of another kind would otherwise be set through an API that does not fit
+ * it — or silently not set at all.
+ */
+function checkBoxField(
+    doc: PDFDocument,
+    mapping: Extract<FieldMapping, { kind: 'acroform_checkbox' }>,
+): PDFCheckBox {
+    try {
+        return doc.getForm().getCheckBox(mapping.pdfField);
+    } catch (cause) {
+        throw new Error(
+            `statutory render: "${mapping.pdfField}" is not a checkbox on this form — an `
+            + 'acroform_checkbox mapping ticks a real widget, and a field of another kind '
+            + 'needs the mapping kind that matches it',
+            { cause },
+        );
+    }
 }
 
 /** Set one named text field, refusing rather than guessing at any other kind. */
@@ -184,59 +282,4 @@ function setTextField(
     }
     refuseIfTheWidgetWouldClip(field, mapping.ourField, value, ruler);
     field.setText(value);
-}
-
-/**
- * Every value has somewhere to go, and every required answer is present.
- *
- * Both directions are checked because they fail differently and both fail
- * silently. A value with no mapping disappears; a required field with no value
- * produces a form that looks filled and is not.
- */
-function checkValuesAgainstMap(map: FieldMap, values: ReadonlyMap<string, string>): void {
-    const mapped = new Set(map.mappings.map((m) => m.ourField));
-    const unmapped = [...values.keys()].filter((k) => !mapped.has(k));
-    if (unmapped.length > 0) {
-        fail(`${unmapped.length} value(s) have no mapping on ${map.formId} ${map.version} and would `
-            + `be dropped: ${unmapped.join(', ')}`);
-    }
-
-    const missing = map.requiredFields.filter((f) => !values.has(f));
-    if (missing.length > 0) {
-        fail(`${missing.length} required field(s) were never supplied: ${missing.join(', ')}. `
-            + 'An empty string is an answer; an absent key is not, and a form nobody filled must '
-            + 'not read as one somebody filled and left blank.');
-    }
-
-    checkChoicesAreReachable(map.mappings, values);
-}
-
-/**
- * A choice must land in a box that exists.
- *
- * The dangerous case: the FIELD is mapped, so every count of mapped fields looks
- * complete, and the ANSWER given matches none of its boxes — so nothing is
- * marked and the form comes out with that question unanswered.
- */
-function checkChoicesAreReachable(
-    mappings: readonly FieldMapping[],
-    values: ReadonlyMap<string, string>,
-): void {
-    const answers = new Map<string, Set<string>>();
-    for (const m of mappings) {
-        if (m.kind !== 'checkbox') continue;
-        const known = answers.get(m.ourField) ?? new Set<string>();
-        known.add(m.whenValue);
-        answers.set(m.ourField, known);
-    }
-    for (const [field, known] of answers) {
-        const value = values.get(field);
-        // An absent key is "not answered" and was already judged against
-        // `requiredFields`; an empty string is an explicit "none of these".
-        if (value === undefined || value === '') continue;
-        if (!known.has(value)) {
-            fail(`"${field}" was answered "${value}" and this form has no box for that answer `
-                + `(it has: ${[...known].join(', ')})`);
-        }
-    }
 }

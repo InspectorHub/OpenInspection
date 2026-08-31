@@ -25,6 +25,7 @@ import {
     setRating as bindingSetRating,
     setNotes as bindingSetNotes,
     setValue as bindingSetValue,
+    setItemAttribute as bindingSetItemAttribute,
     toggleCanned as bindingToggleCanned,
     setDefectFields as bindingSetDefectFields,
     appendPhoto as bindingAppendPhoto,
@@ -72,6 +73,19 @@ export interface CollabFindingsApi {
     setNotes: (sectionId: string, itemId: string, notes: string) => void;
     commitNotes: (sectionId: string, itemId: string, notes: string) => void;
     setItemValue: (sectionId: string, itemId: string, value: unknown) => void;
+    /**
+     * One key of a finding's structured `attributes` bag — the equipment and
+     * choice sub-fields an item declares, and the source 47 statutory
+     * `item_attribute` bindings read.
+     *
+     * ⚠️ It belongs HERE and not on a fetcher intent, and that distinction was
+     * the whole bug: `inspection-edit.tsx` submitted a `set-item-attribute`
+     * intent that no action ever handled, and even a write that DID reach D1
+     * was erased by the next flush of the collab doc, which knew nothing about
+     * it. Collaboration is the only editor write path (see `useFindings`), so
+     * an attribute has to travel the same road as a rating or a note.
+     */
+    setItemAttribute: (sectionId: string, itemId: string, attributeId: string, value: unknown) => void;
     toggleCannedComment: (
         sectionId: string,
         itemId: string,
@@ -166,6 +180,17 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
 
     const setItemValue = (sectionId: string, itemId: string, value: unknown): void => {
         bindingSetValue(doc, sectionId, itemId, value, unit);
+        setDirty(true);
+    };
+
+    const setItemAttribute = (
+        sectionId: string, itemId: string, attributeId: string, value: unknown,
+    ): void => {
+        // MERGED into the attributes Y.Map by key, never replaced whole: an item
+        // carries up to a dozen attributes and two inspectors can answer two of
+        // them at once. `docSetItemAttribute` sets one key inside the seeded
+        // container, which is what keeps that a CRDT merge rather than a race.
+        bindingSetItemAttribute(doc, sectionId, itemId, attributeId, value, unit);
         setDirty(true);
     };
 
@@ -323,6 +348,7 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
         setNotes,
         commitNotes,
         setItemValue,
+        setItemAttribute,
         toggleCannedComment,
         setDefectFields,
         insertComment,

@@ -2,8 +2,10 @@ import { useMemo } from "react";
 import {
     declaresStatutoryForm,
     deriveEditorGroups,
+    formBoundItemIds,
     type EditorGroup,
 } from "~/lib/editor/statutory-groups";
+import { formCompleteness, type FormCompleteness } from "~/lib/editor/form-completeness";
 
 /**
  * The repeated blocks this inspection's form prints, or none.
@@ -40,4 +42,29 @@ export function useStatutoryGroups(
  */
 export function useStructuralEditingAllowed(templateSnapshot: unknown): boolean {
     return useMemo(() => !declaresStatutoryForm(templateSnapshot), [templateSnapshot]);
+}
+
+/**
+ * How much of this inspection's statutory form is answered, or `null`.
+ *
+ * `null` covers both "this template declares no form" and "it declares one that
+ * binds nothing", because the caller does the same thing with either: it shows
+ * no counter at all. A zero-of-zero counter would report progress on a document
+ * that has no boxes.
+ *
+ * Here rather than in the editor route for the same reason as the hook above:
+ * the route is a place where things are wired, not worked out.
+ */
+export function useStatutoryFormProgress(
+    templateSnapshot: unknown,
+    results: Parameters<typeof formCompleteness>[1],
+): FormCompleteness | null {
+    return useMemo(() => {
+        const declaration = (templateSnapshot as {
+            statutoryForm?: Parameters<typeof formBoundItemIds>[0];
+        } | null)?.statutoryForm;
+        if (!declaration) return null;
+        const done = formCompleteness(formBoundItemIds(declaration), results);
+        return done.total > 0 ? done : null;
+    }, [templateSnapshot, results]);
 }

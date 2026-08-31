@@ -35,6 +35,34 @@ describe("ItemEditor — item.description hint", () => {
     expect(screen.getByText("From the county record.")).toBeTruthy();
   });
 
+  it("keeps a transcribed option list on separate lines instead of one paragraph", () => {
+    // What a statutory question's description actually holds: the authority's
+    // own instruction text, which is frequently a list.
+    const description = [
+      "All glazed openings are covered with:",
+      "A. Plywood",
+      "B. OSB",
+      "C. Reinforced concrete roof deck",
+    ].join("\n");
+    const { container } = render(
+      <ItemEditor
+        {...base}
+        item={{ id: "i4", label: "Opening protection", type: "text", description }}
+        result={{}}
+        onValue={vi.fn()}
+      />
+    );
+    const hint = container.querySelector('[data-testid="item-description-hint"]');
+    expect(hint?.textContent).toBe(description);
+    // ⚠️ THE ASSERTION ABOVE CANNOT SEE THE DEFECT. `textContent` reports the
+    // newlines whether or not they render: under the browser default
+    // (`white-space: normal`) all four lines collapse into one paragraph and
+    // that expectation still passes. CSS is the whole of this fix, so the class
+    // is what has to be asserted — and the page itself is what has to be looked
+    // at, which is why this change also has a browser record.
+    expect(hint?.className).toContain("whitespace-pre-line");
+  });
+
   it("omits the hint when no description is set", () => {
     const { container } = render(
       <ItemEditor {...base} item={{ id: "i3", label: "Attic", type: "rich" }} result={{}} />

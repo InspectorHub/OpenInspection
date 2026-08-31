@@ -275,6 +275,14 @@ const AUTHORITY_HOSTS = new Set([
     'trec.texas.gov',
     'floir.gov',
     'www.floir.gov',
+    // Citizens Property Insurance Corporation publishes its own four-point and
+    // roof inspection forms, on its own site, and no agency republishes them.
+    // The "authority" a version is watched against is whoever PUBLISHES the
+    // document, which for a carrier-issued form is the carrier -- pointing the
+    // watcher at a state agency instead would poll a page these forms never
+    // appear on, and report faithfully that nothing had changed.
+    'www.citizensfla.com',
+    'citizensfla.com',
 ]);
 
 /** Verdict for one sourceUrl literal. Unreadable is a failure, never a skip. */

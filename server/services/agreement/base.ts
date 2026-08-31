@@ -1,9 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
 import type { agreementRequests, agreementSigners } from '../../lib/db/schema';
-import { hashToken } from '../../lib/token-hash';
-
-/** SHA-256 hex — reused for both token hashing and content-snapshot hashing. */
-export const sha256Hex = hashToken;
 
 export interface SignerInput {
     name: string;

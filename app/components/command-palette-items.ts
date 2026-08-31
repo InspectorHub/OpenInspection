@@ -32,14 +32,18 @@ export const RECENTS_CAP = 8;
 
 // Built as thunks (not module-level consts) so the Paraglide `m.*()` labels
 // resolve inside the per-request locale scope instead of freezing at import.
-export function getPages(hasMarketplace: boolean): PaletteItem[] {
+export function getPages(): PaletteItem[] {
   return [
     { id: "p-inspections", label: m.command_palette_page_inspections(), group: m.command_palette_group_pages(), icon: "page", to: "/inspections", hint: m.command_palette_hint_g_then_i() },
     { id: "p-reports", label: m.command_palette_page_reports(), group: m.command_palette_group_pages(), icon: "page", to: "/inspections?workflow=published", hint: m.command_palette_hint_g_then_r() },
     { id: "p-templates", label: m.command_palette_page_templates(), group: m.command_palette_group_pages(), icon: "page", to: "/library/templates", hint: m.command_palette_hint_g_then_t() },
-    // SaaS-only: `/library/marketplace` 404s in standalone, and the palette is
-    // the second door to it besides the Library hub tile.
-    ...(hasMarketplace ? [{ id: "p-marketplace", label: m.command_palette_page_marketplace(), group: m.command_palette_group_pages(), icon: "page", to: "/library/marketplace" }] : []),
+    // Unconditional. This entry took a `hasMarketplace` argument while the
+    // browse route 404'd outside saas; that 404 rested on the claim that nothing
+    // could reach a standalone catalogue, and the seeder in
+    // `server/services/starter-content/seed-marketplace-libraries.ts` had been
+    // filling one from repository fixtures the whole time. Every deployment has
+    // a catalogue, so the palette offers the second door to it in every mode.
+    { id: "p-marketplace", label: m.command_palette_page_marketplace(), group: m.command_palette_group_pages(), icon: "page", to: "/library/marketplace" },
     { id: "p-agreements", label: m.command_palette_page_agreements(), group: m.command_palette_group_pages(), icon: "page", to: "/library/agreements" },
     { id: "p-comments", label: m.command_palette_page_comments(), group: m.command_palette_group_pages(), icon: "page", to: "/library/comments" },
     { id: "p-repair", label: m.command_palette_page_repair(), group: m.command_palette_group_pages(), icon: "page", to: "/library/repair-items" },

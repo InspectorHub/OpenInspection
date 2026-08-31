@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, desc, sql } from 'drizzle-orm';
 import { smsConsentLog, smsDisclosureVersions } from '../lib/db/schema';
 import { nanoid } from 'nanoid';
-import { sha256Hex } from './signing-key.service';
+import { sha256Hex } from '../lib/sha256';
 
 export type ConsentAction = 'granted' | 'revoked';
 export type CapturedVia = 'booking_form' | 'optin_link' | 'admin';

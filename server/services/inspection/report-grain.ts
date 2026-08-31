@@ -18,7 +18,7 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { inspectionResults, reports } from '../../lib/db/schema';
-import { sha256Hex } from '../signing-key.service';
+import { sha256Hex } from '../../lib/sha256';
 import { RENDER_VERSION } from '../../lib/pdf';
 
 /** Any drizzle handle the render path holds. Structural, so tests can pass theirs. */

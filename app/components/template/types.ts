@@ -2,6 +2,8 @@
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
+import type { ItemChoice } from '../../../server/types/template-schema';
+
 export type PropertyType = 'single-family' | 'multi-unit' | 'commercial';
 
 export interface SectionApplicability {
@@ -42,7 +44,13 @@ interface Attribute {
   id: string;
   name: string;
   type: string;
-  choices?: string[];
+  /** Bare string = value and label are the same word; the pair carries an
+   *  authority form's printed wording beside the token that gets stored. The
+   *  editor passes `attributes` through untouched (see
+   *  `serializeItemForSave`), so this only has to be wide enough not to
+   *  narrow a statutory template on a round trip through the author's screen —
+   *  a `string[]` here would have made saving one strip every label. */
+  choices?: ItemChoice[];
   unit?: string;
   required?: boolean;
   isSafety?: boolean;
@@ -70,6 +78,17 @@ export interface TemplateItem {
   options?: ItemOptions;
   attributes?: Attribute[];
   source?: { platform: string; externalId: string } | null;
+  /** The item this one nests under, within the same section. Null = top level. */
+  parentId?: string | null;
+  /** Author-written display number, printed beside the label. Distinct from the
+   *  outline number the item list derives from the tree.
+   *
+   *  It was absent here, and absent from the editor's save serializer, while
+   *  being present on the authority type, in the Zod base fields, in ITEM_KEYS
+   *  and in the report projection — so authoring one and saving lost it, with
+   *  nothing anywhere saying so. `lint:item-key-parity` exists because of this
+   *  key, not because of `parentId`. */
+  number?: string;
 }
 
 export interface TemplateSection {

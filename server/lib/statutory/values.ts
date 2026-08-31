@@ -20,6 +20,12 @@
  * produced, because a signature image must never enter this object -- see
  * `StatutoryValueSource`.
  *
+ * And a fourth, which is the same absence for the opposite reason: a question
+ * the form DID NOT ASK of this inspection. The 1802 prints its minimal-condition
+ * boxes only under "categories B, C, or D", and for an answer of A they are not
+ * a blank the inspector left -- they are not on his page at all. That emits no
+ * key either, and `applicability.ts` owns the whole rule.
+ *
  * -- 2. EVERY REFUSAL NAMES THE THING ----------------------------------------
  * A binding that points at an item or an attribute the template does not have
  * is a broken template, and the tempting alternative -- yield '' and carry on --
@@ -51,10 +57,23 @@
  * half-implemented copy of that check here is exactly how the next person comes
  * to fix only one of them.
  *
+ * -- 5. AN ANSWER MAY BE SEVERAL OPTIONS -------------------------------------
+ * `render.ts` has always accepted `string | readonly string[]` and ticks every
+ * box a list names. This side used to return `Record<string, string>`, so the
+ * pipe was narrower at this end: an item attribute holding
+ * `['cracking','cupping_curling']` reached the renderer as
+ * `"cracking,cupping_curling"`, which matches no `whenValue` and is refused by
+ * name. The forms genuinely ask for lists — six published questions print
+ * "check all that apply", from the Citizens photo requirements (6 boxes) to the
+ * 1802's roof coverings (7) — so the collection side now carries what the
+ * renderer could always draw. `asAnswer` in `resolve-source.ts` is the one
+ * place a stored array becomes one, and its comment says why an empty array is
+ * NOT a third case.
+ *
  * -- Why a Record and not a Map ----------------------------------------------
- * `renderStatutoryForm` already takes `Record<string, string>` and it shipped
- * first. Handing it a Map would mean converting at the call site, and that is a
- * conversion which exists only because two authors disagreed.
+ * `renderStatutoryForm` already takes a `Record` and it shipped first. Handing
+ * it a Map would mean converting at the call site, and that is a conversion
+ * which exists only because two authors disagreed.
  *
  * WARNING: VALUES ARE STRINGIFIED BUT NEVER TRIMMED. Trimming would silently
  * eat a deliberate leading space, and we do not know which box on which
@@ -65,118 +84,24 @@
 import type {
     FieldGroup,
     StatutoryFormDeclaration,
-    StatutoryInspectionField,
-    StatutoryValueSource,
     TemplateSchemaV2,
-    TemplateItem,
 } from '../../types/template-schema';
+import {
+    applyDependencies, refuseConditionalOverflowDestination, refuseUnusableDependencies,
+} from './applicability';
 import {
     groupFieldName, refuseOverCapacity,
     refuseOverflowThatDoesNotFit, validateGroups,
 } from './groups';
+import { asAnswer, asValue, fail, itemsById, resolve } from './resolve-source';
+import type { StatutoryValue } from './field-map';
+// Re-exported because both were declared here before `resolve-source.ts` existed,
+// and every import site names this module. Moving the declaration is a refactor;
+// moving the NAME would be a rename of a public type in the same commit.
+import type { StatutoryItemResult, StatutoryInspectionFacts } from './resolve-source';
+export type { StatutoryItemResult, StatutoryInspectionFacts } from './resolve-source';
 
-/** One item's stored answers. Rich items answer on `rating`, everything else on
- *  `value`; attribute answers are keyed by attribute id. */
-export interface StatutoryItemResult {
-    rating?: unknown;
-    value?: unknown;
-    attributes?: Record<string, unknown>;
-}
 
-/**
- * The inspection-level facts a binding may read, one per
- * `StatutoryInspectionField`. Null where the inspection has no answer.
- *
- * DERIVED FROM THE UNION ON PURPOSE, never a hand-written list of the same
- * names. A field added to `StatutoryInspectionField` becomes a REQUIRED key
- * here in the same commit, so every place that builds a facts object goes
- * type-red until it supplies the new value. A parallel list would let a new
- * member reach the form as `undefined` — which stringifies to a blank box, and
- * a blank box on an authority's form reads as an inspector who did not answer.
- */
-export type StatutoryInspectionFacts = Record<StatutoryInspectionField, string | null>;
-
-function fail(reason: string): never {
-    throw new Error(`statutory values: ${reason}`);
-}
-
-/**
- * Stringify one resolved answer.
- *
- * `null`/`undefined` become an empty string rather than the words "null" or
- * "undefined" -- those would be PRINTED on the authority's form. See the module
- * header for why there is no `.trim()` here.
- */
-function asValue(raw: unknown): string {
-    if (raw === null || raw === undefined) return '';
-    return String(raw);
-}
-
-/** Every item in the snapshot, flattened. Sections carry no meaning for a form
- *  binding: the declaration names an item id, and where that item sits is the
- *  template's business rather than the form's. */
-function itemsById(snapshot: TemplateSchemaV2): Map<string, TemplateItem> {
-    const out = new Map<string, TemplateItem>();
-    for (const section of snapshot.sections ?? []) {
-        for (const item of section.items ?? []) out.set(item.id, item);
-    }
-    return out;
-}
-
-function requireItem(items: Map<string, TemplateItem>, itemId: string, ourField: string): TemplateItem {
-    const item = items.get(itemId);
-    if (!item) {
-        fail(`binding "${ourField}" points at item "${itemId}", which this template does not contain`);
-    }
-    return item;
-}
-
-function resolve(
-    source: StatutoryValueSource,
-    ourField: string,
-    items: Map<string, TemplateItem>,
-    results: Record<string, StatutoryItemResult>,
-    facts: StatutoryInspectionFacts,
-): string {
-    switch (source.from) {
-        case 'item': {
-            requireItem(items, source.itemId, ourField);
-            const result = results[source.itemId];
-            // `rating` first: a rich item answers there, and an item carrying
-            // both is answering with its rating.
-            return asValue(result?.rating ?? result?.value);
-        }
-        case 'item_attribute': {
-            const item = requireItem(items, source.itemId, ourField);
-            const declared = (item.attributes ?? []).some((a) => a.id === source.attribute);
-            if (!declared) {
-                fail(
-                    `binding "${ourField}" reads attribute "${source.attribute}" of item `
-                    + `"${source.itemId}", which does not declare it`,
-                );
-            }
-            return asValue(results[source.itemId]?.attributes?.[source.attribute]);
-        }
-        case 'inspection': {
-            // The field union is closed, so this lookup cannot miss for any
-            // value the compiler accepted. It is still checked, because a
-            // template row is DATA and data outlives the type that described it.
-            if (!(source.field in facts)) {
-                fail(`binding "${ourField}" reads unknown inspection field "${source.field}"`);
-            }
-            return asValue(facts[source.field]);
-        }
-        case 'literal':
-            return asValue(source.value);
-        default: {
-            // Unreachable through the type, and deliberately not silent: a row
-            // written before a source kind was retired would otherwise be
-            // skipped, and a skipped binding is a blank box on the form.
-            const unknownSource = source as { from?: unknown };
-            return fail(`binding "${ourField}" has unrecognised source kind "${String(unknownSource.from)}"`);
-        }
-    }
-}
 
 /**
  * What ONE instance of a repeated block answered, keyed by the group's own
@@ -212,7 +137,7 @@ export type StatutoryGroupInstances = Readonly<Record<string, readonly Statutory
 function expandGroups(
     groups: readonly FieldGroup[],
     instances: StatutoryGroupInstances,
-    values: Record<string, string>,
+    values: Record<string, StatutoryValue>,
 ): void {
     validateGroups(groups);
 
@@ -247,12 +172,20 @@ function expandGroups(
         }
     }
 
+    // `asAnswer`, not `asValue`. A group's field is an ordinary question and a
+    // group's slot is an ordinary printed slot, so an instance may hold a list
+    // exactly as an item attribute may -- the roof block's damage signs are a
+    // "check all that apply" on the form itself. `asValue` is `String()`, which
+    // turns ['cracking','cupping'] into "cracking,cupping": a value that names
+    // no box, ticks nothing, and is refused by name at render time. That is the
+    // narrow pipe the collection side was widened to remove, and this was the
+    // one place still holding it.
     for (const group of groups) {
         const recorded = instances[group.id] ?? [];
         for (let index = 0; index < group.capacity; index++) {
             const instance = recorded[index];
             for (const field of group.fields) {
-                values[groupFieldName(group.id, index, field)] = asValue(instance?.[field]);
+                values[groupFieldName(group.id, index, field)] = asAnswer(instance?.[field]);
             }
         }
     }
@@ -277,6 +210,11 @@ function expandGroups(
  * overflow must never lose.
  */
 function overflowLine(group: FieldGroup, index: number, instance: StatutoryGroupInstance): string {
+    // `asValue` here is deliberate and is NOT the narrow pipe `expandGroups`
+    // fixed. This composes a SENTENCE for a comments box -- our prose around the
+    // inspector's answers -- rather than a value a mapping compares against a
+    // `whenValue`, so a list has to become readable text somewhere and there is
+    // no box for it to miss.
     const answered = group.fields
         .map((field) => [field, asValue(instance[field])] as const)
         .filter(([, value]) => value !== '')
@@ -316,7 +254,7 @@ function fieldLabel(field: string): string {
 function routeOverflow(
     groups: readonly FieldGroup[],
     instances: StatutoryGroupInstances,
-    values: Record<string, string>,
+    values: Record<string, StatutoryValue>,
 ): void {
     for (const group of groups) {
         const destination = group.overflowTo;
@@ -329,7 +267,20 @@ function routeOverflow(
             .map((instance, offset) => overflowLine(group, group.capacity + offset, instance));
         // The box holds ONE text, so the existing value is part of what has to
         // fit -- measuring only our addition would pass and still overrun.
-        const existing = values[destination] ?? '';
+        //
+        // A LIST CANNOT BE THAT BOX. `overflowTo` names a comments field the
+        // form prints "(use additional pages if needed)" beside; a field bound
+        // to a multi-select answer is a SET OF TICKED BOXES, and appending a
+        // sentence to one has no meaning on the page. Refused by name rather
+        // than joined, for the reason `render.ts` gives in the same situation:
+        // joining would put a separator of ours onto the authority's document.
+        const held = values[destination];
+        if (Array.isArray(held)) {
+            fail(`group "${group.id}" overflows into "${destination}", which this template `
+                + 'binds to a multi-select answer. An overflowing instance is written as a '
+                + 'sentence, and a set of ticked boxes has nowhere to put one.');
+        }
+        const existing = held ?? '';
         const combined = existing === ''
             ? lines.join('\n')
             : [existing, ...lines].join('\n');
@@ -352,7 +303,9 @@ function routeOverflow(
  * @returns our field name -> the string to place on the form. Every binding
  *   except a signature produces a key, and every slot of every declared group
  *   produces one; a binding that cannot be resolved, and a block with more
- *   instances than the form holds, throw instead.
+ *   instances than the form holds, throw instead. A field `dependsOn` rules out
+ *   for these answers produces NO key -- the form did not ask it, which is not
+ *   the same fact as an answer of nothing.
  */
 export function collectStatutoryValues(
     declaration: StatutoryFormDeclaration,
@@ -360,10 +313,15 @@ export function collectStatutoryValues(
     results: Record<string, StatutoryItemResult>,
     facts: StatutoryInspectionFacts,
     instances: StatutoryGroupInstances = {},
-): Record<string, string> {
+): Record<string, StatutoryValue> {
     const items = itemsById(snapshot);
-    const values: Record<string, string> = {};
-    // Groups first, so a declaration that is broken or a house that overflows
+    const values: Record<string, StatutoryValue> = {};
+    // The declaration's own shape first, so a template that is broken for EVERY
+    // inspection is refused before this one's answers are read. A rule reported
+    // against a particular inspection sends the reader to the inspection.
+    refuseUnusableDependencies(declaration);
+    refuseConditionalOverflowDestination(declaration);
+    // Groups next, so a declaration that is broken or a house that overflows
     // the page is refused before any value is resolved.
     if (declaration.groups !== undefined) {
         expandGroups(declaration.groups, instances, values);
@@ -374,6 +332,12 @@ export function collectStatutoryValues(
         if (source.from === 'signature') continue;
         values[ourField] = resolve(source, ourField, items, results, facts);
     }
+    // AFTER every binding, because a dependency reads another field's answer and
+    // no ordering of the bindings puts a controlling field first. This is the
+    // only place a key is REMOVED: a question the form did not ask emits none,
+    // while a question asked and not answered keeps its key with an empty
+    // string, and `applicability.ts` says at length why those are different.
+    applyDependencies(declaration, values);
     // Last, because an overflow is appended to a destination the loop above has
     // just written, and because the refusal it can still raise is the END of the
     // chain rather than the start of it.

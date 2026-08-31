@@ -20,14 +20,34 @@
  * thirteen, and called 250 entries "small".
  */
 import { CANNED_COMMENTS } from './canned-comments';
+import trecRei76 from '../../../data/seed-templates/trec-rei-7-6.json';
+import flCitizensRoof from '../../../data/seed-templates/fl-citizens-roof-rcf-1.json';
+import flCitizens4point from '../../../data/seed-templates/fl-citizens-4point-insp4pt.json';
+import flOirB11802 from '../../../data/seed-templates/fl-oir-b1-1802-rev-04-26.json';
 
 export interface StarterMarketplaceLibraryFixture {
     name:      string;
-    kind:      'comments' | 'templates';
+    /**
+     * Which local table an import writes, and how an un-import undoes it. The
+     * database enum has carried three values since `statutory` arrived; this
+     * type carried two, so the one kind that most needed a catalogue entry was
+     * the one no fixture could express.
+     */
+    kind:      'comments' | 'templates' | 'statutory';
     semver:    string;
     schema:    unknown;
     changelog: string;
     featured:  boolean;
+    /**
+     * The state or country whose rules the pack is written to, or absent when it
+     * is written to none.
+     *
+     * An exact-match browse filter and the only column that can say a pack is
+     * not for everybody. Set on a statutory entry because a jurisdiction is what
+     * a statutory form IS: an inspector in Ohio should be able to tell at a
+     * glance, and the filter exists on the API already.
+     */
+    jurisdiction?: string;
 }
 
 /**
@@ -64,5 +84,191 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         },
         changelog: 'Initial trial-onboarding starter library.',
         featured:  true,
+    },
+    {
+        // A statutory package is here rather than in `template-seed.service.ts`'s
+        // auto-seed list on purpose: a statutory template renders onto the
+        // authority's own PDF, which this repository does not carry, so handing
+        // one to every new workspace would mint a template that cannot produce
+        // anything. The marketplace install path refuses exactly that
+        // (`assertStatutoryInstallable`) and tells the operator which file to
+        // upload and where. Installing is a decision an operator makes; seeding
+        // is not.
+        //
+        // ALL FOUR PUBLISHED REVISIONS ARE NOW DECLARED HERE.
+        // `PUBLISHED_FORM_VERSIONS` carries `tx_trec_rei`,
+        // `fl_citizens_4point`, `fl_citizens_roof` and `fl_oir_b1_1802`, and
+        // each has an entry below.
+        //
+        // A `kind: 'statutory'` entry's `schema` IS A TEMPLATE: sections, items,
+        // and a `statutoryForm` declaration binding each of the form's field
+        // names to one of them (`assertStatutorySchema` validates exactly that,
+        // and `bindings: {}` would install a pack that produces a blank official
+        // document). Publishing a revision says which PDF and where each value
+        // is drawn; a catalogue entry additionally has to ask the inspector the
+        // form's questions, in the form's own printed wording — 95 of them on
+        // the four-point form and 96 on the 1802. The signed candidates carry
+        // coordinates and field names; they do not carry those printed labels,
+        // so a template cannot be generated from them and inventing the wording
+        // would put a question to an inspector that the authority never asked.
+        // Each pack was therefore authored with the form in hand.
+        name:      trecRei76.name,
+        kind:      'statutory',
+        /**
+         * ⚠️ BUMP THIS WHENEVER `trec-rei-7-6.json` CHANGES, and never otherwise.
+         *
+         * `seedMarketplaceLibraries` refreshes a row exactly when this string
+         * differs from the one already in the database, and the "update
+         * available" badge is the same equality test against what a workspace
+         * imported. So a corrected binding that ships without a bump here
+         * reaches no deployment that already installed the pack, and nobody is
+         * told: their template keeps producing the document with the old
+         * binding, and every surface reports success.
+         *
+         * It is NOT the authority's revision label — that lives in the
+         * declaration inside the schema and answers a different question (which
+         * printed form these bindings were authored against). A new TREC
+         * revision is a new field map and a new pack; a bump here is us
+         * correcting our own work against the same printed form.
+         */
+        semver:    '1.0.1',
+        // The template document itself, imported rather than restated. It is the
+        // single source both the local seed file and this catalogue entry read,
+        // because two hand-maintained copies of one 41-section form is how the
+        // last one drifted into a document with thirteen blank sections.
+        schema:    trecRei76.schema,
+        changelog: 'Declares the form as `tx_trec_rei` rather than `tx_trec_rei_7_6`. The form '
+            + 'is the same form and the revision label is unchanged; the old id named a '
+            + 'revision, which would have made TREC\'s next revision a second form that the '
+            + 'inspection date could never choose between.',
+        // Not featured. Featured is the top of the shelf for everyone, and this
+        // pack is useful to inspectors in one state.
+        featured:  false,
+        jurisdiction: 'TX',
+    },
+    {
+        // Citizens Property Insurance Corporation's Roof Inspection Form. Same
+        // shape as the Texas entry above and for the same reasons; what differs
+        // is what the form asks and how the template carries it.
+        //
+        // ⚠️ ITS TWELVE CHOICE QUESTIONS DO NOT SHARE ONE VOCABULARY, so there
+        // is no `ratingSystem` here and there must not be one. TREC gets away
+        // with a single embedded rating because all 41 of its items ask the same
+        // question; this form asks twelve different ones over fourteen values
+        // (`full_replacement`, `satisfactory`, `cupping_curling`, `yes`, …), and
+        // each is an `item_attribute` whose stored value is the answer. Those
+        // stored values are the field map's own `whenValue` strings, character
+        // for character: `render.ts` matches with `===` and nothing normalises,
+        // so a template storing the printed label instead ("Full replacement")
+        // produces a completely blank official form with every gate green.
+        //
+        // ⚠️ ONE OF THE FORM'S 36 BLANKS IS DELIBERATELY UNBOUND —
+        // `inspector_title`, which this product has no source for. It was three:
+        // `inspector_license_type` and `inspector_signature_date` were unbound
+        // for the same reason and the reason was answered rather than lived
+        // with — both now read a column somebody fills in, and neither is an
+        // alias of a column that already existed. The reasoning for the one
+        // that is left is in
+        // `server/data/seed-templates/fl-citizens-roof-rcf-1.gaps.md`, because
+        // on a printed form "left blank on purpose" and "forgotten" look
+        // identical and only that file can tell them apart.
+        name:      flCitizensRoof.name,
+        kind:      'statutory',
+        // Bump whenever `fl-citizens-roof-rcf-1.json` changes, and never
+        // otherwise — the reasoning is on the Texas entry above and applies
+        // unchanged. It is OUR version of these bindings, not Citizens'
+        // revision label, which is `RCF-1 03 25` and lives in the declaration.
+        semver:    '1.2.0',
+        schema:    flCitizensRoof.schema,
+        changelog: 'Adds the wording each option is printed with beside its stored value, so '
+            + "the inspector reads the form's own words instead of the token. The stored "
+            + 'values are unchanged.',
+        featured:  false,
+        jurisdiction: 'FL',
+    },
+    {
+        // Citizens Property Insurance Corporation's 4-Point Inspection Form —
+        // the largest of the three, and the one the other two are read against.
+        // Same shape as the entries above and for the same reasons; what differs
+        // is what the form asks and how the template carries it.
+        //
+        // ⚠️ FORTY-FOUR CHOICE QUESTIONS, FIFTY-FIVE DISTINCT VALUES, AND NO
+        // AXIS BETWEEN THEM, so there is no `ratingSystem` here and there must
+        // not be one. Each question is an `item_attribute` whose stored value is
+        // the field map's own `whenValue`, character for character:
+        // `satisfactory`, `circuit_breaker`, `n_a`, `cupping_curling`.
+        // `render.ts` matches with `===` and nothing normalises, so a template
+        // storing the printed label instead produces a completely blank official
+        // form with every gate green.
+        //
+        // ⚠️ ITS ROOF BLOCK IS NOT THE ROOF FORM'S. The two Citizens forms print
+        // the same twelve roof questions and word three of them differently
+        // (`Overall condition:` here against `Overall condition` there). The
+        // WORDING is each form's own; the stored VALUES are deliberately
+        // identical, so one inspection can feed both forms without answering
+        // twice.
+        //
+        // ⚠️ ONE OF THE FORM'S 95 BLANKS IS DELIBERATELY UNBOUND —
+        // `inspector_title`, the same box the roof pack cannot fill and for the
+        // same reason: this product has no source for a job title. The reasoning,
+        // and the smaller gaps behind the blanks that ARE bound, are in
+        // `server/data/seed-templates/fl-citizens-4point-insp4pt.gaps.md`,
+        // because on a printed form "left blank on purpose" and "forgotten" look
+        // identical and only that file can tell them apart.
+        name:      flCitizens4point.name,
+        kind:      'statutory',
+        // Bump whenever `fl-citizens-4point-insp4pt.json` changes, and never
+        // otherwise — the reasoning is on the Texas entry above and applies
+        // unchanged. It is OUR version of these bindings, not Citizens' revision
+        // label, which is `Insp4pt 03 25` and lives in the declaration.
+        semver:    '1.1.0',
+        schema:    flCitizens4point.schema,
+        changelog: 'Adds the wording each option is printed with beside its stored value, so '
+            + "the inspector reads the form's own words instead of the token. The stored "
+            + 'values are unchanged.',
+        featured:  false,
+        jurisdiction: 'FL',
+    },
+    {
+        // The Florida Office of Insurance Regulation's Uniform Mitigation
+        // Verification Inspection Form, adopted by Rule 69O-170.0155, F.A.C.
+        // Same shape as the entries above; three things about it differ.
+        //
+        // 🔴 ITS STORED ANSWERS ARE BARE LETTERS — `A`, `B`, `C`, `D`, `X`, `Z`,
+        // `NA` — seventy distinct values over thirty-four questions, and they
+        // are the field map's own `whenValue` strings character for character.
+        // `render.ts` matches with `===` and nothing normalises, so a template
+        // storing the printed label ("A - Wood frame") instead of the value
+        // produces a COMPLETELY BLANK official form with every gate green. That
+        // has happened once already on this form. The choice lists in the
+        // schema were taken from the signed candidate rather than typed.
+        //
+        // ⚠️ IT IS THE ONLY FORM WITH `dependsOn`. Three of its questions exist
+        // only for certain answers to an earlier one, and the form says so in
+        // its own words: the minimal-condition boxes belong to answers B, C and
+        // D of question 6; "check here if entire roof deck underside covered" is
+        // printed one indent under Spray foam products; the twelve non-glazed
+        // sub-levels run A.1 to N.3 and questions 9's X and Z have none. A
+        // conditional question is deliberately absent from the field map's
+        // `requiredFields` — see `StatutoryFormDeclaration.dependsOn`.
+        //
+        // ⚠️ SEVEN OF ITS 96 BLANKS ARE DELIBERATELY UNBOUND, more than either
+        // Citizens form, because this one prints an owner contact block and a
+        // homeowner's own signature that this product has no source for. Which
+        // seven, and what would have to exist first, is in
+        // `server/data/seed-templates/fl-oir-b1-1802-rev-04-26.gaps.md`.
+        name:      flOirB11802.name,
+        kind:      'statutory',
+        // Bump whenever `fl-oir-b1-1802-rev-04-26.json` changes, and never
+        // otherwise — the reasoning is on the Texas entry above and applies
+        // unchanged. It is OUR version of these bindings, not the Office's
+        // revision label, which is `Rev. 04/26` and lives in the declaration.
+        semver:    '1.1.0',
+        schema:    flOirB11802.schema,
+        changelog: 'Adds the wording each printed option carries beside its stored value for '
+            + 'the questions whose answers are not letters; the bare-letter answers are '
+            + 'unchanged, as are all stored values.',
+        featured:  false,
+        jurisdiction: 'FL',
     },
 ];

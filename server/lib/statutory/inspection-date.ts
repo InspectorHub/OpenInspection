@@ -80,3 +80,61 @@ export function utcMidnightOf(calendarDay: string): number {
     }
     return asMs;
 }
+
+/**
+ * The shapes `inspections.date` is actually written in. Measured 2026-08-30
+ * across every writer of that column, and on a local database carrying both.
+ *
+ * The column's own comment in `schema/inspection/core.ts` calls it a calendar
+ * day, and 12 of 14 local rows are exactly that. The other 2 are full ISO
+ * instants, and they are not an accident:
+ *
+ *   - `inspection-core.service.ts` falls back to `createdAt.toISOString()`
+ *     whenever a caller supplies no date;
+ *   - the new-inspection WIZARD writes `${date}T${startTime}:00` on purpose,
+ *     because `booking.service.ts` reads the time of day back out of this
+ *     column at `slice(11, 16)` to mark a slot busy;
+ *   - `fulfill-booking.ts`, `inspection-request.service.ts`, the clone path and
+ *     the re-inspection path all write a full instant too.
+ *
+ * So the calendar day WINS as the meaning, and the time suffix is real data a
+ * different subsystem depends on. Truncating the column would silently undo
+ * double-booking detection; refusing the suffix here refuses every inspection
+ * the wizard ever created. What is left is to read the leading calendar day,
+ * which is what every other reader of this column already does
+ * (`reschedule-date.ts` slices 0..10 to get the civil day, 11..16 to get the
+ * clock).
+ */
+const STORED_INSPECTION_DATE = /^(\d{4}-\d{2}-\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
+/**
+ * The calendar day a stored `inspections.date` names.
+ *
+ * This is the ONLY door between that column and the statutory subsystem, and it
+ * is narrow on purpose: everything past it -- `utcMidnightOf`,
+ * `calendarDayForForm`, `partOfValue` -- takes a bare `YYYY-MM-DD` and refuses
+ * anything else, for the reason at the top of this file. Widening any of THOSE
+ * to accept an instant would let a timestamp reach a form blank; widening this
+ * one lets the subsystem read the rows this product actually creates.
+ *
+ * The day is taken from the leading characters rather than through `new Date`,
+ * so no timezone is applied on the way: whatever civil day the writer recorded
+ * is the day the revision is selected from. A trailing instant is discarded
+ * because no statutory question is answered by the time of day.
+ *
+ * @param stored the raw column value: `YYYY-MM-DD`, or that followed by a time.
+ * @returns exactly `YYYY-MM-DD`, already proven to be a day that exists.
+ */
+export function calendarDayOfStoredDate(stored: string): string {
+    const parts = STORED_INSPECTION_DATE.exec(stored);
+    if (!parts) {
+        fail(`"${stored}" is not a stored inspection date -- expected YYYY-MM-DD, `
+            + 'optionally followed by a time');
+    }
+    const calendarDay = parts[1];
+    // Not a second parser: the day still has to be a day, and that judgement
+    // stays in one place. `2026-02-30T09:00:00Z` is refused here exactly as
+    // `2026-02-30` is, because a rolled date crosses a revision cutover.
+    utcMidnightOf(calendarDay);
+    return calendarDay;
+}

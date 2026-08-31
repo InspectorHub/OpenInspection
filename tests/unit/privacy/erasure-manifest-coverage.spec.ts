@@ -46,6 +46,12 @@ const reportArtifactsStepPath = path.resolve(
     __dirname,
     '../../../server/lib/compliance/erase-report-artifacts.ts',
 );
+// The third delegated step, same shape and same reason. It carries the owner
+// block on `statutory_inspection_details`.
+const statutoryDetailsStepPath = path.resolve(
+    __dirname,
+    '../../../server/lib/compliance/erase-statutory-details.ts',
+);
 const retentionSweepPath = path.resolve(
     __dirname,
     '../../../server/lib/compliance/retention-sweep.ts',
@@ -56,7 +62,8 @@ const orchestratorSource =
     fs.readFileSync(orchestratorPath, 'utf8') +
     fs.readFileSync(sharedAnonymizePath, 'utf8') +
     fs.readFileSync(repairRequestStepPath, 'utf8') +
-    fs.readFileSync(reportArtifactsStepPath, 'utf8');
+    fs.readFileSync(reportArtifactsStepPath, 'utf8') +
+    fs.readFileSync(statutoryDetailsStepPath, 'utf8');
 
 /**
  * A delegated step only counts if the orchestrator actually calls it. Reading
@@ -69,6 +76,7 @@ const orchestratorCallsRepairRequestStep = rawOrchestrator.includes('eraseRepair
 const orchestratorCallsReportArtifactSteps =
     rawOrchestrator.includes('eraseReportViews(') &&
     rawOrchestrator.includes('eraseReportTranslations(');
+const orchestratorCallsStatutoryDetailsStep = rawOrchestrator.includes('eraseStatutoryDetails(');
 
 /** Source with comments stripped, so prose cannot satisfy or trip a scan. */
 function stripComments(src: string): string {
@@ -116,6 +124,15 @@ describe('erasure-manifest coverage', () => {
             'erase-report-artifacts.ts is read into the drift scan above. If the orchestrator ' +
             'stops calling eraseReportViews() / eraseReportTranslations(), the report_views and ' +
             'report_translations rules would still pass the scan while nothing executed them.',
+        ).toBe(true);
+    });
+
+    it('the delegated statutory-details step is actually called by the orchestrator', () => {
+        expect(
+            orchestratorCallsStatutoryDetailsStep,
+            'erase-statutory-details.ts is read into the drift scan above. If the orchestrator '
+            + 'stops calling eraseStatutoryDetails(), the owner-block rules would still pass the '
+            + 'scan while nothing executed them.',
         ).toBe(true);
     });
 

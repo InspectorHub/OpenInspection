@@ -126,4 +126,85 @@ describe('applyResultsBatch', () => {
         const rows = await db.select().from(inspectionResults).all();
         expect(rows).toHaveLength(0);
     });
+    /**
+     * `itemAttribute` — the field the whole item-attributes panel writes through.
+     *
+     * It was in the enum and had NO fold: the header used to send this shape to
+     * `InspectionService.patchItem`, a method that no longer exists anywhere in
+     * the repository, so it fell through to the scalar branch and wrote
+     * `entry.itemAttribute`. Nothing reads that key. Every reader — the editor's
+     * panel, and all 47 statutory `item_attribute` bindings — reads
+     * `entry.attributes[<attributeId>]`.
+     */
+    it('folds an itemAttribute patch into entry.attributes under its own id', async () => {
+        const res = await applyResultsBatch(asD1Db(db), 'i-1', [{
+            itemId: 'roof_predominant', sectionId: 'roof', field: 'itemAttribute',
+            value: { attributeId: 'damage_signs', value: 'cupping_curling' },
+        }], { tenantId: 't-1' });
+        expect(res.applied).toBe(1);
+
+        const row = await db.select().from(inspectionResults).get();
+        const data = row!.data as Record<string, Record<string, unknown>>;
+        const entry = data['_default:roof:roof_predominant'];
+        expect(entry).toBeDefined();
+        expect(entry.attributes).toEqual({ damage_signs: 'cupping_curling' });
+        // NEGATIVE CONTROL — the key nobody reads must not be written as well.
+        expect(entry.itemAttribute).toBeUndefined();
+    });
+
+    it('MERGES a second attribute rather than replacing the first', async () => {
+        // One dropdown sends one attribute and an item declares up to twelve.
+        // A whole-object write would clear every answer beside the newest one,
+        // which on a statutory form is a blank box that reads as unanswered.
+        await applyResultsBatch(asD1Db(db), 'i-1', [{
+            itemId: 'roof_predominant', sectionId: 'roof', field: 'itemAttribute',
+            value: { attributeId: 'damage_signs', value: 'cupping_curling' },
+        }], { tenantId: 't-1' });
+        await applyResultsBatch(asD1Db(db), 'i-1', [{
+            itemId: 'roof_predominant', sectionId: 'roof', field: 'itemAttribute',
+            value: { attributeId: 'overall_condition', value: 'satisfactory' },
+        }], { tenantId: 't-1' });
+
+        const row = await db.select().from(inspectionResults).get();
+        const data = row!.data as Record<string, Record<string, unknown>>;
+        expect(data['_default:roof:roof_predominant'].attributes).toEqual({
+            damage_signs: 'cupping_curling',
+            overall_condition: 'satisfactory',
+        });
+    });
+
+    it('overwrites the SAME attribute, so a corrected answer wins', async () => {
+        for (const value of ['cracking', 'cupping_curling']) {
+            await applyResultsBatch(asD1Db(db), 'i-1', [{
+                itemId: 'roof_predominant', sectionId: 'roof', field: 'itemAttribute',
+                value: { attributeId: 'damage_signs', value },
+            }], { tenantId: 't-1' });
+        }
+        const row = await db.select().from(inspectionResults).get();
+        const data = row!.data as Record<string, Record<string, unknown>>;
+        expect(data['_default:roof:roof_predominant'].attributes)
+            .toEqual({ damage_signs: 'cupping_curling' });
+    });
+
+    it('refuses a patch that does not name which attribute it answers', async () => {
+        // Silently writing an unnamed answer is how one arrives on a statutory
+        // form under the wrong question.
+        await expect(applyResultsBatch(asD1Db(db), 'i-1', [{
+            itemId: 'roof_predominant', sectionId: 'roof', field: 'itemAttribute',
+            value: 'cupping_curling',
+        }], { tenantId: 't-1' })).rejects.toThrow(/attributeId/);
+    });
+
+    it('leaves a cleared answer as null rather than dropping the key', async () => {
+        // "—" is an answer of nothing, and on a form an absent key and an empty
+        // one are different facts (see statutory values.ts).
+        await applyResultsBatch(asD1Db(db), 'i-1', [{
+            itemId: 'roof_predominant', sectionId: 'roof', field: 'itemAttribute',
+            value: { attributeId: 'damage_signs', value: null },
+        }], { tenantId: 't-1' });
+        const row = await db.select().from(inspectionResults).get();
+        const data = row!.data as Record<string, Record<string, unknown>>;
+        expect(data['_default:roof:roof_predominant'].attributes)
+            .toEqual({ damage_signs: null });
+    });
 });

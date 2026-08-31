@@ -80,12 +80,37 @@ export type ItemType =
 type ItemAttributeType =
     | 'boolean' | 'text' | 'number' | 'select' | 'multi_select' | 'date';
 
+/**
+ * One option an attribute offers.
+ *
+ * A bare string means the value and the label are the same thing, which is what
+ * every template written before this widening says, and it keeps meaning that.
+ *
+ * The pair exists because a statutory template's stored values are the tokens a
+ * form's `whenValue` is matched against -- `blowing_fuses`,
+ * `improper_breaker_size`, `other_explain` -- and those were what the inspector
+ * read on screen. The wording beside each box is PRINTED on the authority's
+ * form, so putting it here is transcription, not invention.
+ *
+ * 🔴 THE VALUE IS THE VALUE. `render.ts` compares `value === whenValue` byte for
+ * byte, so `label` is display only and must never be what gets stored. Storing
+ * a label produces a completely blank official form and no gate goes red for it
+ * -- that has already happened once, in `c6569cae`.
+ *
+ * WHY NOT A PARALLEL `choiceLabels` MAP. Two lists that must agree, with nothing
+ * making them agree, is the failure this project keeps hitting: one gets an
+ * entry, the other does not, and the disagreement is invisible until an
+ * inspector reads a raw key or a form prints blank. Pairing them makes drift
+ * unrepresentable rather than merely discouraged.
+ */
+export type ItemChoice = string | { value: string; label: string };
+
 /** Optional sub-fields nested under an item, e.g. tonnage on an HVAC unit. */
 interface ItemAttribute {
     id: string;
     name: string;
     type: ItemAttributeType;
-    choices?: string[];
+    choices?: ItemChoice[];
     unit?: string;
     required?: boolean;
     isSafety?: boolean;
@@ -144,6 +169,34 @@ export interface TemplateItem {
     defaultRecommendation?: string;
     attributes?: ItemAttribute[];
     source?: ItemSource | null;
+    /**
+     * The item this one sits under; absent or null means top level.
+     *
+     * -- WHY A PARENT POINTER AND NOT AN INDENT LEVEL ---------------------
+     * An indent level draws the same picture and answers none of the
+     * questions that matter: delete the parent and its indented rows are
+     * still level 2, dangling under nothing; move the parent and nothing
+     * knows what should travel with it. A parent pointer answers both, and
+     * makes "is this document well formed" a question with an answer.
+     *
+     * -- WHY NOT A `children` ARRAY ---------------------------------------
+     * Dozens of places walk `section.items` as a flat array. Nesting the
+     * array turns every one of them into a recursion, and the ones that are
+     * missed do not throw -- they silently print less. A parent pointer keeps
+     * the array one-dimensional, so every existing walk still sees every item.
+     *
+     * -- THE ARRAY ORDER IS THE TREE ORDER --------------------------------
+     * `items` is a pre-order walk of the tree: an item's whole subtree sits
+     * immediately after it and before its next sibling. That invariant is what
+     * lets a report print A, A.1, A.1.a, A.2, B by reading the array in order,
+     * with no renderer change at all. See `server/lib/template-hierarchy.ts`.
+     *
+     * Depth is capped at three levels -- the same bound, for the same
+     * bounded-parent-walk reason, as the unit tree in `services/unit.service.ts`.
+     * A parent in another section is not a parent: sections are the report's
+     * pagination and table-of-contents unit.
+     */
+    parentId?: string | null;
 }
 
 interface SectionApplicability {
@@ -235,10 +288,24 @@ interface TemplateStructure {
  * closed door is the enforcement; this comment is only the reason for it.
  */
 
+/**
+ * The declaration types, re-exported COMPLETE.
+ *
+ * ⚠️ `StatutoryFieldDependencies` is baselined in `scripts/knip-baseline.json`
+ * and is the only member here with no importer of its own — the one place that
+ * needs it takes it from `statutory-declaration` directly. It stays because
+ * this list is a SURFACE rather than a collection of individually-earned
+ * exports: a reader who reaches a declaration type through this module and
+ * finds five of the six has been told something false about where the sixth
+ * lives. Dropping it would make the module's answer depend on which types
+ * happened to have a second consumer this week.
+ */
 export type {
     StatutoryInspectionField,
     FieldGroup,
     StatutoryValueSource,
+    StatutoryFieldDependency,
+    StatutoryFieldDependencies,
     StatutoryFormDeclaration,
 } from './statutory-declaration';
 

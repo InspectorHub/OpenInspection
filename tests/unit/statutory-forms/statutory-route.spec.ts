@@ -13,6 +13,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
+import { r2Keys } from '../../../server/lib/r2-keys';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
@@ -38,6 +39,29 @@ vi.mock('../../../server/lib/statutory/forms', async () => {
             effectiveUntil: null,
             sourceUrl: 'https://example.gov/f.pdf', sourceHash: fixture.hash,
             publishedBy: 'a.operator', publishedAt: Date.UTC(2026, 0, 1),
+            withdrawn: null,
+        }, {
+            // The revision it superseded. Two of them are needed to have a
+            // template that produces one revision while an inspection's own date
+            // selects the other -- the only state this route refuses.
+            formId: 'yy_flat_form', version: 'Rev. 01/25',
+            effectiveFrom: Date.UTC(2025, 0, 1),
+            mandatoryFrom: Date.UTC(2025, 0, 1),
+            effectiveUntil: Date.UTC(2026, 0, 1),
+            sourceUrl: 'https://example.gov/f-old.pdf', sourceHash: '00'.repeat(32),
+            publishedBy: 'a.operator', publishedAt: Date.UTC(2025, 0, 1),
+            withdrawn: null,
+        }, {
+            // A revision taken out of service, and for a stated reason. The
+            // route's refusal branches on that reason, so a catalogue that only
+            // recorded "withdrawn" could not exercise it.
+            formId: 'yy_flat_form', version: 'Rev. 07/24',
+            effectiveFrom: Date.UTC(2024, 0, 1),
+            mandatoryFrom: Date.UTC(2024, 0, 1),
+            effectiveUntil: Date.UTC(2025, 0, 1),
+            sourceUrl: 'https://example.gov/f-2024.pdf', sourceHash: '11'.repeat(32),
+            publishedBy: 'a.operator', publishedAt: Date.UTC(2024, 0, 1),
+            withdrawn: { at: Date.UTC(2026, 1, 1), reason: 'field_map_incorrect' },
         }],
         FIELD_MAPS: [],
         fieldMapFor: () => ({
@@ -84,6 +108,26 @@ const GOOD = 'insp-good';
 const DRAFT = 'insp-draft';
 const PLAIN = 'insp-plain';
 const OTHER = 'insp-other-tenant';
+/** Declares the revision its date selects. */
+const MATCHED = 'insp-matched-revision';
+/** Declares the revision its date does NOT select. */
+const SUPERSEDED = 'insp-superseded-revision';
+/** Declares a revision that has been WITHDRAWN. */
+const WITHDRAWN = 'insp-withdrawn-revision';
+/**
+ * Created by the new-inspection WIZARD, whose `date` carries a time suffix.
+ *
+ * Not a hypothetical shape: `inspection-create-variants.service.ts` writes
+ * `${date}T${startTime}:00` on purpose, because `booking.service.ts` reads the
+ * clock back out of this column at `slice(11, 16)`. Six write paths in all
+ * store an instant here. Every one of those inspections used to 500 on both
+ * statutory endpoints, and the offer's 500 was swallowed into "no form here".
+ */
+const TIMED = 'insp-wizard-timed';
+/** Declares the form and binds nothing the map requires. */
+const UNANSWERABLE = 'insp-unanswerable';
+/** Declares the form, binds the required field, and nobody answered it. */
+const UNANSWERED = 'insp-unanswered-required';
 
 const INSPECTOR = 'usr-dana';
 
@@ -104,13 +148,34 @@ const SNAPSHOT_DECLARED = {
     statutoryForm: DECLARATION,
 };
 
+/**
+ * Declares the form and binds NOTHING, so the map's own required field can never
+ * be supplied. That is the shape the FL Citizens roof pack is in today for
+ * `inspector_signature_date`, and the refusal is a sentence worth reading.
+ */
+const SNAPSHOT_UNANSWERABLE = {
+    schemaVersion: 2,
+    sections: [{ id: 'sec', title: 'S', items: [{ id: 'itm_owner', label: 'Owner', type: 'rich' }] }],
+    statutoryForm: { formId: FORM, bindings: {} },
+};
+
 const SNAPSHOT_PLAIN = {
     schemaVersion: 2,
     sections: [{ id: 'sec', title: 'S', items: [{ id: 'itm_owner', label: 'Owner', type: 'rich' }] }],
 };
 
+/** The same template, saying which revision its bindings were written against. */
+const snapshotDeclaringRevision = (revision: string) => ({
+    ...SNAPSHOT_DECLARED,
+    statutoryForm: { ...DECLARATION, revision },
+});
+
 function bucket() {
-    const key = `_platform/statutory-forms/${FORM}/${encodeURIComponent(REVISION)}.pdf`;
+    // Built by `r2Keys.statutoryFormSource`, never spelt out again here: a bucket
+    // keyed by a re-derived string agrees with the shape it was copied from, so it
+    // goes on answering after the builder changes and production stops finding the
+    // object.
+    const key = r2Keys.statutoryFormSource(FORM, REVISION);
     return {
         get: async (k: string) => (k === key
             ? { arrayBuffer: async () => flat.bytes.buffer.slice(flat.bytes.byteOffset, flat.bytes.byteOffset + flat.bytes.byteLength) }
@@ -179,7 +244,51 @@ beforeEach(async () => {
         { ...base, id: DRAFT, tenantId: TENANT, templateSnapshot: SNAPSHOT_DECLARED },
         { ...base, id: PLAIN, tenantId: TENANT, templateSnapshot: SNAPSHOT_PLAIN },
         { ...base, id: OTHER, tenantId: OTHER_TENANT, templateSnapshot: SNAPSHOT_DECLARED },
+        {
+            ...base, id: MATCHED, tenantId: TENANT, inspectorId: INSPECTOR,
+            templateSnapshot: snapshotDeclaringRevision(REVISION),
+        },
+        {
+            ...base, id: SUPERSEDED, tenantId: TENANT, inspectorId: INSPECTOR,
+            templateSnapshot: snapshotDeclaringRevision('Rev. 01/25'),
+        },
+        {
+            ...base, id: WITHDRAWN, tenantId: TENANT, inspectorId: INSPECTOR,
+            templateSnapshot: snapshotDeclaringRevision('Rev. 07/24'),
+        },
+        {
+            ...base, id: UNANSWERABLE, tenantId: TENANT, inspectorId: INSPECTOR,
+            templateSnapshot: SNAPSHOT_UNANSWERABLE,
+        },
+        {
+            ...base, id: UNANSWERED, tenantId: TENANT, inspectorId: INSPECTOR,
+            templateSnapshot: SNAPSHOT_DECLARED,
+        },
+        {
+            ...base, id: TIMED, tenantId: TENANT, inspectorId: INSPECTOR,
+            // Same calendar day as every other row, plus the wizard's suffix.
+            date: '2026-05-01T09:30:00.000Z',
+            templateSnapshot: SNAPSHOT_DECLARED,
+        },
     ] as never);
+    // The one item the fixture map REQUIRES, actually answered.
+    //
+    // ⚠️ It used to be unanswered, and every "produces" control below still
+    // passed: the binding resolved to '' and the form came out with its only
+    // required box blank. `render.ts` refuses that now — a field in
+    // `requiredFields` is required of every inspection — so a positive control
+    // that produces has to be an inspection somebody actually answered. Keyed
+    // as `inspection_results.data` is really written (`unit:section:item`),
+    // because a flat map is the one shape the product never produces.
+    await db.insert(schema.inspectionResults).values(
+        [GOOD, MATCHED, SUPERSEDED, WITHDRAWN, TIMED, OTHER].map((inspectionId) => ({
+            id: `res-${inspectionId}`,
+            tenantId: inspectionId === OTHER ? OTHER_TENANT : TENANT,
+            inspectionId,
+            data: { '_default:sec:itm_owner': { value: 'Zoe Ng' } },
+            lastSyncedAt: new Date(),
+        })) as never,
+    );
     await db.insert(schema.reports).values([
         {
             id: 'rep-good', tenantId: TENANT, inspectionId: GOOD, title: 'Report', kind: 'primary',
@@ -196,6 +305,32 @@ beforeEach(async () => {
         {
             id: 'rep-other', tenantId: OTHER_TENANT, inspectionId: OTHER, title: 'Report', kind: 'primary',
             status: 'published', createdAt: new Date(), publishedAt: new Date(Date.UTC(2026, 4, 2)),
+        },
+        {
+            id: 'rep-matched', tenantId: TENANT, inspectionId: MATCHED, title: 'Report', kind: 'primary',
+            status: 'published', createdAt: new Date(), publishedAt: new Date(Date.UTC(2026, 4, 2)),
+        },
+        {
+            id: 'rep-superseded', tenantId: TENANT, inspectionId: SUPERSEDED, title: 'Report', kind: 'primary',
+            status: 'published', createdAt: new Date(), publishedAt: new Date(Date.UTC(2026, 4, 2)),
+        },
+        {
+            id: 'rep-withdrawn', tenantId: TENANT, inspectionId: WITHDRAWN, title: 'Report', kind: 'primary',
+            status: 'published', createdAt: new Date(), publishedAt: new Date(Date.UTC(2026, 4, 2)),
+        },
+        {
+            id: 'rep-timed', tenantId: TENANT, inspectionId: TIMED, title: 'Report', kind: 'primary',
+            status: 'published', createdAt: new Date(), publishedAt: new Date(Date.UTC(2026, 4, 2)),
+        },
+        {
+            id: 'rep-unanswerable', tenantId: TENANT, inspectionId: UNANSWERABLE, title: 'Report',
+            kind: 'primary', status: 'published', createdAt: new Date(),
+            publishedAt: new Date(Date.UTC(2026, 4, 2)),
+        },
+        {
+            id: 'rep-unanswered', tenantId: TENANT, inspectionId: UNANSWERED, title: 'Report',
+            kind: 'primary', status: 'published', createdAt: new Date(),
+            publishedAt: new Date(Date.UTC(2026, 4, 2)),
         },
     ] as never);
 });
@@ -245,6 +380,61 @@ describe('GET /:id/statutory-form.pdf', () => {
         expect(res.headers.get('x-artifact-status')).toBeTruthy();
     });
 
+    it('refuses a WITHDRAWN revision in its own words, naming the fault', async () => {
+        // Same status code as the refusal below and a different sentence, which
+        // is the whole of spec 5.3: this template's revision was taken out of
+        // service because OUR field map for it was wrong, and the inspector's
+        // next step -- wait for a corrected map, and reissue what already went
+        // out -- is not the next step for an authority's own withdrawal.
+        const res = await get(WITHDRAWN);
+        expect(res.status).toBe(409);
+
+        const message = (await res.json() as { error: { message: string } }).error.message;
+        expect(message).toContain('Rev. 07/24');
+        // The reason, in words the reader can act on.
+        expect(message).toMatch(/field map/i);
+        // And the revision that governs the inspection now, so the sentence ends
+        // somewhere rather than merely reporting a problem.
+        expect(message).toContain('Rev. 04/26');
+        // NOT the superseded-template sentence: that one blames the template for
+        // being written against a different document, which is true here and is
+        // not the thing that needs doing.
+        expect(message).not.toMatch(/produces revision/i);
+    });
+
+    it('refuses when the inspection is governed by a revision this template does not produce', async () => {
+        // The one state the design blocks. This inspection is dated 2026-05-01,
+        // which Rev. 04/26 governs, and its template was written against
+        // Rev. 01/25. Producing anyway would put the newer revision's bytes
+        // under the older revision's bindings: where the two forms' field names
+        // overlap the result is a plausible, WRONG official document, and
+        // recordProduction would file it as legitimate.
+        const res = await get(SUPERSEDED);
+        expect(res.status).toBe(409);
+
+        // Both revisions, because a refusal that names neither leaves the
+        // inspector with nothing to act on. The way out is a new inspection on
+        // the updated template -- there is no migration (see revision-status.ts).
+        const body = await res.json() as { error: { message: string } };
+        expect(body.error.message).toContain('Rev. 04/26');
+        expect(body.error.message).toContain('Rev. 01/25');
+        // Nothing was produced, so nothing may have been recorded as produced.
+        expect(producer.facts).toBeNull();
+    });
+
+    it('POSITIVE CONTROL — produces when the template declares the governing revision', async () => {
+        // Without this one, a route that refused every declared revision would
+        // satisfy the assertion above perfectly.
+        expect((await get(MATCHED)).status).toBe(200);
+    });
+
+    it('POSITIVE CONTROL — produces when the template names no revision at all', async () => {
+        // A template that makes no claim about which revision it was built for
+        // cannot be measured against the one the date selects, and a guess would
+        // refuse a correct report. GOOD declares a form and no revision.
+        expect((await get(GOOD)).status).toBe(200);
+    });
+
     it('fills inspector and company identity from real sources', async () => {
         // A blank licence line is not an absent value on a statutory form -- the
         // box is preprinted, so blank reads as "this submission is invalid".
@@ -260,5 +450,88 @@ describe('GET /:id/statutory-form.pdf', () => {
         expect(facts.inspector_license).toBe('HI-12345');
         expect(facts.company_name).toBe('Acme Inspections');
         expect(facts.company_phone).toBe('555-0100');
+    });
+
+    it('tells the inspector WHICH field the form still needs', async () => {
+        // The whole defect: this refusal is a useful sentence — it names the
+        // field the person standing in the house has to go and fill — and the
+        // browser received `{"error":{"message":"Internal server error"}}`,
+        // because only the route's OWN refusals were AppErrors.
+        const res = await get(UNANSWERABLE);
+        expect(res.status).toBe(422);
+
+        const message = (await res.json() as { error: { message: string } }).error.message;
+        expect(message).toContain('owner.name');
+        expect(message).toMatch(/required field/i);
+        expect(message).not.toMatch(/internal server error/i);
+        // The internal stage prefix is for the log, not for the reader.
+        expect(message).not.toContain('statutory render:');
+    });
+
+    it('refuses with the same 422 when the required box is ANSWERED WITH NOTHING', async () => {
+        // The shape the FL Citizens roof form was actually in: the binding is
+        // there, it resolves, and it resolves to ''. `UNANSWERABLE` above is the
+        // other shape (no binding at all), and before this rule the two ended
+        // differently — one refused, the other produced a form with a blank box
+        // over the inspector's signature.
+        //
+        // This inspection declares the form and has no answers stored, so
+        // `owner.name` reaches the renderer as an empty string.
+        const res = await get(UNANSWERED);
+        expect(res.status).toBe(422);
+        const message = (await res.json() as { error: { message: string } }).error.message;
+        expect(message).toContain('owner.name');
+        expect(message).toMatch(/required field/i);
+    });
+
+    it('NEGATIVE CONTROL — a refusal the ROUTE raises keeps its own status', async () => {
+        // 422 must not swallow the 409s. A translator that turned every failure
+        // into one code would be as uninformative as the 500 it replaced.
+        expect((await get(SUPERSEDED)).status).toBe(409);
+        expect((await get(DRAFT)).status).toBe(409);
+    });
+
+    it('produces for an inspection whose stored date carries a time', async () => {
+        // The wizard's shape. Before this, the route sliced the day for the
+        // revision check and then handed the RAW column value to the producer
+        // and to `calendarDayForForm`, both of which refuse anything that is not
+        // exactly YYYY-MM-DD -- so the response was 500.
+        expect((await get(TIMED)).status).toBe(200);
+    });
+
+    it('prints the DAY of a timed date, with the instant discarded', async () => {
+        // Not merely "it did not throw": the box on the form has to carry the
+        // civil day. A pass that only checked the status could be satisfied by
+        // printing the whole timestamp.
+        await get(TIMED);
+        expect(producedFacts().inspection_date).toBe('05/01/2026');
+    });
+});
+
+describe('GET /:id/statutory-form (the offer)', () => {
+    async function offer(id: string, tenantId = TENANT) {
+        const res = await buildApp(tenantId).request(
+            `/api/inspections/${id}/statutory-form`, {}, ENV(),
+        );
+        return { status: res.status, body: await res.json() as { data: { available: boolean } } };
+    }
+
+    it('offers the form for an inspection whose stored date carries a time', async () => {
+        // This is the one the page reads, and its failure was INVISIBLE: the
+        // loader kept `available: false` on a non-ok response, so the control
+        // simply did not render and nothing anywhere said why.
+        const { status, body } = await offer(TIMED);
+        expect(status).toBe(200);
+        expect(body.data.available).toBe(true);
+    });
+
+    it('POSITIVE CONTROL — and for a bare calendar day', async () => {
+        expect((await offer(GOOD)).body.data.available).toBe(true);
+    });
+
+    it('NEGATIVE CONTROL — a template declaring no form is still unavailable', async () => {
+        // Without this, a route that answered `available: true` unconditionally
+        // would satisfy both assertions above.
+        expect((await offer(PLAIN)).body.data.available).toBe(false);
     });
 });

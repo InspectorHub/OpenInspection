@@ -19,6 +19,7 @@ import { EnglishSpanBadge } from "./TranslationNotice";
 import { useAnchorId } from "./report-half-scope";
 import { getSectionIcon } from "~/lib/report-helpers";
 import { ReportItemCard } from "./ReportItemCard";
+import { itemDepths, subtreeOf } from "../../../../../server/lib/template-hierarchy";
 import {
   PRINT_SECTION_HEADING_CLASS,
   REPORT_HEADING_STYLE,
@@ -64,6 +65,24 @@ export function ReportSectionBlock({
 }: ReportSectionBlockProps) {
   // A TOC target — so it is namespaced per half. See report-half-scope.
   const anchorId = useAnchorId();
+  // Sub-items render INSIDE their parent's card rather than as peer cards. A
+  // card of its own tells the reader this row is as important as the ones
+  // around it, and a qualifier is not.
+  const depths = itemDepths(section.items);
+  const present = new Set(section.items.map((i) => i.id));
+  // A parentId pointing outside THIS list is a top-level card, not a dropped
+  // row: the `defects` filter removes items, so a child can outlive its parent.
+  const topLevel = section.items.filter((i) => {
+    const parentId = i.parentId ?? null;
+    return parentId === null || !present.has(parentId);
+  });
+  // The WHOLE subtree, not the direct children. Taking only direct children
+  // would print nothing for a third level -- and printing less is this design's
+  // one failure mode that throws nothing and shows up only on paper.
+  const descendantsOf = (id: string) => {
+    const ids = new Set(subtreeOf(section.items, id).slice(1));
+    return section.items.filter((i) => ids.has(i.id));
+  };
   if (filter === "defects" && section.items.length === 0) return null;
   return (
     <div id={anchorId(section.id)} className="mb-6 group/section relative scroll-mt-4" style={section.alwaysPageBreak ? { breakBefore: "page" } : undefined}>
@@ -84,17 +103,42 @@ export function ReportSectionBlock({
       {/* Items (hidden in summary mode) */}
       {filter !== "summary" && (
         <div className="space-y-3">
-          {section.items.map((item) => (
-            <ReportItemCard
-              key={item.id}
-              item={item}
-              showEstimates={showEstimates}
-              showPhotos={showPhotos}
-              mediaVisible={mediaVisible}
-              renderMediaTile={renderMediaTile}
-              selectedForRepair={!!repairItems[item.id]}
-              onToggleRepairItem={onToggleRepairItem}
-            />
+          {topLevel.map((item) => (
+            <div key={item.id} data-report-item>
+              <ReportItemCard
+                item={item}
+                showEstimates={showEstimates}
+                showPhotos={showPhotos}
+                mediaVisible={mediaVisible}
+                renderMediaTile={renderMediaTile}
+                selectedForRepair={!!repairItems[item.id]}
+                onToggleRepairItem={onToggleRepairItem}
+              />
+              {descendantsOf(item.id).map((child) => (
+                <div
+                  key={child.id}
+                  data-report-subitem
+                  /* Logical inline start, so a right-to-left report indents from
+                     the right with no second code path. Inline rather than a
+                     utility: the wrapper's own classes already set spacing, and
+                     two utilities of equal specificity resolve by stylesheet
+                     order rather than by the order written here. */
+                  style={{ marginInlineStart: (depths.get(child.id) ?? 1) * 16 }}
+                  className="mt-2"
+                >
+                  <ReportItemCard
+                    item={child}
+                    nested
+                    showEstimates={showEstimates}
+                    showPhotos={showPhotos}
+                    mediaVisible={mediaVisible}
+                    renderMediaTile={renderMediaTile}
+                    selectedForRepair={!!repairItems[child.id]}
+                    onToggleRepairItem={onToggleRepairItem}
+                  />
+                </div>
+              ))}
+            </div>
           ))}
         </div>
       )}

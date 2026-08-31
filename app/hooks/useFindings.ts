@@ -80,6 +80,7 @@ export function useFindings(
     setNotes: noop,
     commitNotes: noop,
     setItemValue: noop,
+    setItemAttribute: noop,
     toggleCannedComment: noop,
     setDefectFields: noop,
     insertComment: noop,

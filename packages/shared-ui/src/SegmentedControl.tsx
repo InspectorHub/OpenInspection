@@ -79,6 +79,28 @@ export function SegmentedControl({
 
   const sizeClass = size === "md" ? "py-1.5 text-[12px]" : "py-1 text-[11px]";
 
+  /**
+   * The 44×44 floor, applied where a FINGER is the pointer.
+   *
+   * Measured on the mobile theme sheet: the four segments came out 27×25 CSS px
+   * each, 31px apart centre to centre. That is the surface a finger uses, and
+   * 44×44 is the floor this repository already applies by hand elsewhere
+   * (`min-h-11` in CannedCommentRow, `min-h-[44px] min-w-[44px]` in the media
+   * studio). The segments were below it because the button carried `py-1` and NO
+   * horizontal padding at all -- each one was exactly as wide as its own word.
+   *
+   * -- WHY A POINTER QUERY AND NOT A `size="touch"` PROP ----------------------
+   * A prop would put the floor behind something every touch surface has to
+   * REMEMBER to pass, and forgetting is silent -- the control would look fine on
+   * the desk it was built at. This control already has ten call sites. The
+   * question "is a finger doing the pointing" is answerable by the browser, so
+   * it is answered there and nobody has to carry it.
+   *
+   * Mouse density is deliberately unchanged: `pointer-coarse` does not match a
+   * desktop, so every existing surface renders exactly as it did.
+   */
+  const touchClass = "pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:px-3";
+
   return (
     <div
       role="radiogroup"
@@ -100,7 +122,7 @@ export function SegmentedControl({
             title={o.title}
             onClick={() => onChange(o.value)}
             onKeyDown={(e) => onKeyDown(e, i)}
-            className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-ih-pill font-bold transition-colors focus:outline-none focus:shadow-ih-focus ${sizeClass} ${
+            className={`flex-1 inline-flex items-center justify-center gap-1.5 px-2 rounded-ih-pill font-bold transition-colors focus:outline-none focus:shadow-ih-focus ${sizeClass} ${touchClass} ${
               active
                 // The ring is what makes the selection legible on a card
                 // surface: the lifted segment is itself `bg-ih-bg-card`, so on a

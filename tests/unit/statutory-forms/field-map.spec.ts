@@ -15,10 +15,10 @@ import {
     validateFieldMap,
     validateFieldMapShape,
     validateAgainstPdf,
-    sha256Hex,
     type FieldMap,
     type FieldMapping,
 } from '../../../server/lib/statutory/field-map';
+import { sha256Hex } from '../../../server/lib/sha256';
 import type { StatutoryFormVersion } from '../../../server/lib/statutory/form-registry';
 import { buildFieldedPdf, buildFlatPdf, type PdfFixture } from '../helpers/statutory-pdf-fixtures';
 
@@ -32,6 +32,7 @@ beforeAll(async () => {
 
 const VERSION = (hash: string): StatutoryFormVersion => ({
     formId: 'xx_example_form',
+    formTitle: 'Yankee Flat Form',
     version: '1-0',
     effectiveFrom: Date.parse('2026-01-01T00:00:00.000Z'),
     mandatoryFrom: Date.parse('2026-01-01T00:00:00.000Z'),
@@ -40,6 +41,7 @@ const VERSION = (hash: string): StatutoryFormVersion => ({
     sourceHash: hash,
     publishedBy: 'u1',
     publishedAt: Date.parse('2026-08-21T00:00:00.000Z'),
+    withdrawn: null,
 });
 
 const MAP = (hash: string): FieldMap => ({
@@ -100,14 +102,31 @@ describe('validateFieldMap', () => {
         )).toThrow(/inspection\.date/);
     });
 
-    it('refuses two mappings writing the same value twice', () => {
+    it('refuses two mappings writing into one form field', () => {
+        // The duplicate is the TARGET, not the field. Two values sent to one
+        // widget means one of them is stored and the other is not, and the
+        // document that comes out looks filled either way.
+        expect(() => validateFieldMap({
+            ...MAP(fielded.hash),
+            mappings: [
+                { kind: 'acroform', ourField: 'client.name', pdfField: 'Text1' },
+                { kind: 'acroform', ourField: 'property.address', pdfField: 'Text1' },
+            ],
+        }, VERSION(fielded.hash))).toThrow(/Text1/);
+    });
+
+    it('ALLOWS one value written into two form fields — the form asked twice', () => {
+        // Measured on FL OIR-B1-1802, which prints the property address in the
+        // footer of all six pages. A rule keyed on `ourField` made that
+        // unmappable; the only way to satisfy it was to invent six field names
+        // for one answer.
         expect(() => validateFieldMap({
             ...MAP(fielded.hash),
             mappings: [
                 { kind: 'acroform', ourField: 'client.name', pdfField: 'Name of Client' },
                 { kind: 'acroform', ourField: 'client.name', pdfField: 'Text1' },
             ],
-        }, VERSION(fielded.hash))).toThrow(/client\.name/);
+        }, VERSION(fielded.hash))).not.toThrow();
     });
 
     it('ALLOWS several checkbox mappings for one field — that is what a rating is', () => {
@@ -235,6 +254,27 @@ describe('overlay fit declarations', () => {
         }))).toThrow(/maxWidth/);
     });
 
+    it('refuses a maxWidth declared without a maxHeight', () => {
+        // The mirror, and the more common half. `fitOverlay` returns early
+        // unless BOTH are present, so a lone maxWidth measures nothing at all —
+        // not in fit.ts, and not anywhere else. Measured on the Citizens
+        // four-point candidate: all 48 of its overlays declared a width, none
+        // declared a height, and no value was ever checked against one.
+        expect(() => validateFieldMapShape(withOverlay({
+            kind: 'overlay', ourField: 'comments', page: 0, x: 10, y: 20, size: 10,
+            maxWidth: 200,
+        }))).toThrow(/maxHeight/);
+    });
+
+    it('refuses a minSize with a maxWidth and no maxHeight', () => {
+        // A floor with nothing to shrink against is the same shape of claim:
+        // three numbers that read as a measurement and bound nothing.
+        expect(() => validateFieldMapShape(withOverlay({
+            kind: 'overlay', ourField: 'comments', page: 0, x: 10, y: 20, size: 10,
+            maxWidth: 200, minSize: 6,
+        }))).toThrow(/maxHeight/);
+    });
+
     it('POSITIVE CONTROL — a complete fit declaration validates', () => {
         expect(() => validateFieldMapShape(withOverlay({
             kind: 'overlay', ourField: 'comments', page: 0, x: 10, y: 20, size: 10,
@@ -248,6 +288,145 @@ describe('overlay fit declarations', () => {
         expect(() => validateFieldMapShape(withOverlay({
             kind: 'overlay', ourField: 'comments', page: 0, x: 10, y: 20, size: 10,
         }))).not.toThrow();
+    });
+});
+
+/**
+ * Three overlays share one `ourField` on purpose: the form printed three blanks
+ * and its own slashes between them, so one value has to arrive as three pieces.
+ * That is the ONE new way a field may legitimately repeat, and every other way
+ * it can repeat still writes one value over another.
+ */
+describe('validateFieldMapShape — overlays that draw one part of a value', () => {
+    const withMappings = (mappings: FieldMapping[]): FieldMap => ({
+        ...MAP('a'.repeat(64)), requiredFields: [], mappings,
+    });
+
+    /** The real geometry of `building_code_a_permit_application_date`, measured. */
+    const THREE: FieldMapping[] = [
+        { kind: 'overlay', ourField: 'permit_date', part: 'date_month', page: 0,
+            x: 472.20, y: 439.84, size: 9, maxWidth: 20.10, maxHeight: 11 },
+        { kind: 'overlay', ourField: 'permit_date', part: 'date_day', page: 0,
+            x: 495.12, y: 439.84, size: 9, maxWidth: 19.98, maxHeight: 11 },
+        { kind: 'overlay', ourField: 'permit_date', part: 'date_year', page: 0,
+            x: 517.80, y: 439.84, size: 9, maxWidth: 40.02, maxHeight: 11 },
+    ];
+
+    it('POSITIVE CONTROL — three different parts of one field validate', () => {
+        // Without this the refusals below would all pass against a validator
+        // that rejected every parted map.
+        expect(() => validateFieldMapShape(withMappings([...THREE]))).not.toThrow();
+    });
+
+    it('refuses the same part drawn twice into ONE blank', () => {
+        // A pasted coordinate that was never re-measured. The second one wins
+        // and nothing says the first was overwritten.
+        expect(() => validateFieldMapShape(withMappings([
+            ...THREE, { ...THREE[0] } as FieldMapping,
+        ]))).toThrow(/permit_date.*date_month/is);
+    });
+
+    it('ALLOWS the same part drawn into two DIFFERENT printed blanks', () => {
+        // A form that prints the month twice prints it twice. What the old rule
+        // read as a paste was the field repeating, and a field repeating is what
+        // these forms do; the paste is the COORDINATE repeating, above.
+        expect(() => validateFieldMapShape(withMappings([
+            ...THREE, { ...THREE[0], x: 600 } as FieldMapping,
+        ]))).not.toThrow();
+    });
+
+    it('refuses a whole-value overlay beside the parts of the same field', () => {
+        // 45pt of `03/15/2026` drawn across three blanks that already hold the
+        // parts -- the exact failure the parts exist to prevent, reintroduced.
+        expect(() => validateFieldMapShape(withMappings([
+            ...THREE,
+            { kind: 'overlay', ourField: 'permit_date', page: 0, x: 473.7, y: 439.84,
+                size: 9, maxWidth: 88, maxHeight: 11 },
+        ]))).toThrow(/permit_date.*both in parts and as a whole value/is);
+    });
+
+    it('POSITIVE CONTROL — an unparted overlay on a DIFFERENT field is fine', () => {
+        expect(() => validateFieldMapShape(withMappings([
+            ...THREE,
+            { kind: 'overlay', ourField: 'year_built', page: 0, x: 40, y: 439.84,
+                size: 9, maxWidth: 60, maxHeight: 11 },
+        ]))).not.toThrow();
+    });
+
+    it('refuses two unparted overlays drawn at one coordinate', () => {
+        // The rule that existed before parts, re-keyed onto the target: two
+        // values at one origin, the second painted over the first.
+        expect(() => validateFieldMapShape(withMappings([
+            { kind: 'overlay', ourField: 'year_built', page: 0, x: 40, y: 400, size: 9 },
+            { kind: 'overlay', ourField: 'stories', page: 0, x: 40, y: 400, size: 9 },
+        ]))).toThrow(/40, 400/is);
+    });
+
+    it('ALLOWS one unparted value drawn at two coordinates', () => {
+        expect(() => validateFieldMapShape(withMappings([
+            { kind: 'overlay', ourField: 'year_built', page: 0, x: 40, y: 400, size: 9 },
+            { kind: 'overlay', ourField: 'year_built', page: 0, x: 90, y: 400, size: 9 },
+        ]))).not.toThrow();
+    });
+
+    it('still refuses a field mapped as both a checkbox and a drawn value', () => {
+        expect(() => validateFieldMapShape(withMappings([
+            ...THREE,
+            { kind: 'checkbox', ourField: 'permit_date', whenValue: 'x', page: 0, x: 40, y: 400 },
+        ]))).toThrow(/permit_date.*checkbox/is);
+    });
+
+    it('refuses a part family with a piece missing', () => {
+        // Two of three blanks filled prints `03 /  /2026` -- which reads as an
+        // inspector who skipped a box, and nothing anywhere would say otherwise.
+        expect(() => validateFieldMapShape(withMappings([THREE[0], THREE[2]])))
+            .toThrow(/permit_date.*date_day/is);
+    });
+
+    it('POSITIVE CONTROL — the complete family validates', () => {
+        expect(() => validateFieldMapShape(withMappings([...THREE]))).not.toThrow();
+    });
+
+    it('refuses a part with no maxHeight', () => {
+        // `fitOverlay` measures nothing unless BOTH bounds are declared, and
+        // pdf-lib's own maxWidth only breaks at spaces -- a run of digits has
+        // none, so it runs off the side of the blank in silence. A part that is
+        // not measured is worse than the single overlay it replaced, because it
+        // looks fixed.
+        expect(() => validateFieldMapShape(withMappings([
+            { ...THREE[0], maxHeight: undefined } as FieldMapping, THREE[1], THREE[2],
+        ]))).toThrow(/permit_date.*date_month.*maxWidth and maxHeight/is);
+    });
+
+    it('refuses a part with no maxWidth', () => {
+        expect(() => validateFieldMapShape(withMappings([
+            { ...THREE[0], maxWidth: undefined } as FieldMapping, THREE[1], THREE[2],
+        ]))).toThrow(/permit_date.*date_month.*maxWidth and maxHeight/is);
+    });
+
+    it('POSITIVE CONTROL — an UNPARTED overlay with neither bound is still fine', () => {
+        // The bounds are required of parts only. Every map authored before they
+        // existed declares neither, and must not start refusing.
+        expect(() => validateFieldMapShape(withMappings([
+            { kind: 'overlay', ourField: 'year_built', page: 0, x: 40, y: 400, size: 9 },
+        ]))).not.toThrow();
+    });
+
+    it('refuses a part that declares minSize', () => {
+        // A part's width is fixed (two digits or four), so a floor can only fire
+        // when maxWidth was measured too small -- and then it shrinks the year
+        // while its siblings stay put, printing a date in two sizes and hiding
+        // the mis-measurement that caused it.
+        expect(() => validateFieldMapShape(withMappings([
+            { ...THREE[2], minSize: 7 } as FieldMapping, THREE[0], THREE[1],
+        ]))).toThrow(/permit_date.*date_year.*minSize/is);
+    });
+
+    it('POSITIVE CONTROL — an UNPARTED overlay may still declare minSize', () => {
+        expect(() => validateFieldMapShape(withMappings([
+            { kind: 'overlay', ourField: 'comments', page: 0, x: 40, y: 400,
+                size: 10, maxWidth: 200, maxHeight: 24, minSize: 7 },
+        ]))).not.toThrow();
     });
 });
 
@@ -299,6 +478,52 @@ describe('validateAgainstPdf', () => {
         const notAPdf = new TextEncoder().encode('%PDF- nope');
         const map = { ...MAP(await sha256Hex(notAPdf)), requiredFields: [] };
         await expect(validateAgainstPdf(map, notAPdf)).rejects.toThrow();
+    });
+});
+
+/**
+ * A part's drawn width is knowable from the map alone: it is always two digits
+ * or four, and every Helvetica digit advances 556/1000 of the em. So a blank too
+ * small for its own part can be refused before any inspection exists -- which is
+ * a different failure from "I measured the blank next door", and only this one
+ * is arithmetic.
+ */
+describe('validateAgainstPdf — a part that cannot fit its own digits', () => {
+    /** The real Q4.1 roof row on FL OIR-B1-1802: three 18.07pt blanks. */
+    const roofRow = (size: number): FieldMap => ({
+        ...MAP(flat.hash), requiredFields: [],
+        mappings: [
+            { kind: 'overlay', ourField: 'roof_permit_date', part: 'date_month', page: 0,
+                x: 166.92, y: 591.0, size, maxWidth: 18.07, maxHeight: 10.3 },
+            { kind: 'overlay', ourField: 'roof_permit_date', part: 'date_day', page: 0,
+                x: 187.45, y: 591.0, size, maxWidth: 18.07, maxHeight: 10.3 },
+            { kind: 'overlay', ourField: 'roof_permit_date', part: 'date_year', page: 0,
+                x: 207.98, y: 591.0, size, maxWidth: 18.07, maxHeight: 10.3 },
+        ],
+    });
+
+    it('refuses a four-digit year at 9pt in an 18.07pt blank', async () => {
+        // `2026` is 20.016pt at 9pt Helvetica. The blank is 18.07 -- it was cut
+        // for four 9pt Times underscores, which are 18.000. Drawn at 9 it
+        // overruns by 1.95pt and nothing raises today.
+        await expect(validateAgainstPdf(roofRow(9), flat.bytes))
+            .rejects.toThrow(/roof_permit_date.*date_year.*20\.0.*18\.07/is);
+    });
+
+    it('POSITIVE CONTROL — the same blank at 8pt is accepted', async () => {
+        // 17.792 <= 18.07, by 0.274pt. Without this the check above would also
+        // pass against a validator that refused every part.
+        await expect(validateAgainstPdf(roofRow(8), flat.bytes)).resolves.toBeUndefined();
+    });
+
+    it('POSITIVE CONTROL — an unparted overlay is not measured this way', async () => {
+        // The check is about a fixed-width part. A free-text overlay's width is
+        // not knowable from the map, and `fit.ts` owns it at render time.
+        await expect(validateAgainstPdf({
+            ...MAP(flat.hash), requiredFields: [],
+            mappings: [{ kind: 'overlay', ourField: 'comments', page: 0,
+                x: 40, y: 400, size: 10, maxWidth: 4 }],
+        }, flat.bytes)).resolves.toBeUndefined();
     });
 });
 

@@ -66,14 +66,13 @@ export interface SessionContext {
    * which is the allowlist that decides what actually ships. A capability
    * missing from that function is not readable here at any price — which is how
    * two surfaces came to gate the marketplace on `branding.isSaas` while the
-   * page itself gated it on `hasContentMarketplace`.
+   * page itself gated it on a capability that had never been put on the wire.
    */
   deployment: {
     mode: string;
     hasBilling: boolean;
     hasSeatQuota: boolean;
     mcpEnabled: boolean;
-    hasContentMarketplace: boolean;
     videoBackendManaged: boolean;
     hasManagedCompliance: boolean;
     /** Whether the import wizard may offer to hand an unreadable file to a
