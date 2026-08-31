@@ -4,9 +4,10 @@ import { fieldMap, version } from '../../../server/lib/statutory/forms/fl-oir-b1
 import { PUBLISHED_FORM_VERSIONS } from '../../../server/lib/statutory/forms';
 import { versionForInspection } from '../../../server/lib/statutory/form-registry';
 import { collectStatutoryValues } from '../../../server/lib/statutory/values';
+import { choiceValue } from '../../../server/lib/template-choices';
 import { refuseUnusableDependencies } from '../../../server/lib/statutory/applicability';
 import type {
-    StatutoryFormDeclaration, TemplateSchemaV2,
+    ItemChoice, StatutoryFormDeclaration, TemplateSchemaV2,
 } from '../../../server/types/template-schema';
 
 /**
@@ -30,7 +31,7 @@ import type {
  * `checkChoicesAreReachable` only refuses an answer that WAS given, and boxes
  * nobody chose simply stay unticked.
  */
-interface SeedAttribute { id: string; name: string; type: string; choices?: string[] }
+interface SeedAttribute { id: string; name: string; type: string; choices?: ItemChoice[] }
 interface SeedItem { id: string; label: string; type: string; description?: string; attributes?: SeedAttribute[] }
 
 const schema = seed.schema as unknown as TemplateSchemaV2 & {
@@ -50,9 +51,12 @@ for (const m of fieldMap.mappings) {
     boxesByField.set(m.ourField, known);
 }
 
+// VALUES, not the pairs. An option now carries the authority's printed
+// wording beside the token an answer is stored as, and everything below
+// compares the TOKEN against the form's own `whenValue`.
 const choicesByAttribute = new Map(
     items.flatMap((i) => (i.attributes ?? []).map(
-        (a) => [`${i.id} ${a.id}`, new Set(a.choices ?? [])] as const,
+        (a) => [`${i.id} ${a.id}`, new Set((a.choices ?? []).map(choiceValue))] as const,
     )),
 );
 
@@ -268,8 +272,15 @@ function answeredResults(): Record<string, { value?: unknown; attributes?: Recor
         if (!item.attributes?.length) { results[item.id] = { value: 'x' }; continue; }
         const attributes: Record<string, unknown> = {};
         for (const a of item.attributes) {
+            // `choiceValue`, so the synthetic answer set is what an inspector's
+            // click actually stores. Taking `a.choices[0]` raw would hand the
+            // renderer an OBJECT, which stringifies to "[object Object]" on the
+            // authority's form -- exactly the class of defect this file exists
+            // to catch, and one that would not have thrown.
             attributes[a.id] = a.choices?.length
-                ? (a.type === 'multi_select' ? [a.choices[0]] : a.choices[0])
+                ? (a.type === 'multi_select'
+                    ? [choiceValue(a.choices[0])]
+                    : choiceValue(a.choices[0]))
                 : 'x';
         }
         results[item.id] = { attributes };

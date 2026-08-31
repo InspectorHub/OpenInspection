@@ -80,12 +80,37 @@ export type ItemType =
 type ItemAttributeType =
     | 'boolean' | 'text' | 'number' | 'select' | 'multi_select' | 'date';
 
+/**
+ * One option an attribute offers.
+ *
+ * A bare string means the value and the label are the same thing, which is what
+ * every template written before this widening says, and it keeps meaning that.
+ *
+ * The pair exists because a statutory template's stored values are the tokens a
+ * form's `whenValue` is matched against -- `blowing_fuses`,
+ * `improper_breaker_size`, `other_explain` -- and those were what the inspector
+ * read on screen. The wording beside each box is PRINTED on the authority's
+ * form, so putting it here is transcription, not invention.
+ *
+ * 🔴 THE VALUE IS THE VALUE. `render.ts` compares `value === whenValue` byte for
+ * byte, so `label` is display only and must never be what gets stored. Storing
+ * a label produces a completely blank official form and no gate goes red for it
+ * -- that has already happened once, in `c6569cae`.
+ *
+ * WHY NOT A PARALLEL `choiceLabels` MAP. Two lists that must agree, with nothing
+ * making them agree, is the failure this project keeps hitting: one gets an
+ * entry, the other does not, and the disagreement is invisible until an
+ * inspector reads a raw key or a form prints blank. Pairing them makes drift
+ * unrepresentable rather than merely discouraged.
+ */
+export type ItemChoice = string | { value: string; label: string };
+
 /** Optional sub-fields nested under an item, e.g. tonnage on an HVAC unit. */
 interface ItemAttribute {
     id: string;
     name: string;
     type: ItemAttributeType;
-    choices?: string[];
+    choices?: ItemChoice[];
     unit?: string;
     required?: boolean;
     isSafety?: boolean;

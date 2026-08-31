@@ -58,8 +58,14 @@
                 "name": "If updated (check one):",
                 "type": "select",
                 "choices": [
-                  "full_replacement",
-                  "partial_replacement"
+                  {
+                    "value": "full_replacement",
+                    "label": "Full replacement"
+                  },
+                  {
+                    "value": "partial_replacement",
+                    "label": "Partial replacement"
+                  }
                 ]
               },
               {
@@ -72,8 +78,14 @@
                 "name": "Overall condition",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory (explain below)"
+                  }
                 ]
               },
               {
@@ -81,14 +93,38 @@
                 "name": "Any visible signs of damage / deterioration? (check all that apply and explain below)",
                 "type": "multi_select",
                 "choices": [
-                  "cracking",
-                  "cupping_curling",
-                  "excessive_granule_loss",
-                  "exposed_asphalt",
-                  "exposed_felt",
-                  "missing_loose_cracked_tabs_or_tiles",
-                  "soft_spots_in_decking",
-                  "visible_hail_damage"
+                  {
+                    "value": "cracking",
+                    "label": "Cracking"
+                  },
+                  {
+                    "value": "cupping_curling",
+                    "label": "Cupping/curling"
+                  },
+                  {
+                    "value": "excessive_granule_loss",
+                    "label": "Excessive granule loss"
+                  },
+                  {
+                    "value": "exposed_asphalt",
+                    "label": "Exposed asphalt"
+                  },
+                  {
+                    "value": "exposed_felt",
+                    "label": "Exposed felt"
+                  },
+                  {
+                    "value": "missing_loose_cracked_tabs_or_tiles",
+                    "label": "Missing/loose/cracked tabs or tiles"
+                  },
+                  {
+                    "value": "soft_spots_in_decking",
+                    "label": "Soft spots in decking"
+                  },
+                  {
+                    "value": "visible_hail_damage",
+                    "label": "Visible hail damage"
+                  }
                 ]
               },
               {
@@ -96,8 +132,14 @@
                 "name": "Any visible signs of leaks?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No (If \"yes\", explain below)"
+                  }
                 ]
               },
               {
@@ -105,8 +147,14 @@
                 "name": "Attic/underside of decking",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               },
               {
@@ -114,8 +162,14 @@
                 "name": "Interior ceilings",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               }
             ]
@@ -156,8 +210,14 @@
                 "name": "If updated (check one):",
                 "type": "select",
                 "choices": [
-                  "full_replacement",
-                  "partial_replacement"
+                  {
+                    "value": "full_replacement",
+                    "label": "Full replacement"
+                  },
+                  {
+                    "value": "partial_replacement",
+                    "label": "Partial replacement"
+                  }
                 ]
               },
               {
@@ -170,8 +230,14 @@
                 "name": "Overall condition",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory (explain below)"
+                  }
                 ]
               },
               {
@@ -179,14 +245,38 @@
                 "name": "Any visible signs of damage / deterioration? (check all that apply and explain below)",
                 "type": "multi_select",
                 "choices": [
-                  "cracking",
-                  "cupping_curling",
-                  "excessive_granule_loss",
-                  "exposed_asphalt",
-                  "exposed_felt",
-                  "missing_loose_cracked_tabs_or_tiles",
-                  "soft_spots_in_decking",
-                  "visible_hail_damage"
+                  {
+                    "value": "cracking",
+                    "label": "Cracking"
+                  },
+                  {
+                    "value": "cupping_curling",
+                    "label": "Cupping/curling"
+                  },
+                  {
+                    "value": "excessive_granule_loss",
+                    "label": "Excessive granule loss"
+                  },
+                  {
+                    "value": "exposed_asphalt",
+                    "label": "Exposed asphalt"
+                  },
+                  {
+                    "value": "exposed_felt",
+                    "label": "Exposed felt"
+                  },
+                  {
+                    "value": "missing_loose_cracked_tabs_or_tiles",
+                    "label": "Missing/loose/cracked tabs or tiles"
+                  },
+                  {
+                    "value": "soft_spots_in_decking",
+                    "label": "Soft spots in decking"
+                  },
+                  {
+                    "value": "visible_hail_damage",
+                    "label": "Visible hail damage"
+                  }
                 ]
               },
               {
@@ -194,8 +284,14 @@
                 "name": "Any visible signs of leaks?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No (If \"yes\", explain below)"
+                  }
                 ]
               },
               {
@@ -203,8 +299,14 @@
                 "name": "Attic/underside of decking",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               },
               {
@@ -212,8 +314,14 @@
                 "name": "Interior ceilings",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               }
             ]

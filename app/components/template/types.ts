@@ -2,6 +2,8 @@
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
+import type { ItemChoice } from '../../../server/types/template-schema';
+
 export type PropertyType = 'single-family' | 'multi-unit' | 'commercial';
 
 export interface SectionApplicability {
@@ -42,7 +44,13 @@ interface Attribute {
   id: string;
   name: string;
   type: string;
-  choices?: string[];
+  /** Bare string = value and label are the same word; the pair carries an
+   *  authority form's printed wording beside the token that gets stored. The
+   *  editor passes `attributes` through untouched (see
+   *  `serializeItemForSave`), so this only has to be wide enough not to
+   *  narrow a statutory template on a round trip through the author's screen —
+   *  a `string[]` here would have made saving one strip every label. */
+  choices?: ItemChoice[];
   unit?: string;
   required?: boolean;
   isSafety?: boolean;

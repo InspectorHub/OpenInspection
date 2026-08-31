@@ -1,4 +1,5 @@
 import type { ItemAttribute } from '../../lib/types';
+import { choiceLabel, choiceValue } from '../../../server/lib/template-choices';
 
 /**
  * What one attribute can hold.
@@ -76,7 +77,13 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                                 className="w-full px-2 py-1 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
                             >
                                 <option value="">—</option>
-                                {(attr.choices ?? []).map(c => <option key={c} value={c}>{c}</option>)}
+                                {/* `value` is the option's VALUE and `label` is
+                                    only its text: what a change event carries
+                                    is `e.target.value`, so the form still
+                                    receives the token it matches on. */}
+                                {(attr.choices ?? []).map(c => (
+                                    <option key={choiceValue(c)} value={choiceValue(c)}>{choiceLabel(c)}</option>
+                                ))}
                             </select>
                         </div>
                     );
@@ -119,10 +126,10 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                             </legend>
                             <div className="flex flex-wrap gap-x-4 gap-y-1">
                                 {(attr.choices ?? []).map(c => (
-                                    <label key={c} className="flex items-center gap-1.5 text-ih-fg-2">
+                                    <label key={choiceValue(c)} className="flex items-center gap-1.5 text-ih-fg-2">
                                         <input
                                             type="checkbox"
-                                            checked={ticked.includes(c)}
+                                            checked={ticked.includes(choiceValue(c))}
                                             onChange={e => {
                                                 // Rebuilt from the DECLARED choice
                                                 // order, never by appending: the
@@ -132,11 +139,15 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                                                 // the order somebody clicked is a
                                                 // value that differs between two
                                                 // inspectors who answered the same.
-                                                const next = (attr.choices ?? []).filter(
-                                                    (option) => (option === c
+                                                // VALUES, not labels: this array
+                                                // is the stored answer, and a
+                                                // label in it matches no box on
+                                                // the authority's form.
+                                                const next = (attr.choices ?? [])
+                                                    .map(choiceValue)
+                                                    .filter((option) => (option === choiceValue(c)
                                                         ? e.target.checked
-                                                        : ticked.includes(option)),
-                                                );
+                                                        : ticked.includes(option)));
                                                 // Empty is NOT an empty array. A form
                                                 // reader refuses one by name: "none
                                                 // of these" is the empty string, and
@@ -146,7 +157,7 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                                             }}
                                             className="w-3.5 h-3.5 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
                                         />
-                                        {c}
+                                        {choiceLabel(c)}
                                     </label>
                                 ))}
                             </div>

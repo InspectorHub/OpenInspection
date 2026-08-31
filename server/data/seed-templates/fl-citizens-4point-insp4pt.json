@@ -33,12 +33,30 @@
                 "name": "Minimum Photo Requirements:",
                 "type": "multi_select",
                 "choices": [
-                  "dwelling_each_side",
-                  "roof_each_slope",
-                  "plumbing",
-                  "main_panel_with_door_label",
-                  "panel_off",
-                  "hazards_and_deficiencies"
+                  {
+                    "value": "dwelling_each_side",
+                    "label": "Dwelling: Each side"
+                  },
+                  {
+                    "value": "roof_each_slope",
+                    "label": "Roof: Each slope"
+                  },
+                  {
+                    "value": "plumbing",
+                    "label": "Plumbing: Water heater (incl TPRV), under cabinet plumbing/drains, exposed valves"
+                  },
+                  {
+                    "value": "main_panel_with_door_label",
+                    "label": "Main electrical service panel with interior door label"
+                  },
+                  {
+                    "value": "panel_off",
+                    "label": "Electrical box with panel off"
+                  },
+                  {
+                    "value": "hazards_and_deficiencies",
+                    "label": "All hazards or deficiencies noted in this report"
+                  }
                 ]
               }
             ]
@@ -60,8 +78,14 @@
                 "name": "Type:",
                 "type": "select",
                 "choices": [
-                  "circuit_breaker",
-                  "fuse"
+                  {
+                    "value": "circuit_breaker",
+                    "label": "Circuit breaker"
+                  },
+                  {
+                    "value": "fuse",
+                    "label": "Fuse"
+                  }
                 ]
               },
               {
@@ -74,8 +98,14 @@
                 "name": "Is amperage sufficient for current usage?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No (explain)"
+                  }
                 ]
               },
               {
@@ -106,8 +136,14 @@
                 "name": "Type:",
                 "type": "select",
                 "choices": [
-                  "circuit_breaker",
-                  "fuse"
+                  {
+                    "value": "circuit_breaker",
+                    "label": "Circuit breaker"
+                  },
+                  {
+                    "value": "fuse",
+                    "label": "Fuse"
+                  }
                 ]
               },
               {
@@ -120,8 +156,14 @@
                 "name": "Is amperage sufficient for current usage?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No (explain)"
+                  }
                 ]
               },
               {
@@ -152,9 +194,18 @@
                 "name": "Indicate presence of any of the following:",
                 "type": "multi_select",
                 "choices": [
-                  "cloth_wiring",
-                  "active_knob_and_tube",
-                  "branch_circuit_aluminum_wiring"
+                  {
+                    "value": "cloth_wiring",
+                    "label": "Cloth wiring"
+                  },
+                  {
+                    "value": "active_knob_and_tube",
+                    "label": "Active knob and tube"
+                  },
+                  {
+                    "value": "branch_circuit_aluminum_wiring",
+                    "label": "Branch circuit aluminum wiring"
+                  }
                 ]
               },
               {
@@ -167,8 +218,14 @@
                 "name": "* If single strand (aluminum branch) wiring, provide details of all remediation. Separate documentation of all work must be provided.",
                 "type": "multi_select",
                 "choices": [
-                  "copalum_crimp",
-                  "alumiconn"
+                  {
+                    "value": "copalum_crimp",
+                    "label": "Connections repaired via COPALUM crimp"
+                  },
+                  {
+                    "value": "alumiconn",
+                    "label": "Connections repaired via AlumiConn"
+                  }
                 ]
               }
             ]
@@ -184,19 +241,58 @@
                 "name": "Hazards Present",
                 "type": "multi_select",
                 "choices": [
-                  "blowing_fuses",
-                  "tripping_breakers",
-                  "empty_sockets",
-                  "loose_wiring",
-                  "improper_grounding",
-                  "corrosion",
-                  "over_fusing",
-                  "double_taps",
-                  "exposed_wiring",
-                  "unsafe_wiring",
-                  "improper_breaker_size",
-                  "scorching",
-                  "other_explain"
+                  {
+                    "value": "blowing_fuses",
+                    "label": "Blowing fuses"
+                  },
+                  {
+                    "value": "tripping_breakers",
+                    "label": "Tripping breakers"
+                  },
+                  {
+                    "value": "empty_sockets",
+                    "label": "Empty sockets"
+                  },
+                  {
+                    "value": "loose_wiring",
+                    "label": "Loose wiring"
+                  },
+                  {
+                    "value": "improper_grounding",
+                    "label": "Improper grounding"
+                  },
+                  {
+                    "value": "corrosion",
+                    "label": "Corrosion"
+                  },
+                  {
+                    "value": "over_fusing",
+                    "label": "Over fusing"
+                  },
+                  {
+                    "value": "double_taps",
+                    "label": "Double taps"
+                  },
+                  {
+                    "value": "exposed_wiring",
+                    "label": "Exposed wiring"
+                  },
+                  {
+                    "value": "unsafe_wiring",
+                    "label": "Unsafe wiring"
+                  },
+                  {
+                    "value": "improper_breaker_size",
+                    "label": "Improper breaker size"
+                  },
+                  {
+                    "value": "scorching",
+                    "label": "Scorching"
+                  },
+                  {
+                    "value": "other_explain",
+                    "label": "Other (explain)"
+                  }
                 ]
               },
               {
@@ -217,8 +313,14 @@
                 "name": "General condition of the electrical system:",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory (explain)"
+                  }
                 ]
               }
             ]
@@ -234,14 +336,38 @@
                 "name": "Wiring Type(s)",
                 "type": "multi_select",
                 "choices": [
-                  "copper",
-                  "copper_clad_al",
-                  "nm_bx_or_conduit",
-                  "single_strand_al",
-                  "cloth_knob_and_tube",
-                  "other",
-                  "multistrand_al",
-                  "cloth_jacket_rubber_insulated"
+                  {
+                    "value": "copper",
+                    "label": "Copper"
+                  },
+                  {
+                    "value": "copper_clad_al",
+                    "label": "Copper Clad AL"
+                  },
+                  {
+                    "value": "nm_bx_or_conduit",
+                    "label": "NM, BX or Conduit"
+                  },
+                  {
+                    "value": "single_strand_al",
+                    "label": "Single Strand AL"
+                  },
+                  {
+                    "value": "cloth_knob_and_tube",
+                    "label": "Cloth (Knob & Tube)"
+                  },
+                  {
+                    "value": "other",
+                    "label": "Other"
+                  },
+                  {
+                    "value": "multistrand_al",
+                    "label": "Multistrand AL"
+                  },
+                  {
+                    "value": "cloth_jacket_rubber_insulated",
+                    "label": "Cloth Jacket Rubber Insulated"
+                  }
                 ]
               },
               {
@@ -268,8 +394,14 @@
                 "name": "Central AC:",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               },
               {
@@ -277,8 +409,14 @@
                 "name": "Central heat:",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               },
               {
@@ -291,8 +429,14 @@
                 "name": "Are the heating, ventilation and air conditioning systems in good working order?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No (explain)"
+                  }
                 ]
               },
               {
@@ -323,8 +467,14 @@
                 "name": "Is a wood-burning stove or central gas fireplace present?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               },
               {
@@ -332,8 +482,14 @@
                 "name": "Was it professionally installed?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               },
               {
@@ -341,8 +497,14 @@
                 "name": "Space heater used as primary heat source?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               },
               {
@@ -350,8 +512,14 @@
                 "name": "Is the source portable?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               },
               {
@@ -359,8 +527,14 @@
                 "name": "Does the air handler/condensate line or drain pan show any signs of blockage or leakage, including water damage to the surrounding area?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               }
             ]
@@ -382,8 +556,14 @@
                 "name": "Is there a temperature pressure relief valve on the water heater?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               },
               {
@@ -391,8 +571,14 @@
                 "name": "Is there any indication of an active leak?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               },
               {
@@ -400,8 +586,14 @@
                 "name": "Is there any indication of a prior leak?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               },
               {
@@ -422,9 +614,18 @@
                 "name": "Dishwasher",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory",
-                  "n_a"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
                 ]
               },
               {
@@ -432,9 +633,18 @@
                 "name": "Refrigerator",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory",
-                  "n_a"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
                 ]
               },
               {
@@ -442,9 +652,18 @@
                 "name": "Washing machine",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory",
-                  "n_a"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
                 ]
               },
               {
@@ -452,9 +671,18 @@
                 "name": "Water heater",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory",
-                  "n_a"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
                 ]
               },
               {
@@ -462,9 +690,18 @@
                 "name": "Showers/Tubs",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory",
-                  "n_a"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
                 ]
               },
               {
@@ -472,9 +709,18 @@
                 "name": "Toilets",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory",
-                  "n_a"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
                 ]
               },
               {
@@ -482,9 +728,18 @@
                 "name": "Sinks",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory",
-                  "n_a"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
                 ]
               },
               {
@@ -492,9 +747,18 @@
                 "name": "Sump pump",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory",
-                  "n_a"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
                 ]
               },
               {
@@ -502,9 +766,18 @@
                 "name": "Main shut off valve",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory",
-                  "n_a"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
                 ]
               },
               {
@@ -512,9 +785,18 @@
                 "name": "All other visible",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory",
-                  "n_a"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory"
+                  },
+                  {
+                    "value": "n_a",
+                    "label": "N/A"
+                  }
                 ]
               },
               {
@@ -570,14 +852,38 @@
                 "name": "Type of pipes (check all that apply)",
                 "type": "multi_select",
                 "choices": [
-                  "copper",
-                  "pex",
-                  "pvc_cpvc",
-                  "other",
-                  "galvanized",
-                  "cast_iron",
-                  "polybutylene",
-                  "abs"
+                  {
+                    "value": "copper",
+                    "label": "Copper"
+                  },
+                  {
+                    "value": "pex",
+                    "label": "PEX"
+                  },
+                  {
+                    "value": "pvc_cpvc",
+                    "label": "PVC/CPVC"
+                  },
+                  {
+                    "value": "other",
+                    "label": "Other (specify)"
+                  },
+                  {
+                    "value": "galvanized",
+                    "label": "Galvanized"
+                  },
+                  {
+                    "value": "cast_iron",
+                    "label": "Cast Iron"
+                  },
+                  {
+                    "value": "polybutylene",
+                    "label": "Polybutylene"
+                  },
+                  {
+                    "value": "abs",
+                    "label": "ABS"
+                  }
                 ]
               },
               {
@@ -634,8 +940,14 @@
                 "name": "If updated (check one):",
                 "type": "select",
                 "choices": [
-                  "full_replacement",
-                  "partial_replacement"
+                  {
+                    "value": "full_replacement",
+                    "label": "Full replacement"
+                  },
+                  {
+                    "value": "partial_replacement",
+                    "label": "Partial replacement"
+                  }
                 ]
               },
               {
@@ -648,8 +960,14 @@
                 "name": "Overall condition:",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory (explain below)"
+                  }
                 ]
               },
               {
@@ -657,14 +975,38 @@
                 "name": "Any visible signs of damage / deterioration? (check all that apply and explain below)",
                 "type": "multi_select",
                 "choices": [
-                  "cracking",
-                  "cupping_curling",
-                  "excessive_granule_loss",
-                  "exposed_asphalt",
-                  "exposed_felt",
-                  "missing_loose_cracked_tabs_or_tiles",
-                  "soft_spots_in_decking",
-                  "visible_hail_damage"
+                  {
+                    "value": "cracking",
+                    "label": "Cracking"
+                  },
+                  {
+                    "value": "cupping_curling",
+                    "label": "Cupping/curling"
+                  },
+                  {
+                    "value": "excessive_granule_loss",
+                    "label": "Excessive granule loss"
+                  },
+                  {
+                    "value": "exposed_asphalt",
+                    "label": "Exposed asphalt"
+                  },
+                  {
+                    "value": "exposed_felt",
+                    "label": "Exposed felt"
+                  },
+                  {
+                    "value": "missing_loose_cracked_tabs_or_tiles",
+                    "label": "Missing/loose/cracked tabs or tiles"
+                  },
+                  {
+                    "value": "soft_spots_in_decking",
+                    "label": "Soft spots in decking"
+                  },
+                  {
+                    "value": "visible_hail_damage",
+                    "label": "Visible hail damage"
+                  }
                 ]
               },
               {
@@ -672,8 +1014,14 @@
                 "name": "Any visible signs of leaks?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No (If \"yes\" explain below)"
+                  }
                 ]
               },
               {
@@ -681,8 +1029,14 @@
                 "name": "Attic/underside of decking",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               },
               {
@@ -690,8 +1044,14 @@
                 "name": "Interior ceilings",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               }
             ]
@@ -732,8 +1092,14 @@
                 "name": "If updated (check one):",
                 "type": "select",
                 "choices": [
-                  "full_replacement",
-                  "partial_replacement"
+                  {
+                    "value": "full_replacement",
+                    "label": "Full replacement"
+                  },
+                  {
+                    "value": "partial_replacement",
+                    "label": "Partial replacement"
+                  }
                 ]
               },
               {
@@ -746,8 +1112,14 @@
                 "name": "Overall condition:",
                 "type": "select",
                 "choices": [
-                  "satisfactory",
-                  "unsatisfactory"
+                  {
+                    "value": "satisfactory",
+                    "label": "Satisfactory"
+                  },
+                  {
+                    "value": "unsatisfactory",
+                    "label": "Unsatisfactory (explain below)"
+                  }
                 ]
               },
               {
@@ -755,14 +1127,38 @@
                 "name": "Any visible signs of damage / deterioration? (check all that apply and explain below)",
                 "type": "multi_select",
                 "choices": [
-                  "cracking",
-                  "cupping_curling",
-                  "excessive_granule_loss",
-                  "exposed_asphalt",
-                  "exposed_felt",
-                  "missing_loose_cracked_tabs_or_tiles",
-                  "soft_spots_in_decking",
-                  "visible_hail_damage"
+                  {
+                    "value": "cracking",
+                    "label": "Cracking"
+                  },
+                  {
+                    "value": "cupping_curling",
+                    "label": "Cupping/curling"
+                  },
+                  {
+                    "value": "excessive_granule_loss",
+                    "label": "Excessive granule loss"
+                  },
+                  {
+                    "value": "exposed_asphalt",
+                    "label": "Exposed asphalt"
+                  },
+                  {
+                    "value": "exposed_felt",
+                    "label": "Exposed felt"
+                  },
+                  {
+                    "value": "missing_loose_cracked_tabs_or_tiles",
+                    "label": "Missing/loose/cracked tabs or tiles"
+                  },
+                  {
+                    "value": "soft_spots_in_decking",
+                    "label": "Soft spots in decking"
+                  },
+                  {
+                    "value": "visible_hail_damage",
+                    "label": "Visible hail damage"
+                  }
                 ]
               },
               {
@@ -770,8 +1166,14 @@
                 "name": "Any visible signs of leaks?",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No (If \"yes\" explain below)"
+                  }
                 ]
               },
               {
@@ -779,8 +1181,14 @@
                 "name": "Attic/underside of decking",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               },
               {
@@ -788,8 +1196,14 @@
                 "name": "Interior ceilings",
                 "type": "select",
                 "choices": [
-                  "yes",
-                  "no"
+                  {
+                    "value": "yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "no",
+                    "label": "No"
+                  }
                 ]
               }
             ]

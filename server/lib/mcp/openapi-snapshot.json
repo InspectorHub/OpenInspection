@@ -2405,7 +2405,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -2710,7 +2734,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -2903,7 +2951,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -3049,7 +3121,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -3242,7 +3338,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -3435,7 +3555,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -3628,7 +3772,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -3821,7 +3989,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -3967,7 +4159,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -13506,7 +13722,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -13811,7 +14051,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -14004,7 +14268,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -14150,7 +14438,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -14343,7 +14655,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -14536,7 +14872,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -14729,7 +15089,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -14922,7 +15306,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -15068,7 +15476,31 @@
                                     "choices": {
                                       "type": "array",
                                       "items": {
-                                        "type": "string"
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "The token stored in the results and matched against a statutory form mapping"
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "What the inspector reads on screen; never stored"
+                                              }
+                                            },
+                                            "required": [
+                                              "value",
+                                              "label"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        ]
                                       },
                                       "description": "TODO describe choices field for the OpenInspection MCP integration"
                                     },
@@ -19832,7 +20264,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -20137,7 +20593,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -20330,7 +20810,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -20476,7 +20980,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -20669,7 +21197,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -20862,7 +21414,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -21055,7 +21631,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -21248,7 +21848,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },
@@ -21394,7 +22018,31 @@
                                         "choices": {
                                           "type": "array",
                                           "items": {
-                                            "type": "string"
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "value": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "The token stored in the results and matched against a statutory form mapping"
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "description": "What the inspector reads on screen; never stored"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
                                           },
                                           "description": "TODO describe choices field for the OpenInspection MCP integration"
                                         },

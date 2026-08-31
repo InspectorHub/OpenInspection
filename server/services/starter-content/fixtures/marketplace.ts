@@ -175,10 +175,11 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         // otherwise — the reasoning is on the Texas entry above and applies
         // unchanged. It is OUR version of these bindings, not Citizens'
         // revision label, which is `RCF-1 03 25` and lives in the declaration.
-        semver:    '1.1.0',
+        semver:    '1.2.0',
         schema:    flCitizensRoof.schema,
-        changelog: 'Binds the signature date and the licence type, and takes every damage sign '
-            + 'the form asks for rather than one.',
+        changelog: 'Adds the wording each option is printed with beside its stored value, so '
+            + "the inspector reads the form's own words instead of the token. The stored "
+            + 'values are unchanged.',
         featured:  false,
         jurisdiction: 'FL',
     },
@@ -217,9 +218,11 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         // otherwise — the reasoning is on the Texas entry above and applies
         // unchanged. It is OUR version of these bindings, not Citizens' revision
         // label, which is `Insp4pt 03 25` and lives in the declaration.
-        semver:    '1.0.0',
+        semver:    '1.1.0',
         schema:    flCitizens4point.schema,
-        changelog: 'First catalogue release of the Florida Citizens 4-Point package.',
+        changelog: 'Adds the wording each option is printed with beside its stored value, so '
+            + "the inspector reads the form's own words instead of the token. The stored "
+            + 'values are unchanged.',
         featured:  false,
         jurisdiction: 'FL',
     },
@@ -257,9 +260,11 @@ export const MARKETPLACE_LIBRARIES: ReadonlyArray<StarterMarketplaceLibraryFixtu
         // otherwise — the reasoning is on the Texas entry above and applies
         // unchanged. It is OUR version of these bindings, not the Office's
         // revision label, which is `Rev. 04/26` and lives in the declaration.
-        semver:    '1.0.0',
+        semver:    '1.1.0',
         schema:    flOirB11802.schema,
-        changelog: 'First catalogue release of the Florida OIR-B1-1802 wind mitigation package.',
+        changelog: 'Adds the wording each printed option carries beside its stored value for '
+            + 'the questions whose answers are not letters; the bare-letter answers are '
+            + 'unchanged, as are all stored values.',
         featured:  false,
         jurisdiction: 'FL',
     },

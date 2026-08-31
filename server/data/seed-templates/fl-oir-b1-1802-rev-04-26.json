@@ -45,9 +45,18 @@
                 "name": "A FORTIFIED Home® □ Roof, □ Silver, or □ Gold Certificate may be used to validate the attributes marked in questions 4 through 6, and questions 8 through 9 (check type of certificate and attach photocopy).",
                 "type": "select",
                 "choices": [
-                  "roof",
-                  "silver",
-                  "gold"
+                  {
+                    "value": "roof",
+                    "label": "Roof"
+                  },
+                  {
+                    "value": "silver",
+                    "label": "Silver"
+                  },
+                  {
+                    "value": "gold",
+                    "label": "Gold"
+                  }
                 ]
               }
             ]
@@ -124,10 +133,22 @@
                 "name": "Region: Location based on design windspeed. See ASCE 7-22 (700-year MRI) Risk Category 2 (www.ascehazardtool.org).",
                 "type": "select",
                 "choices": [
-                  "hvhz",
-                  "region_1",
-                  "region_2",
-                  "region_3"
+                  {
+                    "value": "hvhz",
+                    "label": "HVHZ"
+                  },
+                  {
+                    "value": "region_1",
+                    "label": "Region 1 (≥ 140 mph)"
+                  },
+                  {
+                    "value": "region_2",
+                    "label": "Region 2 (130 mph – 139 mph)"
+                  },
+                  {
+                    "value": "region_3",
+                    "label": "Region 3 (< 130 mph)"
+                  }
                 ]
               }
             ]
@@ -143,8 +164,14 @@
                 "name": "Roof Slope: For single-family homes with multiple slopes, indicate the slope that is at least two thirds of the main roof area when determining greater than or equal to 6:12, OR less than 6:12.",
                 "type": "select",
                 "choices": [
-                  "gte_6_12",
-                  "lt_6_12"
+                  {
+                    "value": "gte_6_12",
+                    "label": "Greater than or equal to (≥ 6:12)"
+                  },
+                  {
+                    "value": "lt_6_12",
+                    "label": "Less than (< 6:12)"
+                  }
                 ]
               }
             ]
@@ -166,13 +193,34 @@
                 "name": "Select all roof covering types in use.",
                 "type": "multi_select",
                 "choices": [
-                  "asphalt_fiberglass_shingle",
-                  "concrete_clay_tile",
-                  "synthetic_composite_tile",
-                  "metal",
-                  "built_up",
-                  "membrane",
-                  "other"
+                  {
+                    "value": "asphalt_fiberglass_shingle",
+                    "label": "Asphalt/Fiberglass Shingle"
+                  },
+                  {
+                    "value": "concrete_clay_tile",
+                    "label": "Concrete/Clay Tile"
+                  },
+                  {
+                    "value": "synthetic_composite_tile",
+                    "label": "Synthetic/Composite Tile"
+                  },
+                  {
+                    "value": "metal",
+                    "label": "Metal"
+                  },
+                  {
+                    "value": "built_up",
+                    "label": "Built Up"
+                  },
+                  {
+                    "value": "membrane",
+                    "label": "Membrane"
+                  },
+                  {
+                    "value": "other",
+                    "label": "Other"
+                  }
                 ]
               }
             ]
@@ -203,7 +251,10 @@
                 "name": "No Information Provided for Compliance",
                 "type": "multi_select",
                 "choices": [
-                  "true"
+                  {
+                    "value": "true",
+                    "label": "No Information Provided for Compliance"
+                  }
                 ]
               }
             ]
@@ -234,7 +285,10 @@
                 "name": "No Information Provided for Compliance",
                 "type": "multi_select",
                 "choices": [
-                  "true"
+                  {
+                    "value": "true",
+                    "label": "No Information Provided for Compliance"
+                  }
                 ]
               }
             ]
@@ -265,7 +319,10 @@
                 "name": "No Information Provided for Compliance",
                 "type": "multi_select",
                 "choices": [
-                  "true"
+                  {
+                    "value": "true",
+                    "label": "No Information Provided for Compliance"
+                  }
                 ]
               }
             ]
@@ -296,7 +353,10 @@
                 "name": "No Information Provided for Compliance",
                 "type": "multi_select",
                 "choices": [
-                  "true"
+                  {
+                    "value": "true",
+                    "label": "No Information Provided for Compliance"
+                  }
                 ]
               }
             ]
@@ -327,7 +387,10 @@
                 "name": "No Information Provided for Compliance",
                 "type": "multi_select",
                 "choices": [
-                  "true"
+                  {
+                    "value": "true",
+                    "label": "No Information Provided for Compliance"
+                  }
                 ]
               }
             ]
@@ -358,7 +421,10 @@
                 "name": "No Information Provided for Compliance",
                 "type": "multi_select",
                 "choices": [
-                  "true"
+                  {
+                    "value": "true",
+                    "label": "No Information Provided for Compliance"
+                  }
                 ]
               }
             ]
@@ -394,7 +460,10 @@
                 "name": "No Information Provided for Compliance",
                 "type": "multi_select",
                 "choices": [
-                  "true"
+                  {
+                    "value": "true",
+                    "label": "No Information Provided for Compliance"
+                  }
                 ]
               }
             ]
@@ -498,9 +567,18 @@
                 "name": "A. Toenails:",
                 "type": "select",
                 "choices": [
-                  "toenail_driven_at_angle",
-                  "connectors_not_installed_as_intended",
-                  "documented_185_lb_uplift"
+                  {
+                    "value": "toenail_driven_at_angle",
+                    "label": "Truss/rafter anchored to top plate of wall using nails driven at an angle through the truss/rafter and attached to the top plate of the wall"
+                  },
+                  {
+                    "value": "connectors_not_installed_as_intended",
+                    "label": "Metal connectors or structural fasteners that are not installed as intended do not meet the minimal conditions or requirements of B, C, or D"
+                  },
+                  {
+                    "value": "documented_185_lb_uplift",
+                    "label": "Other connection method documented to provide a substantiated wind allowable uplift capacity of 185 lbs. or greater."
+                  }
                 ]
               }
             ]
@@ -534,9 +612,18 @@
                 "name": "B. Clips:",
                 "type": "select",
                 "choices": [
-                  "no_wrap_over_truss",
-                  "one_wrap_min_three_nails",
-                  "documented_386_lb_uplift"
+                  {
+                    "value": "no_wrap_over_truss",
+                    "label": "Metal connectors that do not wrap over the truss/rafter"
+                  },
+                  {
+                    "value": "one_wrap_min_three_nails",
+                    "label": "Metal connectors with a minimum of one (1) strap that wraps over the truss/rafter and does not meet the nail position requirements of C or D but is secured with a minimum of three (3) nails"
+                  },
+                  {
+                    "value": "documented_386_lb_uplift",
+                    "label": "Purpose-made metal connector(s) or structural fastener(s) with a substantiated wind allowable uplift capacity of 386 lbs. or greater installed per the manufacturer’s installation specifications (requires site-specific documentation)."
+                  }
                 ]
               }
             ]
@@ -552,8 +639,14 @@
                 "name": "C. Single Wraps:",
                 "type": "select",
                 "choices": [
-                  "single_strap_two_and_one_nails",
-                  "documented_535_lb_uplift"
+                  {
+                    "value": "single_strap_two_and_one_nails",
+                    "label": "Metal connectors consisting of a single strap that wraps over the truss/rafter and are secured with a minimum of two (2) nails on one side and a minimum of one (1) nail on the opposing side"
+                  },
+                  {
+                    "value": "documented_535_lb_uplift",
+                    "label": "Purpose-made metal connector(s) or structural fastener(s) with a substantiated wind allowable uplift capacity of 535 lbs. or greater installed per the manufacturer’s installation specifications (requires site-specific documentation.)"
+                  }
                 ]
               }
             ]
@@ -569,9 +662,18 @@
                 "name": "D. Double Wraps:",
                 "type": "select",
                 "choices": [
-                  "two_separate_straps",
-                  "single_strap_three_nails_each_side",
-                  "documented_891_lb_uplift"
+                  {
+                    "value": "two_separate_straps",
+                    "label": "Metal Connectors consisting of two (2) separate straps, one on either side of the truss/rafter where each strap wraps over the truss/rafter and is secured with a minimum of two (2) nails on one side, and a minimum of one (1) nail on the opposing side"
+                  },
+                  {
+                    "value": "single_strap_three_nails_each_side",
+                    "label": "Metal connectors consisting of a single strap that wraps over the truss/rafter, are secured to the side of the wall and/or bottom of the top plate with a minimum of three (3) nails on each side"
+                  },
+                  {
+                    "value": "documented_891_lb_uplift",
+                    "label": "Purpose-made metal connector(s) or structural fastener(s) with a substantiated wind allowable uplift capacity of 891 lbs. or greater installed per the manufacturer’s installation specifications (requires site-specific documentation)."
+                  }
                 ]
               }
             ]
@@ -651,10 +753,22 @@
                 "name": "A. Sealed Roof Deck (also called SWR)",
                 "type": "select",
                 "choices": [
-                  "fully_adhered_astm_d1970",
-                  "taped_deck_seams",
-                  "double_layer_no_tape",
-                  "spray_foam"
+                  {
+                    "value": "fully_adhered_astm_d1970",
+                    "label": "Fully adhered polymer-modified bitumen roofing underlayment complying with ASTM D1970."
+                  },
+                  {
+                    "value": "taped_deck_seams",
+                    "label": "Tape over roof deck seams with felt or synthetic."
+                  },
+                  {
+                    "value": "double_layer_no_tape",
+                    "label": "Double layer of felt or synthetic with no tape."
+                  },
+                  {
+                    "value": "spray_foam",
+                    "label": "Spray foam products."
+                  }
                 ]
               },
               {
@@ -662,7 +776,10 @@
                 "name": "check here if entire roof deck underside covered.",
                 "type": "multi_select",
                 "choices": [
-                  "true"
+                  {
+                    "value": "true",
+                    "label": "check here if entire roof deck underside covered."
+                  }
                 ]
               }
             ]
@@ -684,14 +801,38 @@
                 "name": "Glazed Openings — Windows or Entry Doors",
                 "type": "multi_select",
                 "choices": [
-                  "NA",
-                  "A",
-                  "B",
-                  "C",
-                  "N_appears_a_or_b_unverified",
-                  "N_cannot_be_identified",
-                  "X",
-                  "Z"
+                  {
+                    "value": "NA",
+                    "label": "N/A Not applicable – there are no openings of this type on the structure"
+                  },
+                  {
+                    "value": "A",
+                    "label": "A Verified cyclic pressure & large missile (9 lb. for windows, doors/4.5 lb. for skylights)"
+                  },
+                  {
+                    "value": "B",
+                    "label": "B Verified cyclic pressure & large missile (4-8 lb. for windows, doors/2 lb. for skylights)"
+                  },
+                  {
+                    "value": "C",
+                    "label": "C Verified plywood/OSB meeting Table 1609.1.2 of the FBC 2007"
+                  },
+                  {
+                    "value": "N_appears_a_or_b_unverified",
+                    "label": "N Opening Protection products that appear to be A or B but are not verified"
+                  },
+                  {
+                    "value": "N_cannot_be_identified",
+                    "label": "Other protective coverings that cannot be identified as A, B, or C"
+                  },
+                  {
+                    "value": "X",
+                    "label": "X No Windborne Debris Protection"
+                  },
+                  {
+                    "value": "Z",
+                    "label": "Z Damaged openings in need of repair/replacement"
+                  }
                 ]
               },
               {
@@ -699,14 +840,38 @@
                 "name": "Glazed Openings — Garage Doors",
                 "type": "multi_select",
                 "choices": [
-                  "NA",
-                  "A",
-                  "B",
-                  "C",
-                  "N_appears_a_or_b_unverified",
-                  "N_cannot_be_identified",
-                  "X",
-                  "Z"
+                  {
+                    "value": "NA",
+                    "label": "N/A Not applicable – there are no openings of this type on the structure"
+                  },
+                  {
+                    "value": "A",
+                    "label": "A Verified cyclic pressure & large missile (9 lb. for windows, doors/4.5 lb. for skylights)"
+                  },
+                  {
+                    "value": "B",
+                    "label": "B Verified cyclic pressure & large missile (4-8 lb. for windows, doors/2 lb. for skylights)"
+                  },
+                  {
+                    "value": "C",
+                    "label": "C Verified plywood/OSB meeting Table 1609.1.2 of the FBC 2007"
+                  },
+                  {
+                    "value": "N_appears_a_or_b_unverified",
+                    "label": "N Opening Protection products that appear to be A or B but are not verified"
+                  },
+                  {
+                    "value": "N_cannot_be_identified",
+                    "label": "Other protective coverings that cannot be identified as A, B, or C"
+                  },
+                  {
+                    "value": "X",
+                    "label": "X No Windborne Debris Protection"
+                  },
+                  {
+                    "value": "Z",
+                    "label": "Z Damaged openings in need of repair/replacement"
+                  }
                 ]
               },
               {
@@ -714,14 +879,38 @@
                 "name": "Glazed Openings — Skylights",
                 "type": "multi_select",
                 "choices": [
-                  "NA",
-                  "A",
-                  "B",
-                  "C",
-                  "N_appears_a_or_b_unverified",
-                  "N_cannot_be_identified",
-                  "X",
-                  "Z"
+                  {
+                    "value": "NA",
+                    "label": "N/A Not applicable – there are no openings of this type on the structure"
+                  },
+                  {
+                    "value": "A",
+                    "label": "A Verified cyclic pressure & large missile (9 lb. for windows, doors/4.5 lb. for skylights)"
+                  },
+                  {
+                    "value": "B",
+                    "label": "B Verified cyclic pressure & large missile (4-8 lb. for windows, doors/2 lb. for skylights)"
+                  },
+                  {
+                    "value": "C",
+                    "label": "C Verified plywood/OSB meeting Table 1609.1.2 of the FBC 2007"
+                  },
+                  {
+                    "value": "N_appears_a_or_b_unverified",
+                    "label": "N Opening Protection products that appear to be A or B but are not verified"
+                  },
+                  {
+                    "value": "N_cannot_be_identified",
+                    "label": "Other protective coverings that cannot be identified as A, B, or C"
+                  },
+                  {
+                    "value": "X",
+                    "label": "X No Windborne Debris Protection"
+                  },
+                  {
+                    "value": "Z",
+                    "label": "Z Damaged openings in need of repair/replacement"
+                  }
                 ]
               },
               {
@@ -729,14 +918,38 @@
                 "name": "Glazed Openings — Glass Block",
                 "type": "multi_select",
                 "choices": [
-                  "NA",
-                  "A",
-                  "B",
-                  "C",
-                  "N_appears_a_or_b_unverified",
-                  "N_cannot_be_identified",
-                  "X",
-                  "Z"
+                  {
+                    "value": "NA",
+                    "label": "N/A Not applicable – there are no openings of this type on the structure"
+                  },
+                  {
+                    "value": "A",
+                    "label": "A Verified cyclic pressure & large missile (9 lb. for windows, doors/4.5 lb. for skylights)"
+                  },
+                  {
+                    "value": "B",
+                    "label": "B Verified cyclic pressure & large missile (4-8 lb. for windows, doors/2 lb. for skylights)"
+                  },
+                  {
+                    "value": "C",
+                    "label": "C Verified plywood/OSB meeting Table 1609.1.2 of the FBC 2007"
+                  },
+                  {
+                    "value": "N_appears_a_or_b_unverified",
+                    "label": "N Opening Protection products that appear to be A or B but are not verified"
+                  },
+                  {
+                    "value": "N_cannot_be_identified",
+                    "label": "Other protective coverings that cannot be identified as A, B, or C"
+                  },
+                  {
+                    "value": "X",
+                    "label": "X No Windborne Debris Protection"
+                  },
+                  {
+                    "value": "Z",
+                    "label": "Z Damaged openings in need of repair/replacement"
+                  }
                 ]
               },
               {
@@ -744,15 +957,42 @@
                 "name": "Non-Glazed Openings — Entry Doors",
                 "type": "multi_select",
                 "choices": [
-                  "NA",
-                  "A",
-                  "B",
-                  "C",
-                  "D",
-                  "N_appears_a_or_b_unverified",
-                  "N_cannot_be_identified",
-                  "X",
-                  "Z"
+                  {
+                    "value": "NA",
+                    "label": "N/A Not applicable – there are no openings of this type on the structure"
+                  },
+                  {
+                    "value": "A",
+                    "label": "A Verified cyclic pressure & large missile (9 lb. for windows, doors/4.5 lb. for skylights)"
+                  },
+                  {
+                    "value": "B",
+                    "label": "B Verified cyclic pressure & large missile (4-8 lb. for windows, doors/2 lb. for skylights)"
+                  },
+                  {
+                    "value": "C",
+                    "label": "C Verified plywood/OSB meeting Table 1609.1.2 of the FBC 2007"
+                  },
+                  {
+                    "value": "D",
+                    "label": "D Verified Non-Glazed Entry or Garage Doors indicating compliance with ASTM E 330, ANSI/DASMA 108, or PA/TAS 202 for wind pressure resistance"
+                  },
+                  {
+                    "value": "N_appears_a_or_b_unverified",
+                    "label": "N Opening Protection products that appear to be A or B but are not verified"
+                  },
+                  {
+                    "value": "N_cannot_be_identified",
+                    "label": "Other protective coverings that cannot be identified as A, B, or C"
+                  },
+                  {
+                    "value": "X",
+                    "label": "X No Windborne Debris Protection"
+                  },
+                  {
+                    "value": "Z",
+                    "label": "Z Damaged openings in need of repair/replacement"
+                  }
                 ]
               },
               {
@@ -760,15 +1000,42 @@
                 "name": "Non-Glazed Openings — Garage Doors",
                 "type": "multi_select",
                 "choices": [
-                  "NA",
-                  "A",
-                  "B",
-                  "C",
-                  "D",
-                  "N_appears_a_or_b_unverified",
-                  "N_cannot_be_identified",
-                  "X",
-                  "Z"
+                  {
+                    "value": "NA",
+                    "label": "N/A Not applicable – there are no openings of this type on the structure"
+                  },
+                  {
+                    "value": "A",
+                    "label": "A Verified cyclic pressure & large missile (9 lb. for windows, doors/4.5 lb. for skylights)"
+                  },
+                  {
+                    "value": "B",
+                    "label": "B Verified cyclic pressure & large missile (4-8 lb. for windows, doors/2 lb. for skylights)"
+                  },
+                  {
+                    "value": "C",
+                    "label": "C Verified plywood/OSB meeting Table 1609.1.2 of the FBC 2007"
+                  },
+                  {
+                    "value": "D",
+                    "label": "D Verified Non-Glazed Entry or Garage Doors indicating compliance with ASTM E 330, ANSI/DASMA 108, or PA/TAS 202 for wind pressure resistance"
+                  },
+                  {
+                    "value": "N_appears_a_or_b_unverified",
+                    "label": "N Opening Protection products that appear to be A or B but are not verified"
+                  },
+                  {
+                    "value": "N_cannot_be_identified",
+                    "label": "Other protective coverings that cannot be identified as A, B, or C"
+                  },
+                  {
+                    "value": "X",
+                    "label": "X No Windborne Debris Protection"
+                  },
+                  {
+                    "value": "Z",
+                    "label": "Z Damaged openings in need of repair/replacement"
+                  }
                 ]
               }
             ]
@@ -816,8 +1083,14 @@
                 "name": "C. All glazed openings are covered with: □ Plywood OR □ OSB, meeting the requirements of Table 1609.1.2 of the FBC 2007",
                 "type": "select",
                 "choices": [
-                  "plywood",
-                  "osb"
+                  {
+                    "value": "plywood",
+                    "label": "Plywood"
+                  },
+                  {
+                    "value": "osb",
+                    "label": "OSB"
+                  }
                 ]
               }
             ]

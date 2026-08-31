@@ -5,8 +5,9 @@ import { fieldMap, version } from '../../../server/lib/statutory/forms/fl-citize
 import { PUBLISHED_FORM_VERSIONS } from '../../../server/lib/statutory/forms';
 import { versionForInspection } from '../../../server/lib/statutory/form-registry';
 import { collectStatutoryValues } from '../../../server/lib/statutory/values';
+import { choiceLabel, choiceValue } from '../../../server/lib/template-choices';
 import type {
-    StatutoryFormDeclaration, TemplateSchemaV2,
+    ItemChoice, StatutoryFormDeclaration, TemplateSchemaV2,
 } from '../../../server/types/template-schema';
 
 /**
@@ -31,7 +32,7 @@ import type {
  * official form and nothing throws — `checkChoicesAreReachable` only refuses an
  * answer that was given, and boxes nobody chose simply stay unticked.
  */
-interface SeedAttribute { id: string; name: string; type: string; choices?: string[] }
+interface SeedAttribute { id: string; name: string; type: string; choices?: ItemChoice[] }
 interface SeedItem { id: string; label: string; type: string; attributes?: SeedAttribute[] }
 
 const schema = seed.schema as unknown as TemplateSchemaV2 & {
@@ -52,9 +53,12 @@ for (const m of fieldMap.mappings) {
 }
 
 /** Every attribute in the template, keyed the way a binding addresses one. */
+// VALUES, not the pairs. An option now carries the authority's printed
+// wording beside the token an answer is stored as, and everything below
+// compares the TOKEN against the form's own `whenValue`.
 const choicesByAttribute = new Map(
     items.flatMap((i) => (i.attributes ?? []).map(
-        (a) => [`${i.id} ${a.id}`, new Set(a.choices ?? [])] as const,
+        (a) => [`${i.id} ${a.id}`, new Set((a.choices ?? []).map(choiceValue))] as const,
     )),
 );
 
@@ -127,16 +131,37 @@ describe('FL Citizens four-point Insp4pt 03 25 seed template', () => {
         expect(ours.size).toBe(12);
         expect([...ours.keys()].sort()).toEqual([...roofAttrs.keys()].sort());
         let differ = 0;
+        let labelsDiffer = 0;
         for (const [id, mine] of ours) {
             const theirs = roofAttrs.get(id)!;
-            expect([...(mine.choices ?? [])], id).toEqual([...(theirs.choices ?? [])]);
+            // VALUES: identical, asserted per attribute so a drift names itself.
+            expect((mine.choices ?? []).map(choiceValue), id)
+                .toEqual((theirs.choices ?? []).map(choiceValue));
             if (mine.name !== theirs.name) differ += 1;
+            const myLabels = (mine.choices ?? []).map(choiceLabel);
+            const theirLabels = (theirs.choices ?? []).map(choiceLabel);
+            // Compared as JSON rather than joined on a separator: a joined
+            // comparison is only as good as the separator not occurring in
+            // the data, and these labels are the authority's punctuation.
+            if (JSON.stringify(myLabels) !== JSON.stringify(theirLabels)) labelsDiffer += 1;
         }
         // Measured on the two PDFs: `Remaining useful life (years):` and
         // `Overall condition:` carry a colon here and none on the roof form.
         expect(differ).toBe(2);
         expect(ours.get('overall_condition')?.name).toBe('Overall condition:');
         expect(roofAttrs.get('overall_condition')?.name).toBe('Overall condition');
+        // And exactly ONE choice list is worded differently. Measured on the
+        // two PDFs at the word-box level: the parenthetical sits on the same
+        // printed line as the No box on both, and RCF-1 puts a comma after
+        // "yes" where this form does not. Copying one form's wording to the
+        // other would make this zero — which is why it is asserted as one and
+        // named, rather than left as "they may differ".
+        expect(labelsDiffer).toBe(1);
+        const leaks = (a: SeedAttribute | undefined) => (a?.choices ?? []).map(choiceLabel);
+        expect(leaks(ours.get('visible_signs_of_leaks')))
+            .toEqual(['Yes', 'No (If "yes" explain below)']);
+        expect(leaks(roofAttrs.get('visible_signs_of_leaks')))
+            .toEqual(['Yes', 'No (If "yes", explain below)']);
     });
 
     it('carries no rating system, because this form has no single judgement axis', () => {
@@ -230,8 +255,15 @@ function answeredResults(): Record<string, { value?: unknown; attributes?: Recor
         if (!item.attributes?.length) { results[item.id] = { value: 'x' }; continue; }
         const attributes: Record<string, unknown> = {};
         for (const a of item.attributes) {
+            // `choiceValue`, so the synthetic answer set is what an inspector's
+            // click actually stores. Taking `a.choices[0]` raw would hand the
+            // renderer an OBJECT, which stringifies to "[object Object]" on the
+            // authority's form -- exactly the class of defect this file exists
+            // to catch, and one that would not have thrown.
             attributes[a.id] = a.choices?.length
-                ? (a.type === 'multi_select' ? [a.choices[0]] : a.choices[0])
+                ? (a.type === 'multi_select'
+                    ? [choiceValue(a.choices[0])]
+                    : choiceValue(a.choices[0]))
                 : 'x';
         }
         results[item.id] = { attributes };

@@ -70,13 +70,35 @@ const ItemOptionsSchema = z.object({
     minPhotos:   z.number().nullable().optional().describe('TODO describe minPhotos field for the OpenInspection MCP integration'),
 }).strict();
 
+/**
+ * One option an attribute offers: either a bare token, or that token paired
+ * with the wording the authority's form prints beside its box.
+ *
+ * 🔴 THE VALUE IS WHAT GETS STORED. A statutory form is rendered by comparing
+ * the stored answer to a mapping's `whenValue` byte for byte, so a label that
+ * reached the results would print a blank official document. Widening `choices`
+ * rather than adding a parallel `choiceLabels` map is what keeps the two from
+ * being able to disagree — see `ItemChoice` in `server/types/template-schema.ts`.
+ *
+ * `.strict()` on the object half so a caller sending `{ value, title }` is
+ * refused by name rather than having the label silently dropped, which would
+ * put a raw token back on the inspector's screen with nothing to show for it.
+ */
+const ItemChoiceSchema = z.union([
+    z.string(),
+    z.object({
+        value: z.string().min(1).describe('The token stored in the results and matched against a statutory form mapping'),
+        label: z.string().min(1).describe('What the inspector reads on screen; never stored'),
+    }).strict(),
+]);
+
 /** Optional sub-fields nested under an item, e.g. tonnage on an HVAC unit. */
 const ItemAttributeTypeEnum = z.enum(['boolean', 'text', 'number', 'select', 'multi_select', 'date']);
 const ItemAttributeSchema = z.object({
     id:             z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
     name:           z.string().min(1).describe('TODO describe name field for the OpenInspection MCP integration'),
     type:           ItemAttributeTypeEnum.describe('TODO describe type field for the OpenInspection MCP integration'),
-    choices:        z.array(z.string()).optional().describe('TODO describe choices field for the OpenInspection MCP integration'),
+    choices:        z.array(ItemChoiceSchema).optional().describe('TODO describe choices field for the OpenInspection MCP integration'),
     unit:           z.string().optional().describe('TODO describe unit field for the OpenInspection MCP integration'),
     required:       z.boolean().optional().describe('TODO describe required field for the OpenInspection MCP integration'),
     isSafety:       z.boolean().optional().describe('TODO describe isSafety field for the OpenInspection MCP integration'),

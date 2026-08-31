@@ -4,8 +4,9 @@ import { fieldMap, version } from '../../../server/lib/statutory/forms/fl-citize
 import { PUBLISHED_FORM_VERSIONS } from '../../../server/lib/statutory/forms';
 import { versionForInspection } from '../../../server/lib/statutory/form-registry';
 import { collectStatutoryValues } from '../../../server/lib/statutory/values';
+import { choiceValue } from '../../../server/lib/template-choices';
 import type {
-    StatutoryFormDeclaration, TemplateSchemaV2,
+    ItemChoice, StatutoryFormDeclaration, TemplateSchemaV2,
 } from '../../../server/types/template-schema';
 
 /**
@@ -25,7 +26,7 @@ import type {
  * the boxes simply stay unticked. That failure has happened on this branch once
  * already, which is why the vocabulary check below is the crux of this file.
  */
-interface SeedAttribute { id: string; name: string; type: string; choices?: string[] }
+interface SeedAttribute { id: string; name: string; type: string; choices?: ItemChoice[] }
 interface SeedItem { id: string; label: string; type: string; attributes?: SeedAttribute[] }
 
 const schema = seed.schema as unknown as TemplateSchemaV2 & {
@@ -88,9 +89,16 @@ describe('FL Citizens roof RCF-1 03 25 seed template', () => {
         // THE CRUX. Both directions and both numbers: a template offering an
         // option the page has no box for prints nothing for that answer, and a
         // page box no option can reach is a question the software cannot answer.
+        // `choiceValue`, never `a.choices` raw: an option now carries the
+        // authority's printed wording beside the token, and it is the TOKEN
+        // this compares. Reading the pair itself would compare objects to
+        // strings and fail loudly; reading `.label` would compare the wording
+        // to the map and fail loudly too — both of which is the point. The
+        // silent version is the one where the panel stores a label, and the
+        // assertion below is what stands between that and a blank form.
         const byField = new Map(
             items.flatMap((i) => (i.attributes ?? []).map(
-                (a) => [`${i.id} ${a.id}`, new Set(a.choices ?? [])] as const,
+                (a) => [`${i.id} ${a.id}`, new Set((a.choices ?? []).map(choiceValue))] as const,
             )),
         );
         let checked = 0;

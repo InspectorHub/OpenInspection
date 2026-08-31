@@ -1,3 +1,5 @@
+import type { ItemChoice } from "../../server/types/template-schema";
+
 export interface PublishBlockingDefect {
     sectionId:    string;
     sectionTitle: string;
@@ -22,7 +24,11 @@ export interface ItemAttribute {
     id: string;
     name: string;
     type: 'boolean' | 'text' | 'number' | 'select' | 'multi_select' | 'date';
-    choices?: string[];
+    /** Bare string = value and label are the same word. The pair carries the
+     *  wording an authority's form prints beside a box whose stored token is
+     *  not readable prose. Read them with `choiceValue` / `choiceLabel` from
+     *  `server/lib/template-choices` — the VALUE is what gets stored. */
+    choices?: ItemChoice[];
     unit?: string;
     required?: boolean;
 }
