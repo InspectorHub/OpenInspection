@@ -26,7 +26,7 @@ import { findRatingLevel, type EditorRatingLevel } from "../../lib/rating-levels
 import { findRatingContradictions } from "../../lib/contradiction-lint";
 import { filterCannedEntries, deriveDefectTitle, type CustomDefect, type CustomDefectCategory } from "../../lib/custom-defects";
 import type { DefectTrade } from "../../lib/defect-fields";
-import { ItemHeader } from "../editor-shared/ItemHeader";
+import { ItemHeading } from "./ItemHeading";
 import { FormField, type ItemOptions, type TemplateItem } from "../form/FormField";
 import { m } from "~/paraglide/messages";
 
@@ -378,18 +378,7 @@ export function ItemEditor({
 
  return (
  <div className="max-w-2xl space-y-6">
- {/* Eyebrow + title */}
- <div>
- <div className="text-[11px] text-ih-primary-text font-bold uppercase tracking-wide">
- {sectionTitle}
- </div>
- <ItemHeader label={item.label} size="lg" className="mt-1 text-ih-fg-1" as="h2" />
- {item.description && (
- <p data-testid="item-description-hint" className="mt-1 text-[12px] text-ih-fg-3 leading-relaxed">
- {item.description}
- </p>
- )}
- </div>
+ <ItemHeading sectionTitle={sectionTitle} label={item.label} description={item.description} />
 
  {/* Item attributes (equipment fields: brand, year, model, etc.) */}
  {item.attributes && item.attributes.length > 0 && (
