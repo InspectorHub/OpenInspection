@@ -15,6 +15,7 @@ import { isValidLocale } from '../lib/locale';
 import { DATE_FORMATS, TIME_FORMATS } from '../lib/session/display-prefs';
 import { getDrizzle } from '../lib/route-helpers';
 import { r2Put } from '../lib/r2/objects';
+import { FL_1802_QUALIFICATION_CATEGORIES } from '../lib/statutory/qualification-categories';
 
 /**
  * Booking #7 Sprint A — authenticated profile endpoint mounted at
@@ -76,13 +77,38 @@ export const PatchProfileSchema = z.object({
     // asserts the KEY IS ABSENT rather than asserting its value.
     dateFormat: z.enum(['', ...DATE_FORMATS]).optional().describe('Per-user date order (us|iso|eu). Empty string clears the override (inherit tenant).'),
     timeFormat: z.enum(['', ...TIME_FORMATS]).optional().describe('Per-user clock (12h|24h). Empty string clears the override (inherit tenant).'),
-    // The state licence CLASS a statutory form's "License Type" box asks for,
-    // and the qualification category FL OIR-B1-1802 asks the signer to declare.
-    // Free text on purpose: the vocabulary is the authority's, differs per form
+    // The state licence CLASS a statutory form's "License Type" box asks for.
+    // FREE TEXT ON PURPOSE: the vocabulary is the authority's, differs per form
     // and per state, and an enum here would be this software deciding what a
     // state licenses. Empty string clears, the same convention as above.
+    //
+    // ⚠️ This paragraph used to cover the qualification category below it too,
+    // and stopped being true when that field was closed to the form's own six
+    // values. The two fields look alike and are not: one is a class a state
+    // invents, the other is a checkbox a form prints.
     statutoryLicenseType: z.string().max(120).optional().describe('State licence class printed on a statutory form. NOT an association certification — that is an inspector credential.'),
-    statutoryQualification: z.string().max(120).optional().describe('Statutory qualification category the signer declares. A different axis from the licence class.'),
+    // ⚠️ CLOSED, unlike the licence type above it, and the difference is not an
+    // inconsistency. A licence CLASS is a state's own vocabulary and an enum
+    // here would be this software deciding what a state licenses. A
+    // qualification CATEGORY is a checkbox the form itself prints: FL
+    // OIR-B1-1802 page 5 prints six and says "(check one)", and `render.ts`
+    // compares the stored value byte-for-byte against a mapping's `whenValue`.
+    // A seventh value cannot tick anything.
+    //
+    // It used to be `z.string().max(120)`, which accepted any sentence. The
+    // profile screen has offered nothing but these six and an explicit "none"
+    // since the free-text input was retired, so the only way to store an
+    // unusable value was a hand-written PATCH — and the refusal then arrived at
+    // render time, after the fieldwork, on the day the inspector tried to
+    // produce the document. Verified before closing it: production holds ZERO
+    // non-empty values, so nothing existing is invalidated.
+    //
+    // Derived from the published list rather than retyped, so a category added
+    // to the form cannot be accepted here without being offered on screen.
+    statutoryQualification: z.enum([
+        '',
+        ...FL_1802_QUALIFICATION_CATEGORIES.map((c) => c.value),
+    ] as [string, ...string[]]).optional().describe('Statutory qualification category the signer declares, from the authority\'s own closed list. A different axis from the licence class.'),
 });
 
 const patchProfileRoute = createRoute(withMcpMetadata({

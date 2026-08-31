@@ -36,7 +36,15 @@ const EXCLUDE = [
   /\/\+types\//, // react-router generated route types
 ];
 
-const files = execSync('git ls-files "*.ts" "*.tsx"', { cwd: root, encoding: 'utf8' })
+// ⚠️ `.mjs` IS IN SCOPE, and was not until 2026-08-31.
+// The ceiling read `*.ts`/`*.tsx` only, so every gate script in this very
+// directory was invisible to it — including `verify-statutory-render.mjs` at
+// 1282 lines, three times the limit it exists to enforce, sitting beside the
+// file enforcing it. Sixteen scripts were already over when the glob widened;
+// they are grandfathered at their current size like any other, which is the
+// ratchet doing its job rather than an exemption: none of them may grow, and a
+// new one over 400 lines fails outright.
+const files = execSync('git ls-files "*.ts" "*.tsx" "*.mjs"', { cwd: root, encoding: 'utf8' })
   .split('\n')
   .filter(Boolean)
   .filter((f) => !EXCLUDE.some((re) => re.test(f)));
