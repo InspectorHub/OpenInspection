@@ -1242,7 +1242,9 @@
             "panel_age",
             "year_last_updated",
             "brand_model"
-          ]
+          ],
+          "overflowTo": "additional_comments",
+          "overflowMaxLength": 924
         },
         {
           "id": "roof",
@@ -1265,7 +1267,9 @@
             "visible_signs_of_leaks",
             "leaks_attic_underside_of_decking",
             "leaks_interior_ceilings"
-          ]
+          ],
+          "overflowTo": "additional_comments",
+          "overflowMaxLength": 924
         }
       ],
       "bindings": {

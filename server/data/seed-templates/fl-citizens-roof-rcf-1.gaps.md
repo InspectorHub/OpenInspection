@@ -248,19 +248,30 @@ This is a property of the form, not a defect: Citizens printed a 41.5pt rule. It
 recorded because "the software refused my date" and "the software is broken" look identical
 from the outside.
 
-### 2.5 The `roof` group declares no `overflowTo`, so a third roof surface refuses
+### 2.5 A third roof surface goes to Additional Comments — **CLOSED 2026-08-31**
 
-`groups` in this template is copied verbatim from the signed candidate, including the
-absence of `overflowTo`. A house with three roof surfaces therefore refuses at
-`refuseOverCapacity` with both counts named, rather than routing the third into the comments
-box.
+The `roof` group used to declare no `overflowTo`, so a house with three roof surfaces was
+refused at `refuseOverCapacity` rather than having the third written anywhere. That made the
+software stricter than the form: page 2 prints *(use additional pages as needed)* on
+Additional Comments/Observations, which is the publisher's own answer to where an answer
+that outgrows its box goes, and `groups.ts` cites exactly that sentence pattern.
 
-The form is eligible for a destination — it prints *(use additional pages as needed)* on
-Additional Comments/Observations, which is the publisher's own answer to where an
-overflowing answer goes, and `groups.ts` cites exactly that sentence pattern. The
-candidate's notes (§7 F) flag it as a decision for a reviewer and it has not been ruled on.
-**Declaring it is a one-line change here and should be made together with the same decision
-on the four-point form**, which shares the block and also declares none.
+The group now declares `overflowTo: additional_comments` and
+`overflowMaxLength: 1584`. The length is a COUNT OF THE BOX and not an estimate: the map
+draws that field at 9 pt into 525 × 103.96 pt, which stands **12 lines** of Helvetica at
+that size, and **132 characters** of the block's own overflow prose fit across one such
+line. `overflow-destination.spec.ts` recomputes both numbers from the published map and the
+embedded font and refuses a declaration that disagrees, so the figure cannot drift away from
+the geometry it describes.
+
+⚠️ It is a count of the box, not a promise about every text. `fit.ts` still measures the
+wrapped lines and can refuse a shorter value whose words break badly. That is the intended
+arrangement: this number exists so the FIRST refusal can name the instance that did not fit
+— "the remaining 1 will not fit in additional_comments either" — while the geometric
+measurement remains the one that decides.
+
+The four-point form declares the same destination for the same reason; its box is shorter,
+so its number is 924.
 
 ---
 

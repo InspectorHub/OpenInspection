@@ -366,7 +366,9 @@
             "visible_signs_of_leaks",
             "leaks_attic_underside_of_decking",
             "leaks_interior_ceilings"
-          ]
+          ],
+          "overflowTo": "additional_comments",
+          "overflowMaxLength": 1584
         }
       ],
       "bindings": {

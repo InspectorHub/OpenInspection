@@ -123,19 +123,28 @@ however many panels the house has. So it is bound to `electrical.wiring_types`, 
 panels wired differently.** That is the form's limit, not the template's, and the place to
 say so is Additional Comments/Observations.
 
-### 2.6 The `electrical_panel` and `roof` groups declare no `overflowTo`
+### 2.6 A third panel or roof goes to Additional Comments — **CLOSED 2026-08-31**
 
-`groups` is copied verbatim from the signed candidate, including the absence of
-`overflowTo`. A house with three electrical panels or three roof surfaces therefore refuses
-at `refuseOverCapacity` with both counts named, rather than routing the third into the
-comments box.
+Both groups used to declare no `overflowTo`, so a house with three electrical panels or
+three roof surfaces was refused at `refuseOverCapacity` rather than having the third written
+anywhere. That made the software stricter than the form: page 3 prints *(use additional
+pages if needed)* on Additional Comments/Observations, which is the publisher's own answer
+to where an answer that outgrows its box goes.
 
-The form is eligible for a destination — it prints *(use additional pages if needed)* on
-Additional Comments/Observations, which is the publisher's own answer to where an
-overflowing answer goes. The candidate's notes flag it as a decision for a reviewer and it
-has not been ruled on. **Declaring it is a one-line change here and should be made together
-with the same decision on the roof form**, which shares the roof block and also declares
-none.
+Both groups now declare `overflowTo: additional_comments` and `overflowMaxLength: 924`. The
+length is a COUNT OF THE BOX and not an estimate: the map draws that field at 9 pt into
+525 × 64 pt, which stands **7 lines** of Helvetica at that size, and **132 characters** of a
+block's own overflow prose fit across one such line. `overflow-destination.spec.ts`
+recomputes both numbers from the published map and the embedded font and refuses a
+declaration that disagrees.
+
+⚠️ It is a count of the box, not a promise about every text. `fit.ts` still measures the
+wrapped lines and can refuse a shorter value whose words break badly. That is the intended
+arrangement: this number exists so the FIRST refusal can name the instance that did not fit,
+while the geometric measurement remains the one that decides.
+
+The roof form declares the same destination for the same reason; its box is taller, so its
+number is 1584.
 
 ### 2.7 Photographs are answers to a checklist, not blanks
 
