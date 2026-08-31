@@ -19,6 +19,7 @@
  * because nothing reads it, not because someone remembered to name it.
  */
 import { cmdEnvelopeIssueFields, type CmdEnvelope } from '../lib/sync-events/cmd-envelope';
+import { sha256Hex } from '../lib/sha256';
 
 /** Longest echoed string. The claimed `type`/`dataschema` on an unparseable
  *  message are attacker-shaped input; the real values are far shorter. */
@@ -45,11 +46,6 @@ interface ParkedFingerprint {
 
 function safeStringify(value: unknown): string {
     try { return JSON.stringify(value) ?? String(value); } catch { return String(value); }
-}
-
-async function sha256Hex(input: string): Promise<string> {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
-    return [...new Uint8Array(buf)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function echoString(source: Record<string, unknown>, key: string): string | null {

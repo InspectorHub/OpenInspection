@@ -253,6 +253,20 @@ if (outDir !== null) {
     mkdirSync(abs, { recursive: true });
 }
 
+/**
+ * 🔴 DELIBERATELY NOT `server/lib/sha256.ts`, though this file imports plenty of
+ * other things from `server/`.
+ *
+ * One of the things this script checks is that a published map's `sourceHash`
+ * matches the authority's PDF -- the same comparison `field-map.ts` makes at
+ * runtime with the shared helper. A verifier that imported the implementation it
+ * is verifying could not report a fault in that implementation; it would agree
+ * with it. Node's `createHash` is a second, independent implementation, which is
+ * the whole value of the copy.
+ *
+ * The two were compared before the other eight were merged: identical output on
+ * a known vector, the empty input, non-ASCII text and bytes including NUL.
+ */
 function sha256Hex(bytes) {
     return createHash('sha256').update(bytes).digest('hex');
 }

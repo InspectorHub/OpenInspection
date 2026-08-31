@@ -2,7 +2,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type * as schema from '../lib/db/schema';
 import { tenantLegalVersions, tenantConfigs } from '../lib/db/schema';
-import { sha256Hex } from './signing-key.service';
+import { sha256Hex } from '../lib/sha256';
 import { epochMsToWallClockYmd, resolveTenantTimeZone } from '../lib/tz';
 
 export type LegalDoc = 'privacy' | 'terms';

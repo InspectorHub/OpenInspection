@@ -15,10 +15,10 @@ import {
     validateFieldMap,
     validateFieldMapShape,
     validateAgainstPdf,
-    sha256Hex,
     type FieldMap,
     type FieldMapping,
 } from '../../../server/lib/statutory/field-map';
+import { sha256Hex } from '../../../server/lib/sha256';
 import type { StatutoryFormVersion } from '../../../server/lib/statutory/form-registry';
 import { buildFieldedPdf, buildFlatPdf, type PdfFixture } from '../helpers/statutory-pdf-fixtures';
 

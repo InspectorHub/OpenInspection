@@ -73,7 +73,7 @@ beforeEach(async () => {
     db = drizzle(sqlite, { schema });
     binding = toD1Binding(sqlite);
 
-    const { sha256Hex } = await import('../../../server/lib/statutory/revision-watch');
+    const { sha256Hex } = await import('../../../server/lib/sha256');
     publishedBytesHash = await sha256Hex(new TextEncoder().encode(PUBLISHED_BYTES));
     CATALOGUE[0]!.sourceHash = publishedBytesHash;
 

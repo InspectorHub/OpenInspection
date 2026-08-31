@@ -1,3 +1,5 @@
+import { sha256Hex } from './sha256';
+
 const PBKDF2_ITERATIONS = 100_000;
 const PBKDF2_SALT_BYTES = 16;
 const PBKDF2_HASH_BITS = 256;
@@ -12,11 +14,6 @@ function fromHex(hex: string): Uint8Array<ArrayBuffer> {
         out[i] = parseInt(hex.substr(i * 2, 2), 16);
     }
     return out;
-}
-
-async function sha256Hex(input: string): Promise<string> {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
-    return toHex(new Uint8Array(buf));
 }
 
 /** Constant-time string comparison. Returns false immediately on length mismatch. */

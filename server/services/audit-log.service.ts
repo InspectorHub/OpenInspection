@@ -3,7 +3,8 @@ import { eq, and, desc, asc } from 'drizzle-orm';
 import { esignAuditLogs } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import type { SigningKeyService} from './signing-key.service';
-import { sha256Hex, hexDecode, base64UrlDecode } from './signing-key.service';
+import { sha256Hex } from '../lib/sha256';
+import { hexDecode, base64UrlDecode } from './signing-key.service';
 
 export type AuditEvent =
     | 'request.created'

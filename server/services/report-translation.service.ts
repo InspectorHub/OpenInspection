@@ -26,7 +26,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { reportTranslations } from '../lib/db/schema';
 import { COURTESY_TRANSLATION_NOTICE } from '../lib/legal/courtesy-translation-notice';
-import { sha256Hex } from './signing-key.service';
+import { sha256Hex } from '../lib/sha256';
 
 /** What a caller has in hand once a provider has answered. */
 export interface CourtesyTranslationInput {

@@ -36,6 +36,7 @@
  */
 import { PDFDocument } from 'pdf-lib';
 import { validateNoDuplicateTargets } from './targets';
+import { sha256Hex } from '../sha256';
 import {
     refusePartsThatCannotFitTheirDigits, validatePartMappings, type ValuePart,
 } from './value-parts';
@@ -154,14 +155,6 @@ export interface FieldMap {
      */
     requiredFields: readonly string[];
     mappings: readonly FieldMapping[];
-}
-
-/** sha256 of the exact bytes, lowercase hex. Web Crypto — no Node APIs. */
-export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-    const digest = await crypto.subtle.digest('SHA-256', bytes);
-    return Array.from(new Uint8Array(digest))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
 }
 
 /** Shape of the version a map claims to target — the fields this file compares. */

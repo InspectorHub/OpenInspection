@@ -193,7 +193,8 @@ describe('snapshot growth vs. already-signed versions', () => {
             inspection: (JSON.parse(row!.snapshotJson) as { inspection: unknown }).inspection,
             data: {}, units: [],
         });
-        const { sha256Hex, SigningKeyService, base64UrlEncode } =
+        const { sha256Hex } = await import('../../../server/lib/sha256');
+        const { SigningKeyService, base64UrlEncode } =
             await import('../../../server/services/signing-key.service');
         const legacyHash = await sha256Hex(legacyJson);
         const { privateKey } = await new SigningKeyService({} as D1Database, 'test-encryption-secret-key')

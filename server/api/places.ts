@@ -4,6 +4,7 @@ import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { fetchPlaceDetails, placeDetailsCacheKey, type ResolvedPlace } from '../lib/places/geocode';
+import { sha256Hex } from '../lib/sha256';
 
 /**
  * Spec 5D — Address Autofill (Phase 1) — server-side proxy for the
@@ -24,11 +25,6 @@ import { fetchPlaceDetails, placeDetailsCacheKey, type ResolvedPlace } from '../
  * proxy passes the `sessiontoken` straight through to Google.
  */
 const GOOGLE_BASE = 'https://maps.googleapis.com/maps/api/place';
-
-async function sha256Hex(input: string): Promise<string> {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
 
 // ── GET /api/places/autocomplete ───────────────────────────────────────────
 const autocompleteRoute = createRoute(withMcpMetadata({

@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, isNull } from 'drizzle-orm';
 import { signingKeys } from '../lib/db/schema';
 import { logger } from '../lib/logger';
+import { sha256Hex } from '../lib/sha256';
 
 /**
  * Spec 5H — Per-tenant Ed25519 keypair management.
@@ -214,14 +215,6 @@ export function base64UrlDecode(s: string): Uint8Array {
     const out = new Uint8Array(new ArrayBuffer(bin.length));
     for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return out;
-}
-
-export async function sha256Hex(input: Uint8Array | string): Promise<string> {
-    const bytes: Uint8Array = typeof input === 'string'
-        ? toArrayBufferBacked(new TextEncoder().encode(input))
-        : toArrayBufferBacked(input);
-    const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as unknown as ArrayBuffer));
-    return Array.from(hash).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /** Copy a possibly-SharedArrayBuffer-backed view into a fresh ArrayBuffer-backed Uint8Array. */

@@ -32,15 +32,8 @@
  */
 import { Errors } from '../../lib/errors';
 import { r2Keys } from '../../lib/r2-keys';
+import { sha256Hex } from '../../lib/sha256';
 import type { StatutoryFormVersion } from '../../lib/statutory/form-registry';
-
-/** sha256 as this subsystem spells it everywhere: lowercase hex, no separators. */
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-    const digest = await crypto.subtle.digest('SHA-256', bytes as unknown as BufferSource);
-    return [...new Uint8Array(digest)]
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
-}
 
 /**
  * What an operator is told when the bytes are not the ones this revision names.

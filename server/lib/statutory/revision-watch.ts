@@ -127,17 +127,3 @@ export function classifySighting(
     };
 }
 
-/**
- * sha256 of some bytes, lowercase hex.
- *
- * Web Crypto, so this runs in the Worker as written. The digest is the join
- * between a page, a published revision and the field map authored against it —
- * `field-map.ts` refuses a map whose hash does not match the bytes — so it is
- * spelled the same way everywhere: lowercase hex, no separators.
- */
-export async function sha256Hex(bytes: BufferSource): Promise<string> {
-    const digest = await crypto.subtle.digest('SHA-256', bytes);
-    return [...new Uint8Array(digest)]
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
-}

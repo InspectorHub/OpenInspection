@@ -31,7 +31,7 @@ import {
     StandardFonts,
     decodePDFRawStream,
 } from 'pdf-lib';
-import { sha256Hex } from '../../../server/lib/statutory/field-map';
+import { sha256Hex } from '../../../server/lib/sha256';
 
 export interface PdfFixture {
     bytes: Uint8Array;

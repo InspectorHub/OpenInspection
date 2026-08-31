@@ -17,7 +17,7 @@
 import { eq, and, desc } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { deploymentLegalVersions } from '../lib/db/schema';
-import { sha256Hex } from './signing-key.service';
+import { sha256Hex } from '../lib/sha256';
 
 /** The only document so far. A union rather than a string so a typo cannot mint a doc. */
 export type DeploymentLegalDoc = 'agent_terms';

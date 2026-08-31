@@ -15,7 +15,6 @@
 import { describe, it, expect } from 'vitest';
 import {
     classifySighting,
-    sha256Hex,
     watchTargets,
     type RevisionSighting,
 } from '../../../server/lib/statutory/revision-watch';
@@ -189,15 +188,5 @@ describe('a sighting is not a version, and cannot be turned into one', () => {
         };
         expect(versionForInspection('tx_trec_rei', t('2026-08-23'), [published])?.version)
             .toBe('7-7');
-    });
-});
-
-describe('sha256Hex', () => {
-    it('produces the published digest of "abc"', async () => {
-        // The one vector every SHA-256 implementation is checked against. An
-        // assertion that the output merely looked like 64 hex characters would
-        // pass for a function that hashed the wrong bytes.
-        expect(await sha256Hex(new TextEncoder().encode('abc')))
-            .toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
     });
 });

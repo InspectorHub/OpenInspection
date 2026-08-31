@@ -20,7 +20,7 @@ import { asD1Db } from '../helpers/test-db';
 import { AgreementService } from '../../../server/services/agreement.service';
 // The SAME hashing function production uses. A hand-rolled SHA-256 in the test
 // would pass while production diverged.
-import { sha256Hex } from '../../../server/services/agreement/base';
+import { sha256Hex } from '../../../server/lib/sha256';
 import { certRenderHandler } from '../../../server/api/agreements-render';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
