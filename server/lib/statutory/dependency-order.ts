@@ -16,11 +16,22 @@
  *       ..._spray_foam_underside_...    one box     printed only under spray foam
  *
  * Judged in declaration order with the deepest rule first, the third of those
- * reads its controller's answer BEFORE the middle rule has removed it. An
- * inspection answering "B. No Sealed Roof Deck" while carrying a stale method of
- * spray foam then KEEPS the underside key, and the page prints a ticked "entire
- * roof deck underside covered" beneath a form that says the deck is not sealed
- * at all. Nothing raises, and the document files.
+ * reads its controller's answer BEFORE the middle rule has removed it.
+ *
+ * ⚠️ WHAT THAT ACTUALLY COSTS, MEASURED RATHER THAN ASSUMED. It is NOT a wrong
+ * document: a controller that stops applying while holding an answer is refused
+ * by `refuseAnswerToAQuestionNobodyAsked` in either order, so nothing reaches
+ * paper that should not. What the two orders disagree about is WHICH BOX IS
+ * BLAMED, and the refusal is the part the inspector acts on. An inspection
+ * answering "B. No Sealed Roof Deck" while recording a method of taped deck
+ * seams and ticking the underside box is told, deepest-rule-first, that the
+ * UNDERSIDE box is wrong — it is judged against a method that is still in the
+ * values object and finds the wrong one there. Controllers first, it is told the
+ * deck answer and the method disagree, which is where the contradiction is.
+ *
+ * The guarantee underneath is the stronger statement, and it is the one the
+ * tests assert: what the form carries, or what it says when it refuses, is a
+ * fact about the INSPECTION and not about the order somebody typed the rules in.
  *
  * -- WHY NOT "APPLY THE RULES TWICE" -----------------------------------------
  * Because such a fix is correct exactly as deep as the number of passes it

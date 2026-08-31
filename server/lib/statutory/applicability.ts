@@ -197,9 +197,11 @@ function applies(rule: StatutoryFieldDependency, values: Record<string, Statutor
  *
  * Among the rules themselves: CONTROLLERS FIRST, at any depth, which is what
  * `dependencyOrder` returns and NOT what `Object.entries` returns. A rule whose
- * controlling field is itself conditional has to be judged after its controller
- * has been removed, or it reads an answer to a question the form did not ask and
- * keeps a box that should have gone with it.
+ * controlling field is itself conditional otherwise reads an answer to a
+ * question the form did not ask. Measured, what that changes is which box a
+ * REFUSAL blames rather than whether a wrong page prints — the controller's own
+ * contradiction is caught either way — and the refusal is the part somebody
+ * acts on. `dependency-order.ts` has the worked example.
  */
 export function applyDependencies(
     declaration: StatutoryFormDeclaration,
