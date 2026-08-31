@@ -29,22 +29,35 @@ import type {
  */
 
 /**
- * The three conditional questions, exactly as the signed candidate records
- * them. They are the form's own: question 6's minimal-conditions box exists
- * only for categories B, C and D; question 8's "entire underside covered" box
- * belongs to spray foam alone, because the other three methods are laid on top
- * of the deck and never touch its underside; question 9's non-glazed sub-levels
- * are printed `A.1`…`N.3` under the letters above them, so the letter has to
- * agree.
+ * The five conditional questions, exactly as the signed candidate records them.
+ * They are the form's own: question 6's minimal-conditions box exists only for
+ * categories B, C and D; question 8 prints its four sealing methods indented
+ * under answer A alone, and "entire underside covered" one indent further under
+ * spray foam alone, because the other three methods are laid on top of the deck
+ * and never touch its underside; question 9 prints the plywood/OSB pair under
+ * answer C alone, and its non-glazed sub-levels `A.1`…`N.3` under the letters
+ * above them, so the letter has to agree.
+ *
+ * ⚠️ Question 8 is therefore a CHAIN — the method is gated and also gates —
+ * which is the shape `dependency-order.ts` exists for. Declaration order below
+ * is deliberately NOT the order the rules must be applied in.
  */
 const DEPENDS_ON: StatutoryFieldDependencies = {
     roof_wall_attachment_minimal_condition: {
         field: 'roof_wall_attachment',
         answerIsOneOf: ['B', 'C', 'D'],
     },
+    sealed_roof_deck_method: {
+        field: 'sealed_roof_deck',
+        answerIsOneOf: ['A'],
+    },
     sealed_roof_deck_spray_foam_underside_fully_covered: {
         field: 'sealed_roof_deck_method',
         answerIsOneOf: ['spray_foam'],
+    },
+    opening_protection_wood_panel_type: {
+        field: 'opening_protection',
+        answerIsOneOf: ['C'],
     },
     opening_protection_non_glazed_level: {
         field: 'opening_protection',
@@ -231,12 +244,32 @@ describe('FL OIR-B1-1802 Rev. 04/26', () => {
         expect(StatutoryFormDeclarationSchema.safeParse(noBindings).success).toBe(false);
     });
 
-    it('declares three rules the applicability layer can actually use', () => {
+    it('declares five rules the applicability layer can actually use', () => {
         // Parsing is shape only. This is the layer that decides whether a rule
         // can ever fire: a controlling field nothing binds leaves the question
-        // permanently unasked, which prints as a blank box no gate reads.
+        // permanently unasked, which prints as a blank box no gate reads. It
+        // also refuses a set of rules that gates itself in a ring, which is the
+        // one fault a single rule cannot be blamed for.
         expect(() => refuseUnusableDependencies(declarationForThisForm())).not.toThrow();
-        expect(Object.keys(DEPENDS_ON)).toHaveLength(3);
+        expect(Object.keys(DEPENDS_ON)).toHaveLength(5);
+    });
+
+    it('and a ring in the same place is refused, naming both questions', () => {
+        // The third positive control. `refuseUnusableDependencies` is the only
+        // thing standing between a self-gating template and a form nobody can
+        // produce, so the check that it refuses one is not optional.
+        const ringed: StatutoryFormDeclaration = {
+            ...declarationForThisForm(),
+            dependsOn: {
+                ...DEPENDS_ON,
+                sealed_roof_deck_method: {
+                    field: 'sealed_roof_deck_spray_foam_underside_fully_covered',
+                    answerIsOneOf: ['true'],
+                },
+            },
+        };
+        expect(() => refuseUnusableDependencies(ringed))
+            .toThrow(/gate each other in a ring/);
     });
 
     it('and that check is not vacuous either — the second positive control', () => {

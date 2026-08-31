@@ -147,16 +147,31 @@ describe('FL OIR-B1-1802 Rev. 04/26 seed template', () => {
         expect(distinct.size).toBe(70);
     });
 
-    it('carries the three conditional questions the form states in its own text', () => {
+    it('carries the five conditional questions the form states in its own text', () => {
         // The only published form with `dependsOn`. Each rule is refused by
         // `applicability.ts` if it is unusable, so run that here rather than
         // restating its reasoning.
+        //
+        // Two of the five were printed on the page from the first day and left
+        // undeclared: the four sealing methods are indented under "A. Sealed
+        // Roof Deck" alone, and the plywood/OSB pair under "C. Exterior Opening
+        // Protection – Wood Structural Panels" alone. Until they were declared,
+        // an inspection answering "X. None or Some Glazed Openings" could tick
+        // OSB underneath an empty C box and nothing refused it.
         const rules = decl.dependsOn ?? {};
         expect(Object.keys(rules).sort()).toEqual([
             'opening_protection_non_glazed_level',
+            'opening_protection_wood_panel_type',
             'roof_wall_attachment_minimal_condition',
+            'sealed_roof_deck_method',
             'sealed_roof_deck_spray_foam_underside_fully_covered',
         ]);
+        // A CHAIN, which no published form carried before: question 8's method
+        // is itself conditional AND is the controlling field of the underside
+        // box below it. That is what the dependency order exists for.
+        expect(rules.sealed_roof_deck_spray_foam_underside_fully_covered.field)
+            .toBe('sealed_roof_deck_method');
+        expect(Object.keys(rules)).toContain('sealed_roof_deck_method');
         expect(() => refuseUnusableDependencies(decl)).not.toThrow();
         // ⚠️ A conditional question must NOT also be required of every
         // inspection: the render would refuse a form whose missing key is the
@@ -189,10 +204,17 @@ describe('FL OIR-B1-1802 Rev. 04/26 seed template', () => {
         // Question 6 answered A (toenails), which has no minimal conditions.
         results.question_6_roof_to_wall_attachment.attributes!.weakest_connection = 'A';
         delete results.question_6_minimal_conditions.attributes!.condition;
-        results.question_8_sealed_roof_deck.attributes!.method = 'taped_deck_seams';
+        // Question 8 answered B (no sealed roof deck), which takes the METHOD
+        // and the underside box below it with it — the whole three-deep chain,
+        // judged on the published template rather than on a fixture.
+        results.question_8_sealed_roof_deck.attributes!.answer = 'B';
+        results.question_8_sealed_roof_deck.attributes!.method = null;
         results.question_8_sealed_roof_deck.attributes!.spray_foam_underside_fully_covered = null;
+        // Question 9 answered X (none or some glazed openings), which prints
+        // neither the wood-panel pair nor a non-glazed sub-level.
         results.question_9_opening_protection.attributes!.answer = 'X';
         results.question_9_opening_protection.attributes!.non_glazed_level = null;
+        results.question_9_opening_protection.attributes!.wood_panel_type = null;
 
         // `collectStatutoryValues` applies the rules itself — asserted here
         // rather than by calling `applyDependencies` again, because the fact
@@ -290,6 +312,10 @@ function answeredResults(): Record<string, { value?: unknown; attributes?: Recor
     // sub-answers so the default set is a form that could be filed.
     results.question_6_roof_to_wall_attachment.attributes!.weakest_connection = 'C';
     results.question_8_sealed_roof_deck.attributes!.method = 'spray_foam';
-    results.question_9_opening_protection.attributes!.non_glazed_level = 'A.1';
+    // Question 9 answered C, the one answer that prints BOTH the wood-panel
+    // pair and a set of non-glazed sub-levels, so the default set exercises
+    // every rule on the form rather than silently dropping two of them.
+    results.question_9_opening_protection.attributes!.answer = 'C';
+    results.question_9_opening_protection.attributes!.non_glazed_level = 'C.1';
     return results;
 }

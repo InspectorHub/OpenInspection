@@ -1110,10 +1110,22 @@
             "D"
           ]
         },
+        "sealed_roof_deck_method": {
+          "field": "sealed_roof_deck",
+          "answerIsOneOf": [
+            "A"
+          ]
+        },
         "sealed_roof_deck_spray_foam_underside_fully_covered": {
           "field": "sealed_roof_deck_method",
           "answerIsOneOf": [
             "spray_foam"
+          ]
+        },
+        "opening_protection_wood_panel_type": {
+          "field": "opening_protection",
+          "answerIsOneOf": [
+            "C"
           ]
         },
         "opening_protection_non_glazed_level": {
