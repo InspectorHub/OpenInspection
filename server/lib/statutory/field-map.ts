@@ -34,7 +34,7 @@
  * looked at it. That limit cannot be closed in code; it is stated here so a
  * green check is not read as more than it is.
  */
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, ParseSpeeds } from 'pdf-lib';
 import { validateNoDuplicateTargets } from './targets';
 import { sha256Hex } from '../sha256';
 import {
@@ -340,7 +340,10 @@ export async function validateAgainstPdf(map: FieldMap, pdfBytes: Uint8Array): P
 
     let doc: PDFDocument;
     try {
-        doc = await PDFDocument.load(pdfBytes);
+        // Same parse knob as the renderer uses, for the same reason and with the
+        // same evidence: it changes how the parse is scheduled, not what it
+        // yields. See the note at the load in `render.ts`.
+        doc = await PDFDocument.load(pdfBytes, { parseSpeed: ParseSpeeds.Fastest });
     } catch (cause) {
         throw new Error(
             `statutory field map: the published bytes for ${map.formId} ${map.version} are not a readable PDF`,
