@@ -330,6 +330,13 @@
       "when": 1788083292782,
       "tag": "0046_statutory_inspection_details",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1788238661303,
+      "tag": "0047_tenant_content_version",
+      "breakpoints": true
     }
   ]
 }

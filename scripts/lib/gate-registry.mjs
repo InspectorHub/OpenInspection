@@ -215,6 +215,18 @@ export const SCRIPT_GATES = [
     // commits, and the note above is explicit that a new pre-commit row is a
     // cost decision for every commit in the repo and belongs in its own change.
     { key: 'cronbudget', label: 'lint:cron-budget', script: 'check-cron-budget.mjs', fix: 'npm run lint:cron-budget', rung: PUSH },
+    // Same rung and the same reasoning as the row above: the bundled fixtures
+    // are not something anyone edits between two ordinary commits, and a new
+    // PRECOMMIT row is a cost every commit in the repo pays. What it catches --
+    // a fixture changed without bumping STARTER_CONTENT_VERSION, so existing
+    // workspaces never receive it -- is silent and has no other detector.
+    // `fix` is the bare script, not the `-- --update` form, because this field
+    // is also the registry's KEY: check-gate-registry.mjs strips `npm run ` and
+    // matches the remainder against package.json, so a fix carrying arguments
+    // registers nothing and leaves the gate reported as running on no rung.
+    // How to record a new baseline is in the gate's own failure output, which
+    // is where someone reading a red run is already looking.
+    { key: 'contentversion', label: 'lint:content-version', script: 'check-content-version.mjs', fix: 'npm run lint:content-version', rung: PUSH },
     // NOTE: there is no `docsmarkers` row any more. The user-guide prose is
     // published from the hosted docs site and its marker gate went with it.
     // `tests/docs-shots/` here still PRODUCES the captures, but no markdown in

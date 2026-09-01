@@ -1,4 +1,5 @@
 export * from './core';
+export * from './discovery-objections';
 export * from './ai';
 export * from './email-templates';
 export * from './slug-history';
