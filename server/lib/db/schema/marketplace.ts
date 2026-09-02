@@ -6,6 +6,23 @@ import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqli
 // preserve. Dropping the child also removed the only FK pointing INTO
 // `templates`, which D1 makes a permanent migration liability.
 
+/**
+ * Every kind the catalogue can hold, and the ONE place the list is written.
+ *
+ * It is the `kind` column's enum, and every consumer derives from it rather
+ * than retyping it. That is not tidiness: the browse filter had its own
+ * hand-typed copy reading ['comments', 'templates'], which offered a kind no
+ * row has ever carried and made the five 'statutory' rows unreachable by
+ * filter -- visible only under "All", where nobody looking for them would
+ * think to look. Nothing failed, no test went red, and the service layer
+ * accepted all three the whole time.
+ *
+ * ⚠️ `lint:marketplace-kind-halves` does NOT cover this. It checks that each
+ * kind has an import path and an un-import path, which is a different
+ * question from whether a person can find the kind in the first place.
+ */
+export const MARKETPLACE_KINDS = ['comments', 'templates', 'statutory'] as const;
+
 // The single marketplace catalogue. Every importable kind lives here, keyed by
 // `kind`: a 1:1 kind ('templates' — one catalogue row becomes one local
 // `templates` row) and a 1:N kind ('comments' — one pack becomes N tagged
@@ -18,6 +35,7 @@ import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqli
 export const marketplaceLibraries = sqliteTable('marketplace_libraries', {
   id:            text('id').primaryKey(),
   name:          text('name').notNull(),
+  // See MARKETPLACE_KINDS above for what the values mean.
   // Also the only browse axis that is an enum — property_type reuses the
   // template validator's, and the two below are bounded free text. Backed by
   // idx(kind, featured), which serves list()'s featured-then-downloads order.
@@ -26,7 +44,7 @@ export const marketplaceLibraries = sqliteTable('marketplace_libraries', {
   // one, because its import validates with a schema that admits a statutory
   // declaration and its update retires the row it supersedes. Neither is
   // something an ordinary template import should ever do.
-  kind:          text('kind', { enum: ['comments', 'templates', 'statutory'] }).notNull(),
+  kind:          text('kind', { enum: MARKETPLACE_KINDS }).notNull(),
   // The catalogue's current version. Never ordered or range-compared, only
   // tested for EQUALITY against tenant_library_imports.imported_semver:
   // unequal is what list() reports as `hasUpdate`, equal is what the update
