@@ -87,10 +87,22 @@ function digest(files) {
     const per = new Map();
     const all = createHash('sha256');
     for (const f of files) {
-        // Hash bytes, not text: normalising line endings here would hide a
-        // fixture that changed only its line endings, and this repository is
-        // not uniform about those.
-        const h = createHash('sha256').update(readFileSync(f)).digest('hex');
+        // Line endings are NORMALISED before hashing, and that is a correction
+        // rather than the original intent. This first hashed raw bytes, on the
+        // reasoning that normalising would hide a fixture whose line endings
+        // changed. CI disagreed within the hour: this repository's working
+        // trees are not uniform about eol, so a file checked out as LF on the
+        // runner and sitting as CRLF on a developer's disk hashed to two
+        // different values, and the baseline recorded from one machine failed
+        // on the other.
+        //
+        // Normalising is also simply the right question to ask. What this gate
+        // exists to detect is a change in the CONTENT the seeders ship, and a
+        // line ending is not one: every row inserted from a fixture is
+        // identical either way. A fixture that changed anything a workspace
+        // would receive still moves this hash.
+        const text = readFileSync(f, 'utf8').replace(/\r\n/g, '\n');
+        const h = createHash('sha256').update(text, 'utf8').digest('hex');
         per.set(rel(f), h);
         all.update(rel(f)).update('\0').update(h).update('\0');
     }
