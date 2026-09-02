@@ -22,10 +22,11 @@ import { applyIntegrationSecrets } from '../lib/middleware/integration-secrets';
  * allow-list to this API app, `/settings/**` is not on it, and everything else
  * goes to React Router, which has no `/settings/integrations/qbo/connect` page.
  *
- * NOTE: no router-wide `use('*')` middleware. This router shares its mount
- * prefix with the webhook router, and prefix middleware here would run on
- * `/api/integrations/qbo/webhook` too — a session check in front of a route
- * Intuit calls with an HMAC and no cookie. The guards are per-route.
+ * NOTE: no router-wide `use('*')` middleware. The guards are per-route. This
+ * used to be load-bearing for a second reason — the webhook router shared this
+ * mount prefix, so prefix middleware would have put a session check in front of
+ * a route Intuit calls with an HMAC and no cookie. The webhook has since moved
+ * to the top-level `/webhooks/quickbooks`, so only the first reason remains.
  */
 const api = new Hono<HonoConfig>();
 

@@ -52,7 +52,7 @@ If it is unset, the connect flow stops and the settings page says so explicitly 
 5. Under **Webhooks**, register the endpoint and copy the verifier token:
 
    ```
-   https://<your-domain>/api/integrations/qbo/webhook
+   https://<your-domain>/webhooks/quickbooks
    ```
 
    This is a **different path** from the redirect URI. Putting the callback URL in the webhook field is a common mix-up and produces an `invalid redirect_uri` error at authorize time, because the redirect URI was then never registered at all.

@@ -1,7 +1,7 @@
 /**
  * One QuickBooks company belongs to one workspace, and the webhook depends on it.
  *
- * `POST /api/integrations/qbo/webhook` is unauthenticated and platform-wide:
+ * `POST /webhooks/quickbooks` is unauthenticated and platform-wide:
  * in SaaS the Intuit app belongs to the platform (`qboAppManaged`), so there is
  * ONE webhook URL and ONE verifier token for every realm. Nothing in the URL
  * says which tenant an event is for — the handler verifies the HMAC and then

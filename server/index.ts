@@ -462,21 +462,21 @@ const routes = app
   .route('/api/notifications', notificationsRoutes)
   .route('/api', notificationPreferenceRoutes)   // reader's own preferences (§4)
   .route('/settings/integrations/qbo', qboRoutes)
-  .route('/api/integrations/qbo/webhook', qboWebhookRoutes)
-  // Browser-facing OAuth pair (/connect, /callback). Mounted under /api/* —
-  // NOT under /settings/** with its siblings — because workers/app.ts only
-  // forwards an allow-list of prefixes to this app and /settings/** is not on
-  // it, so a browser can never reach those. Registered AFTER the webhook so no
-  // ordering question can arise on the shared prefix. See lib/qbo-oauth-paths.ts.
+  // Inbound webhooks mount at the TOP LEVEL, never under /api/: the producer
+  // owns the body schema, headers and signature, and none of the /api/*
+  // middleware applies — no CORS, no last-active touch, no idempotency guard
+  // (they dedupe via processed_webhook_events), and emphatically no
+  // subscription gate: a lapsed tenant is when a provider most needs delivery.
+  .route('/webhooks/quickbooks', qboWebhookRoutes)
+  // Browser-facing OAuth pair (/connect, /callback), under /api/* rather than
+  // /settings/** because workers/app.ts forwards only an allow-list and
+  // /settings/** is not on it. The redirect_uri Intuit matches byte-for-byte
+  // comes from the one constant; see lib/qbo-oauth-paths.ts.
   .route(QBO_OAUTH_MOUNT, qboOauthRoutes)
-  // Stripe webhook, tenant-scoped (SaaS): /api/integrations/stripe/webhook/:tenant
-  // resolves the tenant via PUBLIC_PREFIXES path-param resolution so
-  // integration-secrets loads THAT tenant's whsec. The bare path below stays
-  // for standalone (fixed tenant) and as a saas no-op.
-  .route('/api/integrations/stripe/webhook/:tenant', stripeWebhookRoutes)
-  // Stripe webhook (bring-your-own-keys) — public, verified via the tenant's
-  // own stripe-signature secret. Added to isPublic allowlist below.
-  .route('/api/integrations/stripe/webhook', stripeWebhookRoutes)
+  // :tenant is load-bearing — Stripe's verifier secret is per-tenant, so
+  // PUBLIC_PREFIXES must resolve it BEFORE the signature can be checked.
+  .route('/webhooks/stripe/:tenant', stripeWebhookRoutes)
+  .route('/webhooks/stripe', stripeWebhookRoutes)
   // Remote MCP OAuth — grant management API (self list/revoke + admin oversight).
   // Mounted at /api/mcp so paths become /api/mcp/grants*.
   .route('/api/mcp', mcpGrantsRoutes)

@@ -95,13 +95,19 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
     // page as well as the API. Listing it keeps the whole flow outside the
     // gate's reckoning rather than exempted from it; the API half is already
     // covered by the `/api/public/` prefix. See `server/api/unsubscribe.ts`.
-    // `QBO_CALLBACK_PATH` below is public for the same shape of reason as the QBO
-    // webhook beside it: neither caller can hold a session. Intuit returns the
+    // `/webhooks/` below covers every inbound provider webhook in one prefix:
+    // they mount at the top level (see server/index.ts) precisely so they inherit
+    // none of the /api/* middleware, and each one authenticates itself by
+    // verifying the producer's signature over the raw body. A per-path list here
+    // was one forgotten entry away from a webhook that 401s in production only.
+    // `QBO_CALLBACK_PATH` is public for the same shape of reason but is NOT a
+    // webhook — it is the OAuth callback, so it keeps its own exact-match entry.
+    // Neither caller can hold a session. Intuit returns the
     // user by cross-site top-level navigation, and `__Host-inspector_token` is
     // SameSite=Strict, so no cookie is on that request — the route is authorized
     // by a single-use, 600s, owner/manager-issued `state` instead. See
     // `server/api/qbo-oauth.ts`.
-    const isPublic = path.startsWith('/api/__test__/') || path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/invoice/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/v/') || path.startsWith('/.well-known/') || isStaticAssetPath(path) || path === '/api/integrations/qbo/webhook' || path === QBO_CALLBACK_PATH || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/') || path.startsWith('/unsubscribe/') || path.startsWith('/repair-request/') || path.startsWith('/repair-builder/') || path.startsWith('/api/portal/') || path.startsWith('/portal/');
+    const isPublic = path.startsWith('/api/__test__/') || path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/invoice/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/v/') || path.startsWith('/.well-known/') || isStaticAssetPath(path) || path.startsWith('/webhooks/') || path === QBO_CALLBACK_PATH || path.startsWith('/unsubscribe/') || path.startsWith('/repair-request/') || path.startsWith('/repair-builder/') || path.startsWith('/api/portal/') || path.startsWith('/portal/');
 
     if (isAuthPublic || isPublic || isAgentPublic || isConciergePublic || path === '/setup' || path === '/login' || path === '/join') return next();
 

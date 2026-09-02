@@ -110,6 +110,7 @@ app.all("/api/integration/*", (c: any) =>
 app.all("/api/*", toApi);
 app.all("/status", toApi);
 app.all("/m2m/*", toApi);
+app.all("/webhooks/*", toApi); // inbound provider webhooks — top-level by design (spec §3)
 app.all("/photos/*", toApi);
 app.all("/.well-known/*", toApi);
 app.all("/doc", toApi); // OpenAPI JSON (the RR /ui Swagger page fetches it); /ui itself is now an RR route
