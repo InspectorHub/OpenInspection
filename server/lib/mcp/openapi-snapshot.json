@@ -15921,8 +15921,16 @@
           },
           "statutoryQualification": {
             "type": "string",
-            "maxLength": 120,
-            "description": "Statutory qualification category the signer declares. A different axis from the licence class."
+            "enum": [
+              "",
+              "home_inspector",
+              "building_code_inspector",
+              "contractor",
+              "professional_engineer",
+              "professional_architect",
+              "other_recognized_by_insurer"
+            ],
+            "description": "Statutory qualification category the signer declares, from the authority's own closed list. A different axis from the licence class."
           }
         }
       }
