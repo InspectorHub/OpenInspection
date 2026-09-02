@@ -8,11 +8,7 @@ import seed from '../fixtures/cmd-events/cmd-tenant-seed-starter-content-v1.json
 import migAck from '../fixtures/cmd-events/cmd-migration-acknowledge-v1.json';
 import migDeliver from '../fixtures/cmd-events/cmd-migration-deliver-v1.json';
 import migDecline from '../fixtures/cmd-events/cmd-migration-decline-v1.json';
-import {
-    TENANT_CONFIGS_TEST_DDL, USERS_TEST_DDL,
-    ACCOUNT_ACCEPTANCES_TEST_DDL, ACCOUNT_ACCEPTANCES_TEST_INDEX_DDL,
-    MIGRATION_BATCHES_TEST_DDL, MIGRATION_ROWS_TEST_DDL, AUDIT_LOGS_TEST_DDL,
-} from '../helpers/inline-ddl';
+import { ACCOUNT_ACCEPTANCES_TEST_DDL, ACCOUNT_ACCEPTANCES_TEST_INDEX_DDL, AUDIT_LOGS_TEST_DDL, MIGRATION_BATCHES_TEST_DDL, MIGRATION_ROWS_TEST_DDL, TENANTS_TEST_DDL, TENANT_CONFIGS_TEST_DDL, USERS_TEST_DDL } from '../helpers/inline-ddl';
 import { isKnownCmd } from '../../server/lib/sync-events/cmd-envelope';
 
 // Batch 2: the seed fixture exercises the consumer pipeline, not the content
@@ -35,7 +31,7 @@ const b = env as unknown as { DB: D1Database };
 describe('cmd golden fixtures — consumer can apply every fixture (A-21)', () => {
     beforeAll(async () => {
         await b.DB.exec(
-            "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, slug TEXT UNIQUE NOT NULL, tier TEXT NOT NULL DEFAULT 'free', stripe_connect_account_id TEXT, status TEXT NOT NULL DEFAULT 'pending', max_users INTEGER NOT NULL DEFAULT 5, deployment_mode TEXT NOT NULL DEFAULT 'shared', applied_cmd_seq INTEGER NOT NULL DEFAULT 0, applied_cred_seq INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);",
+            TENANTS_TEST_DDL,
         );
         // Batch 2: replies (the replyto fixture) append to the sync outbox.
         await b.DB.exec(

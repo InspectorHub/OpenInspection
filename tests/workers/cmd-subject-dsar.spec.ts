@@ -11,6 +11,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { applyCmdEnvelope } from '../../server/portal/cmd-consumer';
 import exportCmd from '../fixtures/cmd-events/cmd-subject-export-v1.json';
 import eraseCmd from '../fixtures/cmd-events/cmd-subject-erase-v1.json';
+import { TENANTS_TEST_DDL } from '../helpers/inline-ddl';
 
 vi.mock('../../server/services/subject-export.service', () => ({
     SubjectExportService: class {
@@ -53,7 +54,7 @@ const kvStub = { delete: async () => {} } as unknown as KVNamespace;
 
 async function seedSchema(): Promise<void> {
     await b.DB.exec(
-        "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, slug TEXT UNIQUE NOT NULL, tier TEXT NOT NULL DEFAULT 'free', stripe_connect_account_id TEXT, status TEXT NOT NULL DEFAULT 'pending', max_users INTEGER NOT NULL DEFAULT 5, deployment_mode TEXT NOT NULL DEFAULT 'shared', applied_cmd_seq INTEGER NOT NULL DEFAULT 0, applied_cred_seq INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);",
+        TENANTS_TEST_DDL,
     );
     await b.DB.exec('CREATE TABLE IF NOT EXISTS processed_cmd_events (event_id TEXT PRIMARY KEY, cmd_type TEXT NOT NULL, processed_at INTEGER NOT NULL);');
     await b.DB.exec('CREATE TABLE IF NOT EXISTS parked_cmd_events (id TEXT PRIMARY KEY, envelope TEXT NOT NULL, reason TEXT NOT NULL, received_at INTEGER NOT NULL);');
