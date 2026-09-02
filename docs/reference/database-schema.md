@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 109 |
-| Columns | 1262 |
+| Columns | 1263 |
 | Indexes (excluding primary keys) | 181 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 603 (48%) |
+| Columns carrying a source comment | 604 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -771,7 +771,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `discovery_objections`
 
-<sub>server/lib/db/schema/tenant/core.ts · 5 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/tenant/discovery-objections.ts · 5 columns · primary key `id`</sub>
 
 > People who told us not to look them up. `GET /api/integration/tenants/by-email` answers, for one address, WHICH inspection companies hold a live report grant for it.
 
@@ -2825,7 +2825,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `tenants`
 
-<sub>server/lib/db/schema/tenant/core.ts · 10 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/tenant/core.ts · 11 columns · primary key `id`</sub>
 
 > `name` was here — the CONTAINER name, a second column for one fact that was allowed to diverge from `tenant_configs.company_name` and did: of 16 production tenants, 11 matched, 1 had parted ways, 4 had no settings name at all.
 
@@ -2841,6 +2841,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `applied_cmd_seq` | integer | NN | `0` |  | A-21 — high-water mark of the portal→core command sequence applied to this tenant (envelope `tenantseq`). |
 | `applied_cred_seq` | integer | NN | `0` |  | A-21 batch 2 — high-water mark of the CREDENTIAL stream (envelope `credseq`). Admin credentials ride `cmd.tenant.update` sparsely, so the shared tenantseq can't guard them; this independent sequence ensures a stale credential never overwrites a newer one (closes the batch-1 residual). |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
+| `content_version` | text |  |  |  | Which release of the bundled starter content this workspace has been given (`STARTER_CONTENT_VERSION`). **[more]** |
 
 **Indexes**
 
