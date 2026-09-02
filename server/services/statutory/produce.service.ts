@@ -14,9 +14,12 @@
  *   - A missing object degrades, if you let it, into a blank form -- and a
  *     blank looks exactly like an answer nobody had.
  *
- * So nothing here catches and continues. In particular `validateAgainstPdf` is
- * NOT wrapped: it is the only voice on this path that can say "these are not
- * the bytes we published".
+ * So nothing here catches and continues. In particular the check that the
+ * bytes are the ones the map was authored against is NOT wrapped -- it is the
+ * only voice on this path that can say "these are not the bytes we published".
+ * It runs as the renderer's first act rather than as a separate step here; the
+ * note at step 4 says why, and the spec beside this file holds the guarantee
+ * against THIS function so that moving it cannot quietly lose it.
  *
  * -- WHERE THE REVISIONS COME FROM -------------------------------------------
  * The published catalogue in code (`PUBLISHED_FORM_VERSIONS`), not the
@@ -48,7 +51,7 @@ import {
     type StatutoryFormVersion,
 } from '../../lib/statutory/form-registry';
 import { PUBLISHED_FORM_VERSIONS, fieldMapFor as publishedFieldMapFor } from '../../lib/statutory/forms';
-import { validateAgainstPdf, type FieldMap } from '../../lib/statutory/field-map';
+import type { FieldMap } from '../../lib/statutory/field-map';
 import { withdrawalRefusal } from '../../lib/statutory/withdrawal-copy';
 import { renderStatutoryForm } from '../../lib/statutory/render';
 import { utcMidnightOf } from '../../lib/statutory/inspection-date';
@@ -187,10 +190,19 @@ export async function produceStatutoryForm(
     }
     const bytes = new Uint8Array(await object.arrayBuffer());
 
-    // 4. Are these the bytes the map was authored against? Deliberately not
-    //    wrapped -- this throw is the only thing standing between a tampered or
-    //    swapped object and values written into boxes nobody measured.
-    await validateAgainstPdf(map, bytes);
+    // 4. Are these the bytes the map was authored against? The check still
+    //    happens and is still unwrapped -- it moved rather than went away.
+    //    `renderStatutoryForm` performs it as its first act and cannot be asked
+    //    not to, so the call that stood here ran `validateAgainstPdf` with the
+    //    same map and the same bytes a few lines before the renderer ran it
+    //    again: a second sha256 over the whole file and a second full parse of
+    //    it, for a second copy of an answer that had not changed.
+    //
+    //    ⚠️ The guarantee is not left to this comment. The spec beside this
+    //    file asserts that produceStatutoryForm REJECTS when the stored bytes
+    //    do not hash to the published sourceHash, and it asserts it through
+    //    this function rather than through the validator, so it fails if the
+    //    renderer ever stops checking.
 
     const values = collectStatutoryValues(
         input.declaration, input.snapshot, input.results, input.facts, input.instances ?? {},

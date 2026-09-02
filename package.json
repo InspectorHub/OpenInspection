@@ -89,6 +89,7 @@
     "lint:tests-tsconfig": "node scripts/check-tests-tsconfig.mjs",
     "lint:test-imports": "node scripts/check-test-imports.mjs",
     "lint:cron-budget": "node scripts/check-cron-budget.mjs",
+    "lint:content-version": "node scripts/check-content-version.mjs",
     "lint:deadcode": "node scripts/check-deadcode.mjs",
     "lint:timestamps": "node scripts/check-timestamps.mjs",
     "lint:tz": "node scripts/check-tz-safety.mjs",

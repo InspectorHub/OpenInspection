@@ -12,7 +12,7 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { applyCmdEnvelope } from '../../server/portal/cmd-consumer';
 import { readTenantAiCaps } from '../../server/features/plan-quota/ai-caps';
-import { TENANT_CONFIGS_TEST_DDL } from '../helpers/inline-ddl';
+import { TENANTS_TEST_DDL, TENANT_CONFIGS_TEST_DDL } from '../helpers/inline-ddl';
 
 const b = env as unknown as { DB: D1Database };
 
@@ -35,7 +35,7 @@ function envelope(
 
 async function seedSchema(): Promise<void> {
     await b.DB.exec(
-        "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, slug TEXT UNIQUE NOT NULL, tier TEXT NOT NULL DEFAULT 'free', stripe_connect_account_id TEXT, status TEXT NOT NULL DEFAULT 'pending', max_users INTEGER NOT NULL DEFAULT 5, deployment_mode TEXT NOT NULL DEFAULT 'shared', applied_cmd_seq INTEGER NOT NULL DEFAULT 0, applied_cred_seq INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);",
+        TENANTS_TEST_DDL,
     );
     await b.DB.exec(
         'CREATE TABLE IF NOT EXISTS processed_cmd_events (event_id TEXT PRIMARY KEY, cmd_type TEXT NOT NULL, processed_at INTEGER NOT NULL);',

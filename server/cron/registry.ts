@@ -31,6 +31,7 @@
  * exactly that.
  */
 import { agreementExpiryJob, retentionAgreementsJob } from './jobs/agreements';
+import { contentSeedSweepJob } from './jobs/content';
 import { automationFlushJob, reminderEnqueueJob } from './jobs/automation';
 import { r2UsageJob, retentionLogsJob } from './jobs/daily';
 import { reportGenerationJob } from './jobs/inspections';
@@ -69,4 +70,10 @@ export const CRON_JOBS: CronJob[] = [
     // a deployment that publishes no statutory form it never reaches an
     // invocation at all.
     statutoryRevisionWatchJob,
+    // Added after the statutory watch. Last because it is the only job whose
+    // work is a CONSEQUENCE of deploying rather than of time passing: on a
+    // fleet already stamped with this release it probes one LIMIT-1 select and
+    // stops, and it has something to do only in the ticks after an upgrade that
+    // moved STARTER_CONTENT_VERSION.
+    contentSeedSweepJob,
 ];

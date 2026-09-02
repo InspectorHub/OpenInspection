@@ -10,6 +10,22 @@ import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqli
  * storage under `object_key`; they are not in this repository and not in this
  * table.
  *
+ * ⚠️ THIS TABLE IS NOT WHAT RENDERING READS, and a reader who assumes it is
+ * will draw the wrong conclusion from an empty one. `produce.service.ts` takes
+ * the revision and its field map from `PUBLISHED_FORM_VERSIONS` in code, and
+ * `validateAgainstPdf` compares the bytes against `map.sourceHash` — also in
+ * code. Verified 2026-08-31 against production, where this table held ZERO rows
+ * while the four published revisions were fully renderable: the source PDFs
+ * were in object storage and each hashed to its map's `sourceHash`.
+ *
+ * So an empty table does not mean nothing is published; it means nothing has
+ * been recorded HERE. Publishing a revision is a person's decision that needs a
+ * field map authored against those exact bytes, and a row is data that can
+ * arrive without one — which is why the code catalogue leads and this follows.
+ * What this table is for is the operator's record of what was published into
+ * THIS deployment and when it applies, which is a different question from what
+ * the renderer will accept.
+ *
  * ── Nothing deletes a row, and that is the point ────────────────────────────
  * A completed statutory form stays valid for years, and a report may be
  * re-rendered long after the revision it was produced against was superseded.

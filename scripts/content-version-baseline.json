@@ -1,0 +1,39 @@
+{
+  "versions": {
+    "c1": {
+      "combined": "c6d0c14762e2faf7af79adbc2035a067f73b68b010d5a9a91dbbbec981a7b841",
+      "files": {
+        "server/data/seed-templates/commercial-hospitality.json": "e3c4bd49a05e0aaa7c3681b1c57cdfedd84b22b3e798969ffb8125ad37b4df72",
+        "server/data/seed-templates/commercial-industrial.json": "10107fa6d118e6c33a131808506d6b6b82e38d529862ddd5fb1fc983f6cf3e4e",
+        "server/data/seed-templates/commercial-office.json": "f48dd3e01d2cba3599190db96ff22c4da3eecb4f426bcc2d1f1ef011f4e1c414",
+        "server/data/seed-templates/commercial-retail.json": "08e99c582b4e631ed883ceb89e5560528b72a7f3754dae9d8cc8f68dc07b6cff",
+        "server/data/seed-templates/commercial.json": "2238aa5d4e9a9097e22fbfe4ac4a292699f9cb34b0786b4ac5ccc6d357b8560e",
+        "server/data/seed-templates/condo.json": "107cca98a77fb1c629dff298ea4f2299bc9bbd4fec388b63176a8a558a688ad6",
+        "server/data/seed-templates/fl-citizens-4point-insp4pt.json": "6b7e83468ce4450b63238c4e63af3b5213c57c6dfb6da7a9a5925bf138699fb5",
+        "server/data/seed-templates/fl-citizens-roof-rcf-1.json": "b5c3c249cf7f720feef5c3bd8ae306842451bdfd371899f7d4d78b5d13de316e",
+        "server/data/seed-templates/fl-oir-b1-1802-rev-04-26.json": "5f5cc5bf9387c0f59f6e709e5a2045c8d77f31c58654880a4bdbadede18e80bd",
+        "server/data/seed-templates/internachi-13.json": "cc4986fe045ef55cbcfebb6e342a155ee0b271eacf8644bbf822da49b36fe7fa",
+        "server/data/seed-templates/mold-inspection.json": "9d6c1cb7e2c073af0ce48cbace355d4d9eb54163803832f530eb8a7805537e85",
+        "server/data/seed-templates/new-construction-final.json": "fae6e66e5676a452d3ee8bd3229fa12ccc710d054685b8c11738a61ba6c99099",
+        "server/data/seed-templates/new-construction.json": "859ead2fb759031c79ed741c53cdf2f121d36d5c553a300de4f612b30aaa498e",
+        "server/data/seed-templates/pre-listing.json": "5e9cc4538ec1fa54036e65694bfca8eea8f837a583f2f1b579170ef0b381bd2e",
+        "server/data/seed-templates/radon.json": "505713fc5cd60c4c1f25b3af08dc72cfe09359316fa092c68efece799b8515df",
+        "server/data/seed-templates/residential.json": "f241d982895a4b3548bc84aedb66adcce17bf689929c177160e9514c9bfcffa5",
+        "server/data/seed-templates/septic.json": "c94282ec7821c2d0c2cab291561ac64c79c721ee94b05366817c2350f57b3002",
+        "server/data/seed-templates/sewer-scope.json": "9da534d9926baf2136e04b02fced3120d4023e498b4812e591887d51f9463a02",
+        "server/data/seed-templates/trec-rei-7-6.json": "d3280f74e9e27184ac6d606206eec156881f821799433f632c815b1f5ee32d6e",
+        "server/data/seed-templates/wind-mitigation.json": "cd6c78f4cbd0c94d841963e9cba7ab725a87523c43ff0c132877b32555c8962c",
+        "server/lib/people/default-role-profiles.ts": "7a0984542a32c3d5315ce1d8bb8d7f165e3511a6f23ed0dbd27a953f1ac41de4",
+        "server/services/starter-content/fixtures/agreement-template.ts": "df4c62231f191972e801abd8dd67001af23ee910173c029774204ac8f50b6716",
+        "server/services/starter-content/fixtures/canned-comments.ts": "0fe2055871fe14a0ce1d56085992a09d2710e2e29c344d48bbb564abac6e038a",
+        "server/services/starter-content/fixtures/contractor-types.ts": "14c0d79e7a472eb3d3246dc61fe7afcea4c6d5b9cf89475387b8c9f3c9e87a24",
+        "server/services/starter-content/fixtures/event-types.ts": "270fb8fff04e1df7df47b282a8987e63750937461c29d8faa174fd64a0930bb1",
+        "server/services/starter-content/fixtures/marketplace.ts": "33ec6f278ebd04f6ba8c498cdc4652686a89767e9c63f7f70fbc0d4148ce27d9",
+        "server/services/starter-content/fixtures/rating-systems.ts": "47e5d6a16f4a46269d9eb5d94fbd62e394d3fe8ea9580051e2b9e027a48e4208",
+        "server/services/starter-content/fixtures/recommendations.ts": "e19b88f60ec8a48136c6fb7027cfd8b9dfb79744b53711b6998ec50999768236",
+        "server/services/starter-content/fixtures/services.ts": "0b772d630f3fdb51ec318e12081d474ad0606a59dc94d6a8c1d2aa9806b21fe8",
+        "server/services/starter-content/fixtures/tags.ts": "8781790524172b03c54cb18430631411bef99f56309f34a0b654f85c8c5124e6"
+      }
+    }
+  }
+}

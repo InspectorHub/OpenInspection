@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
-import { tenantConfigs, inspectionResults, users, accountAcceptances, migrationBatches, migrationRows, auditLogs } from '../../../server/lib/db/schema';
+import { tenantConfigs, inspectionResults, users, accountAcceptances, migrationBatches, migrationRows, auditLogs, tenants } from '../../../server/lib/db/schema';
 import {
     TENANT_CONFIGS_TEST_DDL, INSPECTION_RESULTS_TEST_DDL, USERS_TEST_DDL,
     ACCOUNT_ACCEPTANCES_TEST_DDL, MIGRATION_BATCHES_TEST_DDL, MIGRATION_ROWS_TEST_DDL,
-    AUDIT_LOGS_TEST_DDL,
+    AUDIT_LOGS_TEST_DDL, TENANTS_TEST_DDL,
 } from '../../helpers/inline-ddl';
 
 /**
@@ -104,16 +104,31 @@ describe('workers inline DDL stays in sync with the Drizzle schema', () => {
     });
 
     /**
-     * The three assisted-import tables the `cmd.migration.*` commands write.
+     * Tables whose assertion is identical, driven by one loop rather than four
+     * copies of the same eight lines -- four near-identical blocks is how the
+     * fifth table gets added to the DDL and forgotten here.
      *
-     * Driven by one loop rather than three copies of the same eight lines: the
-     * assertion is identical for all of them, and three near-identical blocks
-     * is how the fifth table gets added to the DDL and forgotten here.
+     * Each carries its own CONSEQUENCE, because they do not share one. The
+     * three `cmd.migration.*` tables park a delivery that is then retried to
+     * exhaustion; `tenants` breaks the tenant upsert outright. A loop that
+     * printed one seam's consequence for every member would send the next
+     * reader to the wrong place, which is what it did for a few minutes here.
      */
-    for (const [label, ddl, table] of [
-        ['migration_batches', MIGRATION_BATCHES_TEST_DDL, migrationBatches],
-        ['migration_rows', MIGRATION_ROWS_TEST_DDL, migrationRows],
-        ['audit_logs', AUDIT_LOGS_TEST_DDL, auditLogs],
+    const PARKS = 'Add them, or the cmd.migration.* appliers park in real workerd — which on '
+        + 'this seam means the delivery is retried to exhaustion and dies in the dead-letter queue.';
+    const TENANT_UPSERT = 'Add them, or handleTenantUpdate fails outright in real workerd: it inserts '
+        + 'a PARTIAL object and drizzle still binds every column of the table, so a column here '
+        + 'means "table tenants has no column named ...".';
+
+    for (const [label, ddl, table, consequence] of [
+        ['migration_batches', MIGRATION_BATCHES_TEST_DDL, migrationBatches, PARKS],
+        ['migration_rows', MIGRATION_ROWS_TEST_DDL, migrationRows, PARKS],
+        ['audit_logs', AUDIT_LOGS_TEST_DDL, auditLogs, PARKS],
+        // Not a cmd.migration.* table -- it is here because the loop is the
+        // right shape for it, and a fourth near-identical block is how the
+        // fifth table gets forgotten. `tenants` is what proved that: seven
+        // copies of its DDL and no assertion over any of them.
+        ['tenants', TENANTS_TEST_DDL, tenants, TENANT_UPSERT],
     ] as const) {
         it(`${label} test DDL covers every Drizzle schema column`, () => {
             const ddlColumns = ddlColumnNames(ddl);
@@ -122,8 +137,7 @@ describe('workers inline DDL stays in sync with the Drizzle schema', () => {
             expect(
                 missing,
                 `tests/helpers/inline-ddl.ts is missing ${label} column(s): ${missing.join(', ')}. ` +
-                    'Add them, or the cmd.migration.* appliers park in real workerd — which on this ' +
-                    'seam means the delivery is retried to exhaustion and dies in the dead-letter queue.',
+                    consequence,
             ).toEqual([]);
         });
     }

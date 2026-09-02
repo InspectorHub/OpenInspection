@@ -74,3 +74,15 @@ tests/e2e/zz-e2e-coverage-probe.spec.ts
 # Test-run logs — full stdout per run, so an intermittent failure is
 # diagnosable after the fact. See scripts/run-logged.mjs.
 .runlogs/
+
+
+# Authority-published statutory form PDFs. These are the states' own
+# documents: this repository records only their sha256 (see the field maps
+# under server/lib/statutory/forms/), never their bytes. Ignored by name so
+# that dropping the source files here to work on a field map cannot commit
+# them by accident.
+# ⚠️ ANCHORED. Written bare, this pattern matches a directory of that name at
+# ANY depth -- which silently swallowed tests/unit/statutory-forms/ and made
+# every NEW spec added there invisible to git. Tracked files kept working, so
+# nothing failed; the next spec would simply not have been committed.
+/statutory-forms/
