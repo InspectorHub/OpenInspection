@@ -189,13 +189,33 @@ for (const rel of [SCHEMA_FILE, SERVICE_FILE]) {
 const schema = stripComments(readFileSync(join(ROOT, SCHEMA_FILE), 'utf8'));
 const service = stripComments(readFileSync(join(ROOT, SERVICE_FILE), 'utf8'));
 
-const enumMatch = /kind:\s*text\(\s*'kind'\s*,\s*\{\s*enum:\s*\[([^\]]+)\]/.exec(schema);
+/**
+ * The kind list, read from `MARKETPLACE_KINDS` and no longer from the column.
+ *
+ * It used to match the enum literal inline in `text('kind', { enum: [...] })`.
+ * That literal moved out into an exported constant so the browse filter could
+ * DERIVE the list instead of retyping it — and this parser, which was reading
+ * the literal, immediately reported the schema unreadable.
+ *
+ * ⚠️ Worth stating because it is the whole argument for the exit(1) below: the
+ * gate did not go quietly green when its source moved. An "unreadable" that
+ * returned an empty list would have satisfied every per-kind assertion by
+ * having no kind to assert about, and it would have done so on the very change
+ * that added a third kind to the filter. Fail-closed earned its keep here.
+ */
+const enumMatch = /MARKETPLACE_KINDS\s*=\s*\[([^\]]+)\]/.exec(schema);
 if (enumMatch === null) {
-    console.log(`marketplace-kinds: could not read the kind enum from ${SCHEMA_FILE}. Unreadable `
+    console.log(`marketplace-kinds: could not read MARKETPLACE_KINDS from ${SCHEMA_FILE}. Unreadable `
         + 'is a failure here: it looks exactly like "every kind is covered".');
     process.exit(1);
 }
 const kinds = [...enumMatch[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+// A list that parsed to nothing is the same failure wearing a different face.
+if (kinds.length === 0) {
+    console.log(`marketplace-kinds: MARKETPLACE_KINDS parsed to ZERO kinds in ${SCHEMA_FILE}. `
+        + 'Every per-kind assertion below would pass by having nothing to check.');
+    process.exit(1);
+}
 
 const missing = [];
 const blind = [];

@@ -11834,7 +11834,8 @@
             "type": "string",
             "enum": [
               "comments",
-              "templates"
+              "templates",
+              "statutory"
             ],
             "description": "TODO describe kind field for the OpenInspection MCP integration"
           }
@@ -11898,7 +11899,8 @@
             "type": "string",
             "enum": [
               "comments",
-              "templates"
+              "templates",
+              "statutory"
             ],
             "description": "Filter the catalogue to one kind of importable content"
           }

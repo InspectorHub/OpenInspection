@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { PropertyTypeEnum } from './template.schema';
+import { MARKETPLACE_KINDS } from '../db/schema/marketplace';
 
 /**
  * Three browse axes, not one `category` (#293). They are independent: a Texas
@@ -20,7 +21,11 @@ import { PropertyTypeEnum } from './template.schema';
  */
 export const MarketplaceBrowseQuerySchema = z.object({
     search:         z.string().optional().describe('Free-text search over catalogue entry names'),
-    kind:           z.enum(['comments', 'templates']).optional().describe('Filter the catalogue to one kind of importable content'),
+    // Derived from the column's own enum, never retyped. Typed here it read
+    // ['comments', 'templates'], which offered a kind no row carries and hid
+    // every 'statutory' row from the filter -- the service accepted all three
+    // the whole time, so nothing anywhere went red.
+    kind:           z.enum(MARKETPLACE_KINDS).optional().describe('Filter the catalogue to one kind of importable content'),
     propertyType:   PropertyTypeEnum.optional().describe('Filter templates by the property type they are written for'),
     jurisdiction:   z.string().min(1).max(64).optional().describe("Filter by a jurisdiction's form standard, e.g. trec"),
     inspectionKind: z.string().min(1).max(64).optional().describe('Filter by inspection kind, e.g. new_construction'),

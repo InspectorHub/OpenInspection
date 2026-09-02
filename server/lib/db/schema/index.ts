@@ -43,6 +43,7 @@ export {
     marketplaceLibraries,
     tenantLibraryImports,
     tenantMarketplaceImportHistory,
+    MARKETPLACE_KINDS,
 } from './marketplace';
 export { inspectionMessages } from './message';
 export type { MessageAttachment } from './message';
