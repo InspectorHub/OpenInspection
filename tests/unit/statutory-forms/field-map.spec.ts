@@ -441,7 +441,10 @@ describe('validateAgainstPdf', () => {
     });
 
     it('POSITIVE CONTROL — the correctly spelled name validates', async () => {
-        await expect(validateAgainstPdf(MAP(fielded.hash), fielded.bytes)).resolves.toBeUndefined();
+        // Resolves to the PARSED DOCUMENT, not to undefined: the renderer reuses it
+        // rather than parsing the same bytes a second time.
+        await expect(validateAgainstPdf(MAP(fielded.hash), fielded.bytes))
+            .resolves.toHaveProperty('getPageCount');
     });
 
     it('accepts an overlay-only map for a PDF with no fields at all', async () => {
@@ -455,7 +458,7 @@ describe('validateAgainstPdf', () => {
                 { kind: 'checkbox', ourField: 'roof.covering', whenValue: 'shingle', page: 1, x: 80, y: 400 },
             ],
         };
-        await expect(validateAgainstPdf(map, flat.bytes)).resolves.toBeUndefined();
+        await expect(validateAgainstPdf(map, flat.bytes)).resolves.toHaveProperty('getPageCount');
     });
 
     it('refuses a map pointing at a page the PDF does not have', async () => {
@@ -513,7 +516,7 @@ describe('validateAgainstPdf — a part that cannot fit its own digits', () => {
     it('POSITIVE CONTROL — the same blank at 8pt is accepted', async () => {
         // 17.792 <= 18.07, by 0.274pt. Without this the check above would also
         // pass against a validator that refused every part.
-        await expect(validateAgainstPdf(roofRow(8), flat.bytes)).resolves.toBeUndefined();
+        await expect(validateAgainstPdf(roofRow(8), flat.bytes)).resolves.toHaveProperty('getPageCount');
     });
 
     it('POSITIVE CONTROL — an unparted overlay is not measured this way', async () => {
@@ -523,7 +526,7 @@ describe('validateAgainstPdf — a part that cannot fit its own digits', () => {
             ...MAP(flat.hash), requiredFields: [],
             mappings: [{ kind: 'overlay', ourField: 'comments', page: 0,
                 x: 40, y: 400, size: 10, maxWidth: 4 }],
-        }, flat.bytes)).resolves.toBeUndefined();
+        }, flat.bytes)).resolves.toHaveProperty('getPageCount');
     });
 });
 

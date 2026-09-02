@@ -70,7 +70,7 @@
  * truncating, live in `fit.ts`.
  */
 import {
-    PDFDocument, ParseSpeeds, StandardFonts,
+    PDFDocument, StandardFonts,
     type PDFCheckBox, type PDFFont, type PDFTextField,
 } from 'pdf-lib';
 import {
@@ -147,7 +147,12 @@ export async function renderStatutoryForm(
     signatures: ReadonlyMap<string, SignatureImage> = new Map(),
 ): Promise<Uint8Array> {
     validateFieldMapShape(map);
-    await validateAgainstPdf(map, officialPdf);
+    // One parse, not two. `validateAgainstPdf` has to read the document to
+    // check the map against it, and this function used to read the same bytes
+    // again immediately afterwards. It hands its document back precisely so
+    // that second read can go; see the note on its return value for why
+    // drawing on it is safe.
+    const doc = await validateAgainstPdf(map, officialPdf);
     // Read through a Map rather than by index: `Record<string, ...>` types every
     // lookup as present, and this whole function turns on telling an absent key
     // from an empty one. The Map's `get` returns `... | undefined`, so the
@@ -155,13 +160,6 @@ export async function renderStatutoryForm(
     const supplied = new Map<string, StatutoryValue>(Object.entries(values));
     checkValuesAgainstMap(map, supplied, signatures);
 
-    // `Fastest` skips pdf-lib's incremental yielding during parse. It is a
-    // scheduling knob, not a fidelity one: measured against the published TREC
-    // bytes (620,865 B, 245 AcroForm fields) it halves the parse -- 125 ms to
-    // 55 ms in Node -- and the saved document is BYTE-IDENTICAL to the default
-    // parse's, checked with pdf-lib's own timestamps zeroed so the comparison
-    // was of content rather than of the clock.
-    const doc = await PDFDocument.load(officialPdf, { parseSpeed: ParseSpeeds.Fastest });
     const pages = doc.getPages();
     // Embedded on first use only: a form filled entirely through its own fields
     // needs no font of ours, and adding one would put an object of ours into a

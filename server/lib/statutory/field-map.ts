@@ -324,13 +324,22 @@ function validateOverlayFit(m: OverlayMapping): void {
 /**
  * Check a map against the actual published bytes.
  *
- * Resolves (to `undefined`) when the map can be applied to these bytes, rejects
- * naming the first thing that cannot. The hash is checked FIRST: against the
- * wrong revision the field names may well still resolve while the layout
- * underneath has moved, so "the names matched" is not evidence of anything until
- * the bytes are known to be the right ones.
+ * Rejects naming the first thing that cannot be applied. The hash is checked
+ * FIRST: against the wrong revision the field names may well still resolve
+ * while the layout underneath has moved, so "the names matched" is not evidence
+ * of anything until the bytes are known to be the right ones.
+ *
+ * It RETURNS the parsed document: validating means parsing, and whoever
+ * validates is usually about to render -- which used to parse the same bytes
+ * again a few lines later. A caller may ignore it.
+ *
+ * ⚠️ Safe to DRAW on, which is a claim about this function, not about pdf-lib:
+ * `getForm()` CREATES an AcroForm when the document has none, so asking
+ * unconditionally would put an object of ours into a flat form we did not
+ * otherwise touch. It is read only when the map names AcroForm fields --
+ * exactly when the renderer reads it too.
  */
-export async function validateAgainstPdf(map: FieldMap, pdfBytes: Uint8Array): Promise<void> {
+export async function validateAgainstPdf(map: FieldMap, pdfBytes: Uint8Array): Promise<PDFDocument> {
     const actual = await sha256Hex(pdfBytes);
     if (actual !== map.sourceHash) {
         fail(`sourceHash mismatch: these bytes hash to ${actual} and the map was authored `
@@ -340,9 +349,12 @@ export async function validateAgainstPdf(map: FieldMap, pdfBytes: Uint8Array): P
 
     let doc: PDFDocument;
     try {
-        // Same parse knob as the renderer uses, for the same reason and with the
-        // same evidence: it changes how the parse is scheduled, not what it
-        // yields. See the note at the load in `render.ts`.
+        // `Fastest` drops pdf-lib's incremental yielding: a scheduling knob,
+        // not a fidelity one, and this parse is inside one request already
+        // awaiting it. Measured on the largest published form (620,865 B, 245
+        // AcroForm fields): 125 ms at the default, 55 ms here, and the document
+        // saved afterwards is BYTE-IDENTICAL -- compared with pdf-lib's own save
+        // timestamps zeroed, so it was content being compared, not the clock.
         doc = await PDFDocument.load(pdfBytes, { parseSpeed: ParseSpeeds.Fastest });
     } catch (cause) {
         throw new Error(
@@ -352,10 +364,17 @@ export async function validateAgainstPdf(map: FieldMap, pdfBytes: Uint8Array): P
     }
 
     const pageCount = doc.getPageCount();
-    // `getForm()` on a form-less document yields an empty field list rather than
-    // throwing, which is the behaviour a flat form needs: an overlay-only map
-    // against a PDF with no fields is the normal case, not a degraded one.
-    const names = new Set(doc.getForm().getFields().map((f) => f.getName()));
+    const wantsAcroForm = map.mappings.some(
+        (m) => m.kind === 'acroform' || m.kind === 'acroform_checkbox',
+    );
+    // Only when the map names fields in it: `getForm()` on a form-less document
+    // does not throw, it CREATES an empty AcroForm -- and this function hands
+    // the document to the renderer. An overlay-only map against a PDF with no
+    // fields is the normal case, not a degraded one; it has no question to ask
+    // of the form.
+    const names = wantsAcroForm
+        ? new Set(doc.getForm().getFields().map((f) => f.getName()))
+        : new Set<string>();
 
     const missingFields: string[] = [];
     const offPage: string[] = [];
@@ -375,4 +394,5 @@ export async function validateAgainstPdf(map: FieldMap, pdfBytes: Uint8Array): P
         fail(`${offPage.length} mapping(s) fall outside the document, which has ${pageCount} page(s): `
             + offPage.join(', '));
     }
+    return doc;
 }

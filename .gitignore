@@ -81,4 +81,8 @@ tests/e2e/zz-e2e-coverage-probe.spec.ts
 # under server/lib/statutory/forms/), never their bytes. Ignored by name so
 # that dropping the source files here to work on a field map cannot commit
 # them by accident.
-statutory-forms/
+# ⚠️ ANCHORED. Written bare, this pattern matches a directory of that name at
+# ANY depth -- which silently swallowed tests/unit/statutory-forms/ and made
+# every NEW spec added there invisible to git. Tracked files kept working, so
+# nothing failed; the next spec would simply not have been committed.
+/statutory-forms/
