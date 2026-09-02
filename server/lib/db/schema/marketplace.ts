@@ -1,4 +1,8 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { MARKETPLACE_KINDS } from '../../marketplace-kinds';
+
+// Re-exported so the schema barrel keeps offering it beside the table.
+export { MARKETPLACE_KINDS };
 
 // The legacy `marketplace_templates` / `tenant_marketplace_imports` pair was
 // retired here (#293). Its 12 rows moved onto marketplace_libraries as
@@ -6,22 +10,6 @@ import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqli
 // preserve. Dropping the child also removed the only FK pointing INTO
 // `templates`, which D1 makes a permanent migration liability.
 
-/**
- * Every kind the catalogue can hold, and the ONE place the list is written.
- *
- * It is the `kind` column's enum, and every consumer derives from it rather
- * than retyping it. That is not tidiness: the browse filter had its own
- * hand-typed copy reading ['comments', 'templates'], which offered a kind no
- * row has ever carried and made the five 'statutory' rows unreachable by
- * filter -- visible only under "All", where nobody looking for them would
- * think to look. Nothing failed, no test went red, and the service layer
- * accepted all three the whole time.
- *
- * ⚠️ `lint:marketplace-kind-halves` does NOT cover this. It checks that each
- * kind has an import path and an un-import path, which is a different
- * question from whether a person can find the kind in the first place.
- */
-export const MARKETPLACE_KINDS = ['comments', 'templates', 'statutory'] as const;
 
 // The single marketplace catalogue. Every importable kind lives here, keyed by
 // `kind`: a 1:1 kind ('templates' — one catalogue row becomes one local

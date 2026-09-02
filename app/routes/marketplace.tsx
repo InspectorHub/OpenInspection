@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useFetcher, useLoaderData, useNavigate } from "react-router";
+import { Link, useFetcher, useLoaderData, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/marketplace";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -12,6 +12,7 @@ import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 import { StatutoryUpdateConfirm } from "~/components/marketplace/StatutoryUpdateConfirm";
 import { UninstallConfirm } from "~/components/marketplace/UninstallConfirm";
 import type { StatutoryUpdateImpact } from "../../server/services/marketplace/statutory-update-impact";
+import { MARKETPLACE_KINDS } from "../../server/lib/marketplace-kinds";
 
 export function meta() {
   return [{ title: m.marketplace_meta_title() }];
@@ -40,9 +41,22 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const page     = url.searchParams.get("page")     ?? "1";
   const pageSize = url.searchParams.get("pageSize") ?? "50";
+  // The kind filter reaches the API from here, and it did not used to. The tab
+  // strip set client state that nothing read, so every tab rendered the same
+  // list — measured in production on 2026-09-02: pressing "Templates" left two
+  // comment packs and three statutory forms on screen and the count at 17.
+  //
+  // It goes through the URL rather than component state so the loader re-runs
+  // and the SERVER does the filtering. Filtering the loaded page in the browser
+  // would only ever narrow the 50 rows this request happened to carry, which is
+  // a different and quietly wrong answer once the catalogue outgrows a page.
+  const kindParam = url.searchParams.get("kind");
+  const kind = MARKETPLACE_KINDS.find((k) => k === kindParam);
   try {
     const api = createApi(context, { token });
-    const res = await api.marketplace.index.$get({ query: { page, pageSize } });
+    const res = await api.marketplace.index.$get({
+      query: { page, pageSize, ...(kind ? { kind } : {}) },
+    });
     if (!res.ok) {
       // A refused request is a FAILED load, not an empty catalogue. This branch
       // said `loadFailed: false`, so an API error rendered the "Marketplace is
@@ -67,21 +81,50 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 }
 
-// A function (not a module const) so `m.*()` resolves inside the per-request
-// paraglide locale scope, not once at import time.
+/**
+ * The tabs, one per kind the catalogue can hold plus "All".
+ *
+ * A function (not a module const) so `m.*()` resolves inside the per-request
+ * paraglide locale scope, not once at import time.
+ *
+ * ⚠️ The ids are the kind values the API filters by, so this list cannot drift
+ * from the catalogue by someone typing. It had: an "Agreements" tab for a kind
+ * that has never existed — no row carries it and no code anywhere reads it —
+ * and no tab for `statutory`, which three shipped rows do carry. The label is
+ * looked up per kind so a new kind fails at the message lookup rather than
+ * rendering a tab with no name.
+ */
 function getTabs() {
+  const labels: Record<(typeof MARKETPLACE_KINDS)[number], string> = {
+    templates: m.marketplace_tab_templates(),
+    comments: m.marketplace_tab_comments(),
+    statutory: m.marketplace_tab_statutory(),
+  };
   return [
     { id: "all", label: m.marketplace_tab_all() },
-    { id: "templates", label: m.marketplace_tab_templates() },
-    { id: "comments", label: m.marketplace_tab_comments() },
-    { id: "agreements", label: m.marketplace_tab_agreements() },
+    ...MARKETPLACE_KINDS.map((k) => ({ id: k, label: labels[k] })),
   ];
 }
 
 export default function MarketplacePage() {
   const { templates, meta, loadFailed } = useLoaderData<typeof loader>();
-  const [activeTab, setActiveTab] = useState("all");
   const { setPage, setPageSize } = usePagination();
+  // The active tab is READ FROM THE URL, not held in component state. State was
+  // what made the strip decorative: it changed which tab looked selected and
+  // nothing else. Reading the URL also means a filtered view can be linked to
+  // and survives a reload, and that switching tabs resets to page 1 — landing
+  // on page 3 of a filter that has one page would render an empty catalogue.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const kindParam = searchParams.get("kind");
+  const activeTab = MARKETPLACE_KINDS.find((k) => k === kindParam) ?? "all";
+  const setActiveTab = (id: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (id === "all") next.delete("kind"); else next.set("kind", id);
+      next.delete("page");
+      return next;
+    });
+  };
 
   // IA-39 — Install now actually installs. One fetcher; the submitting card is
   // tracked so only its button shows the pending state. On success we jump to
@@ -209,9 +252,16 @@ export default function MarketplacePage() {
 
       {templates.length === 0 ? (
         <Card>
+          {/* An empty FILTER is not an empty catalogue, and saying "Marketplace
+              is empty" in front of a kind that simply has no entries tells the
+              reader something false about the shelf. This page's loader already
+              carries the same lesson from the other direction — an API error
+              used to render this screen, so a failed load read as a bare
+              catalogue. Both are the same mistake: a specific absence reported
+              as a general one. */}
           <EmptyState
-            title={m.marketplace_empty_title()}
-            description={m.marketplace_empty_desc()}
+            title={activeTab === "all" ? m.marketplace_empty_title() : m.marketplace_empty_filtered_title()}
+            description={activeTab === "all" ? m.marketplace_empty_desc() : m.marketplace_empty_filtered_desc()}
           />
         </Card>
       ) : (

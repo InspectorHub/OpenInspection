@@ -7,7 +7,7 @@ import { auditFromContext } from '../lib/audit';
 import { LibraryReplaceParamsSchema, LibraryReplaceBodySchema, LibraryReplacePreviewSchema } from '../lib/validations/library-replace.schema';
 import { ImportHistoryQuerySchema } from '../lib/validations/import-history.schema';
 import { MarketplaceBrowseQuerySchema } from '../lib/validations/marketplace-browse.schema';
-import { MARKETPLACE_KINDS } from '../lib/db/schema/marketplace';
+import { MARKETPLACE_KINDS } from '../lib/marketplace-kinds';
 import {
     paginationQuerySchema,
     PaginatedMetaSchema,

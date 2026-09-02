@@ -37,6 +37,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { resolveEnum } from './lib/resolve-enum.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(root, 'docs', 'reference', 'database-schema.md');
@@ -135,26 +136,6 @@ const meta = {};
 // Counted from the schema text rather than the migrations: the storage type is
 // `integer` either way, and only the Drizzle mode says whether the integer is
 // seconds or milliseconds.
-/**
- * The VALUES an enum column admits, even when the column names a constant.
- *
- * `enum: MARKETPLACE_KINDS` rendered as that name — correct about the source and
- * useless to a reader who opened this document to learn which values are
- * allowed. Resolves only a `const NAME = [ ... ]` in the SAME file, and the `;`
- * bound keeps a non-array constant from walking forward and reporting some
- * other array's values as this column's. Unresolved is returned untouched,
- * never dropped: a name beats a blank cell.
- */
-function resolveEnum(expr, fileText) {
-    if (!expr || expr.startsWith('[')) return expr;
-    const at = fileText.indexOf(`const ${expr} =`);
-    if (at === -1) return expr;
-    const open = fileText.indexOf('[', at);
-    const end = fileText.indexOf(';', at);
-    if (open === -1 || (end !== -1 && open > end)) return expr;
-    const close = fileText.indexOf(']', open);
-    return close === -1 ? expr : fileText.slice(open, close + 1);
-}
 
 let nTsMs = 0, nTsRaw = 0;
 for (const file of walk(join(root, 'server', 'lib', 'db', 'schema'))) {
@@ -204,7 +185,7 @@ for (const file of walk(join(root, 'server', 'lib', 'db', 'schema'))) {
                     const tail = s.match(/,\s*\/\/\s*(.+)$/);
                     const parts = buf.slice();
                     if (tail) parts.push(tail[1].trim());
-                    entry.cols[c[2]] = { prop: c[1], raw: parts.join(' '), enum: resolveEnum(en ? en[1] : null, raw) };
+                    entry.cols[c[2]] = { prop: c[1], raw: parts.join(' '), enum: resolveEnum(en ? en[1] : null, raw, dirname(file)) };
                 }
                 buf = [];
             }
