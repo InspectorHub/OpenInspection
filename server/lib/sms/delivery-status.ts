@@ -9,7 +9,7 @@
  *   - parseTwilioStatus / parseTelnyxStatus: payload → normalized status.
  *   - upsertDeliveryStatus: last-writer-wins upsert into sms_delivery_status.
  *   - recordSentStatus: send-path id-stamping seed (a 'sent' row on send).
- *   - registerSmsStatusRoute: mounts POST /sms/status/:tenant on the public
+ *   - registerSmsStatusRoute: mounts POST /sms/status/:tenant on the webhook
  *     router (verify → dedup → parse → upsert).
  */
 import { drizzle } from 'drizzle-orm/d1';
@@ -204,7 +204,7 @@ export async function recordSentStatus(
 }
 
 /**
- * Mount POST /sms/status/:tenant on the public SMS router. Tenant-scoped
+ * Mount POST /sms/status/:tenant on the SMS webhook router. Tenant-scoped
  * delivery-status webhook: resolve tenant by slug, resolve provider (Twilio
  * default / Telnyx BYO) + verification secret exactly as the inbound /:tenant
  * route does, verify fail-closed (bad sig → 403 before any write), dedup on a

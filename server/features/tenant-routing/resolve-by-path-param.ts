@@ -10,15 +10,20 @@ import type { HonoConfig } from '../../types/hono';
  * the same way slug resolution does.
  *
  * Pattern: /<prefix>/<tenant>/...
- *   prefix ∈ {book, embed/book, inspector, report, sign,
- *             agreements/sign, checkout, m2m/agreement-render}
+ *   prefix ∈ {book, inspector, report, report-view, sign,
+ *             agreements/sign, checkout, m2m/agreement-render,
+ *             webhooks/stripe, api/portal, portal}
  *
  * Returns true if a tenant was extracted + resolved; false otherwise
  * (caller should then try slug → fixed → leave-unset).
  */
+// `/embed/book/` was removed: the only embed URL this app mints is
+// `/embed/{tenant}` (server/lib/public-urls.ts, embedBookingCompanyUrl), so that
+// prefix could never match, and the embed page resolves its tenant by calling
+// `/api/public/book/:tenant` anyway. A prefix that cannot match is not harmless
+// here — it reads as documentation of a URL shape that does not exist.
 const PUBLIC_PREFIXES = [
     '/book/',
-    '/embed/book/',
     '/inspector/',
     '/report-view/',
     '/report/',
@@ -26,7 +31,10 @@ const PUBLIC_PREFIXES = [
     '/agreements/sign/',
     '/checkout/',
     '/m2m/agreement-render/',
-    '/api/integrations/stripe/webhook/',
+    // Stripe's tenant-scoped inbound webhook. The tenant must be resolved from
+    // the path BEFORE the signature can be verified, because the verifier secret
+    // (whsec) is per-tenant.
+    '/webhooks/stripe/',
     // Unified client portal — API routes (this task) + page routes (later task).
     '/api/portal/',
     '/portal/',

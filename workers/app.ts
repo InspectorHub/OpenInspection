@@ -104,20 +104,33 @@ const app = new Hono();
 // allowlist entry whose stated reason ("runs before middleware") was true of
 // the context and not of the function.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-app.all("/api/integration/*", (c: any) =>
+app.all("/api/platform/*", (c: any) =>
     getDeploymentProfile(c.env).hasPortalIntegrationApi ? toApi(c) : c.notFound(),
 );
 app.all("/api/*", toApi);
 app.all("/status", toApi);
 app.all("/m2m/*", toApi);
+app.all("/webhooks/*", toApi); // inbound provider webhooks — top-level by design (spec §3)
 app.all("/photos/*", toApi);
 app.all("/.well-known/*", toApi);
 app.all("/doc", toApi); // OpenAPI JSON (the RR /ui Swagger page fetches it); /ui itself is now an RR route
-app.all("/sso", toApi); // saas SSO handoff (coreAuthRoutes is also mounted at '/')
+app.all("/sso", toApi); // saas SSO handoff — the one auth route mounted at '/' (ssoRootRoutes)
 app.all("/sign/*", toApi); // public signing pages — no React Router /sign route
 app.all("/agent/magic-login", toApi); // agent unified link redeem — no React Router page for this path
 app.get("/inspector/:tenant/:slug/calendar.ics", toApi); // ICS feed (API-only)
-app.get("/observe/:token", toApi); // 1-seg observe — RR owns /observe/inspections/:id
+// Removed: `/observe/:token`. It forwarded to the API app, which has never had
+// a route there, and the React Router route its comment claimed ("RR owns
+// /observe/inspections/:id") does not exist either — the observe surface is
+// `/api/portal/{tenant}/inspections/{id}/observe`. It has been dead on both
+// sides since the single-worker migration; the entry-dispatch parity gate is
+// what finally said so.
+
+// NOT listed here on purpose: `/mcp` and `/mcp/{slug}`. That prefix is owned by
+// the OAuthProvider wrapper installed around this whole app in `fetch` below —
+// it matches `apiRoute` as a literal path prefix and hands the request to the
+// McpAgent Durable Object, so it never reaches this router when MCP is enabled.
+// Routing it to `toApi` would be a lie about ownership AND a behaviour change
+// when the flag is off, where the path correctly falls through to the SSR 404.
 
 // Audited as React Router-owned (the RR migration superseded the API HTML; the API
 // still serves their DATA under /api/public/*): /book /report /r /messages /verify

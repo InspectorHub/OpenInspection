@@ -361,6 +361,18 @@ export const SCRIPT_GATES = [
     // is visible without standing between every commit and the person making
     // it, which is how a red gate turns into a habit of --no-verify.
     { key: 'marketplacekindhalves', label: 'lint:marketplace-kind-halves', script: 'check-marketplace-kind-halves.mjs', fix: 'npm run lint:marketplace-kind-halves', rung: PUSH },
+    // The URL taxonomy: webhooks at the top level, the M2M seam at
+    // /api/platform/, no /company/ here. PRECOMMIT because it reads three files
+    // and a mount path is wrong the moment it is typed -- there is no
+    // half-finished state for it to blame the wrong commit for.
+    { key: 'urltaxonomy', label: 'lint:url-taxonomy', script: 'check-url-taxonomy.mjs', fix: 'npm run lint:url-taxonomy', rung: PRECOMMIT },
+    // Entry-dispatch parity, at PUSH for `marketplacekindhalves`'s reason: it
+    // checks that TWO files agree, and the Hono mount and the entry's forward
+    // are routinely written in different commits. Worth having because the
+    // failure is silent -- an unforwarded prefix reaches React Router and 404s,
+    // and unit tests call the handler directly, so nothing else can see it.
+    // Registering it found a forward dead since the single-worker migration.
+    { key: 'routedispatch', label: 'lint:route-dispatch', script: 'check-route-dispatch-parity.mjs', fix: 'npm run lint:route-dispatch', rung: PUSH },
 ];
 
 export const DUP_GATE = { key: 'dup', label: 'Duplicate-code ceiling', fix: 'npm run lint:dup', rung: PRECOMMIT };

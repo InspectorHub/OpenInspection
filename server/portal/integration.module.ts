@@ -2,7 +2,7 @@
 // codebase touches portal ONLY via this module's two exports + the
 // IntegrationProvider / OutboxService selection in lib/middleware/di.ts.
 // Standalone never reaches these in normal operation. The worker entry
-// (workers/app.ts) 404s /api/integration/* unless APP_MODE=saas.
+// (workers/app.ts) 404s /api/platform/* unless APP_MODE=saas.
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { HonoConfig } from '../types/hono';
 import type { SyncEnvelope } from '../lib/sync-events/envelope';
@@ -22,11 +22,16 @@ interface PortalDrainEnv {
 
 /** Mount the portal->core M2M integration routes on the API app. */
 export function registerPortalIntegration(app: OpenAPIHono<HonoConfig>): void {
-    app.route('/api/integration', integrationRoutes);
+    // `/api/platform`, and deliberately not the singular of the word next
+    // door: that form sat one letter away from `/api/integrations/*` — the
+    // tenant's own QuickBooks/Stripe settings API — and the two differ in
+    // caller, auth mechanism and visibility. `platform` follows the vocabulary
+    // this seam already uses in its own claims (`platformActor`).
+    app.route('/api/platform', integrationRoutes);
     // Its own module rather than more routes in integration.routes.ts: those are
     // about one tenant's lifecycle, these are about the catalogue and the
     // documents produced from it, and the file next door is at its size cap.
-    app.route('/api/integration', statutoryAdminRoutes);
+    app.route('/api/platform', statutoryAdminRoutes);
 }
 
 /**

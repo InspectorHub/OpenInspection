@@ -7,7 +7,7 @@ import type { HonoConfig } from '../../../server/types/hono';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { asD1Db } from '../helpers/test-db';
 
-// GET /api/integration/tenants/by-email is a CROSS-TENANT existence oracle about
+// GET /api/platform/tenants/by-email is a CROSS-TENANT existence oracle about
 // one person: given an address it answers "which inspection companies hold a
 // live report grant for you". It stays, because it is how a homebuyer who lost
 // the email finds their own report — but a person must be able to object to it.
@@ -49,14 +49,14 @@ describe('find-my-report discovery — the objection path', () => {
 
     function app() {
         const a = new OpenAPIHono<HonoConfig>();
-        a.route('/api/integration', integrationRoutes);
+        a.route('/api/platform', integrationRoutes);
         return a;
     }
     async function header() { return signM2mHeader(ENV as Record<string, string | undefined>); }
 
     async function lookup(email: string) {
         const res = await app().request(
-            `/api/integration/tenants/by-email?email=${encodeURIComponent(email)}`,
+            `/api/platform/tenants/by-email?email=${encodeURIComponent(email)}`,
             { headers: { [M2M_HEADER]: await header() } },
             ENV,
         );
@@ -66,7 +66,7 @@ describe('find-my-report discovery — the objection path', () => {
 
     async function object(body: unknown, method: 'POST' | 'DELETE' = 'POST') {
         return app().request(
-            '/api/integration/discovery-objections',
+            '/api/platform/discovery-objections',
             {
                 method,
                 headers: { [M2M_HEADER]: await header(), 'content-type': 'application/json' },

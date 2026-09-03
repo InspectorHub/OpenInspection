@@ -32,7 +32,7 @@ import { agreementSignPath, agreementRenderPath } from './lib/public-urls';
 import { loadVerifyData } from './lib/verify-data';
 
 
-import coreAuthRoutes from './api/auth';
+import coreAuthRoutes, { ssoRootRoutes } from './api/auth';
 import testHooksRoutes from './api/test-hooks';
 import identityRoutes from './api/identity';
 import integrationsApiRoutes from './api/integrations';
@@ -46,7 +46,7 @@ import tenantPresenceRoutes from './api/tenant-presence';
 import inspectionPrefsRoutes from './api/inspection-prefs';
 import aiRoutes from './api/ai';
 import { bookingsRoutes } from './api/bookings';
-import { smsPublicRoutes, smsAdminRoutes } from './api/sms';
+import { smsPublicRoutes, smsWebhookRoutes, smsAdminRoutes } from './api/sms';
 import adminRoutes from './api/admin';
 import adminBrandingRoutes from './api/admin/branding';
 import adminDefectCategoriesRoutes from './api/admin/admin-defect-categories';
@@ -313,9 +313,9 @@ app.use('/api/*', requireActiveSubscription);
 // statements (above and below) since they don't affect the route type signature.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- referenced via `typeof routes` on line 800 (CoreApiType export)
 const routes = app
-  // Mount auth routes at canonical API path AND at root so that /setup, /login (POST), /join (POST) work without redirects
+  // Auth mounts ONCE. `GET /sso` alone also answers at the root, because portal mints that absolute URL and the browser follows it.
   .route('/api/auth', coreAuthRoutes)
-  .route('/', coreAuthRoutes)
+  .route('/', ssoRootRoutes)
   // Agent unified link (Spec 3 Task 2) — GET /agent/magic-login redeem. Root
   // mount (not /api) mirrors the /sso pattern above; workers/app.ts forwards
   // this exact path to the API app since it isn't under /api/*.
@@ -364,9 +364,8 @@ const routes = app
   .route('/api/public', publicReportRoutes)
   .route('/api/public', bookingsRoutes)
   .route('/api/public/widget', widgetRoutes)
-  // Booking #7 Sprint A — slug availability check; lives under /api/public so
-  // the slug input on /settings/profile (and any future un-authed pages) can
-  // hit it without a JWT.
+  // Booking #7 Sprint A — slug availability check; under /api/public so the slug
+  // input on /settings/profile (and any future un-authed page) needs no JWT.
   .route('/api/public', publicSlugRoutes)
   // Booking #7 Sprint A — authenticated profile endpoints (slug write).
   .route('/api/profile', profileRoutes)
@@ -382,7 +381,7 @@ const routes = app
   // /inspections/:id/messages...). Session- OR token-gated via resolveClientActor;
   // the global JWT middleware skips /api/public/* so auth is performed in-route.
   .route('/api/public', clientMessageRoutes)
-  // Track L (D6/D9) — public SMS opt-in resolve/confirm + inbound STOP/START webhook.
+  // Track L (D6) — the SMS opt-in pair (resolve/confirm) a person opens.
   .route('/api/public', smsPublicRoutes)
   // Signed email unsubscribe. MUST stay under /api/public — that prefix is what
   // keeps it outside the agent-terms gate; see server/api/unsubscribe.ts.
@@ -456,27 +455,28 @@ const routes = app
   .route('/api/ics', icsRoutes)
   .route('/api/users', userRoutes)
   // Lone cross-cutting messages summary: GET /api/messages/unread-count (sidebar
-  // badge). Every per-inspection messages route lives under /api/inspections
-  // (inspector) or /api/public (client) now.
+  // badge). Per-inspection message routes live under /api/inspections or /api/public.
   .route('/api/messages', messageRoutes)
   .route('/api/notifications', notificationsRoutes)
   .route('/api', notificationPreferenceRoutes)   // reader's own preferences (§4)
-  .route('/settings/integrations/qbo', qboRoutes)
-  .route('/api/integrations/qbo/webhook', qboWebhookRoutes)
-  // Browser-facing OAuth pair (/connect, /callback). Mounted under /api/* —
-  // NOT under /settings/** with its siblings — because workers/app.ts only
-  // forwards an allow-list of prefixes to this app and /settings/** is not on
-  // it, so a browser can never reach those. Registered AFTER the webhook so no
-  // ordering question can arise on the shared prefix. See lib/qbo-oauth-paths.ts.
+  // Inbound webhooks mount at the TOP LEVEL, never under /api/: the producer
+  // owns the body schema, headers and signature, and none of the /api/*
+  // middleware applies — no CORS, no last-active touch, no idempotency guard
+  // (they dedupe via processed_webhook_events), and emphatically no
+  // subscription gate: a lapsed tenant is when a provider most needs delivery.
+  .route('/webhooks/quickbooks', qboWebhookRoutes)
+  // Browser-facing OAuth pair (/connect, /callback). The redirect_uri Intuit
+  // matches byte-for-byte comes from one constant; see lib/qbo-oauth-paths.ts.
   .route(QBO_OAUTH_MOUNT, qboOauthRoutes)
-  // Stripe webhook, tenant-scoped (SaaS): /api/integrations/stripe/webhook/:tenant
-  // resolves the tenant via PUBLIC_PREFIXES path-param resolution so
-  // integration-secrets loads THAT tenant's whsec. The bare path below stays
-  // for standalone (fixed tenant) and as a saas no-op.
-  .route('/api/integrations/stripe/webhook/:tenant', stripeWebhookRoutes)
-  // Stripe webhook (bring-your-own-keys) — public, verified via the tenant's
-  // own stripe-signature secret. Added to isPublic allowlist below.
-  .route('/api/integrations/stripe/webhook', stripeWebhookRoutes)
+  // Management API, same prefix but AFTER the pair — its router-wide use('*')
+  // guards would else 401 Intuit's cookie-less /callback (qbo-api-mount.spec).
+  .route('/api/integrations/qbo', qboRoutes)
+  // :tenant is load-bearing — Stripe's verifier secret is per-tenant, so
+  // PUBLIC_PREFIXES must resolve it BEFORE the signature can be checked.
+  .route('/webhooks/stripe/:tenant', stripeWebhookRoutes)
+  .route('/webhooks/stripe', stripeWebhookRoutes)
+  // Track L (D9) — SMS inbound/status, compliance-status, email events.
+  .route('/webhooks', smsWebhookRoutes)
   // Remote MCP OAuth — grant management API (self list/revoke + admin oversight).
   // Mounted at /api/mcp so paths become /api/mcp/grants*.
   .route('/api/mcp', mcpGrantsRoutes)

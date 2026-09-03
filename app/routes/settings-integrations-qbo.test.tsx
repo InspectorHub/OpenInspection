@@ -26,7 +26,7 @@ import type { QBOConnectionStatus } from "../../server/services/qbo/api-base";
 const HOUR = 3600;
 const NOW_SECONDS = Math.floor(Date.now() / 1000);
 
-/** Exactly what `GET /settings/integrations/qbo/status` puts in `data`. */
+/** Exactly what `GET /api/integrations/qbo/status` puts in `data`. */
 const CONNECTED: QBOConnectionStatus = {
   realmId: "9341457665739480",
   companyName: "Sandbox Company US baeb",

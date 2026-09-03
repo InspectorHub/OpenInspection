@@ -23,21 +23,11 @@ import {
 
 // Phase 0 done: every /api/* module has full route metadata + field descriptions
 // (route metadata from PR #21, Zod field descriptions from this PR).
-// Only root-mounted duplicates of /api/auth/* (see index.ts:444-445; their
-// operationId collides with the canonical version and is deduped) and HTML
-// page mounts remain.
+// Only HTML page mounts remain. The ten root-mounted mirrors of /api/auth/*
+// that used to be skipped here are gone: the auth router is mounted once, at
+// /api/auth, and `GET /sso` — the one auth path still answering at the root —
+// is NOT skipped, so it is held to the same metadata standard as the rest.
 const SKIP_MODULES = new Set([
-    // Root-mounted auth routes (mirror of /api/auth/*, see index.ts:444-445)
-    '/login',
-    '/logout',
-    '/me',
-    '/change-password',
-    '/join',
-    '/forgot-password',
-    '/reset-password',
-    '/setup',
-    '/profile',
-    '/2fa',
     // Misc page routes (HTML pages outside the API surface)
     '/settings',
     '/inspections',
@@ -80,9 +70,9 @@ interface OperationLike {
 function eachOperation(): Array<{ method: string; path: string; op: OperationLike; where: string }> {
     const doc = getOpenApiDoc();
     const results: Array<{ method: string; path: string; op: OperationLike; where: string }> = [];
-    // Deduplicate by operationId — auth routes are mounted twice (see index.ts).
-    // A route's metadata is set on the single createRoute object, so both
-    // mount paths share it; we only need to validate it once.
+    // Deduplicate by operationId — a few routes answer at two paths (ssoConsume
+    // at /api/auth/sso and /sso, and two aliased upload/import routes). Metadata
+    // lives on the single createRoute object, so validating it once is enough.
     const seenOpIds = new Set<string>();
     for (const [path, methods] of Object.entries(doc.paths ?? {})) {
         const mod = moduleOf(path);

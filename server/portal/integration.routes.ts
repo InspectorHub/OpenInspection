@@ -32,7 +32,7 @@ const SyncRedriveSchema = z.object({
 });
 
 /**
- * PATCH /api/integration/tenants/:slug
+ * PATCH /api/platform/tenants/:slug
  * Triggered by Portal when tenant information changes.
  *
  * A-21 batch 2 adjudication: this endpoint is KEPT as permanent RPC — it is
@@ -71,7 +71,7 @@ api.patch('/tenants/:slug', requireServiceBinding, async (c) => {
 // which were removed with it.
 
 /**
- * POST /api/integration/tenants/:slug/data-export
+ * POST /api/platform/tenants/:slug/data-export
  * Triggered by Portal during offboarding workflow. Returns ZIP stream.
  */
 api.post('/tenants/:slug/data-export', requireServiceBinding, async (c) => {
@@ -103,7 +103,7 @@ api.post('/tenants/:slug/data-export', requireServiceBinding, async (c) => {
 });
 
 /**
- * POST /api/integration/tenants/:slug/purge
+ * POST /api/platform/tenants/:slug/purge
  * Triggered by Portal at end of offboarding grace period. Cascade-deletes all tenant data.
  */
 api.post('/tenants/:slug/purge', requireServiceBinding, async (c) => {
@@ -129,7 +129,7 @@ api.post('/tenants/:slug/purge', requireServiceBinding, async (c) => {
 });
 
 /**
- * GET /api/integration/destruction-records — the read side of the purge above.
+ * GET /api/platform/destruction-records — the read side of the purge above.
  * Handler + why it is deliberately NOT tenant-scoped: ./destruction-records.ts.
  */
 api.get('/destruction-records', requireServiceBinding, destructionRecordsHandler);
@@ -144,7 +144,7 @@ api.post('/discovery-objections', requireServiceBinding, fileDiscoveryObjectionH
 api.delete('/discovery-objections', requireServiceBinding, withdrawDiscoveryObjectionHandler);
 
 /**
- * POST /api/integration/sso-handoff
+ * POST /api/platform/sso-handoff
  *
  * Issues a one-time SSO code that the portal hands to the browser
  * so the user lands at `GET /sso?code=...` and gets a workspace-
@@ -223,7 +223,7 @@ api.post('/sso-handoff', requireServiceBinding, async (c) => {
 });
 
 /**
- * POST /api/integration/sync-quota
+ * POST /api/platform/sync-quota
  * Triggered by Portal whenever a tenant's subscription seat count changes.
  * Updates the tenant's max_users column so InviteService.claim sees the new
  * cap on the next request, then invalidates the per-tenant KV cache.
@@ -243,7 +243,7 @@ api.post('/sync-quota', requireServiceBinding, async (c) => {
 });
 
 /**
- * GET /api/integration/tenants/:slug/seat-usage
+ * GET /api/platform/tenants/:slug/seat-usage
  * Reverse seat-sync read: lets the portal reconcile a tenant's Stripe seat
  * quantity against the ACTUAL count of active (non-soft-deleted) members,
  * rather than trusting portal's own last-written value. Reads getSeatUsage's
@@ -261,7 +261,7 @@ api.get('/tenants/:slug/seat-usage', requireServiceBinding, async (c) => {
 });
 
 /**
- * POST /api/integration/seed-starter-content
+ * POST /api/platform/seed-starter-content
  * Invoked by the portal's OnboardingWorkflow once a tenant is provisioned.
  * Seeds initial templates, agreements, rating-systems, and marketplace
  * defaults. Idempotent — safe to retry.
@@ -286,7 +286,7 @@ api.post('/seed-starter-content', requireServiceBinding, async (c) => {
 });
 
 /**
- * POST /api/integration/backfill-default-templates
+ * POST /api/platform/backfill-default-templates
  * M2M one-shot endpoint that seeds the default 7 templates for every tenant.
  * Idempotent — TemplateSeedService.bulkSeed skips templates that already
  * exist by name per tenant.
@@ -322,7 +322,7 @@ api.post('/backfill-default-templates', requireServiceBinding, async (c) => {
 });
 
 /**
- * GET /api/integration/sync-health
+ * GET /api/platform/sync-health
  * Operability snapshot of the core->portal sync outbox for the sysadmin
  * console badge: pending + failed counts and the age (seconds) of the oldest
  * pending row. Same requireServiceBinding guard as the sibling M2M routes.
@@ -338,7 +338,7 @@ api.get('/sync-health', requireServiceBinding, async (c) => {
 });
 
 /**
- * POST /api/integration/sync-redrive
+ * POST /api/platform/sync-redrive
  * Reset failed outbox rows back to `pending` so the next sweeper tick
  * republishes them. Body: { ids?: string[] } — omit `ids` to re-drive every
  * failed row. Returns the number of rows reset.
@@ -359,7 +359,7 @@ api.post('/sync-redrive', requireServiceBinding, async (c) => {
 });
 
 /**
- * POST /api/integration/secrets/reencrypt — JWT_SECRET rotation tool.
+ * POST /api/platform/secrets/reencrypt — JWT_SECRET rotation tool.
  * SaaS-only by construction (this seam is unmounted in standalone); a
  * standalone tenant converges lazily on its next secrets write instead.
  * Idempotent; SOP: docs/saas-ops/jwt-secret-rotation-sop.md.
@@ -401,13 +401,13 @@ api.post('/secrets/reencrypt', requireServiceBinding, async (c) => {
 });
 
 /**
- * GET /api/integration/usage
+ * GET /api/platform/usage
  * Platform usage dashboard read — handler + payload notes in ./usage-report.ts.
  */
 api.get('/usage', requireServiceBinding, usageReportHandler);
 
 /**
- * GET /api/integration/ai-provisioning
+ * GET /api/platform/ai-provisioning
  * Per-tier tenant counts bucketed by the runtime AI credential resolver
  * (managed / byo / unconfigured) for portal's tier-quota console. Handler +
  * contract notes live in ./ai-provisioning.ts.

@@ -18,18 +18,12 @@
     "knownUnreachable": {},
     "uncoveredByDesign": {
         "POST /api/auth/login": "No tenant reaches it: login runs before any session exists, so jwtAuthMiddleware sets no tenantId and the guard's `if (!tenantId) return next()` pass-through fires. The route also owns its outcome - a repeat re-authenticates the same credentials and mints a fresh cookie; nothing is written that a replay could duplicate.",
-        "POST /login": "Same handler as POST /api/auth/login (coreAuthRoutes is mounted at both prefixes), so the by-design claim above applies unchanged.",
         "POST /api/auth/login/2fa": "No tenant on the context yet - the session is not minted until the second factor passes - and the route owns its dedup: the one-time TOTP or recovery code is consumed on first use, so a replay is refused by the code, not by the guard.",
-        "POST /login/2fa": "Same handler as POST /api/auth/login/2fa (dual mount), so the by-design claim above applies unchanged.",
         "POST /api/auth/logout": "A tenant IS on the context here, so this rests on the second question: the route owns its outcome. Deleting the session cookie is idempotent by construction - a repeat writes nothing new and leaves the same end state - so there is no duplicate for the guard to prevent.",
-        "POST /logout": "Same handler as POST /api/auth/logout (dual mount), so the by-design claim above applies unchanged.",
         "POST /api/portal/{tenant}/logout": "Same claim as POST /api/auth/logout: deleting the client-portal session cookie is idempotent by construction, and a repeat writes nothing new.",
         "POST /api/auth/join": "No tenant reaches it: invite acceptance runs before a session exists. It also owns its dedup - the invite token is single-use and is consumed on first acceptance, so a replay is refused by the token.",
-        "POST /join": "Same handler as POST /api/auth/join (dual mount), so the by-design claim above applies unchanged.",
         "POST /api/auth/reset-password": "No tenant reaches it: the reset runs before any session exists. It also owns its dedup - the password-reset token is single-use and is consumed on first use.",
-        "POST /reset-password": "Same handler as POST /api/auth/reset-password (dual mount), so the by-design claim above applies unchanged.",
         "POST /api/auth/setup": "No tenant reaches it: first-run bootstrap runs before any tenant exists, so there is nothing for a key to be scoped to. It also owns its dedup - the route is gated on the SETUP_CODE secret and refuses to bootstrap a deployment that is already set up.",
-        "POST /setup": "Same handler as POST /api/auth/setup (dual mount), so the by-design claim above applies unchanged.",
         "POST /api/__test__/calendar-connection": "Not a production surface: the route is fail-closed behind E2E_EMAIL_SINK and 404s in every real deploy, so no tenant reaches it outside the E2E harness.",
         "POST /api/services/discount/validate": "A POST that writes nothing. validateDiscountCode() only reads discount_codes and computes an amount - it does not increment uses_count and does not reserve the code - so a replay recomputes the same answer over the same rows. There is no duplicate to prevent, which is the 'owns its outcome' answer rather than the 'no tenant' one.",
         "POST /api/public/inspections/{id}/view-tracking-objection": "No tenant reaches it: the route is portal-token/session gated and runs with no tenantId on the context, so the guard passes through. The write is also a no-op on replay - objecting again keeps the original objection date, and withdrawing is an unconditional clear - so the end state is the same either way."

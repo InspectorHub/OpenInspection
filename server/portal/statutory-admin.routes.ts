@@ -13,7 +13,7 @@
  * on purpose: claiming to be the platform costs the key.
  *
  * ── WHAT A SELF-HOSTED DEPLOYMENT DOES INSTEAD ──────────────────────────────
- * `/api/integration/*` is 404 unless `APP_MODE=saas` (see workers/app.ts), so
+ * `/api/platform/*` is 404 unless `APP_MODE=saas` (see workers/app.ts), so
  * these routes do not exist in a standalone build. That is the right shape and
  * not a gap: a standalone deployment has one workspace, so "who else is on this
  * revision" has no plural to answer, and its operator holds the database and
@@ -60,7 +60,7 @@ const DelistBodySchema = z.object({
 });
 
 /**
- * GET /api/integration/statutory-forms/installs
+ * GET /api/platform/statutory-forms/installs
  *
  * Who is on which revision of which statutory package, with the roster. This is
  * the data behind "N workspaces are still on 7-6" and the first half of sizing
@@ -72,7 +72,7 @@ api.get('/statutory-forms/installs', requireServiceBinding, async (c) => {
 });
 
 /**
- * GET /api/integration/statutory-forms/impact?formId=&revision=
+ * GET /api/platform/statutory-forms/impact?formId=&revision=
  *
  * How many official documents were produced from one revision, by how many
  * workspaces. Answerable only because every production writes a row; before
@@ -97,7 +97,7 @@ api.get('/statutory-forms/impact', requireServiceBinding, async (c) => {
 });
 
 /**
- * POST /api/integration/marketplace/:libraryId/delist
+ * POST /api/platform/marketplace/:libraryId/delist
  *
  * Take a catalogue entry out of browse, or (`{"delisted": false}`) put it back.
  * Nothing is deleted and no install is touched — see the schema comment on

@@ -9,7 +9,7 @@ import { resolveManagedAiCredential } from '../lib/ai/managed-credential';
 import { getDeploymentProfile } from '../lib/deployment-profile';
 
 /**
- * GET /api/integration/ai-provisioning — AI provisioning status for portal's
+ * GET /api/platform/ai-provisioning — AI provisioning status for portal's
  * tier-quota console (managed-ai Task 5 follow-up (a)).
  *
  * Per tier, how many tenants would resolve to managed / BYO / unconfigured

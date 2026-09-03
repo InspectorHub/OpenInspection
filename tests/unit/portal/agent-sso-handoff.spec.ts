@@ -2,12 +2,12 @@
  * Spec 3 Task 5b — tenant-null SSO handoff branch (agent JWT via /sso).
  *
  * Portal's Google-OIDC agent-mode callback (Task 5c) hands off `{ email }`
- * (NO tenantId) to POST /api/integration/sso-handoff, gets a `/sso?code=`
+ * (NO tenantId) to POST /api/platform/sso-handoff, gets a `/sso?code=`
  * URL, and 302s the agent to it. This exercises BOTH halves end-to-end
  * against a shared in-memory KV so the handoff-issued code is actually
  * redeemable by the consumer:
  *
- *  - POST /api/integration/sso-handoff (server/portal/integration.routes.ts)
+ *  - POST /api/platform/sso-handoff (server/portal/integration.routes.ts)
  *    agent branch: no tenantId in the body -> resolves the GLOBAL agent
  *    (findGlobalAgentByEmail) -> KV payload is { userId } only.
  *  - GET /api/auth/sso (server/api/auth.ts) tenant-null branch: KV payload
@@ -98,7 +98,7 @@ describe('Tenant-null SSO handoff — agent JWT via /sso (Spec 3 Task 5b)', () =
 
     function buildHandoffApp() {
         const app = new OpenAPIHono<HonoConfig>();
-        app.route('/api/integration', integrationRoutes);
+        app.route('/api/platform', integrationRoutes);
         return app;
     }
 
@@ -132,7 +132,7 @@ describe('Tenant-null SSO handoff — agent JWT via /sso (Spec 3 Task 5b)', () =
     async function postHandoff(body: Record<string, unknown>) {
         const app = buildHandoffApp();
         const env = envFor();
-        return app.request('/api/integration/sso-handoff', {
+        return app.request('/api/platform/sso-handoff', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
@@ -142,7 +142,7 @@ describe('Tenant-null SSO handoff — agent JWT via /sso (Spec 3 Task 5b)', () =
         }, env);
     }
 
-    describe('POST /api/integration/sso-handoff — agent branch (no tenantId)', () => {
+    describe('POST /api/platform/sso-handoff — agent branch (no tenantId)', () => {
         it('mints a code for a global agent; KV payload has userId only, no tenantId', async () => {
             await seedGlobalAgent(AGENT_USER_ID, AGENT_EMAIL);
 
@@ -164,7 +164,7 @@ describe('Tenant-null SSO handoff — agent JWT via /sso (Spec 3 Task 5b)', () =
         });
     });
 
-    describe('POST /api/integration/sso-handoff — EXISTING tenant branch (regression)', () => {
+    describe('POST /api/platform/sso-handoff — EXISTING tenant branch (regression)', () => {
         it('still mints a { userId, tenantId } code for a (tenantId, email) tenant user', async () => {
             await seedTenantUser(TENANT_USER_ID, TENANT_USER_EMAIL);
 

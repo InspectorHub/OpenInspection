@@ -406,9 +406,9 @@ function collect() {
     const push = (method, fullPath, file, site) => {
         if (!MUTATING.has(method)) return;
         // Marked resolved even when the path is a duplicate: a dual-mounted
-        // router (coreAuthRoutes at both `/api/auth` and `/`) resolves ONE
-        // declaration to two paths, and a router reached twice resolves it to
-        // the same path twice. Either way the declaration was placed.
+        // router (stripeWebhookRoutes, at `/webhooks/stripe/:tenant` and at
+        // `/webhooks/stripe`) resolves ONE declaration to two paths; a router
+        // reached twice resolves it to the same path twice. Either way it landed.
         resolvedSites.add(site);
         const route = `${method.toUpperCase()} ${fullPath}`;
         if (seen.has(route)) return;

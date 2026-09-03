@@ -1,5 +1,5 @@
 /**
- * Managed-AI provider tier, Task 5 follow-up (a) — `GET /api/integration/
+ * Managed-AI provider tier, Task 5 follow-up (a) — `GET /api/platform/
  * ai-provisioning`. The M2M-guarded endpoint portal's tier-quota console reads
  * to answer "how many tenants per tier are managed / BYO / unconfigured".
  *
@@ -49,11 +49,11 @@ const ENV = {
 
 type TierCounts = { managed: number; byo: number; unconfigured: number };
 
-describe('GET /api/integration/ai-provisioning', () => {
+describe('GET /api/platform/ai-provisioning', () => {
   let testDb: BetterSQLite3Database<typeof schema>;
   let sqlite: ReturnType<typeof createTestDb>['sqlite'];
 
-  function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/integration', integrationRoutes); return a; }
+  function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/platform', integrationRoutes); return a; }
   async function header() { return signM2mHeader(ENV as Record<string, string | undefined>); }
 
   beforeEach(async () => {
@@ -64,7 +64,7 @@ describe('GET /api/integration/ai-provisioning', () => {
   afterEach(() => { sqlite.close(); vi.clearAllMocks(); });
 
   it('403 without M2M header', async () => {
-    const res = await app().request('/api/integration/ai-provisioning', {}, ENV);
+    const res = await app().request('/api/platform/ai-provisioning', {}, ENV);
     expect(res.status).toBe(403);
   });
 
@@ -78,7 +78,7 @@ describe('GET /api/integration/ai-provisioning', () => {
     vi.mocked(loadTenantSecrets).mockImplementation(async (_db, _kv, tenantId) =>
       tenantId === 't-free-key' || tenantId === 't-pro-key' ? { GEMINI_API_KEY: 'tenant-own-key' } : null);
 
-    const res = await app().request('/api/integration/ai-provisioning', { headers: { [M2M_HEADER]: await header() } }, ENV);
+    const res = await app().request('/api/platform/ai-provisioning', { headers: { [M2M_HEADER]: await header() } }, ENV);
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { tiers: Record<string, TierCounts> } };
 
@@ -103,7 +103,7 @@ describe('GET /api/integration/ai-provisioning', () => {
       { id: 't-pro-trial', slug: 't', tier: 'pro', status: 'trial', createdAt: new Date() },
     ] as never);
 
-    const res = await app().request('/api/integration/ai-provisioning', { headers: { [M2M_HEADER]: await header() } }, ENV);
+    const res = await app().request('/api/platform/ai-provisioning', { headers: { [M2M_HEADER]: await header() } }, ENV);
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { tiers: Record<string, TierCounts> } };
     expect(body.data.tiers).toEqual({ pro: { managed: 0, byo: 0, unconfigured: 1 } });
@@ -119,7 +119,7 @@ describe('GET /api/integration/ai-provisioning', () => {
     ] as never);
 
     const noKeyEnv = { ...ENV, AI_MANAGED_API_KEY: undefined };
-    const res = await app().request('/api/integration/ai-provisioning', { headers: { [M2M_HEADER]: await header() } }, noKeyEnv);
+    const res = await app().request('/api/platform/ai-provisioning', { headers: { [M2M_HEADER]: await header() } }, noKeyEnv);
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { tiers: Record<string, TierCounts> } };
     expect(body.data.tiers).toEqual({ pro: { managed: 0, byo: 0, unconfigured: 1 } });
@@ -131,14 +131,14 @@ describe('GET /api/integration/ai-provisioning', () => {
     ] as never);
     vi.mocked(loadTenantSecrets).mockRejectedValue(new Error('undecryptable'));
 
-    const res = await app().request('/api/integration/ai-provisioning', { headers: { [M2M_HEADER]: await header() } }, ENV);
+    const res = await app().request('/api/platform/ai-provisioning', { headers: { [M2M_HEADER]: await header() } }, ENV);
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { tiers: Record<string, TierCounts> } };
     expect(body.data.tiers).toEqual({ free: { managed: 0, byo: 0, unconfigured: 1 } });
   });
 
   it('no tenants at all -> empty tiers map, not an error', async () => {
-    const res = await app().request('/api/integration/ai-provisioning', { headers: { [M2M_HEADER]: await header() } }, ENV);
+    const res = await app().request('/api/platform/ai-provisioning', { headers: { [M2M_HEADER]: await header() } }, ENV);
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { tiers: Record<string, unknown> } };
     expect(body.data.tiers).toEqual({});

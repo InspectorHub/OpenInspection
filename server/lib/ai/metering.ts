@@ -46,7 +46,7 @@ export interface AiQuotaPreflight {
  *
  * This is the ONE place the paid-tier entitlement is decided, shared by the
  * meter below, by the capability gate and provenance sink the composition point
- * builds from the same answer, and by `GET /api/integration/ai-provisioning`
+ * builds from the same answer, and by `GET /api/platform/ai-provisioning`
  * (portal's provisioning console read) — so the count portal renders and the
  * metric the meter tags can never come from two resolvers that disagree.
  *

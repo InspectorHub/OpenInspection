@@ -71,12 +71,12 @@ function buildApp(role: UserRole | undefined) {
         return next();
     });
 
-    app.route('/settings/integrations/qbo', qboRoutes);
+    app.route('/api/integrations/qbo', qboRoutes);
     return app;
 }
 
 function call(role: UserRole | undefined, path: string, method = 'POST') {
-    return buildApp(role).request(`/settings/integrations/qbo${path}`, {
+    return buildApp(role).request(`/api/integrations/qbo${path}`, {
         method,
         headers: { Cookie: '__Host-inspector_token=stub' },
     });

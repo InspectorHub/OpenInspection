@@ -1,8 +1,8 @@
 /**
  * WH-4 — Compliance-status webhook receiver (provider-parameterized).
  *
- * Mounts POST /:provider/compliance-status/:tenant on the public SMS router
- * (full path /api/public/:provider/compliance-status/:tenant).
+ * Mounts POST /compliance-status/:provider/:tenant on the SMS webhook router
+ * (full path /webhooks/compliance-status/:provider/:tenant).
  *
  * Twilio (and, in Plan 2, Telnyx) posts brand/campaign/TFV status transitions
  * here (configured as a StatusCallback URL during managed provisioning). The
@@ -44,14 +44,14 @@ export type { ComplianceEvent } from '../messaging/compliance-provider';
  * receiver reconstructs for signature validation (`${getBaseUrl(c)}${c.req.path}`).
  * A mismatch here would make every callback fail the signature check (403).
  *
- * Mount prefix `/api/public` + the route path `/:provider/compliance-status/:tenant`.
+ * Mount prefix `/webhooks` + the route path `/compliance-status/:provider/:tenant`.
  */
 export function complianceWebhookUrl(
     baseUrl: string,
     providerId: ComplianceProviderId,
     tenantSlug: string,
 ): string {
-    return `${baseUrl}/api/public/${providerId}/compliance-status/${tenantSlug}`;
+    return `${baseUrl}/webhooks/compliance-status/${providerId}/${tenantSlug}`;
 }
 
 /**
@@ -93,14 +93,14 @@ function resolveWebhookSecret(
 }
 
 /**
- * Mount POST /:provider/compliance-status/:tenant on the public SMS router.
+ * Mount POST /compliance-status/:provider/:tenant on the SMS webhook router.
  *
  * The handler validates the provider, verifies the webhook signature fail-closed
  * (verify BEFORE any DB write), and delegates the state-machine update to
  * MessagingComplianceService.applyComplianceCallback (thin route).
  */
 export function registerComplianceStatusRoute(router: Hono<HonoConfig>): void {
-    router.post('/:provider/compliance-status/:tenant', async (c) => {
+    router.post('/compliance-status/:provider/:tenant', async (c) => {
         // Step 1: Validate the provider param. Only known ComplianceProviderId
         // values ('twilio' | 'telnyx') are accepted; anything else → 404 so
         // unknown paths do not reveal route structure.

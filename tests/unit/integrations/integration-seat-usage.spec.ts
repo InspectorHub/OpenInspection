@@ -1,5 +1,5 @@
 /**
- * Free-tier usage quotas Task 8b — `GET /api/integration/tenants/:slug/seat-usage`.
+ * Free-tier usage quotas Task 8b — `GET /api/platform/tenants/:slug/seat-usage`.
  * M2M-guarded, saas-only read the portal uses for reverse seat-sync: reconcile
  * a tenant's Stripe seat quantity against the ACTUAL count of active
  * (non-soft-deleted) members rather than trusting portal's last-written value.
@@ -19,11 +19,11 @@ import { signM2mHeader, M2M_HEADER } from '../../../server/lib/m2m-auth';
 const FAKE_PEM = `-----BEGIN PRIVATE KEY-----\n${btoa('test-m2m-shared-key-material-0123456789')}\n-----END PRIVATE KEY-----`;
 const ENV = { DB: {}, JWT_CURRENT_KID: 'v1', JWT_PRIVATE_KEY_V1: FAKE_PEM } as Record<string, unknown>;
 
-describe('GET /api/integration/tenants/:slug/seat-usage', () => {
+describe('GET /api/platform/tenants/:slug/seat-usage', () => {
   let testDb: BetterSQLite3Database<typeof schema>;
   let sqlite: ReturnType<typeof createTestDb>['sqlite'];
 
-  function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/integration', integrationRoutes); return a; }
+  function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/platform', integrationRoutes); return a; }
   async function header() { return signM2mHeader(ENV as Record<string, string | undefined>); }
 
   beforeEach(async () => {
@@ -36,13 +36,13 @@ describe('GET /api/integration/tenants/:slug/seat-usage', () => {
   afterEach(() => { sqlite.close(); vi.clearAllMocks(); });
 
   it('403 without M2M header', async () => {
-    const res = await app().request('/api/integration/tenants/tenant-a/seat-usage', {}, ENV);
+    const res = await app().request('/api/platform/tenants/tenant-a/seat-usage', {}, ENV);
     expect(res.status).toBe(403);
   });
 
   it('404 for unknown slug', async () => {
     const res = await app().request(
-      '/api/integration/tenants/no-such-tenant/seat-usage',
+      '/api/platform/tenants/no-such-tenant/seat-usage',
       { headers: { [M2M_HEADER]: await header() } },
       ENV,
     );
@@ -61,7 +61,7 @@ describe('GET /api/integration/tenants/:slug/seat-usage', () => {
     ] as never);
 
     const res = await app().request(
-      '/api/integration/tenants/tenant-a/seat-usage',
+      '/api/platform/tenants/tenant-a/seat-usage',
       { headers: { [M2M_HEADER]: await header() } },
       ENV,
     );
@@ -86,7 +86,7 @@ describe('GET /api/integration/tenants/:slug/seat-usage', () => {
     ] as never);
 
     const res = await app().request(
-      '/api/integration/tenants/tenant-a/seat-usage',
+      '/api/platform/tenants/tenant-a/seat-usage',
       { headers: { [M2M_HEADER]: await header() } },
       ENV,
     );
@@ -100,7 +100,7 @@ describe('GET /api/integration/tenants/:slug/seat-usage', () => {
     ] as never);
 
     const res = await app().request(
-      '/api/integration/tenants/tenant-b/seat-usage',
+      '/api/platform/tenants/tenant-b/seat-usage',
       { headers: { [M2M_HEADER]: await header() } },
       ENV,
     );
@@ -111,9 +111,9 @@ describe('GET /api/integration/tenants/:slug/seat-usage', () => {
 });
 
 import workerEntry from '../../../workers/app';
-describe('GET /api/integration/tenants/:slug/seat-usage — standalone gate', () => {
+describe('GET /api/platform/tenants/:slug/seat-usage — standalone gate', () => {
   it('404s in standalone APP_MODE (route family is saas-only)', async () => {
-    const req = new Request('https://x/api/integration/tenants/tenant-a/seat-usage');
+    const req = new Request('https://x/api/platform/tenants/tenant-a/seat-usage');
     const res = await workerEntry.fetch(req, { APP_MODE: 'standalone' } as never, {} as never);
     expect(res.status).toBe(404);
   });

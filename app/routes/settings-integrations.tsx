@@ -46,7 +46,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const secrets = (secretsBody.data ?? {}) as Record<string, string>;
   const logBody = logRes?.ok ? ((await logRes.json()) as Record<string, unknown>) : {};
   const webhookLog = (logBody.data ?? []) as WebhookLogEntry[];
-  const webhookBase = `${new URL(request.url).origin}/api/integrations/stripe/webhook`;
+  // This is the URL the tenant pastes into their own Stripe dashboard, so it has
+  // to be the address Stripe will actually reach — the top-level webhook mount
+  // in server/index.ts, which is deliberately outside /api/ and its middleware.
+  // If that mount ever moves, this string has to move with it or every tenant
+  // who copies it registers a 404 with Stripe.
+  const webhookBase = `${new URL(request.url).origin}/webhooks/stripe`;
 
   const configBody = configRes?.ok
     ? ((await configRes.json()) as Record<string, unknown>)

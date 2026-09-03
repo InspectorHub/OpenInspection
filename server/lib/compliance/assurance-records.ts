@@ -290,10 +290,10 @@ export interface DestructionRecordPage {
  * side: it must survive the purge it records.
  *
  * The safety therefore does NOT come from the query. It comes from the caller:
- * the only exposure is `GET /api/integration/destruction-records`, behind the
+ * the only exposure is `GET /api/platform/destruction-records`, behind the
  * `x-portal-m2m` HMAC (`requireServiceBinding`), on a seam the worker entry 404s
  * unless `APP_MODE=saas`, and it is the sibling of the
- * `POST /api/integration/tenants/:slug/purge` that writes these rows. Do not
+ * `POST /api/platform/tenants/:slug/purge` that writes these rows. Do not
  * mount this function on a tenant-session route: `tenantId` here is a FILTER
  * supplied by an operator, and accepting it from an end user would be a
  * cross-tenant read by construction.

@@ -13,8 +13,8 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import {
     internalJwtPayload,
     assertCompanySlugMatches,
-    companySlugFromMcpPath,
-    stripCompanyPrefix,
+    slugFromMcpPath,
+    stripMcpSlugPrefix,
     isGrantUserActive,
 } from '../../../server/lib/mcp/identity-bridge';
 import type { McpProps } from '../../../server/durable-objects/inspector-mcp';
@@ -88,53 +88,57 @@ describe('assertCompanySlugMatches', () => {
     });
 });
 
-describe('companySlugFromMcpPath', () => {
-    it('extracts slug from /company/{slug}/mcp', () => {
-        expect(companySlugFromMcpPath('/company/acme/mcp')).toBe('acme');
+describe('slugFromMcpPath', () => {
+    it('extracts slug from /mcp/{slug}', () => {
+        expect(slugFromMcpPath('/mcp/acme')).toBe('acme');
     });
 
-    it('returns null for a standalone /mcp path (no company prefix)', () => {
-        expect(companySlugFromMcpPath('/mcp')).toBeNull();
+    it('returns null for a standalone /mcp path (no slug segment)', () => {
+        expect(slugFromMcpPath('/mcp')).toBeNull();
     });
 
-    it('extracts slug when path has a trailing slash', () => {
-        expect(companySlugFromMcpPath('/company/acme/mcp/')).toBe('acme');
+    it('returns null for a trailing slash with no slug', () => {
+        expect(slugFromMcpPath('/mcp/')).toBeNull();
     });
 
-    it('extracts slug when path continues after /mcp/', () => {
-        expect(companySlugFromMcpPath('/company/acme/mcp/sse')).toBe('acme');
+    it('extracts slug when the path continues after the slug', () => {
+        expect(slugFromMcpPath('/mcp/acme/sse')).toBe('acme');
     });
 
     it('decodes a percent-encoded slug', () => {
-        expect(companySlugFromMcpPath('/company/acme%2Dco/mcp')).toBe('acme-co');
+        expect(slugFromMcpPath('/mcp/acme%2Dco')).toBe('acme-co');
     });
 
     it('returns null for unrelated paths', () => {
-        expect(companySlugFromMcpPath('/api/inspections')).toBeNull();
+        expect(slugFromMcpPath('/api/inspections')).toBeNull();
+    });
+
+    it('no longer recognises the retired /company/{slug}/mcp shape', () => {
+        expect(slugFromMcpPath('/company/acme/mcp')).toBeNull();
     });
 });
 
-describe('stripCompanyPrefix', () => {
+describe('stripMcpSlugPrefix', () => {
     it('reduces the saas MCP path to the agent mount path', () => {
         // Regression: McpAgent.serve("/mcp") matches the literal mount via
-        // URLPattern, so /company/{slug}/mcp must be reduced or it 404s.
-        expect(stripCompanyPrefix('/company/acme/mcp')).toBe('/mcp');
+        // URLPattern, so /mcp/{slug} must be reduced or it 404s.
+        expect(stripMcpSlugPrefix('/mcp/acme')).toBe('/mcp');
     });
 
-    it('preserves any sub-path after /mcp (e.g. legacy SSE /message)', () => {
-        expect(stripCompanyPrefix('/company/acme/mcp/message')).toBe('/mcp/message');
+    it('preserves any sub-path after the slug (e.g. legacy SSE /message)', () => {
+        expect(stripMcpSlugPrefix('/mcp/acme/message')).toBe('/mcp/message');
     });
 
     it('handles a slug with encoded characters', () => {
-        expect(stripCompanyPrefix('/company/acme%2Dco/mcp')).toBe('/mcp');
+        expect(stripMcpSlugPrefix('/mcp/acme%2Dco')).toBe('/mcp');
     });
 
     it('leaves a standalone /mcp path unchanged', () => {
-        expect(stripCompanyPrefix('/mcp')).toBe('/mcp');
+        expect(stripMcpSlugPrefix('/mcp')).toBe('/mcp');
     });
 
     it('leaves unrelated paths unchanged', () => {
-        expect(stripCompanyPrefix('/api/inspections')).toBe('/api/inspections');
+        expect(stripMcpSlugPrefix('/api/inspections')).toBe('/api/inspections');
     });
 });
 

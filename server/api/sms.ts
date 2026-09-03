@@ -1,15 +1,15 @@
 /**
  * Track L (D6/D9) — SMS consent capture + inbound STOP/START webhook.
  *
- * Public router (`smsPublicRoutes`, mounted /api/public):
+ * Public router (`smsPublicRoutes`, mounted /api/public) — pages a person opens:
  *   - GET  /sms/optin-resolve?token=… — resolve an opt-in link token to the
  *     current disclosure + company name (the SSR opt-in page renders this).
  *   - POST /sms/optin-confirm {token}  — record a `granted` event (optin_link).
- *   - POST /sms/inbound        — platform shared-number webhook (D9 shape 1).
- *   - POST /sms/inbound/:tenant — tenant-scoped webhook (D9 shape 2).
- *   The inbound routes are plain Hono `.post` (form-encoded; validated by the
- *   Twilio request signature, not a zod body) and are NOT part of the typed
- *   BFF client — Twilio calls them directly.
+ * Webhook router (`smsWebhookRoutes`, mounted /webhooks) — provider callbacks:
+ *   - POST /sms/inbound, /sms/inbound/:tenant — STOP/START (D9 shapes 1 and 2).
+ *   - POST /sms/status/:tenant, /compliance-status/:provider/:tenant,
+ *     /email/:provider/:tenant — delegated to the lib modules named below.
+ *   Plain Hono, signature-validated, never zod-validated, never in the BFF client.
  *
  * Admin router (`smsAdminRoutes`, mounted /api/'manager', requireRole owner/'manager'):
  *   - POST /sms/attest {inspectionId}  — inspector attestation (admin) → granted.
@@ -58,7 +58,7 @@ import { registerSmsStatusRoute, recordSentStatus, verifyInboundSignature } from
 import { registerComplianceStatusRoute } from '../lib/sms/compliance-webhook';
 import { registerEmailEventsRoute } from '../lib/email/email-events';
 import { logger } from '../lib/logger';
-import type { Context } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { HonoConfig } from '../types/hono';
 import { getDrizzle, type AppDrizzle } from '../lib/route-helpers';
 
@@ -89,7 +89,7 @@ async function helpReplyBrand(c: Context<HonoConfig>, scopeTenantId: string | nu
     return resolveSmsBrand(getDrizzle(c), scopeTenantId, platformFallback);
 }
 
-// ─── Public router ───────────────────────────────────────────────────────────
+// ─── Public router — the opt-in pair the SSR page calls; a person opens these ─
 
 const optinResolveRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -180,13 +180,14 @@ export const smsPublicRoutes = createApiRouter()
         return c.json({ success: true as const }, 200);
     });
 
-// Inbound webhook — plain Hono routes (signature-validated). Not in the typed
-// client; the provider (Twilio form-encoded, or Telnyx Ed25519 JSON) posts here
-// directly. The platform shape is always Twilio (the shared platform number).
-smsPublicRoutes.post('/sms/inbound', (c) =>
+// ─── Webhook router — a vendor calls these; nobody opens them in a browser ───
+// The provider owns the body shape and the signature, so they mount at the top
+// level, outside /api/* and its middleware. The platform shape is always Twilio.
+export const smsWebhookRoutes = new Hono<HonoConfig>();
+smsWebhookRoutes.post('/sms/inbound', (c) =>
     handleInbound(c, { provider: 'twilio', secret: c.env.TWILIO_AUTH_TOKEN ?? '', scopeTenantId: null }));
 
-smsPublicRoutes.post('/sms/inbound/:tenant', async (c) => {
+smsWebhookRoutes.post('/sms/inbound/:tenant', async (c) => {
     const slug = c.req.param('tenant');
     const db = getDrizzle(c);
     const tenant = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).get();
@@ -220,19 +221,18 @@ smsPublicRoutes.post('/sms/inbound/:tenant', async (c) => {
 });
 
 // Delivery-status webhook (WH-2) — POST /sms/status/:tenant. Verify → dedup →
-// parse → last-writer-wins upsert. Implementation lives in lib/sms/delivery-status
-// (keeps this router file under the file-size cap; recordSentStatus is re-exported).
-registerSmsStatusRoute(smsPublicRoutes);
+// parse → LWW upsert; in lib/sms/delivery-status (recordSentStatus re-exported).
+registerSmsStatusRoute(smsWebhookRoutes);
 
-// Compliance-status webhook (WH-4) — POST /:provider/compliance-status/:tenant.
+// Compliance-status webhook (WH-4) — POST /compliance-status/:provider/:tenant.
 // Receives provider brand/campaign/TFV status callbacks for managed provisioning.
 // Implementation lives in lib/sms/compliance-webhook (keeps this file under size cap).
-registerComplianceStatusRoute(smsPublicRoutes);
+registerComplianceStatusRoute(smsWebhookRoutes);
 
 // Email deliverability webhook (WH-3) — POST /email/:provider/:tenant. Verify →
 // dedup → parse → append-only suppression insert for hard bounce / complaint.
 // Implementation lives in lib/email/email-events (provider is a path segment).
-registerEmailEventsRoute(smsPublicRoutes);
+registerEmailEventsRoute(smsWebhookRoutes);
 
 /**
  * Shared inbound handler. Verifies the provider's inbound signature, extracts

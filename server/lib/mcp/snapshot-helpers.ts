@@ -98,7 +98,8 @@ export function reduceOpenApiDoc(doc: {
             // Only include operations with full MCP metadata (x-scopes + x-tier).
             if (!Array.isArray(op['x-scopes']) || typeof op['x-tier'] !== 'string') continue;
 
-            // Deduplicate: root-mounted auth routes share the same operationId as /api/auth/*.
+            // Deduplicate: a route mounted at two paths (e.g. ssoConsume, which
+            // answers at /api/auth/sso and at /sso) carries ONE operationId.
             if (seenOpIds.has(operationId)) continue;
             seenOpIds.add(operationId);
 

@@ -3,7 +3,7 @@ import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core
 /**
  * One QuickBooks company, one workspace — and the webhook depends on it.
  *
- * `POST /api/integrations/qbo/webhook` is unauthenticated and platform-wide: in
+ * `POST /webhooks/quickbooks` is unauthenticated and platform-wide: in
  * SaaS the Intuit app belongs to the platform, so there is ONE webhook URL and
  * ONE verifier token for every realm, and nothing in the URL names a tenant.
  * The handler verifies the HMAC and then resolves the tenant SOLELY by the

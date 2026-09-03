@@ -31,7 +31,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
  *
  * Deliberately NOT gated on deployment mode: both modes need it, and both
  * already call this seeder with this signature. Deliberately NOT mounted under
- * `/api/integration/*` either — that prefix 404s outside SaaS, which would
+ * `/api/platform/*` either — that prefix 404s outside SaaS, which would
  * reproduce the exact gap this route closes.
  */
 const StarterContentInstallResponseSchema = z.object({
