@@ -32,7 +32,7 @@ import { agreementSignPath, agreementRenderPath } from './lib/public-urls';
 import { loadVerifyData } from './lib/verify-data';
 
 
-import coreAuthRoutes from './api/auth';
+import coreAuthRoutes, { ssoRootRoutes } from './api/auth';
 import testHooksRoutes from './api/test-hooks';
 import identityRoutes from './api/identity';
 import integrationsApiRoutes from './api/integrations';
@@ -313,9 +313,9 @@ app.use('/api/*', requireActiveSubscription);
 // statements (above and below) since they don't affect the route type signature.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- referenced via `typeof routes` on line 800 (CoreApiType export)
 const routes = app
-  // Mount auth routes at canonical API path AND at root so that /setup, /login (POST), /join (POST) work without redirects
+  // Auth mounts ONCE. `GET /sso` alone also answers at the root, because portal mints that absolute URL and the browser follows it.
   .route('/api/auth', coreAuthRoutes)
-  .route('/', coreAuthRoutes)
+  .route('/', ssoRootRoutes)
   // Agent unified link (Spec 3 Task 2) — GET /agent/magic-login redeem. Root
   // mount (not /api) mirrors the /sso pattern above; workers/app.ts forwards
   // this exact path to the API app since it isn't under /api/*.

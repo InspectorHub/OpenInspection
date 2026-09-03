@@ -111,26 +111,21 @@ const joinTeamRoute = createRoute(withMcpMetadata({
 /**
  * GET /sso?code=<uuid>
  *
- * SSO consume endpoint — the receiving half of the portal-issued
- * handoff token minted at POST /api/platform/sso-handoff. Reads
- * `sso:<code>` from KV (single-use, short TTL), looks up the user,
- * issues a workspace-scoped session cookie, and redirects into the
- * inspector dashboard.
+ * SSO consume endpoint — the receiving half of the portal-issued handoff token
+ * minted at POST /api/platform/sso-handoff. Reads `sso:<code>` from KV
+ * (single-use, short TTL), looks up the user, issues a workspace-scoped session
+ * cookie, and redirects into the inspector dashboard. Public route (no auth
+ * middleware): the code IS the credential, and it is deleted from KV on success
+ * so a leaked URL can't be replayed.
  *
- * Public route (no auth middleware) — the code IS the credential.
- * Code is deleted from KV on success so a leaked URL can't be replayed.
+ * This is what makes multi-workspace switching frictionless: the user clicks a
+ * workspace card → portal calls /api/platform/sso-handoff for a code → portal
+ * 302s the browser here → core sets the right cookie → the user lands on the
+ * right tenant's dashboard.
  *
- * This endpoint is what makes multi-workspace switching feel
- * frictionless from portal: user clicks a workspace card → portal
- * calls /api/platform/sso-handoff to get a code → portal 302s the
- * browser to this URL → core sets the right cookie → user lands on
- * the right tenant's dashboard.
- *
- * Spec 3 Task 5b — the KV payload's `tenantId` is now OPTIONAL. When
- * ABSENT (an agent handoff — portal's Google-OIDC agent-mode callback hands
- * off just an email, no tenantId), this mints a tenant-less agent JWT
- * instead of a tenant JWT and redirects to /agent-dashboard. The tenant path
- * below (tenantId present) is unchanged.
+ * Spec 3 Task 5b — the KV payload's `tenantId` is OPTIONAL. When ABSENT (an
+ * agent handoff: portal's Google-OIDC agent-mode callback hands off just an
+ * email), this mints a tenant-less agent JWT and redirects to /agent-dashboard.
  */
 const ssoConsumeRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -258,6 +253,86 @@ const setupStatusRoute = createRoute(withMcpMetadata({
     operationId: 'getSetupStatus',
     description: 'Public, no-login check of whether the instance has completed first-run setup (any tenant-scoped user exists). Drives the /setup page redirect guard.',
 }, { scopes: [], tier: 'excluded' }));
+
+// `GET /sso` is its own router so server/index.ts can mount it at the ROOT without
+// dragging the rest of the auth surface there: the portal mints an absolute
+// `https://app.{domain}/sso?code=<code>` and the browser navigates straight to it.
+export const ssoRootRoutes = createApiRouter().openapi(ssoConsumeRoute, async (c) => {
+    const { code, return_to } = c.req.valid('query');
+    if (!c.env.TENANT_CACHE) return c.redirect('/login?sso=unavailable', 302);
+
+    const raw = await c.env.TENANT_CACHE.get(`sso:${code}`);
+    if (!raw) return c.redirect('/login?sso=expired', 302);
+    // Single-use: delete BEFORE issuing the cookie so a parallel replay
+    // can't piggyback on a still-resolving call.
+    await c.env.TENANT_CACHE.delete(`sso:${code}`);
+
+    let parsed: { userId?: string; tenantId?: string; actor?: { platformAdminId?: string; email?: string } | null };
+    try { parsed = JSON.parse(raw); } catch { return c.redirect('/login?sso=invalid', 302); }
+    if (!parsed.userId) return c.redirect('/login?sso=invalid', 302);
+
+    if (!parsed.tenantId) {
+        // Agent handoff (Spec 3 Task 5b) — tenant-null payload minted by
+        // the agent branch of POST /api/platform/sso-handoff.
+        // Re-verify the account AT REDEEM TIME (mirrors
+        // redeemMagicLogin/findGlobalAgentById — server/services/agent/
+        // magic-login.service.ts) rather than trusting the issue-time
+        // snapshot: the account may have been deleted or demoted from
+        // 'agent' during the code's TTL window.
+        const agent = await findGlobalAgentById(c.env.DB, parsed.userId);
+        if (!agent) return c.redirect('/login?sso=invalid', 302);
+
+        const keyring = await c.var.keyringPromise!;
+        const now = Math.floor(Date.now() / 1000);
+        // Agent JWT claim shape mirrors server/api/agent/login.ts and
+        // server/api/agent/magic-login.ts EXACTLY — no
+        // tenantId/custom:tenantId. Agents are global users.
+        const token = await signJwt({
+            sub: agent.id,
+            role: 'agent',
+            'custom:userRole': 'agent',
+            email: agent.email,
+            iat: now,
+            exp: now + 60 * 60 * 24,
+        }, keyring);
+
+        setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
+        // Global agent identity — tenant-less by design, so this does NOT
+        // go through the tenant-scoped audit_logs table (auditLogs.tenantId
+        // is a NOT NULL FK to tenants.id). Structured logging only, mirrors
+        // the magic-login redeem handler.
+        logger.info('sso_consume.agent_session_minted', { userId: agent.id });
+        return c.redirect('/agent-dashboard', 302);
+    }
+
+    const d = getDrizzle(c);
+    // Excludes soft-deleted (removed member) rows — a portal handoff must
+    // not mint a session cookie for a member who has been removed from
+    // this workspace.
+    const user = await d.select().from(users)
+        .where(and(eq(users.id, parsed.userId), eq(users.tenantId, parsed.tenantId), isNull(users.deletedAt)))
+        .get();
+    if (!user) return c.redirect('/login?sso=invalid', 302);
+
+    const keyring = await c.var.keyringPromise!;
+    const now = Math.floor(Date.now() / 1000);
+    const token = await signJwt({
+        sub: user.id,
+        'custom:tenantId': user.tenantId,
+        'custom:userRole': user.role,
+        role: user.role,
+        iat: now,
+        exp: now + 60 * 60 * 24,
+        // Marker so audit logs / downstream middleware can detect that
+        // this session was minted via portal handoff rather than direct
+        // password login.
+        'custom:sso': true,
+        ...platformActorClaims(parsed.actor), // a support session, when it is one
+    }, keyring);
+
+    setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
+    return c.redirect(safeReturnTo(return_to, '/inspections'), 302);
+});
 
 const coreAuthRoutes = createApiRouter()
     .openapi(loginRoute, async (c) => {
@@ -403,82 +478,7 @@ const coreAuthRoutes = createApiRouter()
             data: { redirect: '/inspections' }
         }, 200);
     })
-    .openapi(ssoConsumeRoute, async (c) => {
-        const { code, return_to } = c.req.valid('query');
-        if (!c.env.TENANT_CACHE) return c.redirect('/login?sso=unavailable', 302);
-
-        const raw = await c.env.TENANT_CACHE.get(`sso:${code}`);
-        if (!raw) return c.redirect('/login?sso=expired', 302);
-        // Single-use: delete BEFORE issuing the cookie so a parallel replay
-        // can't piggyback on a still-resolving call.
-        await c.env.TENANT_CACHE.delete(`sso:${code}`);
-
-        let parsed: { userId?: string; tenantId?: string; actor?: { platformAdminId?: string; email?: string } | null };
-        try { parsed = JSON.parse(raw); } catch { return c.redirect('/login?sso=invalid', 302); }
-        if (!parsed.userId) return c.redirect('/login?sso=invalid', 302);
-
-        if (!parsed.tenantId) {
-            // Agent handoff (Spec 3 Task 5b) — tenant-null payload minted by
-            // the agent branch of POST /api/platform/sso-handoff.
-            // Re-verify the account AT REDEEM TIME (mirrors
-            // redeemMagicLogin/findGlobalAgentById — server/services/agent/
-            // magic-login.service.ts) rather than trusting the issue-time
-            // snapshot: the account may have been deleted or demoted from
-            // 'agent' during the code's TTL window.
-            const agent = await findGlobalAgentById(c.env.DB, parsed.userId);
-            if (!agent) return c.redirect('/login?sso=invalid', 302);
-
-            const keyring = await c.var.keyringPromise!;
-            const now = Math.floor(Date.now() / 1000);
-            // Agent JWT claim shape mirrors server/api/agent/login.ts and
-            // server/api/agent/magic-login.ts EXACTLY — no
-            // tenantId/custom:tenantId. Agents are global users.
-            const token = await signJwt({
-                sub: agent.id,
-                role: 'agent',
-                'custom:userRole': 'agent',
-                email: agent.email,
-                iat: now,
-                exp: now + 60 * 60 * 24,
-            }, keyring);
-
-            setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
-            // Global agent identity — tenant-less by design, so this does NOT
-            // go through the tenant-scoped audit_logs table (auditLogs.tenantId
-            // is a NOT NULL FK to tenants.id). Structured logging only, mirrors
-            // the magic-login redeem handler.
-            logger.info('sso_consume.agent_session_minted', { userId: agent.id });
-            return c.redirect('/agent-dashboard', 302);
-        }
-
-        const d = getDrizzle(c);
-        // Excludes soft-deleted (removed member) rows — a portal handoff must
-        // not mint a session cookie for a member who has been removed from
-        // this workspace.
-        const user = await d.select().from(users)
-            .where(and(eq(users.id, parsed.userId), eq(users.tenantId, parsed.tenantId), isNull(users.deletedAt)))
-            .get();
-        if (!user) return c.redirect('/login?sso=invalid', 302);
-
-        const keyring = await c.var.keyringPromise!;
-        const now = Math.floor(Date.now() / 1000);
-        const token = await signJwt({
-            sub: user.id,
-            'custom:tenantId': user.tenantId,
-            'custom:userRole': user.role,
-            role: user.role,
-            iat: now,
-            exp: now + 60 * 60 * 24,
-            // Marker so audit logs / downstream middleware can detect that
-            // this session was minted via portal handoff rather than direct
-            // password login.
-            'custom:sso': true,
-            ...platformActorClaims(parsed.actor), // a support session, when it is one
-        }, keyring);
-
-        setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
-        return c.redirect(safeReturnTo(return_to, '/inspections'), 302);
-    })
+    .route('/', ssoRootRoutes) // what keeps /api/auth/sso answering; index.ts mounts the same router at the root
     .openapi(forgotPasswordRoute, async (c) => {
         // SaaS deploys disable the local password form (password reset via
         // portal) — see the matching guard on POST /api/auth/login. Password

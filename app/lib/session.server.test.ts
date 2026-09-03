@@ -169,7 +169,7 @@ describe("which login page a session ends on", () => {
  * A browser-direct hit on the API (portal SSO, `GET /sso`) gets
  * `Set-Cookie: __Host-inspector_token` straight from Hono. A form login goes
  * through the BFF instead, and Workers' fetch() strips Set-Cookie on that
- * server-to-server hop (see the comment at server/api/auth.ts:317) — so the
+ * server-to-server hop (see "Token Relay BFF" in server/api/auth.ts) — so the
  * browser ended up holding only the React-Router session cookie. Loaders kept
  * working, because they relay the token as a Bearer; anything the BROWSER
  * issues directly did not: the collab WebSocket 401'd on every handshake, and
