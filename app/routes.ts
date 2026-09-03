@@ -105,6 +105,7 @@ export default [
   // person reviewed the result before it became one. The API endpoints predate
   // this route by a long way and had no caller in `app/` at all.
   route("resources/ai-assist", "routes/resources/ai-assist.tsx"),
+  route("resources/two-factor", "routes/resources/two-factor.tsx"),
   route("resources/comments-library", "routes/resources/comments-library.tsx"),
   route("resources/defect-categories", "routes/resources/defect-categories.tsx"),
   route("resources/repair-items", "routes/resources/repair-items.tsx"),
