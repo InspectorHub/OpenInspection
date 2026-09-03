@@ -27,7 +27,8 @@ import { flattenReportDefects } from '../lib/repair-defects';
 import { generatePdfFromUrl } from '../lib/pdf';
 import { checkRateLimit } from '../lib/rate-limit';
 import { resolveBuilderAccess } from '../lib/repair-access';
-import { runBuilderGate, runAssertCanEdit, runAssertMayAuthorTag, runShareGate, getBaseUrl, loadQuickPhrases } from '../lib/repair-gates';
+import { runBuilderGate, runAssertCanEdit, runAssertMayAuthorTag, runShareGate, loadQuickPhrases } from '../lib/repair-gates';
+import { getBaseUrl } from '../lib/url';
 import {
     shareViewRoute,
     sharePdfRoute,

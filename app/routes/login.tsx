@@ -6,6 +6,7 @@ import { getToken, createSessionWithToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeLoginSchema } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
+import { TwoFactorChallengeForm } from "~/components/auth/TwoFactorChallengeForm";
 import { Input, Button } from "@core/shared-ui";
 import { safeReturnTo } from "../../server/lib/mcp/safe-return-to";
 import { m } from "~/paraglide/messages";
@@ -41,8 +42,63 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return { returnTo };
 }
 
+/**
+ * Second step of a two-factor sign-in.
+ *
+ * Kept in the SAME action as the credential post, and reached by the presence
+ * of `challengeToken`, so the challenge never becomes a route of its own that
+ * could be opened cold. The token rides a hidden field rather than a cookie or
+ * a URL: `server/api/auth.ts` mints it deliberately without a Set-Cookie so a
+ * stolen session cookie alone can never satisfy the second factor, and a
+ * credential in a URL would land in history and referrers.
+ */
+async function completeTwoFactor(
+  context: Route.ActionArgs["context"],
+  formData: FormData,
+  challengeToken: string,
+) {
+  const code = String(formData.get("code") ?? "").trim();
+  const returnTo = formData.get("returnTo");
+  const dest = safeReturnTo(typeof returnTo === "string" ? returnTo : null, "/inspections");
+
+  // The token is handed back on every failure. Without it a mistyped digit
+  // would drop the challenge and send the person back to the password form —
+  // which reads as "wrong password" and is how a working second factor gets
+  // reported as a broken login.
+  const again = { requires2fa: true as const, challengeToken, returnTo: typeof returnTo === "string" ? returnTo : "" };
+
+  if (code.length < 6) {
+    return { ...again, error: m.auth_login_2fa_error_code_required() };
+  }
+
+  try {
+    const api = createApi(context);
+    const res = await api.auth.login["2fa"].$post({ json: { challengeToken, code } });
+    if (!res.ok) {
+      // 401 covers both a wrong code and an expired challenge, and the two need
+      // different advice: retyping helps with one and cannot help with the other.
+      return { ...again, error: res.status === 401 ? m.auth_login_2fa_error_rejected() : m.auth_login_2fa_error_failed() };
+    }
+    const body = (await res.json().catch(() => ({}))) as Record<string, Record<string, unknown>>;
+    const jwt = body?.data?.token as string | undefined;
+    if (!jwt) return { ...again, error: m.auth_login_2fa_error_failed() };
+    return createSessionWithToken(context, jwt, dest);
+  } catch {
+    return { ...again, error: m.auth_login_error_network() };
+  }
+}
+
 export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
+
+  // Checked BEFORE the credential schema: a 2FA post carries no email or
+  // password, so parsing it as a login would answer "email is required" to
+  // someone who has already proved their password.
+  const challengeToken = formData.get("challengeToken");
+  if (typeof challengeToken === "string" && challengeToken.length > 0) {
+    return completeTwoFactor(context, formData, challengeToken);
+  }
+
   // Same schema as the client (Conform onValidate) — defends the API and powers
   // the no-JS path (the native form POST lands here without client validation).
   const submission = parseWithZod(formData, { schema: makeLoginSchema() });
@@ -80,8 +136,14 @@ export async function action({ request, context }: Route.ActionArgs) {
       return createSessionWithToken(context, jwt, dest);
     }
 
-    if (body?.data?.requires2fa) {
-      return submission.reply({ formErrors: [m.auth_login_error_2fa_unsupported()] });
+    // The password was right and the account has a second factor. Hand the
+    // challenge to the page. This used to answer "2FA is not yet supported in
+    // the new frontend", which meant enabling 2FA locked the account out —
+    // the server issued a challenge nothing could answer.
+    const challenge = body?.data?.requires2fa ? (body.data.challengeToken as string | undefined) : undefined;
+    if (challenge) {
+      const rt = formData.get("returnTo");
+      return { requires2fa: true as const, challengeToken: challenge, returnTo: typeof rt === "string" ? rt : "", error: "" };
     }
 
     return submission.reply({ formErrors: [m.auth_login_error_no_token()] });
@@ -91,11 +153,25 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function LoginPage() {
-  const lastResult = useActionData<typeof action>();
+  const actionData = useActionData<typeof action>();
   const data = useLoaderData<typeof loader>();
   const returnTo = data && "returnTo" in data ? (data.returnTo ?? "") : "";
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+
+  // A live challenge replaces the password form rather than sitting beside it:
+  // the password is already accepted at this point, and leaving both on screen
+  // invites a second credential post that would be rejected as a bad login.
+  const challenge = actionData && "requires2fa" in actionData ? actionData : null;
+
+  // Conform only ever sees a credential submission. A 2FA reply is not a
+  // submission result and handing it to `useForm` would make it read the
+  // challenge fields as validation errors on email and password.
+  //
+  // Narrowed on the value itself rather than on `challenge`: a ternary over a
+  // sibling tells the compiler nothing about THIS binding's type, so the
+  // challenge shape stayed in the union and conform rejected it.
+  const lastResult = actionData && !("requires2fa" in actionData) ? actionData : undefined;
 
   // Conform threads server validation back through `lastResult`, so field- and
   // form-level errors come from ONE place whether validated on the client
@@ -108,6 +184,21 @@ export default function LoginPage() {
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
   });
+
+  if (challenge) {
+    return (
+      <AuthShell
+        heading={m.auth_login_2fa_heading()}
+        subtitle={m.auth_login_2fa_subtitle()}
+      >
+        <TwoFactorChallengeForm
+          challengeToken={challenge.challengeToken}
+          returnTo={challenge.returnTo}
+          error={challenge.error || undefined}
+        />
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell

@@ -59,7 +59,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `doc` | text | NN UQ |  |  | Which document. Free text rather than an enum: the set of documents a deployment publishes is the deployment's business, and refusing an unknown one at the seam is the boundary's job, not the column's. |
 | `version` | text | NN UQ |  |  | `YYYY-MM-DD`, the version the person was shown. |
 | `content_hash` | text | NN |  |  | SHA-256 hex of the body shown. What was SHOWN, not where it lived. |
-| `authority_basis` | text | NN |  | `AUTHORITY_BASES` | On what basis this binds anyone — see `lib/auth/authority-basis.ts`. Deliberately separate from any role column: role is an operational fact and says nothing about signing authority. |
+| `authority_basis` | text | NN |  | ` /** Created the company. Binds it. */ owner, /** * An administrator t…` | On what basis this binds anyone — see `lib/auth/authority-basis.ts`. Deliberately separate from any role column: role is an operational fact and says nothing about signing authority. |
 | `accepted_at` | integer | NN IX |  |  | When the HUMAN accepted, epoch ms — not when this row was written. On the portal-originated path those differ by however long the onboarding workflow took, and collapsing them would forge the legal fact to match the plumbing. |
 | `created_at` | integer | NN |  |  | When this row was written. Distinct from the above, on purpose. |
 
@@ -1644,7 +1644,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `batch_id` | text | NN IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `tenant_id` | text | NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `entity` | text | NN |  | `MIGRATION_ENTITY_KINDS` |  |
+| `entity` | text | NN |  | `template, contact, member` |  |
 | `position` | integer | NN |  |  | Index within the bundle's array for this entity kind — how a report names the entry. |
 | `payload` | text | NN |  |  | The bundle entry, stringified once at stage time. |
 | `conflict_with` | text |  |  |  | id of the existing row this one collides with; NULL = no collision. |
@@ -1950,7 +1950,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `location_snapshot` | text |  |  |  | *Serialized JSON snapshot.* |
 | `category_snapshot` | text |  |  |  | *Serialized JSON snapshot.* |
 | `trade_snapshot` | text |  |  |  | IA-57 — the recommended trade ("who fixes this"), snapshotted at add time so the contractor reading the shared list knows which trade to send. **[more]** |
-| `repair_action_tag` | text |  |  | `REPAIR_ACTION_TAGS` | #275 — WHAT THE BUYER IS ASKING FOR on this line: repair it, replace it, give me the money (`fund`), or something else. **[more]** |
+| `repair_action_tag` | text |  |  | `repair, replace, fund, other` | #275 — WHAT THE BUYER IS ASKING FOR on this line: repair it, replace it, give me the money (`fund`), or something else. **[more]** |
 
 **Indexes**
 
@@ -2396,7 +2396,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `form_id` | text | NN UQ IX |  |  | The form we were looking for — never a revision of it. Soft reference. |
 | `source_url` | text | NN UQ |  |  | The authority page that was polled, verbatim from the published revision. |
 | `observed_hash` | text | NN UQ |  |  | sha256 (lowercase hex) of the bytes that page served. |
-| `verdict` | text | NN |  | `SIGHTING_VERDICTS` | How that digest compared with every revision of this form we publish. `unrecognised` is its own answer rather than a flavour of `changed`: with nothing published on our side there is nothing to compare against, and an alarm raised out of that would be one we invented. |
+| `verdict` | text | NN |  | `unchanged, changed, unrecognised` | How that digest compared with every revision of this form we publish. `unrecognised` is its own answer rather than a flavour of `changed`: with nothing published on our side there is nothing to compare against, and an alarm raised out of that would be one we invented. |
 | `first_seen_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `last_seen_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 
@@ -2695,7 +2695,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `r2_bytes` | integer | NN | `0` |  | *A size in bytes.* |
 | `kv_keys` | integer | NN | `0` |  | *An integer value.* |
 | `destroyed_at` | integer | NN IX |  |  | When destruction was INITIATED. The row is written before the cascade, not after — see `status`. |
-| `status` | text | NN | `'completed'` | `DESTRUCTION_STATUSES` | Written BEFORE the D1/R2/KV cascade as 'started', updated to 'completed' with the real counts once every step has run. **[more]** |
+| `status` | text | NN | `'completed'` | `started, completed` | Written BEFORE the D1/R2/KV cascade as 'started', updated to 'completed' with the real counts once every step has run. **[more]** |
 | `completed_at` | integer |  |  |  | Null while 'started'. The gap between this and `destroyed_at` is how long the purge took; its absence is how you find one that never finished. |
 | `record_version` | integer | NN | `1` |  | ── Measurement universe (appended at table end for D1 rebuild safety) ── `status` answers "did the purge finish?". **[more]** |
 | `stores_measured` | text |  |  |  | JSON array of the stores this destruction attempted. Null on generation 1. |
@@ -2718,7 +2718,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `email` | text | NN UQ |  |  |  |
-| `role` | text | NN | `'inspector'` | `ROLES` | The role the invitee GETS: `joinTeam` copies it straight onto users.role, for a brand-new row and for a reactivated soft-deleted one alike, and emits it on the `user.invited` outbox event that drives portal seat sync. |
+| `role` | text | NN | `'inspector'` | `owner, manager, inspector, agent` | The role the invitee GETS: `joinTeam` copies it straight onto users.role, for a brand-new row and for a reactivated soft-deleted one alike, and emits it on the `user.invited` outbox event that drives portal seat sync. |
 | `status` | text | NN | `'pending'` | `pending, accepted` | Schema Rules: state-machine column declares its enum (type-layer only). |
 | `expires_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `permission_overrides` | text |  |  |  | `mentor_id` and `assigned_section_ids` were here, mirroring the columns of the same name on `users` so an invite could carry them through accept. **[more]** |
@@ -2885,7 +2885,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `default_signature_base64` | text |  |  |  | Spec 5H D2 — saved signature used for auto-sign on publish + Settings prefill. |
 | `is_signature_enabled` | integer | NN | `true` |  | 2026-06-14 — per-inspector opt-in for the business-card email footer (independent of Point of Contact). |
 | `slug` | text | UQ |  |  | FROZEN for inspectors (2026-06-06, DB-12/IA-26): the per-inspector booking slug is retired — /book/:tenant is the canonical public entry and no inspector-facing route writes this column anymore. **[more]** |
-| `role` | text | NN | `'manager'` | `ROLES` | DDL default is FROZEN (D1 cannot alter column defaults without a table rebuild and users is FK-referenced). |
+| `role` | text | NN | `'manager'` | `owner, manager, inspector, agent` | DDL default is FROZEN (D1 cannot alter column defaults without a table rebuild and users is FK-referenced). |
 | `onboarding_state` | text |  |  |  | Sparse map of one-time UI flags — an ABSENT key means "not done yet", so a NULL column is simply a fresh account and nothing has to backfill it. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `totp_secret` | text |  |  |  | Spec 4A — TOTP 2FA. All fields are per-user opt-in; nullable until enabled. |

@@ -55,7 +55,10 @@ import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SCHEMA_FILE = 'server/lib/db/schema/marketplace.ts';
+// The kind list, not the table. It moved out of the schema module so the
+// browse page could read it without pulling drizzle into the browser bundle,
+// and this gate follows it rather than the file it used to sit in.
+const SCHEMA_FILE = 'server/lib/marketplace-kinds.ts';
 const SERVICE_FILE = 'server/services/marketplace.service.ts';
 
 /** Where a request can enter. A half called from nowhere here is unreachable. */

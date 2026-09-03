@@ -145,6 +145,11 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
   fd.append("intent", "invite");
   fd.append("email", email);
   fd.append("role", role);
+ // Sent explicitly, both ways. This checkbox existed for a long time and was
+ // never submitted, so unticking "send email" emailed them anyway; the field
+ // is written on every submit now rather than only when false, so the request
+ // says what the screen says.
+ fd.append("notify", notify ? "true" : "false");
   if (Object.keys(diff).length > 0) fd.append("permissionOverrides", JSON.stringify(diff));
   inviteFetcher.submit(fd, { method: "POST", action: "/resources/team-members" });
  }

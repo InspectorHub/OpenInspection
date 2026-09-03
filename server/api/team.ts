@@ -1,25 +1,23 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
-import { eq } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
 import { exportPayroll } from '../services/pay-split.service';
 import { PayrollExportSchema, PayrollRunResponseSchema } from '../lib/validations/pay-split.schema';
 import { requireSeatAvailable } from '../features/seat-quota';
-import { getBaseUrl } from '../lib/url';
-import { tenantConfigs } from '../lib/db/schema';
+import { inviteAcceptUrl } from '../lib/url';
 import { auditFromContext } from '../lib/audit';
 import {
     InviteMemberSchema,
     UpdateMemberSchema,
     InviteResponseSchema,
-    TeamMembersResponseSchema,
-    TeamDefaultsSchema
+    TeamMembersResponseSchema
 } from '../lib/validations/admin.schema';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { getDrizzle } from '../lib/route-helpers';
+import teamDefaultsRoutes from './team-defaults';
 
 /**
  * POST /api/team/payroll-export — the company-level half of #278.
@@ -214,12 +212,9 @@ const resendInviteRoute = createRoute(withMcpMetadata({
     operationId: "resendTeamInvite",
 }, { scopes: ['write'], tier: 'extended' }));
 
-// ─── Design System 0520 subsystem C P10.2 — team defaults ──
-// `TeamDefaultsSchema` lives in lib/validations/admin/settings.ts: this endpoint
-// writes `tenant_configs`, and the write allowlist in
-// lib/tenant-config-write-policy.ts derives the column from that shape.
-
 const teamRoutes = createApiRouter()
+    // `/defaults` lives in its own file — see team-defaults.ts for why.
+    .route('/', teamDefaultsRoutes)
     .openapi(listTeamMembersRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const teamService = c.var.services.team;
@@ -229,7 +224,10 @@ const teamRoutes = createApiRouter()
             success: true,
             data: {
                 members: activeUsers,
-                invites: pendingInvites,
+                invites: pendingInvites.map((invite) => ({
+                    ...invite,
+                    inviteLink: inviteAcceptUrl(c, invite.id),
+                })),
                 maxUsers,
             }
         }, 200);
@@ -260,10 +258,20 @@ const teamRoutes = createApiRouter()
             metadata: { role: body.role },
         });
 
-        const inviteLink = `${getBaseUrl(c)}/join?token=${token}`;
+        const inviteLink = inviteAcceptUrl(c, token);
 
-        // Send email via service (requires RESEND_API_KEY in env)
-        await c.var.services.email.sendInvitation(body.email, inviteLink);
+        // Send email via service (requires RESEND_API_KEY in env), unless the
+        // caller is delivering the link themselves.
+        //
+        // The flag defaults to true, so every existing caller is unaffected.
+        // It is only honourable at all because `inviteLink` comes back in the
+        // response AND the pending row can produce it again later: an invite
+        // with no email and no link is not a quiet invite, it is one nobody can
+        // accept. The drawer's checkbox spent a long time promising this
+        // without sending the flag, which is how it came to be implemented.
+        if (body.notify) {
+            await c.var.services.email.sendInvitation(body.email, inviteLink);
+        }
 
         return c.json({
             success: true,
@@ -316,52 +324,9 @@ const teamRoutes = createApiRouter()
         const { token } = c.req.valid('param');
         const invite = await c.var.services.team.findPendingInvite(tenantId, token);
         if (!invite) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Invite not found' } }, 404);
-        const inviteLink = `${getBaseUrl(c)}/join?token=${token}`;
+        const inviteLink = inviteAcceptUrl(c, token);
         await c.var.services.email.sendInvitation(invite.email, inviteLink);
         return c.json({ success: true as const, data: { resent: true as const } }, 200);
-    })
-    /** GET /api/team/defaults — read the team-page toggles. */
-    .openapi(withMcpMetadata({
-        method: 'get', path: '/defaults',
-        operationId: 'getTeamDefaults',
-        tags: ['team'],
-        summary: "Get tenant team-page default toggles",
-        description: "Returns the boolean toggles that govern the team page: teamModeDefault. Used to drive UI state.",
-        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        responses: { 200: { description: 'ok' } },
-    }, { scopes: ['read'], tier: 'extended' }), async (c) => {
-        const tenantId = c.get('tenantId');
-        const db = getDrizzle(c);
-        const row = await db.select({
-            teamModeDefault:          tenantConfigs.teamModeDefault,
-        }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
-        return c.json({
-            success: true as const,
-            data: row ?? {
-                teamModeDefault:          false,
-            },
-        }, 200);
-    })
-    /** PUT /api/team/defaults — patch any subset of the toggles. */
-    .openapi(withMcpMetadata({
-        method: 'put', path: '/defaults',
-        operationId: 'updateTeamDefaults',
-        tags: ['team'],
-        summary: "Update tenant team-page default toggles",
-        description: "Patches any subset of the team-page toggles (teamModeDefault). Missing keys leave existing values unchanged.",
-        middleware: [requireRole('owner', 'manager')] as const,
-        request: { body: { content: { 'application/json': { schema: TeamDefaultsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
-        responses: { 200: { description: 'ok' } },
-    }, { scopes: ['admin'], tier: 'extended' }), async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const update: Partial<typeof tenantConfigs.$inferInsert> = {};
-        if (body.teamModeDefault          !== undefined) update.teamModeDefault          = body.teamModeDefault;
-
-        if (Object.keys(update).length > 0) {
-            await c.var.services.branding.updateBranding(tenantId, update);
-        }
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
     })
     .openapi(exportPayrollRoute, async (c) => {
         const tenantId = c.get('tenantId');

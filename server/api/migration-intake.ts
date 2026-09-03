@@ -1,6 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
-import { getBaseUrl } from '../lib/repair-gates';
+import { inviteAcceptUrl } from '../lib/url';
 import { getDrizzle } from '../lib/route-helpers';
 import { auditFromContext } from '../lib/audit';
 import { Errors } from '../lib/errors';
@@ -302,7 +302,7 @@ const migrationIntakeRoutes = createApiRouter()
         for (const invite of result.invites) {
             try {
                 await c.var.services.email.sendInvitation(
-                    invite.email, `${getBaseUrl(c)}/join?token=${invite.token}`,
+                    invite.email, inviteAcceptUrl(c, invite.token),
                 );
                 invitesSent++;
             } catch {

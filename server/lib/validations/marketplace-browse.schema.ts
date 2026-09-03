@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { PropertyTypeEnum } from './template.schema';
-import { MARKETPLACE_KINDS } from '../db/schema/marketplace';
+import { MARKETPLACE_KINDS } from '../marketplace-kinds';
 
 /**
  * Three browse axes, not one `category` (#293). They are independent: a Texas
