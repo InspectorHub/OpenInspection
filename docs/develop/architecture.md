@@ -45,7 +45,7 @@ OpenInspection runs as ONE Cloudflare Worker. `workers/app.ts` is a Hono app tha
                     └──────────────────────────────────────────┘
 ```
 
-- **`workers/app.ts`** — a Hono app is the worker entry. It routes API-owned paths (`/api/*`, `/status`, `/m2m/*`, `/photos/*`, `/.well-known/*`, `/doc`, `/sso`, `/sign/*`, ICS/observe feeds) to the API app and sends everything else to the React Router v8 SSR handler. It injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding between workers).
+- **`workers/app.ts`** — a Hono app is the worker entry. It routes API-owned paths (`/api/*`, `/status`, `/m2m/*`, `/photos/*`, `/.well-known/*`, `/doc`, `/sso`, `/sign/*`, `/webhooks/*`, the ICS feed) to the API app and sends everything else to the React Router v8 SSR handler. It injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding between workers).
 - **`server/`** — Hono + Drizzle + D1. Handles all business logic, authentication, and data access. Exposes a typed JSON API.
 - **`app/`** — React Router v8 + React 19 + Tailwind v4. Server-side renders the React UI on the edge.
 - **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based React components (Button, Pill, Card, etc.).
