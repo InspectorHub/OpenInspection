@@ -38,6 +38,11 @@ export async function action({ request, context }: Route.ActionArgs) {
         const email = fd.get("email") as string | null;
         const role = (fd.get("role") ?? "inspector") as string;
 
+        // Absent means TRUE. The checkbox that produces this defaulted to on
+        // for its whole life while sending nothing, so "the field is missing"
+        // has to keep meaning what the drawer looked like it meant.
+        const notify = fd.get("notify") !== "false";
+
         if (!email) return { ok: false, intent, error: "Email is required", url: null };
 
         // Advanced-permissions disclosure ships a JSON map of the capability
@@ -56,13 +61,18 @@ export async function action({ request, context }: Route.ActionArgs) {
 
         try {
             const res = await api.team.invite.$post({
-                json: { email, role, permissionOverrides } as Parameters<typeof api.team.invite.$post>[0]["json"],
+                json: { email, role, permissionOverrides, notify } as Parameters<typeof api.team.invite.$post>[0]["json"],
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({})) as { error?: string };
                 return { ok: false, intent, error: body?.error ?? `HTTP ${res.status}`, url: null };
             }
-            return { ok: true, intent, error: null, url: null };
+            // The invite link, which the server has always returned and nothing
+            // has ever shown. It matters most when notify is false: that is the
+            // case where this link is the ONLY way the invitee ever hears about
+            // the invitation.
+            const created = await res.json().catch(() => ({})) as { data?: { inviteLink?: string } };
+            return { ok: true, intent, error: null, url: created?.data?.inviteLink ?? null };
         } catch (e) {
             return { ok: false, intent, error: e instanceof Error ? e.message : "Failed", url: null };
         }

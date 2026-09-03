@@ -12,7 +12,7 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { safeISODate } from '../../lib/date';
 import type { MemberWithCalendarSync } from '../../services/admin.service';
-import { getBaseUrl } from '../../lib/url';
+import { inviteAcceptUrl } from '../../lib/url';
 import {
     InviteMemberSchema,
     DataErasureSchema,
@@ -278,7 +278,7 @@ const adminDataRoutes = createApiRouter()
         const adminService = c.var.services.admin;
         const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role);
 
-        const inviteLink = `${getBaseUrl(c)}/join?token=${inviteId}`;
+        const inviteLink = inviteAcceptUrl(c, inviteId);
 
         const emailPromise = c.var.services.email.sendInvitation(body.email, inviteLink)
             .catch(() => { /* email delivery is best-effort */ });

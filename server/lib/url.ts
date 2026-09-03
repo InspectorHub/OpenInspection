@@ -38,6 +38,26 @@ export function getBaseUrl(c: Context<HonoConfig>): string {
 }
 
 /**
+ * The one accept URL for an invitation.
+ *
+ * There is exactly one of these per invite and several places that need it —
+ * the create response, the email, the resend, the roster's "Invite link"
+ * dialog, the admin console and the roster import. Composed by hand in each,
+ * they drifted the moment one of them used a different base: a screen that
+ * pasted its own browser origin in front of the token produced a SECOND URL
+ * for one invitation, and on any deployment reached at an address other than
+ * its configured base that second URL is the one that does not work.
+ *
+ * The token is `tenant_invites.id` — a uuid today, so the encoding is a no-op
+ * on every value that currently reaches here. It is applied anyway because
+ * this function is the boundary between an id and a URL, and that is where a
+ * value stops being safe by inspection.
+ */
+export function inviteAcceptUrl(c: Context<HonoConfig>, token: string): string {
+    return `${getBaseUrl(c)}/join?token=${encodeURIComponent(token)}`;
+}
+
+/**
  * Sprint B-4 — extract the bare host (no protocol, no path) for use in
  * inspectorSignature() which builds `https://{host}/book/{slug}` links.
  * Mirrors getBaseUrl preference: APP_BASE_URL wins, falls back to the

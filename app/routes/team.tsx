@@ -7,6 +7,7 @@ import { SeatBanner } from "~/components/SeatBanner";
 import { InviteSeatDrawer } from "~/components/modals/InviteSeatDrawer";
 import { EditMemberDrawer, type EditableMember } from "~/components/modals/EditMemberDrawer";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { InviteLinkModal, type InviteLinkTarget } from "~/components/modals/InviteLinkModal";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { importEntryHref } from "~/lib/import-entry-points";
 import { Breadcrumb } from "~/components/Breadcrumb";
@@ -14,28 +15,12 @@ import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table, Banner } f
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { isAdminRole } from "~/lib/access";
+import { ROLE_TONES, expiryLabel, type Member, type LoaderActiveUser, type LoaderInvite } from "./team.shapes";
 
 export function meta() {
   return [{ title: m.settings_team_meta_title() }];
 }
 
-interface Member {
-  id: string;
-  name: string | null;
-  email: string;
-  role: string;
-  status: "active" | "pending";
-  lastActiveAt: string | null;
-  /** Present only on pending rows — the tenant_invites token to cancel/resend. */
-  token: string | null;
-  /** Present only on pending rows — ISO expiry for the "expires in Nd" label. */
-  expiresAt: string | null;
-  /** Capability toggles differing from the role template; seeds the edit drawer (IA-101). */
-  permissionOverrides: Record<string, boolean> | null;
-}
-
-interface LoaderActiveUser { id: string; email: string; role: string; name?: string | null; permissionOverrides?: Record<string, boolean> | null }
-interface LoaderInvite { id: string; email: string; role: string; expiresAt: string }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
@@ -68,11 +53,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const active: Member[] = (body.data?.members ?? []).map((u) => ({
       id: u.id, name: u.name ?? null, email: u.email, role: u.role,
       status: "active", lastActiveAt: null, token: null, expiresAt: null,
+      inviteLink: null,
       permissionOverrides: u.permissionOverrides ?? null,
     }));
     const pending: Member[] = (body.data?.invites ?? []).map((i) => ({
       id: i.id, name: null, email: i.email, role: i.role,
       status: "pending", lastActiveAt: null, token: i.id, expiresAt: i.expiresAt,
+      inviteLink: i.inviteLink ?? null,
       // A pending invite's overrides live on tenant_invites and are replayed
       // at accept time; there is no member row to edit yet.
       permissionOverrides: null,
@@ -108,15 +95,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   return { ok: false };
 }
 
-const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "monitor" | "sat" | "gen"> = {
-  owner: "primary",
-  manager: "info",
-  inspector: "neutral",
-  lead: "info",
-  specialist: "sat",
-  agent: "warning",
-  office: "gen",
-};
 
 export default function TeamPage() {
   const { members, canManage, loadFailed } = useLoaderData<typeof loader>();
@@ -125,20 +103,16 @@ export default function TeamPage() {
   const { submit: submitCancel, busy: cancelBusy } = useGuardedSubmit<{ ok?: boolean }>();
   const resendFetcher = useFetcher<{ ok?: boolean; resent?: boolean }>();
   const [pendingCancel, setPendingCancel] = useState<{ token: string; email: string } | null>(null);
+
+  // Which pending invite's link is on screen. The dialog itself is
+  // `InviteLinkModal`, which owns why it SHOWS the URL rather than only
+  // copying it.
+  const [linkInvite, setLinkInvite] = useState<InviteLinkTarget | null>(null);
   const sessionCtx = useSessionContext();
   const [activeTab, setActiveTab] = useState("active");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editMember, setEditMember] = useState<EditableMember | null>(null);
 
-  // Human "expires in Nd" / "expired Nd ago" from an ISO expiry. Whole-day
-  // granularity is enough for a 7-day invite window.
-  function expiryLabel(iso: string | null): string {
-    if (!iso) return "";
-    const ms = new Date(iso).getTime() - Date.now();
-    const days = Math.round(Math.abs(ms) / 86_400_000);
-    if (ms <= 0) return m.settings_team_invite_expired({ days });
-    return m.settings_team_invite_expires_in({ days });
-  }
 
   // Built in the render (request ALS scope) so the labels resolve per-request
   // rather than freezing the locale at module import.
@@ -260,6 +234,27 @@ export default function TeamPage() {
                       </span>
                       {canManage && (
                         <>
+                          {/* The invite link, which the server has returned on
+                              creation since the endpoint was written and which
+                              nothing has ever shown. It lives on the ROW rather
+                              than in the create drawer because the drawer is
+                              transient — close it and the link is gone — while
+                              this row is where someone comes back to ask "what
+                              about that invitation".
+
+                              It is also what makes the drawer's "send email"
+                              checkbox honourable: an invite created without an
+                              email is only quiet rather than broken if the
+                              inviter can still fetch the link. */}
+                          {member.inviteLink && (
+                            <button
+                              type="button"
+                              onClick={() => setLinkInvite({ url: member.inviteLink as string, email: member.email })}
+                              className="text-[12px] font-medium text-ih-primary-text hover:underline"
+                            >
+                              {m.settings_team_invite_link_action()}
+                            </button>
+                          )}
                           <resendFetcher.Form method="post" className="inline">
                             <input type="hidden" name="intent" value="resend-invite" />
                             <input type="hidden" name="token" value={member.token} />
@@ -345,6 +340,10 @@ export default function TeamPage() {
         }}
         onCancel={() => setPendingCancel(null)}
       />
+      {/* Keyed on the URL so the Copy button's "Link copied" state cannot
+          survive into the NEXT invitation's dialog and claim a copy that was
+          never made for it. */}
+      <InviteLinkModal key={linkInvite?.url ?? ""} target={linkInvite} onClose={() => setLinkInvite(null)} />
     </div>
   );
 }

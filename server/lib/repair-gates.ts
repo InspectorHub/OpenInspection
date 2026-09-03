@@ -5,7 +5,6 @@
  *   - runBuilderGate   — publish + tenant-flag gate for the CRUD/source routes
  *   - runAssertCanEdit — wraps the service assertCanEdit into explicit 403/404
  *   - runShareGate     — shareToken lookup + publish gate for the share routes
- *   - getBaseUrl       — absolute base URL from env or Host header
  */
 
 import type { Context } from 'hono';
@@ -194,10 +193,4 @@ export async function runShareGate(
         tenantId: request.tenantId,
         propertyAddress: insp.propertyAddress ?? null,
     };
-}
-
-/** Derive the absolute base URL from env or the incoming Host header. */
-export function getBaseUrl(c: Context<HonoConfig>): string {
-    return (c.env.APP_BASE_URL || '').replace(/\/$/, '')
-        || (c.req.header('host') ? `https://${c.req.header('host')}` : '');
 }
