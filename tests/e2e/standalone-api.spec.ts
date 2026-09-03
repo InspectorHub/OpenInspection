@@ -380,7 +380,7 @@ test.describe.serial('Standalone API Tests', () => {
         // that 302 satisfies any test that only checks "not 404".
         //
         // What remains mode-specific is publishing a catalogue row across
-        // workspaces, which lives under /api/integration/* — asserted absent by
+        // workspaces, which lives under /api/platform/* — asserted absent by
         // its own test, and unaffected by this one.
         const res = await fetchPage(request, '/library/marketplace', adminToken);
         expect(res.status(), 'standalone must serve the marketplace').toBe(200);

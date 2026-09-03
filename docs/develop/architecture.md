@@ -166,7 +166,7 @@ tenant. You never manage tenants or subdomains. Tenant resolution lives in
 `server/features/tenant-routing/`; in standalone the `tenantRouter` middleware simply pins
 the request to `profile.fixedTenantId` (`resolve-by-fixed-tenant.ts`).
 
-> A SaaS overlay (`server/portal/`, active only when `APP_MODE=saas`) lets a multi-tenant deployment hand tenant records, seats and credentials to an external control plane over the machine-to-machine seam described in [`reference/api.md`](../reference/api.md). Standalone builds execute none of it: `hasPortalIntegrationApi` is false, so `/api/integration/*` is not mounted at all. The code is here and readable; what runs on the other end of that seam is not part of this repository.
+> A SaaS overlay (`server/portal/`, active only when `APP_MODE=saas`) lets a multi-tenant deployment hand tenant records, seats and credentials to an external control plane over the machine-to-machine seam described in [`reference/api.md`](../reference/api.md). Standalone builds execute none of it: `hasPortalIntegrationApi` is false, so `/api/platform/*` is not mounted at all. The code is here and readable; what runs on the other end of that seam is not part of this repository.
 
 ### Reading a deployment capability
 

@@ -9,7 +9,7 @@ import { MigrationSourceFileService } from '../services/migration-intake/source-
 import { assertStaffAccessAuthorized } from '../services/migration-intake/staff-access';
 
 /**
- * `GET /api/integration/migration-runs/:batchId/source`
+ * `GET /api/platform/migration-runs/:batchId/source`
  *
  * Hands a workspace's uploaded import file to the person at the deployment
  * operator who is going to convert it — and writes down that they did.

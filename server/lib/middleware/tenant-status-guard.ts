@@ -4,7 +4,7 @@ import { Errors } from '../errors';
 
 const SUSPEND_EXEMPT_PREFIXES = [
     '/api/auth/',
-    '/api/integration/',
+    '/api/platform/',
     '/status',
     '/sso',
 ];

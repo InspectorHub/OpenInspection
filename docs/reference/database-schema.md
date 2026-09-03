@@ -773,7 +773,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/tenant/discovery-objections.ts · 5 columns · primary key `id`</sub>
 
-> People who told us not to look them up. `GET /api/integration/tenants/by-email` answers, for one address, WHICH inspection companies hold a live report grant for it.
+> People who told us not to look them up. `GET /api/platform/tenants/by-email` answers, for one address, WHICH inspection companies hold a live report grant for it.
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|

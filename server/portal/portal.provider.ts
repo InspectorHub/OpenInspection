@@ -136,7 +136,7 @@ export class PortalProvider implements IntegrationProvider {
                 return;
             }
             // The acceptance travels with the credential on this path too. The
-            // RPC entry point (`PATCH /api/integration/tenants/:slug`) is the
+            // RPC entry point (`PATCH /api/platform/tenants/:slug`) is the
             // fallback the onboarding workflow uses when the command queue is
             // unavailable, so leaving it out here would mean the invariant held
             // on the queue path and not on the path taken when the queue is

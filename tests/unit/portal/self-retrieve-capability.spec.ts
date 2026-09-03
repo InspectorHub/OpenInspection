@@ -47,7 +47,7 @@ async function seedCustomRoles(db: BetterSQLite3Database<typeof schema>, tenantI
 }
 
 // ---------------------------------------------------------------------------
-// Site 1 — GET /api/integration/tenants/by-email (cross-tenant discovery)
+// Site 1 — GET /api/platform/tenants/by-email (cross-tenant discovery)
 // ---------------------------------------------------------------------------
 describe('find-my-report discovery — capability-driven role filter', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
@@ -56,7 +56,7 @@ describe('find-my-report discovery — capability-driven role filter', () => {
     const FAKE_PEM = `-----BEGIN PRIVATE KEY-----\n${btoa('test-m2m-shared-key-material-0123456789')}\n-----END PRIVATE KEY-----`;
     const ENV = { DB: {}, JWT_CURRENT_KID: 'v1', JWT_PRIVATE_KEY_V1: FAKE_PEM } as Record<string, unknown>;
 
-    function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/integration', integrationRoutes); return a; }
+    function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/platform', integrationRoutes); return a; }
     async function header() { return signM2mHeader(ENV as Record<string, string | undefined>); }
 
     beforeEach(async () => {
@@ -75,25 +75,25 @@ describe('find-my-report discovery — capability-driven role filter', () => {
     afterEach(() => { sqlite.close(); vi.clearAllMocks(); });
 
     it('finds the tenant for a plain client-role grant', async () => {
-        const res = await app().request('/api/integration/tenants/by-email?email=jane@x.com', { headers: { [M2M_HEADER]: await header() } }, ENV);
+        const res = await app().request('/api/platform/tenants/by-email?email=jane@x.com', { headers: { [M2M_HEADER]: await header() } }, ENV);
         const body = await res.json() as { data: { slugs: string[] } };
         expect(body.data.slugs).toEqual(['acme-cap']);
     });
 
     it('finds the tenant for an agent-kind grant (buyer_agent) — Spec 3 flip opened selfRetrieveReport for agents', async () => {
-        const res = await app().request('/api/integration/tenants/by-email?email=agent@x.com', { headers: { [M2M_HEADER]: await header() } }, ENV);
+        const res = await app().request('/api/platform/tenants/by-email?email=agent@x.com', { headers: { [M2M_HEADER]: await header() } }, ENV);
         const body = await res.json() as { data: { slugs: string[] } };
         expect(body.data.slugs).toEqual(['acme-cap']);
     });
 
     it('does NOT find the tenant for a custom other-kind grant', async () => {
-        const res = await app().request('/api/integration/tenants/by-email?email=vendor@x.com', { headers: { [M2M_HEADER]: await header() } }, ENV);
+        const res = await app().request('/api/platform/tenants/by-email?email=vendor@x.com', { headers: { [M2M_HEADER]: await header() } }, ENV);
         const body = await res.json() as { data: { slugs: string[] } };
         expect(body.data.slugs).toEqual([]);
     });
 
     it('finds the tenant for a CUSTOM non-literal client-kind role key (capability-derived, not a hard-coded list)', async () => {
-        const res = await app().request('/api/integration/tenants/by-email?email=buyer@x.com', { headers: { [M2M_HEADER]: await header() } }, ENV);
+        const res = await app().request('/api/platform/tenants/by-email?email=buyer@x.com', { headers: { [M2M_HEADER]: await header() } }, ENV);
         const body = await res.json() as { data: { slugs: string[] } };
         expect(body.data.slugs).toEqual(['acme-cap']);
     });

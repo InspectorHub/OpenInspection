@@ -104,7 +104,7 @@ const app = new Hono();
 // allowlist entry whose stated reason ("runs before middleware") was true of
 // the context and not of the function.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-app.all("/api/integration/*", (c: any) =>
+app.all("/api/platform/*", (c: any) =>
     getDeploymentProfile(c.env).hasPortalIntegrationApi ? toApi(c) : c.notFound(),
 );
 app.all("/api/*", toApi);

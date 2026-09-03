@@ -56,7 +56,7 @@ const DESCRIPTIONS: Record<keyof DeploymentProfile, string> = {
     tenantRecordOwnedByPortal:
         'Whether a platform stores the authoritative tenant record and this worker reads a projection of it. Decides which admin provider is constructed; in standalone this deployment owns the row outright.',
     hasPortalIntegrationApi:
-        'Whether the portal machine-to-machine surface (`/api/integration/*`) is mounted. Standalone 404s the whole prefix rather than answering on an API nobody can authenticate to.',
+        'Whether the portal machine-to-machine surface (`/api/platform/*`) is mounted. Standalone 404s the whole prefix rather than answering on an API nobody can authenticate to.',
     hasAssistedMigration:
         'An import whose file no adapter can read may be handed to a support team. Absent in standalone, where the file is refused before it is stored rather than kept for nobody.',
     importMaxCsvBytes:

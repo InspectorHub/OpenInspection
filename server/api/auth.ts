@@ -112,7 +112,7 @@ const joinTeamRoute = createRoute(withMcpMetadata({
  * GET /sso?code=<uuid>
  *
  * SSO consume endpoint — the receiving half of the portal-issued
- * handoff token minted at POST /api/integration/sso-handoff. Reads
+ * handoff token minted at POST /api/platform/sso-handoff. Reads
  * `sso:<code>` from KV (single-use, short TTL), looks up the user,
  * issues a workspace-scoped session cookie, and redirects into the
  * inspector dashboard.
@@ -122,7 +122,7 @@ const joinTeamRoute = createRoute(withMcpMetadata({
  *
  * This endpoint is what makes multi-workspace switching feel
  * frictionless from portal: user clicks a workspace card → portal
- * calls /api/integration/sso-handoff to get a code → portal 302s the
+ * calls /api/platform/sso-handoff to get a code → portal 302s the
  * browser to this URL → core sets the right cookie → user lands on
  * the right tenant's dashboard.
  *
@@ -141,7 +141,7 @@ const ssoConsumeRoute = createRoute(withMcpMetadata({
     tags: ['auth', 'public'],
     request: {
         query: z.object({
-            code: z.string().min(8).describe('One-time SSO handoff code minted by the portal at POST /api/integration/sso-handoff. Single-use, expires after 60 seconds, deleted from KV on successful consume.'),
+            code: z.string().min(8).describe('One-time SSO handoff code minted by the portal at POST /api/platform/sso-handoff. Single-use, expires after 60 seconds, deleted from KV on successful consume.'),
             return_to: z.string().optional().describe('Same-origin path to redirect to after the SSO handoff completes (e.g. /oauth/authorize?...); rejected if not a single-slash path — open-redirect guard.'),
         }),
     },
@@ -419,7 +419,7 @@ const coreAuthRoutes = createApiRouter()
 
         if (!parsed.tenantId) {
             // Agent handoff (Spec 3 Task 5b) — tenant-null payload minted by
-            // the agent branch of POST /api/integration/sso-handoff.
+            // the agent branch of POST /api/platform/sso-handoff.
             // Re-verify the account AT REDEEM TIME (mirrors
             // redeemMagicLogin/findGlobalAgentById — server/services/agent/
             // magic-login.service.ts) rather than trusting the issue-time

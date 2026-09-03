@@ -3,7 +3,7 @@ import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core
 /**
  * People who told us not to look them up.
  *
- * `GET /api/integration/tenants/by-email` answers, for one address, WHICH
+ * `GET /api/platform/tenants/by-email` answers, for one address, WHICH
  * inspection companies hold a live report grant for it. That is a cross-tenant
  * statement about a person's relationships, assembled by the platform rather
  * than by any single company, and this table is how a person stops it. The

@@ -1,10 +1,10 @@
 /**
  * Trial Sample-Data Mode (2026-05-20 spec) —
- *   POST /api/integration/seed-starter-content integration tests.
+ *   POST /api/platform/seed-starter-content integration tests.
  *
  * The seed endpoint was migrated from the core admin router (`/api/admin/*`)
  * to the portal integration seam (`server/portal/integration.routes.ts`,
- * mounted at `/api/integration/*`). This mounts the real integration routes on
+ * mounted at `/api/platform/*`). This mounts the real integration routes on
  * a fresh OpenAPIHono so we exercise the actual middleware chain (the
  * `requireServiceBinding` M2M guard + the route handler). `drizzle-orm/d1` is
  * mocked to a better-sqlite3 instance so existence checks + seed inserts hit a
@@ -29,7 +29,7 @@ import { signM2mHeader, M2M_HEADER } from '../../../server/lib/m2m-auth';
 const FAKE_PEM = `-----BEGIN PRIVATE KEY-----\n${btoa('test-m2m-shared-key-material-0123456789')}\n-----END PRIVATE KEY-----`;
 const M2M_ENV = { DB: {}, JWT_CURRENT_KID: 'v1', JWT_PRIVATE_KEY_V1: FAKE_PEM } as Record<string, unknown>;
 
-describe('POST /api/integration/seed-starter-content', () => {
+describe('POST /api/platform/seed-starter-content', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let sqlite: any;
@@ -37,8 +37,8 @@ describe('POST /api/integration/seed-starter-content', () => {
 
     function buildApp() {
         const app = new OpenAPIHono<HonoConfig>();
-        // Mirror registerPortalIntegration(app): app.route('/api/integration', integrationRoutes).
-        app.route('/api/integration', integrationRoutes);
+        // Mirror registerPortalIntegration(app): app.route('/api/platform', integrationRoutes).
+        app.route('/api/platform', integrationRoutes);
         return app;
     }
 
@@ -65,7 +65,7 @@ describe('POST /api/integration/seed-starter-content', () => {
 
     it('seeds starter content with a valid x-portal-m2m header (Service Binding)', async () => {
         const app = buildApp();
-        const res = await app.request('/api/integration/seed-starter-content', {
+        const res = await app.request('/api/platform/seed-starter-content', {
             method: 'POST',
             headers: {
                 'content-type':  'application/json',
@@ -86,7 +86,7 @@ describe('POST /api/integration/seed-starter-content', () => {
 
     it('returns 403 when the M2M header is missing', async () => {
         const app = buildApp();
-        const res = await app.request('/api/integration/seed-starter-content', {
+        const res = await app.request('/api/platform/seed-starter-content', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ tenantId }),
@@ -100,7 +100,7 @@ describe('POST /api/integration/seed-starter-content', () => {
 
     it('returns 404 for an unknown tenantId', async () => {
         const app = buildApp();
-        const res = await app.request('/api/integration/seed-starter-content', {
+        const res = await app.request('/api/platform/seed-starter-content', {
             method: 'POST',
             headers: {
                 'content-type':  'application/json',

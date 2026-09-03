@@ -1,5 +1,5 @@
 /**
- * Free-tier usage quotas Task 7 — `GET /api/integration/usage` payload shape.
+ * Free-tier usage quotas Task 7 — `GET /api/platform/usage` payload shape.
  * The M2M-guarded, saas-only endpoint the portal console reads to render a
  * platform-wide usage dashboard: per tenant, lifetime sums for every metered
  * dimension plus the tenant's plan tier and (free tier only) the caps those
@@ -21,12 +21,12 @@ import { signM2mHeader, M2M_HEADER } from '../../../server/lib/m2m-auth';
 const FAKE_PEM = `-----BEGIN PRIVATE KEY-----\n${btoa('test-m2m-shared-key-material-0123456789')}\n-----END PRIVATE KEY-----`;
 const ENV = { DB: {}, JWT_CURRENT_KID: 'v1', JWT_PRIVATE_KEY_V1: FAKE_PEM } as Record<string, unknown>;
 
-describe('GET /api/integration/usage', () => {
+describe('GET /api/platform/usage', () => {
   let testDb: BetterSQLite3Database<typeof schema>;
   let sqlite: ReturnType<typeof createTestDb>['sqlite'];
   let testD1: D1Database;
 
-  function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/integration', integrationRoutes); return a; }
+  function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/platform', integrationRoutes); return a; }
   async function header() { return signM2mHeader(ENV as Record<string, string | undefined>); }
 
   beforeEach(async () => {
@@ -41,7 +41,7 @@ describe('GET /api/integration/usage', () => {
   afterEach(() => { sqlite.close(); vi.clearAllMocks(); });
 
   it('403 without M2M header', async () => {
-    const res = await app().request('/api/integration/usage', {}, ENV);
+    const res = await app().request('/api/platform/usage', {}, ENV);
     expect(res.status).toBe(403);
   });
 
@@ -58,7 +58,7 @@ describe('GET /api/integration/usage', () => {
     await m.record('t-pro', 'sms', '2026-06', 500);
     await m.record('t-pro', 'email', '2026-06', 900);
 
-    const res = await app().request('/api/integration/usage', { headers: { [M2M_HEADER]: await header() } }, ENV);
+    const res = await app().request('/api/platform/usage', { headers: { [M2M_HEADER]: await header() } }, ENV);
     expect(res.status).toBe(200);
     const body = await res.json() as { data: Array<Record<string, unknown>> };
 
@@ -78,7 +78,7 @@ describe('GET /api/integration/usage', () => {
   });
 
   it('empty usage_counters -> empty data array', async () => {
-    const res = await app().request('/api/integration/usage', { headers: { [M2M_HEADER]: await header() } }, ENV);
+    const res = await app().request('/api/platform/usage', { headers: { [M2M_HEADER]: await header() } }, ENV);
     expect(res.status).toBe(200);
     const body = await res.json() as { data: unknown[] };
     expect(body.data).toEqual([]);

@@ -1,9 +1,9 @@
 /**
- * `GET /api/integration/destruction-records` — the read side of the purge.
+ * `GET /api/platform/destruction-records` — the read side of the purge.
  *
  * `tenant_destruction_records` is the durable, non-personal proof that a
  * workspace's data was physically destroyed. It is written by
- * `POST /api/integration/tenants/:slug/purge` and, until this route existed, was
+ * `POST /api/platform/tenants/:slug/purge` and, until this route existed, was
  * read by nothing at all — so "produce the record of tenant X's destruction"
  * could only be answered by opening D1 by hand.
  *
@@ -38,11 +38,11 @@ interface RecordsBody {
     };
 }
 
-describe('GET /api/integration/destruction-records', () => {
+describe('GET /api/platform/destruction-records', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
     let sqlite: ReturnType<typeof createTestDb>['sqlite'];
 
-    function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/integration', integrationRoutes); return a; }
+    function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/platform', integrationRoutes); return a; }
     async function header() { return signM2mHeader(ENV as Record<string, string | undefined>); }
 
     beforeEach(async () => {
@@ -58,13 +58,13 @@ describe('GET /api/integration/destruction-records', () => {
     afterEach(() => { sqlite.close(); vi.clearAllMocks(); });
 
     it('403 without the M2M header', async () => {
-        const res = await app().request('/api/integration/destruction-records', {}, ENV);
+        const res = await app().request('/api/platform/destruction-records', {}, ENV);
         expect(res.status).toBe(403);
     });
 
     it('403 with a bogus M2M header', async () => {
         const res = await app().request(
-            '/api/integration/destruction-records',
+            '/api/platform/destruction-records',
             { headers: { [M2M_HEADER]: 'not-a-real-hmac' } },
             ENV,
         );
@@ -73,7 +73,7 @@ describe('GET /api/integration/destruction-records', () => {
 
     it('returns every record newest first for an authorised operator', async () => {
         const res = await app().request(
-            '/api/integration/destruction-records',
+            '/api/platform/destruction-records',
             { headers: { [M2M_HEADER]: await header() } },
             ENV,
         );
@@ -86,7 +86,7 @@ describe('GET /api/integration/destruction-records', () => {
 
     it('narrows to one destroyed workspace by tenantId', async () => {
         const res = await app().request(
-            '/api/integration/destruction-records?tenantId=ghost-a',
+            '/api/platform/destruction-records?tenantId=ghost-a',
             { headers: { [M2M_HEADER]: await header() } },
             ENV,
         );
@@ -97,7 +97,7 @@ describe('GET /api/integration/destruction-records', () => {
 
     it('400 on a limit outside the allowed page range', async () => {
         const res = await app().request(
-            '/api/integration/destruction-records?limit=0',
+            '/api/platform/destruction-records?limit=0',
             { headers: { [M2M_HEADER]: await header() } },
             ENV,
         );
@@ -106,7 +106,7 @@ describe('GET /api/integration/destruction-records', () => {
 
     it('pages backwards with the returned nextBefore cursor', async () => {
         const first = await app().request(
-            '/api/integration/destruction-records?limit=1',
+            '/api/platform/destruction-records?limit=1',
             { headers: { [M2M_HEADER]: await header() } },
             ENV,
         );
@@ -115,7 +115,7 @@ describe('GET /api/integration/destruction-records', () => {
         expect(firstBody.data.nextBefore).toBe(2_000);
 
         const second = await app().request(
-            `/api/integration/destruction-records?limit=1&before=${firstBody.data.nextBefore}`,
+            `/api/platform/destruction-records?limit=1&before=${firstBody.data.nextBefore}`,
             { headers: { [M2M_HEADER]: await header() } },
             ENV,
         );
@@ -125,9 +125,9 @@ describe('GET /api/integration/destruction-records', () => {
 });
 
 import workerEntry from '../../../workers/app';
-describe('GET /api/integration/destruction-records — standalone gate', () => {
+describe('GET /api/platform/destruction-records — standalone gate', () => {
     it('404s in standalone APP_MODE (route family is saas-only)', async () => {
-        const req = new Request('https://x/api/integration/destruction-records');
+        const req = new Request('https://x/api/platform/destruction-records');
         const res = await workerEntry.fetch(req, { APP_MODE: 'standalone' } as never, {} as never);
         expect(res.status).toBe(404);
     });

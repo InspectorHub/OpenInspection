@@ -1,7 +1,7 @@
 /**
  * The objection to being discoverable across tenants, and the proof it requires.
  *
- * `GET /api/integration/tenants/by-email` answers, for one address, which
+ * `GET /api/platform/tenants/by-email` answers, for one address, which
  * inspection companies hold a live report grant for that person. It stays —
  * it is how a homebuyer who lost the email reaches their own report — but a
  * person has to be able to leave it.
@@ -132,8 +132,8 @@ async function provesAddressControl(d: DrizzleD1Database, email: string, grantTo
 }
 
 /**
- * POST /api/integration/discovery-objections   — file one
- * DELETE /api/integration/discovery-objections — withdraw it
+ * POST /api/platform/discovery-objections   — file one
+ * DELETE /api/platform/discovery-objections — withdraw it
  *
  * Body: `{ email, grantToken }`. Both verbs require the same proof of control
  * (`provesAddressControl`) — a withdrawal that needed less than the filing would

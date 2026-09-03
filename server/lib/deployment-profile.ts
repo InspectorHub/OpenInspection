@@ -157,7 +157,7 @@ export interface DeploymentProfile {
      *  mode. Naming the question is what makes the answer checkable. */
     tenantRecordOwnedByPortal: boolean;
 
-    /** Whether the portal M2M surface (`/api/integration/*`) exists at all.
+    /** Whether the portal M2M surface (`/api/platform/*`) exists at all.
      *  False in standalone: there is no platform on the other end, so the entry
      *  404s the prefix rather than mounting a machine-to-machine API nobody can
      *  authenticate to. A surface that answers is a surface somebody probes.
