@@ -109,7 +109,7 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
     // `server/api/qbo-oauth.ts`.
     const isPublic = path.startsWith('/api/__test__/') || path.startsWith('/api/public/') || path.startsWith('/api/platform/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/invoice/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/v/') || path.startsWith('/.well-known/') || isStaticAssetPath(path) || path.startsWith('/webhooks/') || path === QBO_CALLBACK_PATH || path.startsWith('/unsubscribe/') || path.startsWith('/repair-request/') || path.startsWith('/repair-builder/') || path.startsWith('/api/portal/') || path.startsWith('/portal/');
 
-    if (isAuthPublic || isPublic || isAgentPublic || isConciergePublic || path === '/setup' || path === '/login' || path === '/join') return next();
+    if (isAuthPublic || isPublic || isAgentPublic || isConciergePublic || path === '/setup') return next();
 
     // First-time setup is gated solely by the SETUP_CODE secret, validated in
     // POST /api/auth/setup. No KV bootstrap code is generated here.
