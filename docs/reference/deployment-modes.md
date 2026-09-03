@@ -45,7 +45,7 @@ that way.
 | `hasSetupWizard` | yes | no | `/setup` exists, gated on the `SETUP_CODE` secret, to create the first account. |
 | `aiDevMockFallback` | yes | no | AI calls may fall back to a local mock when no credential resolves. |
 | `hasManagedAi` | no | yes | A platform-provided AI credential can ever be resolved. Standalone has no platform, so the managed path is absent rather than disabled — use your own key in Settings → Advanced → AI. |
-| `mcpApiRoute` | `/mcp` | `/company/` | Where the MCP OAuth surface mounts. | <!-- no-portal-routes-allow: this cell is the VALUE of this engine's own mcpApiRoute setting, not a link to a hosted screen -->
+| `mcpApiRoute` | `/mcp` | `/mcp` | Where the MCP OAuth surface mounts. |
 | `videoBackendManaged` | no | yes | Whether the platform picks the video backend. Standalone operators set `videoMode` themselves, which is why the self-host settings form exists and the saas one refuses to save. |
 | `hasManagedCompliance` | no | yes | A platform-operated compliance path (managed SMS 10DLC brand/campaign filing) exists. Absent in standalone — nobody can file on your behalf. |
 | `qboAppManaged` | no | yes | The platform supplies the Intuit app tenants connect through, so nobody is asked for a Client ID. Standalone brings its own: Intuit matches a redirect URI byte for byte and a self-hosted deploy answers on its own domain, so the platform app cannot work there — which is why the credential form, including `QBO_ENV`, renders only in standalone. |

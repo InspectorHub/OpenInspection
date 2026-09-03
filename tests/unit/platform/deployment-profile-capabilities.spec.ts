@@ -23,10 +23,12 @@ describe('DeploymentProfile capability surface', () => {
         expect(STANDALONE_PROFILE.hasPortalIntegrationApi).toBe(false);
     });
 
-    it('saas plan-manages the video backend and mounts MCP under the company prefix', () => {
+    it('saas plan-manages the video backend and mounts MCP under the same /mcp prefix', () => {
         expect(SAAS_PROFILE.videoBackendManaged).toBe(true);
         expect(SAAS_PROFILE.hasManagedCompliance).toBe(true);
-        expect(SAAS_PROFILE.mcpApiRoute).toBe('/company/');
+        // Per-workspace endpoints are /mcp/{slug}; the MOUNT is identical in
+        // both modes, so this field no longer discriminates them at all.
+        expect(SAAS_PROFILE.mcpApiRoute).toBe('/mcp');
         // Portal is the system of record for the tenant row and the M2M surface
         // exists for it to talk through. These two replaced the last two
         // `env.APP_MODE` comparisons outside the seam.

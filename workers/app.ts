@@ -120,6 +120,13 @@ app.all("/agent/magic-login", toApi); // agent unified link redeem — no React 
 app.get("/inspector/:tenant/:slug/calendar.ics", toApi); // ICS feed (API-only)
 app.get("/observe/:token", toApi); // 1-seg observe — RR owns /observe/inspections/:id
 
+// NOT listed here on purpose: `/mcp` and `/mcp/{slug}`. That prefix is owned by
+// the OAuthProvider wrapper installed around this whole app in `fetch` below —
+// it matches `apiRoute` as a literal path prefix and hands the request to the
+// McpAgent Durable Object, so it never reaches this router when MCP is enabled.
+// Routing it to `toApi` would be a lie about ownership AND a behaviour change
+// when the flag is off, where the path correctly falls through to the SSR 404.
+
 // Audited as React Router-owned (the RR migration superseded the API HTML; the API
 // still serves their DATA under /api/public/*): /book /report /r /messages /verify
 // /agreements /login /logout /forgot-password /inspections and all app pages.
