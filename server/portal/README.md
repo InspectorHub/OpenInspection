@@ -2,7 +2,7 @@
 
 Optional integration with the InspectorHub SaaS control plane. **Active only when
 `APP_MODE=saas`** (declared in `wrangler.saas.jsonc`). The worker entry
-(`workers/app.ts`) returns 404 for `/api/integration/*` otherwise, and the outbox
+(`workers/app.ts`) returns 404 for `/api/platform/*` otherwise, and the outbox
 publishes only when the `SYNC_QUEUE` producer binding is present. A self-host
 build (default `wrangler.jsonc`) executes none of this directory.
 
@@ -26,7 +26,7 @@ To produce a portal-free build: delete this directory, the
 `registerPortalIntegration(app)` call in `server/index.ts`, the
 `drainPortalOutbox` call in `server/scheduled.ts`, the `PortalProvider` +
 `OutboxService` branches in `server/lib/middleware/di.ts` (fall back to
-`StandaloneProvider` + leave `outbox` undefined), and the `/api/integration/*`
+`StandaloneProvider` + leave `outbox` undefined), and the `/api/platform/*`
 guard in `workers/app.ts`.
 
 Detailed integration docs live in the super-project `docs/saas-ops/`.

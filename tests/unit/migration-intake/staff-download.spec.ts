@@ -1,5 +1,5 @@
 /**
- * `GET /api/integration/migration-runs/:batchId/source` — the operator side of
+ * `GET /api/platform/migration-runs/:batchId/source` — the operator side of
  * an assisted import, and the first thing in this pipeline that can make opening
  * somebody else's file leave a trace.
  *
@@ -53,16 +53,16 @@ async function sha256(bytes: Uint8Array): Promise<string> {
     return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-describe('GET /api/integration/migration-runs/:batchId/source', () => {
+describe('GET /api/platform/migration-runs/:batchId/source', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
     let sqlite: ReturnType<typeof createTestDb>['sqlite'];
     let env: Record<string, unknown>;
 
-    function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/integration', integrationRoutes); return a; }
+    function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/platform', integrationRoutes); return a; }
 
     async function m2mGet(batchId: string, actor: PlatformActor | undefined) {
         const header = await signM2mHeader(env as Record<string, string | undefined>, actor);
-        return app().request(`/api/integration/migration-runs/${batchId}/source`, { headers: { [M2M_HEADER]: header } }, env);
+        return app().request(`/api/platform/migration-runs/${batchId}/source`, { headers: { [M2M_HEADER]: header } }, env);
     }
 
     async function lastAuditRow() {

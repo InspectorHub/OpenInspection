@@ -1,5 +1,5 @@
 /**
- * Default-template backfill — POST /api/integration/backfill-default-templates
+ * Default-template backfill — POST /api/platform/backfill-default-templates
  * signed-handshake tests.
  *
  * A one-shot M2M endpoint (no request body): it iterates every tenant and
@@ -27,14 +27,14 @@ const M2M_ENV = {
     JWT_PRIVATE_KEY_V1: FAKE_PEM,
 } as Record<string, unknown>;
 
-describe('POST /api/integration/backfill-default-templates', () => {
+describe('POST /api/platform/backfill-default-templates', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let sqlite: any;
 
     function buildApp() {
         const app = new OpenAPIHono<HonoConfig>();
-        app.route('/api/integration', integrationRoutes);
+        app.route('/api/platform', integrationRoutes);
         return app;
     }
 
@@ -61,7 +61,7 @@ describe('POST /api/integration/backfill-default-templates', () => {
 
     it('runs the backfill with a valid x-portal-m2m header (Service Binding)', async () => {
         const app = buildApp();
-        const res = await app.request('/api/integration/backfill-default-templates', {
+        const res = await app.request('/api/platform/backfill-default-templates', {
             method: 'POST',
             headers: {
                 'content-type':  'application/json',
@@ -76,7 +76,7 @@ describe('POST /api/integration/backfill-default-templates', () => {
 
     it('returns 403 when the M2M header is missing', async () => {
         const app = buildApp();
-        const res = await app.request('/api/integration/backfill-default-templates', {
+        const res = await app.request('/api/platform/backfill-default-templates', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
         }, M2M_ENV);

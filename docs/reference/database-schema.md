@@ -773,7 +773,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/tenant/discovery-objections.ts · 5 columns · primary key `id`</sub>
 
-> People who told us not to look them up. `GET /api/integration/tenants/by-email` answers, for one address, WHICH inspection companies hold a live report grant for it.
+> People who told us not to look them up. `GET /api/platform/tenants/by-email` answers, for one address, WHICH inspection companies hold a live report grant for it.
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -1841,7 +1841,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/qbo.ts · 11 columns · primary key `tenant_id`</sub>
 
-> One QuickBooks company, one workspace — and the webhook depends on it. `POST /api/integrations/qbo/webhook` is unauthenticated and platform-wide: in SaaS the Intuit app belongs to the platform, so there is ONE webhook URL and ONE verifier token for every realm, and nothing in the URL names a tenant.
+> One QuickBooks company, one workspace — and the webhook depends on it. `POST /webhooks/quickbooks` is unauthenticated and platform-wide: in SaaS the Intuit app belongs to the platform, so there is ONE webhook URL and ONE verifier token for every realm, and nothing in the URL names a tenant.
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|

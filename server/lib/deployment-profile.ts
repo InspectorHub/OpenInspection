@@ -77,11 +77,12 @@ export interface DeploymentProfile {
      *  Read this instead of branching on APP_MODE — see the file header. */
     hasManagedAi: boolean;
 
-    /** Where the MCP OAuth surface mounts. SaaS serves per-workspace endpoints
-     *  under /company/{slug}/mcp, so the provider takes the broad '/company/'
-     *  prefix; standalone has one fixed '/mcp'. The company-slug guard applies
-     *  exactly when this is '/company/' — derive it, do not re-test the mode. */
-    mcpApiRoute: '/mcp' | '/company/';
+    /** Where the MCP OAuth surface mounts. Always '/mcp': standalone serves the
+     *  single fixed endpoint, saas serves per-workspace /mcp/{slug} under the
+     *  same prefix. It used to be '/company/' in saas — a prefix broad enough
+     *  to swallow the entire /company/* namespace, which made "do not add a
+     *  /company/* route" an invisible rule living in a file nobody reads. */
+    mcpApiRoute: '/mcp';
 
     /** Whether the PLATFORM decides the video backend. True in saas (plan gate
      *  on tenants.tier/status); false in standalone, where the operator sets
@@ -157,7 +158,7 @@ export interface DeploymentProfile {
      *  mode. Naming the question is what makes the answer checkable. */
     tenantRecordOwnedByPortal: boolean;
 
-    /** Whether the portal M2M surface (`/api/integration/*`) exists at all.
+    /** Whether the portal M2M surface (`/api/platform/*`) exists at all.
      *  False in standalone: there is no platform on the other end, so the entry
      *  404s the prefix rather than mounting a machine-to-machine API nobody can
      *  authenticate to. A surface that answers is a surface somebody probes.
@@ -222,7 +223,7 @@ export const SAAS_PROFILE: DeploymentProfile = {
     hasSetupWizard: false,
     aiDevMockFallback: false,
     hasManagedAi: true,
-    mcpApiRoute: '/company/',
+    mcpApiRoute: '/mcp',
     videoBackendManaged: true,
     hasManagedCompliance: true,
     qboAppManaged: true,

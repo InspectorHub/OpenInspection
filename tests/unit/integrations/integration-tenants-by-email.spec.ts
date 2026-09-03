@@ -15,11 +15,11 @@ import { asD1Db } from '../helpers/test-db';
 const FAKE_PEM = `-----BEGIN PRIVATE KEY-----\n${btoa('test-m2m-shared-key-material-0123456789')}\n-----END PRIVATE KEY-----`;
 const ENV = { DB: {}, JWT_CURRENT_KID: 'v1', JWT_PRIVATE_KEY_V1: FAKE_PEM } as Record<string, unknown>;
 
-describe('GET /api/integration/tenants/by-email', () => {
+describe('GET /api/platform/tenants/by-email', () => {
   let testDb: BetterSQLite3Database<typeof schema>;
   let sqlite: ReturnType<typeof createTestDb>['sqlite'];
 
-  function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/integration', integrationRoutes); return a; }
+  function app() { const a = new OpenAPIHono<HonoConfig>(); a.route('/api/platform', integrationRoutes); return a; }
   async function header() { return signM2mHeader(ENV as Record<string, string | undefined>); }
 
   beforeEach(async () => {
@@ -42,17 +42,17 @@ describe('GET /api/integration/tenants/by-email', () => {
   afterEach(() => { sqlite.close(); vi.clearAllMocks(); });
 
   it('403 without M2M header', async () => {
-    const res = await app().request('/api/integration/tenants/by-email?email=jane@x.com', {}, ENV);
+    const res = await app().request('/api/platform/tenants/by-email?email=jane@x.com', {}, ENV);
     expect(res.status).toBe(403);
   });
   it('returns only tenants with a LIVE grant', async () => {
-    const res = await app().request('/api/integration/tenants/by-email?email=jane@x.com', { headers: { [M2M_HEADER]: await header() } }, ENV);
+    const res = await app().request('/api/platform/tenants/by-email?email=jane@x.com', { headers: { [M2M_HEADER]: await header() } }, ENV);
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { slugs: string[] } };
     expect(body.data.slugs).toEqual(['acme']); // t2 grant revoked
   });
   it('400 on missing email', async () => {
-    const res = await app().request('/api/integration/tenants/by-email', { headers: { [M2M_HEADER]: await header() } }, ENV);
+    const res = await app().request('/api/platform/tenants/by-email', { headers: { [M2M_HEADER]: await header() } }, ENV);
     expect(res.status).toBe(400);
   });
 });

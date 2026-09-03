@@ -781,7 +781,12 @@ describe('the agent-terms gate', () => {
  * agent request cannot go round — which is a different claim, and the one that
  * silently stops being true when someone reorders the chain.
  */
-describe('the gate is mounted where it cannot be skipped', { timeout: 30_000 }, () => {
+// 60s, not 30s, and the number is measured rather than guessed: run alone on a
+// warm tree this block reports 30.77s of test time against a 30s ceiling, so the
+// margin was zero and it failed two of three full-suite runs. The cost is the
+// `await import('../../../server/index')` below — the whole app, once — and a CI
+// runner is slower than the machine that produced that number.
+describe('the gate is mounted where it cannot be skipped', { timeout: 60_000 }, () => {
     it('runs on every path, after the JWT middleware and before the idempotency guard', async () => {
         const { app, idempotencyGuard } = await import('../../../server/index');
         const { jwtAuthMiddleware: realJwt } = await import('../../../server/lib/middleware/jwt-auth');

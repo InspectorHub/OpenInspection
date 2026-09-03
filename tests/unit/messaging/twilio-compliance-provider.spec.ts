@@ -168,7 +168,7 @@ describe('TwilioComplianceProvider.provision (sp10dlc)', () => {
         const captured: { data?: Record<string, string> } = {};
         const provider = new TwilioComplianceProvider(fakeTwilio([], { capturedProfile: captured }));
         const store = new D1ComplianceStateStore({} as D1Database);
-        const url = 'https://app.example.test/api/public/twilio/compliance-status/acme';
+        const url = 'https://app.example.test/webhooks/compliance-status/twilio/acme';
         await provider.provision(
             { tenantId: 'cb1', channel: 'sp10dlc', businessInfo: INFO, statusCallbackUrl: url }, store,
         );
@@ -345,7 +345,7 @@ describe('TwilioComplianceProvider.syncStatus', () => {
 
 describe('TwilioComplianceProvider.verifyWebhookSignature', () => {
     const SECRET = 'compliance-token';
-    const URL = 'https://app.example.test/api/public/twilio/compliance-status/acme';
+    const URL = 'https://app.example.test/webhooks/compliance-status/twilio/acme';
 
     it('accepts a valid signature', async () => {
         const provider = new TwilioComplianceProvider(fakeTwilio([]));
@@ -407,7 +407,7 @@ describe('TwilioComplianceProvider.webhookUrl', () => {
     it('builds the twilio-prefixed compliance-status URL', () => {
         const provider = new TwilioComplianceProvider(fakeTwilio([]));
         expect(provider.webhookUrl('https://app.example.test', 'acme'))
-            .toBe('https://app.example.test/api/public/twilio/compliance-status/acme');
+            .toBe('https://app.example.test/webhooks/compliance-status/twilio/acme');
     });
 
     it('exposes id = twilio', () => {

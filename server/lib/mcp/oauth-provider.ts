@@ -2,7 +2,7 @@ import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
 import { InspectorMcp } from '../../durable-objects/inspector-mcp';
 import type { McpProps } from '../../durable-objects/inspector-mcp';
 import { mcpEnabled } from './flag';
-import { assertCompanySlugMatches, companySlugFromMcpPath, stripCompanyPrefix } from './identity-bridge';
+import { assertCompanySlugMatches, slugFromMcpPath, stripMcpSlugPrefix } from './identity-bridge';
 import { getDeploymentProfile, type ProfileEnv } from '../deployment-profile';
 
 /**
@@ -26,16 +26,16 @@ type McpFlagEnv = { MCP_ENABLED?: string } & ProfileEnv;
  * is unaffected and the OAuth surface is not mounted at all.
  *
  * apiRoute strategy (docs/develop/conventions/mcp-oauth-notes.md §4 / §11.3), read from
- * profile.mcpApiRoute:
- *   - standalone: '/mcp'        — single fixed endpoint
- *   - saas:       '/company/'   — broad literal prefix; per-workspace /company/{slug}/mcp
+ * profile.mcpApiRoute, which is always '/mcp':
+ *   - standalone: the single fixed endpoint /mcp
+ *   - saas:       per-workspace /mcp/{slug} under the same prefix
  *
- * '/company/' is collision-free today — no existing /company/* routes; existing
- * slug routes are /book/ /inspector/ /portal/ /report/ /sign/ /observe/.
- * Re-verify before adding any new /company/* route — OAuthProvider treats every
- * /company/* request as an authenticated API call when this flag is on. The
- * segment is the full word `company` (not an abbreviation) per the project
- * URL-clarity rule and aligns with product terminology (Company).
+ * OAuthProvider matches apiRoute as a literal path PREFIX, so one value covers
+ * both shapes. The saas mount used to be the broad '/company/' prefix, which
+ * made OAuthProvider treat every /company/* request as an authenticated API
+ * call — it held the whole namespace hostage to a "do not add a /company/*
+ * route" rule written in a file nobody reads. That namespace is now released;
+ * this engine claims nothing under /company/.
  */
 export function buildOAuthHandler(
     appFetch: FetchFn,
@@ -43,51 +43,46 @@ export function buildOAuthHandler(
 ): { fetch: FetchFn } {
     if (!mcpEnabled(env)) return { fetch: appFetch };
 
-    // '/company/' is a broad literal prefix — all /company/* requests go through
-    // token auth. Slug validation (spec §6) is applied in the wrapper below.
-    const apiRoute = getDeploymentProfile(env).mcpApiRoute;
+    // A literal path prefix — every /mcp* request goes through token auth.
+    // Slug validation (spec §6) is applied in the wrapper below.
+    const apiRoute = getDeploymentProfile(env).mcpApiRoute; // always '/mcp'
 
     // McpAgent.serve() internal path is always '/mcp'; 'INSPECTOR_MCP' overrides
     // McpAgent's default MCP_OBJECT binding name (see wrangler.jsonc DO bindings).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const baseServeHandler = InspectorMcp.serve('/mcp', { binding: 'INSPECTOR_MCP' }) as any;
 
-    // The slug guard is needed exactly when the mount path carries the company
-    // prefix — derived from the route, not re-tested against the mode, so the
-    // two cannot drift (OI #308). The standalone path is byte-identical:
-    // companySlugFromMcpPath always returns null with no /company/ prefix.
+    // One handler for both modes: the slug guard fires exactly when the PATH
+    // carries a slug segment, not when the mode says it should. The standalone
+    // request /mcp has no slug segment, so slugFromMcpPath returns null and the
+    // request is delegated untouched — the two modes cannot drift (OI #308).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const apiHandler: any = apiRoute === '/company/'
-        ? {
-            fetch(
-                req: Request,
-                e: unknown,
-                ctx: ExecutionContext & { props?: McpProps },
-            ): Response | Promise<Response> {
-                const url = new URL(req.url);
-                const urlSlug = companySlugFromMcpPath(url.pathname);
-                if (urlSlug !== null) {
-                    const props = ctx.props;
-                    if (!props || !assertCompanySlugMatches(urlSlug, props)) {
-                        return new Response(JSON.stringify({ error: 'tenant_mismatch' }), {
-                            status: 403,
-                            headers: { 'content-type': 'application/json' },
-                        });
-                    }
-                    // McpAgent.serve('/mcp') matches the literal mount path via
-                    // URLPattern; the saas endpoint is /company/{slug}/mcp, which
-                    // would never match and 404s ("Not found"). Strip the
-                    // /company/{slug} prefix so the agent sees its mount path.
-                    // Tenant identity travels in ctx.props (verified above), and
-                    // the DO instance is keyed by session id — not the URL — so
-                    // this rewrite preserves tenant isolation.
-                    url.pathname = stripCompanyPrefix(url.pathname);
-                    return baseServeHandler.fetch(new Request(url, req), e, ctx);
-                }
-                return baseServeHandler.fetch(req, e, ctx);
-            },
-        }
-        : baseServeHandler;
+    const apiHandler: any = {
+        fetch(
+            req: Request,
+            e: unknown,
+            ctx: ExecutionContext & { props?: McpProps },
+        ): Response | Promise<Response> {
+            const url = new URL(req.url);
+            const urlSlug = slugFromMcpPath(url.pathname);
+            if (urlSlug === null) return baseServeHandler.fetch(req, e, ctx);
+            const props = ctx.props;
+            if (!props || !assertCompanySlugMatches(urlSlug, props)) {
+                return new Response(JSON.stringify({ error: 'tenant_mismatch' }), {
+                    status: 403,
+                    headers: { 'content-type': 'application/json' },
+                });
+            }
+            // McpAgent.serve('/mcp') matches the literal mount path via
+            // URLPattern; the saas endpoint is /mcp/{slug}, which would never
+            // match and 404s ("Not found"). Reduce it to the mount path so the
+            // agent sees what it registered. Tenant identity travels in
+            // ctx.props (verified above), and the DO instance is keyed by
+            // session id — not the URL — so this rewrite preserves isolation.
+            url.pathname = stripMcpSlugPrefix(url.pathname);
+            return baseServeHandler.fetch(new Request(url, req), e, ctx);
+        },
+    };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const provider = new OAuthProvider<any>({

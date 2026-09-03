@@ -36,7 +36,7 @@ let sqlite: ReturnType<typeof createTestDb>['sqlite'];
 
 function app() {
     const a = new Hono<HonoConfig>();
-    a.route('/api/integration', statutoryAdminRoutes);
+    a.route('/api/platform', statutoryAdminRoutes);
     return a;
 }
 async function auth() {
@@ -107,13 +107,13 @@ afterEach(() => {
 describe('the platform statutory admin surface', () => {
     it('answers nothing at all without a signed M2M header', async () => {
         for (const path of [
-            '/api/integration/statutory-forms/installs',
-            `/api/integration/statutory-forms/impact?formId=${FORM}&revision=${encodeURIComponent(REVISION)}`,
+            '/api/platform/statutory-forms/installs',
+            `/api/platform/statutory-forms/impact?formId=${FORM}&revision=${encodeURIComponent(REVISION)}`,
         ]) {
             const res = await app().request(path, {}, ENV);
             expect(res.status).toBe(403);
         }
-        const res = await app().request('/api/integration/marketplace/lib-1/delist',
+        const res = await app().request('/api/platform/marketplace/lib-1/delist',
             { method: 'POST' }, ENV);
         expect(res.status).toBe(403);
         const row = await db.select().from(schema.marketplaceLibraries)
@@ -122,7 +122,7 @@ describe('the platform statutory admin surface', () => {
     });
 
     it('reports how many workspaces are on each revision, which is where a recall starts', async () => {
-        const res = await get('/api/integration/statutory-forms/installs');
+        const res = await get('/api/platform/statutory-forms/installs');
         expect(res.status).toBe(200);
         const body = await res.json() as { data: Array<Record<string, unknown>> };
 
@@ -147,7 +147,7 @@ describe('the platform statutory admin surface', () => {
 
     it('a withdrawal names the documents already produced, not the inspections', async () => {
         const res = await get(
-            `/api/integration/statutory-forms/impact?formId=${FORM}&revision=${encodeURIComponent(REVISION)}`);
+            `/api/platform/statutory-forms/impact?formId=${FORM}&revision=${encodeURIComponent(REVISION)}`);
         expect(res.status).toBe(200);
         const body = await res.json() as { data: Record<string, unknown> };
 
@@ -163,7 +163,7 @@ describe('the platform statutory admin surface', () => {
         // The positive control. A handler that counted the whole table would
         // pass the assertion above and report 4 here.
         const res = await get(
-            `/api/integration/statutory-forms/impact?formId=${FORM}&revision=${encodeURIComponent(OLDER)}`);
+            `/api/platform/statutory-forms/impact?formId=${FORM}&revision=${encodeURIComponent(OLDER)}`);
         const body = await res.json() as { data: Record<string, unknown> };
         expect(body.data['productions']).toBe(1);
         expect(body.data['tenants']).toBe(1);
@@ -173,7 +173,7 @@ describe('the platform statutory admin surface', () => {
         const before = await browseCatalogue(db as never, 't1');
         expect(before.rows.some((r) => r.id === 'lib-1')).toBe(true);
 
-        const res = await app().request('/api/integration/marketplace/lib-1/delist',
+        const res = await app().request('/api/platform/marketplace/lib-1/delist',
             { method: 'POST', headers: { ...(await auth()), 'content-type': 'application/json' },
                 body: JSON.stringify({ delisted: true }) }, ENV);
         expect(res.status).toBe(200);
@@ -197,16 +197,16 @@ describe('the platform statutory admin surface', () => {
 
     it('a delisting can be taken back, because it deleted nothing', async () => {
         const headers = { ...(await auth()), 'content-type': 'application/json' };
-        await app().request('/api/integration/marketplace/lib-1/delist',
+        await app().request('/api/platform/marketplace/lib-1/delist',
             { method: 'POST', headers, body: JSON.stringify({ delisted: true }) }, ENV);
-        await app().request('/api/integration/marketplace/lib-1/delist',
+        await app().request('/api/platform/marketplace/lib-1/delist',
             { method: 'POST', headers, body: JSON.stringify({ delisted: false }) }, ENV);
         const after = await browseCatalogue(db as never, 't1');
         expect(after.rows.some((r) => r.id === 'lib-1')).toBe(true);
     });
 
     it('refuses to delist a catalogue entry that does not exist', async () => {
-        const res = await app().request('/api/integration/marketplace/nope/delist',
+        const res = await app().request('/api/platform/marketplace/nope/delist',
             { method: 'POST', headers: { ...(await auth()), 'content-type': 'application/json' },
                 body: JSON.stringify({ delisted: true }) }, ENV);
         expect(res.status).toBe(404);

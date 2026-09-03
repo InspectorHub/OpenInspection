@@ -2,7 +2,7 @@ import { z } from '@hono/zod-openapi';
 import { AUTHORITY_BASES } from '../../auth/authority-basis';
 
 /**
- * Body schema for PATCH /api/integration/tenants/:slug (M2M).
+ * Body schema for PATCH /api/platform/tenants/:slug (M2M).
  * slug comes from URL param, not body.
  */
 export const TenantStatusBodySchema = z.object({

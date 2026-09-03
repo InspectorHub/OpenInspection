@@ -6,12 +6,12 @@ import { readDestructionRecords } from '../lib/compliance/assurance-records';
 import { DestructionRecordQuerySchema } from '../lib/validations/assurance.schema';
 
 /**
- * GET /api/integration/destruction-records — the read side of the tenant purge.
+ * GET /api/platform/destruction-records — the read side of the tenant purge.
  *
  * `tenant_destruction_records` is the durable, non-personal proof that a
  * workspace's data was physically destroyed: counts of rows, R2 objects, R2
  * bytes and KV keys, plus when. It is written by
- * `POST /api/integration/tenants/:slug/purge` and, until this handler existed,
+ * `POST /api/platform/tenants/:slug/purge` and, until this handler existed,
  * was read by nothing at all — so "produce the record of tenant X's destruction"
  * could only be answered by opening D1 by hand.
  *

@@ -44,7 +44,7 @@ The URL depends on the deployment mode:
 | Mode | MCP endpoint |
 |---|---|
 | **Standalone** (single-tenant / self-host) | `https://<your-host>/mcp` |
-| **SaaS** (multi-tenant) | `https://<your-host>/company/<company-slug>/mcp` |
+| **SaaS** (multi-tenant) | `https://<your-host>/mcp/<company-slug>` |
 
 In SaaS, the company slug in the path scopes the connection to one company. A
 user who belongs to several companies makes **one connection per company** (see
@@ -56,7 +56,8 @@ them automatically):
 
 - Protected-resource metadata (RFC 9728): `/.well-known/oauth-protected-resource`
   (and the path-scoped variant for the endpoint, e.g.
-  `/.well-known/oauth-protected-resource/mcp`)
+  `/.well-known/oauth-protected-resource/mcp`, or
+  `/.well-known/oauth-protected-resource/mcp/<company-slug>` in SaaS)
 - Authorization: `/oauth/authorize`
 - Token: `/oauth/token`
 - Dynamic client registration (RFC 7591): `/oauth/register`
@@ -70,7 +71,7 @@ Using the Claude Code CLI:
 ```bash
 claude mcp add --transport http openinspection https://<your-host>/mcp
 # SaaS:
-claude mcp add --transport http openinspection https://<your-host>/company/<company-slug>/mcp
+claude mcp add --transport http openinspection https://<your-host>/mcp/<company-slug>
 ```
 
 The first time Claude calls a tool, it discovers the OAuth metadata, registers
@@ -127,8 +128,8 @@ companies means adding one MCP connection per company, each with that company's
 slug in the URL:
 
 ```bash
-claude mcp add --transport http acme  https://<your-host>/company/acme/mcp
-claude mcp add --transport http globex https://<your-host>/company/globex/mcp
+claude mcp add --transport http acme   https://<your-host>/mcp/acme
+claude mcp add --transport http globex https://<your-host>/mcp/globex
 ```
 
 Each connection has its own consent and its own revocable grant.

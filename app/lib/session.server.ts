@@ -205,7 +205,7 @@ export async function requireToken(context: LoadContext, request: Request): Prom
  * Why the app has to: a browser-direct hit on the API (portal SSO, `GET /sso`)
  * receives this cookie straight from Hono, but a form login goes through the
  * BFF, and Workers' fetch() strips Set-Cookie on that server-to-server hop —
- * see the comment at server/api/auth.ts:317, which is why that endpoint also
+ * see the "Token Relay BFF" comment in server/api/auth.ts, which is why it also
  * returns the JWT in its body. Without this, the browser holds only the React
  * Router session cookie: loaders work (they relay the token as a Bearer) while
  * anything the BROWSER issues directly does not, which is what left the collab

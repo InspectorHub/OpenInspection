@@ -33,7 +33,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // Imported AFTER the mock is registered.
 // eslint-disable-next-line import/order
-import { smsPublicRoutes } from '../../../server/api/sms';
+import { smsWebhookRoutes } from '../../../server/api/sms';
 import { SmsConsentService } from '../../../server/services/sms-consent.service';
 import { signParams } from '../../../server/lib/sms/send-sms';
 import { makeExecutionContext } from '../helpers/exec-ctx';
@@ -68,7 +68,7 @@ function buildApp() {
         c.set('profile', STANDALONE_PROFILE);
         await next();
     });
-    app.route('/api/public', smsPublicRoutes);
+    app.route('/webhooks', smsWebhookRoutes);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     return app;
 }
@@ -124,7 +124,7 @@ describe('inbound STOP — every subject the number stands for', () => {
     it('records a STOP from a staff member, who has no contact row at all', async () => {
         await seedUser('u-staff', TENANT, PHONE);
 
-        const res = await inbound('/api/public/sms/inbound/acme', 'STOP');
+        const res = await inbound('/webhooks/sms/inbound/acme', 'STOP');
         expect(res.status).toBe(200);
 
         const written = await rows();
@@ -146,7 +146,7 @@ describe('inbound STOP — every subject the number stands for', () => {
         await seedContact('c-jane', TENANT, 'client', PHONE);
         await seedUser('u-jane', TENANT, PHONE);
 
-        expect((await inbound('/api/public/sms/inbound/acme', 'STOP')).status).toBe(200);
+        expect((await inbound('/webhooks/sms/inbound/acme', 'STOP')).status).toBe(200);
 
         const written = await rows();
         expect(written.length).toBe(2);
@@ -161,8 +161,8 @@ describe('inbound STOP — every subject the number stands for', () => {
         // Otherwise the webhook is a one-way door for the one audience that has
         // no consumer opt-in page to come back through.
         await seedUser('u-staff', TENANT, PHONE);
-        await inbound('/api/public/sms/inbound/acme', 'STOP');
-        await inbound('/api/public/sms/inbound/acme', 'START');
+        await inbound('/webhooks/sms/inbound/acme', 'STOP');
+        await inbound('/webhooks/sms/inbound/acme', 'START');
 
         expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, 'u-staff', 'user'))
             .toBe('granted');
@@ -171,7 +171,7 @@ describe('inbound STOP — every subject the number stands for', () => {
     it('POSITIVE CONTROL — a contact-only STOP behaves exactly as it did', async () => {
         await seedContact('c-jane', TENANT, 'client', PHONE);
 
-        expect((await inbound('/api/public/sms/inbound/acme', 'STOP')).status).toBe(200);
+        expect((await inbound('/webhooks/sms/inbound/acme', 'STOP')).status).toBe(200);
 
         const written = await rows();
         expect(written.length).toBe(1);
@@ -190,7 +190,7 @@ describe('inbound STOP — every subject the number stands for', () => {
         await seedUser('u-acme', TENANT, PHONE);
         await seedUser('u-beta', OTHER_TENANT, PHONE);
 
-        expect((await inbound('/api/public/sms/inbound', 'STOP')).status).toBe(200);
+        expect((await inbound('/webhooks/sms/inbound', 'STOP')).status).toBe(200);
 
         const svc = new SmsConsentService({} as D1Database);
         expect(await svc.getLatest(TENANT, 'u-acme', 'user')).toBe('revoked');
@@ -201,7 +201,7 @@ describe('inbound STOP — every subject the number stands for', () => {
         await seedUser('u-acme', TENANT, PHONE);
         await seedUser('u-beta', OTHER_TENANT, PHONE);
 
-        await inbound('/api/public/sms/inbound/acme', 'STOP');
+        await inbound('/webhooks/sms/inbound/acme', 'STOP');
 
         const svc = new SmsConsentService({} as D1Database);
         expect(await svc.getLatest(TENANT, 'u-acme', 'user')).toBe('revoked');
@@ -221,7 +221,7 @@ describe('inbound STOP — the basis it is stamped with', () => {
         // opt-out count with business counterparties.
         await seedContact('c-1', TENANT, type, PHONE);
 
-        await inbound('/api/public/sms/inbound/acme', 'STOP');
+        await inbound('/webhooks/sms/inbound/acme', 'STOP');
 
         const row = await db.select().from(schema.smsConsentLog)
             .where(and(

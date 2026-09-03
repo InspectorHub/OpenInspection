@@ -90,7 +90,7 @@ async function qboApiFetch(
   try {
     const env = getCloudflareEnv(context);
     const apiBase = getApiUrl(context);
-    const req = new Request(`${apiBase}/settings/integrations/qbo${path}`, {
+    const req = new Request(`${apiBase}/api/integrations/qbo${path}`, {
       method,
       headers: { Cookie: cookie },
     });

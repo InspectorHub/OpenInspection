@@ -1,7 +1,7 @@
 import { z } from '@hono/zod-openapi';
 
 /**
- * POST /api/integration/sso-handoff body (consumed by the integration
+ * POST /api/platform/sso-handoff body (consumed by the integration
  * module's handoff route). Portal->core M2M handoff (guarded by
  * requireServiceBinding).
  *

@@ -26,29 +26,30 @@ export function internalJwtPayload(props: McpProps): Record<string, unknown> {
 }
 
 /** Spec §6 defense-in-depth: the company slug in the saas MCP URL
- * (/company/{slug}/mcp) MUST equal the slug baked into the OAuth grant.
- * A token issued for one company presented at another company's URL is
- * rejected here (tenant isolation also holds downstream via the
- * props.tenantId → internal JWT → ScopedDB chain; this fails loud at the edge). */
+ * (/mcp/{slug}) MUST equal the slug baked into the OAuth grant. A token issued
+ * for one company presented at another company's URL is rejected here (tenant
+ * isolation also holds downstream via the props.tenantId → internal JWT →
+ * ScopedDB chain; this fails loud at the edge). */
 export function assertCompanySlugMatches(urlSlug: string, props: McpProps): boolean {
     return urlSlug === props.tenantSlug;
 }
 
-/** Extract the company slug from a saas MCP path: /company/{slug}/mcp → slug. Null if absent. */
-export function companySlugFromMcpPath(pathname: string): string | null {
-    const m = pathname.match(/^\/company\/([^/]+)\/mcp(?:\/|$)/);
+/** Extract the company slug from a saas MCP path: /mcp/{slug} → slug.
+ *  Null for the bare standalone mount (/mcp) — which is what makes the saas
+ *  and standalone code paths byte-identical below it. */
+export function slugFromMcpPath(pathname: string): string | null {
+    const m = pathname.match(/^\/mcp\/([^/]+)(?:\/|$)/);
     return m ? decodeURIComponent(m[1]) : null;
 }
 
 /**
- * Strip the `/company/{slug}` prefix from a saas MCP path so it matches the
- * McpAgent mount path: `/company/acme/mcp` → `/mcp`, `/company/acme/mcp/message`
- * → `/mcp/message`. McpAgent.serve('/mcp') matches the literal mount via
- * URLPattern, so the saas tenant-in-URL path must be reduced before delegating.
- * Paths without the prefix (standalone `/mcp`) are returned unchanged.
+ * Reduce a saas MCP path to the McpAgent mount path: `/mcp/acme` → `/mcp`,
+ * `/mcp/acme/message` → `/mcp/message`. McpAgent.serve('/mcp') matches the
+ * literal mount via URLPattern, so the tenant-in-URL form must be reduced
+ * before delegating. Paths without a slug segment are returned unchanged.
  */
-export function stripCompanyPrefix(pathname: string): string {
-    return pathname.replace(/^\/company\/[^/]+/, '');
+export function stripMcpSlugPrefix(pathname: string): string {
+    return pathname.replace(/^\/mcp\/[^/]+/, '/mcp');
 }
 
 /**
@@ -85,7 +86,7 @@ export async function isGrantUserActive(env: AppEnv, props: McpProps): Promise<b
  * as the lazy-import pattern in workers/app.ts.
  *
  * Testing: the pure helpers above (internalJwtPayload, assertCompanySlugMatches,
- * companySlugFromMcpPath) and isGrantUserActive are unit-tested (C3 / Fix 1).
+ * slugFromMcpPath) and isGrantUserActive are unit-tested (C3 / Fix 1).
  * The full buildKeyring → signJwt → app.fetch path in this function is NOT yet
  * exercised by any automated test — C4's workers test STUBS callApiAsUser to
  * assert tool-handler wiring, so the JWT-mint → in-process dispatch seam is

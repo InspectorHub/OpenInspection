@@ -9,7 +9,7 @@ import { FREE_TIER_CAPS } from '../features/plan-quota/policy';
 import { logger } from '../lib/logger';
 
 /**
- * GET /api/integration/usage — platform monitoring: aggregated usage counters
+ * GET /api/platform/usage — platform monitoring: aggregated usage counters
  * across all tenants, for the portal console's usage dashboard. Per tenant:
  * lifetime sums for every metered dimension (platform + bring-your-own
  * sms/email, inspections), the r2_bytes gauge, the tenant's plan tier, and —

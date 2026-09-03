@@ -22,7 +22,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // Imported AFTER the mock is registered.
 // eslint-disable-next-line import/order
-import { smsPublicRoutes, smsAdminRoutes } from '../../../server/api/sms';
+import { smsPublicRoutes, smsWebhookRoutes, smsAdminRoutes } from '../../../server/api/sms';
 import * as resolveTwilioModule from '../../../server/lib/sms/resolve-twilio';
 import { SmsConsentService } from '../../../server/services/sms-consent.service';
 import { signParams } from '../../../server/lib/sms/send-sms';
@@ -71,6 +71,7 @@ function buildApp(db: BetterSQLite3Database<typeof schema>, profile: typeof SAAS
         await next();
     });
     app.route('/api/public', smsPublicRoutes);
+    app.route('/webhooks', smsWebhookRoutes);
     app.route('/api/admin', smsAdminRoutes);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     return app;
@@ -203,11 +204,11 @@ describe('SMS consent API (Track L Task 8)', () => {
         await new SmsConsentService({} as D1Database).record(TENANT, contactId, 'granted', 'admin', {});
 
         const params = { From: '+15551234567', Body: 'STOP' };
-        const url = `${APP_BASE_URL}/api/public/sms/inbound/acme`;
+        const url = `${APP_BASE_URL}/webhooks/sms/inbound/acme`;
         const sig = await signParams(PLATFORM_TOKEN, url, params);
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/sms/inbound/acme',
+        const res = await app.request('/webhooks/sms/inbound/acme',
             { ...form(params), headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': sig } },
             FAKE_ENV, makeExecCtx());
         expect(res.status).toBe(200);
@@ -230,11 +231,11 @@ describe('SMS consent API (Track L Task 8)', () => {
         await svc.record(OTHER_TENANT, cBeta, 'granted', 'admin', {});
 
         const params = { From: '+15551234567', Body: 'STOP' };
-        const url = `${APP_BASE_URL}/api/public/sms/inbound`;
+        const url = `${APP_BASE_URL}/webhooks/sms/inbound`;
         const sig = await signParams(PLATFORM_TOKEN, url, params);
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/sms/inbound',
+        const res = await app.request('/webhooks/sms/inbound',
             { ...form(params), headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': sig } },
             FAKE_ENV, makeExecCtx());
         expect(res.status).toBe(200);
@@ -251,7 +252,7 @@ describe('SMS consent API (Track L Task 8)', () => {
 
         const params = { From: '+15551234567', Body: 'STOP' };
         const app = buildApp(db);
-        const res = await app.request('/api/public/sms/inbound',
+        const res = await app.request('/webhooks/sms/inbound',
             { ...form(params), headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': 'wrong' } },
             FAKE_ENV, makeExecCtx());
         expect(res.status).toBe(403);
@@ -324,11 +325,11 @@ describe('SMS consent API (Track L Task 8)', () => {
         await new SmsConsentService({} as D1Database).record(TENANT, contactId, 'granted', 'admin', {});
 
         const params = { From: '+15551234567', Body: 'HELP' };
-        const url = `${APP_BASE_URL}/api/public/sms/inbound`;
+        const url = `${APP_BASE_URL}/webhooks/sms/inbound`;
         const sig = await signParams(PLATFORM_TOKEN, url, params);
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/sms/inbound',
+        const res = await app.request('/webhooks/sms/inbound',
             { ...form(params), headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': sig } },
             FAKE_ENV, makeExecCtx());
         expect(res.status).toBe(200);
@@ -407,7 +408,7 @@ describe('BYO Telnyx tenant inbound (Ed25519 JSON webhook)', () => {
         const env = { ...FAKE_ENV, TELNYX_VERIFY_NOW_MS: Number(TELNYX_TS) * 1000 } as unknown as HonoConfig['Bindings'];
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/sms/inbound/acme', {
+        const res = await app.request('/webhooks/sms/inbound/acme', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
@@ -437,7 +438,7 @@ describe('BYO Telnyx tenant inbound (Ed25519 JSON webhook)', () => {
         const env = { ...FAKE_ENV, TELNYX_VERIFY_NOW_MS: Number(TELNYX_TS) * 1000 } as unknown as HonoConfig['Bindings'];
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/sms/inbound/acme', {
+        const res = await app.request('/webhooks/sms/inbound/acme', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
@@ -466,7 +467,7 @@ describe('BYO Telnyx tenant inbound (Ed25519 JSON webhook)', () => {
         const env = { ...FAKE_ENV, TELNYX_VERIFY_NOW_MS: Number(TELNYX_TS) * 1000 } as unknown as HonoConfig['Bindings'];
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/sms/inbound/acme', {
+        const res = await app.request('/webhooks/sms/inbound/acme', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
@@ -974,7 +975,7 @@ describe('Managed compliance admin endpoints (Task 6)', () => {
 
 import { signParams as _signParamsForCompliance } from '../../../server/lib/messaging/twilio';
 import { MessagingComplianceService } from '../../../server/services/messaging-compliance.service';
-import { smsPublicRoutes as _smsPublicRoutes } from '../../../server/api/sms';
+import { smsWebhookRoutes as _smsWebhookRoutes } from '../../../server/api/sms';
 import { TwilioComplianceProvider } from '../../../server/lib/messaging/providers/twilio-compliance';
 
 /**
@@ -995,7 +996,7 @@ function fakeReadProvider(tfvs: Array<{ sid: string; status: string }> = []): Tw
 
 const COMPLIANCE_TOKEN = 'compliance-webhook-token';
 
-/** Build a minimal app with smsPublicRoutes mounted for compliance webhook tests. */
+/** Build a minimal app with smsWebhookRoutes mounted for compliance webhook tests. */
 function buildComplianceApp(database: BetterSQLite3Database<typeof schema>, token?: string) {
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => {
@@ -1005,7 +1006,7 @@ function buildComplianceApp(database: BetterSQLite3Database<typeof schema>, toke
         return c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500);
     });
     // No JWT injection needed — this route is fully public (signature-verified).
-    app.route('/api/public', _smsPublicRoutes);
+    app.route('/webhooks', _smsWebhookRoutes);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(database);
 
     const env: HonoConfig['Bindings'] = {
@@ -1045,12 +1046,12 @@ async function postComplianceCallback(
     params: Record<string, string>,
     tokenOverride?: string,
 ) {
-    const url = `${APP_BASE_URL}/api/public/twilio/compliance-status/${tenantSlug}`;
+    const url = `${APP_BASE_URL}/webhooks/compliance-status/twilio/${tenantSlug}`;
     const signingToken = tokenOverride ?? COMPLIANCE_TOKEN;
     const sig = await _signParamsForCompliance(signingToken, url, params);
     const body = new URLSearchParams(params).toString();
     return app.request(
-        `/api/public/twilio/compliance-status/${tenantSlug}`,
+        `/webhooks/compliance-status/twilio/${tenantSlug}`,
         {
             method: 'POST',
             headers: {
@@ -1132,7 +1133,7 @@ describe('Compliance-status webhook (Task 7)', () => {
         const body = new URLSearchParams(params).toString();
 
         const res = await app.request(
-            '/api/public/twilio/compliance-status/acme',
+            '/webhooks/compliance-status/twilio/acme',
             {
                 method: 'POST',
                 headers: {
@@ -1160,7 +1161,7 @@ describe('Compliance-status webhook (Task 7)', () => {
         const body = new URLSearchParams(params).toString();
 
         const res = await app.request(
-            '/api/public/twilio/compliance-status/acme',
+            '/webhooks/compliance-status/twilio/acme',
             {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -1182,7 +1183,7 @@ describe('Compliance-status webhook (Task 7)', () => {
         // Build app with no token in env (both TWILIO_COMPLIANCE_WEBHOOK_TOKEN
         // and TWILIO_AUTH_TOKEN absent).
         const app = new OpenAPIHono<HonoConfig>();
-        app.route('/api/public', _smsPublicRoutes);
+        app.route('/webhooks', _smsWebhookRoutes);
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
         const envNoToken = {
@@ -1195,11 +1196,11 @@ describe('Compliance-status webhook (Task 7)', () => {
 
         const params = { CampaignSid: 'CR123', CampaignStatus: 'TWILIO_APPROVED' };
         // Sign with any token — doesn't matter, will be rejected before verification.
-        const sig = await _signParamsForCompliance('any-token', `${APP_BASE_URL}/api/public/twilio/compliance-status/acme`, params);
+        const sig = await _signParamsForCompliance('any-token', `${APP_BASE_URL}/webhooks/compliance-status/twilio/acme`, params);
         const body = new URLSearchParams(params).toString();
 
         const res = await app.request(
-            '/api/public/twilio/compliance-status/acme',
+            '/webhooks/compliance-status/twilio/acme',
             {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-twilio-signature': sig },
@@ -1230,7 +1231,7 @@ describe('Compliance-status webhook (Task 7)', () => {
         const body = new URLSearchParams(params).toString();
 
         const res = await app.request(
-            '/api/public/bogus/compliance-status/acme',
+            '/webhooks/compliance-status/bogus/acme',
             {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -1265,7 +1266,7 @@ describe('Compliance-status webhook (Task 7)', () => {
         const sig = await sign(ts, rawBody);
 
         const res = await app.request(
-            '/api/public/telnyx/compliance-status/acme',
+            '/webhooks/compliance-status/telnyx/acme',
             {
                 method: 'POST',
                 headers: {
@@ -1303,7 +1304,7 @@ describe('Compliance-status webhook (Task 7)', () => {
         });
 
         const res = await app.request(
-            '/api/public/telnyx/compliance-status/acme',
+            '/webhooks/compliance-status/telnyx/acme',
             {
                 method: 'POST',
                 headers: {

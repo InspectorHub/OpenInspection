@@ -164,7 +164,7 @@ describe('TelnyxComplianceProvider.provision (sp10dlc)', () => {
         const capturedBrand: { body?: Record<string, unknown> } = {};
         const provider = new TelnyxComplianceProvider(fakeTelnyx([], { capturedBrand }));
         const store = new D1ComplianceStateStore({} as D1Database);
-        const url = 'https://app.example.test/api/public/telnyx/compliance-status/acme';
+        const url = 'https://app.example.test/webhooks/compliance-status/telnyx/acme';
         await provider.provision(
             { tenantId: 'cb1', channel: 'sp10dlc', businessInfo: INFO, statusCallbackUrl: url }, store,
         );
@@ -287,7 +287,7 @@ describe('TelnyxComplianceProvider.provision (tollfree)', () => {
         const capturedTfv: { body?: Record<string, unknown> } = {};
         const provider = new TelnyxComplianceProvider(fakeTelnyx([], { capturedTfv }));
         const store = new D1ComplianceStateStore({} as D1Database);
-        const url = 'https://app.example.test/api/public/telnyx/compliance-status/acme';
+        const url = 'https://app.example.test/webhooks/compliance-status/telnyx/acme';
         await provider.provision(
             { tenantId: 'tf3', channel: 'tollfree', businessInfo: INFO, statusCallbackUrl: url }, store,
         );
@@ -574,7 +574,7 @@ describe('TelnyxComplianceProvider.webhookUrl / id', () => {
     it('builds the telnyx-prefixed compliance-status URL', () => {
         const provider = new TelnyxComplianceProvider(fakeTelnyx([]));
         expect(provider.webhookUrl('https://app.example.test', 'acme'))
-            .toBe('https://app.example.test/api/public/telnyx/compliance-status/acme');
+            .toBe('https://app.example.test/webhooks/compliance-status/telnyx/acme');
     });
 
     it('exposes id = telnyx', () => {

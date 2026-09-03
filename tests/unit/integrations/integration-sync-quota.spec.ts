@@ -1,9 +1,9 @@
 /**
- * Seat-quota M2M sync — POST /api/integration/sync-quota signed-handshake tests.
+ * Seat-quota M2M sync — POST /api/platform/sync-quota signed-handshake tests.
  *
  * Migrated from the core admin router (`/api/admin/*`) to the portal
  * integration seam (`server/portal/integration.routes.ts`, mounted at
- * `/api/integration/*`). This mounts the real integration routes on a fresh
+ * `/api/platform/*`). This mounts the real integration routes on a fresh
  * OpenAPIHono so we exercise the actual middleware chain — the
  * `requireServiceBinding` M2M guard + the route handler. `drizzle-orm/d1` is
  * mocked to a better-sqlite3 instance so the `maxUsers` UPDATE hits a real-ish
@@ -34,7 +34,7 @@ const M2M_ENV = {
     JWT_PRIVATE_KEY_V1: FAKE_PEM,
 } as Record<string, unknown>;
 
-describe('POST /api/integration/sync-quota', () => {
+describe('POST /api/platform/sync-quota', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let sqlite: any;
@@ -42,8 +42,8 @@ describe('POST /api/integration/sync-quota', () => {
 
     function buildApp() {
         const app = new OpenAPIHono<HonoConfig>();
-        // Mirror registerPortalIntegration(app): app.route('/api/integration', integrationRoutes).
-        app.route('/api/integration', integrationRoutes);
+        // Mirror registerPortalIntegration(app): app.route('/api/platform', integrationRoutes).
+        app.route('/api/platform', integrationRoutes);
         return app;
     }
 
@@ -71,7 +71,7 @@ describe('POST /api/integration/sync-quota', () => {
 
     it('updates maxUsers with a valid x-portal-m2m header (Service Binding)', async () => {
         const app = buildApp();
-        const res = await app.request('/api/integration/sync-quota', {
+        const res = await app.request('/api/platform/sync-quota', {
             method: 'POST',
             headers: {
                 'content-type':  'application/json',
@@ -94,7 +94,7 @@ describe('POST /api/integration/sync-quota', () => {
 
     it('returns 403 when the M2M header is missing', async () => {
         const app = buildApp();
-        const res = await app.request('/api/integration/sync-quota', {
+        const res = await app.request('/api/platform/sync-quota', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ tenantId, maxUsers: 25 }),
@@ -108,7 +108,7 @@ describe('POST /api/integration/sync-quota', () => {
 
     it('returns 404 for an unknown tenantId', async () => {
         const app = buildApp();
-        const res = await app.request('/api/integration/sync-quota', {
+        const res = await app.request('/api/platform/sync-quota', {
             method: 'POST',
             headers: {
                 'content-type':  'application/json',
@@ -125,7 +125,7 @@ describe('POST /api/integration/sync-quota', () => {
 
     it('returns 400 for invalid input (maxUsers out of range)', async () => {
         const app = buildApp();
-        const res = await app.request('/api/integration/sync-quota', {
+        const res = await app.request('/api/platform/sync-quota', {
             method: 'POST',
             headers: {
                 'content-type':  'application/json',

@@ -160,7 +160,9 @@
     "lint:doclinks": "node scripts/check-doc-links.mjs",
     "lint:no-portal-routes": "node scripts/check-no-portal-routes.mjs",
     "docs:shots": "playwright test -c playwright.docs-shots.config.ts",
-    "lint:unwired": "node scripts/check-unwired.mjs"
+    "lint:unwired": "node scripts/check-unwired.mjs",
+    "lint:url-taxonomy": "node scripts/check-url-taxonomy.mjs",
+    "lint:route-dispatch": "node scripts/check-route-dispatch-parity.mjs"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^0.8.1",
@@ -260,7 +262,9 @@
     "@hono/node-server": ">=2.0.5",
     "brace-expansion": "^5.0.9",
     "ip-address": ">=10.2.2",
-    "fast-uri": "^3.1.5",
+    "fast-uri": "^3.1.6",
+    "qs": "^6.16.0",
+    "@humanfs/node": "^0.16.8",
     "postcss": ">=8.5.18",
     "valibot": ">=1.4.2"
   },

@@ -58,9 +58,9 @@ export const tenantRouter: MiddlewareHandler<HonoConfig> = async (c, next) => {
         // and the JWT middleware downstream sets tenantId from the
         // verified token claim.
         if (!c.get('tenantId')) {
-            const isBypassPath = path === '/setup' || path === '/login'
+            const isBypassPath = path === '/setup'
                 || path === '/api/auth/setup' || path === '/api/auth/login'
-                || path === '/status' || path.startsWith('/api/integration')
+                || path === '/status' || path.startsWith('/api/platform')
                 || path === '/api/agent-signup' || path === '/api/agents/accept'
                 || path === '/api/concierge/confirm'
                 || path === '/api/concierge/book-info'

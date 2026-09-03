@@ -1,7 +1,7 @@
 /**
  * The webhook is an UNAUTHENTICATED public endpoint that names its own tenant.
  *
- * `POST /api/integrations/qbo/webhook` is excluded from JWT middleware, so the
+ * `POST /webhooks/quickbooks` is excluded from JWT middleware, so the
  * only thing standing between the open internet and a tenant's books is the
  * `intuit-signature` HMAC — and the only thing that decides WHOSE books get
  * written is a realm id read out of the request body. Both live in

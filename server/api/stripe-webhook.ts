@@ -13,11 +13,10 @@ import { getDrizzle } from '../lib/route-helpers';
  * index.ts `isPublic`); authenticity is proven by the `stripe-signature`
  * HMAC verified against the tenant's OWN webhook signing secret.
  *
- * Tenant resolution: the slug-scoped mount
- * `/api/integrations/stripe/webhook/:tenant` resolves the tenant via
- * PUBLIC_PREFIXES path-param resolution (saas + standalone); the bare legacy
- * mount still works in standalone via the fixed tenant. No tenant in scope →
- * fail-closed no-op.
+ * Tenant resolution: the slug-scoped mount `/webhooks/stripe/:tenant` resolves
+ * the tenant via PUBLIC_PREFIXES path-param resolution (saas + standalone); the
+ * bare `/webhooks/stripe` mount still works in standalone via the fixed tenant.
+ * No tenant in scope → fail-closed no-op.
  *
  * Processing is SYNCHRONOUS: two idempotent D1 updates, 500 on failure so
  * Stripe's own retry (exponential backoff, up to 3 days) is the durability

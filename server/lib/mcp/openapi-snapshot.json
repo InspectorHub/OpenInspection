@@ -19103,11 +19103,11 @@
           "name": "code",
           "in": "query",
           "required": true,
-          "description": "One-time SSO handoff code minted by the portal at POST /api/integration/sso-handoff. Single-use, expires after 60 seconds, deleted from KV on successful consume.",
+          "description": "One-time SSO handoff code minted by the portal at POST /api/platform/sso-handoff. Single-use, expires after 60 seconds, deleted from KV on successful consume.",
           "schema": {
             "type": "string",
             "minLength": 8,
-            "description": "One-time SSO handoff code minted by the portal at POST /api/integration/sso-handoff. Single-use, expires after 60 seconds, deleted from KV on successful consume."
+            "description": "One-time SSO handoff code minted by the portal at POST /api/platform/sso-handoff. Single-use, expires after 60 seconds, deleted from KV on successful consume."
           }
         },
         {

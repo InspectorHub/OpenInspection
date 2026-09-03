@@ -56,7 +56,7 @@ const DESCRIPTIONS: Record<keyof DeploymentProfile, string> = {
     tenantRecordOwnedByPortal:
         'Whether a platform stores the authoritative tenant record and this worker reads a projection of it. Decides which admin provider is constructed; in standalone this deployment owns the row outright.',
     hasPortalIntegrationApi:
-        'Whether the portal machine-to-machine surface (`/api/integration/*`) is mounted. Standalone 404s the whole prefix rather than answering on an API nobody can authenticate to.',
+        'Whether the portal machine-to-machine surface (`/api/platform/*`) is mounted. Standalone 404s the whole prefix rather than answering on an API nobody can authenticate to.',
     hasAssistedMigration:
         'An import whose file no adapter can read may be handed to a support team. Absent in standalone, where the file is refused before it is stored rather than kept for nobody.',
     importMaxCsvBytes:
@@ -103,8 +103,12 @@ function cell(value: unknown): string {
  * to introduce, which is the leak the gate exists to catch.
  */
 const ROUTE_ALLOW: Partial<Record<keyof DeploymentProfile, string>> = {
-    mcpApiRoute:
-        "this cell is the VALUE of this engine's own mcpApiRoute setting, not a link to a hosted screen",
+    // Empty on purpose. `mcpApiRoute` lived here while its saas value was
+    // `/company/`, which the gate reads as a hosted-service path. The mount is
+    // `/mcp` in both modes now, so the exemption has nothing left to exempt —
+    // and a line-scoped allow left behind on a live row silently exempts
+    // whatever VALUE that row takes next, which is the leak the gate exists
+    // to catch.
 };
 
 export function renderModesTable(): string {

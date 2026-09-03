@@ -184,6 +184,21 @@ describe('gate registry', () => {
             // Cost: one `git ls-files` and an indexOf per file — 0.33s over
             // 3,940 files, measured three times.
             'rawnul',
+            // Added 2026-09-03 with the URL-taxonomy gate, and the lock did its
+            // job once more: registered at this rung without this entry, so the
+            // full run went red on a tree whose pre-commit hook was green.
+            //
+            // It earns pre-commit on the narrowest argument any entry here
+            // makes: what it checks is decided by a single line in a single
+            // file. A mount path is written once and is wrong the moment it is
+            // typed -- there is no half-finished state for it to blame the
+            // wrong commit for, which is the usual reason a gate belongs at
+            // push instead. Its sibling `routedispatch` IS such a gate (two
+            // files must agree) and is registered at PUSH for exactly that
+            // reason; the two arriving together is what makes the distinction
+            // legible. Cost: reads three files and matches route registrations
+            // in them, no directory walk.
+            'urltaxonomy',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);

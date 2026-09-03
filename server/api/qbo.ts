@@ -44,11 +44,11 @@ api.use('*', async (c, next) => {
  * carries no tenant, so it must never reach a handler.
  *
  * The browser-facing half of the integration — `/connect` and `/callback` — is
- * NOT here: it lives in `api/qbo-oauth.ts` under `/api/integrations/qbo`,
- * because this `/settings/**` mount is unreachable from a browser
- * (`workers/app.ts` forwards an allow-list that does not include it). `/connect`
- * kept this same owner/manager guard on the way over; `/callback` is authorized
- * by `state` instead, since Intuit's redirect carries no cookie.
+ * NOT here: it lives in `api/qbo-oauth.ts`. Both routers share the
+ * `/api/integrations/qbo` mount, so the two `use('*')` guards above re-register
+ * across that whole prefix; `server/index.ts` mounts this router AFTER the pair
+ * so they cannot answer Intuit's cookie-less `/callback`. `/connect` carries the
+ * same owner/manager guard per route; `/callback` is authorized by `state`.
  *
  * Asserted at the HTTP boundary in `tests/unit/qbo/qbo-route-authorization.spec.ts`
  * (and `qbo-oauth-callback.spec.ts` for the pair that moved), because neither

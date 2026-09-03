@@ -8,7 +8,7 @@ import { capabilitiesForProfile, type RoleKind } from '../lib/people/capabilitie
 import { hasDiscoveryObjection } from './discovery-objection';
 
 /**
- * GET /api/integration/tenants/by-email?email=<email>
+ * GET /api/platform/tenants/by-email?email=<email>
  * Cross-tenant client grant lookup: returns the slugs of tenants where the
  * email holds a LIVE (not revoked, not expired) grant whose role-profile KIND
  * grants selfRetrieveReport (client/co_client by default — see
