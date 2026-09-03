@@ -12,21 +12,20 @@ import { applyIntegrationSecrets } from '../lib/middleware/integration-secrets';
 /**
  * The two halves of the QuickBooks OAuth handshake that a BROWSER walks
  * through, split out from the rest of the QBO admin router (`api/qbo.ts`) and
- * mounted under `/api/integrations/qbo` beside the webhook.
+ * mounted under `/api/integrations/qbo`.
  *
  * They live here, and not with their siblings, because they are the only QBO
  * routes the outside world navigates to. The siblings (`/status`, `/pause`,
  * `/sync`, …) are fetched by the settings page through the in-process
- * `API_WORKER` binding, so their `/settings/**` mount is fine; these two are
- * not reachable there at all — `workers/app.ts` forwards an explicit prefix
- * allow-list to this API app, `/settings/**` is not on it, and everything else
- * goes to React Router, which has no `/settings/integrations/qbo/connect` page.
+ * `API_WORKER` binding.
  *
- * NOTE: no router-wide `use('*')` middleware. The guards are per-route. This
- * used to be load-bearing for a second reason — the webhook router shared this
- * mount prefix, so prefix middleware would have put a session check in front of
- * a route Intuit calls with an HMAC and no cookie. The webhook has since moved
- * to the top-level `/webhooks/quickbooks`, so only the first reason remains.
+ * NOTE: no router-wide `use('*')` middleware. The guards are per-route. That is
+ * load-bearing again: `api/qbo.ts` now shares this mount prefix, and ITS two
+ * router-wide guards re-register across the whole prefix — these two routes
+ * included. `server/index.ts` therefore mounts this router FIRST, so a
+ * cookie-less `/callback` from Intuit is answered here rather than 401'd by a
+ * session check meant for the management API. Pinned by
+ * `tests/unit/routing/qbo-api-mount.spec.ts`.
  */
 const api = new Hono<HonoConfig>();
 

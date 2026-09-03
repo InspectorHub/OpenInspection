@@ -459,18 +459,18 @@ const routes = app
   .route('/api/messages', messageRoutes)
   .route('/api/notifications', notificationsRoutes)
   .route('/api', notificationPreferenceRoutes)   // reader's own preferences (§4)
-  .route('/settings/integrations/qbo', qboRoutes)
   // Inbound webhooks mount at the TOP LEVEL, never under /api/: the producer
   // owns the body schema, headers and signature, and none of the /api/*
   // middleware applies — no CORS, no last-active touch, no idempotency guard
   // (they dedupe via processed_webhook_events), and emphatically no
   // subscription gate: a lapsed tenant is when a provider most needs delivery.
   .route('/webhooks/quickbooks', qboWebhookRoutes)
-  // Browser-facing OAuth pair (/connect, /callback), under /api/* rather than
-  // /settings/** because workers/app.ts forwards only an allow-list and
-  // /settings/** is not on it. The redirect_uri Intuit matches byte-for-byte
-  // comes from the one constant; see lib/qbo-oauth-paths.ts.
+  // Browser-facing OAuth pair (/connect, /callback). The redirect_uri Intuit
+  // matches byte-for-byte comes from one constant; see lib/qbo-oauth-paths.ts.
   .route(QBO_OAUTH_MOUNT, qboOauthRoutes)
+  // Management API, same prefix but AFTER the pair — its router-wide use('*')
+  // guards would else 401 Intuit's cookie-less /callback (qbo-api-mount.spec).
+  .route('/api/integrations/qbo', qboRoutes)
   // :tenant is load-bearing — Stripe's verifier secret is per-tenant, so
   // PUBLIC_PREFIXES must resolve it BEFORE the signature can be checked.
   .route('/webhooks/stripe/:tenant', stripeWebhookRoutes)
