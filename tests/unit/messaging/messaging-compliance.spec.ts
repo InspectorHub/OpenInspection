@@ -424,7 +424,7 @@ describe('syncManagedStatus — change detection', () => {
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig, AppServices } from '../../../server/types/hono';
-import { smsPublicRoutes } from '../../../server/api/sms';
+import { smsWebhookRoutes } from '../../../server/api/sms';
 import { signParams } from '../../../server/lib/messaging/twilio';
 import { makeExecutionContext } from '../helpers/exec-ctx';
 
@@ -465,7 +465,7 @@ async function buildWebhookApp(
         await next();
     });
 
-    app.route('/api/public', smsPublicRoutes);
+    app.route('/webhooks', smsWebhookRoutes);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(database);
 
     const env: HonoConfig['Bindings'] = {
@@ -486,10 +486,10 @@ async function postWebhook(
     tenantSlug: string,
     params: Record<string, string>,
 ) {
-    const url = `${APP_BASE_URL_WH}/api/public/twilio/compliance-status/${tenantSlug}`;
+    const url = `${APP_BASE_URL_WH}/webhooks/compliance-status/twilio/${tenantSlug}`;
     const sig = await signParams(COMPLIANCE_TOKEN_WH, url, params);
     return app.request(
-        `/api/public/twilio/compliance-status/${tenantSlug}`,
+        `/webhooks/compliance-status/twilio/${tenantSlug}`,
         {
             method: 'POST',
             headers: {

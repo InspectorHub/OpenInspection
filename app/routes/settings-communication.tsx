@@ -562,7 +562,7 @@ export default function SettingsCommunication() {
   const tenantSlug = session?.branding.tenantSlug ?? "";
   const inboundUrl =
     typeof window !== "undefined" && tenantSlug
-      ? `${window.location.origin}/api/public/sms/inbound/${tenantSlug}`
+      ? `${window.location.origin}/webhooks/sms/inbound/${tenantSlug}`
       : "";
 
   // Transient success flash — visible for 4s after a secret save round-trip.

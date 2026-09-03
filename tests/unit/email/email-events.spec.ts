@@ -10,14 +10,14 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
  * WH-3 — tenant email-events receiver (in-process Hono harness, mirrors
  * sms-api.spec.ts): mock drizzle-orm/d1 → test sqlite, seal each tenant's webhook
  * secret into tenant_configs.secrets_enc via sealSecrets, then drive
- * POST /api/public/email/:provider/:tenant with synthetic signed payloads.
+ * POST /webhooks/email/:provider/:tenant with synthetic signed payloads.
  */
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // Imported AFTER the mock is registered.
 // eslint-disable-next-line import/order
-import { smsPublicRoutes } from '../../../server/api/sms';
+import { smsWebhookRoutes } from '../../../server/api/sms';
 import { sealSecrets } from '../../../server/lib/config-crypto';
 import { makeExecutionContext } from '../helpers/exec-ctx';
 
@@ -48,7 +48,7 @@ function buildApp(database: BetterSQLite3Database<typeof schema>) {
         }
         return c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500);
     });
-    app.route('/api/public', smsPublicRoutes);
+    app.route('/webhooks', smsWebhookRoutes);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(database);
     return app;
 }
@@ -132,7 +132,7 @@ describe('WH-3 email-events receiver — Resend (Svix HMAC)', () => {
         const headers = await svixHeaders(body, 'msg_hb1', tsSeconds);
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/email/resend/acme',
+        const res = await app.request('/webhooks/email/resend/acme',
             { method: 'POST', headers, body }, FAKE_ENV, makeExecCtx());
 
         expect(res.status).toBe(200);
@@ -149,7 +149,7 @@ describe('WH-3 email-events receiver — Resend (Svix HMAC)', () => {
         const headers = await svixHeaders(body, 'msg_cp1', tsSeconds);
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/email/resend/acme',
+        const res = await app.request('/webhooks/email/resend/acme',
             { method: 'POST', headers, body }, FAKE_ENV, makeExecCtx());
 
         expect(res.status).toBe(200);
@@ -164,7 +164,7 @@ describe('WH-3 email-events receiver — Resend (Svix HMAC)', () => {
         const headers = await svixHeaders(body, 'msg_sb1', tsSeconds);
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/email/resend/acme',
+        const res = await app.request('/webhooks/email/resend/acme',
             { method: 'POST', headers, body }, FAKE_ENV, makeExecCtx());
 
         expect(res.status).toBe(200);
@@ -177,10 +177,10 @@ describe('WH-3 email-events receiver — Resend (Svix HMAC)', () => {
         const headers = await svixHeaders(body, 'msg_dup1', tsSeconds);
 
         const app = buildApp(db);
-        const first = await app.request('/api/public/email/resend/acme',
+        const first = await app.request('/webhooks/email/resend/acme',
             { method: 'POST', headers, body }, FAKE_ENV, makeExecCtx());
         expect(first.status).toBe(200);
-        const second = await app.request('/api/public/email/resend/acme',
+        const second = await app.request('/webhooks/email/resend/acme',
             { method: 'POST', headers, body }, FAKE_ENV, makeExecCtx());
         expect(second.status).toBe(200);
 
@@ -194,7 +194,7 @@ describe('WH-3 email-events receiver — Resend (Svix HMAC)', () => {
         headers['svix-signature'] = 'v1,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='; // wrong
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/email/resend/acme',
+        const res = await app.request('/webhooks/email/resend/acme',
             { method: 'POST', headers, body }, FAKE_ENV, makeExecCtx());
 
         expect(res.status).toBe(403);
@@ -203,14 +203,14 @@ describe('WH-3 email-events receiver — Resend (Svix HMAC)', () => {
 
     it('unknown provider → 404', async () => {
         const app = buildApp(db);
-        const res = await app.request('/api/public/email/bogus/acme',
+        const res = await app.request('/webhooks/email/bogus/acme',
             { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }, FAKE_ENV, makeExecCtx());
         expect(res.status).toBe(404);
     });
 
     it('unknown tenant → 404', async () => {
         const app = buildApp(db);
-        const res = await app.request('/api/public/email/resend/ghost',
+        const res = await app.request('/webhooks/email/resend/ghost',
             { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }, FAKE_ENV, makeExecCtx());
         expect(res.status).toBe(404);
     });
@@ -230,7 +230,7 @@ describe('WH-3 email-events receiver — SendGrid (ECDSA P-256)', () => {
         await sealWebhookSecret(db, TENANT, 'SENDGRID_WEBHOOK_PUBLIC_KEY', spki);
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/email/sendgrid/acme', {
+        const res = await app.request('/webhooks/email/sendgrid/acme', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',

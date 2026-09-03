@@ -16,7 +16,7 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 describe('Twilio validateInboundSignature (ctx form)', () => {
-    const url = 'https://app.example.com/api/public/sms/inbound';
+    const url = 'https://app.example.com/webhooks/sms/inbound';
     const params = { From: '+15551234567', Body: 'STOP' };
     const authToken = 'authtoken';
 
@@ -89,7 +89,7 @@ describe('Telnyx validateInboundSignature (Ed25519)', () => {
         const headers: Record<string, string> = { 'telnyx-timestamp': opts.ts };
         if (!opts.omitSig) headers['telnyx-signature-ed25519'] = opts.sig;
         return {
-            url: 'https://app.example.com/api/public/sms/inbound',
+            url: 'https://app.example.com/webhooks/sms/inbound',
             rawBody: opts.rawBody ?? body,
             params: {},
             headers,

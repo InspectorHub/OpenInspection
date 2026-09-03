@@ -1,7 +1,7 @@
 /**
  * WH-3 — tenant email deliverability webhook receiver.
  *
- * Mounts POST /email/:provider/:tenant on the public router. The provider is a
+ * Mounts POST /email/:provider/:tenant on the webhook router. The provider is a
  * PATH segment (never sniffed from headers/body). For a request:
  *   - coerce/validate :provider against EMAIL_BYO_PROVIDERS (unknown → 404);
  *   - resolve :tenant slug → tenant id (unknown → 404);

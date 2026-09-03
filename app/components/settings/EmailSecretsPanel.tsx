@@ -102,7 +102,7 @@ export function EmailSecretsPanel({
   const webhookField = WEBHOOK_FIELDS[provider];
   const webhookUrl =
     webhookBaseUrl && tenantSlug
-      ? `${webhookBaseUrl}/api/public/email/${provider}/${tenantSlug}`
+      ? `${webhookBaseUrl}/webhooks/email/${provider}/${tenantSlug}`
       : "";
 
   return (

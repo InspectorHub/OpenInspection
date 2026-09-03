@@ -46,7 +46,7 @@ import tenantPresenceRoutes from './api/tenant-presence';
 import inspectionPrefsRoutes from './api/inspection-prefs';
 import aiRoutes from './api/ai';
 import { bookingsRoutes } from './api/bookings';
-import { smsPublicRoutes, smsAdminRoutes } from './api/sms';
+import { smsPublicRoutes, smsWebhookRoutes, smsAdminRoutes } from './api/sms';
 import adminRoutes from './api/admin';
 import adminBrandingRoutes from './api/admin/branding';
 import adminDefectCategoriesRoutes from './api/admin/admin-defect-categories';
@@ -364,9 +364,8 @@ const routes = app
   .route('/api/public', publicReportRoutes)
   .route('/api/public', bookingsRoutes)
   .route('/api/public/widget', widgetRoutes)
-  // Booking #7 Sprint A — slug availability check; lives under /api/public so
-  // the slug input on /settings/profile (and any future un-authed pages) can
-  // hit it without a JWT.
+  // Booking #7 Sprint A — slug availability check; under /api/public so the slug
+  // input on /settings/profile (and any future un-authed page) needs no JWT.
   .route('/api/public', publicSlugRoutes)
   // Booking #7 Sprint A — authenticated profile endpoints (slug write).
   .route('/api/profile', profileRoutes)
@@ -382,7 +381,7 @@ const routes = app
   // /inspections/:id/messages...). Session- OR token-gated via resolveClientActor;
   // the global JWT middleware skips /api/public/* so auth is performed in-route.
   .route('/api/public', clientMessageRoutes)
-  // Track L (D6/D9) — public SMS opt-in resolve/confirm + inbound STOP/START webhook.
+  // Track L (D6) — the SMS opt-in pair (resolve/confirm) a person opens.
   .route('/api/public', smsPublicRoutes)
   // Signed email unsubscribe. MUST stay under /api/public — that prefix is what
   // keeps it outside the agent-terms gate; see server/api/unsubscribe.ts.
@@ -456,8 +455,7 @@ const routes = app
   .route('/api/ics', icsRoutes)
   .route('/api/users', userRoutes)
   // Lone cross-cutting messages summary: GET /api/messages/unread-count (sidebar
-  // badge). Every per-inspection messages route lives under /api/inspections
-  // (inspector) or /api/public (client) now.
+  // badge). Per-inspection message routes live under /api/inspections or /api/public.
   .route('/api/messages', messageRoutes)
   .route('/api/notifications', notificationsRoutes)
   .route('/api', notificationPreferenceRoutes)   // reader's own preferences (§4)
@@ -477,6 +475,8 @@ const routes = app
   // PUBLIC_PREFIXES must resolve it BEFORE the signature can be checked.
   .route('/webhooks/stripe/:tenant', stripeWebhookRoutes)
   .route('/webhooks/stripe', stripeWebhookRoutes)
+  // Track L (D9) — SMS inbound/status, compliance-status, email events.
+  .route('/webhooks', smsWebhookRoutes)
   // Remote MCP OAuth — grant management API (self list/revoke + admin oversight).
   // Mounted at /api/mcp so paths become /api/mcp/grants*.
   .route('/api/mcp', mcpGrantsRoutes)

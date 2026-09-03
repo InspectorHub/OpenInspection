@@ -6,7 +6,7 @@ import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
  * id the provider returned at send time (Twilio message SID / Telnyx message id).
  *
  * The send path seeds a `sent` row the moment a message is accepted; the
- * provider's delivery-status webhook (POST /sms/status/:tenant) then upserts the
+ * provider's delivery-status webhook (POST /webhooks/sms/status/:tenant) then upserts the
  * terminal state. Upsert is LAST-WRITER-WINS by `updatedAt`: an event whose
  * observed time is older than the stored `updatedAt` must NOT overwrite a newer
  * status (out-of-order callbacks are common).

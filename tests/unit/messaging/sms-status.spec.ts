@@ -11,13 +11,13 @@ import { and, eq } from 'drizzle-orm';
 /**
  * WH-2 — SMS delivery-status receiver (POST /sms/status/:tenant) + send-path
  * id-stamping. Mirrors the sms-api.spec harness: mock drizzle-orm/d1 → test
- * sqlite, mount smsPublicRoutes, drive app.request().
+ * sqlite, mount smsWebhookRoutes, drive app.request().
  */
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // eslint-disable-next-line import/order
-import { smsPublicRoutes, recordSentStatus } from '../../../server/api/sms';
+import { smsWebhookRoutes, recordSentStatus } from '../../../server/api/sms';
 import { signParams } from '../../../server/lib/sms/send-sms';
 import { sealSecrets } from '../../../server/lib/config-crypto';
 import { makeExecutionContext } from '../helpers/exec-ctx';
@@ -51,7 +51,7 @@ function buildApp(db: BetterSQLite3Database<typeof schema>) {
         }
         return c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500);
     });
-    app.route('/api/public', smsPublicRoutes);
+    app.route('/webhooks', smsWebhookRoutes);
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     return app;
 }
@@ -91,11 +91,11 @@ describe('WH-2 Twilio delivery-status receiver (POST /sms/status/:tenant)', () =
     it('valid signature, MessageStatus=delivered → delivered row keyed on the SID', async () => {
         const sid = 'SM_delivered_1';
         const params = { MessageSid: sid, MessageStatus: 'delivered' };
-        const url = `${APP_BASE_URL}/api/public/sms/status/acme`;
+        const url = `${APP_BASE_URL}/webhooks/sms/status/acme`;
         const sig = await signParams(PLATFORM_TOKEN, url, params);
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/sms/status/acme', {
+        const res = await app.request('/webhooks/sms/status/acme', {
             method: 'POST',
             headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': sig },
             body: twilioForm(params),
@@ -108,7 +108,7 @@ describe('WH-2 Twilio delivery-status receiver (POST /sms/status/:tenant)', () =
 
     it('status advances forward (sent → delivered) but a terminal status is never downgraded', async () => {
         const sid = 'SM_rank';
-        const url = `${APP_BASE_URL}/api/public/sms/status/acme`;
+        const url = `${APP_BASE_URL}/webhooks/sms/status/acme`;
         const app = buildApp(db);
 
         // Distinct event ids come from the differing MessageStatus (SID:status), so
@@ -117,7 +117,7 @@ describe('WH-2 Twilio delivery-status receiver (POST /sms/status/:tenant)', () =
             const params = { MessageSid: sid, MessageStatus: status };
             const sig = await signParams(PLATFORM_TOKEN, url, params);
             const env = { ...FAKE_ENV, WEBHOOK_NOW_MS: nowMs } as unknown as HonoConfig['Bindings'];
-            return app.request('/api/public/sms/status/acme', {
+            return app.request('/webhooks/sms/status/acme', {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': sig },
                 body: twilioForm(params),
@@ -144,13 +144,13 @@ describe('WH-2 Twilio delivery-status receiver (POST /sms/status/:tenant)', () =
         } as never);
 
         const params = { MessageSid: sid, MessageStatus: 'failed' };
-        const url = `${APP_BASE_URL}/api/public/sms/status/acme`;
+        const url = `${APP_BASE_URL}/webhooks/sms/status/acme`;
         const sig = await signParams(PLATFORM_TOKEN, url, params);
         // Pin the receiver clock to an OLDER time than the stored row.
         const env = { ...FAKE_ENV, WEBHOOK_NOW_MS: 1_000_000_000_000 } as unknown as HonoConfig['Bindings'];
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/sms/status/acme', {
+        const res = await app.request('/webhooks/sms/status/acme', {
             method: 'POST',
             headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': sig },
             body: twilioForm(params),
@@ -165,10 +165,10 @@ describe('WH-2 Twilio delivery-status receiver (POST /sms/status/:tenant)', () =
     it('duplicate event_id → 200 no-op, no second write', async () => {
         const sid = 'SM_dup';
         const params = { MessageSid: sid, MessageStatus: 'sent' };
-        const url = `${APP_BASE_URL}/api/public/sms/status/acme`;
+        const url = `${APP_BASE_URL}/webhooks/sms/status/acme`;
         const sig = await signParams(PLATFORM_TOKEN, url, params);
         const app = buildApp(db);
-        const send = () => app.request('/api/public/sms/status/acme', {
+        const send = () => app.request('/webhooks/sms/status/acme', {
             method: 'POST',
             headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': sig },
             body: twilioForm(params),
@@ -191,7 +191,7 @@ describe('WH-2 Twilio delivery-status receiver (POST /sms/status/:tenant)', () =
         const sid = 'SM_bad';
         const params = { MessageSid: sid, MessageStatus: 'delivered' };
         const app = buildApp(db);
-        const res = await app.request('/api/public/sms/status/acme', {
+        const res = await app.request('/webhooks/sms/status/acme', {
             method: 'POST',
             headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': 'wrong' },
             body: twilioForm(params),
@@ -202,7 +202,7 @@ describe('WH-2 Twilio delivery-status receiver (POST /sms/status/:tenant)', () =
 
     it('unknown tenant slug → 404', async () => {
         const app = buildApp(db);
-        const res = await app.request('/api/public/sms/status/nope', {
+        const res = await app.request('/webhooks/sms/status/nope', {
             method: 'POST',
             headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': 'x' },
             body: twilioForm({ MessageSid: 'SM', MessageStatus: 'sent' }),
@@ -261,7 +261,7 @@ describe('WH-2 Telnyx delivery-status receiver', () => {
         const env = { ...FAKE_ENV, TELNYX_VERIFY_NOW_MS: Number(TELNYX_TS) * 1000 } as unknown as HonoConfig['Bindings'];
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/sms/status/acme', {
+        const res = await app.request('/webhooks/sms/status/acme', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
@@ -287,7 +287,7 @@ describe('WH-2 Telnyx delivery-status receiver', () => {
         const env = { ...FAKE_ENV, TELNYX_VERIFY_NOW_MS: Number(TELNYX_TS) * 1000 } as unknown as HonoConfig['Bindings'];
 
         const app = buildApp(db);
-        const res = await app.request('/api/public/sms/status/acme', {
+        const res = await app.request('/webhooks/sms/status/acme', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
