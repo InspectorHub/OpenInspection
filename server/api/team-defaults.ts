@@ -70,6 +70,4 @@ const teamDefaultsRoutes = createApiRouter()
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
     });
 
-export type TeamDefaultsApi = typeof teamDefaultsRoutes;
-
 export default teamDefaultsRoutes;
