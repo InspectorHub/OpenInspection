@@ -80,5 +80,6 @@
   "server/lib/db/schema/inspection/core.ts": 415,
   "server/services/agreement/signer-state.ts": 413,
   "app/components/portal/sections/ReportView.tsx": 407,
-  "scripts/check-non-translatable.mjs": 402
+  "scripts/check-non-translatable.mjs": 402,
+  "playwright.config.ts": 401
 }
