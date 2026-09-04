@@ -17877,6 +17877,34 @@
     "description": "Completes a password reset flow: validates the one-time reset token and updates the account password to the new value supplied."
   },
   {
+    "operationId": "resetTeamMemberTwoFactor",
+    "method": "POST",
+    "pathTemplate": "/api/team/members/{id}/two-factor/reset",
+    "scopes": [
+      "write"
+    ],
+    "tag": "team",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "The member's user id.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The member's user id."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Clear a member's two-factor enrolment",
+    "description": "Wipes a member's TOTP secret, enabled flag and recovery codes so they can sign in with their password and enrol again. Owner-only: this is the one action that lowers another person's authentication requirement. Exists because every self-service 2FA endpoint requires a valid code, which leaves someone who has lost both their authenticator and their recovery codes with no path back into the workspace. Does not change the password and does not end the member's existing sessions."
+  },
+  {
     "operationId": "resolveSmsOptin",
     "method": "GET",
     "pathTemplate": "/api/public/sms/optin-resolve",

@@ -239,6 +239,10 @@ export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
         // names come from TOGGLEABLE, so read and write describe one set.
         permissionOverrides: capabilityToggleMap().nullable().optional()
             .describe("Capability toggles that differ from this member's role template, or null when they match it exactly."),
+        // The FLAG only. Never the secret and never the recovery-code hashes:
+        // this list is readable by every inspector, and the page needs exactly
+        // one bit — whether there is a second factor for an owner to clear.
+        totpEnabled: z.boolean().describe('Whether this member has two-factor authentication enrolled. An owner can clear it from the team page when they have lost both their authenticator and their recovery codes.'),
         createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
     })).describe('TODO describe members field for the OpenInspection MCP integration'),
     invites: z.array(z.object({

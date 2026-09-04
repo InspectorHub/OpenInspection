@@ -76,7 +76,7 @@
   "app/components/editor/InspectionSettingsSheet.tsx": 419,
   "scripts/check-endorsement-copy.mjs": 419,
   "server/services/marketplace.service.ts": 419,
-  "app/routes/calendar.tsx": 415,
+  "app/routes/calendar.tsx": 417,
   "server/lib/db/schema/inspection/core.ts": 415,
   "server/services/agreement/signer-state.ts": 413,
   "scripts/check-non-translatable.mjs": 402

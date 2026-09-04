@@ -251,6 +251,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'user.invite': { family: 'user', label: 'audit_action_user_invite', meta: { role: 'name' }, status: { kind: 'live' } },
     'user.join': { family: 'user', label: 'audit_action_user_join', meta: { role: 'name' }, status: { kind: 'live' } },
     'user.password_change': { family: 'user', label: 'audit_action_user_password_change', meta: {}, status: { kind: 'live' } },
+    'user.two_factor_reset': { family: 'user', label: 'audit_action_user_two_factor_reset', meta: { email: 'person' }, status: { kind: 'live' } },
 };
 
 /**

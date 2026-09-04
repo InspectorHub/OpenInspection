@@ -47,6 +47,7 @@
   "editor_shared_menu_move_down": "Bajar",
   "editor_shared_add_item": "+ Agregar elemento",
   "editor_shared_add_sub_item": "+ Agregar subelemento",
+  "editor_shared_add_sub_item_at_cap": "+ Agregar subelemento — el límite son tres niveles",
   "editor_shared_delete_with_children": "¿Eliminar \"{label}\" y los {count} elementos que contiene?",
   "editor_shared_delete_with_children_confirm": "Eliminar todo",
   "editor_shared_nest_under": "Anidado bajo",

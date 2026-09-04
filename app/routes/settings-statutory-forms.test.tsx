@@ -50,6 +50,7 @@ const GENERIC = "The upload was refused and nothing was stored.";
 
 const STORED: StatutorySourceRowData = {
     formId: "tx_trec_rei",
+    formTitle: "Texas Real Estate Commission Property Inspection Report",
     revision: "7-6",
     sourceHash: "2222222222222222222222222222222222222222222222222222222222222222",
     sourceUrl: "https://www.trec.texas.gov/forms/rei-7-6",
@@ -64,6 +65,7 @@ const STORED: StatutorySourceRowData = {
 
 const MISSING: StatutorySourceRowData = {
     formId: "yy_flat_form",
+    formTitle: "Example Authority Flat Form",
     revision: "Rev. 04/26",
     sourceHash: "3333333333333333333333333333333333333333333333333333333333333333",
     sourceUrl: "https://example.gov/forms/flat.pdf",
@@ -242,6 +244,29 @@ describe("settings → statutory form PDFs: the list", () => {
         expect(form?.querySelector<HTMLInputElement>('input[name="revision"]')?.value)
             .toBe("Rev. 04/26");
         expect(form?.querySelector<HTMLInputElement>('input[name="file"]')?.type).toBe("file");
+    });
+
+    // The heading is what somebody reads while holding a PDF they just
+    // downloaded from the authority. `formId` is a database key — lowercased,
+    // underscored, ours — and cannot be checked against anything the authority
+    // publishes. Both assertions matter: the title must lead, and the id must
+    // survive, because every refusal message and the upload endpoint name it.
+    it("heads the row with the form's own name, and still carries the id", async () => {
+        renderPage({ revisions: [STORED] });
+        const row = within(await card(STORED));
+        expect(row.getByRole("heading", { name: new RegExp(STORED.formTitle) })).toBeTruthy();
+        expect(row.getByText(STORED.formId)).toBeTruthy();
+    });
+
+    it("names the row's region by the form's name, not by its id", async () => {
+        renderPage({ revisions: [STORED] });
+        // A screen reader moving by region should land on the document's name.
+        // `find`, not `get`: this page renders from a loader, so a synchronous
+        // query here asserts against an empty body and fails for the wrong
+        // reason — which is exactly what it did the first time.
+        expect(
+            await screen.findByRole("region", { name: new RegExp(STORED.formTitle) }),
+        ).toBeTruthy();
     });
 
     it("shows the expected sha256 in full, because a truncated one cannot be compared", async () => {

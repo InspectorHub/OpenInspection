@@ -8,6 +8,7 @@ import { logger } from '../lib/logger';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
 import { getCapabilities, TOGGLEABLE, type Capability, type PermissionOverrides } from '../lib/auth/capabilities';
 import { revokeAllUserGrants } from '../lib/mcp/grants';
+import { resetMemberTwoFactor } from './team/reset-two-factor';
 
 /**
  * Loose shape accepted from the validated invite body. Zod under
@@ -75,6 +76,11 @@ export class TeamService {
                 // template, so opening it on a member who HAD overrides and
                 // pressing Save would silently reset them to defaults.
                 permissionOverrides: users.permissionOverrides,
+                // Whether the member has a second factor, so the page can
+                // offer the owner's reset ONLY where there is something to
+                // reset. The flag alone — never the secret or the recovery
+                // codes, which have no business leaving the row.
+                totpEnabled: users.totpEnabled,
                 createdAt: users.createdAt
             }).from(users).where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt))),
             db.select().from(tenantInvites)
@@ -347,6 +353,17 @@ export class TeamService {
         }
 
         return user;
+    }
+
+    /**
+     * Clear a member's two-factor enrolment, so they can sign in with their
+     * password alone and enrol again. Owner-only at the route.
+     *
+     * The rules — and the reason this exists at all — are in
+     * `./team/reset-two-factor.ts`, which this delegates to unchanged.
+     */
+    async resetMemberTwoFactor(tenantId: string, userId: string, requesterId: string) {
+        return resetMemberTwoFactor(this.getDB(), { tenantId, userId, requesterId });
     }
 
 }

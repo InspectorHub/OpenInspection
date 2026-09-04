@@ -19,6 +19,9 @@ import {
   type ViewMode,
 } from "~/components/calendar/calendar-helpers";
 import { AvailabilityHeatmapWeek } from "~/components/settings/AvailabilityHeatmapWeek";
+import { RescheduleRevisionAdvisory } from "~/components/calendar/RescheduleRevisionAdvisory";
+import { rescheduleInspection } from "./calendar.reschedule.server";
+import type { RevisionStatus } from "../../server/lib/statutory/revision-status";
 import { useWeekSummary } from "~/hooks/useWeekSummary";
 import { BlockTimeDrawer, type CalendarMember } from "~/components/calendar/BlockTimeDrawer";
 import { CalendarScopeToolbar } from "~/components/calendar/CalendarScopeToolbar";
@@ -138,13 +141,10 @@ export async function action({ request, context }: Route.ActionArgs) {
   const api = createApi(context, { token });
 
   if (intent === "reschedule") {
-    const id = formData.get("id") as string;
-    const date = formData.get("date") as string;
-    const res = await api.inspections[":id"].$patch({
-      param: { id },
-      json: { date },
+    return rescheduleInspection(api, {
+      id: formData.get("id") as string,
+      date: formData.get("date") as string,
     });
-    return { ok: res.ok };
   }
 
   if (intent === "block-create" || intent === "block-update") {
@@ -194,7 +194,7 @@ export default function CalendarPage() {
   // The drop target is the calendar grid itself: there is no button to disable,
   // and a second drag cannot be completed inside one request round trip.
   // submit-guard-allow-no-busy: the control is a drag target, not a button.
-  const { submit: submitReschedule } = useGuardedSubmit();
+  const { submit: submitReschedule, fetcher: rescheduleFetcher } = useGuardedSubmit<{ ok?: boolean; revisionStatus?: RevisionStatus | null; date?: string }>();
   const navigation = useNavigation();
   const isLoading = navigation.state === "loading";
   const canManageTeam = isAdminRole(role);
@@ -322,6 +322,8 @@ export default function CalendarPage() {
               : m.calendar_meta_this_week({ count: thisWeekEvents.length })
         }
       />
+
+      <RescheduleRevisionAdvisory result={rescheduleFetcher.data} />
 
       <CalendarScopeToolbar
         scope={scope}

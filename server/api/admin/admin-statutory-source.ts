@@ -63,6 +63,7 @@ const listSourcesRoute = createRoute(withMcpMetadata({
                         storageBound: z.boolean().describe('Whether this deployment has object storage bound at all. False means no upload can ever succeed here, which is a different problem from an absent file.'),
                         revisions: z.array(z.object({
                             formId: z.string().describe('Stable id of the statutory form itself, e.g. tx_trec_rei.'),
+                            formTitle: z.string().describe("The form's own published name, as the issuing authority writes it. Present because formId is a database key and cannot be checked against the authority's site."),
                             revision: z.string().describe("The authority's own revision label, verbatim."),
                             sourceHash: z.string().describe('sha256 an upload for this revision is checked against, lowercase hex.'),
                             sourceUrl: z.string().describe('Where the authority publishes this revision. Provenance for a human; nothing is fetched from it.'),
