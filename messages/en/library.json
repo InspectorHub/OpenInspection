@@ -246,5 +246,16 @@
   "marketplace_update_clean_desc": "All {total} comments from this library are still exactly as the publisher shipped them. Updating to {semver} replaces them.",
   "marketplace_update_clean_submit": "Update to {semver}",
   "marketplace_update_error": "The update did not run. Nothing was changed.",
-  "marketplace_review_update": "Review update"
+  "marketplace_review_update": "Review update",
+  "library_tags_new_title": "New tag",
+  "library_tags_edit_title": "Edit tag",
+  "library_tags_name_label": "Name",
+  "library_tags_color_label": "Color",
+  "library_tags_color_none": "No color",
+  "library_tags_seed_name_locked": "This is one of the starter tags. Its colour can change; its name cannot, because inspections already reference it by name.",
+  "library_tags_save": "Save",
+  "library_tags_saving": "Saving…",
+  "library_tags_cancel": "Cancel",
+  "library_tags_edit_action": "Edit",
+  "library_tags_readonly_note": "Tags are managed by an owner or manager. You can create one; renaming and recolouring an existing tag is theirs."
 }

@@ -352,6 +352,13 @@ function ReportHalf(props: ReportViewProps & { forcedHalf?: "en" | "translated" 
         <ReportRepairPanel
           selectedRepairList={selectedRepairList}
           onClose={() => setRepairPanel(false)}
+          // Same href the header builds, gated on the same flag. Why it is a
+          // link at all is on `builderHref` in ReportRepairPanel.
+          builderHref={
+            data.enableCustomerRepairExport
+              ? `/repair-builder/${tenant}/${id}${urlToken ? `?token=${encodeURIComponent(urlToken)}` : ""}`
+              : null
+          }
         />
       )}
 

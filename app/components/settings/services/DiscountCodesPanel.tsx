@@ -1,4 +1,8 @@
+import { useEffect, useRef, useState } from "react";
+import { useRevalidator } from "react-router";
 import { m } from "~/paraglide/messages";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { DiscountEditorModal, type EditableDiscount } from "./DiscountEditorModal";
 
 interface Discount {
   id: string;
@@ -6,9 +10,35 @@ interface Discount {
   type: "percent" | "fixed";
   value: number;
   active: boolean;
+  maxUses?: number | null;
+  expiresAt?: string | null;
 }
 
 export function DiscountCodesPanel({ discounts }: { discounts: Discount[] }) {
+  const [editing, setEditing] = useState<EditableDiscount | null>(null);
+  const { submit, fetcher, busy } = useGuardedSubmit<{ ok?: boolean; error?: string }>();
+  const revalidator = useRevalidator();
+
+  // In an effect, never during render: the page owns the row data, so a
+  // successful save has to close the dialog AND re-read the list.
+  const reply = fetcher.state === "idle" ? fetcher.data : undefined;
+  const handled = useRef<typeof reply>(undefined);
+  useEffect(() => {
+    if (!reply || handled.current === reply) return;
+    handled.current = reply;
+    if (reply.ok) {
+      setEditing(null);
+      revalidator.revalidate();
+    }
+  }, [reply, revalidator]);
+
+  function save(form: HTMLFormElement) {
+    const fd = new FormData(form);
+    const payload: Record<string, string> = {};
+    for (const [k, v] of fd.entries()) if (typeof v === "string") payload[k] = v;
+    submit(payload, { method: "post", action: "/resources/discount-codes" });
+  }
+
   return (
     <div className="pt-2">
       <h3 className="text-[15px] font-bold text-ih-fg-1 mb-2">{m.settings_discount_heading()}</h3>
@@ -36,14 +66,34 @@ export function DiscountCodesPanel({ discounts }: { discounts: Discount[] }) {
                     {d.active ? m.settings_discount_active() : m.settings_discount_disabled()}
                   </span>
                 </div>
-                <button className="text-[12px] font-semibold text-ih-primary-text hover:underline">
-                  {m.common_edit()}
+                <button
+                  type="button"
+                  onClick={() => setEditing(d)}
+                  disabled={busy}
+                  className="text-[12px] font-semibold text-ih-primary-text hover:underline disabled:opacity-50"
+                >
+                  {m.settings_discount_edit_action()}
                 </button>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Keyed on the row. The editor derives its `type` from the discount in
+          a `useState` initialiser, and an initialiser runs ONCE — mounted with
+          `discount: null` it would stay on "percent" forever, so a $50 fixed
+          code opened as "Percent off" with an empty amount and saving it would
+          have converted the code. Remounting per row is what makes the
+          initialiser see the real value. */}
+      <DiscountEditorModal
+        key={editing?.id ?? "none"}
+        discount={editing}
+        busy={busy}
+        error={reply?.ok === false ? reply.error : undefined}
+        onClose={() => setEditing(null)}
+        onSubmit={save}
+      />
     </div>
   );
 }
