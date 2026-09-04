@@ -202,7 +202,22 @@ describe('produceStatutoryForm — whose bytes', () => {
 
     it('refuses when the object is missing rather than rendering a blank form', async () => {
         await expect(produceStatutoryForm({ ...ctx(), bucket: bucketWith({}) }))
-            .rejects.toThrow(/not stored|missing/i);
+            .rejects.toThrow(/has not been supplied/i);
+    });
+
+    // This refusal reaches an INSPECTOR, through `refusalToUser`, in the middle
+    // of a job — and the person who can clear it is the workspace owner, on a
+    // screen the inspector cannot open. So the sentence has to name the remedy
+    // and the owner, and must not spend its length on plumbing.
+    it('tells the reader who supplies the file and on which screen', async () => {
+        const err = await produceStatutoryForm({ ...ctx(), bucket: bucketWith({}) })
+            .then(() => null, (e: unknown) => e as Error);
+        expect(err).toBeInstanceOf(Error);
+        expect(err!.message).toMatch(/workspace owner/i);
+        expect(err!.message).toMatch(/Settings → Statutory form PDFs/);
+        // Negative half, with the positive control above it: an R2 key is
+        // something the reader can neither check nor act on.
+        expect(err!.message).not.toMatch(/_platform\//);
     });
 
     it('refuses when no field map is published for the chosen revision', async () => {

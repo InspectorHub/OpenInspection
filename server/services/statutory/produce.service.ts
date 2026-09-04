@@ -183,9 +183,21 @@ export async function produceStatutoryForm(
     const key = r2Keys.statutoryFormSource(input.formId, version.version);
     const object = await input.bucket.get(key);
     if (!object) {
+        // WRITTEN FOR THE PERSON WHO MEETS IT, WHO IS NOT THE PERSON WHO CAN
+        // FIX IT. This refusal reaches an inspector, mid-job, through
+        // `refusalToUser`. It used to name the formId and the R2 key — two
+        // strings an inspector can neither check nor act on — and said nothing
+        // about who supplies the file or where. Supplying it is owner-only and
+        // deployment-wide, so the only useful next move the reader has is to
+        // ask a specific person for a specific screen; that is what this says.
+        //
+        // The key stays out of the sentence and in the log: `refusalToUser`
+        // logs the raw message, and formId + revision locate the object
+        // uniquely through `r2Keys.statutoryFormSource`.
         fail(
-            `the official PDF for "${input.formId}" ${version.version} is not stored at ${key}. `
-            + 'Refusing rather than rendering a blank form.',
+            `the "${version.formTitle}" form (revision ${version.version}) has not been supplied `
+            + 'to this deployment yet. A workspace owner adds it under Settings → Statutory '
+            + 'form PDFs, once per revision. Refusing rather than rendering a blank form.',
         );
     }
     const bytes = new Uint8Array(await object.arrayBuffer());

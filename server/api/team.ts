@@ -18,6 +18,7 @@ import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { getDrizzle } from '../lib/route-helpers';
 import teamDefaultsRoutes from './team-defaults';
+import teamTwoFactorRoutes from './team-two-factor';
 
 /**
  * POST /api/team/payroll-export — the company-level half of #278.
@@ -215,6 +216,8 @@ const resendInviteRoute = createRoute(withMcpMetadata({
 const teamRoutes = createApiRouter()
     // `/defaults` lives in its own file — see team-defaults.ts for why.
     .route('/', teamDefaultsRoutes)
+    // Account recovery, mounted here so the path stays /api/team/members/... .
+    .route('/', teamTwoFactorRoutes)
     .openapi(listTeamMembersRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const teamService = c.var.services.team;

@@ -124,6 +124,8 @@ export async function storeStatutoryFormSource(
  */
 export interface StatutoryFormSourcePresence {
     formId: string;
+    /** The form's own published name, as the authority writes it. */
+    formTitle: string;
     /** The authority's own revision label, verbatim. */
     revision: string;
     /** The sha256 an upload is checked against, lowercase hex. */
@@ -169,6 +171,13 @@ export async function listStatutoryFormSources(input: {
             : await input.bucket.head(r2Keys.statutoryFormSource(version.formId, version.version));
         return {
             formId: version.formId,
+            // The form's own name, carried because `formId` is a DATABASE KEY.
+            // The registry says so where it is declared: an id is lowercased,
+            // underscored and ours, and it is neither what the authority calls
+            // the document nor what a person can check against their site. This
+            // list is read while matching a downloaded PDF to a row, which is
+            // exactly the job an id cannot do.
+            formTitle: version.formTitle,
             revision: version.version,
             sourceHash: version.sourceHash,
             sourceUrl: version.sourceUrl,
