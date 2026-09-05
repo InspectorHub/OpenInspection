@@ -59,8 +59,6 @@ import {
     refuseIndexInsidePrintedRange,
 } from '../../services/statutory/overflow.service';
 import { versionForInspection } from '../../lib/statutory/form-registry';
-import { revisionStatusForInspection } from '../../lib/statutory/revision-status';
-import { withdrawalRefusal, supersededRefusal } from '../../lib/statutory/withdrawal-copy';
 import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
 import { utcMidnightOf, calendarDayOfStoredDate } from '../../lib/statutory/inspection-date';
 import { statutoryNoticeFor, formatEffectiveDate } from '../../lib/statutory/disclaimer';
@@ -68,10 +66,12 @@ import { Errors } from '../../lib/errors';
 import { refusalToUser } from '../../lib/statutory/refusal-to-user';
 import * as schema from '../../lib/db/schema';
 import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
-import { gatherStatutoryInputs } from './statutory-inputs';
+import { resolveProducibleStatutoryForm } from '../../services/statutory/producible';
+import { watermarkAsPreview } from '../../lib/statutory/preview-watermark';
 import { logger } from '../../lib/logger';
 import {
     statutoryFormRoute,
+    statutoryPreviewRoute,
     statutoryOfferRoute,
     addInstanceRoute,
 } from './statutory.routes';
@@ -83,22 +83,17 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
     const tenantId = c.get('tenantId');
     const db = drizzle(c.env.DB, { schema });
 
-    const inspection = await db.select()
-        .from(schema.inspections)
-        .where(and(eq(schema.inspections.id, id), eq(schema.inspections.tenantId, tenantId)))
-        .get();
-    // Same answer for "does not exist" and "belongs to someone else": telling
-    // the two apart is itself a disclosure.
-    if (!inspection) throw Errors.NotFound('Inspection not found');
+    // Preconditions 2, 3 and 4 and every input, resolved by the same function
+    // the editor's preview calls. They decide WHICH DOCUMENT comes out, so a
+    // second copy of them would be a second opinion about the one thing this
+    // subsystem exists to keep single.
+    const { snapshot, declaration, inspectionDay, inputs, instances } =
+        await resolveProducibleStatutoryForm(db, c.env.DB, tenantId, id);
 
-    const snapshot = inspection.templateSnapshot as (TemplateSchemaV2 & {
-        statutoryForm?: StatutoryFormDeclaration;
-    }) | null;
-    const declaration = snapshot?.statutoryForm;
-    if (!snapshot || !declaration) {
-        throw Errors.NotFound('This inspection produces no statutory form');
-    }
-
+    // Precondition 1, and it stays HERE rather than moving with the others: it
+    // is not about which document comes out, it is about reproducing the one
+    // that was handed over. A preview is never handed over, so it does not
+    // apply there -- see `statutory-preview.ts`.
     const published = await db.select()
         .from(schema.reports)
         .where(and(
@@ -111,72 +106,12 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
     if (!published?.publishedAt) {
         throw Errors.Conflict(
             'This inspection has no published report version yet. A statutory form produced from '
-            + 'editable content could not be reproduced later.',
+            + 'editable content could not be reproduced later. To check the form before then, '
+            + 'open the preview in the editor -- it renders the same document, watermarked, and '
+            + 'files nothing.',
         );
     }
-
-    // Precondition 3. Refused before anything is rendered and before anything is
-    // recorded: a refusal after the bytes exist is a document that was produced.
-    //
-    // `null` and the three non-blocking states pass. In particular a template
-    // that names no revision is NOT refused -- it makes no claim to measure, and
-    // guessing one would refuse a correct report. The blocking state is the only
-    // one where the template's own claim contradicts the inspection's date.
-    // ONE reading of the column, handed to everything below: `inspections.date`
-    // holds a calendar day OR that day plus an instant (`calendarDayOfStoredDate`),
-    // and everything past this line takes a bare day. The hand-rolled slice that
-    // used to sit here narrowed the revision check while the RAW value still went
-    // on to the producer -- which is how every wizard-made inspection 500ed.
-    const inspectionDay = calendarDayOfStoredDate(inspection.date);
-    const revision = revisionStatusForInspection({
-        snapshot,
-        inspectionDate: inspectionDay,
-        now: Date.now(),
-    });
-    if (revision?.kind === 'withdrawn') {
-        // Checked before `cannot_produce`, in the same order the criterion
-        // itself decides them: a withdrawal is the only fault here that has
-        // already put wrong documents into somebody's hands, and its remedy
-        // depends on WHY. Refusing with the generic "different document"
-        // sentence would be true and useless.
-        throw Errors.Conflict(withdrawalRefusal({
-            formId: declaration.formId,
-            version: revision.version,
-            reason: revision.reason,
-            at: revision.withdrawnAt,
-            replacementVersion: revision.replacementVersion,
-            inspectionDate: inspectionDay,
-        }));
-    }
-    if (revision?.kind === 'cannot_produce') {
-        throw Errors.Conflict(supersededRefusal({
-            formId: declaration.formId,
-            inspectionDate: inspectionDay,
-            applicableVersion: revision.applicableVersion,
-            templateVersion: revision.templateVersion,
-        }));
-    }
-
-    const { results, facts, signatures, skippedNonDefaultUnits } = await refusalToUser(
-        () => gatherStatutoryInputs(db, c.env.DB, tenantId, inspection, inspectionDay, declaration),
-    );
-    if (skippedNonDefaultUnits.length > 0) {
-        // Answered only under some other unit. This form describes one dwelling,
-        // so substituting a unit's answer would print its findings under the
-        // whole building's address.
-        logger.warn('statutory: item answered only outside the default unit', {
-            inspectionId: id,
-            items: skippedNonDefaultUnits.slice(0, 10),
-            count: skippedNonDefaultUnits.length,
-        });
-    }
-
-    // Instances the page has no slot to print. Printed slots are ordinary items
-    // and arrive through the bindings above; these are what the item model has
-    // nowhere to put, and without them a third panel would simply not exist as
-    // far as the form is concerned.
-    const instances = await new StatutoryOverflowService(db)
-        .instancesFor(tenantId, id, declaration.formId);
+    const { results, facts, signatures } = inputs;
 
     const produced = await refusalToUser(() => produceStatutoryForm({
         formId: declaration.formId,
@@ -214,6 +149,62 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
         ),
     });
 })
+    /**
+     * The preview. Same document, no published report required, nothing filed.
+     *
+     * Everything that decides WHICH document comes out is resolved by the same
+     * function the deliverable calls, so the two cannot drift apart on a
+     * revision boundary and show an inspector a form the download will refuse.
+     * What differs is exactly two things, and both are visible right here
+     * rather than behind a flag: `recordProduction` is not called, and the
+     * bytes are stamped before they leave.
+     */
+    .openapi(statutoryPreviewRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const tenantId = c.get('tenantId');
+        const db = drizzle(c.env.DB, { schema });
+
+        const { snapshot, declaration, inspectionDay, inputs, instances } =
+            await resolveProducibleStatutoryForm(db, c.env.DB, tenantId, id);
+
+        const produced = await refusalToUser(() => produceStatutoryForm({
+            formId: declaration.formId,
+            inspectionDate: inspectionDay,
+            declaration,
+            snapshot,
+            results: inputs.results ?? {},
+            facts: inputs.facts,
+            instances,
+            signatures: inputs.signatures,
+            bucket: c.env.PHOTOS,
+        }));
+
+        // NOTHING IS RECORDED HERE, ON PURPOSE. `recordProduction` exists so a
+        // recall can count the documents that LEFT; a preview never leaves, and
+        // a row claiming it did would make a recall chase a document nobody
+        // has. The absence is the feature -- see the route's own note.
+        const watermarked = await watermarkAsPreview(produced.bytes);
+
+        return new Response(watermarked, {
+            status: 200,
+            headers: {
+                'content-type': 'application/pdf',
+                // Inline: this is meant to be LOOKED at, in the editor, not
+                // saved. A download would put an unpublishable copy of
+                // still-changing work into somebody's downloads folder, which
+                // is the one place the watermark has to survive on its own.
+                'content-disposition': 'inline',
+                // Never cached. The whole point is that it reflects the
+                // inspection as it stands right now; a cached preview would
+                // answer a question about a version the inspector has already
+                // moved past, and look authoritative doing it.
+                'cache-control': 'no-store',
+                // No `deliverableHeaders`: those carry `x-artifact-status` and a
+                // produced-at drawn from the published version, and there is no
+                // published version here to be true about.
+            },
+        });
+    })
     .openapi(statutoryOfferRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId');

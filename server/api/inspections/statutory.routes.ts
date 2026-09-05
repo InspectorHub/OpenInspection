@@ -42,6 +42,48 @@ const statutoryFormRoute = createRoute(withMcpMetadata({
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
+ * The PREVIEW route, read by the editor while the inspection is still open.
+ *
+ * Same document, same bindings, same revision judgement -- and deliberately NOT
+ * the same preconditions. It does not require a published report version, which
+ * is the whole reason it exists: until now the only way to see whether a value
+ * landed in the right box on an authority's fixed layout was to publish the
+ * report to the client and download the deliverable, so an inspector paid an
+ * irreversible, client-visible act for a look at their own work.
+ *
+ * Two things make dropping that precondition safe rather than convenient:
+ * nothing is written -- `recordProduction` is not called, so no production row
+ * claims a document that was never handed over -- and every page is stamped
+ * NOT FOR SUBMISSION, because the bytes themselves are the only thing that can
+ * still say so once they leave the browser.
+ *
+ * ⚠️ It is a different PATH, not a query flag on the deliverable. A `?preview=1`
+ * would put "is this filed" and "is this watermarked" behind a parameter that
+ * any caller can omit or mistype, and the failure mode of getting it wrong is
+ * either a watermark on a real submission or a clean copy of unfinished work.
+ * Two paths cannot be confused by a typo.
+ */
+const statutoryPreviewRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/{id}/statutory-form/preview.pdf',
+    tags: ['inspections'],
+    summary: 'Preview the statutory form before publishing anything',
+    description:
+        'Renders the same form as the deliverable, watermarked and recorded nowhere, with no '
+        + 'published report required. 404 when the template declares none; 409 when the '
+        + "inspection's date is governed by a revision this template does not produce.",
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: { params: z.object({ id: z.string().trim().min(1).describe('Inspection ID') }) },
+    responses: {
+        200: { description: 'The rendered form, watermarked as a preview' },
+        404: { description: 'No such inspection for this workspace, or its template declares no form' },
+        409: { description: "The governing revision is not the one this template produces" },
+        422: { description: 'The inspection cannot fill this form yet — the message names the fields' },
+    },
+    operationId: 'previewInspectionStatutoryForm',
+}, { scopes: ['read'], tier: 'extended' }));
+
+/**
  * The offer route, read by the inspection hub loader.
  *
  * It exists so the UI can ask "is there a statutory form here, and what does
@@ -109,4 +151,4 @@ const addInstanceRoute = createRoute(withMcpMetadata({
 // AddInstanceBodySchema is deliberately NOT exported: it is the request body
 // of one route in this file and has no second reader. Exporting it would add a
 // name to the module surface that nothing imports.
-export { statutoryFormRoute, statutoryOfferRoute, addInstanceRoute };
+export { statutoryFormRoute, statutoryPreviewRoute, statutoryOfferRoute, addInstanceRoute };

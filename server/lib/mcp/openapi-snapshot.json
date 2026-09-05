@@ -16670,6 +16670,34 @@
     "description": "Shows which pay rows the current tenant rules and roster would move, and to what, WITHOUT moving them. Re-deriving amounts silently is how somebody's pay changes with nobody deciding it should, so the preview exists to make the decision explicit before the write."
   },
   {
+    "operationId": "previewInspectionStatutoryForm",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/statutory-form/preview.pdf",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection ID",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection ID"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Preview the statutory form before publishing anything",
+    "description": "Renders the same form as the deliverable, watermarked and recorded nowhere, with no published report required. 404 when the template declares none; 409 when the inspection's date is governed by a revision this template does not produce."
+  },
+  {
     "operationId": "previewMessageTemplate",
     "method": "POST",
     "pathTemplate": "/api/message-templates/preview",
