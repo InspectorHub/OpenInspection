@@ -9,6 +9,10 @@ import {
     StatutorySourceRow,
     type StatutorySourceRowData,
 } from "~/components/statutory/StatutorySourceRow";
+import {
+    StatutoryReadinessCard,
+    type StatutoryReadinessData,
+} from "~/components/statutory/StatutoryReadinessCard";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { requireOwnerLoader } from "~/lib/access.server";
 import { createApi } from "~/lib/api-client.server";
@@ -46,13 +50,13 @@ export function meta() {
 
 /** The GET's body, exactly as the route module declares it. */
 interface SourceListBody {
-    data?: { storageBound?: boolean; revisions?: StatutorySourceRowData[] };
+    data?: { storageBound?: boolean; revisions?: StatutorySourceRowData[]; readiness?: StatutoryReadinessData };
 }
 
 export async function loader({ context, request }: Route.LoaderArgs) {
     const { forbidden, token } = await requireOwnerLoader(context, request);
     if (forbidden) {
-        return { forbidden: true, loadFailed: false, storageBound: true, revisions: [] as StatutorySourceRowData[] };
+        return { forbidden: true, loadFailed: false, storageBound: true, revisions: [] as StatutorySourceRowData[], readiness: null };
     }
 
     const api = createApi(context, { token });
@@ -62,7 +66,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
         // would render "this build publishes no statutory forms" — a statement
         // about the software, made on the strength of a request that failed,
         // and one an operator would reasonably act on by giving up.
-        return { forbidden: false, loadFailed: true, storageBound: true, revisions: [] as StatutorySourceRowData[] };
+        return { forbidden: false, loadFailed: true, storageBound: true, revisions: [] as StatutorySourceRowData[], readiness: null };
     }
     const body = (await res.json()) as SourceListBody;
     return {
@@ -72,6 +76,11 @@ export async function loader({ context, request }: Route.LoaderArgs) {
         // bound" warning up rather than hiding a reason uploads cannot land.
         storageBound: body.data?.storageBound ?? false,
         revisions: body.data?.revisions ?? [],
+        // null, never an empty shape: a readiness card built from a body that
+        // did not carry one would tick nothing and read as "nothing is set up",
+        // which is a claim about the workspace made on the strength of a
+        // response that said nothing.
+        readiness: body.data?.readiness ?? null,
     };
 }
 
@@ -130,7 +139,7 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 
 export default function SettingsStatutoryForms() {
-    const { forbidden, loadFailed, storageBound, revisions } = useLoaderData<typeof loader>();
+    const { forbidden, loadFailed, storageBound, revisions, readiness } = useLoaderData<typeof loader>();
     const result = useActionData<typeof action>();
     const navigation = useNavigation();
     const locale = useDisplayLocale();
@@ -177,6 +186,14 @@ export default function SettingsStatutoryForms() {
                 the request comes back. */}
             {!storageBound && !loadFailed && (
                 <Banner tone="danger">{m.statutory_source_no_storage()}</Banner>
+            )}
+
+            {/* The whole question, before the one part of it this page can act
+                on. Absent when the read failed — a card that ticked nothing
+                would be a claim about the workspace made from a response that
+                said nothing. */}
+            {readiness && !loadFailed && readiness.forms.length > 0 && (
+                <StatutoryReadinessCard readiness={readiness} />
             )}
 
             {revisions.length === 0 && !loadFailed ? (
