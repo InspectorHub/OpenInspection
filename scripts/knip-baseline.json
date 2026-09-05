@@ -3,6 +3,5 @@
   "types:server/lib/data-exchange/types.ts:ExchangeDisposition",
   "types:server/lib/data-exchange/types.ts:ExchangeOmission",
   "types:server/lib/data-exchange/types.ts:ExchangeSerializer",
-  "types:server/lib/migration-intake/csv.ts:CsvRecord",
-  "types:server/types/template-schema.ts:StatutoryFieldDependencies"
+  "types:server/lib/migration-intake/csv.ts:CsvRecord"
 ]

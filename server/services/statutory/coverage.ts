@@ -43,7 +43,10 @@ import {
 } from '../../api/inspections/statutory-inputs';
 import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
 
-export interface StatutoryMissingField {
+// Not exported: nothing needs one missing field's type on its own, and the
+// dead-code gate is right to say so. It reaches every consumer inside
+// `StatutoryCoverage.missing`.
+interface StatutoryMissingField {
     /** The form's own field name, as the refusal would name it. */
     field: string;
     /**

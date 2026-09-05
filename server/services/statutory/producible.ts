@@ -40,7 +40,9 @@ import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/tem
 import type { StatutoryInputs } from '../../api/inspections/statutory-inputs';
 import type { StatutoryGroupInstances } from '../../lib/statutory/values';
 
-export type StatutorySnapshot = TemplateSchemaV2 & { statutoryForm?: StatutoryFormDeclaration };
+// Not exported: it is this file's own shorthand for the two callers here, and
+// `ProducibleStatutoryForm` already carries it out to everyone else.
+type StatutorySnapshot = TemplateSchemaV2 & { statutoryForm?: StatutoryFormDeclaration };
 
 export interface ProducibleStatutoryForm {
     inspection: typeof schema.inspections.$inferSelect;
