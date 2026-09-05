@@ -59,6 +59,15 @@ export const PRE_INSPECTION_FACTS: ReadonlySet<StatutoryInspectionField> = new S
  */
 export type FactProvenance = 'pre_inspection' | 'per_inspection' | 'unknown';
 
+/**
+ * Narrowing guard, so a caller holding a plain string can ask the set without
+ * asserting its way in. A cast here would let a typo through as a fact name and
+ * silently classify a profile field as per-inspection.
+ */
+export function isPreInspectionFact(value: string): value is StatutoryInspectionField {
+    return PRE_INSPECTION_FACTS.has(value as StatutoryInspectionField);
+}
+
 export function provenanceOfBinding(
     source: { from: string; field?: string } | undefined,
 ): FactProvenance {

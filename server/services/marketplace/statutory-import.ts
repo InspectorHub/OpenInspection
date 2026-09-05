@@ -10,6 +10,9 @@
  */
 import { StatutoryTemplateSchema } from '../../lib/validations/statutory-template.schema';
 import { Errors } from '../../lib/errors';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { fieldMapFor } from '../../lib/statutory/forms';
+import { unsuppliableRequiredFields, unsuppliableRefusal } from '../statutory/install-gaps';
 import { r2Keys } from '../../lib/r2-keys';
 import { versionForInspection, type StatutoryFormVersion } from '../../lib/statutory/form-registry';
 import type { StatutoryFormDeclaration } from '../../types/statutory-declaration';
@@ -61,6 +64,15 @@ export async function assertStatutoryInstallable(
     bucket: R2Bucket | undefined,
     schema: unknown,
     versions: readonly StatutoryFormVersion[],
+    /**
+     * The workspace, for the second "installed but unusable" check: whether
+     * anybody here can supply the profile-level facts the form REQUIRES.
+     *
+     * Required rather than optional on purpose. An optional argument that
+     * callers may omit turns a check nobody ran into a check that passed, and
+     * that is precisely the fault this whole function exists to prevent.
+     */
+    workspace: { db: DrizzleD1Database<Record<string, unknown>>; tenantId: string },
 ): Promise<void> {
     assertStatutorySchema(schema);
     const declaration = statutoryDeclarationOf(schema);
@@ -69,6 +81,42 @@ export async function assertStatutoryInstallable(
     // cannot turn a missing declaration into an unchecked install.
     if (declaration === null) return;
     await assertStatutorySourcePresent({ bucket, versions, declaration, now: Date.now() });
+    await assertSomebodyCanSupplyIt({ ...workspace, versions, declaration, now: Date.now() });
+}
+
+/**
+ * The other half of "installed but unusable": the form's profile-level required
+ * fields, and whether ANY member can supply them.
+ *
+ * Same standard as the PDF check above and deliberately not a stricter one --
+ * NOBODY, never EVERYBODY. A workspace where one inspector has a licence and
+ * three do not can produce this form, and refusing that would gate work
+ * somebody can already do. A workspace where nobody has one has installed a
+ * template that renders for no inspection anyone creates.
+ *
+ * Skips silently when no revision can be named, exactly as the PDF check does
+ * and for the same reason: there is no field map to read `requiredFields` from,
+ * so there is no question to ask.
+ */
+async function assertSomebodyCanSupplyIt(input: {
+    db: DrizzleD1Database<Record<string, unknown>>;
+    tenantId: string;
+    versions: readonly StatutoryFormVersion[];
+    declaration: StatutoryFormDeclaration;
+    now: number;
+}): Promise<void> {
+    const { declaration, versions } = input;
+    const version = typeof declaration.revision === 'string'
+        ? versions.find((v) => v.formId === declaration.formId && v.version === declaration.revision)
+        : versionForInspection(declaration.formId, input.now, versions);
+    if (!version) return;
+    const map = fieldMapFor(version.formId, version.version);
+    if (!map) return;
+
+    const gaps = await unsuppliableRequiredFields(input.db, input.tenantId, map, declaration);
+    if (gaps.length > 0) {
+        throw Errors.Conflict(unsuppliableRefusal(version.formId, version.version, gaps));
+    }
 }
 
 /** The declaration a statutory catalogue row carries, or null if it carries none. */
