@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { Card, Pill } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
@@ -45,9 +46,17 @@ export interface StatutoryReadinessData {
     licenceClass: { filled: number; total: number };
 }
 
-function Tick({ ok, label }: { ok: boolean; label: string }) {
-    return (
-        <span className="inline-flex items-center gap-1.5 text-[12px]">
+function Tick({ ok, label, fixHref }: { ok: boolean; label: string; fixHref?: string }) {
+    // A LINK ONLY WHERE THE READER CAN ACT.
+    //
+    // This page is owner-only, and an owner IS an administrator — so the
+    // missing template is theirs to install, and a diagnosis with no treatment
+    // was the wrong call. The other two legs stay as prose: the licence class
+    // is typed by each inspector on their own profile, and a link that takes an
+    // owner somewhere they can only watch is worse than a sentence naming who
+    // to ask.
+    const body = (
+        <>
             {/* The mark is aria-hidden and the STATE is in the text, because a
                 screen reader reading "✓ Template" and "✗ Template" identically
                 is the whole failure this row exists to avoid. */}
@@ -60,11 +69,49 @@ function Tick({ ok, label }: { ok: boolean; label: string }) {
                     {ok ? m.statutory_readiness_sr_ready() : m.statutory_readiness_sr_missing()}
                 </span>
             </span>
-        </span>
+        </>
     );
+
+    // Linked only when it is BOTH missing and fixable from here: a link on a
+    // green tick invites a trip that changes nothing.
+    if (!ok && fixHref) {
+        return (
+            <Link
+                to={fixHref}
+                className="inline-flex items-center gap-1.5 text-[12px] underline underline-offset-2 hover:text-ih-fg-1"
+            >
+                {body}
+            </Link>
+        );
+    }
+    return <span className="inline-flex items-center gap-1.5 text-[12px]">{body}</span>;
 }
 
-export function StatutoryReadinessCard({ readiness }: { readiness: StatutoryReadinessData }) {
+export function StatutoryReadinessCard({ readiness }: {
+    /** null when the server could not compute it — see below. */
+    readiness: StatutoryReadinessData | null;
+}) {
+    // COULD NOT CHECK IS A STATE, NOT AN ABSENCE.
+    //
+    // The first version rendered nothing here, which is the shape a failing
+    // test pushes you towards and the wrong one for the reader: an owner who
+    // saw this card yesterday and does not see it today learns nothing, and
+    // "the check is gone" is indistinguishable from "the feature was removed".
+    // The rows below are unaffected either way — that part of best-effort was
+    // right — but the reader is told which of the two happened.
+    if (readiness === null) {
+        return (
+            <Card className="p-5 space-y-1" data-testid="statutory-readiness">
+                <h2 className="text-[15px] font-bold text-ih-fg-1">
+                    {m.statutory_readiness_title()}
+                </h2>
+                <p className="text-[12px] text-ih-fg-3">
+                    {m.statutory_readiness_unavailable()}
+                </p>
+            </Card>
+        );
+    }
+
     const { forms, licenceClass } = readiness;
     const someoneCanSign = licenceClass.filled > 0;
 
@@ -104,7 +151,11 @@ export function StatutoryReadinessCard({ readiness }: { readiness: StatutoryRead
                                 </span>
                             ) : (
                                 <>
-                                    <Tick ok={form.templateInstalled} label={m.statutory_readiness_template()} />
+                                    <Tick
+                                        ok={form.templateInstalled}
+                                        label={m.statutory_readiness_template()}
+                                        fixHref="/library/marketplace"
+                                    />
                                     <Tick ok={form.sourceStored} label={m.statutory_readiness_pdf()} />
                                     <Tick
                                         ok={someoneCanSign}
