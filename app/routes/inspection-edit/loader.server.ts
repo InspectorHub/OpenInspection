@@ -51,13 +51,36 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // The inspection-level answers a statutory form asks for. This endpoint 404s
  // for every ordinary inspection — that is its ANSWER, not a failure — so the
  // null it leaves behind is what decides whether the panel renders at all.
- api.inspections[":id"]["statutory-details"].$get({ param: { id } }).catch(() => null),
+ // Same trap as the coverage call below, and the same fix. It has been written
+ // `.catch()` here since it was added; nothing had exercised the absent-link
+ // path, which is exactly how a latent synchronous throw stays latent.
+ (async () => {
+   try {
+     return await api.inspections[":id"]["statutory-details"].$get({ param: { id } });
+   } catch (cause) {
+     console.error("[statutory-details] could not be requested at all", cause);
+     return null;
+   }
+ })(),
  // Which required boxes are still empty. Fetched HERE rather than on demand
  // because the whole point is that an inspector sees it without asking: the
  // information existed all along and only ever arrived after publish.
  // A failure leaves null, which renders as no panel rather than as "nothing is
  // missing" — see the type's own note.
- api.inspections[":id"]["statutory-form"].coverage.$get({ param: { id } }).catch(() => null),
+ // ⚠️ try/catch, NOT `.catch()`. `inspector-portal.tsx` already wrote this
+ // down and I made the mistake anyway: `.catch()` handles a REJECTED promise,
+ // while the typed-client chain throws SYNCHRONOUSLY the moment any link in
+ // `inspections[":id"]["statutory-form"].coverage.$get` is absent — an older
+ // build, or a test stub. That throw escapes Promise.all and 500s the whole
+ // editor, so a best-effort panel would take the page down with it.
+ (async () => {
+   try {
+     return await api.inspections[":id"]["statutory-form"].coverage.$get({ param: { id } });
+   } catch (cause) {
+     console.error("[statutory-coverage] could not be requested at all", cause);
+     return null;
+   }
+ })(),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
