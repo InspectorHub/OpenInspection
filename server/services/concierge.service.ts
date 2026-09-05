@@ -3,7 +3,8 @@ import { and, eq, isNull } from 'drizzle-orm';
 import {
     inspections,
     tenantConfigs,
-    conciergeConfirmTokens,    contacts,
+    conciergeConfirmTokens,
+    contacts,
     users,
     tenants,
     contactRoleProfiles,

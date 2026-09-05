@@ -22,7 +22,8 @@ import { getTenantId, getDrizzle } from '../lib/route-helpers';
 import { resolveLocale } from '../lib/locale';
 import { formatCurrency } from '../lib/format';
 import { qboPaymentKey } from '../lib/qbo-payment-key';
-import invoicePaymentRoutes from './invoices/payments';
+import invoicePaymentRoutes from './invoices/payments';
+
 import { fireAndForget } from '../lib/fire-and-forget';
 
 const listInvoicesRoute = createRoute(withMcpMetadata({

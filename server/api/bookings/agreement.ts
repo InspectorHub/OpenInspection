@@ -15,7 +15,8 @@ import { PublicAgreementBodySchema } from '../../lib/validations/agreement-publi
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
 import { getDrizzle } from '../../lib/route-helpers';
 import { resolveAutomationCompanyName } from '../../services/automation/company-name';
-import { AGREEMENT_LANGUAGE_DISCLOSURE } from '../../lib/legal/agreement-language-disclosure';
+import { AGREEMENT_LANGUAGE_DISCLOSURE } from '../../lib/legal/agreement-language-disclosure';
+
 import { fireAndForget } from '../../lib/fire-and-forget';
 
 // Local aliases for the literal unions the DB columns are narrowed to in the

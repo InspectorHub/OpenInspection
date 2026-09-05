@@ -37,7 +37,8 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // Must import AFTER the drizzle mock.
 // eslint-disable-next-line import/order
-import { bookingsRoutes } from '../../../server/api/bookings';
+import { bookingsRoutes } from '../../../server/api/bookings';
+
 import { makeExecutionContext } from '../helpers/exec-ctx';
 
 vi.mock('../../../server/lib/rate-limit', () => ({

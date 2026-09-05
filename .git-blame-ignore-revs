@@ -1,0 +1,26 @@
+# Revisions that `git blame` should look straight through.
+#
+# One unabbreviated 40-character SHA per line. Lines starting with `#` and blank
+# lines are ignored. Only commits that changed formatting and NOTHING else may
+# be listed here — a commit with any behaviour change in it must never be made
+# invisible to blame.
+#
+# GitHub reads this file from the repository root automatically and shows an
+# "Ignoring revisions in .git-blame-ignore-revs" banner in the blame view.
+# Git does not: locally it has to be pointed at the file once, per clone:
+#
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#     git config blame.markIgnoredLines true      # optional: marks moved lines '?'
+#
+# Without that config, `git blame` locally will still attribute those lines to
+# the formatting commit while github.com does not — a difference that has cost
+# people an afternoon before.
+
+# ── The LF normalisation, 2026-09-05 ───────────────────────────────────────
+# 58 files rewritten from CRLF (and, in ten of them, a lone CR) to LF in a
+# single commit that changed no source at all. Every line of those files will
+# otherwise blame to it forever.
+#
+# ⚠️ TODO: the commit does not exist yet. Once it is made, append its full SHA
+# below — `git rev-parse HEAD` immediately after committing — in a SEPARATE
+# follow-up commit, since a commit cannot contain its own hash.

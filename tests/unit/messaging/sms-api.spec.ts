@@ -1870,7 +1870,8 @@ describe('Managed-eligibility gate — POST /sms/compliance/provision and /resub
 
 // ─── MeteringService.getCount (Task 10) ─────────────────────────────────────
 
-import { MeteringService } from '../../../server/services/metering.service';
+import { MeteringService } from '../../../server/services/metering.service';
+
 import { makeExecutionContext } from '../helpers/exec-ctx';
 
 describe('MeteringService.getCount (Task 10)', () => {
