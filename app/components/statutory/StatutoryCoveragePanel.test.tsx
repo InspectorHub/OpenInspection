@@ -28,6 +28,7 @@ const HREF = "/api/inspections/insp-1/statutory-form/preview.pdf";
 /** The production failure, as a fixture: two profile fields, one on the job. */
 const MIXED: StatutoryCoverageData = {
     formId: "tx_trec_rei",
+    formTitle: "Texas Real Estate Commission Property Inspection Report",
     revision: "REI 7-6",
     requiredTotal: 5,
     missing: [

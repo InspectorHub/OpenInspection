@@ -81,12 +81,12 @@
   "statutory_details_owner_work_phone": "Teléfono del trabajo",
   "statutory_details_owner_cell_phone": "Teléfono celular",
   "statutory_coverage_title": "Statutory form readiness",
-  "statutory_coverage_subtitle": "What {formId} {revision} still needs before it can be produced.",
+  "statutory_coverage_subtitle": "What {formTitle} {revision} still needs before it can be produced.",
   "statutory_coverage_complete": "Every required box on this form has an answer.",
   "statutory_coverage_missing": "{count} of {total} required field(s) have no answer yet.",
-  "statutory_coverage_profile_group": "Set once, on a profile — not per inspection",
+  "statutory_coverage_profile_group": "Still to set on a profile — once, not per inspection",
   "statutory_coverage_profile_hint": "These come from the inspector's profile and the workspace, so they are the same on every job. Fix them under Settings and every future inspection is covered.",
-  "statutory_coverage_inspection_group": "Answered on this inspection",
+  "statutory_coverage_inspection_group": "Still to answer on this inspection",
   "statutory_coverage_preview": "Preview the form",
   "statutory_coverage_preview_hint": "Opens the authority's page with today's answers, watermarked. Nothing is filed."
 }

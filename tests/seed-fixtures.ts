@@ -10,7 +10,7 @@
  */
 import { execSync } from 'child_process';
 import { createHash } from 'crypto';
-import { existsSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import path from 'path';
 
 const ADMIN_EMAIL    = 'admin-seed@seed.test';
@@ -212,6 +212,35 @@ function d1Script(sql: string, cwd: string, label: string): void {
  * the two-defects-on-one-item case (`findingKey` collision ordinals) that this
  * page has to render distinguishably.
  */
+/** The statutory inspection the editor's coverage panel is asserted against. */
+export const STATUTORY_INSPECTION_ID = 'seed-statutory-inspection';
+
+/**
+ * The snapshot that inspection carries — the SHIPPED TREC pack's own schema,
+ * imported rather than retyped.
+ *
+ * A hand-written declaration here would be a second copy of 119 bindings
+ * authored against one revision's field map, and the spec built on it would
+ * assert against a form this software does not publish. Importing means a
+ * revision change breaks the fixture loudly instead of leaving it quietly
+ * describing a document nobody ships.
+ */
+const STATUTORY_TEMPLATE_SNAPSHOT = ((): Record<string, unknown> => {
+    // READ, not imported. This module is loaded by Playwright's globalSetup
+    // under plain Node ESM, where a JSON import needs `with { type: 'json' }`
+    // — and the same file is also pulled in by bundled test runs that do not.
+    // Reading the bytes works in both and needs no loader agreement.
+    const file = new URL('../server/data/seed-templates/trec-rei-7-6.json', import.meta.url);
+    const pack = JSON.parse(readFileSync(file, 'utf8')) as { schema: Record<string, unknown> };
+    if (pack.schema?.statutoryForm === undefined) {
+        // Fail loudly rather than seeding an inspection whose snapshot declares
+        // no form: the coverage panel would simply not render, and the spec
+        // would report "panel missing" for a fixture fault.
+        throw new Error('[seed-fixtures] the shipped TREC pack carries no statutoryForm');
+    }
+    return pack.schema;
+})();
+
 const DELIVERED_TEMPLATE_SNAPSHOT = {
     schemaVersion: 2,
     // Path 2 of getReportData's rating resolution (the results row leaves
@@ -540,6 +569,37 @@ export function seedFixtures(appDir: string): void {
          VALUES ('${CLIENT_ACCESS_TOKEN_ID}', '${TENANT_A_ID}', '${SEED_INSPECTIONS.delivered}',
                  '${CLIENT_RECIPIENT_EMAIL}', 'client', ${nowMs},
                  NULL, NULL, '${CLIENT_PORTAL_TOKEN_HASH}', NULL, NULL)`, cwd);
+
+    // ── A STATUTORY inspection, for the editor's coverage panel ─────────────
+    //
+    // Shaped to show BOTH halves of what a form can still be missing, because a
+    // fixture that showed one would leave the other's rendering unproven:
+    //
+    //   - `inspector_license_number` is missing because HALF_INSPECTOR_ID has no
+    //     `inspector_credentials` row (only the lead inspector is given one, for
+    //     the report cover badge). That is a PROFILE gap — the same shape
+    //     that reached production on 2026-09-05, where nobody learned of it
+    //     until after the report had been published to the client.
+    //   - `client_name` is missing because no `inspection_people` primary client
+    //     is linked to this row. That one genuinely belongs to this job.
+    //
+    // The declaration is READ FROM THE SHIPPED SEED TEMPLATE, never retyped. A
+    // hand-copied one would drift from the map it is authored against and the
+    // spec would then be asserting against a form nobody ships.
+    d1(`INSERT OR REPLACE INTO inspections
+         (id, tenant_id, inspector_id, property_address, property_type, date, status,
+          report_status, payment_status, price_cents, is_payment_required,
+          is_agreement_required, created_at)
+         VALUES ('${STATUTORY_INSPECTION_ID}', '${TENANT_A_ID}', '${HALF_INSPECTOR_ID}',
+                 '7 Statutory Way, Plano TX', 'residential', '2026-06-01', 'scheduled',
+                 'in_progress', 'unpaid', 0, 0, 0, '${now}')`, cwd);
+    d1Script(
+        `UPDATE inspections SET template_snapshot = '${JSON.stringify(STATUTORY_TEMPLATE_SNAPSHOT)}'
+` +
+        `WHERE id = '${STATUTORY_INSPECTION_ID}' AND tenant_id = '${TENANT_A_ID}';
+`,
+        cwd, 'statutory-snapshot',
+    );
 
     // Report content. Both payloads are JSON, so they go through d1Script (see
     // its comment) rather than the single-line --command path.

@@ -96,7 +96,13 @@ export async function refusalToUser<T>(step: () => Promise<T>): Promise<T> {
         if (sentence === null) throw cause;
         logger.warn('statutory: production refused', { reason: message });
         throw Errors.UnprocessableEntity(
-            `This statutory form cannot be produced yet. ${sentence}`,
+            // Sentence-cased at the join. The refusals downstream are written as
+            // continuations and several start lowercase, so concatenating them
+            // raw produced "…cannot be produced yet. the \"…\" form has not been
+            // supplied" — seen in a browser on 2026-09-05. Nothing here can be
+            // asserted about the original casing without changing every message
+            // that already reads correctly, so only the FIRST character moves.
+            `This statutory form cannot be produced yet. ${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}`,
         );
     }
 }

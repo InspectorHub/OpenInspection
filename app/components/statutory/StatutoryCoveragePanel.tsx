@@ -30,6 +30,7 @@ import { m } from "~/paraglide/messages";
  */
 export interface StatutoryCoverageData {
     formId: string;
+    formTitle: string;
     revision: string | null;
     requiredTotal: number;
     missing: { field: string; provenance: "pre_inspection" | "per_inspection" | "unknown" }[];
@@ -76,7 +77,10 @@ export function StatutoryCoveragePanel({ coverage, previewHref }: StatutoryCover
                 </div>
                 <p className="text-[12px] text-ih-fg-3">
                     {m.statutory_coverage_subtitle({
-                        formId: coverage.formId,
+                        // The authority's own NAME for the document. `formId` is
+                        // a database key; printing it asks the reader to
+                        // recognise "tx_trec_rei".
+                        formTitle: coverage.formTitle,
                         revision: coverage.revision ?? "",
                     })}
                 </p>

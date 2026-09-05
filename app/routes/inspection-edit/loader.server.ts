@@ -328,6 +328,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // nobody checked, which is the one state worse than printing nothing.
  type StatutoryCoverage = {
    formId: string;
+   formTitle: string;
    revision: string | null;
    requiredTotal: number;
    missing: { field: string; provenance: "pre_inspection" | "per_inspection" | "unknown" }[];

@@ -48,5 +48,15 @@ export default defineConfig({
             name: 'repair-builder-client-link',
             testMatch: 'repair-builder-client-link.spec.ts',
         },
+        // The editor's statutory coverage panel. It belongs HERE for a second
+        // reason on top of the shared one: a statutory template cannot be minted
+        // through the tenant-facing API at all -- the validator refuses the
+        // declaration on purpose -- so the inspection has to be seeded with the
+        // shipped pack's own schema before the worker starts, which is exactly
+        // what globalSetup's SEED_E2E branch does.
+        {
+            name: 'statutory-coverage',
+            testMatch: 'statutory-coverage.spec.ts',
+        },
     ],
 });

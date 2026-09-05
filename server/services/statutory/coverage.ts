@@ -57,6 +57,15 @@ export interface StatutoryMissingField {
 
 export interface StatutoryCoverage {
     formId: string;
+    /**
+     * The authority's own name for the document.
+     *
+     * Carried because `formId` is a DATABASE KEY and the offer route already
+     * says so where it hands the UI a title instead. Seen on a screenshot on
+     * 2026-09-05: the panel printed "What tx_trec_rei REI 7-6 still needs",
+     * which no test could object to and no inspector should have to read.
+     */
+    formTitle: string;
     /** The revision the inspection's own date selects, or null if none does. */
     revision: string | null;
     /** Required by the form of EVERY inspection. */
@@ -124,6 +133,7 @@ export async function statutoryCoverageFor(
 
     return {
         formId: declaration.formId,
+        formTitle: version.formTitle,
         revision: version.version,
         requiredTotal: map.requiredFields.length,
         missing,
