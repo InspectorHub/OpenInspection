@@ -8,6 +8,8 @@ import { InviteSeatDrawer } from "~/components/modals/InviteSeatDrawer";
 import { EditMemberDrawer, type EditableMember } from "~/components/modals/EditMemberDrawer";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { InviteLinkModal, type InviteLinkTarget } from "~/components/modals/InviteLinkModal";
+import { ResetTwoFactorDialog, type ResetTwoFactorTarget } from "~/components/modals/ResetTwoFactorDialog";
+import { resetMemberTwoFactor } from "./team.reset-two-factor.server";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { importEntryHref } from "~/lib/import-entry-points";
 import { Breadcrumb } from "~/components/Breadcrumb";
@@ -55,6 +57,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       status: "active", lastActiveAt: null, token: null, expiresAt: null,
       inviteLink: null,
       permissionOverrides: u.permissionOverrides ?? null,
+      totpEnabled: u.totpEnabled === true,
     }));
     const pending: Member[] = (body.data?.invites ?? []).map((i) => ({
       id: i.id, name: null, email: i.email, role: i.role,
@@ -63,8 +66,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       // A pending invite's overrides live on tenant_invites and are replayed
       // at accept time; there is no member row to edit yet.
       permissionOverrides: null,
+      // Nobody has enrolled anything until they accept.
+      totpEnabled: false,
     }));
-    return { members: [...active, ...pending], canManage: isAdminRole(role), loadFailed };
+    return { members: [...active, ...pending], canManage: isAdminRole(role), isOwner: role === "owner", loadFailed };
   } catch {
     // `canManage` is derived from the JWT role, which was resolved BEFORE this
     // try block and is not in doubt. Returning false here downgraded an owner's
@@ -72,7 +77,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // affordances, which reads as "you are not allowed" rather than "we could
     // not load this".
     loadFailed = true;
-    return { members: [] as Member[], canManage: isAdminRole(role), loadFailed };
+    return { members: [] as Member[], canManage: isAdminRole(role), isOwner: role === "owner", loadFailed };
   }
 }
 
@@ -87,6 +92,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     const res = await api.team.invites[":token"].$delete({ param: { token: inviteToken } });
     return { ok: res.ok };
   }
+  if (intent === "reset-two-factor") {
+    return resetMemberTwoFactor(api, form.get("id") as string);
+  }
   if (intent === "resend-invite") {
     const inviteToken = form.get("token") as string;
     const res = await api.team.invites[":token"].resend.$post({ param: { token: inviteToken } });
@@ -97,10 +105,15 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 
 export default function TeamPage() {
-  const { members, canManage, loadFailed } = useLoaderData<typeof loader>();
+  const { members, canManage, isOwner, loadFailed } = useLoaderData<typeof loader>();
   // #106 - cancelling an invite burns the token; a second cancel would 404
   // and read as a failure. `resendFetcher` below is a <Form>, not a submit.
   const { submit: submitCancel, busy: cancelBusy } = useGuardedSubmit<{ ok?: boolean }>();
+  // The owner's two-factor reset. Its own submit rather than sharing the
+  // cancel-invite one: two dialogs sharing a busy flag disable each other, and
+  // a reset that silently rode a cancel's in-flight guard would be dropped.
+  const { submit: submitResetTwoFactor, busy: resetTwoFactorBusy } = useGuardedSubmit<{ ok?: boolean }>();
+  const [pendingReset, setPendingReset] = useState<ResetTwoFactorTarget | null>(null);
   const resendFetcher = useFetcher<{ ok?: boolean; resent?: boolean }>();
   const [pendingCancel, setPendingCancel] = useState<{ token: string; email: string } | null>(null);
 
@@ -282,6 +295,7 @@ export default function TeamPage() {
                     // through a whole drawer and then 403 on save. The API
                     // enforces owner/manager regardless — this stops us
                     // offering an action we know will be refused.
+                    <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => setEditMember({
@@ -295,6 +309,22 @@ export default function TeamPage() {
                     >
                       {m.common_edit()}
                     </button>
+                      {/* OWNER ONLY, and only where there is something to
+                          clear. This is the one action that lowers another
+                          person's authentication requirement, so it is not on
+                          the wider admin tier — and offering it on a member
+                          with no enrolment would answer with a refusal the
+                          owner could have been spared. */}
+                      {isOwner && member.totpEnabled === true && (
+                        <button
+                          type="button"
+                          onClick={() => setPendingReset({ id: member.id as string, email: member.email })}
+                          className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1"
+                        >
+                          {m.settings_team_reset_two_factor()}
+                        </button>
+                      )}
+                    </div>
                   ) : null,
               },
             ]}
@@ -339,6 +369,16 @@ export default function TeamPage() {
           }
         }}
         onCancel={() => setPendingCancel(null)}
+      />
+      <ResetTwoFactorDialog
+        target={pendingReset}
+        busy={resetTwoFactorBusy}
+        onConfirm={(target) => {
+          if (submitResetTwoFactor({ intent: "reset-two-factor", id: target.id }, { method: "post" })) {
+            setPendingReset(null);
+          }
+        }}
+        onCancel={() => setPendingReset(null)}
       />
       {/* Keyed on the URL so the Copy button's "Link copied" state cannot
           survive into the NEXT invitation's dialog and claim a copy that was

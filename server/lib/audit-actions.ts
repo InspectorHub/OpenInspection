@@ -55,6 +55,12 @@ export type AuditAction =
     | 'user.invite'
     | 'user.join'
     | 'user.password_change'
+    // An owner clearing ANOTHER member's second factor. Its own action rather
+    // than a generic update, because it is the only one that lowers somebody
+    // else's authentication requirement and it leaves no other trace: the
+    // member's row afterwards is indistinguishable from one that never
+    // enrolled, so the audit row is the whole record that it happened.
+    | 'user.two_factor_reset'
     | 'agreement.create'
     | 'agreement.send'
     | 'agreement.remind'

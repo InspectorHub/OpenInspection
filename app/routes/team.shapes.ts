@@ -31,9 +31,11 @@ export interface Member {
   inviteLink: string | null;
   /** Capability toggles differing from the role template; seeds the edit drawer (IA-101). */
   permissionOverrides: Record<string, boolean> | null;
+  /** Whether this member has a second factor an owner could clear. */
+  totpEnabled: boolean;
 }
 
-export interface LoaderActiveUser { id: string; email: string; role: string; name?: string | null; permissionOverrides?: Record<string, boolean> | null }
+export interface LoaderActiveUser { id: string; email: string; role: string; name?: string | null; permissionOverrides?: Record<string, boolean> | null; totpEnabled?: boolean }
 export interface LoaderInvite { id: string; email: string; role: string; expiresAt: string; inviteLink?: string }
 
 export const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "monitor" | "sat" | "gen"> = {

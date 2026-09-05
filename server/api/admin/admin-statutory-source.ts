@@ -32,6 +32,9 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { Errors } from '../../lib/errors';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { getDrizzle } from '../../lib/route-helpers';
+import { logger } from '../../lib/logger';
+import { statutoryReadiness } from '../../services/statutory/readiness';
 import { PUBLISHED_FORM_VERSIONS } from '../../lib/statutory/forms';
 import { listStatutoryFormSources, storeStatutoryFormSource } from '../../services/statutory/source-upload';
 
@@ -63,6 +66,7 @@ const listSourcesRoute = createRoute(withMcpMetadata({
                         storageBound: z.boolean().describe('Whether this deployment has object storage bound at all. False means no upload can ever succeed here, which is a different problem from an absent file.'),
                         revisions: z.array(z.object({
                             formId: z.string().describe('Stable id of the statutory form itself, e.g. tx_trec_rei.'),
+                            formTitle: z.string().describe("The form's own published name, as the issuing authority writes it. Present because formId is a database key and cannot be checked against the authority's site."),
                             revision: z.string().describe("The authority's own revision label, verbatim."),
                             sourceHash: z.string().describe('sha256 an upload for this revision is checked against, lowercase hex.'),
                             sourceUrl: z.string().describe('Where the authority publishes this revision. Provenance for a human; nothing is fetched from it.'),
@@ -77,6 +81,24 @@ const listSourcesRoute = createRoute(withMcpMetadata({
                             sizeBytes: z.number().nullable().describe('Size of the stored PDF, or null when nothing is stored.'),
                             uploadedAt: z.number().nullable().describe('When the stored bytes were written, epoch ms, or null when nothing is stored.'),
                         })).describe('Every revision this build publishes, in catalogue order.'),
+                        // The other two prerequisites. Present on THIS response
+                        // rather than an endpoint of its own because a screen
+                        // that had to join two calls shows the join wrong on the
+                        // day one of them fails — the same reasoning that put
+                        // presence on this read in the first place.
+                        readiness: z.object({
+                            forms: z.array(z.object({
+                                formId: z.string().describe('Stable id of the form.'),
+                                formTitle: z.string().describe("The form's own published name."),
+                                currentRevision: z.string().nullable().describe('The revision in force TODAY, or null when none is. Readiness is answered for that revision only: a superseded revision whose PDF is stored does not make a job booked today producible.'),
+                                templateInstalled: z.boolean().describe('A template in this workspace declares this form.'),
+                                sourceStored: z.boolean().describe("The authority's PDF for the revision in force is in this deployment's storage."),
+                            })).describe('One row per form this build publishes.'),
+                            licenceClass: z.object({
+                                filled: z.number().describe('Active non-agent members whose printed licence class is set.'),
+                                total: z.number().describe('Active non-agent members. Agents cannot sign a form, so they are not counted.'),
+                            }).describe('A fraction, not a flag: "some inspectors can produce this and some cannot" is the true and useful state.'),
+                        }).optional().describe('Whether a job booked TODAY could produce each form, across all three prerequisites. OMITTED — never sent as an empty shape — when it could not be computed: a card of crosses built from a query that never answered would read as "nothing is set up", which is a claim about the workspace.'),
                     })),
                 },
             },
@@ -136,11 +158,42 @@ const adminStatutorySourceRoutes = createApiRouter()
         // service reports that as `storageBound: false`, which is the honest
         // answer, where a throw here would show the operator a broken page
         // instead of the reason their uploads cannot land.
+        const bucket = c.env.PHOTOS as R2Bucket | undefined;
         const data = await listStatutoryFormSources({
-            bucket: c.env.PHOTOS as R2Bucket | undefined,
+            bucket,
             versions: PUBLISHED_FORM_VERSIONS,
         });
-        return c.json({ success: true as const, data }, 200);
+        // The other two prerequisites, answered here because this is the only
+        // screen where somebody is thinking about them. The rows below say
+        // whether the PDF is stored; on their own they let an owner finish the
+        // one job they can do and still be missing a template or a licence
+        // class — each of which is discovered later, by somebody else, mid-job.
+        //
+        // BEST-EFFORT, AND THAT IS THE POINT. The rows are what this page is
+        // for: an owner comes here to supply a document. Readiness is an
+        // addition, and an addition that can take the upload screen down with
+        // it when a query fails is a net loss. On failure the key is OMITTED —
+        // never sent as an empty shape, which the client would render as a card
+        // of crosses and read as "nothing is set up", a claim about the
+        // workspace made from a query that never answered.
+        let readiness;
+        try {
+            readiness = await statutoryReadiness({
+                db: getDrizzle(c),
+                tenantId: c.get('tenantId'),
+                bucket,
+                versions: PUBLISHED_FORM_VERSIONS,
+                now: Date.now(),
+            });
+        } catch (err) {
+            logger.warn('statutory readiness could not be computed; the upload rows are unaffected', {
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
+        return c.json({
+            success: true as const,
+            data: { ...data, ...(readiness ? { readiness } : {}) },
+        }, 200);
     })
     .openapi(uploadSourceRoute, async (c) => {
         const { formId } = c.req.valid('param');

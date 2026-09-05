@@ -29,7 +29,8 @@ import { RecordingAiProvider } from '../../../server/lib/ai/providers/recording'
 import { segmentReport } from '../../../server/lib/translation/segment-report';
 import { idempotencyMiddleware } from '../../../server/lib/middleware/idempotency';
 import { AppError } from '../../../server/lib/errors';
-import type { HonoConfig } from '../../../server/types/hono';
+import type { HonoConfig } from '../../../server/types/hono';
+
 import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '11111111-1111-4111-8111-111111111111';

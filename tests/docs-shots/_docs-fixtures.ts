@@ -269,3 +269,27 @@ export async function ensureDocsSignerLink(page: Page, inspectionId: string): Pr
     if (!url) throw new Error('docs fixture: signer link endpoint returned no url');
     return new URL(url, 'http://127.0.0.1').pathname + new URL(url, 'http://127.0.0.1').search;
 }
+
+/**
+ * The marketplace catalogue.
+ *
+ * WHY THIS IS NEEDED AT ALL. The seed builds its tenant with raw SQL, so
+ * `seedStarterContent` — the only thing that fills `marketplace_libraries` —
+ * has never run on it. The browse page therefore rendered "Marketplace is
+ * empty · 0 available", and the capture PASSED: the readiness locator matched,
+ * the file was written, and the guide about installing content would have
+ * shipped illustrated by a bare shelf. An empty result reads as green.
+ *
+ * `POST /api/admin/data/install-bundled-content` is the product's own installer
+ * (owner-only; the seed admin is the owner). It is idempotent by name and
+ * reports counts of what it ADDED, so re-running a capture cannot accumulate
+ * rows or change the picture.
+ */
+export async function ensureDocsCatalogue(page: Page): Promise<void> {
+    const res = await page.request.post('/api/admin/data/install-bundled-content', {
+        headers: await authedWriteHeaders(page),
+    });
+    if (!res.ok()) {
+        throw new Error(`docs fixture: bundled-content install -> ${res.status()} ${await res.text()}`);
+    }
+}

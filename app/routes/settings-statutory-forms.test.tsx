@@ -25,8 +25,9 @@ import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { createRoutesStub, Outlet } from "react-router";
 
-import SettingsStatutoryForms from "~/routes/settings-statutory-forms";
+import SettingsStatutoryForms, { type loader } from "~/routes/settings-statutory-forms";
 import type { StatutorySourceRowData } from "~/components/statutory/StatutorySourceRow";
+import type { StatutoryReadinessData } from "~/components/statutory/StatutoryReadinessCard";
 
 /**
  * A real refusal, in the server's own words. Copied from
@@ -50,6 +51,7 @@ const GENERIC = "The upload was refused and nothing was stored.";
 
 const STORED: StatutorySourceRowData = {
     formId: "tx_trec_rei",
+    formTitle: "Texas Real Estate Commission Property Inspection Report",
     revision: "7-6",
     sourceHash: "2222222222222222222222222222222222222222222222222222222222222222",
     sourceUrl: "https://www.trec.texas.gov/forms/rei-7-6",
@@ -64,6 +66,7 @@ const STORED: StatutorySourceRowData = {
 
 const MISSING: StatutorySourceRowData = {
     formId: "yy_flat_form",
+    formTitle: "Example Authority Flat Form",
     revision: "Rev. 04/26",
     sourceHash: "3333333333333333333333333333333333333333333333333333333333333333",
     sourceUrl: "https://example.gov/forms/flat.pdf",
@@ -88,6 +91,7 @@ function renderPage(opts: {
     forbidden?: boolean;
     loadFailed?: boolean;
     storageBound?: boolean;
+    readiness?: StatutoryReadinessData | null;
     /** What the stub action answers, given what the submitted form carried. */
     answer?: (formId: string, revision: string) => ActionResult;
 } = {}) {
@@ -106,11 +110,19 @@ function renderPage(opts: {
                 {
                     path: "settings/statutory-forms",
                     Component: SettingsStatutoryForms,
-                    loader: () => ({
+                    // TYPED AGAINST THE REAL LOADER, not hand-shaped. This
+                    // stub silently drifted once already: `readiness` was added
+                    // to the route and not here, so every test rendered the
+                    // page with an `undefined` the route can never return, and
+                    // 12 of them died inside the card destructuring it. The
+                    // annotation turns the next omission into a type error at
+                    // the commit gate instead of a crash twelve tests deep.
+                    loader: (): Awaited<ReturnType<typeof loader>> => ({
                         forbidden: opts.forbidden ?? false,
                         loadFailed: opts.loadFailed ?? false,
                         storageBound: opts.storageBound ?? true,
                         revisions: opts.revisions ?? [],
+                        readiness: opts.readiness ?? null,
                     }),
                     action: async ({ request }: { request: Request }) => {
                         const form = await request.formData();
@@ -244,6 +256,29 @@ describe("settings → statutory form PDFs: the list", () => {
         expect(form?.querySelector<HTMLInputElement>('input[name="file"]')?.type).toBe("file");
     });
 
+    // The heading is what somebody reads while holding a PDF they just
+    // downloaded from the authority. `formId` is a database key — lowercased,
+    // underscored, ours — and cannot be checked against anything the authority
+    // publishes. Both assertions matter: the title must lead, and the id must
+    // survive, because every refusal message and the upload endpoint name it.
+    it("heads the row with the form's own name, and still carries the id", async () => {
+        renderPage({ revisions: [STORED] });
+        const row = within(await card(STORED));
+        expect(row.getByRole("heading", { name: new RegExp(STORED.formTitle) })).toBeTruthy();
+        expect(row.getByText(STORED.formId)).toBeTruthy();
+    });
+
+    it("names the row's region by the form's name, not by its id", async () => {
+        renderPage({ revisions: [STORED] });
+        // A screen reader moving by region should land on the document's name.
+        // `find`, not `get`: this page renders from a loader, so a synchronous
+        // query here asserts against an empty body and fails for the wrong
+        // reason — which is exactly what it did the first time.
+        expect(
+            await screen.findByRole("region", { name: new RegExp(STORED.formTitle) }),
+        ).toBeTruthy();
+    });
+
     it("shows the expected sha256 in full, because a truncated one cannot be compared", async () => {
         renderPage({ revisions: [MISSING] });
         expect(within(await card(MISSING)).getByText(MISSING.sourceHash)).toBeTruthy();
@@ -281,5 +316,39 @@ describe("settings → statutory form PDFs: the list", () => {
     it("renders nothing but the refusal for a member who is not the owner", async () => {
         renderPage({ revisions: [STORED], forbidden: true });
         expect(screen.queryByTestId("statutory-source-tx_trec_rei-7-6")).toBeNull();
+    });
+
+    // ── THE READINESS CARD IS WIRED ─────────────────────────────────────────
+    // A pair, for this file's usual reason. The card used to reach the page
+    // with no assertion of any kind on it: it rendered, so nothing complained,
+    // and when the loader stub stopped supplying its data the first sign was a
+    // crash inside the component. Both states are pinned so that "the card is
+    // gone" and "the card says it could not check" stay distinguishable.
+    it("shows the readiness card when the loader carried one", async () => {
+        renderPage({
+            revisions: [STORED],
+            readiness: {
+                forms: [{
+                    formId: "tx_trec_rei",
+                    formTitle: "Texas Real Estate Commission Property Inspection Report",
+                    currentRevision: "REI 7-6",
+                    templateInstalled: true,
+                    sourceStored: true,
+                }],
+                licenceClass: { filled: 1, total: 2 },
+            },
+        });
+        const card = await screen.findByTestId("statutory-readiness");
+        expect(within(card).getByText(/Texas Real Estate Commission/)).toBeTruthy();
+    });
+
+    it("says it could not check rather than vanishing when readiness is absent", async () => {
+        // The absent case is `null`, never `undefined`: all three loader
+        // branches set the key. An owner who saw this card yesterday and sees
+        // nothing today cannot tell "the check failed" from "the feature went
+        // away", so the card stays and says which.
+        renderPage({ revisions: [STORED], readiness: null });
+        const card = await screen.findByTestId("statutory-readiness");
+        expect(within(card).queryByText(/Texas Real Estate Commission/)).toBeNull();
     });
 });

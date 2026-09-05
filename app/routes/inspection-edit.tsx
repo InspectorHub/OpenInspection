@@ -1751,6 +1751,8 @@ export default function InspectionEditPage() {
    }}
    onCommitFacts={savePropertyFacts}
    statutoryDetails={loaderData.statutoryDetails}
+   statutoryCoverage={loaderData.statutoryCoverage}
+   statutoryPreviewHref={`/api/inspections/${loaderData.inspection.id}/statutory-form/preview.pdf`}
    pcaNarrative={loaderData.pcaNarrative}
    complianceData={{ ...loaderData.compliance, relianceText: loaderData.relianceText }}
    savingCommercial={subtypeBusy || tierBusy}

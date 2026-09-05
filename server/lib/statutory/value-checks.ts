@@ -56,6 +56,37 @@ function hasNoAnswer(value: StatutoryValue | undefined): boolean {
 }
 
 /**
+ * Which fields this form REQUIRES still have no answer, in the map's own order.
+ *
+ * Exported because two surfaces must agree about it and they run at different
+ * times: this list is what the refusal above names when a form is produced, and
+ * it is also what the editor shows an inspector WHILE they still have the
+ * inspection open. Those two used to be one buried `.filter()`, so the only way
+ * to learn what was missing was to finish the job, publish the report to the
+ * client, and be refused -- by which point the report has already gone out.
+ *
+ * ⚠️ ONE RULE, TWO CALLERS -- never a second copy. A coverage indicator that
+ * computed "still missing" its own way would agree with the refusal on the day
+ * it was written and drift silently afterwards, and the failure mode of that
+ * drift is the worst one available here: a checklist that reads complete over a
+ * form that will be refused, or over one that produces a blank box on an
+ * authority's page.
+ *
+ * A signature counts as answered when it arrives through its own channel, for
+ * the reason `checkValuesAgainstMap` gives: it fills its box without ever being
+ * a value.
+ */
+export function missingRequiredFields(
+    map: FieldMap,
+    values: ReadonlyMap<string, StatutoryValue>,
+    signatures: ReadonlyMap<string, SignatureImage>,
+): string[] {
+    return map.requiredFields.filter(
+        (f) => !signatures.has(f) && hasNoAnswer(values.get(f)),
+    );
+}
+
+/**
  * Every value has somewhere to go, and every required answer is present.
  *
  * Both directions are checked because they fail differently and both fail
@@ -74,10 +105,7 @@ export function checkValuesAgainstMap(
             + `be dropped: ${unmapped.join(', ')}`);
     }
 
-    // A signature is supplied through its own channel and still fills its box.
-    const missing = map.requiredFields.filter(
-        (f) => !signatures.has(f) && hasNoAnswer(values.get(f)),
-    );
+    const missing = missingRequiredFields(map, values, signatures);
     if (missing.length > 0) {
         fail(`${missing.length} required field(s) have no answer: ${missing.join(', ')}. `
             + 'A field this form REQUIRES is required of every inspection, so an answer of '

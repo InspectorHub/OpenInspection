@@ -8,6 +8,7 @@ import { findingKey } from "~/hooks/findings/shared";
 import type { EditorGroup } from "~/lib/editor/statutory-groups";
 import { m } from "~/paraglide/messages";
 import { itemDepths, outlineNumbers, subtreeOf, MAX_ITEM_DEPTH } from "../../../server/lib/template-hierarchy";
+import { useItemRowMenu } from "~/hooks/useItemRowMenu";
 import { ItemRowIndent } from "./ItemRowIndent";
 import { ItemSubtreeDeleteModal, type PendingSubtreeDelete } from "./ItemSubtreeDeleteModal";
 
@@ -158,19 +159,8 @@ export function ItemList({
     setPendingDelete({ id, label, count });
   };
   const lastClickedRef = useRef<string | null>(null);
-  const [menuItemId, setMenuItemId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  // The ⋯ menu is rendered in a portal at this viewport anchor so the
-  // overflow-y-auto item column never clips it (the last item's menu opens
-  // downward past the scroll container's edge).
-  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
-  const openItemMenu = (itemId: string, el: HTMLElement) => {
-    if (menuItemId === itemId) { setMenuItemId(null); setMenuAnchor(null); return; }
-    const r = el.getBoundingClientRect();
-    setMenuItemId(itemId);
-    setMenuAnchor({ x: r.right, y: r.bottom });
-  };
-  const closeItemMenu = () => { setMenuItemId(null); setMenuAnchor(null); };
+  const { menuItemId, menuAnchor, openItemMenu, closeItemMenu } = useItemRowMenu();
   const structuralEditing = Boolean(onDuplicateItem || onDeleteItem || onMoveItem || onRenameItem);
   const resultsMap = results ?? {};
   // Phase U (Batch C1) — resolve a result in the active unit scope. The bare
@@ -331,14 +321,20 @@ export function ItemList({
                         {onDuplicateItem && (
                           <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDuplicateItem(item.id); }}>{m.editor_shared_menu_duplicate()}</MenuItem>
                         )}
-                        {/* Not offered at the cap, rather than offered and
-                            refused: a control that fails on click has taught
-                            nobody anything. Hidden in a grouped template for
-                            the same reason `+ Add item` already is — a free
-                            item reaches no binding, so what is typed into it
-                            never arrives on the authority's form. */}
-                        {onAddSubItem && !grouped && (depths.get(item.id) ?? 0) < MAX_ITEM_DEPTH - 1 && (
-                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onAddSubItem(item.id); }}>{m.editor_shared_add_sub_item()}</MenuItem>
+                        {/* At the cap: DISABLED and says why. Omitting it —
+                            the previous behaviour — leaves the author
+                            comparing one row's menu against another's to infer
+                            a rule nothing states. Still HIDDEN in a grouped
+                            template, because there the answer is "not in this
+                            kind of template at all": a free item reaches no
+                            binding, so what is typed into it never arrives on
+                            the authority's form. */}
+                        {onAddSubItem && !grouped && (
+                          (depths.get(item.id) ?? 0) < MAX_ITEM_DEPTH - 1 ? (
+                            <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onAddSubItem(item.id); }}>{m.editor_shared_add_sub_item()}</MenuItem>
+                          ) : (
+                            <MenuItem disabled aria-disabled="true">{m.editor_shared_add_sub_item_at_cap()}</MenuItem>
+                          )
                         )}
                         {onMoveItem && fullIdx > 0 && (
                           <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, -1); }}>{m.editor_shared_menu_move_up()}</MenuItem>

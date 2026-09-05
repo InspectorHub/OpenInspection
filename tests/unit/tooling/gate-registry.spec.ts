@@ -199,6 +199,29 @@ describe('gate registry', () => {
             // legible. Cost: reads three files and matches route registrations
             // in them, no directory walk.
             'urltaxonomy',
+            // Added 2026-09-05 with the LF gate, and the lock caught it too:
+            // registered at this rung without this entry, so the full run went
+            // red on a tree whose pre-commit hook was green. That is twice in
+            // three days, which is the argument for the lock rather than
+            // against it.
+            //
+            // It earns pre-commit on `rawnul`'s argument, sharpened. THE REPAIR
+            // STOPS BEING FREE THE MOMENT THE COMMIT EXISTS, and here it stops
+            // being free for OTHER PEOPLE: a CRLF rewrite turns a three-line
+            // edit into a whole-file diff, and a whole-file diff into a
+            // whole-file merge conflict on every open branch that touches the
+            // same file. Measured on this repository the same week -- one
+            // in-place rewrite of `messages/*/settings.json` landed upstream as
+            // 293 CRLF lines and left PR #333 conflicting on all of them, for a
+            // real content difference of nine lines.
+            //
+            // A lone CR is the `rawnul` case exactly: git calls the file
+            // binary, so `git grep`, ripgrep and every review diff answer
+            // "Binary file ... matches" with no line number. Ten files in this
+            // repository were already in that state and nothing had reported
+            // them. Cost: 310 ms over 4,002 files, measured against `rawnul`'s
+            // 272 ms beside it.
+            'eol',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);

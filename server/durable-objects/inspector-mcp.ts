@@ -4,7 +4,6 @@
 // executes it in-process as the authenticated user via the identity bridge.
 import { McpAgent } from 'agents/mcp';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
-import snapshot from '../lib/mcp/openapi-snapshot.json';
 import { selectTools, toolNameFromOperationId, type SnapshotEntry } from '../lib/mcp/tools';
 import { selectResources, buildResourceRequest } from '../lib/mcp/resources';
 import { buildToolInput, toZodInputSchema, type ToolInput } from '../lib/mcp/resolve-schema';
@@ -38,6 +37,53 @@ export interface McpProps extends Record<string, unknown> {
  * Lives in `lib/mcp/result-limits` so a handler that must keep a field inside
  * the slice can assert against the same number instead of copying it. */
 const MAX_RESULT_BYTES = MCP_MAX_RESULT_BYTES;
+
+/**
+ * The MCP tool/resource catalogue, loaded ONCE and only when a session needs it.
+ *
+ * ── WHY IT CANNOT BE A STATIC IMPORT ────────────────────────────────────────
+ * `openapi-snapshot.json` is ~900 KB. A static JSON import becomes a JS object
+ * literal that V8 materialises during MODULE EVALUATION — so it is paid on
+ * every cold start of the whole Worker, not on the requests that use it.
+ *
+ * And it cannot be paid anywhere cheaper. `InspectorMcp` must be a static
+ * export for wrangler to bind the Durable Object class, and
+ * `lib/mcp/oauth-provider.ts` imports this module too, with `buildOAuthHandler`
+ * running on every fetch. The snapshot therefore sat in the eager module graph
+ * in front of EVERY request, including requests that never touch MCP.
+ *
+ * `MCP_ENABLED` did not save it either: `buildOAuthHandler` returns
+ * `{ fetch: appFetch }` unchanged when the flag is off — but only after this
+ * module has already been evaluated. A deployment with MCP switched off paid
+ * the full startup cost and got nothing back for it.
+ *
+ * That is a violation of the invariant `workers/app.ts` states over the DO
+ * re-exports: "their import graphs must stay light".
+ *
+ * ── HOW IT WAS FOUND ────────────────────────────────────────────────────────
+ * From the outside, by a self-hoster hitting Cloudflare Error 1102 on `/` and
+ * `/login` at roughly 5% of requests (discussion #325). The signature was
+ * `outcome: exceededCpu` with `cpuTime: 10, wallTime: 13` — 13 ms of wall time
+ * cannot contain a per-request CPU breach, which is what identifies this as the
+ * script STARTUP limit rather than the per-request one. That limit is the same
+ * on Free and Paid, so no plan change addresses it.
+ *
+ * Measured: the eager graph reachable from the entry chunk falls from 1,291 KiB
+ * to 791 KiB, and cold starts of 120–190 ms disappear. Total upload is
+ * unchanged — compressed script size was never the binding constraint, which is
+ * why `check-bundle-size.mjs` passed at ~70% throughout.
+ *
+ * ⚠️ DO NOT RESTORE THE STATIC IMPORT. Both readers below are already async and
+ * only touch the catalogue at session-registration time, which is what makes
+ * this safe. `getComponentSchemas()` a few lines down defers the rest of the
+ * OpenAPI document for exactly the same reason.
+ */
+let snapshotPromise: Promise<SnapshotEntry[]> | undefined;
+
+const getSnapshot = (): Promise<SnapshotEntry[]> =>
+    (snapshotPromise ??= import('../lib/mcp/openapi-snapshot.json').then(
+        (m) => m.default as unknown as SnapshotEntry[],
+    ));
 
 /** OpenAPI document config — MUST match the snapshot generator / route-metadata
  * spec so the `components.schemas` resolved here line up with the snapshot. */
@@ -128,7 +174,7 @@ export async function registerGrantedTools(
     props: McpProps,
     makeCtx: () => ExecutionContext = makeExecutionContext,
 ): Promise<void> {
-    const all = snapshot as SnapshotEntry[];
+    const all = await getSnapshot();
     const includeExtended = extendedToolsEnabled(env as unknown as { MCP_EXTENDED_TOOLS?: string });
     const granted = selectTools(all, props.scopes, { includeExtended });
 
@@ -181,7 +227,7 @@ export async function registerGrantedResources(
     makeCtx: () => ExecutionContext = makeExecutionContext,
 ): Promise<void> {
     const includeExtended = extendedToolsEnabled(env as unknown as { MCP_EXTENDED_TOOLS?: string });
-    const resources = selectResources(snapshot as SnapshotEntry[], props.scopes, { includeExtended });
+    const resources = selectResources(await getSnapshot(), props.scopes, { includeExtended });
 
     const read = async (entry: SnapshotEntry, vars: Record<string, string>, uri: URL) => {
         // Defense-in-depth: re-assert the read grant before dispatching.

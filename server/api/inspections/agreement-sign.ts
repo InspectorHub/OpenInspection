@@ -26,7 +26,8 @@ import { eq, and, asc } from 'drizzle-orm';
 import { inspections as inspectionTable, agreementRequests, agreementSigners } from '../../lib/db/schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
 import { getDrizzle } from '../../lib/route-helpers';
-import { resolveAutomationCompanyName } from '../../services/automation/company-name';
+import { resolveAutomationCompanyName } from '../../services/automation/company-name';
+
 import { fireAndForget } from '../../lib/fire-and-forget';
 
 const agreementSignRoutes = createApiRouter();

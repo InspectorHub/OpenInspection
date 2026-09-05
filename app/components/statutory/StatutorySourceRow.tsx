@@ -13,6 +13,7 @@ import { m } from "~/paraglide/messages";
  */
 export interface StatutorySourceRowData {
     formId: string;
+    formTitle: string;
     revision: string;
     sourceHash: string;
     sourceUrl: string;
@@ -83,9 +84,17 @@ export function StatutorySourceRow({
         >
         <Card className="p-5 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
+                {/* THE FORM'S NAME LEADS, NOT ITS ID.
+                    This heading used to be `tx_trec_rei · REI 7-6`. The id is a
+                    database key — the registry says so where it declares it —
+                    and this is the one screen where somebody is matching a PDF
+                    they just downloaded from the authority against a row. The
+                    id stays, in mono and secondary, because it is what the
+                    upload endpoint and every error message name. */}
                 <h3 id={headingId} className="text-[15px] font-bold text-ih-fg-1">
-                    {row.formId} · {row.revision}
+                    {row.formTitle} · {row.revision}
                 </h3>
+                <code className="text-[11px] font-mono text-ih-fg-3">{row.formId}</code>
                 {/* The presence pill is the whole point of the row, so it is
                     first and it is never absent — a row with no pill would read
                     as "no answer yet" rather than as "not stored". */}

@@ -47,6 +47,7 @@
   "editor_shared_menu_move_down": "Move down",
   "editor_shared_add_item": "+ Add item",
   "editor_shared_add_sub_item": "+ Add sub-item",
+  "editor_shared_add_sub_item_at_cap": "+ Add sub-item — three levels is the limit",
   "editor_shared_delete_with_children": "Delete \"{label}\" and the {count} items under it?",
   "editor_shared_delete_with_children_confirm": "Delete all",
   "editor_shared_nest_under": "Nests under",

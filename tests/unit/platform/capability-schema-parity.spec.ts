@@ -53,6 +53,11 @@ describe('team request schemas accept exactly the TOGGLEABLE capability set', ()
                     email: 'a@example.com',
                     role: 'inspector',
                     permissionOverrides: everyCapability,
+                    // Required on the response, and unrelated to capabilities:
+                    // the team page reads it to decide whether an owner has a
+                    // second factor to clear. Present here so this fixture is a
+                    // complete member row rather than a capability-only one.
+                    totpEnabled: false,
                     createdAt: '2026-01-01T00:00:00Z',
                 }],
                 invites: [],

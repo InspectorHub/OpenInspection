@@ -153,7 +153,8 @@ export class MarketplaceService {
       // half a validator cannot answer: whether the authority's own PDF is in
       // storage. Installed-but-unable-to-produce is the failure this pair exists
       // to prevent, and it is refused before any row is written.
-      await assertStatutoryInstallable(this.bucket, entry.schema, PUBLISHED_FORM_VERSIONS);
+      await assertStatutoryInstallable(this.bucket, entry.schema, PUBLISHED_FORM_VERSIONS,
+        { db: this.db, tenantId: this.tenantId });
       localEntityId = await insertLocalTemplate(this.db, this.tenantId, entry.name, entry.schema, now);
     } else if (entry.kind === 'templates') {
       // Spec 5B P3 — gate imports on v2 schema validation. The catalogue can
@@ -265,7 +266,8 @@ export class MarketplaceService {
     // extended validator, or a package could be installed and then never
     // updated because the tenant-facing schema refuses its declaration.
     if (mkt.kind === 'statutory') {
-      await assertStatutoryInstallable(this.bucket, mkt.schema, PUBLISHED_FORM_VERSIONS);
+      await assertStatutoryInstallable(this.bucket, mkt.schema, PUBLISHED_FORM_VERSIONS,
+        { db: this.db, tenantId: this.tenantId });
     } else {
       this.assertV2Schema(mkt.schema);
     }

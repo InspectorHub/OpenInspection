@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { StatutoryDetailsHost } from "~/components/statutory/StatutoryDetailsHost";
+import { StatutoryCoveragePanel } from "~/components/statutory/StatutoryCoveragePanel";
 import { PcaNarrativePanel } from "~/components/inspection/PcaNarrativePanel";
 import { CompliancePanel } from "~/components/inspection-edit/CompliancePanel";
 import { CommercialReportControls, type ReportTier } from "~/components/editor/CommercialReportControls";
@@ -35,6 +36,8 @@ interface InspectionOverviewProps {
     onSaveField: ComponentProps<typeof PropertyInfoForm>["onSave"];
     onCommitFacts: ComponentProps<typeof PropertyInfoForm>["onCommit"];
     statutoryDetails: ComponentProps<typeof StatutoryDetailsHost>["details"];
+    statutoryCoverage: ComponentProps<typeof StatutoryCoveragePanel>["coverage"];
+    statutoryPreviewHref: string;
     pcaNarrative: ComponentProps<typeof PcaNarrativePanel>["narrative"];
     complianceData: ComponentProps<typeof CompliancePanel>["data"];
     savingCommercial: boolean;
@@ -48,6 +51,8 @@ export function InspectionOverview({
     onSaveField,
     onCommitFacts,
     statutoryDetails,
+    statutoryCoverage,
+    statutoryPreviewHref,
     pcaNarrative,
     complianceData,
     savingCommercial,
@@ -65,6 +70,14 @@ export function InspectionOverview({
                 templateFields={templateFields}
                 onSave={onSaveField}
                 onCommit={onCommitFacts}
+            />
+            {/* Above the details form on purpose: this says WHAT is still
+                needed, and the form below is where some of it is typed. The
+                other half points at Settings, which is not on this page at
+                all -- so the reader needs the list before the form, not after. */}
+            <StatutoryCoveragePanel
+                coverage={statutoryCoverage}
+                previewHref={statutoryPreviewHref}
             />
             <StatutoryDetailsHost details={statutoryDetails} />
             {/* Commercial PCA Phase T — subtype + report tier selectors. Gated on

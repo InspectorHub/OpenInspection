@@ -27,11 +27,24 @@ test('offers Add sub-item on an item that can still take one', () => {
   expect(screen.getByText('+ Add sub-item')).toBeTruthy();
 });
 
-test('does NOT offer it at the depth cap', () => {
-  // Not offered, rather than offered and refused: a control that fails on
-  // click has taught nobody anything.
-  renderList({ onAddSubItem: vi.fn() });
+test('at the depth cap the entry is present, disabled, and names the limit', () => {
+  // It used to be omitted entirely. An absent entry is not a refusal a reader
+  // can learn from — the rule exists nowhere on screen, and the author is left
+  // comparing one row's menu against another's to infer it. Disabled, carrying
+  // the limit, answers the question where it is asked.
+  const onAddSubItem = vi.fn();
+  renderList({ onAddSubItem });
   openMenuFor('entire underside');
+
+  const entry = screen.getByText(/three levels is the limit/) as HTMLElement;
+  expect(entry).toBeTruthy();
+  expect((entry as HTMLButtonElement).disabled).toBe(true);
+
+  // Disabled in fact, not only in appearance: the handler must not fire.
+  fireEvent.click(entry);
+  expect(onAddSubItem).not.toHaveBeenCalled();
+
+  // And it is not the working entry wearing a longer label.
   expect(screen.queryByText('+ Add sub-item')).toBeNull();
 });
 

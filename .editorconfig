@@ -1,0 +1,29 @@
+# Line endings, at the point where a file is WRITTEN.
+#
+# `.gitattributes` fixes what lands in the blob and what lands in the working
+# tree; `scripts/check-line-endings.mjs` refuses a commit that carries a CR.
+# This file is the earliest of the three: it asks the editor not to create the
+# problem in the first place, so the other two never have to report it.
+#
+# ⚠️ It is prevention, not enforcement, and the gap is worth naming: VS Code
+# does NOT honour this without the EditorConfig extension installed (it is on
+# editorconfig.org's plugin-required list, alongside Sublime Text and
+# Notepad++). Vim, Neovim, the JetBrains IDEs, Helix, Emacs and Xcode do honour
+# it natively. So a contributor with a stock VS Code gets nothing from this
+# file, which is exactly why it is the layer that is allowed to be optional and
+# the gate is the layer that is not.
+#
+# Deliberately minimal. `insert_final_newline` and `trim_trailing_whitespace`
+# are NOT set: they would make every conforming editor reformat files on save,
+# which turns an unrelated one-line edit into a whitespace commit — the same
+# class of damage this whole trio exists to prevent, just from the other side.
+root = true
+
+[*]
+end_of_line = lf
+charset = utf-8
+
+# The `.bat`/`.cmd` exception, kept in step with `.gitattributes`. See the long
+# note there: LF-only batch files fail `goto` at ~3% of label offsets.
+[*.{bat,cmd}]
+end_of_line = crlf
