@@ -83,6 +83,14 @@ export const SCRIPT_GATES = [
     // and the oldest had been unreadable that way for months. A `git ls-files`
     // walk with an indexOf per file; among the cheapest gates in this list.
     { key: 'rawnul', label: 'Raw NUL bytes (files invisible to git grep)', script: 'check-raw-nul.mjs', fix: 'npm run lint:raw-nul', rung: PRECOMMIT },
+    // The CR twin of the gate above, at PRECOMMIT for the same reason: one tool
+    // writing one file creates it, and it is free to undo in that commit and a
+    // whole-file merge conflict on somebody else's branch later. Not redundant
+    // with `.gitattributes` -- `text=auto` calls a LONE-CR file binary and so
+    // declines to normalise the worst case. Why, and the ten files it was
+    // already true of, are in check-line-endings.mjs's header. Cost measured
+    // against `rawnul` beside it: 310 ms vs 272 ms over 4002 files.
+    { key: 'eol', label: 'LF line endings (no CRLF, no lone CR)', script: 'check-line-endings.mjs', fix: 'npm run lint:eol', rung: PRECOMMIT },
     // Belongs at pre-commit rather than CI: what it catches is a CAPABILITY
     // being added -- a money column, a money field on the inspection record, a
     // money input on a new screen. By the time CI sees one it is written and

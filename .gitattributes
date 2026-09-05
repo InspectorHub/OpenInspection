@@ -1,7 +1,61 @@
+# ── Line endings ────────────────────────────────────────────────────────────
+# Every text file in this repository is stored with LF in the blob, and checked
+# out with LF on every platform — Windows included.
+#
+# The two halves do different jobs and both are needed:
+#   text=auto  git decides text-vs-binary per file and normalises CRLF to LF
+#              when writing the BLOB, so a CRLF working file still commits clean.
+#   eol=lf     git writes LF into the WORKING TREE on checkout, instead of
+#              letting a Windows clone's core.autocrlf hand the file back as
+#              CRLF. Without this half the repository is clean and every Windows
+#              worktree is not — which is how an in-place rewrite by any tool
+#              that reads and writes text puts CRLF back into the next commit.
+#
+# ⚠️ This does NOT catch a LONE CR — a carriage return that is not part of a
+# CRLF pair. git's own text/binary heuristic classifies such a file as BINARY,
+# so `text=auto` declines to touch it, and `git grep`, ripgrep and every review
+# diff answer "Binary file ... matches" with no line number. Ten .ts/.tsx files
+# in this repository were in that state on 2026-09-05 and nothing reported it.
+# `scripts/check-line-endings.mjs` (npm run lint:eol) is the gate for that hole,
+# and for anything this file stops applying to.
+* text=auto eol=lf
+
+# Real byte content. Declared rather than detected, so `text=auto` never has to
+# guess about them and no diff tries to render them as lines. `binary` is git's
+# built-in macro for `-text -diff -merge`.
+*.png binary
+*.ico binary
+*.pdf binary
+
+# Windows batch scripts are the one text format that wants CRLF, and the rule is
+# here BEFORE the first one exists because that is the only cheap moment to add
+# it. There are no `.bat`/`.cmd` files in this repository today.
+#
+# The usual claim — "cmd.exe requires CRLF" — is overstated, and it was measured
+# rather than repeated: on Windows 11, LF-only batch files run correctly for
+# `echo`, `goto`, `call`, `if`/`for` blocks and a label on the final line. But
+# cmd.exe's label scanner reads in ~512-byte chunks and only resets that
+# boundary on a CRLF, so a label straddling a chunk boundary is not found. In a
+# sweep of 90 LF-only files differing only in where the label started, 3 failed
+# with "cannot find the batch label specified"; the same 90 with CRLF failed 0
+# times. It is offset-dependent, so adding a byte anywhere earlier in the file
+# creates or removes it. Cheap to prevent, unpleasant to debug — which is why
+# git, microsoft/vscode and dotnet/runtime all pin these too.
+#
+# scripts/check-line-endings.mjs reads these attributes and exempts whatever is
+# declared `eol=crlf` here, so the gate and this file cannot disagree.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
 # Git hooks and shell scripts must be stored and checked out with LF endings.
 # A CRLF shebang makes the kernel look for an interpreter named `sh\r`, so the
 # hook dies with "bad interpreter" on Linux and macOS while working fine on the
 # Windows machine that committed it. The blobs happen to be LF today because of
 # how this machine is configured; this states it instead of relying on that.
+#
+# Kept as their own entries even though the `*` rule above already covers them:
+# these use unconditional `text`, not `text=auto`, so they do not depend on the
+# heuristic at all. The hooks are extensionless, which is exactly the shape a
+# content heuristic is most likely to get wrong.
 .githooks/** text eol=lf
 *.sh text eol=lf

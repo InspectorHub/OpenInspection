@@ -294,6 +294,24 @@ describe('GET /api/admin/statutory-forms', () => {
         expect(current?.sourceUrl).toBe(PUBLISHED_FORM_VERSIONS[0]?.sourceUrl);
     });
 
+    // The readiness block is BEST-EFFORT and these specs prove the fallback is
+    // real rather than theoretical: this environment has no DB binding at all,
+    // so the readiness query throws on every one of them — and every assertion
+    // about the rows still holds. An addition that could take the upload screen
+    // down with it would be a net loss on the page an owner comes here to use.
+    it('still lists the revisions when readiness cannot be computed', async () => {
+        const body = await (await list()).json() as ListBody;
+        expect(body.data.revisions.length).toBeGreaterThan(0);
+    });
+
+    it('OMITS readiness rather than sending an empty shape', async () => {
+        // An empty shape would render as a card of crosses and read as
+        // "nothing is set up" — a claim about the workspace made from a query
+        // that never answered.
+        const body = await (await list()).json() as { data: { readiness?: unknown } };
+        expect(body.data.readiness).toBeUndefined();
+    });
+
     it('reports a withdrawal with its reason, and reports its absence as null', async () => {
         // Two revisions, one withdrawn: the reason decides what the reader does
         // next (wait for us, or move to the revision now in force), so a bare

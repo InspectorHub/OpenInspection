@@ -71,7 +71,8 @@ export async function reinstallCatalogEntry(input: ReinstallInput): Promise<{
         // workspace, and "it passed when you first installed it" is not a fact
         // about the row being written now.
         if (entry.kind === 'statutory') {
-            await assertStatutoryInstallable(input.bucket, entry.schema, PUBLISHED_FORM_VERSIONS);
+            await assertStatutoryInstallable(input.bucket, entry.schema, PUBLISHED_FORM_VERSIONS,
+                { db: input.db, tenantId: input.tenantId });
         } else {
             input.assertV2Schema(entry.schema);
         }

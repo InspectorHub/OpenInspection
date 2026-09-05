@@ -15,7 +15,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const id = params.id;
 
  const api = createApi(context, { token });
- const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, unitsRes, unitProgressRes, complianceRes, statutoryDetailsRes] = await Promise.all([
+ const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, unitsRes, unitProgressRes, complianceRes, statutoryDetailsRes, statutoryCoverageRes] = await Promise.all([
  api.inspections[":id"].$get({ param: { id } }),
  // Commercial PCA Phase U (Batch C-lazy) — first paint only needs the common
  // scope. The editor opens at activeUnitId = null (the '_default' scope), so
@@ -51,7 +51,36 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // The inspection-level answers a statutory form asks for. This endpoint 404s
  // for every ordinary inspection — that is its ANSWER, not a failure — so the
  // null it leaves behind is what decides whether the panel renders at all.
- api.inspections[":id"]["statutory-details"].$get({ param: { id } }).catch(() => null),
+ // Same trap as the coverage call below, and the same fix. It has been written
+ // `.catch()` here since it was added; nothing had exercised the absent-link
+ // path, which is exactly how a latent synchronous throw stays latent.
+ (async () => {
+   try {
+     return await api.inspections[":id"]["statutory-details"].$get({ param: { id } });
+   } catch (cause) {
+     console.error("[statutory-details] could not be requested at all", cause);
+     return null;
+   }
+ })(),
+ // Which required boxes are still empty. Fetched HERE rather than on demand
+ // because the whole point is that an inspector sees it without asking: the
+ // information existed all along and only ever arrived after publish.
+ // A failure leaves null, which renders as no panel rather than as "nothing is
+ // missing" — see the type's own note.
+ // ⚠️ try/catch, NOT `.catch()`. `inspector-portal.tsx` already wrote this
+ // down and I made the mistake anyway: `.catch()` handles a REJECTED promise,
+ // while the typed-client chain throws SYNCHRONOUSLY the moment any link in
+ // `inspections[":id"]["statutory-form"].coverage.$get` is absent — an older
+ // build, or a test stub. That throw escapes Promise.all and 500s the whole
+ // editor, so a best-effort panel would take the page down with it.
+ (async () => {
+   try {
+     return await api.inspections[":id"]["statutory-form"].coverage.$get({ param: { id } });
+   } catch (cause) {
+     console.error("[statutory-coverage] could not be requested at all", cause);
+     return null;
+   }
+ })(),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
@@ -314,5 +343,24 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
    statutoryDetails = body.data ?? null;
  }
 
- return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails };
+ // ⚠️ NULL IS NOT "NOTHING IS MISSING". Null means the question could not be
+ // answered — no statutory form here, or the request failed — and the panel
+ // does not render at all. An empty `missing` array is the OTHER thing: the
+ // question was asked and the answer is "none", which is worth showing. A
+ // component that treated the two alike would print a green tick over a form
+ // nobody checked, which is the one state worse than printing nothing.
+ type StatutoryCoverage = {
+   formId: string;
+   formTitle: string;
+   revision: string | null;
+   requiredTotal: number;
+   missing: { field: string; provenance: "pre_inspection" | "per_inspection" | "unknown" }[];
+ };
+ let statutoryCoverage: StatutoryCoverage | null = null;
+ if (statutoryCoverageRes?.ok) {
+   const body = await statutoryCoverageRes.json() as { data?: StatutoryCoverage | null };
+   statutoryCoverage = body.data ?? null;
+ }
+
+ return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage };
 }

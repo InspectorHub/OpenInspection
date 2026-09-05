@@ -6,7 +6,8 @@ import { logger } from './logger';
 import { resolveAutomationCompanyName } from '../services/automation/company-name';
 import { getBookingHost } from './url';
 import { envelopeVerifyUrl } from './agreement-verify-url';
-import type { HonoConfig } from '../types/hono';
+import type { HonoConfig } from '../types/hono';
+
 import { fireAndForget } from './fire-and-forget';
 
 /**

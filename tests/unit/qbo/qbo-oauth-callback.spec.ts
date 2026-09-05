@@ -34,7 +34,8 @@ vi.mock('../../../server/lib/jwt-keyring', () => ({
 // eslint-disable-next-line import/order
 import qboOauthRoutes from '../../../server/api/qbo-oauth';
 // eslint-disable-next-line import/order
-import { QBO_OAUTH_MOUNT, qboRedirectUri } from '../../../server/lib/qbo-oauth-paths';
+import { QBO_OAUTH_MOUNT, qboRedirectUri } from '../../../server/lib/qbo-oauth-paths';
+
 import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';

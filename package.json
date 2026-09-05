@@ -96,6 +96,7 @@
     "lint:idempotency": "node scripts/check-idempotency-coverage.mjs",
     "lint:ext-collisions": "node scripts/check-extension-collisions.mjs",
     "lint:raw-nul": "node scripts/check-raw-nul.mjs",
+    "lint:eol": "node scripts/check-line-endings.mjs",
     "lint:i18n": "node scripts/check-i18n.mjs",
     "lint:i18n-catalog": "node scripts/check-i18n-catalog.mjs",
     "lint:i18n-glossary": "node scripts/check-i18n-glossary.mjs",
@@ -204,7 +205,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.42.0",
+    "@cloudflare/vite-plugin": "^1.54.4",
     "@cloudflare/vitest-pool-workers": "^0.16.17",
     "@cloudflare/workers-types": "^4.20260702.1",
     "@eslint/js": "^10.0.1",
@@ -251,7 +252,7 @@
     "typescript-eslint": "^8.68.0",
     "vite": "^8.1.5",
     "vitest": "^4.1.7",
-    "wrangler": "^4.102.0"
+    "wrangler": "^4.129.0"
   },
   "overrides": {
     "esbuild": "^0.28.1",
