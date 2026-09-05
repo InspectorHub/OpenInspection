@@ -21,6 +21,8 @@
 # single commit that changed no source at all. Every line of those files will
 # otherwise blame to it forever.
 #
-# ⚠️ TODO: the commit does not exist yet. Once it is made, append its full SHA
-# below — `git rev-parse HEAD` immediately after committing — in a SEPARATE
-# follow-up commit, since a commit cannot contain its own hash.
+# Verified formatting-only before listing: every file the chrome-record judge
+# flagged was compared against its parent with CR stripped from both sides, and
+# the content difference is zero. A commit with any behaviour change in it must
+# never be made invisible to blame, so that check is the price of an entry here.
+dd95a800f9838cd8be1fc1297f5970f7ba0a589b
