@@ -68,10 +68,12 @@ import * as schema from '../../lib/db/schema';
 import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
 import { resolveProducibleStatutoryForm } from '../../services/statutory/producible';
 import { watermarkAsPreview } from '../../lib/statutory/preview-watermark';
+import { statutoryCoverageFor } from '../../services/statutory/coverage';
 import { logger } from '../../lib/logger';
 import {
     statutoryFormRoute,
     statutoryPreviewRoute,
+    statutoryCoverageRoute,
     statutoryOfferRoute,
     addInstanceRoute,
 } from './statutory.routes';
@@ -204,6 +206,25 @@ const statutoryRoutes = createApiRouter().openapi(statutoryFormRoute, async (c) 
                 // published version here to be true about.
             },
         });
+    })
+    /**
+     * Coverage. Reuses the resolver, so it refuses on a withdrawn or mismatched
+     * revision exactly as the render does -- a checklist that stayed green over
+     * a form the download will refuse is the failure this whole change exists
+     * to remove, and it would be introduced right here.
+     */
+    .openapi(statutoryCoverageRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const tenantId = c.get('tenantId');
+        const db = drizzle(c.env.DB, { schema });
+
+        const { inspection, snapshot, inspectionDay } =
+            await resolveProducibleStatutoryForm(db, c.env.DB, tenantId, id);
+
+        const coverage = await statutoryCoverageFor(
+            db, c.env.DB, tenantId, inspection, inspectionDay, snapshot,
+        );
+        return c.json({ success: true, data: coverage }, 200);
     })
     .openapi(statutoryOfferRoute, async (c) => {
         const { id } = c.req.valid('param');

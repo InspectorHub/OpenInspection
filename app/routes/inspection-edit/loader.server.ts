@@ -15,7 +15,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const id = params.id;
 
  const api = createApi(context, { token });
- const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, unitsRes, unitProgressRes, complianceRes, statutoryDetailsRes] = await Promise.all([
+ const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, unitsRes, unitProgressRes, complianceRes, statutoryDetailsRes, statutoryCoverageRes] = await Promise.all([
  api.inspections[":id"].$get({ param: { id } }),
  // Commercial PCA Phase U (Batch C-lazy) — first paint only needs the common
  // scope. The editor opens at activeUnitId = null (the '_default' scope), so
@@ -52,6 +52,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // for every ordinary inspection — that is its ANSWER, not a failure — so the
  // null it leaves behind is what decides whether the panel renders at all.
  api.inspections[":id"]["statutory-details"].$get({ param: { id } }).catch(() => null),
+ // Which required boxes are still empty. Fetched HERE rather than on demand
+ // because the whole point is that an inspector sees it without asking: the
+ // information existed all along and only ever arrived after publish.
+ // A failure leaves null, which renders as no panel rather than as "nothing is
+ // missing" — see the type's own note.
+ api.inspections[":id"]["statutory-form"].coverage.$get({ param: { id } }).catch(() => null),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
@@ -314,5 +320,23 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
    statutoryDetails = body.data ?? null;
  }
 
- return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails };
+ // ⚠️ NULL IS NOT "NOTHING IS MISSING". Null means the question could not be
+ // answered — no statutory form here, or the request failed — and the panel
+ // does not render at all. An empty `missing` array is the OTHER thing: the
+ // question was asked and the answer is "none", which is worth showing. A
+ // component that treated the two alike would print a green tick over a form
+ // nobody checked, which is the one state worse than printing nothing.
+ type StatutoryCoverage = {
+   formId: string;
+   revision: string | null;
+   requiredTotal: number;
+   missing: { field: string; provenance: "pre_inspection" | "per_inspection" | "unknown" }[];
+ };
+ let statutoryCoverage: StatutoryCoverage | null = null;
+ if (statutoryCoverageRes?.ok) {
+   const body = await statutoryCoverageRes.json() as { data?: StatutoryCoverage | null };
+   statutoryCoverage = body.data ?? null;
+ }
+
+ return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage };
 }

@@ -8160,6 +8160,34 @@
     "description": "Auto-generated placeholder for getInspectionRequestByInspection (GET /by-inspection/{inspectionId}, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "getInspectionStatutoryCoverage",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/statutory-form/coverage",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection ID",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection ID"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Which fields this inspection still owes its statutory form",
+    "description": "Names the required fields that have no answer yet, each tagged with when it could first have been answered. Requires no published report. `null` when the template declares no form, which is the ordinary case."
+  },
+  {
     "operationId": "getInspectionStatutoryDetails",
     "method": "GET",
     "pathTemplate": "/api/inspections/{id}/statutory-details",

@@ -42,6 +42,42 @@ const statutoryFormRoute = createRoute(withMcpMetadata({
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
+ * What this inspection still owes its form, asked WHILE it can still be
+ * answered.
+ *
+ * ── WHY NOT FOLDED INTO THE OFFER ROUTE ─────────────────────────────────────
+ * The offer answers "is there a form here, and what does the notice say" from
+ * the catalogue and one row, and the inspection hub calls it on every page
+ * load. Coverage has to gather every input the renderer would -- results,
+ * facts, credentials, overflow instances -- to answer honestly. Putting the two
+ * behind one path would make every hub load pay for an answer it does not
+ * display, and on 2026-09-05 production was measurably killing ordinary page
+ * loads at the free tier's CPU limit. Cheap questions and expensive ones get
+ * their own paths so a caller can choose.
+ *
+ * The answer is deliberately the SAME LIST the download refuses with -- see
+ * `missingRequiredFields`. A second opinion here would read complete over a
+ * form that will be refused, and a checklist is believed.
+ */
+const statutoryCoverageRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/{id}/statutory-form/coverage',
+    tags: ['inspections'],
+    summary: 'Which fields this inspection still owes its statutory form',
+    description:
+        'Names the required fields that have no answer yet, each tagged with when it could first '
+        + 'have been answered. Requires no published report. `null` when the template declares no '
+        + 'form, which is the ordinary case.',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: { params: z.object({ id: z.string().trim().min(1).describe('Inspection ID') }) },
+    responses: {
+        200: { description: 'The coverage, or null when this inspection produces no form' },
+        404: { description: 'No such inspection for this workspace' },
+    },
+    operationId: 'getInspectionStatutoryCoverage',
+}, { scopes: ['read'], tier: 'extended' }));
+
+/**
  * The PREVIEW route, read by the editor while the inspection is still open.
  *
  * Same document, same bindings, same revision judgement -- and deliberately NOT
@@ -151,4 +187,10 @@ const addInstanceRoute = createRoute(withMcpMetadata({
 // AddInstanceBodySchema is deliberately NOT exported: it is the request body
 // of one route in this file and has no second reader. Exporting it would add a
 // name to the module surface that nothing imports.
-export { statutoryFormRoute, statutoryPreviewRoute, statutoryOfferRoute, addInstanceRoute };
+export {
+    statutoryFormRoute,
+    statutoryPreviewRoute,
+    statutoryCoverageRoute,
+    statutoryOfferRoute,
+    addInstanceRoute,
+};
