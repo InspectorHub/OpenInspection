@@ -189,10 +189,15 @@ export default function SettingsStatutoryForms() {
             )}
 
             {/* The whole question, before the one part of it this page can act
-                on. Absent when the read failed — a card that ticked nothing
-                would be a claim about the workspace made from a response that
-                said nothing. */}
-            {readiness && !loadFailed && readiness.forms.length > 0 && (
+                on. It renders even when the server could not compute it: the
+                card then SAYS it could not check, rather than disappearing.
+                A card that vanishes is indistinguishable from a feature that
+                was removed, and it teaches a returning reader nothing.
+
+                Withheld only when the whole read failed, because the notice
+                above already says that and two failure notices is one too
+                many. */}
+            {!loadFailed && (
                 <StatutoryReadinessCard readiness={readiness} />
             )}
 

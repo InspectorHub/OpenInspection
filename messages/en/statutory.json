@@ -28,6 +28,7 @@
   "statutory_update_withdrawn_authority": "Revision {version}, the one this workspace's template still produces, was withdrawn by the authority. No software update will bring it back, so updating is the only way forward. Inspections still on the withdrawn revision have to be started again on the updated template.",
   "statutory_update_withdrawn_inflight_one": "1 inspection in progress is still on revision {version} and can no longer produce its form.",
   "statutory_update_withdrawn_inflight_many": "{count} inspections in progress are still on revision {version} and can no longer produce their form.",
+  "statutory_readiness_unavailable": "This check could not run just now, so nothing here is claimed either way. The revisions below are unaffected — reload to try again.",
   "statutory_readiness_title": "Could a job booked today produce these?",
   "statutory_readiness_subtitle": "Three things have to be true, and they belong to three different people. This is the only screen that can show all three at once.",
   "statutory_readiness_ready": "Ready",
