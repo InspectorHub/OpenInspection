@@ -56,7 +56,7 @@ const FANOUT_CALLS = 3;
  * removes the work; never raise it without saying in the commit message what
  * bought the extra statement.
  */
-const FANOUT_TOTAL = 30;
+const FANOUT_TOTAL = 26;
 
 /**
  * Proxy rather than a spread copy: D1Database carries its methods on the

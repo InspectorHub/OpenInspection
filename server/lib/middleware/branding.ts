@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { tenantConfigs } from '../db/schema';
 import type { HonoConfig } from '../../types/hono';
 import { logger } from '../logger';
+import { memoOnce } from '../request-scope';
 
 /**
  * Middleware to resolve and inject branding configuration for the current tenant.
@@ -40,70 +41,84 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
     }
 
     const cacheKey = `branding:${tenantId}`;
-    const cached = await c.env.TENANT_CACHE?.get(cacheKey);
 
-    if (cached) {
-        try {
-            const parsed = JSON.parse(cached) as BrandingConfig;
-            c.set('branding', parsed);
-            return await next();
-        } catch (e) {
-            logger.error('[branding] Cache parse failed', {}, e instanceof Error ? e : undefined);
-        }
-    }
+    // The WHOLE resolve is memoised, KV-hit path included, not just the D1
+    // fallback: a page render fans out into 15 in-process API calls that each
+    // re-enter this chain, so wrapping only the fallback would still leave 15
+    // KV round trips. The KV backfill stays inside, which turns 15 writes into
+    // one. Reuse inside a single ~350ms render is strictly fresher than the
+    // 3600s TTL this already ships with.
+    //
+    // Everything this closure reads is constant for the life of one request:
+    // tenantId is fixed by the time this middleware runs, and isSaas /
+    // portalBaseUrl / tenantStatus come from the deployment profile and the
+    // resolved tenant, neither of which changes mid-request.
+    const branding = await memoOnce(c.env, `branding:${tenantId}`, async (): Promise<BrandingConfig> => {
+        const cached = await c.env.TENANT_CACHE?.get(cacheKey);
 
-    const db = drizzle(c.env.DB);
-    try {
-        const config = await db.select({
-            companyName: tenantConfigs.companyName,
-            primaryColor: tenantConfigs.primaryColor,
-            logoUrl: tenantConfigs.logoUrl,
-            supportEmail: tenantConfigs.supportEmail,
-            billingUrl: tenantConfigs.billingUrl,
-            defaultProfileId: tenantConfigs.defaultProfileId
-        })
-        .from(tenantConfigs)
-        .where(eq(tenantConfigs.tenantId, tenantId))
-        .get();
-
-        const branding: BrandingConfig = config ? {
-            companyName: config.companyName || defaultBranding.companyName,
-            primaryColor: config.primaryColor || defaultBranding.primaryColor,
-            logoUrl: config.logoUrl,
-            supportEmail: config.supportEmail || defaultBranding.supportEmail,
-            billingUrl: config.billingUrl || defaultBranding.billingUrl,
-            defaultProfileId: config.defaultProfileId ?? 'signature',
-            // Deployment flags re-applied — these are intentionally NOT cached
-            // because they depend on the deployment profile (mode + login redirect base)
-            // rather than on per-tenant config, so a tenant moving between
-            // standalone and shared during a deploy should pick up the new
-            // value on the next request without waiting for the KV TTL.
-            isSaas,
-            portalBaseUrl,
-            tenantStatus,
-        } : defaultBranding;
-
-        c.set('branding', branding);
-
-        if (config && c.env.TENANT_CACHE) {
+        if (cached) {
             try {
-                const cacheable: BrandingConfig = {
-                    companyName:     branding.companyName,
-                    primaryColor: branding.primaryColor,
-                    logoUrl:      branding.logoUrl,
-                    supportEmail: branding.supportEmail,
-                    billingUrl:   branding.billingUrl,
-                };
-                if (branding.defaultProfileId !== undefined) cacheable.defaultProfileId = branding.defaultProfileId;
-                c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(cacheable), { expirationTtl: 3600 }));
-            } catch {
-                // executionCtx unavailable in test environments
+                return JSON.parse(cached) as BrandingConfig;
+            } catch (e) {
+                logger.error('[branding] Cache parse failed', {}, e instanceof Error ? e : undefined);
             }
         }
-    } catch (e) {
-        logger.error('[branding] DB lookup failed', {}, e instanceof Error ? e : undefined);
-        c.set('branding', defaultBranding);
-    }
+
+        const db = drizzle(c.env.DB);
+        try {
+            const config = await db.select({
+                companyName: tenantConfigs.companyName,
+                primaryColor: tenantConfigs.primaryColor,
+                logoUrl: tenantConfigs.logoUrl,
+                supportEmail: tenantConfigs.supportEmail,
+                billingUrl: tenantConfigs.billingUrl,
+                defaultProfileId: tenantConfigs.defaultProfileId
+            })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+
+            const resolved: BrandingConfig = config ? {
+                companyName: config.companyName || defaultBranding.companyName,
+                primaryColor: config.primaryColor || defaultBranding.primaryColor,
+                logoUrl: config.logoUrl,
+                supportEmail: config.supportEmail || defaultBranding.supportEmail,
+                billingUrl: config.billingUrl || defaultBranding.billingUrl,
+                defaultProfileId: config.defaultProfileId ?? 'signature',
+                // Deployment flags re-applied — these are intentionally NOT cached
+                // because they depend on the deployment profile (mode + login redirect base)
+                // rather than on per-tenant config, so a tenant moving between
+                // standalone and shared during a deploy should pick up the new
+                // value on the next request without waiting for the KV TTL.
+                isSaas,
+                portalBaseUrl,
+                tenantStatus,
+            } : defaultBranding;
+
+            if (config && c.env.TENANT_CACHE) {
+                try {
+                    const cacheable: BrandingConfig = {
+                        companyName:     resolved.companyName,
+                        primaryColor: resolved.primaryColor,
+                        logoUrl:      resolved.logoUrl,
+                        supportEmail: resolved.supportEmail,
+                        billingUrl:   resolved.billingUrl,
+                    };
+                    if (resolved.defaultProfileId !== undefined) cacheable.defaultProfileId = resolved.defaultProfileId;
+                    c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(cacheable), { expirationTtl: 3600 }));
+                } catch {
+                    // executionCtx unavailable in test environments
+                }
+            }
+
+            return resolved;
+        } catch (e) {
+            logger.error('[branding] DB lookup failed', {}, e instanceof Error ? e : undefined);
+            return defaultBranding;
+        }
+    });
+
+    c.set('branding', branding);
 
     await next();
 };
