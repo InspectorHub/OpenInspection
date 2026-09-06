@@ -5,6 +5,7 @@ import { users, tenants } from '../db/schema';
 import type { HonoConfig } from '../../types/hono';
 import { getBookingHost } from '../url';
 import { logger } from '../logger';
+import { memoOnce } from '../request-scope';
 
 /**
  * Sprint B-1 — populates BrandingConfig.currentUserSlug + bookingHost so
@@ -40,17 +41,24 @@ export const inspectorPaletteMiddleware: MiddlewareHandler<HonoConfig> = async (
     }
 
     try {
+        // Both resolves below are memoised WHOLE, KV-hit path included, and
+        // keyed by tenant as well as subject. A page render fans out into 15
+        // in-process API calls that each re-enter this chain, so wrapping only
+        // the D1 fallback would leave 15 KV round trips standing. Reuse inside
+        // one render is strictly fresher than the 300s TTL already in force.
         const cacheKey = userSlugCacheKey(user.sub);
         // KV stores '' for "user has no slug" so the absence is cached too.
-        let slug = await c.env.TENANT_CACHE?.get(cacheKey);
-        if (slug === null || slug === undefined) {
+        const slug = await memoOnce(c.env, `user-slug:${tenantId}:${user.sub}`, async () => {
+            const fromCache = await c.env.TENANT_CACHE?.get(cacheKey);
+            if (fromCache !== null && fromCache !== undefined) return fromCache;
             const row = await drizzle(c.env.DB).select({ slug: users.slug })
                 .from(users)
                 .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)))
                 .get();
-            slug = row?.slug ?? '';
-            await c.env.TENANT_CACHE?.put(cacheKey, slug, { expirationTtl: SLUG_CACHE_TTL_S });
-        }
+            const resolved = row?.slug ?? '';
+            await c.env.TENANT_CACHE?.put(cacheKey, resolved, { expirationTtl: SLUG_CACHE_TTL_S });
+            return resolved;
+        });
         // Tenant slug: public/standalone paths set `requestedTenantSlug` via
         // tenant routing; saas AUTHENTICATED requests resolve the tenant from
         // the JWT and never set it — fall back to a cached tenants.slug lookup
@@ -59,15 +67,19 @@ export const inspectorPaletteMiddleware: MiddlewareHandler<HonoConfig> = async (
         let tenantSlug = c.get('requestedTenantSlug') ?? null;
         if (!tenantSlug) {
             const tKey = tenantSlugCacheKey(tenantId);
-            let cached = await c.env.TENANT_CACHE?.get(tKey);
-            if (cached === null || cached === undefined) {
+            // A separate resolve from the user slug above, not the same lookup
+            // narrowed -- different table, different key namespace.
+            const cached = await memoOnce(c.env, `tenant-slug:${tenantId}`, async () => {
+                const fromCache = await c.env.TENANT_CACHE?.get(tKey);
+                if (fromCache !== null && fromCache !== undefined) return fromCache;
                 const row = await drizzle(c.env.DB).select({ slug: tenants.slug })
                     .from(tenants)
                     .where(eq(tenants.id, tenantId))
                     .get();
-                cached = row?.slug ?? '';
-                await c.env.TENANT_CACHE?.put(tKey, cached, { expirationTtl: SLUG_CACHE_TTL_S });
-            }
+                const resolved = row?.slug ?? '';
+                await c.env.TENANT_CACHE?.put(tKey, resolved, { expirationTtl: SLUG_CACHE_TTL_S });
+                return resolved;
+            });
             tenantSlug = cached || null;
         }
 
