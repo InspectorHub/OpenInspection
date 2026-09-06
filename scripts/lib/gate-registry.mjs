@@ -215,6 +215,17 @@ export const SCRIPT_GATES = [
     { key: 'testimports', label: 'lint:test-imports', script: 'check-test-imports.mjs', fix: 'npm run lint:test-imports', rung: PUSH },
     { key: 'deadcode', label: 'lint:deadcode', script: 'check-deadcode.mjs', fix: 'npm run lint:deadcode', rung: PUSH },
     { key: 'timestamps', label: 'lint:timestamps', script: 'check-timestamps.mjs', fix: 'npm run lint:timestamps', rung: PUSH },
+    // PUSH, not PRECOMMIT. It walks every .ts/.tsx under app/ (778 files), which
+    // is too much to charge every commit for drift that only matters once the
+    // work leaves the machine. The thing it protects is a measurement: one page
+    // render fans out into 15 in-process API calls, each re-entering the whole
+    // global middleware chain, and those calls now share memoised per-request
+    // work. A new global app.use('*') costs 15x rather than 1x, and a new loader
+    // call grows the multiplier -- both invisible in a diff, both statically
+    // checkable. Its third check is not a ratchet at all but the security
+    // invariant underneath the memoisation: the request scope must never reach
+    // toApi, which serves external HTTP traffic.
+    { key: 'middlewarebudget', label: 'lint:middleware-budget', script: 'check-middleware-budget.mjs', fix: 'npm run lint:middleware-budget', rung: PUSH },
     { key: 'i18n', label: 'lint:i18n', script: 'check-i18n.mjs', fix: 'npm run lint:i18n', rung: PUSH },
     { key: 'i18ncatalog', label: 'lint:i18n-catalog', script: 'check-i18n-catalog.mjs', fix: 'npm run lint:i18n-catalog', rung: PUSH },
     { key: 'i18nglossary', label: 'lint:i18n-glossary', script: 'check-i18n-glossary.mjs', fix: 'npm run lint:i18n-glossary', rung: PUSH },

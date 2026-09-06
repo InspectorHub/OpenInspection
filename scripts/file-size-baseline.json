@@ -76,7 +76,7 @@
   "server/services/template.service.ts": 420,
   "app/components/editor/InspectionSettingsSheet.tsx": 419,
   "scripts/check-endorsement-copy.mjs": 419,
-  "scripts/lib/gate-registry.mjs": 418,
+  "scripts/lib/gate-registry.mjs": 429,
   "app/routes/calendar.tsx": 417,
   "server/lib/db/schema/inspection/core.ts": 415,
   "server/services/agreement/signer-state.ts": 413,
