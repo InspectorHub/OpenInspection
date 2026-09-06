@@ -1,6 +1,19 @@
 import { defineConfig } from 'vitest/config';
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
 import path from 'node:path';
+import { generateKeyPairSync } from 'node:crypto';
+
+// An ES256 keypair minted when this config loads, never stored. `contextBootstrap`
+// builds a keyring from these on EVERY request and throws when they are absent,
+// which fails the request before any middleware D1 work happens — so a suite that
+// measures the middleware chain cannot run without them. Generating rather than
+// committing a PEM keeps key material out of a public repository and out of every
+// secret scanner's inbox; nothing here verifies a token minted anywhere else.
+const testKeyPair = generateKeyPairSync('ec', {
+    namedCurve: 'P-256',
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+});
 
 // C-8: selective real-runtime (workerd / miniflare) coverage for the queue
 // paths only. Existing node-env suites (vitest.api.config.ts / vitest.config.ts)
@@ -40,6 +53,17 @@ export default defineConfig({
                 compatibilityDate: '2026-04-12',
                 compatibilityFlags: ['nodejs_compat'],
                 d1Databases: { DB: 'test-sync-db' },
+                // TENANT_CACHE + the JWT keyring are what the global `app.use('*')`
+                // chain reads on every request. Without them the chain throws
+                // before it does any of the work `middleware-d1-floor.spec.ts`
+                // exists to count.
+                kvNamespaces: { TENANT_CACHE: 'test-tenant-cache' },
+                bindings: {
+                    JWT_CURRENT_KID: 'v1',
+                    JWT_PRIVATE_KEY_V1: testKeyPair.privateKey,
+                    JWT_PUBLIC_KEY_V1: testKeyPair.publicKey,
+                    JWT_SECRET: 'test-only-kdf-input',
+                },
                 // A-21 batch 3 — the offboarding commands stream between real
                 // (miniflare-emulated) R2 buckets: PHOTOS in, EXPORTS_BUCKET out.
                 r2Buckets: { PHOTOS: 'test-photos', EXPORTS_BUCKET: 'test-exports' },
