@@ -59,7 +59,14 @@ The web layer uses a **Token Relay BFF** pattern: the React Router v8 server hol
 - **React 19**: future React Native app can reuse hooks and state logic (useInspection, useFindings, useSync)
 - **SSR on Workers**: full server rendering at the edge, same latency as static HTML
 - **hono/client**: Hono exports `AppType`, React Router v8 uses `hono/client` for compile-time type-safe API calls — zero handwritten API client
-- **CF Free Tier safe**: React Router v8 SSR adds ~1-3ms CPU per request, well within 10ms limit
+- ⚠️ **CPU per request is NOT ~1-3ms.** This line used to read "CF Free Tier
+  safe: React Router v8 SSR adds ~1-3ms CPU per request, well within 10ms
+  limit". Measured against a live deployment on 2026-09-05, over seven days of
+  real traffic: **p50 8ms, p95 49ms, p99 106ms, max 494ms**. A statutory-form
+  render is ~470ms in workerd on its own. The old figure was an SSR microcost
+  quoted as if it were the request, and it was never re-measured.
+  A plan capping CPU in the low milliseconds will kill ordinary page loads —
+  observed, as HTTP 1102, on a plain settings page.
 
 > **The same arithmetic has to be done for the scheduled path, and for a long time it was not.**
 > The Workers Free CPU ceiling is 10 ms **per invocation**, and it applies to a cron
