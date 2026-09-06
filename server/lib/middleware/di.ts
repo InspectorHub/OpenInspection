@@ -100,18 +100,12 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
     // tier carries no status, and null is deliberately NOT an entitlement.
     let tenantPlan: TenantPlan | null = null;
     if (tenantId && c.req.path.startsWith('/api/')) {
-        // Its own key, not the `secrets:` one: this returns a LoadedEmailConfig
-        // (renamed, filtered, plus six other reads) while `secrets:` holds the
-        // raw env-name map. Different shapes cannot share an entry. The shared
-        // decrypt happens one level down, inside loadEmailSecrets, on the
-        // `secrets:` key. This entry removes the other six statements --
-        // identity, brand, byo provider, AI attestation, AI config, templates --
-        // that every in-process call was re-reading.
+        // Its own key, NOT the `secrets:` one — the shapes differ, so they
+        // cannot share an entry; see loadEmailSecrets for where the shared
+        // decrypt actually happens.
         emailCfg = await memoOnce(c.env, `email-cfg:${tenantId}`, () => loadTenantEmailConfig(c.env, tenantId));
         if (!tenantTierForQuota && c.var.profile.hasUsageQuota) {
-            // Plan and tier do not change midway through a render.
-            tenantPlan = await memoOnce(c.env, `plan:${tenantId}`,
-                () => readTenantPlan(c.env.DB, tenantId)).catch(() => null);
+            tenantPlan = await memoOnce(c.env, `plan:${tenantId}`, () => readTenantPlan(c.env.DB, tenantId)).catch(() => null);
             tenantTierForQuota = tenantPlan?.tier;
         }
     }
