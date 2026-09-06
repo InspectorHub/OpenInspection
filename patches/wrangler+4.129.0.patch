@@ -1,0 +1,28 @@
+diff --git a/node_modules/wrangler/wrangler-dist/cli.js b/node_modules/wrangler/wrangler-dist/cli.js
+index a96ca41..3eb4125 100644
+--- a/node_modules/wrangler/wrangler-dist/cli.js
++++ b/node_modules/wrangler/wrangler-dist/cli.js
+@@ -165233,7 +165233,13 @@ function castErrorCause(cause) {
+   if (cause instanceof Error) {
+     return cause;
+   }
+-  const error53 = new Error();
++  const error53 = new Error(
++    cause && typeof cause === "object" && typeof cause.message === "string" ? cause.message : void 0
++  );
++  if (cause && typeof cause === "object") {
++    if (typeof cause.name === "string") error53.name = cause.name;
++    if (typeof cause.stack === "string") error53.stack = cause.stack;
++  }
+   error53.cause = cause;
+   return error53;
+ }
+@@ -354736,7 +354742,7 @@ var init_DevEnv = __esm({
+               telemetryMessage: "api dev miniflare user error"
+             })
+           );
+-        } else if (event.source === "ProxyController" && (event.reason.startsWith("Failed to send message to") || event.reason.startsWith("Could not connect to InspectorProxyWorker"))) {
++        } else if (event.source === "ProxyController" && (event.reason.startsWith("Failed to send message to") || event.reason.startsWith("Could not connect to InspectorProxyWorker") || event.reason.startsWith("Error inside ProxyWorker"))) {
+           logger2.debug(`Error in ${event.source}: ${event.reason}
+ `, event.cause);
+           logger2.debug("=> Error contextual data:", event.data);

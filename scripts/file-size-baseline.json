@@ -76,11 +76,11 @@
   "server/services/template.service.ts": 420,
   "app/components/editor/InspectionSettingsSheet.tsx": 419,
   "scripts/check-endorsement-copy.mjs": 419,
+  "scripts/lib/gate-registry.mjs": 418,
   "app/routes/calendar.tsx": 417,
   "server/lib/db/schema/inspection/core.ts": 415,
   "server/services/agreement/signer-state.ts": 413,
   "app/components/portal/sections/ReportView.tsx": 407,
-  "scripts/lib/gate-registry.mjs": 407,
   "scripts/check-non-translatable.mjs": 402,
   "playwright.config.ts": 401
 }

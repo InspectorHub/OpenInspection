@@ -167,6 +167,17 @@ export const SCRIPT_GATES = [
     // plan that builds a primitive before its caller, and a gate that is red
     // for a legitimate reason all week is a gate people learn to pass with
     // --no-verify. ~10s: one knip pass over the production entry graph.
+    // PUSH, not PRECOMMIT: it reads node_modules, which is environment state
+    // rather than anything a commit stages. What it guards is the one kind of
+    // dependency change that leaves NO trace where anyone looks -- `npm ls`,
+    // package.json and the lockfile all read 4.129.0 whether the patch applied
+    // or not. Without it, a lost postinstall silently restores the bug that
+    // failed this repository's e2e job three times out of four.
+    // ⚠️ `fix` is the DIAGNOSTIC, not the remedy: the remedy is `npm install`,
+    // which re-runs patch-package. The registry requires a real npm script here
+    // and the lock is right to -- a fix line naming a command nobody can run is
+    // worse than none. The script itself prints what to do.
+    { key: 'wranglerpatch', label: 'wrangler patch present (workers-sdk#15317)', script: 'check-wrangler-patch.mjs', fix: 'npm run lint:wrangler-patch', rung: PUSH },
     { key: 'unwired', label: 'lint:unwired', script: 'check-unwired.mjs', fix: 'npm run lint:unwired', rung: PUSH },
     { key: 'erasure', label: 'lint:erasure', script: 'check-erasure-manifest.mjs', fix: 'npm run lint:erasure', rung: PUSH },
     { key: 'retention', label: 'lint:retention', script: 'check-retention-manifest.mjs', fix: 'npm run lint:retention', rung: PUSH },
