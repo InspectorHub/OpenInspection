@@ -85,14 +85,9 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
                 supportEmail: config.supportEmail || defaultBranding.supportEmail,
                 billingUrl: config.billingUrl || defaultBranding.billingUrl,
                 defaultProfileId: config.defaultProfileId ?? 'signature',
-                // Deployment flags re-applied — these are intentionally NOT cached
-                // because they depend on the deployment profile (mode + login redirect base)
-                // rather than on per-tenant config, so a tenant moving between
-                // standalone and shared during a deploy should pick up the new
-                // value on the next request without waiting for the KV TTL.
-                isSaas,
-                portalBaseUrl,
-                tenantStatus,
+                // No deployment flags here — they are stamped once, below, on
+                // every path. Applying them here as well is what let the
+                // cache-hit path go without them.
             } : defaultBranding;
 
             if (config && c.env.TENANT_CACHE) {
@@ -118,7 +113,19 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
         }
     });
 
-    c.set('branding', branding);
+    // The deployment flags are stamped HERE, on every path, and this is the only
+    // place that does it. They depend on the deployment profile (mode + login
+    // redirect base) and on the tenant this request resolved — not on per-tenant
+    // config — which is why the KV entry deliberately does not carry them, and
+    // why whatever a stale entry does carry must lose to the live value.
+    //
+    // They used to be applied inside the D1 branch instead. The cache-hit branch
+    // returned the parsed blob verbatim, so once the entry was warm — it has a
+    // 3600s TTL, so that is the steady state, not the edge case — branding
+    // reached `session-context.ts` with `isSaas` undefined, and every surface
+    // gated on it (the "Switch workspace" entry) went dark. Two copies of one
+    // rule, and the one on the hot path was the missing one.
+    c.set('branding', { ...branding, isSaas, portalBaseUrl, tenantStatus });
 
     await next();
 };
