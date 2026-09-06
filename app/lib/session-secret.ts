@@ -20,8 +20,13 @@
  * Domain-separation salt for the derived session secret. Distinct from
  * config-crypto's salt on purpose: the same JWT_SECRET feeds both, and they
  * must not produce the same derived key.
+ *
+ * Module-private deliberately. It is an implementation detail of the one
+ * derivation below, and exporting it invites the second copy this file's header
+ * warns about: a caller that imports the salt is a caller doing its own PBKDF2,
+ * which is exactly how the derived value drifts by a byte and logs everyone out.
  */
-export const SESSION_SECRET_SALT = new TextEncoder().encode(
+const SESSION_SECRET_SALT = new TextEncoder().encode(
   "openinspection:session-cookie:v1",
 );
 
