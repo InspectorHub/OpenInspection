@@ -129,7 +129,7 @@ tests/
   in `vitest.workers.config.ts`.
 - When a workers spec hand-maintains DDL (e.g. a `tenant_configs` table), assert
   it against the Drizzle schema instead of trusting a "keep in sync" comment —
-  `tests/unit/inline-ddl-schema-sync.spec.ts` is the pattern.
+  `tests/unit/platform/inline-ddl-schema-sync.spec.ts` is the pattern.
 
 ### Contract (`tests/contract/<party>/`)
 

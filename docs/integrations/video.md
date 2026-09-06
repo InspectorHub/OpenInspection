@@ -89,13 +89,24 @@ PDF renders (via `env.BROWSER.quickAction('pdf', ...)`) cannot embed video. `ser
 
 | File | Covers |
 |---|---|
-| `tests/unit/resolve.spec.ts` | 4-way resolution table, backend instance type, `streamSubdomain` propagation, fail-closed 503 |
-| `tests/unit/r2-backend.spec.ts` | Token mint/verify (tamper + expiry), type/size validation, R2 key shape, finalize idempotency |
-| `tests/unit/media-video.spec.ts` | `MediaVideoService` (Stream) + `StreamVideoBackend` tenant guard and finalize |
-| `tests/unit/report-video.spec.ts` | `selectReportMedia` — image / video-player / video-poster branches |
-| `tests/web/unit/video-capture.spec.ts` | `VideoCapture` — privacy checkbox present (R2), absent (Stream) |
-| `tests/web/unit/video-player.spec.ts` | `VideoPlayer` — iframe rendered for Stream, native `<video>` for R2 |
-| `tests/unit/session-context-video.spec.ts` | `sessionContext` video fields exposed to the frontend |
+| `tests/unit/report-style/resolve.spec.ts` | 4-way resolution table, backend instance type, `streamSubdomain` propagation, fail-closed 503 |
+| `tests/unit/storage/r2-backend.spec.ts` | Token mint/verify (tamper + expiry), type/size validation, R2 key shape, finalize idempotency |
+| `tests/unit/media/media-video.spec.ts` | `MediaVideoService` (Stream) + `StreamVideoBackend` tenant guard and finalize |
+| `tests/unit/reports/report-video.spec.ts` | `selectReportMedia` — image / video-player / video-poster branches |
+
+⚠️ **The two component behaviours below have NO test, and this table claimed they
+did.** It listed `tests/web/unit/video-capture.spec.ts` and
+`tests/web/unit/video-player.spec.ts`; `tests/web/unit/` does not exist, and a
+search across every spec finds nothing referencing `VideoCapture` or
+`VideoPlayer` at all. The components ship (`app/components/media-studio/`), so
+the entries read as coverage that would catch a regression, and there is none:
+
+- `VideoCapture` — privacy checkbox present (R2), absent (Stream)
+- `VideoPlayer` — iframe rendered for Stream, native `<video>` for R2
+
+Both are provider-conditional rendering, which is exactly the shape a unit test
+holds well. Writing them is open work, not a documentation fix.
+| `tests/unit/media/session-context-video.spec.ts` | `sessionContext` video fields exposed to the frontend |
 
 ---
 

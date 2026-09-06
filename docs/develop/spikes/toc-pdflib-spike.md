@@ -1,5 +1,11 @@
 # Spike: TOC page numbers via Chrome link annotations + pdf-lib (Task 18)
 
+
+> ⚠️ The scratch artifact this spike names (`scripts/spike/toc-pdflib-spike.mjs`) was **deleted after the
+> experiment** — a spike's code is disposable, its verdict is not. It is cited
+> here so the measurement can be traced in git history, not because the file is
+> still on disk. `git log --diff-filter=D -- scripts/spike/toc-pdflib-spike.mjs` finds the removal.
+
 **Verdict: PASS ✅** — implement the two-pass pdf-lib approach (Task 19a).
 
 ## Question

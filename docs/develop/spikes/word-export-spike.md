@@ -1,5 +1,11 @@
 # Commercial PCA Phase W — Task 1 spike decision (`docx`-on-Workers GO/FALLBACK gate)
 
+
+> ⚠️ The scratch artifact this spike names (`server/lib/_spike-docx-import.ts`) was **deleted after the
+> experiment** — a spike's code is disposable, its verdict is not. It is cited
+> here so the measurement can be traced in git history, not because the file is
+> still on disk. `git log --diff-filter=D -- server/lib/_spike-docx-import.ts` finds the removal.
+
 Plan: `2026-06-26-commercial-pca-phase-w-plan.md`, Task 1 (not tracked in this
 repository, so not a resolvable link from here).
 Issue: `#186`.
