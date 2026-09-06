@@ -1,5 +1,11 @@
 # Spike: Paged.js × Cloudflare Browser Run — TOC page numbers (Commercial PCA Phase O, Task 1)
 
+
+> ⚠️ The scratch artifact this spike names (`tests/e2e/report-toc-pagednumbers.spec.ts`) was **deleted after the
+> experiment** — a spike's code is disposable, its verdict is not. It is cited
+> here so the measurement can be traced in git history, not because the file is
+> still on disk. `git log --diff-filter=D -- tests/e2e/report-toc-pagednumbers.spec.ts` finds the removal.
+
 **Verdict: FALLBACK** — page-numbered TOC deferred. Ship the numberless clickable TOC + heading-derived PDF bookmarks (Phase O Tasks 2–6). Do not implement Tasks 7–9 until a follow-up resolves this GO.
 
 ## Question

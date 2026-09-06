@@ -89,13 +89,24 @@ PDF renders (via `env.BROWSER.quickAction('pdf', ...)`) cannot embed video. `ser
 
 | File | Covers |
 |---|---|
-| `tests/unit/resolve.spec.ts` | 4-way resolution table, backend instance type, `streamSubdomain` propagation, fail-closed 503 |
-| `tests/unit/r2-backend.spec.ts` | Token mint/verify (tamper + expiry), type/size validation, R2 key shape, finalize idempotency |
-| `tests/unit/media-video.spec.ts` | `MediaVideoService` (Stream) + `StreamVideoBackend` tenant guard and finalize |
-| `tests/unit/report-video.spec.ts` | `selectReportMedia` — image / video-player / video-poster branches |
-| `tests/web/unit/video-capture.spec.ts` | `VideoCapture` — privacy checkbox present (R2), absent (Stream) |
-| `tests/web/unit/video-player.spec.ts` | `VideoPlayer` — iframe rendered for Stream, native `<video>` for R2 |
-| `tests/unit/session-context-video.spec.ts` | `sessionContext` video fields exposed to the frontend |
+| `tests/unit/report-style/resolve.spec.ts` | 4-way resolution table, backend instance type, `streamSubdomain` propagation, fail-closed 503 |
+| `tests/unit/storage/r2-backend.spec.ts` | Token mint/verify (tamper + expiry), type/size validation, R2 key shape, finalize idempotency |
+| `tests/unit/media/media-video.spec.ts` | `MediaVideoService` (Stream) + `StreamVideoBackend` tenant guard and finalize |
+| `tests/unit/reports/report-video.spec.ts` | `selectReportMedia` — image / video-player / video-poster branches |
+
+| `app/components/media-studio/VideoPlayer.test.tsx` | `VideoPlayer` — Stream iframe vs native `<video>`, and the three fail-closed paths (no subdomain, missing R2 ids, still transcoding) |
+| `app/components/media-studio/VideoCapture.test.tsx` | `VideoCapture` — privacy notice present (R2) / absent (Stream), and that accepting it is what ENABLES the pick button |
+
+⚠️ These two live beside the components (`app/**/*.test.tsx`), not under
+`tests/`. This table previously named files under `tests/web/unit/` — a
+directory that does not exist — so it claimed coverage for years that was never
+written. If a row here names a file, open it before believing it.
+
+The assertion worth knowing about in `VideoCapture.test.tsx` is not that the
+checkbox renders: it is that `pickDisabled` keeps the upload button disabled
+until the box is ticked. A checkbox that renders but gates nothing passes every
+presence test while letting an R2 upload start with no acceptance recorded.
+| `tests/unit/media/session-context-video.spec.ts` | `sessionContext` video fields exposed to the frontend |
 
 ---
 

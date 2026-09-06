@@ -215,6 +215,13 @@ export const SCRIPT_GATES = [
     { key: 'testimports', label: 'lint:test-imports', script: 'check-test-imports.mjs', fix: 'npm run lint:test-imports', rung: PUSH },
     { key: 'deadcode', label: 'lint:deadcode', script: 'check-deadcode.mjs', fix: 'npm run lint:deadcode', rung: PUSH },
     { key: 'timestamps', label: 'lint:timestamps', script: 'check-timestamps.mjs', fix: 'npm run lint:timestamps', rung: PUSH },
+    // PUSH, not PRECOMMIT: it walks 778 files under app/, too much to charge
+    // every commit for drift that only matters once work leaves the machine.
+    // It protects a measurement -- a render fans out into 15 in-process API
+    // calls that each re-enter the whole global chain, so a new app.use('*')
+    // costs 15x, not 1x. Its third check is not a ratchet but the security
+    // invariant: the request scope must never reach toApi.
+    { key: 'middlewarebudget', label: 'lint:middleware-budget', script: 'check-middleware-budget.mjs', fix: 'npm run lint:middleware-budget', rung: PUSH },
     { key: 'i18n', label: 'lint:i18n', script: 'check-i18n.mjs', fix: 'npm run lint:i18n', rung: PUSH },
     { key: 'i18ncatalog', label: 'lint:i18n-catalog', script: 'check-i18n-catalog.mjs', fix: 'npm run lint:i18n-catalog', rung: PUSH },
     { key: 'i18nglossary', label: 'lint:i18n-glossary', script: 'check-i18n-glossary.mjs', fix: 'npm run lint:i18n-glossary', rung: PUSH },

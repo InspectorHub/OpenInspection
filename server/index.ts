@@ -14,7 +14,6 @@ import { inspectorPaletteMiddleware } from './lib/middleware/inspector-palette';
 import { touchLastActiveMiddleware } from './lib/middleware/touch-last-active';
 import { tenantRouter } from './features/tenant-routing';
 import { diMiddleware } from './lib/middleware/di';
-import { requireActiveSubscription } from './lib/middleware/tier-guard';
 import { securityHeaders } from './lib/middleware/security-headers';
 import { AppError, ErrorCode } from './lib/errors';
 import { sendError } from './lib/response';
@@ -299,7 +298,6 @@ app.use('*', inspectorPaletteMiddleware);
 app.use('/api/*', touchLastActiveMiddleware);
 
 // API Routes
-app.use('/api/*', requireActiveSubscription);
 
 // Module Routes — chained so that `typeof routes` accumulates every sub-router's
 // path schema, enabling typed `hc<CoreApiType>()` API calls in the future.

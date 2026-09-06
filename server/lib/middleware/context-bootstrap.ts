@@ -2,6 +2,7 @@ import type { MiddlewareHandler } from 'hono';
 import type { HonoConfig } from '../../types/hono';
 import { getDeploymentProfile } from '../deployment-profile';
 import { buildKeyring } from '../jwt-keyring';
+import { memoOnce } from '../request-scope';
 
 /**
  * A-16 — earliest-stage request context: deployment profile + JWT keyring.
@@ -21,7 +22,16 @@ export const contextBootstrap: MiddlewareHandler<HonoConfig> = async (c, next) =
     // that never touch JWTs (webhooks, healthchecks). Real awaiters still see
     // the original rejection — the .catch() returns a separate, swallowed
     // chain that never sees an `await`.
-    const keyringPromise = buildKeyring(c.env as unknown as Record<string, string | undefined>);
+    //
+    // Shared across the in-process API fan-out: a page render re-enters this
+    // chain 16 times and rebuilt the keyring from PEM every time (measured
+    // 3.53ms/request of pure importKey, on top of 14.84ms of repeat ECDSA
+    // verification). The keyring depends only on c.env, so there is nothing
+    // that could go stale inside one request. Deliberately request-scoped and
+    // not isolate-scoped: an isolate-level cache would save a little more and
+    // would raise a new question about how long key material stays resident.
+    const keyringPromise = memoOnce(c.env, 'keyring',
+        () => buildKeyring(c.env as unknown as Record<string, string | undefined>));
     keyringPromise.catch(() => { /* defer reporting to the first awaiter */ });
     c.set('keyringPromise', keyringPromise);
     await next();

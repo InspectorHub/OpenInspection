@@ -65,6 +65,7 @@ import { PortalProvider } from '../../portal/portal.provider';
 import { PlanQuotaGuard, readTenantPlan } from '../../features/plan-quota/guard';
 import type { TenantPlan } from '../../features/plan-quota/policy';
 import { tenantAiCapsLoader } from '../../features/plan-quota/ai-caps';
+import { memoOnce } from '../request-scope';
 
 /**
  * Middleware that injects a lazy-loaded service registry into the Hono context.
@@ -99,9 +100,12 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
     // tier carries no status, and null is deliberately NOT an entitlement.
     let tenantPlan: TenantPlan | null = null;
     if (tenantId && c.req.path.startsWith('/api/')) {
-        emailCfg = await loadTenantEmailConfig(c.env, tenantId);
+        // Its own key, NOT the `secrets:` one — the shapes differ, so they
+        // cannot share an entry; see loadEmailSecrets for where the shared
+        // decrypt actually happens.
+        emailCfg = await memoOnce(c.env, `email-cfg:${tenantId}`, () => loadTenantEmailConfig(c.env, tenantId));
         if (!tenantTierForQuota && c.var.profile.hasUsageQuota) {
-            tenantPlan = await readTenantPlan(c.env.DB, tenantId).catch(() => null);
+            tenantPlan = await memoOnce(c.env, `plan:${tenantId}`, () => readTenantPlan(c.env.DB, tenantId)).catch(() => null);
             tenantTierForQuota = tenantPlan?.tier;
         }
     }

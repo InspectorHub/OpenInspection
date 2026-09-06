@@ -10,6 +10,10 @@ import { buildOAuthHandler } from "../server/lib/mcp/oauth-provider";
 // resolver over `ProfileEnv`. Pulling it in does not drag the API graph in
 // behind it, which is the thing that rule protects.
 import { getDeploymentProfile } from "../server/lib/deployment-profile";
+// Same top-level exemption as `deployment-profile.ts` above, for the same
+// reason: `request-scope.ts` imports nothing at all, so it cannot drag the API
+// graph in behind it.
+import { createRequestScope, REQUEST_SCOPE } from "../server/lib/request-scope";
 // i18n Phase C — request-scoped locale. paraglideMiddleware establishes an
 // AsyncLocalStorage scope so getLocale()/m.*() resolve per-request (never a
 // module-global) across the multi-tenant Worker. Generated (git-ignored); the
@@ -52,11 +56,18 @@ const requestHandler = createRequestHandler(
 // env.API_WORKER.fetch) instead of an HTTP loopback to this same worker — no
 // extra network hop, no API_URL needed.
 const ssr = (c: Ctx) => {
+  // One scope per OUTER request, shared by every in-process API call this
+  // render fans out. Built once here rather than per call: the 15 calls must
+  // see the SAME scope or nothing is shared. `toApi` — the entry for real
+  // external HTTP traffic — keeps passing the raw `c.env`, so memoisation is
+  // unreachable from outside by construction rather than by a flag.
+  const scope = createRequestScope();
+  const innerEnv = { ...c.env, [REQUEST_SCOPE]: scope };
   const env: WorkerEnv = {
     ...c.env,
     API_WORKER: {
       fetch: async (req: Request) =>
-        (await getApi()).app.fetch(req, c.env, c.executionCtx),
+        (await getApi()).app.fetch(req, innerEnv, c.executionCtx),
     },
   };
   const context = new RouterContextProvider();

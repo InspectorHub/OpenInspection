@@ -1,35 +1,21 @@
 import { createCookieSessionStorage, redirect } from "react-router";
 import type { SessionStorage } from "react-router";
 import { getCloudflareEnv, type LoadContext } from "~/lib/load-context";
+import { deriveSessionSecret } from "~/lib/session-secret";
 
 /** Fields stored in the React Router `__session` cookie. */
 type AppSessionData = { token: string };
 
 /**
- * Domain-separation salt for the derived session secret. Distinct from
- * config-crypto's salt on purpose: the same JWT_SECRET feeds both, and they
- * must not produce the same derived key.
+ * Cached derivation — PBKDF2 at 100k iterations is too costly per request.
+ *
+ * ⚠️ The memo is PER-ISOLATE, so this is not "paid once": every new isolate
+ * pays it on its FIRST request, and `getToken` sits on nearly every route
+ * (including `routes/home.tsx`, which only redirects). Measured 2026-09-06:
+ * the derivation alone exceeds the Workers Free plan's entire 10ms CPU budget.
+ * Provision `SESSION_SECRET` and this never runs — `scripts/derive-session-secret.ts`
+ * computes the byte-identical value so existing cookies keep verifying.
  */
-const SESSION_SECRET_SALT = new TextEncoder().encode("openinspection:session-cookie:v1");
-
-/** PBKDF2 over JWT_SECRET — same shape config-crypto already uses. */
-async function deriveSessionSecret(jwtSecret: string): Promise<string> {
-  const material = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(jwtSecret),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: SESSION_SECRET_SALT, iterations: 100_000, hash: "SHA-256" },
-    material,
-    256,
-  );
-  return [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/** Cached derivation — PBKDF2 at 100k iterations is too costly per request. */
 let _derived: { from: string; value: Promise<string> } | null = null;
 
 function readEnvVar(context: LoadContext | undefined, name: "SESSION_SECRET" | "JWT_SECRET"): string | undefined {

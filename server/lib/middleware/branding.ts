@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { tenantConfigs } from '../db/schema';
 import type { HonoConfig } from '../../types/hono';
 import { logger } from '../logger';
+import { memoOnce } from '../request-scope';
 
 /**
  * Middleware to resolve and inject branding configuration for the current tenant.
@@ -34,76 +35,122 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
         tenantStatus,
     };
 
+    // ⚠️ THIS EARLY RETURN IS THE COMMON CASE IN SAAS, not an edge case.
+    //
+    // This middleware is mounted at server/index.ts:250, and jwtAuthMiddleware —
+    // which is what sets `tenantId` in saas — is mounted at :257. tenantRouter
+    // (:249) only resolves a tenant in standalone (fixedTenantId) or on the
+    // public slug prefixes (/book/, /report/, /portal/, …); its own header says
+    // "in saas mode the JWT middleware downstream owns tenantId".
+    //
+    // So on a saas authenticated /api/* request — exactly what the 15-call
+    // render fan-out issues — `tenantId` is undefined here and this returns
+    // defaultBranding without touching KV, D1 or the memo below. Consequences
+    // worth knowing before reading the rest of this file: the `branding:` memo
+    // buys nothing in saas (it is a standalone and public-path win), and the
+    // flag-stamping below cannot be exercised by a saas dashboard request.
+    // Moving this middleware after the JWT one would change that, and is a
+    // deliberate ordering change, not a cleanup.
     if (!tenantId) {
         c.set('branding', defaultBranding);
         return await next();
     }
 
     const cacheKey = `branding:${tenantId}`;
-    const cached = await c.env.TENANT_CACHE?.get(cacheKey);
 
-    if (cached) {
-        try {
-            const parsed = JSON.parse(cached) as BrandingConfig;
-            c.set('branding', parsed);
-            return await next();
-        } catch (e) {
-            logger.error('[branding] Cache parse failed', {}, e instanceof Error ? e : undefined);
-        }
-    }
+    // The WHOLE resolve is memoised, KV-hit path included, not just the D1
+    // fallback: a page render fans out into 15 in-process API calls that each
+    // re-enter this chain, so wrapping only the fallback would still leave 15
+    // KV round trips. The KV backfill stays inside, which turns 15 writes into
+    // one. Reuse inside a single ~350ms render is strictly fresher than the
+    // 3600s TTL this already ships with.
+    //
+    // Everything this closure reads is constant for the life of one request:
+    // tenantId is fixed by the time this middleware runs, and isSaas /
+    // portalBaseUrl / tenantStatus come from the deployment profile and the
+    // resolved tenant, neither of which changes mid-request.
+    const branding = await memoOnce(c.env, `branding:${tenantId}`, async (): Promise<BrandingConfig> => {
+        const cached = await c.env.TENANT_CACHE?.get(cacheKey);
 
-    const db = drizzle(c.env.DB);
-    try {
-        const config = await db.select({
-            companyName: tenantConfigs.companyName,
-            primaryColor: tenantConfigs.primaryColor,
-            logoUrl: tenantConfigs.logoUrl,
-            supportEmail: tenantConfigs.supportEmail,
-            billingUrl: tenantConfigs.billingUrl,
-            defaultProfileId: tenantConfigs.defaultProfileId
-        })
-        .from(tenantConfigs)
-        .where(eq(tenantConfigs.tenantId, tenantId))
-        .get();
-
-        const branding: BrandingConfig = config ? {
-            companyName: config.companyName || defaultBranding.companyName,
-            primaryColor: config.primaryColor || defaultBranding.primaryColor,
-            logoUrl: config.logoUrl,
-            supportEmail: config.supportEmail || defaultBranding.supportEmail,
-            billingUrl: config.billingUrl || defaultBranding.billingUrl,
-            defaultProfileId: config.defaultProfileId ?? 'signature',
-            // Deployment flags re-applied — these are intentionally NOT cached
-            // because they depend on the deployment profile (mode + login redirect base)
-            // rather than on per-tenant config, so a tenant moving between
-            // standalone and shared during a deploy should pick up the new
-            // value on the next request without waiting for the KV TTL.
-            isSaas,
-            portalBaseUrl,
-            tenantStatus,
-        } : defaultBranding;
-
-        c.set('branding', branding);
-
-        if (config && c.env.TENANT_CACHE) {
+        if (cached) {
             try {
-                const cacheable: BrandingConfig = {
-                    companyName:     branding.companyName,
-                    primaryColor: branding.primaryColor,
-                    logoUrl:      branding.logoUrl,
-                    supportEmail: branding.supportEmail,
-                    billingUrl:   branding.billingUrl,
-                };
-                if (branding.defaultProfileId !== undefined) cacheable.defaultProfileId = branding.defaultProfileId;
-                c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(cacheable), { expirationTtl: 3600 }));
-            } catch {
-                // executionCtx unavailable in test environments
+                return JSON.parse(cached) as BrandingConfig;
+            } catch (e) {
+                logger.error('[branding] Cache parse failed', {}, e instanceof Error ? e : undefined);
             }
         }
-    } catch (e) {
-        logger.error('[branding] DB lookup failed', {}, e instanceof Error ? e : undefined);
-        c.set('branding', defaultBranding);
-    }
+
+        const db = drizzle(c.env.DB);
+        try {
+            const config = await db.select({
+                companyName: tenantConfigs.companyName,
+                primaryColor: tenantConfigs.primaryColor,
+                logoUrl: tenantConfigs.logoUrl,
+                supportEmail: tenantConfigs.supportEmail,
+                billingUrl: tenantConfigs.billingUrl,
+                defaultProfileId: tenantConfigs.defaultProfileId
+            })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+
+            const resolved: BrandingConfig = config ? {
+                companyName: config.companyName || defaultBranding.companyName,
+                primaryColor: config.primaryColor || defaultBranding.primaryColor,
+                logoUrl: config.logoUrl,
+                supportEmail: config.supportEmail || defaultBranding.supportEmail,
+                billingUrl: config.billingUrl || defaultBranding.billingUrl,
+                defaultProfileId: config.defaultProfileId ?? 'signature',
+                // No deployment flags here — they are stamped once, below, on
+                // every path. Applying them here as well is what let the
+                // cache-hit path go without them.
+            } : defaultBranding;
+
+            if (config && c.env.TENANT_CACHE) {
+                try {
+                    const cacheable: BrandingConfig = {
+                        companyName:     resolved.companyName,
+                        primaryColor: resolved.primaryColor,
+                        logoUrl:      resolved.logoUrl,
+                        supportEmail: resolved.supportEmail,
+                        billingUrl:   resolved.billingUrl,
+                    };
+                    if (resolved.defaultProfileId !== undefined) cacheable.defaultProfileId = resolved.defaultProfileId;
+                    c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(cacheable), { expirationTtl: 3600 }));
+                } catch {
+                    // executionCtx unavailable in test environments
+                }
+            }
+
+            return resolved;
+        } catch (e) {
+            // ⚠️ The memo caches this fallback too, so ONE transient D1 failure
+            // on the first fanned-out call serves default branding for the whole
+            // render rather than for that one call. Accepted deliberately: the
+            // alternative is 15 sequential retries against a database that just
+            // failed, inside a single CPU budget, and a page that renders half
+            // in the tenant's branding and half in the platform's is a worse
+            // artifact than one that is consistently degraded. Caching only
+            // successful resolves is the change to make if that trade ever
+            // stops holding.
+            logger.error('[branding] DB lookup failed', {}, e instanceof Error ? e : undefined);
+            return defaultBranding;
+        }
+    });
+
+    // The deployment flags are stamped HERE, on every path, and this is the only
+    // place that does it. They depend on the deployment profile (mode + login
+    // redirect base) and on the tenant this request resolved — not on per-tenant
+    // config — which is why the KV entry deliberately does not carry them, and
+    // why whatever a stale entry does carry must lose to the live value.
+    //
+    // They used to be applied inside the D1 branch instead. The cache-hit branch
+    // returned the parsed blob verbatim, so once the entry was warm — it has a
+    // 3600s TTL, so that is the steady state, not the edge case — branding
+    // reached `session-context.ts` with `isSaas` undefined, and every surface
+    // gated on it (the "Switch workspace" entry) went dark. Two copies of one
+    // rule, and the one on the hot path was the missing one.
+    c.set('branding', { ...branding, isSaas, portalBaseUrl, tenantStatus });
 
     await next();
 };

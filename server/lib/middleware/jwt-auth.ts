@@ -30,6 +30,7 @@ import type { UserRole } from '../../types/auth';
 import { bearerToken, AUTH_COOKIE_NAME } from '../auth-helpers';
 import { readPlatformActorClaim } from '../platform-actor-claims';
 import { QBO_CALLBACK_PATH } from '../qbo-oauth-paths';
+import { memoOnce } from '../request-scope';
 
 // Static asset extensions — these bypass JWT verification. We use a strict allowlist
 // rather than path.includes('.') so a dot inside a path segment (e.g. "/inspections/foo.bar")
@@ -150,7 +151,11 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
             }
         }
 
-        const payload = await verifyJwt(token, keyring);
+        // Same token, same keyring => same payload; verification is a pure
+        // function of the two. A page render re-enters this chain 16 times
+        // through the in-process API fan-out, and ECDSA verification of that one
+        // token cost 14.84ms/request (measured 2026-09-06).
+        const payload = await memoOnce(c.env, `jwt:${token}`, () => verifyJwt(token, keyring));
         const classification = classifyJwtPayload(payload);
         const userId = payload.sub as string | undefined;
         const tokenIat = payload.iat as number | undefined;
@@ -165,7 +170,14 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
         // Making it fail closed instead is a deliberate change, not a cleanup.
         const cache = c.env.TENANT_CACHE as KVNamespace | undefined;
         if (userId && cache) {
-            const invalidatedAt = await cache.get(`pwchanged:${userId}`);
+            // Workers KV is eventually consistent -- a write can take up to 60
+            // seconds to propagate -- so re-reading this marker 16 times inside
+            // one ~350ms render cannot observe anything a single read would
+            // miss. The freshness those 15 extra reads appear to buy does not
+            // exist. Only the read is shared; the comparison below still runs
+            // on every pass.
+            const invalidatedAt = await memoOnce(c.env, `pwchanged:${userId}`,
+                () => cache.get(`pwchanged:${userId}`));
             if (invalidatedAt) {
                 const invalidatedTs = parseInt(invalidatedAt, 10);
                 if (!tokenIat || tokenIat < invalidatedTs) {

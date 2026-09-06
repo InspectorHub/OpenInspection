@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenants } from '../../lib/db/schema';
 import type { HonoConfig } from '../../types/hono';
+import { memoOnce } from '../../lib/request-scope';
 
 /**
  * Standalone path: fixed tenant id from profile, with KV cache
@@ -12,23 +13,37 @@ export async function resolveByFixedTenant(c: Context<HonoConfig>, tenantId: str
     c.set('tenantId', tenantId);
 
     const cacheKey = `global_tenant:${tenantId}`;
-    let cachedTenant = c.env.TENANT_CACHE ? await c.env.TENANT_CACHE.get(cacheKey, { type: 'json' }) : null;
 
-    if (!cachedTenant) {
+    // Memoised across the in-process API fan-out: one page render re-enters the
+    // global middleware chain 15 times, and this row read was 1 of the 10 D1
+    // statements every one of those passes paid. The whole KV-then-D1 resolve
+    // is inside, so the repeat KV round trips go too. Reuse within a single
+    // render is strictly fresher than the 3600s TTL already in force here.
+    const cachedTenant = await memoOnce(c.env, `tenant-row:${tenantId}`, async (): Promise<unknown> => {
+        const fromCache = c.env.TENANT_CACHE ? await c.env.TENANT_CACHE.get(cacheKey, { type: 'json' }) : null;
+        if (fromCache) return fromCache;
+
         try {
             const db = drizzle(c.env.DB);
             const tenant = await db.select().from(tenants).where(eq(tenants.id, tenantId)).get();
             if (tenant) {
-                cachedTenant = tenant;
                 if (c.env.TENANT_CACHE && c.executionCtx) {
                     c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(tenant), { expirationTtl: 3600 }));
                 }
+                return tenant;
             }
         } catch {
             // DB unavailable / not yet provisioned — leave metadata unset, tenantId
             // is already populated from the profile so downstream still functions.
+            //
+            // As in branding.ts, the memo caches this null for the whole render
+            // rather than per call, so one transient failure leaves
+            // requestedTenantSlug / tenantTier / tenantStatus unset for all of
+            // it. Milder here: di.ts reads the plan from D1 on its own and
+            // tenantStatus defaults to 'active' downstream.
         }
-    }
+        return null;
+    });
 
     if (cachedTenant) {
         const t = cachedTenant as Record<string, unknown>;
