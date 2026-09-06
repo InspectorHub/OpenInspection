@@ -94,18 +94,18 @@ PDF renders (via `env.BROWSER.quickAction('pdf', ...)`) cannot embed video. `ser
 | `tests/unit/media/media-video.spec.ts` | `MediaVideoService` (Stream) + `StreamVideoBackend` tenant guard and finalize |
 | `tests/unit/reports/report-video.spec.ts` | `selectReportMedia` — image / video-player / video-poster branches |
 
-⚠️ **The two component behaviours below have NO test, and this table claimed they
-did.** It listed `tests/web/unit/video-capture.spec.ts` and
-`tests/web/unit/video-player.spec.ts`; `tests/web/unit/` does not exist, and a
-search across every spec finds nothing referencing `VideoCapture` or
-`VideoPlayer` at all. The components ship (`app/components/media-studio/`), so
-the entries read as coverage that would catch a regression, and there is none:
+| `app/components/media-studio/VideoPlayer.test.tsx` | `VideoPlayer` — Stream iframe vs native `<video>`, and the three fail-closed paths (no subdomain, missing R2 ids, still transcoding) |
+| `app/components/media-studio/VideoCapture.test.tsx` | `VideoCapture` — privacy notice present (R2) / absent (Stream), and that accepting it is what ENABLES the pick button |
 
-- `VideoCapture` — privacy checkbox present (R2), absent (Stream)
-- `VideoPlayer` — iframe rendered for Stream, native `<video>` for R2
+⚠️ These two live beside the components (`app/**/*.test.tsx`), not under
+`tests/`. This table previously named files under `tests/web/unit/` — a
+directory that does not exist — so it claimed coverage for years that was never
+written. If a row here names a file, open it before believing it.
 
-Both are provider-conditional rendering, which is exactly the shape a unit test
-holds well. Writing them is open work, not a documentation fix.
+The assertion worth knowing about in `VideoCapture.test.tsx` is not that the
+checkbox renders: it is that `pickDisabled` keeps the upload button disabled
+until the box is ticked. A checkbox that renders but gates nothing passes every
+presence test while letting an R2 upload start with no acceptance recorded.
 | `tests/unit/media/session-context-video.spec.ts` | `sessionContext` video fields exposed to the frontend |
 
 ---
