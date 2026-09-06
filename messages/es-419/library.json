@@ -246,5 +246,16 @@
   "marketplace_update_clean_desc": "Los {total} comentarios de esta biblioteca siguen exactamente como los publicó el editor. Actualizar a {semver} los reemplaza.",
   "marketplace_update_clean_submit": "Actualizar a {semver}",
   "marketplace_update_error": "La actualización no se ejecutó. No se cambió nada.",
-  "marketplace_review_update": "Revisar actualización"
+  "marketplace_review_update": "Revisar actualización",
+  "library_tags_new_title": "Nueva etiqueta",
+  "library_tags_edit_title": "Editar etiqueta",
+  "library_tags_name_label": "Nombre",
+  "library_tags_color_label": "Color",
+  "library_tags_color_none": "Sin color",
+  "library_tags_seed_name_locked": "Esta es una de las etiquetas iniciales. Su color puede cambiar; su nombre no, porque las inspecciones ya la referencian por nombre.",
+  "library_tags_save": "Guardar",
+  "library_tags_saving": "Guardando…",
+  "library_tags_cancel": "Cancelar",
+  "library_tags_edit_action": "Editar",
+  "library_tags_readonly_note": "Las etiquetas las administra un propietario o gerente. Usted puede crear una; renombrar y recolorear una existente les corresponde a ellos."
 }

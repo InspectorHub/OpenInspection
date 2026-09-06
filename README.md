@@ -53,7 +53,7 @@ OpenInspection is [open source home inspection software](https://inspectorhub.io
 
 ## Why OpenInspection
 
-- **Free to run**: Cloudflare Workers Free tier covers a solo inspector's full year. Pay only for a domain (~$10).
+- **Cheap to run**: a solo inspector's whole year fits in Cloudflare's smallest paid Workers plan, plus a domain (~$10/yr). The free plan is enough to try it and enough to deploy it, but ⚠️ **not enough to run it**: its CPU ceiling is in the low milliseconds and this application's p95 request is ~49ms (measured over seven days of live traffic, 2026-09-05). A statutory-form render alone is ~470ms.
 - **Yours**: fork it, change templates, add integrations. No vendor lock-in.
 - **Fast**: edge-deployed, < 100 ms response times globally
 - **Compliant**: PBKDF2-SHA256 password hashing, hash-chained Ed25519 audit log on e-signatures (ESIGN Act + UETA), server-rendered PDF + Certificate of Completion via Browser Run, offline-verifiable evidence pack, tenant-scoped data isolation
@@ -69,7 +69,7 @@ Want to evaluate the product without running any infrastructure? Register at [**
 
 ### 2. Deploy to Cloudflare (one-click)
 
-1. Click the **Deploy to Cloudflare** button above and follow the wizard. This was verified end-to-end on the Cloudflare Workers **Free** plan (2026-05-31). The wizard may surface a "Workers Paid" notice banner — it is **non-blocking**; the deploy completes on the free plan.
+1. Click the **Deploy to Cloudflare** button above and follow the wizard. The DEPLOY was verified end-to-end on the Cloudflare Workers **Free** plan (2026-05-31), and the wizard's "Workers Paid" notice banner is **non-blocking** — the deploy completes. ⚠️ That verified the install, not the running application: under real traffic the free plan's CPU ceiling returns HTTP 1102 on ordinary pages (observed 2026-09-05). Plan for a paid Workers plan before putting it in front of clients.
 2. Cloudflare reads the committed `wrangler.jsonc` (which carries **placeholder IDs only**) and **auto-provisions and binds** the required resources — D1 (`DB`), KV (`TENANT_CACHE`), R2 (`PHOTOS`), the `BROWSER` binding, the Durable Objects and the Workflow — injecting the real resource IDs for you. There is no manual ID editing.
 3. After the deploy finishes, visit `/setup` on your new Worker URL and enter your **`SETUP_CODE`** to create the first admin account. For the one-click path, the wizard reads [`.dev.vars.example`](.dev.vars.example) and surfaces `SETUP_CODE` as a secret field you fill in **during** the deploy — that is the value you type at `/setup`. It must be any value of at least 6 characters. `/setup` is gated solely on this secret: if `SETUP_CODE` is unset the endpoint refuses to proceed, so an unprovisioned Worker can't be claimed. You can change it later in the dashboard under **Settings → Variables and Secrets**.
 

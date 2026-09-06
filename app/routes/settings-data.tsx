@@ -115,22 +115,6 @@ export default function SettingsData() {
         </Link>
       </section>
 
-      {/* Data cleanup */}
-      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
-        <div>
-          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_data_cleanup_heading()}</h3>
-          <p className="text-[12px] text-ih-fg-3 mt-1">{m.settings_data_cleanup_subtitle()}</p>
-        </div>
-        <div className="flex gap-3 flex-wrap">
-          <button className="h-9 px-4 rounded-md border border-ih-bad text-[13px] font-medium text-ih-bad-fg hover:bg-ih-bad-bg transition-colors">
-            {m.settings_data_cleanup_delete_test()}
-          </button>
-          <button className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
-            {m.settings_data_cleanup_gdpr_export()}
-          </button>
-        </div>
-      </section>
-
       {/* Install what's new — the bundled starter content this release ships.
           ADDS only; the rename caveat is stated ABOVE the button because an
           operator would otherwise discover it by pressing the button. */}

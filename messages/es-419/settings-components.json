@@ -662,5 +662,21 @@
   "settings_2fa_cancel": "Cancelar",
   "settings_2fa_working": "Procesando…",
   "settings_2fa_done": "Listo",
-  "settings_2fa_enabled_just_now": "La verificación en dos pasos está activa. Se le pedirá un código la próxima vez que inicie sesión."
+  "settings_2fa_enabled_just_now": "La verificación en dos pasos está activa. Se le pedirá un código la próxima vez que inicie sesión.",
+  "settings_discount_edit_title": "Editar código de descuento",
+  "settings_discount_edit_action": "Editar",
+  "settings_discount_code_label": "Código",
+  "settings_discount_type_label": "Tipo",
+  "settings_discount_type_percent": "Porcentaje de descuento",
+  "settings_discount_type_fixed": "Monto fijo de descuento",
+  "settings_discount_value_percent_label": "Porcentaje (número entero)",
+  "settings_discount_value_fixed_label": "Monto en dólares",
+  "settings_discount_maxuses_label": "Usos máximos",
+  "settings_discount_maxuses_hint": "Déjelo en blanco para no poner límite.",
+  "settings_discount_expires_label": "Vence",
+  "settings_discount_expires_hint": "Déjelo en blanco para que no venza nunca.",
+  "settings_discount_active_label": "Activo — los clientes pueden aplicar este código",
+  "settings_discount_save": "Guardar",
+  "settings_discount_saving": "Guardando…",
+  "settings_discount_cancel": "Cancelar"
 }

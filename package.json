@@ -23,6 +23,7 @@
     "publish": true
   },
   "scripts": {
+    "postinstall": "patch-package",
     "dev": "npm run build && wrangler dev -c build/server/wrangler.json --persist-to .wrangler/state --port 8787",
     "dev:hmr": "npm run vendor:copy && react-router dev",
     "dev:tunnel": "npm run build && wrangler dev -c build/server/wrangler.json --persist-to .wrangler/state --tunnel",
@@ -97,6 +98,7 @@
     "lint:ext-collisions": "node scripts/check-extension-collisions.mjs",
     "lint:raw-nul": "node scripts/check-raw-nul.mjs",
     "lint:eol": "node scripts/check-line-endings.mjs",
+    "lint:wrangler-patch": "node scripts/check-wrangler-patch.mjs",
     "lint:i18n": "node scripts/check-i18n.mjs",
     "lint:i18n-catalog": "node scripts/check-i18n-catalog.mjs",
     "lint:i18n-glossary": "node scripts/check-i18n-glossary.mjs",
@@ -245,6 +247,7 @@
     "konva": "^10.2.5",
     "lint-staged": "^16.4.0",
     "miniflare": "^4.20260405.0",
+    "patch-package": "^8.0.1",
     "swagger-ui-dist": "^5.32.6",
     "tailwindcss": "^4.1.0",
     "tsx": "^4.22.3",

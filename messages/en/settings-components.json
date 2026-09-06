@@ -662,5 +662,21 @@
   "settings_2fa_cancel": "Cancel",
   "settings_2fa_working": "Working…",
   "settings_2fa_done": "Done",
-  "settings_2fa_enabled_just_now": "Two-factor authentication is on. You will be asked for a code the next time you sign in."
+  "settings_2fa_enabled_just_now": "Two-factor authentication is on. You will be asked for a code the next time you sign in.",
+  "settings_discount_edit_title": "Edit discount code",
+  "settings_discount_edit_action": "Edit",
+  "settings_discount_code_label": "Code",
+  "settings_discount_type_label": "Type",
+  "settings_discount_type_percent": "Percent off",
+  "settings_discount_type_fixed": "Fixed amount off",
+  "settings_discount_value_percent_label": "Percent (whole number)",
+  "settings_discount_value_fixed_label": "Amount in dollars",
+  "settings_discount_maxuses_label": "Maximum uses",
+  "settings_discount_maxuses_hint": "Leave blank for no limit.",
+  "settings_discount_expires_label": "Expires",
+  "settings_discount_expires_hint": "Leave blank to never expire.",
+  "settings_discount_active_label": "Active — clients can apply this code",
+  "settings_discount_save": "Save",
+  "settings_discount_saving": "Saving…",
+  "settings_discount_cancel": "Cancel"
 }

@@ -17,9 +17,27 @@ import type { ReportItem } from "./types";
 export interface ReportRepairPanelProps {
   selectedRepairList: ReportItem[];
   onClose: () => void;
+  /**
+   * Where the repair request is actually built and sent.
+   *
+   * The Send button below had no `onClick` for its whole life, and the reason
+   * it is a LINK rather than a new endpoint is that the flow already exists:
+   * `/repair-builder/{tenant}/{id}` is a real route with create, add-item,
+   * intro, share, PDF and email behind it, and `ReportHeader` already links
+   * there. This panel is presentational — it holds a client-side selection and
+   * no inspection identity — so the honest fix is to take the reader to the
+   * flow, not to grow a second one here.
+   *
+   * NULL when the tenant has `enableCustomerRepairExport` off. The panel's own
+   * toggle is gated only on `hideClientActions`, while the header's builder
+   * link is gated on BOTH — so a tenant who switched the builder off can still
+   * open this panel, and a Send that ignored the flag would hand back the
+   * capability they turned off.
+   */
+  builderHref: string | null;
 }
 
-export function ReportRepairPanel({ selectedRepairList, onClose }: ReportRepairPanelProps) {
+export function ReportRepairPanel({ selectedRepairList, onClose, builderHref }: ReportRepairPanelProps) {
   return (
     <div className="print:hidden fixed bottom-0 left-0 right-0 z-50 bg-ih-bg-card border-t border-ih-border max-h-[60vh] overflow-y-auto rounded-t-xl">
       <div className="max-w-4xl mx-auto p-6">
@@ -71,12 +89,17 @@ export function ReportRepairPanel({ selectedRepairList, onClose }: ReportRepairP
                 >
                   {m.pca_repair_panel_export_pdf()}
                 </button>
-                <button
-                  type="button"
-                  className="px-4 py-2 text-sm font-semibold rounded-lg bg-ih-primary text-ih-primary-fg"
-                >
-                  {m.pca_repair_panel_send()}
-                </button>
+                {/* An <a>, not a button with a handler: this navigates, and a
+                    button that navigates is a button a middle-click and a
+                    "open in new tab" cannot use. */}
+                {builderHref && (
+                  <a
+                    href={builderHref}
+                    className="px-4 py-2 text-sm font-semibold rounded-lg bg-ih-primary text-ih-primary-fg inline-flex items-center"
+                  >
+                    {m.pca_repair_panel_send()}
+                  </a>
+                )}
               </div>
             </div>
           </>
