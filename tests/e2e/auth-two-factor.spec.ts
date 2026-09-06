@@ -35,16 +35,36 @@ const codeFor = (secret: string) =>
     new TOTP({ secret: Secret.fromBase32(secret), algorithm: 'SHA1', digits: 6, period: 30 }).generate();
 
 /**
- * POST, retried once when the dev worker restarts underneath the request.
+ * The two ways the local dev worker drops a request underneath us. Matched on
+ * the BODY, because the status code alone does not distinguish either of them
+ * from a real server fault.
  *
- * `wrangler dev` reloads after the build settles and answers anything in flight
- * with 503 "Your worker restarted mid-request… Only GET or HEAD requests are
- * retried automatically". That is infrastructure, not the API — but it arrives
- * as a 503, which reads exactly like a server fault, and it cost a debugging
- * round here before the response BODY was printed. A single retry on that one
- * message keeps the noise out without hiding a real 503: any other 503 is
- * returned untouched for the assertion to fail on.
+ * 1. `wrangler dev` reloads after the build settles and answers anything in
+ *    flight with 503 "Your worker restarted mid-request… Only GET or HEAD
+ *    requests are retried automatically".
+ * 2. The isolate is recycled and the next request in lands on it as it goes
+ *    away: miniflare answers 500 with "Network connection lost".
+ *
+ * Shape 2 was diagnosed 2026-09-06 and is why this list is a list. Measured
+ * outside Playwright entirely, with plain fetch against a hand-started dev
+ * server: after `POST /2fa/setup` returns 200, the NEXT request fails this way
+ * and the two after it succeed — and the server keeps serving `/status`
+ * throughout, so nothing crashed. It is not the verify handler, which is a
+ * lookup, a TOTP check and one UPDATE; it is the request that follows setup,
+ * whichever one that happens to be. Setup is the heaviest call in the suite
+ * (eight recovery-code hashes plus QR generation), and the worker log has no
+ * entry for the dropped request at all.
+ *
+ * Retrying is honest here and hiding it would not be: on the first shape the
+ * suite already retried, and the second is the same event wearing a different
+ * status. Both retry ONCE and only on their own message, so a genuine 500 or
+ * 503 still reaches the assertion untouched.
  */
+const DEV_WORKER_DROPPED_REQUEST = [
+    { status: 503, body: 'restarted mid-request' },
+    { status: 500, body: 'Network connection lost' },
+];
+
 async function post(request: APIRequestContext, path: string, data: unknown, token?: string) {
     const send = () => {
         const { headers } = csrfHeaders();
@@ -58,8 +78,10 @@ async function post(request: APIRequestContext, path: string, data: unknown, tok
         });
     };
     const first = await send();
-    if (first.status() !== 503) return first;
-    if (!(await first.text()).includes('restarted mid-request')) return first;
+    const candidates = DEV_WORKER_DROPPED_REQUEST.filter((d) => d.status === first.status());
+    if (candidates.length === 0) return first;
+    const text = await first.text();
+    if (!candidates.some((d) => text.includes(d.body))) return first;
     return send();
 }
 
