@@ -15,6 +15,7 @@ import { buildUnsubscribeLinks } from '../notifications/unsubscribe-footer';
 import { buildOutboundCoolingWindow, coolingWindowApplies } from './outbound-cooling-window';
 import { getDeploymentProfile } from '../deployment-profile';
 import { logger } from '../logger';
+import { memoOnce } from '../request-scope';
 import { ResendProvider } from './providers/resend';
 import { RecordingEmailProvider } from './providers/recording';
 import { drizzle } from 'drizzle-orm/d1';
@@ -288,9 +289,15 @@ export function assembleTenantEmailService(
  * ciphertext (see lib/secrets-cache.ts).
  */
 async function loadEmailSecrets(env: EmailServiceEnv, tenantId: string): Promise<LoadedEmailConfig['dbSecrets']> {
-    const dec = (await loadTenantSecrets(
+    // Same `secrets:${tenantId}` key as the integration-secrets middleware,
+    // which loads this identical bundle a few middlewares earlier and does not
+    // know this call exists. Sharing the key is what collapses the double
+    // decrypt; the two shapes differ (that one is a flat env-name map, this one
+    // is renamed and filtered below), which is why the SHARED unit is
+    // loadTenantSecrets rather than either caller's return value.
+    const dec = (await memoOnce(env, `secrets:${tenantId}`, () => loadTenantSecrets(
         env.DB, env.TENANT_CACHE, tenantId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
-    ).catch(() => null)) ?? {};
+    )).catch(() => null)) ?? {};
     return {
         ...(dec.RESEND_API_KEY       ? { resendApiKey:   dec.RESEND_API_KEY }       : {}),
         ...(dec.GEMINI_API_KEY       ? { geminiApiKey:   dec.GEMINI_API_KEY }       : {}),

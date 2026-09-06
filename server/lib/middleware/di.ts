@@ -65,6 +65,7 @@ import { PortalProvider } from '../../portal/portal.provider';
 import { PlanQuotaGuard, readTenantPlan } from '../../features/plan-quota/guard';
 import type { TenantPlan } from '../../features/plan-quota/policy';
 import { tenantAiCapsLoader } from '../../features/plan-quota/ai-caps';
+import { memoOnce } from '../request-scope';
 
 /**
  * Middleware that injects a lazy-loaded service registry into the Hono context.
@@ -99,9 +100,18 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
     // tier carries no status, and null is deliberately NOT an entitlement.
     let tenantPlan: TenantPlan | null = null;
     if (tenantId && c.req.path.startsWith('/api/')) {
-        emailCfg = await loadTenantEmailConfig(c.env, tenantId);
+        // Its own key, not the `secrets:` one: this returns a LoadedEmailConfig
+        // (renamed, filtered, plus six other reads) while `secrets:` holds the
+        // raw env-name map. Different shapes cannot share an entry. The shared
+        // decrypt happens one level down, inside loadEmailSecrets, on the
+        // `secrets:` key. This entry removes the other six statements --
+        // identity, brand, byo provider, AI attestation, AI config, templates --
+        // that every in-process call was re-reading.
+        emailCfg = await memoOnce(c.env, `email-cfg:${tenantId}`, () => loadTenantEmailConfig(c.env, tenantId));
         if (!tenantTierForQuota && c.var.profile.hasUsageQuota) {
-            tenantPlan = await readTenantPlan(c.env.DB, tenantId).catch(() => null);
+            // Plan and tier do not change midway through a render.
+            tenantPlan = await memoOnce(c.env, `plan:${tenantId}`,
+                () => readTenantPlan(c.env.DB, tenantId)).catch(() => null);
             tenantTierForQuota = tenantPlan?.tier;
         }
     }

@@ -20,6 +20,7 @@
 import type { MiddlewareHandler } from 'hono';
 import { loadTenantSecrets } from '../secrets-cache';
 import type { HonoConfig } from '../../types/hono';
+import { memoOnce } from '../request-scope';
 import { logger } from '../logger';
 import { INTEGRATION_SECRET_KEYS } from '../secrets-catalog';
 
@@ -71,9 +72,16 @@ export const integrationSecretsMiddleware: MiddlewareHandler<HonoConfig> = async
     try {
         // A-16 — ciphertext is KV-cached; loadTenantSecrets is the single
         // envelope-aware decrypt entry point (see lib/secrets-cache.ts).
-        const decrypted = await loadTenantSecrets(
+        // `secrets:${tenantId}` is shared on purpose with the email config
+        // loader (server/lib/email/build-email-service.ts), which bottoms out in
+        // this same function. The two call sites do not know about each other,
+        // so before this key the SAME ciphertext was fetched and AES-GCM
+        // decrypted twice per in-process call -- statements 3 and 10 of the ten
+        // the chain paid, measured 2026-09-06. One key is what removes the 2x;
+        // memoising each site separately would only remove the 15x.
+        const decrypted = await memoOnce(c.env, `secrets:${tenantId}`, () => loadTenantSecrets(
             c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
-        );
+        ));
         if (decrypted) {
             // COPY FIRST. The runtime hands every request in an isolate the SAME
             // `env` object — verified in workerd, see

@@ -63,7 +63,7 @@
   "app/components/portal/sections/RepairBuilderSection.tsx": 450,
   "app/components/editor/CostItemsPanel.tsx": 449,
   "server/api/inspections/results.ts": 449,
-  "server/lib/middleware/di.ts": 448,
+  "server/lib/middleware/di.ts": 458,
   "app/lib/collab/results-doc-connection.ts": 435,
   "server/api/inspections/media.ts": 435,
   "app/components/media-studio/VideoCapture.tsx": 433,
