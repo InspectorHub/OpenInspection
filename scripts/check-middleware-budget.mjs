@@ -219,6 +219,22 @@ const measuredBaseline = {
   fanOut: Object.fromEntries(Object.entries(fanOut.map).sort(([a], [b]) => (a < b ? -1 : 1))),
 };
 
+// Check 3 is registered BEFORE the --update path, not with the other console
+// output further down. It is the security invariant, and this script advertises
+// --update as the remedy for a red run: with the fail() registered later,
+// `--update` printed "check 3 … LEAKING" and still exited 0 with a fresh
+// baseline, so the documented fix silently accepted the one thing that has no
+// baseline. Someone who added a global middleware AND wired the scope into
+// toApi would have been told to run --update, and it would have said yes.
+if (seam.hits.length > 0) {
+  fail(
+    `${WORKER_ENTRY}: the toApi slice references ${[...new Set(seam.hits)].join(", ")}. ` +
+      `toApi serves EXTERNAL HTTP requests; giving it the request scope would let unrelated ` +
+      `requests share memoised auth and tenant decisions. The scope belongs in ssr only. ` +
+      `This invariant has no baseline and cannot be re-baselined with --update.`,
+  );
+}
+
 if (UPDATE) {
   if (failures.length > 0) {
     console.error("Refusing to write a baseline from a broken instrument:\n");
@@ -345,13 +361,8 @@ console.log(
 );
 console.log(`         slice examined: const toApi … const app = new Hono (${seam.slicedChars} chars)`);
 if (seam.hits.length > 0) {
+  // The failure itself was registered above, before the --update path.
   console.log(`         matches: ${[...new Set(seam.hits)].join(", ")}`);
-  fail(
-    `${WORKER_ENTRY}: the toApi slice references ${[...new Set(seam.hits)].join(", ")}. ` +
-      `toApi serves EXTERNAL HTTP requests; giving it the request scope would let unrelated ` +
-      `requests share memoised auth and tenant decisions. The scope belongs in ssr only. ` +
-      `This invariant has no baseline and cannot be re-baselined with --update.`,
-  );
 }
 
 // ---------------------------------------------------------------------------

@@ -96,7 +96,20 @@ describe('global middleware D1 budget', () => {
         // 0 hits means the counter stopped counting, not that the chain got
         // free. Fail on it explicitly.
         expect(n, 'counter recorded no statements - the instrument is broken, not the code fixed').toBeGreaterThan(0);
-        expect(n, `unscoped chain spent ${n} D1 statements, ratchet is ${COLD_FLOOR}`).toBeLessThanOrEqual(COLD_FLOOR);
+
+        // EQUALITY, not <=. This number is an invariant, not a ratchet: the
+        // header says it must not move, and a one-sided assertion cannot say
+        // that. A DROP here is the failure worth catching -- change memoOnce to
+        // fall back to a module-level map when no scope is present (the
+        // isolate-scoped design request-scope.ts explicitly rejects) and
+        // external requests begin sharing memoised auth and tenant decisions
+        // across users in one isolate, while this count falls from 10 to about
+        // 2 and a `toBeLessThanOrEqual` reports PASS.
+        //
+        // If middleware work is legitimately removed, this fails and the
+        // constant is updated in that same commit -- which is the point: the
+        // number moving should require someone to say why.
+        expect(n, `unscoped chain spent ${n} D1 statements, invariant is exactly ${COLD_FLOOR}`).toBe(COLD_FLOOR);
     });
 
     it('shares middleware work across an in-process fan-out sharing one scope', async () => {

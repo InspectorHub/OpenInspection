@@ -35,6 +35,12 @@ export async function resolveByFixedTenant(c: Context<HonoConfig>, tenantId: str
         } catch {
             // DB unavailable / not yet provisioned — leave metadata unset, tenantId
             // is already populated from the profile so downstream still functions.
+            //
+            // As in branding.ts, the memo caches this null for the whole render
+            // rather than per call, so one transient failure leaves
+            // requestedTenantSlug / tenantTier / tenantStatus unset for all of
+            // it. Milder here: di.ts reads the plan from D1 on its own and
+            // tenantStatus defaults to 'active' downstream.
         }
         return null;
     });

@@ -35,6 +35,22 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
         tenantStatus,
     };
 
+    // ⚠️ THIS EARLY RETURN IS THE COMMON CASE IN SAAS, not an edge case.
+    //
+    // This middleware is mounted at server/index.ts:250, and jwtAuthMiddleware —
+    // which is what sets `tenantId` in saas — is mounted at :257. tenantRouter
+    // (:249) only resolves a tenant in standalone (fixedTenantId) or on the
+    // public slug prefixes (/book/, /report/, /portal/, …); its own header says
+    // "in saas mode the JWT middleware downstream owns tenantId".
+    //
+    // So on a saas authenticated /api/* request — exactly what the 15-call
+    // render fan-out issues — `tenantId` is undefined here and this returns
+    // defaultBranding without touching KV, D1 or the memo below. Consequences
+    // worth knowing before reading the rest of this file: the `branding:` memo
+    // buys nothing in saas (it is a standalone and public-path win), and the
+    // flag-stamping below cannot be exercised by a saas dashboard request.
+    // Moving this middleware after the JWT one would change that, and is a
+    // deliberate ordering change, not a cleanup.
     if (!tenantId) {
         c.set('branding', defaultBranding);
         return await next();
@@ -108,6 +124,15 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
 
             return resolved;
         } catch (e) {
+            // ⚠️ The memo caches this fallback too, so ONE transient D1 failure
+            // on the first fanned-out call serves default branding for the whole
+            // render rather than for that one call. Accepted deliberately: the
+            // alternative is 15 sequential retries against a database that just
+            // failed, inside a single CPU budget, and a page that renders half
+            // in the tenant's branding and half in the platform's is a worse
+            // artifact than one that is consistently degraded. Caching only
+            // successful resolves is the change to make if that trade ever
+            // stops holding.
             logger.error('[branding] DB lookup failed', {}, e instanceof Error ? e : undefined);
             return defaultBranding;
         }

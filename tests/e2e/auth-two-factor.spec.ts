@@ -61,9 +61,28 @@ const codeFor = (secret: string) =>
  * 503 still reaches the assertion untouched.
  */
 const DEV_WORKER_DROPPED_REQUEST = [
-    { status: 503, body: 'restarted mid-request' },
-    { status: 500, body: 'Network connection lost' },
+    { status: 503, body: 'restarted mid-request', safeOnAnyPath: true },
+    { status: 500, body: 'Network connection lost', safeOnAnyPath: false },
 ];
+
+/**
+ * Paths this suite may safely send twice.
+ *
+ * The 503 shape needs no such list: wrangler's own message says non-GET
+ * requests are NOT retried automatically, which is a statement that the handler
+ * did not run. The 500 shape carries no equivalent guarantee — miniflare can
+ * report a dropped connection after the worker began executing — so retrying it
+ * blindly is a real hazard on exactly one call here. `POST /2fa/setup` mints a
+ * new secret and eight fresh recovery codes on every invocation, so a silent
+ * second execution would rotate them out from under the response the test
+ * already captured, and the later assertions would fail as though the product
+ * had lost the codes.
+ *
+ * Everything else the suite POSTs is replay-safe: verify sets totpEnabled=true,
+ * login/2fa exchanges a challenge that stays valid until spent, and disable
+ * clears state that is already clear.
+ */
+const REPLAY_SAFE = new Set(['/api/auth/login', '/api/auth/login/2fa', '/api/auth/2fa/verify', '/api/auth/2fa/disable']);
 
 async function post(request: APIRequestContext, path: string, data: unknown, token?: string) {
     const send = () => {
@@ -78,7 +97,9 @@ async function post(request: APIRequestContext, path: string, data: unknown, tok
         });
     };
     const first = await send();
-    const candidates = DEV_WORKER_DROPPED_REQUEST.filter((d) => d.status === first.status());
+    const candidates = DEV_WORKER_DROPPED_REQUEST.filter(
+        (d) => d.status === first.status() && (d.safeOnAnyPath || REPLAY_SAFE.has(path)),
+    );
     if (candidates.length === 0) return first;
     const text = await first.text();
     if (!candidates.some((d) => text.includes(d.body))) return first;

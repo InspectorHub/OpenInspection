@@ -18,6 +18,16 @@
  * reason it held: the D1 path is correct, and the D1 path is the one a
  * cold-start reading of the file walks through.
  *
+ * ⚠️ WHICH DEPLOYMENT THIS REPRESENTS. `runBranding` hands the middleware a
+ * `tenantId` that is already set. In the real chain that happens in STANDALONE
+ * (tenantRouter resolves the fixed tenant) and on the PUBLIC slug prefixes
+ * (/book/, /report/, /portal/, …) — not on a saas authenticated /api/* request,
+ * where jwtAuthMiddleware sets tenantId at server/index.ts:257, seven lines
+ * AFTER this middleware is mounted at :250, so it early-returns instead. The
+ * `mode: 'saas'` below is therefore only exercising the flag values, not a
+ * request shape saas produces; see the note on that early return in
+ * branding.ts. Do not read these cases as covering the saas dashboard.
+ *
  * Every case below asserts a flag AND a cached per-tenant field, because
  * "the flags are present" also passes on an object that ignored the cache.
  */
