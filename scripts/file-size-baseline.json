@@ -21,7 +21,7 @@
   "scripts/check-platform-defaults.mjs": 701,
   "app/components/media-studio/PhotoAnnotator.tsx": 692,
   "app/hooks/usePhotoOps.ts": 670,
-  "server/services/inspection/inspection-publish.service.ts": 665,
+  "server/services/inspection/inspection-publish.service.ts": 682,
   "server/lib/messaging/providers/telnyx-compliance.ts": 657,
   "app/components/editor/ItemEditor.tsx": 647,
   "app/components/inspection-edit/CompliancePanel.tsx": 638,
