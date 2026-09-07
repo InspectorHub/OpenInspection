@@ -26,6 +26,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { and, eq } from 'drizzle-orm';
 import { inspections, tenants, tenantConfigs, messagingCompliance } from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
+import { memoOnce } from '../lib/request-scope';
 import { auditFromContext } from '../lib/audit';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { Errors } from '../lib/errors';
@@ -579,8 +580,13 @@ export const smsAdminRoutes = createApiRouter()
     .openapi(smsConfigRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const db = getDrizzle(c);
-        const cfg = await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId)).get().catch(() => null);
+        // Memoised for the REQUEST: the settings-communication render calls this
+        // route and /sms/compliance together, and both read the same column.
+        // Each keeps its own failure handling -- this one degrades to null, the
+        // compliance route swallows into undefined -- so only the READ is shared.
+        const cfg = await memoOnce(c.env, `sms-mode:${tenantId}`, async () =>
+            await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs)
+                .where(eq(tenantConfigs.tenantId, tenantId)).get()).catch(() => null);
         const mode = (cfg?.smsMode as 'platform' | 'own') ?? 'platform';
         // Decrypt the tenant's own Twilio secrets to test PRESENCE only (never echoed).
         const dec = (await loadTenantSecrets(
@@ -603,7 +609,9 @@ export const smsAdminRoutes = createApiRouter()
         const tenantId = c.get('tenantId') as string;
         const db = getDrizzle(c);
         let cfg: { smsMode: string | null } | undefined;
-        try { cfg = await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get(); }
+        // Same request-scoped read as /sms/config above -- one row, one statement.
+        try { cfg = await memoOnce(c.env, `sms-mode:${tenantId}`, async () =>
+            await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get()); }
         catch { cfg = undefined; }
         const mode = (cfg?.smsMode as 'platform' | 'own' | 'managed_shared' | 'managed_dedicated') ?? 'platform';
 

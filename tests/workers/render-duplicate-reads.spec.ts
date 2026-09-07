@@ -28,9 +28,16 @@ const migrationSql = import.meta.glob('../../migrations/*.sql', {
  * Statements the covered renders issue MORE THAN ONCE, counted as the excess (a
  * statement run 3x wastes 2), summed across every render in `RENDERS`.
  *
- * Measured 2026-09-07: 107 statements across 5 renders, 4 wasted — and ALL FOUR
- * are the same shape, a `tenant_configs` row read by more than one endpoint of
- * the same page. inspector-portal, contact-detail and calendar are at zero.
+ * Measured 2026-09-07: 103 statements across 5 renders, 103 distinct, ZERO
+ * wasted. Every covered render repeats nothing.
+ *
+ * It was 4 when the coverage first went from one render to five, and all four
+ * were one shape — a `tenant_configs` row read by more than one endpoint of the
+ * same page. Three were `BrandingService` (`getBranding` is a bare SELECT *,
+ * `getBrand` a narrow projection) reached from two endpoints, and once from a
+ * single endpoint twice; the fourth was `select sms_mode` from /sms/config and
+ * /sms/compliance. Both services now memoise the ROW on the request scope and
+ * leave the derivation per-call.
  *
  * ⚠️ Lower it in the same commit that removes one; never raise it to make a
  * change pass. The whole value is that the next duplicate is visible the day it
@@ -54,7 +61,7 @@ const migrationSql = import.meta.glob('../../migrations/*.sql', {
  * moved this number by exactly zero, which is why that memo was reverted rather
  * than kept on a hunch.
  */
-const WASTED_BASELINE = 4;
+const WASTED_BASELINE = 0;
 
 const TENANT = 'dupe-tenant';
 const USER = 'dupe-user';
