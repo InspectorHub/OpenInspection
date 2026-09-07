@@ -109,6 +109,7 @@
   "hub_reinspect_help": "Elija qué elementos trasladar. Los elementos marcados que siguen abiertos vienen preseleccionados.",
   "hub_reinspect_empty": "Este informe no tiene elementos disponibles para trasladar.",
   "hub_publish_title": "Publicar el informe",
+  "hub_publish_unresolved": "{count} elemento(s) requieren atención. Puede publicar ahora o resolverlos primero en el editor.",
   "hub_publish_pending": "Publicando…",
   "hub_publish_submit": "Publicar el informe",
   "hub_publish_notify_client": "Notificar al cliente por correo electrónico",

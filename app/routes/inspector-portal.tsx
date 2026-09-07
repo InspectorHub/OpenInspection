@@ -1325,6 +1325,7 @@ export default function InspectionHubPage() {
         courtesyTranslationEnabled={inspection.courtesyTranslationEnabled ?? false}
         courtesyTranslationLocale={COURTESY_TRANSLATION_LOCALE}
         clientPrefersTranslation={inspection.clientLocale === COURTESY_TRANSLATION_LOCALE}
+        blockingCount={hub.publishReadiness.blockingCount}
         fetcher={publishModal.fetcher}
         submitting={publishModal.busy}
         error={publishModal.error}

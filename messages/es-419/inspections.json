@@ -165,7 +165,7 @@
   "inspections_hub_report_unpublish": "Anular la publicación",
   "inspections_hub_report_submitted": "Informe enviado para revisión.",
   "inspections_hub_report_ready": "Todos los campos obligatorios están completos.",
-  "inspections_hub_report_blockers": "{count} bloqueo(s) por resolver antes de publicar.",
+  "inspections_hub_report_blockers": "{count} elemento(s) requieren atención.",
   "inspections_hub_report_publish": "Publicar el informe",
   "inspections_hub_report_submitting": "Enviando…",
   "inspections_hub_report_submit": "Enviar para revisión",

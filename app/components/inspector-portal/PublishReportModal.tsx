@@ -17,6 +17,7 @@ export function PublishReportModal({
   courtesyTranslationEnabled,
   courtesyTranslationLocale,
   clientPrefersTranslation,
+  blockingCount,
   fetcher,
   submitting,
   error,
@@ -46,6 +47,25 @@ export function PublishReportModal({
    * product made on somebody's behalf.
    */
   clientPrefersTranslation: boolean;
+  /**
+   * How many items the report-status gate still counts as unresolved.
+   *
+   * SHOWN, NEVER ENFORCED. The hub card beside the Publish button already
+   * counted these, but the modal that performs the publish said nothing about
+   * them — so the last screen before an outward-facing act was the one screen
+   * with the least information, while publishing from the editor showed a list.
+   *
+   * It does not disable the submit. Of five established products surveyed
+   * 2026-09-07, four never block publishing on report completeness and the one
+   * that does ships it off by default; Horizon's tutorial states outright that
+   * its equivalent check "will not force you to make an entry. It is simply a
+   * gentle reminder."
+   *
+   * A count and not a list because a count is all the hub has: its payload
+   * carries `{ ready, blockingCount }`. The defects themselves come from a
+   * separate endpoint the editor calls.
+   */
+  blockingCount: number;
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
   submitting: boolean;
   error: string | undefined;
@@ -78,6 +98,11 @@ export function PublishReportModal({
     >
       <fetcher.Form id={FORM_ID} method="post" className="space-y-3">
         <input type="hidden" name="intent" value="publish" />
+        {blockingCount > 0 && (
+          <p className="rounded-md border border-ih-watch bg-ih-watch-bg px-3 py-2 text-[12px] text-ih-watch-fg">
+            {m.hub_publish_unresolved({ count: blockingCount })}
+          </p>
+        )}
         {/* No theme picker — rides the editor's effective default (server
             'modern'); the action sends theme:"modern" explicitly. */}
         <ToggleRow

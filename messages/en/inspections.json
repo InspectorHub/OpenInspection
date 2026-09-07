@@ -165,7 +165,7 @@
   "inspections_hub_report_unpublish": "Unpublish",
   "inspections_hub_report_submitted": "Report submitted for review.",
   "inspections_hub_report_ready": "All required fields are complete.",
-  "inspections_hub_report_blockers": "{count} blocker(s) to resolve before publishing.",
+  "inspections_hub_report_blockers": "{count} item(s) still need attention.",
   "inspections_hub_report_publish": "Publish report",
   "inspections_hub_report_submitting": "Submitting…",
   "inspections_hub_report_submit": "Submit for review",
