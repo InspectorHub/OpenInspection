@@ -691,7 +691,7 @@ app.notFound((c) => {
 // without this `Handler does not export a scheduled() function` fires
 // on every cron tick and the automation flush never runs.
 import { scheduled as baseScheduled } from './scheduled';
-import { handleSyncDlqBatch } from './portal/integration.module';
+import { queue as queueConsumer } from './queue';
 export default {
     fetch: app.fetch.bind(app),
     scheduled: async (event: ScheduledEvent, env: HonoConfig['Bindings'], ctx: ExecutionContext) => {
@@ -703,35 +703,11 @@ export default {
     // (`inspectorhub-cmd-saas`, portal→core commands — A-21), and the sync DLQ
     // (`inspectorhub-sync-dlq-saas`, dead core→portal envelopes → outbox
     // `failed` writeback). Never throws.
-    queue: async (batch: MessageBatch<unknown>, env: HonoConfig['Bindings'], _ctx: ExecutionContext) => {
-        if (batch.queue.includes('word-export')) {
-            const { handleWordExportBatch } = await import('./services/report-export-consumer');
-            const images = (env as unknown as { IMAGES?: import('./lib/media/strip-exif').ImagesBinding }).IMAGES;
-            await handleWordExportBatch({
-                DB: env.DB, PHOTOS: env.PHOTOS, TENANT_CACHE: env.TENANT_CACHE,
-                KEY_ENCRYPTION_SECRET: env.KEY_ENCRYPTION_SECRET, JWT_SECRET: env.JWT_SECRET,
-                ...(images ? { IMAGES: images } : {}),
-            }, batch);
-            return;
-        }
-        // The cron queue. One message = one job = one Worker invocation with its
-        // own CPU budget; that split is what keeps the scheduled path inside the
-        // Workers Free 10 ms per-invocation ceiling.
-        if (batch.queue.includes('-cron')) {
-            const { handleCronBatch } = await import('./cron/consumer');
-            await handleCronBatch(env as never, batch as never);
-            return;
-        }
-        if (batch.queue.includes('-cmd-') && !batch.queue.includes('cmd-dlq')) {
-            const { handleCmdBatch } = await import('./portal/cmd-batch');
-            // SYNC_QUEUE carries replies (A-21 batch 2); PHOTOS/EXPORTS serve
-            // offboarding (batch 3) and the DOs let purge empty them; the last
-            // argument is the secret a report amendment is signed with (cmd-batch.ts).
-            await handleCmdBatch(env.DB, env.TENANT_CACHE, batch, env.SYNC_QUEUE, { photos: env.PHOTOS, exports: env.EXPORTS_BUCKET }, { INSPECTION_DOC: env.INSPECTION_DOC, TENANT_PRESENCE: env.TENANT_PRESENCE }, env, env.KEY_ENCRYPTION_SECRET || env.JWT_SECRET);
-            return;
-        }
-        await handleSyncDlqBatch(env.DB, batch);
-    },
+    //
+    // The body moved to `./queue` so `workers/app.ts` can reach it without
+    // evaluating this module (and with it every route). This export stays so
+    // the default export keeps its full shape for any other consumer.
+    queue: queueConsumer,
 };
 export { SignCompletionWorkflow } from './workflows/sign-completion-workflow';
 
