@@ -43,6 +43,36 @@ function paymentTone(status: string): CardTone {
 }
 
 /**
+ * The report tile answers the CLIENT's question — "can I read it yet?" — not
+ * the inspector's "has it been published?".
+ *
+ * Those two answers diverge whenever a published report is still gated behind
+ * the agreement or payment, and the Hub renders `reportLockNotice`'s "Your
+ * report isn't available yet" banner directly above these cards. A green
+ * "Published" tile underneath it stated the opposite in the same viewport.
+ *
+ * Published-and-open is still plainly "Published"; not-yet-published is still
+ * neutral, because that one is pending on the inspector and there is nothing
+ * for the client to act on.
+ */
+function reportCardState(ov: StatusOverview): { value: string; tone: CardTone } {
+  if (!ov.reportPublished) {
+    return { value: m.portal_status_report_unpublished(), tone: "neutral" };
+  }
+  const lock = reportLockNotice(ov);
+  if (!lock) return { value: m.portal_status_report_published(), tone: "ok" };
+  return {
+    value:
+      lock.reason === "agreement"
+        ? m.portal_status_report_locked_agreement()
+        : m.portal_status_report_locked_payment(),
+    // Same tone as the agreement/payment tiles that name the same gate, so the
+    // client sees one consistent "this is on you" colour across the row.
+    tone: "warn",
+  };
+}
+
+/**
  * Build the 6 overview status cards in a fixed key order:
  * appointment, agreement, payment, report, progress, messages.
  *
@@ -72,8 +102,7 @@ export function statusCardModels(ov: StatusOverview): StatusCardModel[] {
     {
       key: "report",
       label: m.portal_status_report_label(),
-      value: ov.reportPublished ? m.portal_status_report_published() : m.portal_status_report_unpublished(),
-      tone: ov.reportPublished ? "ok" : "neutral",
+      ...reportCardState(ov),
     },
     {
       key: "progress",

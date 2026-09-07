@@ -101,6 +101,8 @@
   "portal_status_agreement_unsigned": "Not signed",
   "portal_status_report_published": "Published",
   "portal_status_report_unpublished": "Not published",
+  "portal_status_report_locked_agreement": "Ready. Sign to unlock.",
+  "portal_status_report_locked_payment": "Ready. Payment due.",
   "portal_status_messages_unread": "{count} unread",
   "portal_status_messages_none": "No new messages",
   "portal_list_empty_title": "No inspections yet",

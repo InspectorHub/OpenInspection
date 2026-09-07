@@ -101,6 +101,8 @@
   "portal_status_agreement_unsigned": "No firmado",
   "portal_status_report_published": "Publicado",
   "portal_status_report_unpublished": "No publicado",
+  "portal_status_report_locked_agreement": "Listo. Firme para desbloquear.",
+  "portal_status_report_locked_payment": "Listo. Pago pendiente.",
   "portal_status_messages_unread": "{count} sin leer",
   "portal_status_messages_none": "No hay mensajes nuevos",
   "portal_list_empty_title": "Aún no hay inspecciones",
