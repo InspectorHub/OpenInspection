@@ -339,63 +339,124 @@ export class InspectionPublishService extends InspectionSubService {
             .get();
         if (!insp) return null;
 
-        // The unlock record is meant to be READ by a person later, so resolve
-        // the name here rather than shipping an opaque id to the browser. A
-        // deleted teammate leaves it null and the UI says "a teammate" — the
-        // release still happened and the reason still stands.
-        let unlockedByName: string | null = null;
-        if (insp.unlockedBy) {
-            const u = await db.select({ name: users.name, email: users.email }).from(users)
-                .where(and(eq(users.id, insp.unlockedBy), eq(users.tenantId, tenantId)))
-                .get();
-            unlockedByName = u?.name ?? u?.email ?? null;
-        }
+        // ONE WAVE. Everything here depends only on `insp` (already resolved) or
+        // on nothing, yet each was its own `await` -- and a sequential await is a
+        // round trip. Measured 2026-09-07: 22 statements at DEPTH 11, and depth
+        // is what a remote D1 charges for, not the count. Now depth 5. Only the
+        // signer tally, which needs the request ids, stays behind this.
+        // The services are constructed inline (they take just a D1Database) per
+        // the DI guidance: compose the read, no constructor-chain redesign.
+        const invoiceSvc = new InvoiceService(this.db);
+        const peopleSvc = new PeopleService({ DB: this.db });
 
-        // Service lines — effective price = priceOverride ?? priceSnapshot
-        // (P-4 authority chain, tier 2). Tenant-scoped on both columns.
-        const serviceRows = await db.select({
-            id:            inspectionServices.id,
-            serviceId:     inspectionServices.serviceId,
-            nameSnapshot:  inspectionServices.nameSnapshot,
-            priceSnapshot: inspectionServices.priceSnapshot,
-            priceOverride: inspectionServices.priceOverride,
-        }).from(inspectionServices)
-            .where(and(
-                eq(inspectionServices.tenantId, tenantId),
-                eq(inspectionServices.inspectionId, inspectionId),
-            ))
-            .all();
+        const [
+            unlockedByName,
+            serviceRows,
+            agreementRows,
+            requestRows,
+            people, readiness, invoice, primaryClient, buyerAgentId, listingAgentId,
+            communication,
+            courtesyTranslationEnabled,
+            reportList,
+            referredByName,
+        ] = await Promise.all([
+            // The unlock record is meant to be READ by a person later, so resolve
+            // the name here rather than shipping an opaque id to the browser. A
+            // deleted teammate leaves it null and the UI says "a teammate" -- the
+            // release still happened and the reason still stands.
+            insp.unlockedBy
+                ? db.select({ name: users.name, email: users.email }).from(users)
+                    .where(and(eq(users.id, insp.unlockedBy), eq(users.tenantId, tenantId)))
+                    .get()
+                    .then((u) => u?.name ?? u?.email ?? null)
+                : Promise.resolve(null),
 
-        // Tenant's agreement templates — drives a "send agreement" dropdown later.
-        const agreementRows = await db.select({ id: agreements.id, name: agreements.name })
-            .from(agreements)
-            .where(eq(agreements.tenantId, tenantId))
-            .orderBy(desc(agreements.createdAt))
-            .all();
+            // Service lines -- effective price = priceOverride ?? priceSnapshot
+            // (P-4 authority chain, tier 2). Tenant-scoped on both columns.
+            db.select({
+                id:            inspectionServices.id,
+                serviceId:     inspectionServices.serviceId,
+                nameSnapshot:  inspectionServices.nameSnapshot,
+                priceSnapshot: inspectionServices.priceSnapshot,
+                priceOverride: inspectionServices.priceOverride,
+            }).from(inspectionServices)
+                .where(and(
+                    eq(inspectionServices.tenantId, tenantId),
+                    eq(inspectionServices.inspectionId, inspectionId),
+                ))
+                .all(),
 
-        // Agreement requests for this inspection, newest first. IA-65 — the hub
-        // now owns signer management, so each envelope arrives with the template
-        // name it was sent from and its signing progress. Both were previously
-        // reachable only from the tenant-wide Library page.
-        const requestRows = await db.select({
-            id:            agreementRequests.id,
-            status:        agreementRequests.status,
-            clientEmail:   agreementRequests.clientEmail,
-            signedAt:      agreementRequests.signedAt,
-            createdAt:     agreementRequests.createdAt,
-            agreementName: agreements.name,
-        }).from(agreementRequests)
-            .leftJoin(agreements, eq(agreementRequests.agreementId, agreements.id))
-            .where(and(
-                eq(agreementRequests.tenantId, tenantId),
-                eq(agreementRequests.inspectionId, inspectionId),
-            ))
-            .orderBy(desc(agreementRequests.createdAt))
-            .all();
+            // Tenant's agreement templates -- drives a "send agreement" dropdown later.
+            db.select({ id: agreements.id, name: agreements.name })
+                .from(agreements)
+                .where(eq(agreements.tenantId, tenantId))
+                .orderBy(desc(agreements.createdAt))
+                .all(),
 
-        // Signer tallies for those envelopes. One extra round trip over the
-        // whole set rather than one per row — an inspection carries a handful of
-        // envelopes at most, and the per-row shape is what invites an N+1.
+            // Agreement requests for this inspection, newest first. IA-65 -- the hub
+            // now owns signer management, so each envelope arrives with the template
+            // name it was sent from and its signing progress. Both were previously
+            // reachable only from the tenant-wide Library page.
+            db.select({
+                id:            agreementRequests.id,
+                status:        agreementRequests.status,
+                clientEmail:   agreementRequests.clientEmail,
+                signedAt:      agreementRequests.signedAt,
+                createdAt:     agreementRequests.createdAt,
+                agreementName: agreements.name,
+            }).from(agreementRequests)
+                .leftJoin(agreements, eq(agreementRequests.agreementId, agreements.id))
+                .where(and(
+                    eq(agreementRequests.tenantId, tenantId),
+                    eq(agreementRequests.inspectionId, inspectionId),
+                ))
+                .orderBy(desc(agreementRequests.createdAt))
+                .all(),
+
+            // getPeopleCard/computePublishReadiness throw NotFound when the row is
+            // absent -- but existence was confirmed above, so they resolve.
+            //
+            // Task 9c -- the flat `inspection.*` client/agent fields (kept for the
+            // hub page's bare-text client fallback + the /contacts/:id link, and
+            // for API-consumer back-compat) are resolved via inspection_people,
+            // NOT the legacy inspections.client_name/_email/_phone/_contact_id/
+            // referred_by_agent_id/selling_agent_id columns -- those survive GDPR
+            // erasure as a stale denormalized cache and would leak an erased
+            // subject's PII. `people` (getPeopleCard) already sources the same
+            // way; this projection is a separate, intentionally-duplicated read
+            // for the flat shape this endpoint has always returned.
+            this.facade.getPeopleCard(inspectionId, tenantId),
+            this.computePublishReadiness(inspectionId, tenantId, insp),
+            invoiceSvc.findByInspectionId(tenantId, inspectionId),
+            peopleSvc.getPrimaryClient(tenantId, inspectionId),
+            peopleSvc.contactIdForRole(tenantId, inspectionId, 'buyer_agent'),
+            peopleSvc.contactIdForRole(tenantId, inspectionId, 'listing_agent'),
+
+            communicationCounts(db, tenantId, inspectionId),
+
+            // #23 -- whether this workspace may PRODUCE a courtesy translation. On
+            // the hub because the publish surface needs it and every role that can
+            // publish must be able to see the opt-in; the settings endpoint that
+            // also answers this is owner/manager only.
+            isCourtesyTranslationEnabled(this.db, tenantId),
+
+            listReportsForHub(db, tenantId, inspectionId),
+
+            // Task 8 -- resolve the referrer's display name for the Order details
+            // card. Soft reference: a deleted contact resolves null, and the card
+            // renders the unattributed state rather than a dangling id.
+            insp.referredByContactId
+                ? db.select({ name: contacts.name }).from(contacts)
+                    .where(and(eq(contacts.id, insp.referredByContactId), eq(contacts.tenantId, tenantId)))
+                    .get()
+                    .then((ref) => ref?.name ?? null)
+                : Promise.resolve(null),
+        ]);
+
+        // The ONLY genuinely dependent read: it needs the request ids above.
+        // One round trip over the whole set rather than one per row -- an
+        // inspection carries a handful of envelopes at most, and the per-row
+        // shape is what invites an N+1.
         const signerRows = requestRows.length > 0
             ? await db.select({ requestId: agreementSigners.requestId, status: agreementSigners.status })
                 .from(agreementSigners)
@@ -406,55 +467,11 @@ export class InspectionPublishService extends InspectionSubService {
                 .all()
             : [];
         const signerTally = new Map<string, { total: number; signed: number }>();
-        for (const s of signerRows) {
-            const cur = signerTally.get(s.requestId) ?? { total: 0, signed: 0 };
+        for (const sg of signerRows) {
+            const cur = signerTally.get(sg.requestId) ?? { total: 0, signed: 0 };
             cur.total += 1;
-            if (s.status === 'signed') cur.signed += 1;
-            signerTally.set(s.requestId, cur);
-        }
-
-        // Reused primitives. getPeopleCard/computePublishReadiness throw NotFound
-        // when the row is absent — but we already confirmed it exists above, so
-        // they resolve. InvoiceService is constructed inline (it takes only a
-        // D1Database, same handle this service holds) per the DI guidance: no
-        // constructor-chain redesign, just compose the read.
-        const invoiceSvc = new InvoiceService(this.db);
-        const peopleSvc = new PeopleService({ DB: this.db });
-        // Task 9c — the flat `inspection.*` client/agent fields (kept for the
-        // hub page's bare-text client fallback + the /contacts/:id link, and
-        // for API-consumer back-compat) are resolved via inspection_people,
-        // NOT the legacy inspections.client_name/_email/_phone/_contact_id/
-        // referred_by_agent_id/selling_agent_id columns — those survive GDPR
-        // erasure as a stale denormalized cache and would leak an erased
-        // subject's PII. `people` below (getPeopleCard) already sources the
-        // same way; this projection is a separate, intentionally-duplicated
-        // read for the flat shape this endpoint has always returned.
-        const [people, readiness, invoice, primaryClient, buyerAgentId, listingAgentId] = await Promise.all([
-            this.facade.getPeopleCard(inspectionId, tenantId),
-            this.computePublishReadiness(inspectionId, tenantId),
-            invoiceSvc.findByInspectionId(tenantId, inspectionId),
-            peopleSvc.getPrimaryClient(tenantId, inspectionId),
-            peopleSvc.contactIdForRole(tenantId, inspectionId, 'buyer_agent'),
-            peopleSvc.contactIdForRole(tenantId, inspectionId, 'listing_agent'),
-        ]);
-
-        const communication = await communicationCounts(db, tenantId, inspectionId);
-        // #23 — whether this workspace may PRODUCE a courtesy translation. On
-        // the hub because the publish surface needs it and every role that can
-        // publish must be able to see the opt-in; the settings endpoint that
-        // also answers this is owner/manager only.
-        const courtesyTranslationEnabled = await isCourtesyTranslationEnabled(this.db, tenantId);
-        const reportList = await listReportsForHub(db, tenantId, inspectionId);
-
-        // Task 8 — resolve the referrer's display name for the Order details
-        // card. Soft reference: a deleted contact resolves null, and the card
-        // renders the unattributed state rather than a dangling id.
-        let referredByName: string | null = null;
-        if (insp.referredByContactId) {
-            const ref = await db.select({ name: contacts.name }).from(contacts)
-                .where(and(eq(contacts.id, insp.referredByContactId), eq(contacts.tenantId, tenantId)))
-                .get();
-            referredByName = ref?.name ?? null;
+            if (sg.status === 'signed') cur.signed += 1;
+            signerTally.set(sg.requestId, cur);
         }
 
         return {
@@ -627,10 +644,25 @@ export class InspectionPublishService extends InspectionSubService {
      * templateSnapshot, and nothing else (#307). The live `templates` row is
      * deliberately not read here any more — see requireTemplateSnapshot.
      */
-    async computePublishReadiness(inspectionId: string, tenantId: string): Promise<PublishReadiness> {
+    async computePublishReadiness(
+        inspectionId: string,
+        tenantId: string,
+        /**
+         * The caller's already-loaded row, when it has one. `getInspectionHub`
+         * reads this exact row to gate on existence and then called this, which
+         * read it again -- the same statement, the same parameters, twice in one
+         * request. Passed explicitly rather than memoised because a service holds
+         * a D1Database, not the request env, so the request scope is not reachable
+         * from here. Used read-only (it is handed to requireTemplateSnapshot),
+         * so sharing the object carries no aliasing risk.
+         *
+         * Omitted by every other caller, which then loads it as before.
+         */
+        preloaded?: typeof inspections.$inferSelect,
+    ): Promise<PublishReadiness> {
         const db = this.getDrizzle();
 
-        const inspection = await db.select().from(inspections)
+        const inspection = preloaded ?? await db.select().from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .get();
         if (!inspection) throw Errors.NotFound('Inspection not found');

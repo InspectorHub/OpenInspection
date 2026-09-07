@@ -161,79 +161,62 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const id = params.id;
   const api = createApi(context, { token });
-  // One aggregate round trip drives the whole page (Task 1's hub endpoint).
-  const res = await api.inspections[":id"].hub.$get({ param: { id } });
-  // Mirror template-edit.tsx: a non-OK response goes to the ErrorBoundary with
-  // an actionable status rather than rendering a blank page. res.status is typed
-  // to the success code by the hono client; read the real value as a number.
-  if (!res.ok) {
-    throw new Response("Inspection not found", {
-      status: (res.status as number) === 403 ? 403 : 404,
-    });
-  }
-  const body = await res.json();
-  const hub = ((body as Record<string, unknown>).data ?? {}) as unknown as HubData;
 
-  // #119 Task 6 — re-inspection candidates for the "Create re-inspection" modal.
-  // Only meaningful off a PUBLISHED baseline (reportStatus=published), so we
-  // fetch them only then. Best-effort: a failure degrades to an empty list.
-  let reinspectCandidates: ReinspectCandidate[] = [];
-  if (isReportPublished(hub.inspection?.reportStatus)) {
-    const candRes = await api.inspections[":id"]["reinspect-candidates"]
-      .$get({ param: { id } })
-      .catch(() => null);
-    if (candRes && candRes.ok) {
-      const candBody = (await candRes.json()) as { data?: { candidates?: ReinspectCandidate[] } };
-      reinspectCandidates = candBody.data?.candidates ?? [];
-    }
-  }
-
-  // #23 — per-report translation state. Its own read rather than a hub field:
-  // it costs a content hash PER REPORT, and the hub is the page's one aggregate
-  // round trip. Best-effort — a failure leaves each row's state undefined, and
-  // the card renders nothing rather than guessing.
-  if (hub.inspection?.courtesyTranslationEnabled || (hub.reports?.length ?? 0) > 0) {
-    const tRes = await api.inspections[":id"]["report-translation"]
-      .$get({ param: { id }, query: {} })
-      .catch(() => null);
-    if (tRes && tRes.ok) {
-      const tBody = (await tRes.json()) as {
-        data?: { reports?: Array<{ reportId: string; state: "none" | "live" | "withheld" }> };
-      };
-      const byId = new Map((tBody.data?.reports ?? []).map((r) => [r.reportId, r.state]));
-      hub.reports = (hub.reports ?? []).map((r) => ({ ...r, translationState: byId.get(r.id) }));
-    }
-  }
+  // ── ONE WAVE ────────────────────────────────────────────────────────────
+  // Every read below is started here, before anything is awaited, so the
+  // page's reads overlap instead of queueing behind each other.
+  //
+  // They used to be a chain of fifteen separate `await`s. Measured 2026-09-07
+  // against a real render: only the hub and session/context overlapped, and the
+  // remaining THIRTEEN endpoints ran strictly one after another, each waiting
+  // for the last -- about 86ms of the render's 156ms of database time spent
+  // walking them single file. Every one of those calls re-enters the API in
+  // process and does its own queries, so the cost multiplies on a remote D1
+  // where each is a network round trip.
+  //
+  // Only three reads genuinely depend on the hub payload, and they are issued
+  // in the second wave further down. Everything here depends on nothing but
+  // `id`, so it starts now.
+  //
+  // Each read keeps the exact fallback it had when it was sequential, inside
+  // its own closure: a rejected read must not take the page down, and a promise
+  // started here that nobody awaits until later must already carry its own
+  // `.catch()` -- otherwise a hub 404 (which throws below) would surface these
+  // as unhandled rejections.
+  const hubP = api.inspections[":id"].hub.$get({ param: { id } });
 
   // Track L (E) — client SMS consent status for the People card. Best-effort:
   // a failure degrades to "none" (the attest affordance still renders).
-  const consentRes = await api.smsAdmin.sms.consent.$get({ query: { inspectionId: id } }).catch(() => null);
-  const smsConsent =
-    consentRes && consentRes.ok
-      ? (((await consentRes.json()) as { data?: { consent?: "granted" | "revoked" | "none" } }).data?.consent ?? "none")
+  const consentP = (async (): Promise<"granted" | "revoked" | "none"> => {
+    const r = await api.smsAdmin.sms.consent.$get({ query: { inspectionId: id } }).catch(() => null);
+    return r && r.ok
+      ? (((await r.json()) as { data?: { consent?: "granted" | "revoked" | "none" } }).data?.consent ?? "none")
       : "none";
+  })();
 
   // Publish comes from the server's capability set (see publishCapFromMe for
   // the full story); isAdmin stays role-derived — the coarse tier is a
   // different question from a capability and has no override.
-  let canPublishCap = false;
-  let canViewCommunication = false;
-  let isAdmin = false;
   // The raw role travels too: the Visits card decides its verbs through ONE
   // function (`visitActions`) that takes a role, so the page cannot grow a
   // second, divergent opinion about who may record lab results.
-  let role = "inspector";
-  const meGet = api.auth?.me?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
-  const meRes = meGet ? await meGet().catch(() => null) : null;
-  if (meRes && meRes.ok) {
+  const meP = (async () => {
+    const meGet = api.auth?.me?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
+    const meRes = meGet ? await meGet().catch(() => null) : null;
+    if (!meRes || !meRes.ok) {
+      return { canPublishCap: false, canViewCommunication: false, role: "inspector", isAdmin: false };
+    }
     const meBody = (await meRes.json().catch(() => ({}))) as {
       data?: { user?: { role?: string }; capabilities?: { publish?: boolean; viewCommunication?: boolean } };
     };
-    canPublishCap = publishCapFromMe(meBody);
-    canViewCommunication = viewCommunicationCapFromMe(meBody);
-    role = meBody.data?.user?.role ?? 'inspector';
-    isAdmin = isAdminRole(role);
-  }
+    const role = meBody.data?.user?.role ?? "inspector";
+    return {
+      canPublishCap: publishCapFromMe(meBody),
+      canViewCommunication: viewCommunicationCapFromMe(meBody),
+      role,
+      isAdmin: isAdminRole(role),
+    };
+  })();
 
   // Plan 1B Task 5 — editable People section: every contact/role pairing on
   // the inspection via inspection_people (Task 3), plus the tenant's role
@@ -244,38 +227,40 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   // contacts.tsx's Roles tab. Optional-chained (mirrors the `meGet` lookup
   // above) so a narrower mocked api-client in unit tests degrades cleanly
   // instead of throwing on a missing property.
-  const peopleGet = api.inspections?.[":id"]?.people?.$get as unknown as
-    | ((args: { param: { id: string } }) => Promise<Response>)
-    | undefined;
-  const peopleRes = peopleGet ? await peopleGet({ param: { id } }).catch(() => null) : null;
-  const people: PersonRow[] =
-    peopleRes && peopleRes.ok ? (((await peopleRes.json()) as { data?: PersonRow[] }).data ?? []) : [];
+  const peopleP = (async (): Promise<PersonRow[]> => {
+    const peopleGet = api.inspections?.[":id"]?.people?.$get as unknown as
+      | ((args: { param: { id: string } }) => Promise<Response>)
+      | undefined;
+    const r = peopleGet ? await peopleGet({ param: { id } }).catch(() => null) : null;
+    return r && r.ok ? (((await r.json()) as { data?: PersonRow[] }).data ?? []) : [];
+  })();
 
-  const roleProfilesGet = api.roleProfiles?.index?.$get as unknown as (() => Promise<Response>) | undefined;
-  const roleProfilesRes = roleProfilesGet ? await roleProfilesGet().catch(() => null) : null;
-  const roleProfiles: RoleProfile[] =
-    roleProfilesRes && roleProfilesRes.ok
-      ? (((await roleProfilesRes.json()) as { data?: RoleProfile[] }).data ?? [])
-      : [];
+  const roleProfilesP = (async (): Promise<RoleProfile[]> => {
+    const g = api.roleProfiles?.index?.$get as unknown as (() => Promise<Response>) | undefined;
+    const r = g ? await g().catch(() => null) : null;
+    return r && r.ok ? (((await r.json()) as { data?: RoleProfile[] }).data ?? []) : [];
+  })();
 
   // Inspector documents (unified portal section ⑦). The inspector document
   // routes are not in the typed client, so fetch the list directly via the
   // in-process API binding, forwarding the request cookie for auth. Best-effort:
   // a non-OK response degrades to an empty list.
-  let documents: DocumentItem[] = [];
-  try {
-    const apiWorker = getCloudflareEnv(context).API_WORKER;
-    const docsRes = await (apiWorker?.fetch ?? fetch)(
-      new Request(`https://internal/api/inspections/${id}/documents`, {
-        headers: { cookie: request.headers.get("cookie") ?? "" },
-      }),
-    );
-    if (docsRes.ok) {
-      documents = (((await docsRes.json()) as { data?: DocumentItem[] }).data ?? []) as DocumentItem[];
+  const documentsP = (async (): Promise<DocumentItem[]> => {
+    try {
+      const apiWorker = getCloudflareEnv(context).API_WORKER;
+      const docsRes = await (apiWorker?.fetch ?? fetch)(
+        new Request(`https://internal/api/inspections/${id}/documents`, {
+          headers: { cookie: request.headers.get("cookie") ?? "" },
+        }),
+      );
+      if (docsRes.ok) {
+        return (((await docsRes.json()) as { data?: DocumentItem[] }).data ?? []) as DocumentItem[];
+      }
+    } catch {
+      // Best-effort: fail open to empty list
     }
-  } catch {
-    // Best-effort: fail open to empty list
-  }
+    return [];
+  })();
 
   // Order-fact editors on the hub (IA-87 + the settings merge). All three are
   // best-effort: each degrades to an empty list, which disables the affected
@@ -285,86 +270,154 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   //  - `referralSources` → the Order-details referral dropdown, which the
   //    editor's settings sheet rendered but never populated (its own caller
   //    never passed the prop), so the field was unsettable from anywhere.
-  // Optional-chained like the `meGet` / `peopleGet` lookups below: a narrower
+  // Optional-chained like the `meGet` / `peopleGet` lookups above: a narrower
   // mocked api-client in a unit test degrades to an empty list instead of
   // throwing on a missing property.
-  const membersGet = api.team?.members?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
-  const membersRes = membersGet ? await membersGet({}).catch(() => null) : null;
-  const members: TeamMember[] = membersRes && membersRes.ok
-    ? (((await membersRes.json()) as { data?: { members?: Array<{ id: string; name?: string | null; email?: string | null }> } })
-        .data?.members ?? []).map((u) => ({ id: u.id, name: u.name ?? "", email: u.email ?? "" }))
-    : [];
+  const membersP = (async (): Promise<TeamMember[]> => {
+    const g = api.team?.members?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
+    const r = g ? await g({}).catch(() => null) : null;
+    return r && r.ok
+      ? (((await r.json()) as { data?: { members?: Array<{ id: string; name?: string | null; email?: string | null }> } })
+          .data?.members ?? []).map((u) => ({ id: u.id, name: u.name ?? "", email: u.email ?? "" }))
+      : [];
+  })();
 
-  const catalogGet = api.services?.index?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
-  const catalogRes = catalogGet ? await catalogGet({}).catch(() => null) : null;
   // `defaultEventTypeSlugs` rides along: it is what makes the Visits card's add
   // picker propose a radon test's drop-off AND its pickup instead of asking the
   // user to remember that a radon job is two visits.
-  const catalogRows = catalogRes && catalogRes.ok
-    ? (((await catalogRes.json()) as {
-        data?: Array<{ id: string; name: string; price: number; active?: boolean; defaultEventTypeSlugs?: string[] | null }>;
-      }).data ?? []).filter((s) => s.active !== false)
-    : [];
-  const serviceCatalog: CatalogService[] = catalogRows.map((s) => ({ id: s.id, name: s.name, price: s.price }));
+  const catalogP = (async () => {
+    const g = api.services?.index?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
+    const r = g ? await g({}).catch(() => null) : null;
+    return r && r.ok
+      ? (((await r.json()) as {
+          data?: Array<{ id: string; name: string; price: number; active?: boolean; defaultEventTypeSlugs?: string[] | null }>;
+        }).data ?? []).filter((sv) => sv.active !== false)
+      : [];
+  })();
 
-  const brandingGet = api.adminBranding?.branding?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
-  const brandingRes = brandingGet ? await brandingGet({}).catch(() => null) : null;
-  let customReferralSources: string[] = [];
-  if (brandingRes && brandingRes.ok) {
-    const body = (await brandingRes.json().catch(() => ({}))) as { data?: { branding?: { customReferralSources?: string[] } } };
-    customReferralSources = body.data?.branding?.customReferralSources ?? [];
-  }
-  const referralSources = resolveReferralSources(customReferralSources);
+  const brandingP = (async (): Promise<string[]> => {
+    const g = api.adminBranding?.branding?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
+    const r = g ? await g({}).catch(() => null) : null;
+    if (!r || !r.ok) return [];
+    const b = (await r.json().catch(() => ({}))) as { data?: { branding?: { customReferralSources?: string[] } } };
+    return b.data?.branding?.customReferralSources ?? [];
+  })();
 
   // IA-40 — published report versions for the Report card's Versions list.
   // Best-effort and unconditional (mirrors the people/consent fetches above): an
   // inspection that was published then unpublished still carries its version
   // history, and that history drives both the diff links and whether the next
   // publish is an amendment. Degrades to an empty list on any failure.
-  const versionsGet = api.inspections?.[":id"]?.versions?.$get as unknown as
-    | ((args: { param: { id: string } }) => Promise<Response>)
-    | undefined;
-  const versionsRes = versionsGet ? await versionsGet({ param: { id } }).catch(() => null) : null;
-  const versions: ReportVersionRow[] =
-    versionsRes && versionsRes.ok
-      ? (((await versionsRes.json()) as { data?: { versions?: ReportVersionRow[] } }).data?.versions ?? [])
+  const versionsP = (async (): Promise<ReportVersionRow[]> => {
+    const g = api.inspections?.[":id"]?.versions?.$get as unknown as
+      | ((args: { param: { id: string } }) => Promise<Response>)
+      | undefined;
+    const r = g ? await g({ param: { id } }).catch(() => null) : null;
+    return r && r.ok
+      ? (((await r.json()) as { data?: { versions?: ReportVersionRow[] } }).data?.versions ?? [])
       : [];
+  })();
 
-  // The visits that make up the job (`inspection_events`), the tenant's
-  // visit-type catalogue and the types this order's services imply. See
-  // `~/lib/inspection-visits` for why all three hang off `api.events`.
-  const { visits, visitTypes, suggestedTypeIds } = await loadVisits(
-    api,
-    id,
-    new Set((hub.services ?? []).map((s) => s.serviceId)),
-    catalogRows,
-  );
-
-  // Its own read rather than a hub field, for the same reason as the two above:
-  // the hub is this page's ONE aggregate round trip, and this answer depends on
-  // what the deployment publishes rather than on the inspection alone.
-  // Best-effort — a failure leaves the control absent, the ordinary case rather
-  // than a broken one.
-  let statutoryForm: {
+  // Its own read rather than a hub field: the hub is this page's ONE aggregate
+  // round trip, and this answer depends on what the deployment publishes rather
+  // than on the inspection alone. Best-effort — a failure leaves the control
+  // absent, the ordinary case rather than a broken one.
+  //
+  // `.catch()` alone did not deliver what that promises: it handles a REJECTED
+  // promise, and `api.inspections[":id"]["statutory-form"].$get` throws
+  // SYNCHRONOUSLY when any link in that chain is absent. Both failures are LOUD
+  // now and only the RENDERING degrades — a silent degrade is indistinguishable
+  // from "this deployment publishes no forms", which is how a 500 here hid
+  // behind a control that simply never appeared.
+  const statutoryP = (async (): Promise<{
     available: boolean; formTitle?: string; revision?: string; effectiveDate?: string; notice?: string;
-  } = { available: false };
-  // `.catch()` alone did not deliver what the paragraph above promises: it
-  // handles a REJECTED promise, and `api.inspections[":id"]["statutory-form"]
-  // .$get` throws SYNCHRONOUSLY when any link in that chain is absent. Both
-  // failures are LOUD now and only the RENDERING degrades — a silent degrade is
-  // indistinguishable from "this deployment publishes no forms", which is how a
-  // 500 here hid behind a control that simply never appeared.
-  try {
-    const sRes = await api.inspections[":id"]["statutory-form"].$get({ param: { id } });
-    if (sRes.ok) {
-      const sBody = (await sRes.json()) as { data?: typeof statutoryForm };
-      statutoryForm = sBody.data ?? { available: false };
-    } else {
+  }> => {
+    try {
+      const sRes = await api.inspections[":id"]["statutory-form"].$get({ param: { id } });
+      if (sRes.ok) {
+        const sBody = (await sRes.json()) as { data?: { available: boolean; formTitle?: string; revision?: string; effectiveDate?: string; notice?: string } };
+        return sBody.data ?? { available: false };
+      }
       console.error("[statutory-offer] failed", sRes.status, await sRes.text().catch(() => ""));
+    } catch (cause) {
+      console.error("[statutory-offer] could not be requested at all", cause);
     }
-  } catch (cause) {
-    console.error("[statutory-offer] could not be requested at all", cause);
+    return { available: false };
+  })();
+
+  // One aggregate round trip drives the whole page (Task 1's hub endpoint).
+  // Awaited first because it is the gate: a non-OK response goes to the
+  // ErrorBoundary with an actionable status rather than rendering a blank page.
+  // res.status is typed to the success code by the hono client; read the real
+  // value as a number.
+  const res = await hubP;
+  if (!res.ok) {
+    throw new Response("Inspection not found", {
+      status: (res.status as number) === 403 ? 403 : 404,
+    });
   }
+  const body = await res.json();
+  const hub = ((body as Record<string, unknown>).data ?? {}) as unknown as HubData;
+
+  const [
+    smsConsent, me, people, roleProfiles, documents, members, catalogRows, customReferralSources, versions, statutoryForm,
+  ] = await Promise.all([
+    consentP, meP, peopleP, roleProfilesP, documentsP, membersP, catalogP, brandingP, versionsP, statutoryP,
+  ]);
+
+  const { canPublishCap, canViewCommunication, role, isAdmin } = me;
+  const serviceCatalog: CatalogService[] = catalogRows.map((sv) => ({ id: sv.id, name: sv.name, price: sv.price }));
+  const referralSources = resolveReferralSources(customReferralSources);
+
+  // ── SECOND WAVE ─────────────────────────────────────────────────────────
+  // The only three reads that genuinely need something from the first: two
+  // read hub fields to decide whether to run at all, and `loadVisits` needs
+  // both the hub's service ids and the service catalogue.
+  const [reinspectCandidates, translationByReport, visitData] = await Promise.all([
+    // #119 Task 6 — re-inspection candidates for the "Create re-inspection"
+    // modal. Only meaningful off a PUBLISHED baseline (reportStatus=published),
+    // so we fetch them only then. Best-effort: a failure degrades to an empty list.
+    (async (): Promise<ReinspectCandidate[]> => {
+      if (!isReportPublished(hub.inspection?.reportStatus)) return [];
+      const candRes = await api.inspections[":id"]["reinspect-candidates"]
+        .$get({ param: { id } })
+        .catch(() => null);
+      if (!candRes || !candRes.ok) return [];
+      const candBody = (await candRes.json()) as { data?: { candidates?: ReinspectCandidate[] } };
+      return candBody.data?.candidates ?? [];
+    })(),
+
+    // #23 — per-report translation state. Its own read rather than a hub field:
+    // it costs a content hash PER REPORT, and the hub is the page's one aggregate
+    // round trip. Best-effort — a failure leaves each row's state undefined, and
+    // the card renders nothing rather than guessing.
+    (async (): Promise<Map<string, "none" | "live" | "withheld"> | null> => {
+      if (!(hub.inspection?.courtesyTranslationEnabled || (hub.reports?.length ?? 0) > 0)) return null;
+      const tRes = await api.inspections[":id"]["report-translation"]
+        .$get({ param: { id }, query: {} })
+        .catch(() => null);
+      if (!tRes || !tRes.ok) return null;
+      const tBody = (await tRes.json()) as {
+        data?: { reports?: Array<{ reportId: string; state: "none" | "live" | "withheld" }> };
+      };
+      return new Map((tBody.data?.reports ?? []).map((r) => [r.reportId, r.state]));
+    })(),
+
+    // The visits that make up the job (`inspection_events`), the tenant's
+    // visit-type catalogue and the types this order's services imply. See
+    // `~/lib/inspection-visits` for why all three hang off `api.events`.
+    loadVisits(
+      api,
+      id,
+      new Set((hub.services ?? []).map((sv) => sv.serviceId)),
+      catalogRows,
+    ),
+  ]);
+
+  if (translationByReport) {
+    hub.reports = (hub.reports ?? []).map((r) => ({ ...r, translationState: translationByReport.get(r.id) }));
+  }
+  const { visits, visitTypes, suggestedTypeIds } = visitData;
 
   return {
     hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, documents, people, roleProfiles, isAdmin, versions,

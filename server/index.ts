@@ -492,13 +492,35 @@ const routes = app
 registerPortalIntegration(app);
 
 // OpenAPI Documentation
-app.doc('/doc', {
+//
+// ⚠️ NOT `app.doc()`. That registers a handler which rebuilds the whole document
+// on EVERY request, walking every route on this app and running every Zod schema
+// through the converter. Measured in production over 24h: `GET /doc` averaged
+// **999.5ms of CPU** with a max of 1022ms — ten times the next most expensive
+// endpoint, and about a hundred times the median request.
+//
+// Two reasons that matters more than its two hits a day suggest. The worker runs
+// on a plan whose CPU ceiling is 10ms per invocation, so this single endpoint is
+// a hundred times over it. And it is PUBLIC and unauthenticated: one second of
+// CPU per request, repeatable by anyone, is a denial-of-service primitive
+// pointed at the whole worker rather than a slow page.
+//
+// The document is a pure function of the route table and the static config
+// below, both fixed at module load, so it cannot vary between requests of one
+// build. Generated once per isolate and reused.
+const OPENAPI_CONFIG = {
     openapi: '3.0.0',
     info: {
         version: '1.0.0-rc.1',
         title: 'OpenInspection Core API',
         description: 'Advanced property inspection platform API documentation.'
     },
+} as const;
+
+let openApiDocument: ReturnType<typeof app.getOpenAPIDocument> | undefined;
+app.get('/doc', (c) => {
+    openApiDocument ??= app.getOpenAPIDocument(OPENAPI_CONFIG);
+    return c.json(openApiDocument);
 });
 
 

@@ -14,6 +14,9 @@ import { getDeploymentProfile } from "../server/lib/deployment-profile";
 // reason: `request-scope.ts` imports nothing at all, so it cannot drag the API
 // graph in behind it.
 import { createRequestScope, REQUEST_SCOPE } from "../server/lib/request-scope";
+// Five string constants, no imports — safe at the top level for the same reason
+// as the two above, and what lets /status answer without importing the API graph.
+import { BUILD } from "../server/generated/version";
 // i18n Phase C — request-scoped locale. paraglideMiddleware establishes an
 // AsyncLocalStorage scope so getLocale()/m.*() resolve per-request (never a
 // module-global) across the multi-tenant Worker. Generated (git-ignored); the
@@ -119,6 +122,37 @@ app.all("/api/platform/*", (c: any) =>
     getDeploymentProfile(c.env).hasPortalIntegrationApi ? toApi(c) : c.notFound(),
 );
 app.all("/api/*", toApi);
+// Served HERE, not through `toApi`, and that is the whole point: `toApi` calls
+// `getApi()`, which lazily imports the entire API module graph. A health check
+// that answers with a build stamp was paying for that import — measured in
+// production over 24h, `GET /status` averaged 46.8ms of CPU with a max of 108ms,
+// which is module evaluation on a cold isolate, not request work.
+//
+// It is polled by uptime monitoring and by the superproject's
+// check-deploy-lag.mjs, so it is exactly the request most likely to ARRIVE at a
+// cold isolate and warm the whole API for nothing.
+//
+// `generated/version.ts` is a tiny standalone module — five string constants and
+// no imports — so this keeps the entry's top-level graph small, the same
+// exemption `deployment-profile.ts` and `request-scope.ts` already carry.
+//
+// ⚠️ The response shape is load-bearing: check-deploy-lag.mjs reads `commit` and
+// `branch`, and refuses to report "no lag" for a status it cannot parse. Keep it
+// byte-compatible with the `/status` route in server/index.ts, which stays for
+// the standalone and in-process test paths that call the API app directly.
+app.get("/status", (c) =>
+  c.json({
+    status: "ok",
+    app: "openinspection-core",
+    version: BUILD.version,
+    commit: BUILD.shortCommit,
+    branch: BUILD.branch,
+    buildTime: BUILD.buildTime,
+    timestamp: new Date().toISOString(),
+  }),
+);
+// Non-GET verbs keep the old path: they are not health checks and have no
+// reason to bypass the API.
 app.all("/status", toApi);
 app.all("/m2m/*", toApi);
 app.all("/webhooks/*", toApi); // inbound provider webhooks — top-level by design (spec §3)
@@ -147,6 +181,42 @@ app.get("/inspector/:tenant/:slug/calendar.ics", toApi); // ICS feed (API-only)
 // still serves their DATA under /api/public/*): /book /report /r /messages /verify
 // /agreements /login /logout /forgot-password /inspections and all app pages.
 
+/**
+ * Vulnerability-scanner probes, answered without rendering anything.
+ *
+ * These paths reach the catch-all below, and the catch-all is a full React
+ * Router SSR render — the 404 page is a real page, with the root layout, the
+ * i18n scope and the whole render pipeline behind it. Measured in production
+ * over 15h: `GET /.env` cost 200ms of CPU, `/config/.env` 89ms, `/backend/.env`
+ * 87ms, `/wordpress/` 172ms. One scanner walking a wordlist, each miss costing
+ * roughly what a real page costs, on a worker whose CPU ceiling is 10ms per
+ * invocation.
+ *
+ * ⚠️ EVERY PATTERN HERE MUST BE ONE NO APP ROUTE COULD EVER USE. A false
+ * positive is a real page turned into a 404 with nothing to explain it, which is
+ * far worse than the CPU this saves. So: no bare-word matching, no guessing at
+ * "suspicious" — only file types this app never serves and tool paths that
+ * belong to other stacks entirely. React Router owns everything else, including
+ * genuine typos, which still get the real 404 page.
+ *
+ * ⚠️ This still costs a Worker INVOCATION — it is a cheap 404, not a free one.
+ * The only free answer is a WAF / firewall rule at the edge, where the request
+ * never reaches the worker at all. That is dashboard configuration rather than
+ * code; this is the half that lives in the repo.
+ */
+const SCANNER_PROBE =
+  /(?:^|\/)\.(?:env|git|svn|hg|aws|ssh)(?:$|[./])|(?:^|\/)(?:wp-admin|wp-login|wp-content|wp-includes|wordpress|phpmyadmin|cgi-bin|vendor\/phpunit)(?:$|\/)|\.(?:php[3457]?|asp|aspx|jsp|cgi|sql|bak|old|swp)$/i;
+
+app.all("*", (c, next) => {
+  if (!SCANNER_PROBE.test(new URL(c.req.url).pathname)) return next();
+  // Plain text, no body worth parsing, and `noindex` so a crawler that stumbles
+  // onto one does not keep asking.
+  return c.text("Not Found", 404, {
+    "cache-control": "public, max-age=3600",
+    "x-robots-tag": "noindex",
+  });
+});
+
 // --- Everything else → React Router SSR (all pages incl. "/") ---
 // Static assets (/favicon.svg, /styles.css, /vendor/*, /fonts/*) are served by the
 // Cloudflare assets layer from build/client before the worker runs.
@@ -164,9 +234,22 @@ export default {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fetch: (req: Request, env: any, ctx: ExecutionContext) =>
     buildOAuthHandler(app.fetch as never, env).fetch(req, env, ctx),
+  // Imported DIRECTLY, not through `getApi()`. The cron tick decides which jobs
+  // are due and enqueues one message each — it never touches a route. Reaching
+  // it through server/index.ts meant evaluating the whole API graph first: all
+  // 426 routes and every Zod schema, measured at ~230ms on a cold isolate (see
+  // the /status note above, where the same import was the entire cost).
+  //
+  // Production, 24h: the `*/5` tick averaged 10.4ms of CPU across 294
+  // invocations against a 10ms ceiling. The tick's own work is a cursor read and
+  // a queue send; the graph it was dragging in is the part worth removing.
+  //
+  // `server/scheduled.ts` is 78 lines and pulls in the cron dispatcher only.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  scheduled: async (controller: any, env: any, ctx: any) =>
-    (await getApi()).default.scheduled(controller, env, ctx),
+  scheduled: async (controller: any, env: any, ctx: any) => {
+    const { scheduled: runScheduled } = await import("../server/scheduled");
+    return runScheduled(controller, env, ctx);
+  },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   queue: async (batch: any, env: any, ctx: any) =>
     (await getApi()).default.queue(batch, env, ctx),

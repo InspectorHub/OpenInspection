@@ -128,6 +128,11 @@ const sessionContextRoutes = createApiRouter()
         let tenantLocale = 'en-US';
         let tenantCurrency = 'USD';
         let archiveRevokesAccess = false;
+        // Resolved inside the tenant_configs read below. Fail mode: a DB error
+        // leaves this `false` (fail-CLOSED to the legacy editor). Deliberately
+        // asymmetric with the happy-path default -- a transient failure should
+        // not silently force a tenant onto collab.
+        let collabEditing = false;
         let legalCfg: {
             legalMode: LegalMode;
             customPrivacyUrl: string | null;
@@ -136,18 +141,46 @@ const sessionContextRoutes = createApiRouter()
         if (tenantId) {
             try {
                 const db = getDrizzle(c);
-                const row = await db.select({
-                    name: users.name,
-                    email: users.email,
-                    timezone: users.timezone,
-                    locale: users.locale,
-                    dateFormat: users.dateFormat,
-                    timeFormat: users.timeFormat,
-                    permissionOverrides: users.permissionOverrides,
-                })
-                    .from(users)
-                    .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)))
-                    .get();
+                // One wave: the two reads are independent, and a sequential
+                // await is a round trip. `collabEditing` used to be a THIRD
+                // select of this same tenant_configs row further down; it rides
+                // along here instead -- same row, same tenant, one statement.
+                const [row, cfg] = await Promise.all([
+                    db.select({
+                        name: users.name,
+                        email: users.email,
+                        timezone: users.timezone,
+                        locale: users.locale,
+                        dateFormat: users.dateFormat,
+                        timeFormat: users.timeFormat,
+                        permissionOverrides: users.permissionOverrides,
+                    })
+                        .from(users)
+                        .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)))
+                        .get(),
+                    db.select({
+                        defaultTimezone: tenantConfigs.defaultTimezone,
+                        defaultLocale: tenantConfigs.defaultLocale,
+                        currency: tenantConfigs.currency,
+                        dateFormat: tenantConfigs.dateFormat,
+                        timeFormat: tenantConfigs.timeFormat,
+                        // IA-100 — the contacts archive dialog states whether
+                        // archiving also revokes report links, so it needs the
+                        // policy, not just the link count.
+                        archiveRevokesAccess: tenantConfigs.archiveRevokesAccess,
+                        legalMode: tenantConfigs.legalMode,
+                        customPrivacyUrl: tenantConfigs.customPrivacyUrl,
+                        customTermsUrl: tenantConfigs.customTermsUrl,
+                        collabEditing: tenantConfigs.collabEditing,
+                    })
+                        .from(tenantConfigs)
+                        .where(eq(tenantConfigs.tenantId, tenantId))
+                        .get(),
+                ]);
+                // Missing row / null / true → ON; only an explicit stored false
+                // is an opt-out. A read failure leaves the initial `false`
+                // (fail-CLOSED to the legacy editor) via the catch below.
+                collabEditing = cfg?.collabEditing !== false;
                 if (row) {
                     userName = row.name;
                     userEmail = row.email;
@@ -157,23 +190,6 @@ const sessionContextRoutes = createApiRouter()
                     userDateFormat = isDateFormat(row.dateFormat) ? row.dateFormat : null;
                     userTimeFormat = isTimeFormat(row.timeFormat) ? row.timeFormat : null;
                 }
-                const cfg = await db.select({
-                    defaultTimezone: tenantConfigs.defaultTimezone,
-                    defaultLocale: tenantConfigs.defaultLocale,
-                    currency: tenantConfigs.currency,
-                    dateFormat: tenantConfigs.dateFormat,
-                    timeFormat: tenantConfigs.timeFormat,
-                    // IA-100 — the contacts archive dialog states whether
-                    // archiving also revokes report links, so it needs the
-                    // policy, not just the link count.
-                    archiveRevokesAccess: tenantConfigs.archiveRevokesAccess,
-                    legalMode: tenantConfigs.legalMode,
-                    customPrivacyUrl: tenantConfigs.customPrivacyUrl,
-                    customTermsUrl: tenantConfigs.customTermsUrl,
-                })
-                    .from(tenantConfigs)
-                    .where(eq(tenantConfigs.tenantId, tenantId))
-                    .get();
                 if (cfg?.defaultTimezone) tenantTimezone = cfg.defaultTimezone;
                 tenantLocale = resolveLocale(cfg?.defaultLocale);
                 if (cfg?.currency) tenantCurrency = cfg.currency;
@@ -259,32 +275,6 @@ const sessionContextRoutes = createApiRouter()
             }
         }
 
-        // Resolve the collaborative editing flag for this tenant. Plain per-tenant
-        // operator toggle (not plan-gated); collab is now the default (#181 Phase 5,
-        // after the photo data-loss gap was closed — every editor write routes
-        // through the Y.Doc under collab). A tenant is collab-ON unless they have an
-        // EXPLICIT stored `false` opt-out (the legacy CAS path stays available until
-        // Tasks 14/15 retire it). So missing row / null / true → ON; only false → OFF.
-        //
-        // Fail mode: a DB error leaves `collabEditing` at its initial `false`
-        // (fail-CLOSED to the legacy path). This is deliberate and intentionally
-        // asymmetric with the happy-path default — a transient resolution failure
-        // should not silently force a tenant onto collab; the legacy editor still
-        // works without the Durable Object, so OFF is the safer fallback.
-        let collabEditing = false;
-        if (tenantId) {
-            try {
-                const db = getDrizzle(c);
-                const row = await db
-                    .select({ collabEditing: tenantConfigs.collabEditing })
-                    .from(tenantConfigs)
-                    .where(eq(tenantConfigs.tenantId, tenantId))
-                    .get();
-                collabEditing = row?.collabEditing !== false;
-            } catch (e) {
-                logger.warn('[session-context] collabEditing resolution failed', { error: (e as Error).message });
-            }
-        }
 
         const tenantSlug = branding?.tenantSlug?.trim() || null;
         let privacyUrl: string | null = null;
