@@ -425,7 +425,7 @@ export class InspectionPublishService extends InspectionSubService {
             // subject's PII. `people` (getPeopleCard) already sources the same
             // way; this projection is a separate, intentionally-duplicated read
             // for the flat shape this endpoint has always returned.
-            this.facade.getPeopleCard(inspectionId, tenantId),
+            this.facade.getPeopleCard(inspectionId, tenantId, insp),
             this.computePublishReadiness(inspectionId, tenantId, insp),
             invoiceSvc.findByInspectionId(tenantId, inspectionId),
             peopleSvc.getPrimaryClient(tenantId, inspectionId),

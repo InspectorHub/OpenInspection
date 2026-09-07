@@ -457,9 +457,22 @@ export class InspectionCoreService extends InspectionSubService {
         return this.recipients.getRecipientList(inspectionId, tenantId);
     }
 
+    /**
+     * Hands the request env down to the sub-service that builds PeopleService,
+     * so `listPeople` can memoise for the request. Set by the DI middleware via
+     * the facade; never set on cron/queue paths, which then behave as before.
+     */
+    setRequestEnv(env: unknown): void {
+        this.recipients.requestEnv = env;
+    }
+
     /** IA-18 — the inspector portal People card. Body in `./inspection-recipients.service`. */
-    async getPeopleCard(inspectionId: string, tenantId: string) {
-        return this.recipients.getPeopleCard(inspectionId, tenantId);
+    async getPeopleCard(
+        inspectionId: string,
+        tenantId: string,
+        preloaded?: typeof inspections.$inferSelect,
+    ) {
+        return this.recipients.getPeopleCard(inspectionId, tenantId, preloaded);
     }
 
 }

@@ -3,6 +3,7 @@ import { contacts, contactRoleProfiles, inspectionPeople } from '../lib/db/schem
 import { capabilitiesForProfile, type RoleCapabilities, type RoleKind } from '../lib/people/capabilities';
 import { PRIMARY_CLIENT_KEY, SECONDARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { Errors } from '../lib/errors';
+import { memoOnce } from '../lib/request-scope';
 import { RoleProfileAdminService } from './role-profile-admin.service';
 
 export interface PersonRow {
@@ -210,17 +211,33 @@ export class PeopleService extends RoleProfileAdminService {
         return { email: row?.email ?? null };
     }
 
+    /**
+     * Everyone attached to an inspection, with their role profile.
+     *
+     * Memoised for the REQUEST when the env carries a request scope. A single
+     * page render fans out into several in-process API calls, and two of them
+     * want this same list: `GET /inspections/:id/people` asks directly, and
+     * `GET /inspections/:id/hub` reaches it through `getPeopleCard`. Measured
+     * 2026-09-07 — the identical join, same parameters, ran twice per render.
+     *
+     * `memoOnce` degrades to a plain call when there is no scope, so every
+     * caller that constructs this service with a bare `{ DB }` (and every
+     * non-render caller) behaves exactly as before. Keyed by tenant AND
+     * inspection so it can never serve one inspection's people for another.
+     */
     async listPeople(tenantId: string, inspectionId: string): Promise<PersonRow[]> {
-        const rows = await this.db.select({
-            id: inspectionPeople.id, contactId: contacts.id, roleProfileId: contactRoleProfiles.id,
-            roleKey: contactRoleProfiles.key, roleLabel: contactRoleProfiles.label, kind: contactRoleProfiles.kind,
-            capabilityOverrides: contactRoleProfiles.capabilityOverrides,
-            name: contacts.name, email: contacts.email, phone: contacts.phone, agency: contacts.agency,
-        }).from(inspectionPeople)
-            .innerJoin(contactRoleProfiles, eq(inspectionPeople.roleProfileId, contactRoleProfiles.id))
-            .innerJoin(contacts, eq(inspectionPeople.contactId, contacts.id))
-            .where(and(eq(inspectionPeople.tenantId, tenantId), eq(inspectionPeople.inspectionId, inspectionId)));
-        return rows as PersonRow[];
+        return memoOnce(this.env, `people:list:${tenantId}:${inspectionId}`, async () => {
+            const rows = await this.db.select({
+                id: inspectionPeople.id, contactId: contacts.id, roleProfileId: contactRoleProfiles.id,
+                roleKey: contactRoleProfiles.key, roleLabel: contactRoleProfiles.label, kind: contactRoleProfiles.kind,
+                capabilityOverrides: contactRoleProfiles.capabilityOverrides,
+                name: contacts.name, email: contacts.email, phone: contacts.phone, agency: contacts.agency,
+            }).from(inspectionPeople)
+                .innerJoin(contactRoleProfiles, eq(inspectionPeople.roleProfileId, contactRoleProfiles.id))
+                .innerJoin(contacts, eq(inspectionPeople.contactId, contacts.id))
+                .where(and(eq(inspectionPeople.tenantId, tenantId), eq(inspectionPeople.inspectionId, inspectionId)));
+            return rows as PersonRow[];
+        });
     }
 
     async getPrimaryClient(tenantId: string, inspectionId: string) {
