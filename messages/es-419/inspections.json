@@ -154,6 +154,7 @@
   "inspections_hub_invoice_hidden": "Monto oculto",
   "inspections_hub_invoice_resend": "Reenviar la solicitud",
   "inspections_hub_invoice_request": "Solicitar el pago",
+  "inspections_hub_invoice_nothing_to_request": "Nada que cobrar aún: establezca un monto primero.",
   "inspections_hub_report_create_reinspection": "Crear una reinspección",
   "inspections_hub_report_published": "Informe publicado.",
   "inspections_hub_report_published_on": "Informe publicado el {date}.",
