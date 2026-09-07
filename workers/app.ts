@@ -234,9 +234,22 @@ export default {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fetch: (req: Request, env: any, ctx: ExecutionContext) =>
     buildOAuthHandler(app.fetch as never, env).fetch(req, env, ctx),
+  // Imported DIRECTLY, not through `getApi()`. The cron tick decides which jobs
+  // are due and enqueues one message each — it never touches a route. Reaching
+  // it through server/index.ts meant evaluating the whole API graph first: all
+  // 426 routes and every Zod schema, measured at ~230ms on a cold isolate (see
+  // the /status note above, where the same import was the entire cost).
+  //
+  // Production, 24h: the `*/5` tick averaged 10.4ms of CPU across 294
+  // invocations against a 10ms ceiling. The tick's own work is a cursor read and
+  // a queue send; the graph it was dragging in is the part worth removing.
+  //
+  // `server/scheduled.ts` is 78 lines and pulls in the cron dispatcher only.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  scheduled: async (controller: any, env: any, ctx: any) =>
-    (await getApi()).default.scheduled(controller, env, ctx),
+  scheduled: async (controller: any, env: any, ctx: any) => {
+    const { scheduled: runScheduled } = await import("../server/scheduled");
+    return runScheduled(controller, env, ctx);
+  },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   queue: async (batch: any, env: any, ctx: any) =>
     (await getApi()).default.queue(batch, env, ctx),
