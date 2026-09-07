@@ -86,3 +86,12 @@ tests/e2e/zz-e2e-coverage-probe.spec.ts
 # every NEW spec added there invisible to git. Tracked files kept working, so
 # nothing failed; the next spec would simply not have been committed.
 /statutory-forms/
+
+# Startup CPU profile from `wrangler check startup`. Not a build output that
+# happens to land here -- scripts/check-bundle-size.mjs tells you to run that
+# command by name when the entry-chunk ceiling fails, so this file appears
+# exactly when someone follows this repo's own diagnostic advice.
+#
+# ANCHORED, per the warning above: it is written to the repo root, and a bare
+# pattern would also match anything of that name at any depth.
+/worker-startup.cpuprofile
