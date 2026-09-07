@@ -127,20 +127,32 @@ describe('session-context collabEditing resolution', () => {
 
     it('DB resolution failure → collabEditing=false (fail-closed to legacy path)', async () => {
         await seedTenant();
-        // Make ONLY the collab-resolution query throw, simulating a transient DB
-        // error on that specific read. The handler calls drizzle() several times
-        // (user lookup, video provider, collab); we proxy the real testDb but make
-        // `.select` of the collabEditing projection throw. Even though the
-        // happy-path default is ON, a failure must NOT silently force a tenant
-        // onto collab — the legacy editor still works without the DO, so OFF is
-        // the safer fallback.
+        // Make the read that RESOLVES collabEditing throw, simulating a transient
+        // DB error. Even though the happy-path default is ON, a failure must NOT
+        // silently force a tenant onto collab — the legacy editor still works
+        // without the DO, so OFF is the safer fallback.
+        //
+        // ⚠️ Matched on "the projection CONTAINS collabEditing", not "the
+        // projection IS exactly collabEditing". It used to be its own one-column
+        // select; it now rides along in the tenant_configs read that also carries
+        // timezone, locale, currency and the legal fields, because that is the
+        // same row and was costing a second statement. The exact-match hook
+        // silently stopped firing when that happened — the test passed while
+        // asserting nothing, which is the failure mode a hook anchored to a
+        // query's precise shape always has.
+        //
+        // Note what did change: failure isolation is now coarser. One config read
+        // failing takes the whole row's defaults with it rather than collab
+        // alone. That is acceptable because those values all came from that one
+        // row anyway — a split could report a timezone while claiming the row was
+        // unreadable — but it is a real difference, not a refactor.
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
             new Proxy(testDb, {
                 get(target, prop, receiver) {
                     if (prop === 'select') {
                         return (fields?: Record<string, unknown>) => {
                             const keys = fields ? Object.keys(fields) : [];
-                            if (keys.length === 1 && keys[0] === 'collabEditing') {
+                            if (keys.includes('collabEditing')) {
                                 throw new Error('simulated DB failure');
                             }
                             return (target.select as (f?: unknown) => unknown)(fields);
