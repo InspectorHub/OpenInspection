@@ -14,7 +14,7 @@
   "server/services/inspection/inspection-analytics.service.ts": 748,
   "server/api/admin/admin-settings.ts": 747,
   "server/services/inspection.service.ts": 742,
-  "server/index.ts": 740,
+  "server/index.ts": 760,
   "server/api/inspections/report-delivery.ts": 736,
   "scripts/check-messaging-rules.mjs": 735,
   "app/routes/template-edit.tsx": 708,
