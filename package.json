@@ -56,6 +56,7 @@
     "lint:platform-defaults": "node scripts/check-platform-defaults.mjs",
     "lint:non-translatable": "node scripts/check-non-translatable.mjs",
     "lint:audit-registry": "node scripts/check-audit-registry.mjs",
+    "lint:loader-awaits": "node scripts/check-loader-awaits.mjs",
     "lint:middleware-budget": "node scripts/check-middleware-budget.mjs",
     "lint:migrefs": "node scripts/check-migration-refs.mjs",
     "lint:chrome-record": "node scripts/check-chrome-record.mjs --self-test",

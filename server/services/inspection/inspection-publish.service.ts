@@ -426,7 +426,7 @@ export class InspectionPublishService extends InspectionSubService {
             // way; this projection is a separate, intentionally-duplicated read
             // for the flat shape this endpoint has always returned.
             this.facade.getPeopleCard(inspectionId, tenantId),
-            this.computePublishReadiness(inspectionId, tenantId),
+            this.computePublishReadiness(inspectionId, tenantId, insp),
             invoiceSvc.findByInspectionId(tenantId, inspectionId),
             peopleSvc.getPrimaryClient(tenantId, inspectionId),
             peopleSvc.contactIdForRole(tenantId, inspectionId, 'buyer_agent'),
@@ -644,10 +644,25 @@ export class InspectionPublishService extends InspectionSubService {
      * templateSnapshot, and nothing else (#307). The live `templates` row is
      * deliberately not read here any more — see requireTemplateSnapshot.
      */
-    async computePublishReadiness(inspectionId: string, tenantId: string): Promise<PublishReadiness> {
+    async computePublishReadiness(
+        inspectionId: string,
+        tenantId: string,
+        /**
+         * The caller's already-loaded row, when it has one. `getInspectionHub`
+         * reads this exact row to gate on existence and then called this, which
+         * read it again -- the same statement, the same parameters, twice in one
+         * request. Passed explicitly rather than memoised because a service holds
+         * a D1Database, not the request env, so the request scope is not reachable
+         * from here. Used read-only (it is handed to requireTemplateSnapshot),
+         * so sharing the object carries no aliasing risk.
+         *
+         * Omitted by every other caller, which then loads it as before.
+         */
+        preloaded?: typeof inspections.$inferSelect,
+    ): Promise<PublishReadiness> {
         const db = this.getDrizzle();
 
-        const inspection = await db.select().from(inspections)
+        const inspection = preloaded ?? await db.select().from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .get();
         if (!inspection) throw Errors.NotFound('Inspection not found');

@@ -222,6 +222,13 @@ export const SCRIPT_GATES = [
     // costs 15x, not 1x. Its third check is not a ratchet but the security
     // invariant: the request scope must never reach toApi.
     { key: 'middlewarebudget', label: 'lint:middleware-budget', script: 'check-middleware-budget.mjs', fix: 'npm run lint:middleware-budget', rung: PUSH },
+    // PUSH, same reasoning. Separate from the middleware budget above because it
+    // measures a different thing: not how much work one call does, but how many
+    // calls a loader waits for IN SEQUENCE. Round-trip depth, not count -- the
+    // inspection loader once awaited fifteen calls one at a time and spent 86ms
+    // of a 156ms render waiting on them. Nothing else can see that: it is not a
+    // type error, not a test failure, and eslint has no rule for it.
+    { key: 'loaderawaits', label: 'lint:loader-awaits', script: 'check-loader-awaits.mjs', fix: 'npm run lint:loader-awaits', rung: PUSH },
     { key: 'i18n', label: 'lint:i18n', script: 'check-i18n.mjs', fix: 'npm run lint:i18n', rung: PUSH },
     { key: 'i18ncatalog', label: 'lint:i18n-catalog', script: 'check-i18n-catalog.mjs', fix: 'npm run lint:i18n-catalog', rung: PUSH },
     { key: 'i18nglossary', label: 'lint:i18n-glossary', script: 'check-i18n-glossary.mjs', fix: 'npm run lint:i18n-glossary', rung: PUSH },
