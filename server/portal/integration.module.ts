@@ -66,38 +66,8 @@ export async function drainPortalOutbox(env: PortalDrainEnv): Promise<void> {
     await flushOutboxOnce(env.DB, env.SYNC_QUEUE, 50);
 }
 
-/**
- * DLQ writeback core. Processes one batch of dead messages from
- * `inspectorhub-sync-dlq-saas`: each message body is a SyncEnvelope that
- * exhausted the portal consumer's retries. For each, mark the originating
- * outbox row `failed` (the durable failure record surfaced by the console),
- * then ack the message. Tolerant: a malformed body is logged and acked (never
- * recycled — there is nothing to retry on a dead message). Never throws the
- * batch. Exported standalone so unit tests can drive it without a worker.
- */
-export async function handleSyncDlqBatch(
-    db: D1Database,
-    batch: MessageBatch<unknown>,
-): Promise<void> {
-    const svc = new OutboxService(db);
-    for (const msg of batch.messages) {
-        try {
-            const body = msg.body as Partial<SyncEnvelope> | undefined;
-            const id = body && typeof body.id === 'string' ? body.id : undefined;
-            if (id) {
-                await svc.markFailedFromDlq(id, 'dlq: retries exhausted');
-            } else {
-                logger.warn('[dlq] message without a parseable envelope id — acking', {
-                    messageId: msg.id,
-                });
-            }
-        } catch (err) {
-            logger.error('[dlq] writeback failed for message', { messageId: msg.id },
-                err instanceof Error ? err : undefined);
-        } finally {
-            // Always ack: a dead message has nothing left to retry. Re-driving
-            // happens via the outbox row (sync-redrive), not the DLQ.
-            msg.ack();
-        }
-    }
-}
+// The DLQ writeback core moved to `./sync-dlq`, and is re-exported here so
+// every existing import site (server/index.ts and two test files) is unchanged.
+// The move is what keeps it reachable without this module's route imports —
+// see the note in sync-dlq.ts.
+export { handleSyncDlqBatch } from './sync-dlq';

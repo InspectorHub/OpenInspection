@@ -9,6 +9,7 @@ import {
 } from '../auth/capabilities';
 import { isRole } from '../auth/roles';
 import { users } from '../db/schema';
+import { memoOnce } from '../request-scope';
 import type { HonoConfig } from '../../types/hono';
 
 /**
@@ -28,8 +29,21 @@ const resolveOverridesFromDb: OverrideResolver = async (c) => {
     const userId = c.get('user')?.sub;
     const sdb = c.get('sdb');
     if (!userId || !sdb) return null;
-    // getById is tenant-scoped (users has a tenantId column) and fail-closed.
-    const row = await sdb.getById(users, userId);
+    // Memoised for the REQUEST, which is what keeps "fresh" true. The doc above
+    // requires reading the column per gated request because an admin can change
+    // overrides without the user re-logging-in; a request-scoped memo re-reads
+    // on the next request, so that invariant holds unchanged.
+    //
+    // What it removes is intra-render repetition. Measured 2026-09-07 by
+    // tests/workers/render-duplicate-reads.spec.ts: this exact statement ran
+    // THREE times in one render — /api/auth/me, /inspections/:id/hub and
+    // /api/services each call capabilitiesFor(), and a render fans out to all
+    // three under one scope. Keyed by user id, so an admin editing SOMEONE
+    // ELSE's overrides shares no entry with their own.
+    const tenantId = c.get('tenantId') ?? '-';
+    const row = await memoOnce(c.env, `caps-overrides:${tenantId}:${userId}`, async () =>
+        // getById is tenant-scoped (users has a tenantId column) and fail-closed.
+        await sdb.getById(users, userId));
     // permission_overrides is drizzle { mode: 'json' } → may be an object,
     // a string, or null. coerceOverrides handles all three and whitelists
     // to the four boolean capability keys.

@@ -250,9 +250,19 @@ export default {
     const { scheduled: runScheduled } = await import("../server/scheduled");
     return runScheduled(controller, env, ctx);
   },
+  // Imported DIRECTLY, like `scheduled` above and for the same reason: the
+  // dispatcher reads `batch.queue` and hands off, so it never needed the route
+  // graph that living in server/index.ts forced it to evaluate.
+  //
+  // ⚠️ Do not repeat the cron claim here without measuring. That split cut a
+  // cold isolate 273ms -> 59ms locally and moved production NOT AT ALL, because
+  // production invocations land on already-warm isolates. This is the same
+  // shape, so the honest expectation is "cheaper cold start, unchanged warm".
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  queue: async (batch: any, env: any, ctx: any) =>
-    (await getApi()).default.queue(batch, env, ctx),
+  queue: async (batch: any, env: any, ctx: any) => {
+    const { queue: runQueue } = await import("../server/queue");
+    return runQueue(batch, env, ctx);
+  },
 };
 
 // Re-export Durable Objects + Workflow so wrangler can bind them on the single
