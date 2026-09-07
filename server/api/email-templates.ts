@@ -302,6 +302,7 @@ const emailTemplateRoutes = createApiRouter()
 
         const tenantId = c.get('tenantId');
         const brandingService = new BrandingService(c.env.DB, c.env.TENANT_CACHE);
+        brandingService.requestEnv = c.env;
         const emailBrand = await brandingService.getEmailBrand(tenantId);
 
         const APP_NAME = c.env.APP_NAME;

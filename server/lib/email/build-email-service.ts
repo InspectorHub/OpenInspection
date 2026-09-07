@@ -316,6 +316,7 @@ async function loadEmailSecrets(env: EmailServiceEnv, tenantId: string): Promise
  */
 export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: string): Promise<LoadedEmailConfig> {
     const branding = new BrandingService(env.DB, env.TENANT_CACHE);
+    branding.requestEnv = env;
     // The `tenant_configs` projection is down to the one field this function is
     // actually about. The AI fields used to ride along because the row was
     // already being fetched — they moved to their own tables when that table

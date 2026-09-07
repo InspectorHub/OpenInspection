@@ -222,6 +222,8 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'branding':
                     target.branding = new BrandingService(c.env.DB, c.env.TENANT_CACHE);
+                    // Request scope, so the tenant_configs reads memoise per request.
+                    target.branding.requestEnv = c.env;
                     break;
                 case 'legalVersion':
                     target.legalVersion = new LegalVersionService(drizzle(c.env.DB));

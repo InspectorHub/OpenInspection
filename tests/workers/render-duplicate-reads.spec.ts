@@ -25,27 +25,36 @@ const migrationSql = import.meta.glob('../../migrations/*.sql', {
 }) as Record<string, string>;
 
 /**
- * Statements this render issues MORE THAN ONCE, counted as the excess (a
- * statement run 3× wastes 2). It is now ZERO: 39 statements, 39 distinct.
+ * Statements the covered renders issue MORE THAN ONCE, counted as the excess (a
+ * statement run 3x wastes 2), summed across every render in `RENDERS`.
  *
- * ⚠️ A ratchet at zero is the strictest kind, and the point. Any new repeated
- * read fails this immediately, with the offending SQL and the endpoints that
- * issued it in the message. Do not raise it to make a change pass — the whole
- * value is that the next duplicate is visible the day it lands.
+ * Measured 2026-09-07: 103 statements across 5 renders, 103 distinct, ZERO
+ * wasted. Every covered render repeats nothing.
  *
- * How it got here, because each step removed a different KIND of problem:
- *   6 → `resolveOverridesFromDb` memoised on the request scope (three endpoints
- *       each read the acting user's full row).
- *   3 → the instrument started keying on bind PARAMETERS. `contactIdForRole`
- *       ×2 was never a duplicate: same SQL, different roles. See `capture`.
- *   2 → `getPeopleCard` takes its caller's inspection row, like
- *       `computePublishReadiness` — /hub loaded it then re-read it.
- *   1 → `PeopleService.listPeople` memoised, with the request env threaded from
- *       the DI middleware into the service tree, so /hub and /people share one
- *       read instead of one each.
- *   0 → nothing repeats.
+ * It was 4 when the coverage first went from one render to five, and all four
+ * were one shape — a `tenant_configs` row read by more than one endpoint of the
+ * same page. Three were `BrandingService` (`getBranding` is a bare SELECT *,
+ * `getBrand` a narrow projection) reached from two endpoints, and once from a
+ * single endpoint twice; the fourth was `select sms_mode` from /sms/config and
+ * /sms/compliance. Both services now memoise the ROW on the request scope and
+ * leave the derivation per-call.
  *
- * One thing this count is NOT, learned by getting it wrong: `tenants.slug` ×2
+ * ⚠️ Lower it in the same commit that removes one; never raise it to make a
+ * change pass. The whole value is that the next duplicate is visible the day it
+ * lands, with its SQL and the endpoints that issued it in the failure message.
+ *
+ * How the covered renders got here, because each step removed a different KIND
+ * of problem:
+ *   - `resolveOverridesFromDb` memoised on the request scope (three endpoints
+ *     each read the acting user's full row).
+ *   - the instrument started keying on bind PARAMETERS. `contactIdForRole` x2
+ *     was never a duplicate: same SQL, different roles. See `capture`.
+ *   - `getPeopleCard` takes its caller's inspection row, like
+ *     `computePublishReadiness` — /hub loaded it then re-read it.
+ *   - `PeopleService.listPeople` memoised, with the request env threaded from
+ *     the DI middleware into the service tree, so /hub and /people share one read.
+ *
+ * One thing this count is NOT, learned by getting it wrong: `tenants.slug` x2
  * appears WITHOUT the warm-up below and vanishes with it, because
  * `inspectorPaletteMiddleware` resolves it KV-first and the warm-up populates
  * that entry. It was never a second D1 reader — memoising `resolveTenantSlug`
@@ -57,6 +66,7 @@ const WASTED_BASELINE = 0;
 const TENANT = 'dupe-tenant';
 const USER = 'dupe-user';
 const INSPECTION = 'dupe-inspection';
+const CONTACT = 'dupe-contact';
 
 /** One issued statement: its SQL and the parameters it was bound with. */
 interface Issued { sql: string; params: unknown[] }
@@ -139,6 +149,10 @@ describe('what one render asks the database twice', () => {
         await b.DB.prepare(
             "INSERT OR IGNORE INTO inspections (id, tenant_id, property_address, date, status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
         ).bind(INSPECTION, TENANT, '1 Test St', '2026-09-07', 'scheduled', now).run();
+        // contact-detail's render needs a contact to read.
+        await b.DB.prepare(
+            "INSERT OR IGNORE INTO contacts (id, tenant_id, name, created_at) VALUES (?, ?, ?, ?)",
+        ).bind(CONTACT, TENANT, 'Dupe Contact', now).run();
         // No tenant_configs row is seeded on purpose. One was added here while
         // chasing a 500, written as `INSERT ... (id, tenant_id)` with a
         // `.catch()` — and `tenant_configs` has no `id` column, so it threw
@@ -147,7 +161,73 @@ describe('what one render asks the database twice', () => {
         // the dead statement; the 500 was positional and the warm-up fixed it.
     });
 
-    it('reports every statement issued more than once under one scope', async () => {
+    /**
+     * The renders this probe covers, and the endpoint set each one fans out to.
+     *
+     * Hand-curated by reading each loader, because the typed client's property
+     * chain (`api.admin["tenant-config"].$get`) is not the URL — the mount point
+     * is. A path guessed wrong would 404, issue almost no statements, and quietly
+     * lower the duplicate count, so `no404` below is not a nicety: it is what
+     * stops a typo from reading as an improvement.
+     *
+     * Extracted with:
+     *   awk '/export async function loader/,/^}/' <route> | grep -oE '\bapi\.[^(]*\$get'
+     */
+    const RENDERS: Array<{ name: string; paths: string[] }> = [
+        {
+            name: 'inspector-portal',
+            paths: [
+                '/api/auth/me',
+                `/api/inspections/${INSPECTION}/hub`,
+                `/api/inspections/${INSPECTION}/people`,
+                `/api/inspections/${INSPECTION}/versions`,
+                '/api/role-profiles',
+                '/api/team/members',
+                '/api/services',
+                '/api/session/context',
+            ],
+        },
+        {
+            name: 'contact-detail',
+            paths: [`/api/contacts/${CONTACT}`, `/api/contacts/${CONTACT}/access`],
+        },
+        {
+            name: 'calendar',
+            paths: [
+                '/api/auth/me',
+                '/api/admin/members',
+                // start/end are REQUIRED by ListCalendarItemsQuerySchema; without
+                // them the route 400s, which short-circuits the handler and would
+                // undercount this render.
+                '/api/calendar/items?start=2026-09-01&end=2026-09-30',
+            ],
+        },
+        {
+            name: 'settings-booking',
+            paths: [
+                '/api/admin/members',
+                '/api/admin/agreements',
+                '/api/admin/branding',
+                '/api/admin/booking-routing',
+                '/api/admin/service-areas/all',
+                '/api/admin/tenant-config',
+            ],
+        },
+        {
+            name: 'settings-communication',
+            paths: [
+                '/api/admin/communication',
+                '/api/admin/tenant-config',
+                // smsAdminRoutes mounts at /api/admin, so the routes declared
+                // '/sms/config' resolve here -- not at a top-level /api/sms.
+                '/api/admin/sms/config',
+                '/api/admin/sms/compliance',
+            ],
+        },
+    ];
+
+    /** Fires one render's endpoint set under ONE shared request scope. */
+    async function measureRender(paths: string[]) {
         const seen: Issued[] = [];
         const scopedEnv = {
             ...testEnv,
@@ -155,44 +235,22 @@ describe('what one render asks the database twice', () => {
             [REQUEST_SCOPE]: createRequestScope(),
         } as unknown as Record<string, unknown>;
 
-        // The endpoint set the inspector-portal loader fans out to.
-        const paths = [
-            '/api/auth/me',
-            `/api/inspections/${INSPECTION}/hub`,
-            `/api/inspections/${INSPECTION}/people`,
-            `/api/inspections/${INSPECTION}/versions`,
-            '/api/role-profiles',
-            '/api/team/members',
-            '/api/services',
-            '/api/session/context',
-        ];
-        // Warm-up, deliberately OUTSIDE the capture and outside the scope.
-        // Whichever endpoint runs first in a fresh fixture 500s — proven by
-        // moving /api/auth/me from first to last, which moved the 500 onto
-        // /hub instead. It is positional, not an endpoint defect. A 5xx stops
-        // issuing statements partway, so without this the first endpoint's
-        // reads go uncounted and every duplicate total is an undercount.
-        await Promise.resolve(app.fetch(
-            new Request('http://x/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
-            { ...testEnv, [REQUEST_SCOPE]: createRequestScope() } as never,
-        )).catch(() => null);
-
-        // Sequential, sharing ONE scope. A render fans these out in parallel,
-        // but parallel makes statements unattributable — and the memo scope is
-        // what decides duplication, not the ordering, so the counts hold either
-        // way while this ordering also says WHICH endpoint issued what.
-        const statuses: (number | string)[] = [];
-        const bodies: string[] = [];
+        const statuses: number[] = [];
+        const errors: string[] = [];
         const owner = new Map<string, Set<string>>();
+        // Sequential, sharing ONE scope. A render fans these out in parallel, but
+        // parallel makes statements unattributable — and the scope decides
+        // duplication, not the ordering, so the counts hold either way while this
+        // ordering also says WHICH endpoint issued what.
         for (const p of paths) {
             const before = seen.length;
             const r = await Promise.resolve(app.fetch(
                 new Request(`http://x${p}`, { headers: { Authorization: `Bearer ${token}` } }),
                 scopedEnv as never,
             )).catch(() => null);
-            statuses.push(r?.status ?? 'threw');
-            if (r && r.status >= 500) {
-                bodies.push(`${p} -> ${(await r.text()).slice(0, 300)}`);
+            statuses.push(r?.status ?? 0);
+            if (r && r.status >= 400) {
+                errors.push(`${p} -> ${r.status} ${(await r.text()).slice(0, 160)}`);
             }
             for (const issued of seen.slice(before)) {
                 const k = keyOf(issued);
@@ -200,41 +258,65 @@ describe('what one render asks the database twice', () => {
                 owner.get(k)!.add(p);
             }
         }
-        const authWalled = statuses.filter((s) => s === 401 || s === 403).length;
 
         const counts = new Map<string, number>();
-        for (const s of seen) {
-            const k = keyOf(s);
-            counts.set(k, (counts.get(k) ?? 0) + 1);
-        }
+        for (const s of seen) counts.set(keyOf(s), (counts.get(keyOf(s)) ?? 0) + 1);
         const dupes = [...counts.entries()].filter(([, n]) => n > 1).sort((a, x) => x[1] - a[1]);
-        const repeated = dupes.reduce((acc, [, n]) => acc + (n - 1), 0);
+        return {
+            total: seen.length,
+            distinct: counts.size,
+            wasted: dupes.reduce((acc, [, n]) => acc + (n - 1), 0),
+            dupes,
+            owner,
+            statuses,
+            authWalled: statuses.filter((s) => s === 401 || s === 403).length,
+            errors,
+            // ANY 4xx/5xx short-circuits the handler and undercounts the render.
+            failed: paths.filter((_, i) => (statuses[i] ?? 0) >= 400),
+        };
+    }
 
-        // The workerd pool does not forward console.log, so the report travels
-        // in the assertion message — the one channel that always surfaces.
-        const report = [
-            `statuses=${statuses.join(',')} authWalled=${authWalled}`,
-            ...bodies,
-            `total=${seen.length} distinct=${counts.size} dupeGroups=${dupes.length} wastedStatements=${repeated}`,
-            ...dupes.slice(0, 20).map(([sql, n]) => `x${n} [${[...(owner.get(sql) ?? [])].join(' + ')}] :: ${sql.slice(0, 90)}`),
-        ].join(' ||| ');
+    it('reports duplicate reads for every covered render', async () => {
+        // Warm-up, deliberately OUTSIDE every capture and scope. Whichever
+        // endpoint runs first in a fresh fixture 500s — proven by moving
+        // /api/auth/me from first to last, which moved the 500 onto /hub. It is
+        // positional, not an endpoint defect. A 5xx stops issuing statements
+        // partway, so without this the first endpoint's reads go uncounted.
+        await Promise.resolve(app.fetch(
+            new Request('http://x/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
+            { ...testEnv, [REQUEST_SCOPE]: createRequestScope() } as never,
+        )).catch(() => null);
+
+        const lines: string[] = [];
+        let grandTotal = 0;
+        let grandWasted = 0;
+        const broken: string[] = [];
+
+        for (const render of RENDERS) {
+            const m = await measureRender(render.paths);
+            grandTotal += m.total;
+            grandWasted += m.wasted;
+            lines.push(
+                `${render.name}: total=${m.total} distinct=${m.distinct} wasted=${m.wasted} statuses=${m.statuses.join(',')}`,
+            );
+            for (const [sql, n] of m.dupes.slice(0, 6)) {
+                lines.push(`   x${n} [${[...(m.owner.get(sql) ?? [])].join(' + ')}] :: ${sql.slice(0, 80)}`);
+            }
+            // Each of these makes the render's count an UNDERCOUNT, so they are
+            // failures of the instrument, not findings about the code.
+            if (m.total === 0) broken.push(`${render.name}: captured NO statements`);
+            if (m.authWalled === render.paths.length) broken.push(`${render.name}: every call auth-walled`);
+            if (m.failed.length) broken.push(`${render.name}: ${m.errors.join(' ; ')}`);
+        }
+
+        const report = [`renders=${RENDERS.length} totalStatements=${grandTotal} totalWasted=${grandWasted}`, ...lines].join(' ||| ');
 
         // The instrument, asserted before anything it measures.
-        expect(seen.length, 'no statements captured — the capture proxy is broken, not the code')
+        expect(broken, `instrument problems make these counts an undercount. ${report}`).toEqual([]);
+        expect(grandTotal, 'no statements captured at all — the capture proxy is broken, not the code')
             .toBeGreaterThan(0);
-        // The failure mode that made the first attempt useless: if every call is
-        // auth-walled, the handlers never ran and a low duplicate count is a lie.
-        expect(authWalled, `every call was auth-walled (statuses ${statuses.join(',')}) — this measures the middleware, not the render`)
-            .toBeLessThan(paths.length);
 
-        // A 5xx endpoint stops issuing statements partway, so it makes the
-        // duplicate count an UNDERCOUNT and the baseline below meaningless.
-        // Assert the render's endpoints actually answered.
-        const failed = statuses.filter((s) => typeof s === 'number' && s >= 500);
-        expect(failed.length, `an endpoint 5xx'd, so the counts below are an undercount. ${report}`)
-            .toBe(0);
-
-        expect(repeated, `wasted statements grew past the baseline. ${report}`)
+        expect(grandWasted, `wasted statements grew past the baseline. ${report}`)
             .toBeLessThanOrEqual(WASTED_BASELINE);
     });
 });

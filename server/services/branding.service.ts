@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { agreements, tenantConfigs } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { memoOnce } from '../lib/request-scope';
 import { policyChargesFees } from '../lib/billing/cancellation-policy';
 import type { EmailIdentityConfig } from '../lib/email/sender-identity';
 import { r2Keys } from '../lib/r2-keys';
@@ -30,6 +31,14 @@ export interface IntegrationConfig {
  * Also manages integration config (plaintext) and secrets (AES-GCM encrypted).
  */
 export class BrandingService {
+    /**
+     * The request env, when the caller had one. Used ONLY to reach the request
+     * scope so the tenant_configs reads below can be memoised for the request.
+     * Undefined outside a request (cron, queue, tests) — `memoOnce` then degrades
+     * to a plain call and behaviour is unchanged.
+     */
+    public requestEnv?: unknown;
+
     constructor(private db: D1Database, private kv?: KVNamespace, private r2?: R2Bucket) {}
 
     private getDrizzle() {
@@ -41,7 +50,13 @@ export class BrandingService {
      */
     async getBranding(tenantId: string, defaults: { companyName: string; primaryColor: string; supportEmail: string }) {
         const db = this.getDrizzle();
-        const config = await db.select().from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+        // Memoised for the REQUEST. Measured 2026-09-07: the settings pages reach
+        // this from two endpoints of one render (/admin/branding and
+        // /admin/tenant-config), and settings-communication reached it twice from
+        // a single endpoint. Only the ROW read is memoised; the defaults below are
+        // pure and stay per-call.
+        const config = await memoOnce(this.requestEnv, `tenant-config:all:${tenantId}`, async () =>
+            await db.select().from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get());
 
         return config ?? {
             companyName: defaults.companyName,
@@ -113,7 +128,11 @@ export class BrandingService {
         termsUrl: string | null;
     }> {
         const db = this.getDrizzle();
-        const row = await db
+        // Same reasoning as getBranding: memoise the ROW, not the derivation.
+        // `opts` (slug/baseUrl) only feeds resolveTenantLegalUrls below and never
+        // reaches the query, so it must NOT be part of the key — two callers with
+        // different opts still want the same row and still get their own links.
+        const row = await memoOnce(this.requestEnv, `tenant-config:brand:${tenantId}`, async () => await db
             .select({
                 companyName: tenantConfigs.companyName,
                 legalName: tenantConfigs.legalName,
@@ -131,7 +150,7 @@ export class BrandingService {
             })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
+            .get());
 
         let privacyUrl: string | null = null;
         let termsUrl: string | null = null;
