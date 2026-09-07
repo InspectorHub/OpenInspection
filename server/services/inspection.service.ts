@@ -1,4 +1,7 @@
 import type { CoverCrop, PhotoCrop } from '../lib/validations/inspection.schema';
+// Type-only: `getPeopleCard`'s optional preloaded row. A value import would put
+// the schema into this facade's runtime graph for a parameter type alone.
+import type { inspections } from '../lib/db/schema';
 import type { ScopedDB } from '../lib/db/scoped';
 import type { AgreementService } from './agreement.service';
 import type { ReportMediaContext } from '../lib/report-video';
@@ -589,13 +592,27 @@ export class InspectionService {
      * can render "Buyer's Agent · 2" if multi-agent ever ships) without a
      * follow-up service refactor.
      */
-    async getPeopleCard(inspectionId: string, tenantId: string): Promise<{
+    /**
+     * Hands the request env to the sub-services that can use it. Called by the DI
+     * middleware, which is the only layer that has `c.env`; the facade itself is
+     * constructed from individual bindings, so without this the request scope
+     * never reaches the service tree and `listPeople` cannot memoise.
+     */
+    setRequestEnv(env: unknown): void {
+        this.core.setRequestEnv(env);
+    }
+
+    async getPeopleCard(
+        inspectionId: string,
+        tenantId: string,
+        preloaded?: typeof inspections.$inferSelect,
+    ): Promise<{
         inspector:     { id: string; name: string | null; email: string; phone: string | null } | null;
         client:        { name: string; email: string | null; phone: string | null } | null;
         buyerAgents:   Array<{ id: string; name: string; email: string | null; phone: string | null; agency: string | null }>;
         listingAgents: Array<{ id: string; name: string; email: string | null; phone: string | null; agency: string | null }>;
     }> {
-        return this.core.getPeopleCard(inspectionId, tenantId);
+        return this.core.getPeopleCard(inspectionId, tenantId, preloaded);
     }
 
     /**

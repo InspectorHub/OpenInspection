@@ -26,45 +26,63 @@ const migrationSql = import.meta.glob('../../migrations/*.sql', {
 
 /**
  * Statements this render issues MORE THAN ONCE, counted as the excess (a
- * statement run 3× wastes 2). Measured, not chosen: 6 before
- * `resolveOverridesFromDb` was memoised, 3 after (41 statements, 38 distinct).
+ * statement run 3× wastes 2). It is now ZERO: 39 statements, 39 distinct.
  *
- * Lower it in the same commit that removes one. All three that remain belong to
- * the hub aggregate, and none is the same job:
- *   - full `inspections` row ×2 and `inspection_people.contact_id` ⋈ ×2 — both
- *     INSIDE /hub, so the fix is passing one result down, the way
- *     `computePublishReadiness` now takes its caller's row.
- *   - people ⋈ contacts ⋈ role_profiles ×2 — /hub and /people genuinely both
- *     need it; deduping means one of them serving the other.
+ * ⚠️ A ratchet at zero is the strictest kind, and the point. Any new repeated
+ * read fails this immediately, with the offending SQL and the endpoints that
+ * issued it in the message. Do not raise it to make a change pass — the whole
+ * value is that the next duplicate is visible the day it lands.
  *
- * Two things this count is NOT, both learned by getting them wrong first:
- *   - `tenants.slug` ×2 appears WITHOUT the warm-up below and vanishes with it,
- *     because `inspectorPaletteMiddleware` resolves it KV-first and the warm-up
- *     populates that entry. It was never a second D1 reader. Memoising
- *     `resolveTenantSlug` moved this number by exactly zero, which is why that
- *     memo was reverted instead of kept on a hunch.
- *   - It is not a CPU emergency. These cost D1 quota and CPU but ZERO round
- *     trips — they already sit inside `Promise.all` waves — and production was
- *     measured 2026-09-07 at one `exceededCpu` per ~2000 invocations.
+ * How it got here, because each step removed a different KIND of problem:
+ *   6 → `resolveOverridesFromDb` memoised on the request scope (three endpoints
+ *       each read the acting user's full row).
+ *   3 → the instrument started keying on bind PARAMETERS. `contactIdForRole`
+ *       ×2 was never a duplicate: same SQL, different roles. See `capture`.
+ *   2 → `getPeopleCard` takes its caller's inspection row, like
+ *       `computePublishReadiness` — /hub loaded it then re-read it.
+ *   1 → `PeopleService.listPeople` memoised, with the request env threaded from
+ *       the DI middleware into the service tree, so /hub and /people share one
+ *       read instead of one each.
+ *   0 → nothing repeats.
+ *
+ * One thing this count is NOT, learned by getting it wrong: `tenants.slug` ×2
+ * appears WITHOUT the warm-up below and vanishes with it, because
+ * `inspectorPaletteMiddleware` resolves it KV-first and the warm-up populates
+ * that entry. It was never a second D1 reader — memoising `resolveTenantSlug`
+ * moved this number by exactly zero, which is why that memo was reverted rather
+ * than kept on a hunch.
  */
-const WASTED_BASELINE = 3;
+const WASTED_BASELINE = 0;
 
 const TENANT = 'dupe-tenant';
 const USER = 'dupe-user';
 const INSPECTION = 'dupe-inspection';
 
-/** Records the SQL text of every prepared statement. Proxy rather than a spread
- *  copy: D1Database carries `prepare` on the prototype. */
-function capture(db: D1Database, onStatement: (sql: string) => void): D1Database {
-    const wrapStmt = (stmt: D1PreparedStatement): D1PreparedStatement =>
+/** One issued statement: its SQL and the parameters it was bound with. */
+interface Issued { sql: string; params: unknown[] }
+
+/**
+ * Records every prepared statement AND the parameters bound to it. Proxy rather
+ * than a spread copy: D1Database carries `prepare` on the prototype.
+ *
+ * ⚠️ The parameters are not a nicety — without them this instrument LIES. It
+ * originally keyed on SQL text alone, which made `contactIdForRole(…, 'buyer_agent')`
+ * and `contactIdForRole(…, 'listing_agent')` look like the same statement run
+ * twice. They are two different reads that happen to share a query shape, and
+ * "deduplicating" them would have deleted one of the two answers.
+ */
+function capture(db: D1Database, onStatement: (s: Issued) => void): D1Database {
+    const wrapStmt = (stmt: D1PreparedStatement, entry: Issued): D1PreparedStatement =>
         new Proxy(stmt, {
             get(t, p, r) {
                 const v = Reflect.get(t, p, r);
                 if (typeof v !== 'function') return v;
                 return (...args: unknown[]) => {
+                    // drizzle binds then executes; record what it bound.
+                    if (p === 'bind') entry.params = args;
                     const out = (v as (...a: unknown[]) => unknown).apply(t, args);
                     return out && typeof out === 'object' && 'bind' in (out as object)
-                        ? wrapStmt(out as D1PreparedStatement)
+                        ? wrapStmt(out as D1PreparedStatement, entry)
                         : out;
                 };
             },
@@ -74,13 +92,14 @@ function capture(db: D1Database, onStatement: (sql: string) => void): D1Database
             const value = Reflect.get(target, prop, receiver);
             if (prop === 'prepare' && typeof value === 'function') {
                 return (sql: string) => {
-                    onStatement(sql);
-                    return wrapStmt((value as (s: string) => D1PreparedStatement).call(target, sql));
+                    const entry: Issued = { sql, params: [] };
+                    onStatement(entry);
+                    return wrapStmt((value as (s: string) => D1PreparedStatement).call(target, sql), entry);
                 };
             }
             if (prop === 'batch' && typeof value === 'function') {
                 return (statements: unknown[]) => {
-                    for (const _ of statements) onStatement('<batch>');
+                    for (const _ of statements) onStatement({ sql: '<batch>', params: [] });
                     return (value as (s: unknown[]) => unknown).call(target, statements);
                 };
             }
@@ -90,6 +109,12 @@ function capture(db: D1Database, onStatement: (sql: string) => void): D1Database
 }
 
 const normalise = (sql: string) => sql.replace(/\s+/g, ' ').replace(/\?\d*/g, '?').trim();
+
+/**
+ * The identity of a read: its query shape AND what it asked for. Two statements
+ * are the same read only when both match — see the warning on `capture`.
+ */
+const keyOf = (s: Issued) => `${normalise(s.sql)} :: ${JSON.stringify(s.params)}`;
 
 const b = testEnv as unknown as { DB: D1Database };
 
@@ -123,7 +148,7 @@ describe('what one render asks the database twice', () => {
     });
 
     it('reports every statement issued more than once under one scope', async () => {
-        const seen: string[] = [];
+        const seen: Issued[] = [];
         const scopedEnv = {
             ...testEnv,
             DB: capture(b.DB, (s) => seen.push(s)),
@@ -169,8 +194,8 @@ describe('what one render asks the database twice', () => {
             if (r && r.status >= 500) {
                 bodies.push(`${p} -> ${(await r.text()).slice(0, 300)}`);
             }
-            for (const sql of seen.slice(before)) {
-                const k = normalise(sql);
+            for (const issued of seen.slice(before)) {
+                const k = keyOf(issued);
                 if (!owner.has(k)) owner.set(k, new Set());
                 owner.get(k)!.add(p);
             }
@@ -179,7 +204,7 @@ describe('what one render asks the database twice', () => {
 
         const counts = new Map<string, number>();
         for (const s of seen) {
-            const k = normalise(s);
+            const k = keyOf(s);
             counts.set(k, (counts.get(k) ?? 0) + 1);
         }
         const dupes = [...counts.entries()].filter(([, n]) => n > 1).sort((a, x) => x[1] - a[1]);

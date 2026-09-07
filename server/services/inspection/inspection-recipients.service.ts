@@ -47,6 +47,26 @@ const RECIPIENT_ROLE_MAP: Record<string, 'client' | 'agent_buyer' | 'agent_listi
  */
 export class InspectionRecipientsService extends InspectionSubService {
     /**
+     * The request env, when the caller had one. Only used to build PeopleService
+     * with the request scope attached, so `listPeople` can memoise across the
+     * several in-process calls one render makes. Undefined outside a request
+     * (cron, queue, tests) — PeopleService then behaves exactly as before.
+     */
+    public requestEnv?: unknown;
+
+    /**
+     * PeopleService carrying the request scope when there is one. The env object
+     * is spread so the D1 binding this sub-service was constructed with stays
+     * authoritative — the request env may hold a different `DB` (it does not
+     * today, but a service must not silently change database on the strength of
+     * an optional field).
+     */
+    private peopleService(): PeopleService {
+        const env = (this.requestEnv ?? {}) as Record<string, unknown>;
+        return new PeopleService({ ...env, DB: this.db });
+    }
+
+    /**
      * Round-2 F1 — list every party associated with an inspection so the
      * Publish modal can render per-recipient Email + Text checkboxes.
      *
@@ -76,7 +96,7 @@ export class InspectionRecipientsService extends InspectionSubService {
             .get();
         if (!inspection) throw Errors.NotFound('Inspection not found');
 
-        const people = await new PeopleService({ DB: this.db }).listPeople(tenantId, inspectionId);
+        const people = await this.peopleService().listPeople(tenantId, inspectionId);
 
         const recipients: InspectionRecipient[] = [];
         for (const p of people) {
@@ -115,7 +135,11 @@ export class InspectionRecipientsService extends InspectionSubService {
      * can render "Buyer's Agent · 2" if multi-agent ever ships) without a
      * follow-up service refactor.
      */
-    async getPeopleCard(inspectionId: string, tenantId: string): Promise<{
+    async getPeopleCard(
+        inspectionId: string,
+        tenantId: string,
+        preloaded?: typeof inspections.$inferSelect,
+    ): Promise<{
         inspector:     { id: string; name: string | null; email: string; phone: string | null } | null;
         client:        { name: string; email: string | null; phone: string | null } | null;
         buyerAgents:   Array<{ id: string; name: string; email: string | null; phone: string | null; agency: string | null }>;
@@ -123,7 +147,15 @@ export class InspectionRecipientsService extends InspectionSubService {
     }> {
         const db = this.getDrizzle();
 
-        const inspection = await db.select().from(inspections)
+        // Takes the caller's row when the caller already has one. `getInspectionHub`
+        // loads this exact row as its authority/tenant gate and then calls straight
+        // in here, so without this the same statement ran twice in one render.
+        // Passed explicitly rather than memoised: a service holds a D1Database, not
+        // the request env, so the request scope is not reachable from here — the
+        // same reason `computePublishReadiness` takes its caller's row. Read-only,
+        // so sharing the object carries no aliasing risk, and every other caller
+        // omits the argument and loads it exactly as before.
+        const inspection = preloaded ?? await db.select().from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .get();
         if (!inspection) throw Errors.NotFound('Inspection not found');
@@ -145,7 +177,7 @@ export class InspectionRecipientsService extends InspectionSubService {
         }
 
         // Client + agents — from inspection_people (via PeopleService).
-        const people = await new PeopleService({ DB: this.db }).listPeople(tenantId, inspectionId);
+        const people = await this.peopleService().listPeople(tenantId, inspectionId);
 
         const clientP = people.find(p => p.roleKey === 'client') ?? null;
         const client = clientP
