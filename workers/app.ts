@@ -14,6 +14,9 @@ import { getDeploymentProfile } from "../server/lib/deployment-profile";
 // reason: `request-scope.ts` imports nothing at all, so it cannot drag the API
 // graph in behind it.
 import { createRequestScope, REQUEST_SCOPE } from "../server/lib/request-scope";
+// Five string constants, no imports — safe at the top level for the same reason
+// as the two above, and what lets /status answer without importing the API graph.
+import { BUILD } from "../server/generated/version";
 // i18n Phase C — request-scoped locale. paraglideMiddleware establishes an
 // AsyncLocalStorage scope so getLocale()/m.*() resolve per-request (never a
 // module-global) across the multi-tenant Worker. Generated (git-ignored); the
@@ -119,6 +122,37 @@ app.all("/api/platform/*", (c: any) =>
     getDeploymentProfile(c.env).hasPortalIntegrationApi ? toApi(c) : c.notFound(),
 );
 app.all("/api/*", toApi);
+// Served HERE, not through `toApi`, and that is the whole point: `toApi` calls
+// `getApi()`, which lazily imports the entire API module graph. A health check
+// that answers with a build stamp was paying for that import — measured in
+// production over 24h, `GET /status` averaged 46.8ms of CPU with a max of 108ms,
+// which is module evaluation on a cold isolate, not request work.
+//
+// It is polled by uptime monitoring and by the superproject's
+// check-deploy-lag.mjs, so it is exactly the request most likely to ARRIVE at a
+// cold isolate and warm the whole API for nothing.
+//
+// `generated/version.ts` is a tiny standalone module — five string constants and
+// no imports — so this keeps the entry's top-level graph small, the same
+// exemption `deployment-profile.ts` and `request-scope.ts` already carry.
+//
+// ⚠️ The response shape is load-bearing: check-deploy-lag.mjs reads `commit` and
+// `branch`, and refuses to report "no lag" for a status it cannot parse. Keep it
+// byte-compatible with the `/status` route in server/index.ts, which stays for
+// the standalone and in-process test paths that call the API app directly.
+app.get("/status", (c) =>
+  c.json({
+    status: "ok",
+    app: "openinspection-core",
+    version: BUILD.version,
+    commit: BUILD.shortCommit,
+    branch: BUILD.branch,
+    buildTime: BUILD.buildTime,
+    timestamp: new Date().toISOString(),
+  }),
+);
+// Non-GET verbs keep the old path: they are not health checks and have no
+// reason to bypass the API.
 app.all("/status", toApi);
 app.all("/m2m/*", toApi);
 app.all("/webhooks/*", toApi); // inbound provider webhooks — top-level by design (spec §3)
