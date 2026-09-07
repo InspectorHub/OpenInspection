@@ -181,6 +181,42 @@ app.get("/inspector/:tenant/:slug/calendar.ics", toApi); // ICS feed (API-only)
 // still serves their DATA under /api/public/*): /book /report /r /messages /verify
 // /agreements /login /logout /forgot-password /inspections and all app pages.
 
+/**
+ * Vulnerability-scanner probes, answered without rendering anything.
+ *
+ * These paths reach the catch-all below, and the catch-all is a full React
+ * Router SSR render — the 404 page is a real page, with the root layout, the
+ * i18n scope and the whole render pipeline behind it. Measured in production
+ * over 15h: `GET /.env` cost 200ms of CPU, `/config/.env` 89ms, `/backend/.env`
+ * 87ms, `/wordpress/` 172ms. One scanner walking a wordlist, each miss costing
+ * roughly what a real page costs, on a worker whose CPU ceiling is 10ms per
+ * invocation.
+ *
+ * ⚠️ EVERY PATTERN HERE MUST BE ONE NO APP ROUTE COULD EVER USE. A false
+ * positive is a real page turned into a 404 with nothing to explain it, which is
+ * far worse than the CPU this saves. So: no bare-word matching, no guessing at
+ * "suspicious" — only file types this app never serves and tool paths that
+ * belong to other stacks entirely. React Router owns everything else, including
+ * genuine typos, which still get the real 404 page.
+ *
+ * ⚠️ This still costs a Worker INVOCATION — it is a cheap 404, not a free one.
+ * The only free answer is a WAF / firewall rule at the edge, where the request
+ * never reaches the worker at all. That is dashboard configuration rather than
+ * code; this is the half that lives in the repo.
+ */
+const SCANNER_PROBE =
+  /(?:^|\/)\.(?:env|git|svn|hg|aws|ssh)(?:$|[./])|(?:^|\/)(?:wp-admin|wp-login|wp-content|wp-includes|wordpress|phpmyadmin|cgi-bin|vendor\/phpunit)(?:$|\/)|\.(?:php[3457]?|asp|aspx|jsp|cgi|sql|bak|old|swp)$/i;
+
+app.all("*", (c, next) => {
+  if (!SCANNER_PROBE.test(new URL(c.req.url).pathname)) return next();
+  // Plain text, no body worth parsing, and `noindex` so a crawler that stumbles
+  // onto one does not keep asking.
+  return c.text("Not Found", 404, {
+    "cache-control": "public, max-age=3600",
+    "x-robots-tag": "noindex",
+  });
+});
+
 // --- Everything else → React Router SSR (all pages incl. "/") ---
 // Static assets (/favicon.svg, /styles.css, /vendor/*, /fonts/*) are served by the
 // Cloudflare assets layer from build/client before the worker runs.
