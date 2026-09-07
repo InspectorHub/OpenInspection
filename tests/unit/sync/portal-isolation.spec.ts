@@ -109,7 +109,7 @@ describe('SaaS-Portal isolation', () => {
     expect(stray, `raw integration.routes/outbox imports outside server/portal/: ${stray.join(', ')}`).toEqual([]);
   });
 
-  it('no concrete server/portal/ import outside the three composition points', () => {
+  it('no concrete server/portal/ import outside the composition points', () => {
     // Stricter than the route/outbox gate: catches ANY import from server/portal/*
     // (service-binding-guard, portal.provider, etc.). The three composition points
     // are the only allowed importers; everything else uses the seams/abstractions.
@@ -123,6 +123,13 @@ describe('SaaS-Portal isolation', () => {
       // rather than kept alongside.
       'server/cron/jobs/integrations.ts',
       'server/lib/middleware/di.ts',
+      // Same move as `scheduled.ts` above, in the other direction: the queue
+      // dispatcher left `server/index.ts` so the entry could reach it without
+      // evaluating every route, and the portal imports it already owned
+      // (cmd-batch, sync-dlq) travelled with it. The queue composition point
+      // moved address; it was not created here. `server/index.ts` stays on this
+      // list because it still imports portal for `registerPortalIntegration`.
+      'server/queue.ts',
     ];
     const stray = hits.filter(
       f => !f.startsWith('server/portal/') && !ALLOWED_IMPORTERS.includes(f),
