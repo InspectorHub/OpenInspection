@@ -264,14 +264,19 @@ describe('collab WS route — auth gate', () => {
         expect(mockDo.idFromName).toHaveBeenCalledWith('t1:rpt-insp1');
     });
 
-    // ── (d) Role-based access — admin/manager bypass assignment check ────────
+    // ── (d) Role-based access — owner/manager bypass assignment check ────────
+    //
+    // ⚠️ `owner`, not `admin`. This case read `userRole: 'admin'` and passed
+    // against a role this product does not have — `ROLES` is
+    // `owner | manager | inspector | agent` — while the real owner was refused.
+    // A spec that invents its vocabulary agrees with the bug.
 
-    it('(d1) admin user who is NOT assigned to the inspection is authorized', async () => {
+    it('(d1) the owner, NOT assigned to the inspection, is authorized', async () => {
         const mockDo = makeMockDoNamespace();
         const { app } = buildApp({
             tenantId:  't1',
-            userId:    'u-admin',
-            userRole:  'admin',
+            userId:    'u-owner',
+            userRole:  'owner',
             doNamespace: mockDo,
             inspectionOverride: {
                 inspectorId: 'u1',

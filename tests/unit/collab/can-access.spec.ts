@@ -14,6 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { canAccessInspectionCollab } from '../../../server/lib/collab/can-access';
+import { ROLES } from '../../../server/lib/auth/roles';
 import type { InspectionRoster } from '../../../server/lib/inspection/roster';
 
 const member = (id: string) => ({ id, name: id, email: `${id}@example.com` });
@@ -25,8 +26,28 @@ const roster = (lead: string | null, helpers: string[] = []): InspectionRoster =
 const LED_BY_INSP = roster('u-insp');
 
 describe('canAccessInspectionCollab', () => {
-  it('admin not assigned is allowed', () =>
-    expect(canAccessInspectionCollab(LED_BY_INSP, { id: 'u-admin', role: 'admin' })).toBe(true));
+  /**
+   * ⚠️ THE ROLE STRINGS HERE MUST BE REAL ONES.
+   *
+   * This suite used to assert that `role: 'admin'` was allowed, and it passed —
+   * against a role this product does not have. `ROLES` is
+   * `owner | manager | inspector | agent`, and the predicate's own set was
+   * `{'admin', 'manager'}`: half of it matched nobody, and `owner` — the
+   * highest role there is — fell through to the roster and was refused on every
+   * inspection it was not personally assigned to.
+   *
+   * A spec that invents its vocabulary agrees with itself and with nothing else.
+   * This case is the instrument check for the ones below it.
+   */
+  it('is written against roles that exist', () => {
+    expect(ROLES).toContain('owner');
+    expect(ROLES).toContain('manager');
+    expect(ROLES).toContain('inspector');
+    expect(ROLES).not.toContain('admin');
+  });
+
+  it('the owner, not assigned, is allowed', () =>
+    expect(canAccessInspectionCollab(LED_BY_INSP, { id: 'u-owner', role: 'owner' })).toBe(true));
 
   it('manager not assigned is allowed', () =>
     expect(canAccessInspectionCollab(LED_BY_INSP, { id: 'u-mgr', role: 'manager' })).toBe(true));
@@ -44,8 +65,16 @@ describe('canAccessInspectionCollab', () => {
     // Fails CLOSED. An inspection whose roster has not been written must not
     // become editable by whoever asks — the safe direction for an auth check.
     expect(canAccessInspectionCollab(roster(null), { id: 'u-insp', role: 'inspector' })).toBe(false);
-    expect(canAccessInspectionCollab(roster(null), { id: 'u-admin', role: 'admin' })).toBe(true);
+    expect(canAccessInspectionCollab(roster(null), { id: 'u-owner', role: 'owner' })).toBe(true);
   });
+
+  /**
+   * POSITIVE CONTROL for the two elevated cases: a role the product does not
+   * issue must not be a way in. Before the fix this was the ONLY string that
+   * opened the door, and no account could ever hold it.
+   */
+  it('a role this product does not issue grants nothing', () =>
+    expect(canAccessInspectionCollab(LED_BY_INSP, { id: 'u-x', role: 'admin' })).toBe(false));
 
   it('a helper on ANOTHER inspection is denied', () => {
     // The roster is fetched per inspection, so membership is never global.

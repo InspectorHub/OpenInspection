@@ -462,6 +462,57 @@ const DELIVERED_RESULTS_DATA = {
     },
 } as const;
 
+/**
+ * The smallest template that can hold a photo: one section, one rich item.
+ *
+ * Separate from `DELIVERED_TEMPLATE_SNAPSHOT` on purpose — that one is read by
+ * the client-report harness and by the docs screenshots, and this fixture exists
+ * to carry an entry that is deliberately unservable.
+ */
+const MEDIA_TEMPLATE_SNAPSHOT = {
+    schemaVersion: 2,
+    ratingSystem: {
+        levels: [
+            { id: 'satisfactory', label: 'Satisfactory', abbreviation: 'S', color: '#16a34a', severity: 'good', isDefect: false },
+            { id: 'defect', label: 'Defect', abbreviation: 'D', color: '#dc2626', severity: 'significant', isDefect: true },
+        ],
+    },
+    sections: [
+        {
+            id: 'exterior',
+            title: 'Exterior',
+            items: [
+                {
+                    id: 'siding',
+                    label: 'Siding',
+                    type: 'rich',
+                    ratingOptions: ['satisfactory', 'defect'],
+                    tabs: { information: [], limitations: [], defects: [] },
+                },
+            ],
+        },
+    ],
+} as const;
+
+/**
+ * One photo, captured on ANOTHER device and not yet uploaded.
+ *
+ * `pendingId` with no `key` and no crop/annotate derivative is what
+ * `resolvePhotoDisplayKey` returns nothing for, and the local blob store on a
+ * fresh browser holds nothing under that id — so `usePhotoOps` computes
+ * `pendingPlaceholder: !hasLocal && !baseKey` as true and hands the viewer an
+ * entry with an empty `url`. Before 49d7d903 that rendered a broken image.
+ */
+const MEDIA_RESULTS_DATA = {
+    '_default:exterior:siding': {
+        rating: 'satisfactory',
+        notes: 'Photographed from the north elevation.',
+        photos: [
+            { key: '', pendingId: 'seed-pending-other-device', pendingUpload: true, pendingKind: 'photo' },
+        ],
+    },
+} as const;
+
 export function seedFixtures(appDir: string): void {
     const cwd = appDir;
     const now = new Date().toISOString();
@@ -577,6 +628,30 @@ export function seedFixtures(appDir: string): void {
     d1(inspectionRow('seed-republished-inspection',  '6 Republished Ct',  'completed', 'published',
         { propertyType: 'commercial' }), cwd);
 
+    // ── The roster, without which the EDITOR cannot be opened at all ────────
+    //
+    // `inspections.inspector_id` says who was assigned; `inspection_inspectors`
+    // is what every reader of "who works this inspection" actually consults —
+    // `getInspectionRoster`, the ICS feed, inspector metrics, version-diff. The
+    // seed set the column and never wrote the rows, so `collab/ws` answered 403
+    // for the assigned inspector and the editor sat on "Connecting…" forever.
+    //
+    // That is why nothing in the editor had ever been checked in a browser
+    // locally: not the photo strip, not the media viewer, not the units panel.
+    // The column alone looks like an assignment and is not one.
+    const rosterRow = (inspectionId: string, userId: string) =>
+        `INSERT OR REPLACE INTO inspection_inspectors
+         (inspection_id, user_id, tenant_id, role, created_at)
+         VALUES ('${inspectionId}', '${userId}', '${TENANT_A_ID}', 'lead', ${nowMs})`;
+    for (const id of ['seed-empty-inspection', 'seed-team-inspection', 'seed-published-inspection',
+        'seed-delivered-inspection', 'seed-republished-inspection']) {
+        d1(rosterRow(id, LEAD_INSPECTOR_ID), cwd);
+    }
+    // The half-done inspection is the one owned by a DIFFERENT inspector — its
+    // specs assert that publish pre-flight fails for its owner, so the roster
+    // has to name that owner rather than the lead.
+    d1(rosterRow('seed-half-done-inspection', HALF_INSPECTOR_ID), cwd);
+
     // ---------------------------------------------------------------------
     // publish → deliver → client link, for `seed-delivered-inspection`
     //
@@ -666,6 +741,37 @@ export function seedFixtures(appDir: string): void {
         `VALUES ('seed-delivered-results', '${TENANT_A_ID}', '${SEED_INSPECTIONS.delivered}',\n` +
         `        '${JSON.stringify(DELIVERED_RESULTS_DATA)}', NULL, ${nowMs}, NULL, NULL, NULL);\n`,
         cwd, 'delivered-results',
+    );
+
+    // ── The media surface, which had no fixture at all ─────────────────────
+    //
+    // Every seeded inspection carried `photos: []`, so the photo strip, the
+    // viewer and everything reached through them could not be opened locally.
+    // A change to the viewer was therefore unverifiable in a browser, and
+    // shipped under a chrome-allow saying so.
+    //
+    // It goes on the EMPTY inspection, not the delivered one. The delivered
+    // fixture is what the client-report harness reads, and a photo entry with
+    // no servable key would render as a broken image in that report — buying a
+    // screenshot by breaking the surface the previous fixture was built to make
+    // checkable.
+    //
+    // ⚠️ THE ENTRY IS DELIBERATELY UNSERVABLE. Empty `key`, no crop or annotate
+    // derivative, and a `pendingId` whose blob is in no local store: that is
+    // exactly the "captured offline on ANOTHER device" case, and it is the one
+    // `usePhotoOps` marks `pendingPlaceholder`. Giving it a key would make it an
+    // ordinary photo and test nothing.
+    d1Script(
+        `UPDATE inspections SET template_snapshot = '${JSON.stringify(MEDIA_TEMPLATE_SNAPSHOT)}'\n` +
+        `WHERE id = '${SEED_INSPECTIONS.empty}' AND tenant_id = '${TENANT_A_ID}';\n`,
+        cwd, 'media-snapshot',
+    );
+    d1Script(
+        `INSERT OR REPLACE INTO inspection_results\n` +
+        `  (id, tenant_id, inspection_id, data, ydoc_state, last_synced_at, rating_system_id, rating_system_snapshot, report_id)\n` +
+        `VALUES ('seed-media-results', '${TENANT_A_ID}', '${SEED_INSPECTIONS.empty}',\n` +
+        `        '${JSON.stringify(MEDIA_RESULTS_DATA)}', NULL, ${nowMs}, NULL, NULL, NULL);\n`,
+        cwd, 'media-results',
     );
 
     console.info(
