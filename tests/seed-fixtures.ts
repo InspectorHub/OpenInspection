@@ -70,6 +70,17 @@ const CLIENT_ACCESS_TOKEN_ID = 'seed-access-token-delivered-client';
  */
 const CLIENT_PORTAL_TOKEN_HASH = createHash('sha256').update(CLIENT_PORTAL_TOKEN, 'utf8').digest('hex');
 
+/**
+ * The PCA report's own client credential — deliberately NOT the one above.
+ *
+ * One token authorising two inspections would make either link work for either
+ * fixture, and a harness whose two addresses are interchangeable cannot show
+ * that a change landed on the surface it was aimed at.
+ */
+const PCA_PORTAL_TOKEN      = 'seed-client-portal-token-pca';
+const PCA_ACCESS_TOKEN_ID   = 'seed-access-token-pca-client';
+const PCA_PORTAL_TOKEN_HASH = createHash('sha256').update(PCA_PORTAL_TOKEN, 'utf8').digest('hex');
+
 // PBKDF2-SHA256 of 'seedpassword' — pre-computed so this setup script does not
 // have to import the password helper.
 //
@@ -707,6 +718,20 @@ export function seedPcaFixtures(appDir: string): void {
                  'full_pca', '2026-06-01', 'completed', 'published', 'paid',
                  250000, 0, 0, 1998, 42000, '${now}')`, cwd);
 
+    // The credential that makes this report OPENABLE. Same shape as the
+    // delivered fixture's: expires_at NULL = open, revoked_at NULL = live, both
+    // read numerically so a 0 would date to 1970 and revoke it.
+    //
+    // Without this row the PCA report was published and unreachable, and
+    // `OpinionOfCost` — the three statutory cost totals ASTM E2018 §11.4 makes a
+    // required sub-block — could not be seen by anyone changing it.
+    d1(`INSERT OR REPLACE INTO inspection_access_tokens
+         (id, tenant_id, inspection_id, recipient_email, role, created_at,
+          expires_at, revoked_at, token_hash, token_enc, view_tracking_objected_at)
+         VALUES ('${PCA_ACCESS_TOKEN_ID}', '${TENANT_A_ID}', '${PCA_INSPECTION_ID}',
+                 '${CLIENT_RECIPIENT_EMAIL}', 'client', ${nowMs},
+                 NULL, NULL, '${PCA_PORTAL_TOKEN_HASH}', NULL, NULL)`, cwd);
+
     // Document review (ASTM §8.6). Four rows, one per disclosure state the
     // checklist exists to keep apart — a document that was never requested, one
     // received but not yet reviewed, one fully reviewed, and one ruled N/A with
@@ -858,6 +883,27 @@ export const SEED_CLIENT_ACCESS = {
     /** Absolute, for a human running `npm run dev`. */
     reportUrl:
         `http://localhost:8787/report-view/${TENANT_A_SLUG}/${SEED_INSPECTIONS.delivered}?token=${CLIENT_PORTAL_TOKEN}`,
+};
+
+/**
+ * The commercial PCA report's client access — the only route to `OpinionOfCost`
+ * and the rest of `PcaSkeleton`, which a `full_pca` report reaches and a
+ * residential one never does.
+ *
+ * ⚠️ Only live after a seed run with `SEED_PCA=1`. The constants below are
+ * always defined; the ROW they address is written only under that flag, exactly
+ * like the rest of the PCA fixture.
+ */
+export const SEED_PCA_ACCESS = {
+    inspectionId: PCA_INSPECTION_ID,
+    tenantSlug: TENANT_A_SLUG,
+    token: PCA_PORTAL_TOKEN,
+    /** Root-relative — use this from a spec (Playwright supplies the origin). */
+    reportPath:
+        `/report-view/${TENANT_A_SLUG}/${PCA_INSPECTION_ID}?token=${PCA_PORTAL_TOKEN}`,
+    /** Absolute, for a human running `npm run dev`. */
+    reportUrl:
+        `http://localhost:8787/report-view/${TENANT_A_SLUG}/${PCA_INSPECTION_ID}?token=${PCA_PORTAL_TOKEN}`,
 };
 
 /**
