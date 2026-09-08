@@ -75,7 +75,7 @@ describe('AutomationService.trigger — agreement filter', () => {
             channels: '["email"]', emailTemplateId: 'tpl-agr-1',
             active: true, isDefault: false, createdAt: new Date(),
         });
-        await svc.trigger({ tenantId: TENANT, inspectionId: INSP, triggerEvent: 'inspection.created', companyName: 'T', reportBaseUrl: 'http://localhost' });
+        await svc.trigger({ tenantId: TENANT, inspectionId: INSP, triggerEvent: 'inspection.created', companyName: 'T'});
         const logs = await testDb.select().from(schema.automationLogs).all();
         expect(logs.length).toBe(0);
     });
@@ -89,7 +89,7 @@ describe('AutomationService.trigger — agreement filter', () => {
             channels: '["email"]', emailTemplateId: 'tpl-agr-2',
             active: true, isDefault: false, createdAt: new Date(),
         });
-        await svc.trigger({ tenantId: TENANT, inspectionId: INSP, triggerEvent: 'inspection.created', companyName: 'T', reportBaseUrl: 'http://localhost' });
+        await svc.trigger({ tenantId: TENANT, inspectionId: INSP, triggerEvent: 'inspection.created', companyName: 'T'});
         const logs = await testDb.select().from(schema.automationLogs).all();
         expect(logs.length).toBe(1);
     });
@@ -103,7 +103,7 @@ describe('AutomationService.trigger — agreement filter', () => {
             channels: '["email"]', emailTemplateId: 'tpl-ord-3',
             active: true, isDefault: false, createdAt: new Date(),
         });
-        await svc.trigger({ tenantId: TENANT, inspectionId: INSP, triggerEvent: 'inspection.created', companyName: 'T', reportBaseUrl: 'http://localhost' });
+        await svc.trigger({ tenantId: TENANT, inspectionId: INSP, triggerEvent: 'inspection.created', companyName: 'T'});
         const logs = await testDb.select().from(schema.automationLogs).all();
         expect(logs.length).toBe(1);
     });

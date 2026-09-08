@@ -151,10 +151,6 @@
     "kind": "wire-shape",
     "reason": "Declared on `AccountDeleteResponseSchema` and returned by the soft-delete endpoint, so the caller receives it. Nothing on this side reads it back."
   },
-  "server/services/automation/shared.ts#TriggerContext.reportBaseUrl": {
-    "kind": "deferred",
-    "reason": "Every trigger site fills it (`reportBaseUrl: c.env.APP_BASE_URL || ''`, in four places) and no automation reads it, so an automation that wanted to link a recipient to their report has the base URL handed to it and no way to use it."
-  },
   "server/services/data-export.service.ts#ExportManifest.photosEmbedded": {
     "kind": "wire-shape",
     "reason": "Part of the export manifest that travels with the archive and crosses the seam (portal reads the manifest on `cmd.subject.export`). The reader is the person holding the export, or portal's record of it."

@@ -84,7 +84,7 @@ describe('staff alerts as rules (B3)', () => {
         const svc = new AutomationService({} as D1Database);
         await svc.trigger({
             tenantId: T, inspectionId: INSP, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://app.example.com',
+            companyName: 'Acme',
         });
 
         const notices = await staffNotices();
@@ -99,7 +99,7 @@ describe('staff alerts as rules (B3)', () => {
         const svc = new AutomationService({} as D1Database);
         await svc.trigger({
             tenantId: T, inspectionId: INSP, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://app.example.com',
+            companyName: 'Acme',
         });
 
         const staff = (await staffNotices()).filter((n) => n.userId !== null);
@@ -119,7 +119,7 @@ describe('staff alerts as rules (B3)', () => {
 
         await svc.trigger({
             tenantId: T, inspectionId: INSP, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://app.example.com',
+            companyName: 'Acme',
         });
 
         const staff = (await staffNotices()).filter((n) => n.userId !== null);

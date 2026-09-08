@@ -31,7 +31,22 @@ export interface TriggerContext {
     inspectionId:  string;
     triggerEvent:  string;
     companyName:   string;
-    reportBaseUrl: string;
+    /**
+     * ⚠️ NO BASE URL HERE. A `reportBaseUrl` sat beside `companyName` and was
+     * read by nothing — four call sites passed `c.env.APP_BASE_URL`, three
+     * passed `''`, and the difference never showed because no template variable
+     * consulted it.
+     *
+     * The base URL is resolved where the message is DELIVERED, not where it is
+     * triggered: `cron/jobs/automation.ts` reads `env.APP_BASE_URL` and hands it
+     * to `deliver-email.ts`, which builds `invoice_url`, `payment_url` and
+     * `agreement_sign_url` from it. That is the right moment — a trigger may be
+     * hours older than its delivery, and the address is a property of the
+     * deployment sending the mail rather than of the request that queued it.
+     *
+     * A `{{report_url}}` variable, if one is ever wanted, belongs beside those
+     * three and needs nothing from this shape.
+     */
     /**
      * Which DELIVERABLE a report event is about. One order can publish a
      * standard report on Tuesday and a radon report on Thursday, and the

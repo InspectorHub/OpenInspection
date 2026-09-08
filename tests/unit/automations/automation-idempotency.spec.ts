@@ -81,7 +81,7 @@ describe('AutomationService.trigger — report.published idempotency (Spec 2 Tas
             channels: ['email'],
         });
         const ctx = { tenantId: TENANT, inspectionId: insp, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' };
+            companyName: 'Acme'};
 
         await svc.trigger(ctx);
         await svc.trigger(ctx); // simulate retry / double-publish
@@ -109,7 +109,7 @@ describe('AutomationService.trigger — report.published idempotency (Spec 2 Tas
             channels: ['email'],
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: insp, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' });
+            companyName: 'Acme'});
 
         const logs = await logsFor(created.id, insp);
         expect(logs).toHaveLength(2);
@@ -126,7 +126,7 @@ describe('AutomationService.trigger — report.published idempotency (Spec 2 Tas
             channels: ['email'],
         });
         const ctx = { tenantId: TENANT, inspectionId: insp, triggerEvent: 'inspection.created',
-            companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' };
+            companyName: 'Acme'};
 
         await svc.trigger(ctx);
         await svc.trigger(ctx); // fired twice — no dedup key for this event

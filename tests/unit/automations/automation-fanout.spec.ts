@@ -74,7 +74,7 @@ describe('AutomationService.trigger — per-recipient fan-out (Spec 2 Task 2a)',
             channels: ['email'],
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: insp, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' });
+            companyName: 'Acme'});
         const logs = await logsFor(created.id, insp);
         expect(logs).toHaveLength(1);
         expect(logs[0].channel).toBe('email');
@@ -95,7 +95,7 @@ describe('AutomationService.trigger — per-recipient fan-out (Spec 2 Task 2a)',
             channels: ['email'],
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: insp, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' });
+            companyName: 'Acme'});
         const logs = await logsFor(created.id, insp);
         expect(logs).toHaveLength(2);
         const byRole = Object.fromEntries(logs.map((l) => [l.recipientRoleKey, l.recipient]));
@@ -114,7 +114,7 @@ describe('AutomationService.trigger — per-recipient fan-out (Spec 2 Task 2a)',
             channels: ['email'],
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: insp, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' });
+            companyName: 'Acme'});
         const logs = await logsFor(created.id, insp);
         // Previously resolveAddress gated email to the PRIMARY_CLIENT_KEY profile
         // only, so a buyer_agent rule's email channel yielded zero logs. Now it
@@ -134,7 +134,7 @@ describe('AutomationService.trigger — per-recipient fan-out (Spec 2 Task 2a)',
             channels: ['email'],
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: insp, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' });
+            companyName: 'Acme'});
         const logs = await logsFor(created.id, insp);
         expect(logs).toHaveLength(1);
         expect(logs[0].recipientRoleKey).toBe('client');
@@ -153,7 +153,7 @@ describe('AutomationService.trigger — per-recipient fan-out (Spec 2 Task 2a)',
             channels: ['email'],
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: insp, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' });
+            companyName: 'Acme'});
         const logs = await logsFor(created.id, insp);
         expect(logs).toHaveLength(1);
         expect(logs[0].recipientRoleKey).toBe('inspector');

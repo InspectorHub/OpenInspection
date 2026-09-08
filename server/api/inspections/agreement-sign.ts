@@ -207,7 +207,7 @@ agreementSignRoutes.post('/:id/sign', async (c) => {
                 tenantId: result.tenantId,
                 inspectionId: result.inspectionId,
                 triggerEvent: 'agreement.signer_signed',
-                companyName: await resolveAutomationCompanyName(getDrizzle(c), result.tenantId), reportBaseUrl: c.env.APP_BASE_URL || '',
+                companyName: await resolveAutomationCompanyName(getDrizzle(c), result.tenantId),
             }), 'automation trigger', { event: 'agreement.signer_signed', tenantId: result.tenantId });
         }
 

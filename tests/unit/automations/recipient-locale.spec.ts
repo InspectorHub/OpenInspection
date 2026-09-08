@@ -113,7 +113,7 @@ async function seedRule(opts: { inAppTemplateId: string | null }) {
 
 const fire = () => svc.trigger({
     tenantId: T, inspectionId: INSP, triggerEvent: 'report.published',
-    companyName: 'Acme', reportBaseUrl: 'https://app.example.com',
+    companyName: 'Acme',
 });
 
 const titleFor = async (contactId: string) => {

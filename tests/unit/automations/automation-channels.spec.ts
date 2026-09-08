@@ -89,7 +89,7 @@ describe('AutomationService — channels + smsTemplateId (Track L)', () => {
             channels: ['email', 'sms'], smsTemplateId: 'tpl-sms',
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: inspId, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' });
+            companyName: 'Acme'});
         const logs = (await db.select().from(schema.automationLogs)
             .where(eq(schema.automationLogs.inspectionId, inspId)).all())
             .filter((l) => l.automationId === created.id);
@@ -113,7 +113,7 @@ describe('AutomationService — channels + smsTemplateId (Track L)', () => {
             channels: ['email', 'sms'], smsTemplateId: 'tpl-sms',
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: inspId, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' });
+            companyName: 'Acme'});
         const logs = (await db.select().from(schema.automationLogs)
             .where(eq(schema.automationLogs.inspectionId, inspId)).all())
             .filter((l) => l.automationId === created.id);

@@ -19,7 +19,7 @@ export async function fireAutomation(
     const companyName = await resolveAutomationCompanyName(drizzle(db), tenantId);
     return new AutomationService(db)
         .trigger({
-            tenantId, inspectionId, triggerEvent: event, reportBaseUrl: '',
+            tenantId, inspectionId, triggerEvent: event,
             companyName,
             // Which DELIVERABLE this is about. `report.published` dedups on a
             // synthetic per-event key, and an inspection-only key collapses the

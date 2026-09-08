@@ -165,7 +165,7 @@ export class EventService {
             await new AutomationService(this.db).trigger({
                 tenantId, inspectionId,
                 triggerEvent: 'event.results_received',
-                companyName: await resolveAutomationCompanyName(drizzle(this.db), tenantId), reportBaseUrl: '',
+                companyName: await resolveAutomationCompanyName(drizzle(this.db), tenantId),
                 // Carries the visit through to delivery: the copy names the
                 // event type from it, and a retry dedupes on it.
                 eventId,
