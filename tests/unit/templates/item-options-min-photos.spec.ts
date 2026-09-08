@@ -48,6 +48,42 @@ function templateWithItemOptions(options: Record<string, unknown>) {
     };
 }
 
+/**
+ * THE TYPE PROMISES A TEMPLATE THE VALIDATOR REFUSES.
+ *
+ * `TemplateSchemaV2` (the TypeScript interface) declares `structure`,
+ * `sectionAssignments`, `itemAssignments` and `propertyMetadataFields` — the
+ * multi-unit / multi-building shape. `TemplateSchemaV2Schema` (the zod
+ * validator, `.strict()`) has never heard of any of them, so a template
+ * carrying one cannot be saved, imported or read back. Nothing writes them,
+ * which is why nobody had noticed; `inspection-resolvers.ts` READS
+ * `structure?.buildings` and is itself listed as unreachable, which is what
+ * being written for a payload that cannot exist looks like from the outside.
+ *
+ * This does not decide whether the multi-unit scope should be built. It makes
+ * the drift LOUD: the next person to add a writer finds out here rather than
+ * from a 400 in production, and if the scope is built the validator has to grow
+ * these fields deliberately rather than by accident.
+ */
+describe('template schema type vs validator', () => {
+    const REJECTED = ['structure', 'sectionAssignments', 'itemAssignments', 'propertyMetadataFields'];
+
+    for (const field of REJECTED) {
+        it(`refuses \`${field}\`, which the TypeScript type still declares`, () => {
+            const base = templateWithItemOptions({});
+            const result = TemplateSchemaV2Schema.safeParse({ ...base, [field]: {} });
+            expect(result.success).toBe(false);
+        });
+    }
+
+    // POSITIVE CONTROL: `.strict()` refuses any unknown key, so the four cases
+    // above would pass against a validator that rejected everything. The
+    // template they are added to must parse on its own.
+    it('accepts the same template without them', () => {
+        expect(TemplateSchemaV2Schema.safeParse(templateWithItemOptions({})).success).toBe(true);
+    });
+});
+
 describe('template item options', () => {
     it('refuses a minimum photo count, which nothing would honour', () => {
         const result = TemplateSchemaV2Schema.safeParse(templateWithItemOptions({ minPhotos: 3 }));

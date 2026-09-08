@@ -28,8 +28,8 @@
     "reason": "On the provider-NEUTRAL request shape because other backends' APIs expose it natively; the OpenAI chat-completions schema has none, so the single adapter drops it rather than guessing at a near-equivalent. Its header says so and tests/unit/ai/openai-compatible.spec.ts pins the behaviour by passing topK and asserting the body carries none. A documented, tested decision, not work owed."
   },
   "server/lib/billing-summary.ts#BillingSummary.guests": {
-    "kind": "deferred",
-    "reason": "The seat-quota summary counts guests — the route's own OpenAPI summary says \"permanent + guests + cap\" — and no surface shows the guest number. A tenant reading their seat usage sees two of the three figures the endpoint advertises."
+    "kind": "wire-shape",
+    "reason": "Returned whole: `GET /api/billing/summary` does `{ ...summary, portalUrl }` (or returns `summary` unchanged) and ships it. The spread reads every field. Whether the seat page RENDERS the guest count is a different question from whether the field is read."
   },
   "server/lib/compliance/erasure-coverage.ts#ErasureCoverageDisclosure.manifestRuleCount": {
     "kind": "wire-shape",
@@ -184,8 +184,8 @@
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
   "server/services/integrations.service.ts#IntegrationRow.lastSync": {
-    "kind": "deferred",
-    "reason": "Every integration row carries when it last synced, and no surface shows it. The calendar components render a staleness badge from a DIFFERENT field (`calendarLastSyncAt`), so the integrations list — the page that lists every connection — is the one place that has the number and does not use it."
+    "kind": "wire-shape",
+    "reason": "Returned whole: `GET /api/integrations` serialises the rows from `services.integrations.status(tenantId)` straight into the response. No field is named because the object is the payload."
   },
   "server/services/migration-intake/assistance.service.ts#ExpiryReminderSummary.finalReminded": {
     "kind": "invisible-read",
@@ -265,7 +265,7 @@
   },
   "server/types/template-schema.ts#TemplateStructure.buildings": {
     "kind": "deferred",
-    "reason": "Read only by `inspection-resolvers.ts`, which `lint:unwired` already lists as unreachable — so the multi-building structure is consumed exclusively by code the product cannot get to. Surfaced once reads inside unwired modules stopped counting."
+    "reason": "The TypeScript type declares it; the `.strict()` validator has never heard of it, so a template carrying it cannot be saved, imported or read back. Nothing writes it, which is why nobody noticed — and `inspection-resolvers.ts`, which reads the sibling `structure?.buildings`, is itself listed as unreachable, because it was written for a payload that cannot exist. Pinned by tests/unit/templates/item-options-min-photos.spec.ts so a future writer finds out there rather than from a 400."
   },
   "server/types/template-schema.ts#TemplateSchemaV2.schemaVersion": {
     "kind": "wire-shape",
@@ -273,14 +273,14 @@
   },
   "server/types/template-schema.ts#TemplateSchemaV2.sectionAssignments": {
     "kind": "deferred",
-    "reason": "Multi-unit template assignment, built for a scope that does not exist yet. `sectionAssignments` / `itemAssignments` / `propertyMetadataFields` describe which parts of a template apply per unit; the per-unit inspection scope they were shaped for is not built, so nothing reads them."
+    "reason": "The TypeScript type declares it; the `.strict()` validator has never heard of it, so a template carrying it cannot be saved, imported or read back. Nothing writes it, which is why nobody noticed — and `inspection-resolvers.ts`, which reads the sibling `structure?.buildings`, is itself listed as unreachable, because it was written for a payload that cannot exist. Pinned by tests/unit/templates/item-options-min-photos.spec.ts so a future writer finds out there rather than from a 400."
   },
   "server/types/template-schema.ts#TemplateSchemaV2.itemAssignments": {
     "kind": "deferred",
-    "reason": "Multi-unit template assignment, built for a scope that does not exist yet. `sectionAssignments` / `itemAssignments` / `propertyMetadataFields` describe which parts of a template apply per unit; the per-unit inspection scope they were shaped for is not built, so nothing reads them."
+    "reason": "The TypeScript type declares it; the `.strict()` validator has never heard of it, so a template carrying it cannot be saved, imported or read back. Nothing writes it, which is why nobody noticed — and `inspection-resolvers.ts`, which reads the sibling `structure?.buildings`, is itself listed as unreachable, because it was written for a payload that cannot exist. Pinned by tests/unit/templates/item-options-min-photos.spec.ts so a future writer finds out there rather than from a 400."
   },
   "server/types/template-schema.ts#TemplateSchemaV2.propertyMetadataFields": {
     "kind": "deferred",
-    "reason": "Multi-unit template assignment, built for a scope that does not exist yet. `sectionAssignments` / `itemAssignments` / `propertyMetadataFields` describe which parts of a template apply per unit; the per-unit inspection scope they were shaped for is not built, so nothing reads them."
+    "reason": "The TypeScript type declares it; the `.strict()` validator has never heard of it, so a template carrying it cannot be saved, imported or read back. Nothing writes it, which is why nobody noticed — and `inspection-resolvers.ts`, which reads the sibling `structure?.buildings`, is itself listed as unreachable, because it was written for a payload that cannot exist. Pinned by tests/unit/templates/item-options-min-photos.spec.ts so a future writer finds out there rather than from a 400."
   }
 }
