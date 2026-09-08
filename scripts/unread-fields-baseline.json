@@ -3,10 +3,6 @@
     "kind": "deferred",
     "reason": "Written in app/components/portal/sections/report/PcaSkeleton.tsx, server/lib/pca-report-block.ts, and read by nothing — every mention there sets it or types it."
   },
-  "app/components/portal/sections/report/types.ts#BucketRollup.immediateCents": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/pca-costs.ts, and read by nothing — every mention there sets it or types it."
-  },
   "app/components/portal/sections/report/types.ts#StyleProfileClient.schemaVersion": {
     "kind": "wire-shape",
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
@@ -166,22 +162,6 @@
   "server/lib/migration-intake/bundle.ts#MigrationBundleV1.formatVersion": {
     "kind": "deferred",
     "reason": "Written in server/lib/migration-intake/adapters/csv-generic.ts, server/lib/migration-intake/adapters/home-inspector-pro.ts, server/lib/migration-intake/adapters/spectora.ts +1, and read by nothing — every mention there sets it or types it."
-  },
-  "server/lib/pca-costs.ts#BucketRollup.immediateCents": {
-    "kind": "deferred",
-    "reason": "Written in app/components/portal/sections/report/types.ts, and read by nothing — every mention there sets it or types it."
-  },
-  "server/lib/pca-costs.ts#BucketRollup.shortTermCents": {
-    "kind": "deferred",
-    "reason": "Written in app/components/portal/sections/report/types.ts, and read by nothing — every mention there sets it or types it."
-  },
-  "server/lib/pca-costs.ts#BucketRollup.reserveCents": {
-    "kind": "deferred",
-    "reason": "Written in app/components/portal/sections/report/types.ts, and read by nothing — every mention there sets it or types it."
-  },
-  "server/lib/pca-costs.ts#CostTables.droppedCount": {
-    "kind": "deferred",
-    "reason": "Written in app/components/portal/sections/report/types.ts, and read by nothing — every mention there sets it or types it."
   },
   "server/lib/pca-report-block.ts#PcaReportBlock.sectionRegistry": {
     "kind": "deferred",

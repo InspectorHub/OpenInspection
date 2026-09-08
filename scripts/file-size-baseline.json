@@ -80,7 +80,7 @@
   "app/routes/calendar.tsx": 417,
   "server/lib/db/schema/inspection/core.ts": 415,
   "server/services/agreement/signer-state.ts": 413,
-  "app/components/portal/sections/ReportView.tsx": 407,
+  "app/components/portal/sections/ReportView.tsx": 409,
   "scripts/check-non-translatable.mjs": 402,
   "playwright.config.ts": 401
 }

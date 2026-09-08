@@ -273,6 +273,8 @@ function ReportHalf(props: ReportViewProps & { forcedHalf?: "en" | "translated" 
         <ReportToc entries={data.outline ?? []} tocPages={data.tocPages} />
         <PcaSkeleton
           data={data.pcaReport ?? null}
+          costTables={data.costTables ?? null}
+          showEstimates={data.showEstimates}
           tier={data.reportTier ?? null}
           reportTimeZone={data.reportTimeZone}
           compliance={{

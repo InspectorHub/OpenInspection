@@ -51,12 +51,19 @@
  * does not, and the total moves by exactly one. A census nobody has red/green
  * tested is a number, not a measurement.
  *
- * Three passes of precision work came out of that, each one measured rather
- * than guessed: 211 findings with a line-based body scan, 141 once the body is
- * taken by matching braces (the line-based one walked off the end of a type and
- * reported the following function's PARAMETERS as its fields), 103 once types
- * whose keys are enumerated are excused, 95 once `scripts/` counts as a place a
- * field can be read from. Every step removed noise, never a real finding.
+ * Five passes of precision work came out of that, each one measured rather than
+ * guessed. 211 findings with a line-based body scan; 141 once the body is taken
+ * by matching braces (the line-based one walked off the end of a type and
+ * reported the following function's PARAMETERS as its fields); 103 once types
+ * whose keys are enumerated are excused; 95 once `scripts/` counts as a place a
+ * field can be read from.
+ *
+ * The last two went the OTHER WAY, and that is the more useful half. Excluding
+ * prose took the count UP, 95 -> 98, because this file's own header had been
+ * counting as a read of the fields it names as examples. Reading the working
+ * tree rather than the index fixed a blindness to files not yet `git add`-ed —
+ * caught when a component was written to consume a flagged field and the count
+ * did not move. A census that only ever falls is not being corrected.
  *
  *   node scripts/check-unread-fields.mjs            # gate
  *   node scripts/check-unread-fields.mjs --update   # re-take the census
@@ -92,7 +99,14 @@ const KINDS = new Set([
 /*  Sources                                                            */
 /* ------------------------------------------------------------------ */
 
-const FILES = execFileSync('git', ['ls-files', 'app', 'server', 'packages'], {
+// `--others --exclude-standard` alongside the tracked list, because a file that
+// has not been `git add`-ed yet is still part of the working tree this gate is
+// asked about. Without it a brand-new module's READS are invisible (the census
+// over-reports the moment you write the consumer) and its own DECLARATIONS are
+// unscanned (a new dead field is not caught until it is staged) — measured the
+// first time a component was written to consume a flagged field and the count
+// did not move.
+const FILES = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', 'app', 'server', 'packages'], {
     encoding: 'utf8',
     cwd: ROOT,
 })
@@ -115,7 +129,7 @@ const SRC = new Map(FILES.map((f) => [f, readFileSync(join(ROOT, f), 'utf8')]));
  * on every commit is not an unread field, and a census that called twenty of
  * them dead would have been teaching people to ignore it.
  */
-const READ_ONLY_CORPUS = execFileSync('git', ['ls-files', 'scripts', 'workers'], {
+const READ_ONLY_CORPUS = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', 'scripts', 'workers'], {
     encoding: 'utf8',
     cwd: ROOT,
 })

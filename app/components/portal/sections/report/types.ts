@@ -284,7 +284,7 @@ interface ReserveSchedule {
   totalUninflatedCents: number; totalInflatedCents: number;
   perSfUninflatedAllYears: number | null; perSfInflatedAllYears: number | null; perSfInflatedPerYear: number | null;
 }
-interface BucketRollup { immediateCents: number; shortTermCents: number; reserveCents: number }
+export interface BucketRollup { immediateCents: number; shortTermCents: number; reserveCents: number }
 export interface CostTables {
   table1: Table1; reserveSchedule: ReserveSchedule | null;
   rollup: BucketRollup; droppedCount: number;
