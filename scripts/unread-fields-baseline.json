@@ -13,15 +13,11 @@
   },
   "app/lib/inspection-media.ts#GalleryPhoto.pendingPlaceholder": {
     "kind": "deferred",
-    "reason": "Written in app/hooks/usePhotoOps.ts, and read by nothing — every mention there sets it or types it."
-  },
-  "app/routes/messages.tsx#ThreadSummary.lastFromRole": {
-    "kind": "deferred",
-    "reason": "Written in server/api/messages-threads.ts, server/services/message.service.ts, and read by nothing — every mention there sets it or types it."
+    "reason": "Computed and set by `usePhotoOps` (`pendingPlaceholder: !hasLocal && !baseKey`) and read by no renderer, so a tile standing in for a photo that has not arrived looks exactly like a photo that has."
   },
   "server/lib/ai/output-classification.ts#ClassificationPosture.requiresReview": {
     "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/ai/output-classification.ts the name appears only in tests (tests/unit/ai/capability-policy.spec.ts)."
+    "reason": "A posture says whether its output needs review before use, and nothing asks. The flag is set where the posture is defined and read nowhere, so the review it calls for is not requested by anything."
   },
   "server/lib/ai/provider.ts#AiRequest.topK": {
     "kind": "deferred",
@@ -33,7 +29,7 @@
   },
   "server/lib/billing-summary.ts#BillingSummary.guests": {
     "kind": "deferred",
-    "reason": "Written in server/api/billing.ts, server/lib/mcp/openapi-snapshot.json, and read by nothing — every mention there sets it or types it."
+    "reason": "The seat-quota summary counts guests — the route's own OpenAPI summary says \"permanent + guests + cap\" — and no surface shows the guest number. A tenant reading their seat usage sees two of the three figures the endpoint advertises."
   },
   "server/lib/compliance/erasure-coverage.ts#ErasureCoverageDisclosure.manifestRuleCount": {
     "kind": "wire-shape",
@@ -113,7 +109,7 @@
   },
   "server/lib/dashboard-columns.ts#DashboardColumn.mobileVisible": {
     "kind": "deferred",
-    "reason": "Declared in server/lib/dashboard-columns.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
+    "reason": "Declares which dashboard columns survive a narrow viewport, and no layout consults it — so the responsive behaviour it describes is whatever the CSS happens to do."
   },
   "server/lib/google-calendar.ts#GoogleTokenResponse.token_type": {
     "kind": "wire-shape",
@@ -161,15 +157,15 @@
   },
   "server/lib/sms/messaging-rules.ts#MessagingRule.identification": {
     "kind": "deferred",
-    "reason": "Written in scripts/check-messaging-rules.mjs, server/data/seed-templates/fl-oir-b1-1802-rev-04-26.gaps.md, server/data/seed-templates/trec-rei-7-6.json +4, and read by nothing — every mention there sets it or types it."
+    "reason": "The identification a rule requires a message to carry. Declared on the rule and consulted by nothing, so a rule that says a message must identify its sender does not make it happen."
   },
   "server/lib/sms/sender-identity.ts#SmsSenderIdentity.platformSender": {
-    "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/sms/sender-identity.ts the name appears only in tests (tests/unit/automations/automation-flush-sms.spec.ts, tests/unit/sms/sender-identity.spec.ts)."
+    "kind": "wire-shape",
+    "reason": "Stored, not computed-and-dropped: `SmsSenderIdentity` is the `$type` of the `sender_identity` JSON column on the automation schema, so every message's record carries who operated the transmission. Read by whoever reads the record."
   },
   "server/lib/sms/sender-identity.ts#SmsSenderIdentity.tenantOnWhoseBehalf": {
-    "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/sms/sender-identity.ts the name appears only in tests (tests/unit/automations/automation-flush-sms.spec.ts, tests/unit/sms/sender-identity.spec.ts)."
+    "kind": "wire-shape",
+    "reason": "Stored in the `sender_identity` JSON column beside `platformSender` — the tenant a message was sent FOR. The pair is the record of who transmitted on whose behalf; nothing branches on it and nothing should."
   },
   "server/lib/subtype-specials.ts#SubtypeSpecialMounts.subItemIds": {
     "kind": "deferred",
@@ -304,8 +300,8 @@
     "reason": "Read as `env[`JWT_PUBLIC_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts). The next rotation slot; provisioning it is a verify-only window before JWT_CURRENT_KID flips."
   },
   "server/types/template-schema.ts#TemplateSection.sharedComments": {
-    "kind": "deferred",
-    "reason": "Written in app/lib/editor/structure-ops.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "invisible-read",
+    "reason": "Read by NAME as a string: `app/lib/editor/structure-ops.ts` lists `'sharedComments'` among the section keys it carries across a structure edit. A string in a list is a read no name-based scan can follow."
   },
   "server/types/template-schema.ts#TemplateSchemaV2.schemaVersion": {
     "kind": "wire-shape",
@@ -313,14 +309,14 @@
   },
   "server/types/template-schema.ts#TemplateSchemaV2.sectionAssignments": {
     "kind": "deferred",
-    "reason": "Declared in server/types/template-schema.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
+    "reason": "Multi-unit template assignment, built for a scope that does not exist yet. `sectionAssignments` / `itemAssignments` / `propertyMetadataFields` describe which parts of a template apply per unit; the per-unit inspection scope they were shaped for is not built, so nothing reads them."
   },
   "server/types/template-schema.ts#TemplateSchemaV2.itemAssignments": {
     "kind": "deferred",
-    "reason": "Declared in server/types/template-schema.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
+    "reason": "Multi-unit template assignment, built for a scope that does not exist yet. `sectionAssignments` / `itemAssignments` / `propertyMetadataFields` describe which parts of a template apply per unit; the per-unit inspection scope they were shaped for is not built, so nothing reads them."
   },
   "server/types/template-schema.ts#TemplateSchemaV2.propertyMetadataFields": {
     "kind": "deferred",
-    "reason": "Declared in server/types/template-schema.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
+    "reason": "Multi-unit template assignment, built for a scope that does not exist yet. `sectionAssignments` / `itemAssignments` / `propertyMetadataFields` describe which parts of a template apply per unit; the per-unit inspection scope they were shaped for is not built, so nothing reads them."
   }
 }

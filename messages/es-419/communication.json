@@ -48,6 +48,7 @@
   "messages_empty_list": "Aún no hay conversaciones. Escríbale a un cliente o a un agente desde una página de inspección y el hilo aparece aquí.",
   "messages_pick_thread": "Elija una conversación a la izquierda.",
   "messages_unknown_contact": "Contacto desconocido",
+  "messages_last_from_you": "Usted:",
   "messages_thread_empty_title": "Aún no hay mensajes con este contacto",
   "messages_thread_empty_body": "Escriba abajo para iniciar la conversación.",
   "messages_thread_spans": "Esta conversación abarca:",
