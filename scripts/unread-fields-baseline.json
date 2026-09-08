@@ -117,7 +117,7 @@
   },
   "server/lib/holidays/resolve-closed-dates.ts#HolidayDataCoverage.minYear": {
     "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/holidays/resolve-closed-dates.ts the name appears only in tests (tests/unit/holidays/resolve-closed-dates.spec.ts)."
+    "reason": "How far back the holiday data reaches, reported alongside its upper bound and read by nothing. A date resolved outside the covered range is answered as confidently as one inside it."
   },
   "server/lib/messaging/compliance-provider.ts#ComplianceEvent.entitySid": {
     "kind": "wire-shape",
@@ -148,8 +148,8 @@
     "reason": "Publish pre-flight. Not one field short of a consumer: `InspectionCoreService.computePreflight` has NO CALLER — no route, no loader — so the whole checklist that would tell an inspector what is missing before publishing is computed by a method nobody invokes. `lint:unwired` cannot see it because the service file is reachable through its other methods."
   },
   "server/lib/qr.ts#QrSvgOptions.margin": {
-    "kind": "deferred",
-    "reason": "Written in app/components/RatingSystemEditor.tsx, app/components/editor-shared/CannedCommentRow.tsx, app/components/editor-shared/DefectCategoryChip.tsx +77, and read by nothing — every mention there sets it or types it."
+    "kind": "invisible-read",
+    "reason": "Read by the qrcode package's svg-tag renderer, which this module deep-imports and hands the whole options object to. Measured rather than assumed: margin 0 gives a 21-module viewBox and margin 8 gives 37. Pinned by tests/unit/platform/qr-options.spec.ts so the pass-through cannot break silently on an upgrade."
   },
   "server/lib/report-style/profiles.ts#StyleProfile.schemaVersion": {
     "kind": "wire-shape",
@@ -169,11 +169,11 @@
   },
   "server/lib/subtype-specials.ts#SubtypeSpecialMounts.subItemIds": {
     "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/subtype-specials.ts the name appears only in tests (tests/unit/inspections/subtype-specials.spec.ts)."
+    "reason": "The sub-items a commercial subtype's special mount brings with it, declared and consulted by nothing, so mounting a special adds the parent and silently drops what was meant to hang beneath it."
   },
   "server/lib/system-coverage.ts#SystemCoverage.attribution": {
     "kind": "deferred",
-    "reason": "Written in app/components/inspector-portal/VisitsCard.tsx, app/components/portal/sections/report/ReportSignatureBlock.tsx, app/lib/report-helpers.ts +25, and read by nothing — every mention there sets it or types it."
+    "reason": "Where a system's coverage claim came from, carried beside the claim and read by nothing — so a coverage figure is shown, or would be, with no way to say what it was derived from."
   },
   "server/lib/version-diff.ts#Snapshot.schemaVersion": {
     "kind": "wire-shape",
@@ -185,7 +185,7 @@
   },
   "server/portal/parked-fingerprint.ts#ParkedFingerprint.invalidFields": {
     "kind": "deferred",
-    "reason": "Written but never read: outside server/portal/parked-fingerprint.ts the name appears only in tests (tests/workers/parked-cmd-redaction.spec.ts)."
+    "reason": "Which fields made a portal event unparseable, computed when it is parked and read by nobody. The parking lot records THAT a message could not be understood without recording WHAT about it could not be."
   },
   "server/services/account.service.ts#AccountExport.exportedAt": {
     "kind": "wire-shape",
@@ -209,15 +209,15 @@
   },
   "server/services/automation/shared.ts#TriggerContext.reportBaseUrl": {
     "kind": "deferred",
-    "reason": "Written in server/api/bookings/agreement.ts, server/api/inspections/agreement-sign.ts, server/lib/sign-effects.ts +3, and read by nothing — every mention there sets it or types it."
+    "reason": "Every trigger site fills it (`reportBaseUrl: c.env.APP_BASE_URL || ''`, in four places) and no automation reads it, so an automation that wanted to link a recipient to their report has the base URL handed to it and no way to use it."
   },
   "server/services/data-export.service.ts#ExportManifest.photosEmbedded": {
     "kind": "wire-shape",
     "reason": "Part of the export manifest that travels with the archive and crosses the seam (portal reads the manifest on `cmd.subject.export`). The reader is the person holding the export, or portal's record of it."
   },
   "server/services/inspection/inspection-analytics.service.ts#RepairListEntry.recommendationLabel": {
-    "kind": "deferred",
-    "reason": "Written in server/api/inspections/report-delivery.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Part of the published response contract — `report-delivery.ts` declares it on the schema and the analytics service fills it from the slug map. It leaves the process; our own client does not render it, which is a separate question from whether the field is dead."
   },
   "server/services/inspection/report-schema-types.ts#SchemaData.schemaVersion": {
     "kind": "wire-shape",
@@ -229,11 +229,11 @@
   },
   "server/services/migration-intake/assistance.service.ts#ExpiryReminderSummary.finalReminded": {
     "kind": "deferred",
-    "reason": "Written but never read: outside server/services/migration-intake/assistance.service.ts the name appears only in tests (tests/unit/migration-intake/assistance-mail.spec.ts)."
+    "reason": "How many assisted runs got their FINAL expiry reminder, counted separately from the earlier one and then dropped. The distinction exists because the last warning before a third party's file is deleted is the one worth knowing about."
   },
   "server/services/migration-intake/repair.service.ts#RemapResult.replacedRowCount": {
-    "kind": "deferred",
-    "reason": "Written in server/api/migration-intake/route-definitions.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Declared on the route's response schema with its own description — \"How many entries it threw away, every one of which is gone\" — so the caller is told. Nothing on this side reads it back."
   },
   "server/services/statutory/production-record.ts#ProductionInput.producedBy": {
     "kind": "wire-shape",
