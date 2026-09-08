@@ -68,9 +68,10 @@ export interface RepairListEntry {
     // No estimateLow / estimateHigh. This list is served over
     // `GET /api/inspections/{id}/repair-list` — an endpoint on the MCP
     // `extended` tier — and it had no equivalent of the report's
-    // pinned-off `showEstimates` gate, so a price on a stored finding
-    // walked straight out of it. A punch list says what needs doing and
-    // which trade does it; what the work costs belongs to whoever bids.
+    // `showEstimates` gate, so a price on a stored finding walked straight
+    // out of it. A punch list says what needs doing and which trade does it;
+    // what the work costs belongs to whoever bids. Their ABSENCE is the
+    // guarantee here, not a flag.
     photos:              Array<{ key: string; url: string }>;
     // Source — distinguishes canned (template-driven) vs custom
     // (per-inspection ad-hoc) defects so realtors can see the mix.

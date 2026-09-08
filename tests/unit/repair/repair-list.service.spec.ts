@@ -164,8 +164,8 @@ describe('Track E1 — InspectionService.getRepairList', () => {
      * The repair list is the punch list a contractor or realtor is handed, and
      * it is served over `GET /api/inspections/{id}/repair-list` — an endpoint on
      * the MCP `extended` tier, which is ON in production. The report badge was
-     * pinned off (`showEstimates = false`), but this exit never had a gate: a
-     * price on a stored finding walked straight out of it.
+     * gated, but this exit never had a gate at all: a price on a stored finding
+     * walked straight out of it.
      *
      * The fixture is written past the service on purpose, with amounts, so this
      * proves the READ drops them rather than the write never having stored them.
@@ -324,8 +324,10 @@ describe('Track E1 — InspectionService.getRepairList', () => {
 
     it('reports showEstimates=false, with or without a tenant config row', async () => {
         // The repair list does not decide this — it forwards getReportData's
-        // `showEstimates`, which is pinned false while embedded estimates are
-        // redesigned as a standalone deliverable.
+        // `showEstimates`, which is decided by the report tier. This fixture is
+        // residential, so the answer is false; a `full_pca` inspection would
+        // forward true, and there would still be no money on the list to show,
+        // because the entry type carries no estimate fields at all.
         //
         // The second half used to insert `show_estimates = 1` and assert the pin
         // held anyway. That column is gone (nothing ever read it), so the
