@@ -1,1 +1,0 @@
-ALTER TABLE `marketplace_libraries` ADD `delisted_at` integer;
