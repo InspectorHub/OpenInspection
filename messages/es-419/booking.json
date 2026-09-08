@@ -33,6 +33,8 @@
   "booking_wizard_heading": "Programe una inspección",
   "booking_wizard_subtitle": "Cuéntenos sobre la propiedad y elija un horario que le convenga.",
   "booking_wizard_submit": "Solicitar la inspección",
+  "booking_verify_required": "Complete la verificación y vuelva a intentarlo.",
+  "booking_verify_unavailable": "No se pudo cargar el desafío de verificación, por lo que este formulario no se puede enviar. Revise su conexión y vuelva a cargar la página.",
   "booking_prefill_remembered_notice": "Se completó con los datos de su última reserva en este navegador.",
   "booking_prefill_clear": "¿No es usted? Borrar",
   "booking_agent_on_behalf_heading": "Reservando en nombre de un cliente como {name}",

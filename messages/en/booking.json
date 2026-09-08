@@ -33,6 +33,8 @@
   "booking_wizard_heading": "Schedule an inspection",
   "booking_wizard_subtitle": "Tell us about the property and pick a time that works.",
   "booking_wizard_submit": "Request Inspection",
+  "booking_verify_required": "Please complete the verification, then try again.",
+  "booking_verify_unavailable": "The verification challenge could not load, so this form cannot be submitted. Check your connection and reload the page.",
   "booking_prefill_remembered_notice": "Filled in from your last booking in this browser.",
   "booking_prefill_clear": "Not you? Clear",
   "booking_agent_on_behalf_heading": "Booking on behalf of a client as {name}",
