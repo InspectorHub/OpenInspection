@@ -185,7 +185,11 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
     try {
       // Omit inspectorId when empty so the server auto-assigns.
       const inspectorId = fd.get("inspectorId") || "";
-      const res = await fetch("/api/public/book", {
+      // `embed=1` is how `admitBooking` knows to apply the tenant's widget
+      // origin allowlist. Without it that block was unreachable and the
+      // allowlist had never run for a booking. The server enforces only a
+      // list a tenant actually configured, so saying so locks nobody out.
+      const res = await fetch("/api/public/book?embed=1", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

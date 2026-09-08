@@ -119,9 +119,9 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     icsToken: text('ics_token'),
     // Cross-origin allowlist for the embeddable booking widget; an entry may
     // carry ONE `*` in the host (`https://*.acme.com`), and protocol/port must
-    // match exactly. NULL or [] is FAIL-CLOSED — `isOriginAllowed` returns false
-    // on an empty list, so the widget embeds nowhere until an origin is saved.
-    // Written only by WidgetService, never through the branding allowlist.
+    // match exactly. `isOriginAllowed` is FAIL-CLOSED on an empty list — right for
+    // its analytics caller; booking admission applies it only when a tenant saved
+    // origins, because no screen can. Written only by WidgetService, never branding.
     widgetAllowedOrigins: text('widget_allowed_origins', { mode: 'json' }).$type<string[]>(),
     // Report Style Presets — default appearance profile id (built-in: signature|meridian|terra).
     // Open-ended (Phase 2 adds tenant-authored profiles); resolveProfile falls back to 'signature'.

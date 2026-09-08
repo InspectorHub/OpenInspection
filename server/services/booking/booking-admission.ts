@@ -76,6 +76,30 @@ async function resolveProperty(
  * here, and unit tests construct the service with a handle that is not
  * `c.env.DB`.
  */
+/**
+ * Whether a slot on the grid falls inside a requested booking window.
+ *
+ * The boundaries are the ones the product already promises: the picker's own
+ * copy and `windowLabelFor` describe morning as before noon and afternoon as
+ * noon onward, and all day as flexible timing. Slot times are zero-padded
+ * `HH:MM`, so a string compare is a clock compare.
+ *
+ * `custom` stays EXACT. A caller naming a time is asking for that time, and a
+ * request for 10:00 that quietly became 09:00 would be worse than a refusal.
+ */
+function satisfiesWindow(
+    slot: string,
+    timeSlot: z.infer<typeof PublicBookingSchema>['timeSlot'],
+    customTime: string | null,
+): boolean {
+    switch (timeSlot) {
+        case 'morning':   return slot < '12:00';
+        case 'afternoon': return slot >= '12:00';
+        case 'all-day':   return true;
+        case 'custom':    return slot === customTime;
+    }
+}
+
 export async function admitBooking(
     c: Context<HonoConfig>,
     db: DrizzleD1Database,
@@ -107,10 +131,24 @@ export async function admitBooking(
     const isWidgetSubmit = c.req.query('embed') === '1';
     const originHeader = c.req.header('origin');
     if (isWidgetSubmit) {
-        const ok = await c.var.services.widget.isOriginAllowed(tenantId, originHeader ?? null);
-        if (!ok) {
-            await c.var.services.widget.recordEvent(tenantId, 'error', { origin: originHeader, reason: 'origin_not_allowed' });
-            throw Errors.Forbidden('Widget submissions from this origin are not allowed for this workspace.');
+        // AN ALLOWLIST NOBODY HAS WRITTEN IS NOT AN EMPTY ALLOWLIST.
+        //
+        // `isOriginAllowed` is fail-closed on an empty list, and its other
+        // caller wants that — `server/api/widget.ts` silently drops analytics
+        // events from origins it cannot vouch for. Applied here it would be a
+        // lock with no key: nothing under `app/` can save an origin (the only
+        // writer is an admin-config endpoint, and the embed settings panel
+        // hands out an iframe snippet without ever mentioning them), so every
+        // embedded booking form in existence would start answering 403 with no
+        // self-service way out. Enforce what a tenant configured; leave a
+        // tenant who configured nothing where they already are.
+        const allowlist = await c.var.services.widget.getAllowedOrigins(tenantId);
+        if (allowlist.length > 0) {
+            const ok = await c.var.services.widget.isOriginAllowed(tenantId, originHeader ?? null);
+            if (!ok) {
+                await c.var.services.widget.recordEvent(tenantId, 'error', { origin: originHeader, reason: 'origin_not_allowed' });
+                throw Errors.Forbidden('Widget submissions from this origin are not allowed for this workspace.');
+            }
         }
     }
 
@@ -153,13 +191,6 @@ export async function admitBooking(
     // Spec 3C / IA-26 — availability enforcement now runs on the tenant
     // aggregation: a slot is bookable iff at least one QUALIFIED inspector
     // is free (or the requested one, when the client chose).
-    let requestedTime: string;
-    switch (body.timeSlot) {
-        case 'morning':   requestedTime = '08:00'; break;
-        case 'afternoon': requestedTime = '13:00'; break;
-        case 'all-day':   requestedTime = '08:00'; break;
-        case 'custom':    requestedTime = body.customTime ?? '08:00'; break;
-    }
     // KNOWN RACE (advisory check): the slot read and the inspection insert
     // below are not atomic and D1 offers no row locks, so two concurrent
     // submits for the last slot can both pass and double-book the same
@@ -178,11 +209,24 @@ export async function admitBooking(
     if (outsideServiceArea) {
         throw Errors.Conflict('No inspector currently serves that area. Please contact the company directly to schedule.');
     }
-    const target = slots.find(s => s.time === requestedTime);
+    // A WINDOW IS SATISFIED BY ANY FREE SLOT INSIDE IT.
+    //
+    // This used to reduce the window to one clock reading — morning and all-day
+    // both became '08:00' — and then look for a slot matching it exactly. The
+    // grid is built from the tenant's own opening hours, so the two met only
+    // when the tenant happened to open at eight. A company that opens at nine
+    // could not be booked for Morning (the first option in the picker) or for
+    // All Day (all the embedded widget can send) on any date at all.
+    const target = slots.find(s =>
+        satisfiesWindow(s.time, body.timeSlot, body.customTime ?? null)
+        && (s.inspectorIds ?? []).some(id => !inspectorId || id === inspectorId));
     const freeIds = (target?.inspectorIds ?? []).filter(id => !inspectorId || id === inspectorId);
     if (freeIds.length === 0) {
         throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
     }
+    // The slot actually chosen, not the constant that was asked for — this is
+    // the start time the inspection is scheduled at and the client is told.
+    const requestedTime = target!.time;
     let routing: RoutingDecision | null = null;
     if (!inspectorId) {
         routing = await service.routeInspector(tenantId, freeIds, {

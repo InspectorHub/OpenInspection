@@ -103,10 +103,21 @@ function submit() {
     fireEvent.submit(document.querySelector("form")!);
 }
 
+/** The one booking POST, or undefined when none was made. */
+function bookingCall() {
+    return fetchMock.mock.calls.find(([url]) => String(url).includes("/api/public/book"));
+}
+
 /** The JSON body of the one booking POST, or null when none was made. */
 function postedBody(): Record<string, unknown> | null {
-    const call = fetchMock.mock.calls.find(([url]) => String(url).includes("/api/public/book"));
+    const call = bookingCall();
     return call ? JSON.parse(call[1].body) : null;
+}
+
+/** The URL of the one booking POST, or null when none was made. */
+function postedUrl(): string | null {
+    const call = bookingCall();
+    return call ? String(call[0]) : null;
 }
 
 describe("embedded booking form: bot challenge", () => {
@@ -170,5 +181,24 @@ describe("embedded booking form: bot challenge", () => {
     it("treats the branded style as light", () => {
         renderEmbed({ theme: "branded" });
         expect(renderOpts!.theme).toBe("light");
+    });
+
+    /**
+     * The form says what it is, so the tenant's origin allowlist can apply.
+     *
+     * `admitBooking` gates that allowlist on `c.req.query('embed') === '1'`.
+     * This form posted to a bare `/api/public/book`, so the flag was never set
+     * and `widget.isOriginAllowed` had never once run for a booking — a
+     * tenant-facing restriction that never executed. The server half now
+     * enforces only an allowlist a tenant actually configured, so declaring
+     * this cannot lock anyone out; see the admission spec for that half.
+     */
+    it("identifies itself as a widget submission", async () => {
+        renderEmbed();
+        act(() => solve!("tok"));
+        fillRequired();
+        submit();
+        await waitFor(() => expect(postedUrl()).not.toBeNull());
+        expect(postedUrl()).toContain("embed=1");
     });
 });
