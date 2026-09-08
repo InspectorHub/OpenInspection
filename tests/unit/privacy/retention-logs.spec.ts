@@ -10,7 +10,7 @@
  * test that restates the number cannot notice the number changing.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { eq, getTableName, is, Table } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
 import { asAnyDb } from '../helpers/test-db';
@@ -59,6 +59,110 @@ describe('manifest <-> executor binding', () => {
         const tables = new Set(RETENTION_MANIFEST.map((r) => r.table));
         const orphaned = RETENTION_EXECUTOR_TABLES.filter((t) => !tables.has(t));
         expect(orphaned, `executors with no rule: ${orphaned.join(', ')}`).toHaveLength(0);
+    });
+});
+
+/**
+ * The manifest names COLUMNS, and until now nothing checked they exist.
+ *
+ * The two above bind rules to executors by TABLE. Inside a rule, three fields
+ * name columns — `timestampColumn`, `rowWindowColumn`, `tenantWindowColumnYears`
+ * — and each executor hardcodes the same column again in Drizzle property form.
+ * Nothing held the two together, so a rename would leave the catalogue
+ * publishing a column that no longer exists while the code retained on a
+ * different clock, with every gate green. The catalogue is what the retention
+ * register and the privacy policy are generated from, so "the manifest is true"
+ * is the property worth enforcing.
+ *
+ * This is the NAME half only. It cannot see whether an executor READS the
+ * column it declares — that is the behavioural half, further down.
+ */
+function sqlColumnNames(table: unknown): Set<string> {
+    // Drizzle columns hang off the table object carrying their SQL `.name`.
+    // Read by shape rather than through a typed accessor so this walks tables
+    // it was not written against. Verified against `audit_logs`: 12 columns,
+    // snake_case, `created_at` among them.
+    const out = new Set<string>();
+    for (const value of Object.values(table as Record<string, unknown>)) {
+        const name = (value as { name?: unknown } | null)?.name;
+        if (typeof name === 'string') out.add(name);
+    }
+    return out;
+}
+
+/**
+ * SQL table name -> the Drizzle table object.
+ *
+ * ⚠️ `table._.name` is NOT it — measured `undefined`. `getTableName` is the
+ * public accessor and `is(v, Table)` is how a table is told from the types,
+ * constants and helpers that also live in the schema barrel. Verified: 109
+ * tables, the same count `lint:seed-sql` reports.
+ */
+const TABLES_BY_SQL_NAME: Map<string, Table> = new Map(
+    Object.values(schema as Record<string, unknown>)
+        .filter((v): v is Table => is(v, Table))
+        .map((t) => [getTableName(t), t]),
+);
+
+describe('every column the manifest names exists on its table', () => {
+    it('is measuring a real schema, not an empty barrel', () => {
+        // An empty map would make all three loops below pass vacuously.
+        expect(TABLES_BY_SQL_NAME.size).toBeGreaterThan(50);
+        expect(RETENTION_MANIFEST.length).toBeGreaterThan(10);
+    });
+
+    it('reports a column that is not there', () => {
+        // POSITIVE CONTROL for the column reader itself: if it returned
+        // everything (or nothing but truthy answers), the three checks below
+        // could not fail however wrong the manifest got.
+        const cols = sqlColumnNames(TABLES_BY_SQL_NAME.get('audit_logs'));
+        expect(cols.has('created_at')).toBe(true);
+        expect(cols.has('no_such_column_xyz')).toBe(false);
+    });
+
+    it('resolves every rule to a table in the schema', () => {
+        const missing = RETENTION_MANIFEST
+            .map((r) => r.table)
+            .filter((t) => !TABLES_BY_SQL_NAME.has(t));
+        expect(missing, `manifest names tables not in the schema: ${missing.join(', ')}`)
+            .toHaveLength(0);
+    });
+
+    it('every timestampColumn is a real column on its own table', () => {
+        const bad = RETENTION_MANIFEST
+            .filter((r) => {
+                const table = TABLES_BY_SQL_NAME.get(r.table);
+                return !table || !sqlColumnNames(table).has(r.timestampColumn);
+            })
+            .map((r) => `${r.table}.${r.timestampColumn}`);
+        expect(bad, `manifest names columns that do not exist: ${bad.join(', ')}`)
+            .toHaveLength(0);
+    });
+
+    it('every rowWindowColumn is a real column on its own table', () => {
+        const declared = RETENTION_MANIFEST.filter((r) => r.rowWindowColumn);
+        // The field is optional and rare, so an empty filter would make the
+        // assertion below green while checking nothing. It is on `migration_batches`.
+        expect(declared.length).toBeGreaterThan(0);
+        const bad = declared
+            .filter((r) => {
+                const table = TABLES_BY_SQL_NAME.get(r.table);
+                return !table || !sqlColumnNames(table).has(r.rowWindowColumn!);
+            })
+            .map((r) => `${r.table}.${r.rowWindowColumn}`);
+        expect(bad, `rowWindowColumn does not exist: ${bad.join(', ')}`).toHaveLength(0);
+    });
+
+    it('every tenantWindowColumnYears is a real column on tenant_configs', () => {
+        const declared = RETENTION_MANIFEST.filter((r) => r.tenantWindowColumnYears);
+        // Same reason: exactly one rule carries it (`report_pdfs`).
+        expect(declared.length).toBeGreaterThan(0);
+        const cols = sqlColumnNames(TABLES_BY_SQL_NAME.get('tenant_configs'));
+        const bad = declared
+            .filter((r) => !cols.has(r.tenantWindowColumnYears!))
+            .map((r) => `${r.table} -> tenant_configs.${r.tenantWindowColumnYears}`);
+        expect(bad, `per-tenant override column does not exist: ${bad.join(', ')}`)
+            .toHaveLength(0);
     });
 });
 
