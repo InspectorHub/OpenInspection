@@ -39,10 +39,6 @@
     "kind": "deferred",
     "reason": "A centralised icon registry of 27 Heroicons paths. Components import icons directly instead, so the registry that was meant to end that never took over."
   },
-  "server/lib/inspection-resolvers.ts": {
-    "kind": "deferred",
-    "reason": "Explicit resolver functions for unit/section/item resolution. Pure, tested, and not called by the code that resolves those things today."
-  },
   "server/lib/legal/non-translatable-manifest.ts": {
     "kind": "tool-consumed",
     "reason": "Carries @gateConsumed: the eleven-category registry is read as text by scripts/check-non-translatable.mjs, which the module graph cannot see."

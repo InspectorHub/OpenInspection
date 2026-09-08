@@ -250,17 +250,5 @@
   "server/types/template-schema.ts#TemplateSchemaV2.schemaVersion": {
     "kind": "wire-shape",
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
-  },
-  "server/types/template-schema.ts#TemplateSchemaV2.sectionAssignments": {
-    "kind": "deferred",
-    "reason": "The TypeScript type declares it; the `.strict()` validator has never heard of it, so a template carrying it cannot be saved, imported or read back. Nothing writes it, which is why nobody noticed — and `inspection-resolvers.ts`, which reads the sibling `structure?.buildings`, is itself listed as unreachable, because it was written for a payload that cannot exist. Pinned by tests/unit/templates/item-options-min-photos.spec.ts so a future writer finds out there rather than from a 400."
-  },
-  "server/types/template-schema.ts#TemplateSchemaV2.itemAssignments": {
-    "kind": "deferred",
-    "reason": "The TypeScript type declares it; the `.strict()` validator has never heard of it, so a template carrying it cannot be saved, imported or read back. Nothing writes it, which is why nobody noticed — and `inspection-resolvers.ts`, which reads the sibling `structure?.buildings`, is itself listed as unreachable, because it was written for a payload that cannot exist. Pinned by tests/unit/templates/item-options-min-photos.spec.ts so a future writer finds out there rather than from a 400."
-  },
-  "server/types/template-schema.ts#TemplateSchemaV2.propertyMetadataFields": {
-    "kind": "deferred",
-    "reason": "The TypeScript type declares it; the `.strict()` validator has never heard of it, so a template carrying it cannot be saved, imported or read back. Nothing writes it, which is why nobody noticed — and `inspection-resolvers.ts`, which reads the sibling `structure?.buildings`, is itself listed as unreachable, because it was written for a payload that cannot exist. Pinned by tests/unit/templates/item-options-min-photos.spec.ts so a future writer finds out there rather than from a 400."
   }
 }

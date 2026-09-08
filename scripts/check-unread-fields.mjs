@@ -87,6 +87,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { declaredProperties } from './lib/type-properties.mjs';
+import { withoutComments, readsProperty } from './lib/read-detection.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = join(ROOT, 'scripts', 'unread-fields-baseline.json');
@@ -162,8 +163,22 @@ const UNWIRED_MODULES = new Set(
         : [],
 );
 
+// `git ls-files` lists what the INDEX tracks, which still includes a file
+// deleted in the working tree but not yet staged — reading it throws ENOENT and
+// takes the whole gate down, which is how this one died the first time a field
+// was removed by deleting its module. A file with no content on disk declares
+// no properties and reads none, so it is skipped; the count is printed on every
+// run, because a skip the operator cannot see is indistinguishable from a file
+// that had nothing to report.
+let skippedMissing = 0;
 const SRC = new Map(
-    FILES.filter((f) => !UNWIRED_MODULES.has(f)).map((f) => [f, readFileSync(join(ROOT, f), 'utf8')]),
+    FILES.filter((f) => !UNWIRED_MODULES.has(f))
+        .filter((f) => {
+            if (existsSync(join(ROOT, f))) return true;
+            skippedMissing += 1;
+            return false;
+        })
+        .map((f) => [f, readFileSync(join(ROOT, f), 'utf8')]),
 );
 
 /**
@@ -184,49 +199,11 @@ const READ_ONLY_CORPUS = execFileSync('git', ['ls-files', '--cached', '--others'
     .filter((f) => /\.(mjs|js|ts)$/.test(f))
     .filter((f) => !/\.(test|spec)\./.test(f));
 
-/**
- * Prose is not a read.
- *
- * Caught by this gate turning on itself: the header above names
- * `TemplateSchema.schemaVersion`, `ErasureRule.biometricStatus` and
- * `RetentionPolicyHeader.approvedBy` as EXAMPLES of what it hunts, and once
- * this file was tracked under `scripts/` it began counting its own
- * documentation as evidence that those fields are used. Seven findings
- * disappeared for no reason but that. A comment mentioning `.foo` HIDES a real
- * finding, which is the expensive direction to be wrong in.
- *
- * A comment is recognised only when it OPENS ITS OWN LINE, block or line alike.
- * The obvious regex form is worse than no stripping at all: a string literal
- * like `"/api/platform/*"` opens a block comment that runs to the next close,
- * and it ate 6108 of `workers/app.ts`'s 15732 characters — 39% of a file,
- * silently, taking a real `.hasPortalIntegrationApi` read with it and reporting
- * that field as unread. Deleting code from the corpus is the same error as
- * counting prose, in the same direction: it invents findings.
- */
-function withoutComments(src) {
-    const out = [];
-    let inBlock = false;
-    for (const line of src.split('\n')) {
-        const t = line.trimStart();
-        if (inBlock) {
-            if (line.includes('*/')) inBlock = false;
-            out.push('');
-            continue;
-        }
-        if (t.startsWith('/*')) {
-            if (!line.includes('*/')) inBlock = true;
-            out.push('');
-            continue;
-        }
-        out.push(t.startsWith('//') ? '' : line);
-    }
-    return out.join('\n');
-}
-
 const READERS = new Map([
     ...[...SRC].map(([f, src]) => [f, withoutComments(src)]),
     ...READ_ONLY_CORPUS.map((f) => [f, withoutComments(readFileSync(join(ROOT, f), 'utf8'))]),
 ]);
+
 /* ------------------------------------------------------------------ */
 /*  Declarations                                                       */
 /* ------------------------------------------------------------------ */
@@ -237,22 +214,8 @@ const declared = declaredProperties(SRC);
 /*  Reads                                                              */
 /* ------------------------------------------------------------------ */
 
-/**
- * Every shape that counts as READING a property. Anything missing from this
- * list becomes a false positive, so it is generous on purpose — a census that
- * cries wolf is one nobody reads.
- */
-function isRead(prop) {
-    const patterns = [
-        new RegExp(`\\.${prop}\\b`),                                   // obj.prop
-        new RegExp(`\\[\\s*["'\`]${prop}["'\`]\\s*\\]`),               // obj["prop"]
-        new RegExp(`\\{[^{}]*\\b${prop}\\b[^{}]*\\}\\s*(?::|=[^=])`),  // destructuring
-        new RegExp(`\\b${prop}\\s*=\\s*[{"'\`]`),                      // JSX prop={…} / prop="…"
-        new RegExp(`\\b${prop}\\s*,`),                                 // shorthand in a destructure list
-    ];
-    for (const [, src] of READERS) for (const re of patterns) if (re.test(src)) return true;
-    return false;
-}
+/** What counts as a read, and why prose does not: `scripts/lib/read-detection.mjs`. */
+const isRead = (prop) => readsProperty(READERS, prop);
 
 /**
  * Types whose KEYS are enumerated, whose fields therefore cannot be judged by
@@ -376,7 +339,8 @@ const deferred = Object.values(baseline).filter((e) => e.kind === 'deferred').le
 // Both numbers print on every run, pass or fail. A gate that speaks only when
 // it is angry cannot be checked on the day it is quiet.
 console.log(
-    `unread-fields: ${declared.length} properties in ${SRC.size} files · ${findings.length} unread `
+    `unread-fields: ${declared.length} properties in ${SRC.size} files `
+    + `(${skippedMissing} skipped, not on disk) · ${findings.length} unread `
     + `· ${Object.keys(baseline).length} baselined (${deferred} still owed) · ${fresh.length} new`,
 );
 if (stale.length) {
