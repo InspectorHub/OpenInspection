@@ -248,22 +248,6 @@ interface RatingSystem {
     levels: RatingLevel[];
 }
 
-export interface TemplateUnit {
-    id: string;
-    name: string;
-    type: 'unit' | 'common';
-}
-
-export interface TemplateBuilding {
-    id: string;
-    name: string;
-    units: TemplateUnit[];
-}
-
-interface TemplateStructure {
-    buildings: TemplateBuilding[];
-}
-
 /**
  * A template's declaration that it produces an authority's own statutory form.
  *
@@ -314,9 +298,17 @@ export interface TemplateSchemaV2 {
     ratingSystem?: RatingSystem;
     propertyType?: 'single-family' | 'multi-unit' | 'commercial';
     commercialSubtype?: string;
-    structure?: TemplateStructure;
     /**
-     * ⚠️ THREE KEYS WERE REMOVED FROM HERE, and none of them was work owed.
+     * ⚠️ FOUR KEYS WERE REMOVED FROM HERE, and none of them was work owed.
+     *
+     * `structure` described a per-template building/unit layout, so a template
+     * could ship a standard one and save an operator building it. That saving
+     * is already banked elsewhere: `UnitsManager` has a bulk-create form —
+     * floors × stacks, or a CSV paste — wired through `hierarchy.ts` to
+     * `UnitService.createMany`, with the generator in
+     * `server/lib/unit-pattern.ts`. A forty-unit building is one form fill.
+     * It took `TemplateBuilding` and `TemplateUnit` with it; nothing imported
+     * either.
      *
      * `sectionAssignments` restated, as two arrays of ids, exactly what the
      * section-level `defaultScope: 'common' | 'unit'` already says per section —

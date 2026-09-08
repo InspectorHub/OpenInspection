@@ -49,41 +49,41 @@ function templateWithItemOptions(options: Record<string, unknown>) {
 }
 
 /**
- * THE TYPE PROMISES A TEMPLATE THE VALIDATOR REFUSES.
+ * THE TYPE AND THE VALIDATOR NOW AGREE, and this is what is left of the case
+ * that said they did not.
  *
- * `TemplateSchemaV2` (the TypeScript interface) declared four keys the zod
- * validator (`.strict()`) had never heard of, so a template carrying one could
- * not be saved, imported or read back.
+ * `TemplateSchemaV2` declared four keys the zod validator (`.strict()`) had
+ * never heard of — `structure`, `sectionAssignments`, `itemAssignments`,
+ * `propertyMetadataFields` — so a template carrying one could not be saved,
+ * imported or read back. All four are gone, and their removal is the point
+ * rather than a loosening of this check: each described a per-TEMPLATE
+ * multi-unit model that lost to a per-INSPECTION one.
  *
- * THREE OF THEM ARE GONE, and their removal is the point rather than a
- * loosening of this check. They described a per-TEMPLATE multi-unit model that
- * lost to a per-INSPECTION one years ago: `sectionAssignments` restated the
- * section-level `defaultScope` the validator already accepts,
- * `itemAssignments` put item scope in a map outside the items, and
- * `propertyMetadataFields` was superseded by the commercial subtype presets.
+ *   sectionAssignments      restated the section-level `defaultScope`
+ *   itemAssignments         put item scope in a map outside the items
+ *   propertyMetadataFields  superseded by the commercial subtype presets
+ *   structure               superseded by UnitsManager's bulk-create form
+ *                           (floors × stacks or a CSV paste)
+ *
  * Where multi-unit actually lives is pinned by
  * `tests/unit/templates/multi-unit-lives-on-inspection-units.spec.ts`.
  *
- * `structure` REMAINS listed here, and remains refused, until it is added to
- * the validator deliberately. That is the value of this case: the drift stays
- * LOUD, so the next person to add a writer finds out here rather than from a
- * 400 in production.
+ * What survives here is the guard that made the drift findable in the first
+ * place: `.strict()` still refuses an unknown key, and the template it is
+ * refused ON still parses. A future key added to the type and forgotten in the
+ * validator fails the same way this one did.
  */
 describe('template schema type vs validator', () => {
-    const REJECTED = ['structure'];
-
-    for (const field of REJECTED) {
-        it(`refuses \`${field}\`, which the TypeScript type still declares`, () => {
-            const base = templateWithItemOptions({});
-            const result = TemplateSchemaV2Schema.safeParse({ ...base, [field]: {} });
-            expect(result.success).toBe(false);
-        });
-    }
+    it('refuses a key the validator does not declare', () => {
+        const base = templateWithItemOptions({});
+        const result = TemplateSchemaV2Schema.safeParse({ ...base, structure: {} });
+        expect(result.success).toBe(false);
+    });
 
     // POSITIVE CONTROL: `.strict()` refuses any unknown key, so the case above
     // would pass against a validator that rejected everything. The template it
     // is added to must parse on its own.
-    it('accepts the same template without them', () => {
+    it('accepts the same template without it', () => {
         expect(TemplateSchemaV2Schema.safeParse(templateWithItemOptions({})).success).toBe(true);
     });
 });
