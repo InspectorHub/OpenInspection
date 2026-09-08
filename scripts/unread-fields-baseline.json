@@ -68,16 +68,16 @@
     "reason": "Policy provenance — when the approval named in `approvedBy` was given. Read by review; code has no business branching on it."
   },
   "server/lib/compliance/retention-rule-types.ts#RetentionRule.rowWindowColumn": {
-    "kind": "deferred",
-    "reason": "Set in the manifest (`rowWindowColumn: 'expires_at'`) and read only by `tests/unit/privacy/migration-intake-retention.spec.ts`, which asserts the value. No product code reads it, and the manifest's own purpose prose says the per-row due date \"is what the sweep compares\" — there being no manifest-driven sweep, nothing compares anything. Unlike its sibling `timestampColumn`, no gate reads this one either."
+    "kind": "invisible-read",
+    "reason": "Declares that migration_batches expires on each row own due date rather than on the rule outer window, and retention-migration-batches.ts does exactly that - it selects on expiresAt, not on the precomputed cutoff. The field is not read by property access because the executor hardcodes the column; the two are now held together by tests/unit/privacy/retention-logs.spec.ts, which asserts the column exists AND that a row 100 days old with a future due date survives while a row created today with a past one does not. Rewriting the executor to use the window makes those three fail. CORRECTION: this entry used to say \"there being no manifest-driven sweep, nothing compares anything\". There is one, it runs nightly, and it compares this column."
   },
   "server/lib/compliance/retention-rule-types.ts#RetentionRule.timestampColumn": {
     "kind": "invisible-read",
-    "reason": "Read by `check-retention-manifest.mjs` (as a required field name in a string array) and `check-retention-policy.mjs` (as the rule's digest anchor). ⚠️ It has no RUNTIME reader — see the deferred entries beside it; nothing under server/ imports RETENTION_MANIFEST."
+    "reason": "Read as a required field NAME by check-retention-manifest.mjs and as the digest anchor by check-retention-policy.mjs, and now bound to the schema by tests/unit/privacy/retention-logs.spec.ts, which fails if any rule names a column its table does not have. Its runtime consumer is the executor for that table, which hardcodes the same column in Drizzle form. CORRECTION: this entry used to end \"it has no RUNTIME reader - nothing under server/ imports RETENTION_MANIFEST\". That was false. retention-logs.ts:40 imports it and line 120 iterates every rule; server/cron/jobs/daily.ts runs the sweep nightly. The claim came from grepping for \".timestampColumn\" property access, which cannot see a module that imports the array whole - the same filtered-grep mistake three other entries here carried."
   },
   "server/lib/compliance/retention-rule-types.ts#RetentionRule.tenantWindowColumnYears": {
-    "kind": "deferred",
-    "reason": "Names the tenant-config column a per-tenant retention window would be read from (`report_pdf_retention_years`). No code reads that column against this manifest, because no manifest-driven sweep exists — the only runtime sweep in the tree is the hand-written e-sign one."
+    "kind": "invisible-read",
+    "reason": "Names the tenant_configs column carrying a per-tenant override in YEARS, where 0 means indefinite. retention-report-pdfs.ts reads exactly that column, resolving one window per distinct tenant. Not a property read for the same reason as its sibling - the executor hardcodes it - and now pinned by tests/unit/privacy/retention-logs.spec.ts: an override shorter than the default must delete, a longer one must keep, 0 must keep forever, and a missing config row must fall back to the disclosed default rather than to indefinite. CORRECTION: this entry used to say \"no manifest-driven sweep exists - the only runtime sweep in the tree is the hand-written e-sign one\". Both halves were false."
   },
   "server/lib/compliance/retention-sweep.ts#RetentionSweepSummary.purgedArtefacts": {
     "kind": "invisible-read",
