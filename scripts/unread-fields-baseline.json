@@ -24,8 +24,8 @@
     "reason": "A posture says whether its output needs review before use, and nothing asks. The flag is set where the posture is defined and read nowhere, so the review it calls for is not requested by anything."
   },
   "server/lib/ai/provider.ts#AiRequest.topK": {
-    "kind": "deferred",
-    "reason": "A sampling parameter the request shape accepts and the adapter never sends. A caller can set it and nothing will happen, which is worse than not offering it: `server/lib/ai/providers/openai-compatible.ts` is the single adapter and it builds its own body."
+    "kind": "wire-shape",
+    "reason": "On the provider-NEUTRAL request shape because other backends' APIs expose it natively; the OpenAI chat-completions schema has none, so the single adapter drops it rather than guessing at a near-equivalent. Its header says so and tests/unit/ai/openai-compatible.spec.ts pins the behaviour by passing topK and asserting the body carries none. A documented, tested decision, not work owed."
   },
   "server/lib/billing-summary.ts#BillingSummary.guests": {
     "kind": "deferred",
@@ -98,14 +98,6 @@
   "server/lib/messaging/compliance-provider.ts#ComplianceEvent.entitySid": {
     "kind": "wire-shape",
     "reason": "The messaging provider's own identifier for the entity an event is about, carried through from Telnyx and Twilio. Ours to pass on and to log, not to interpret."
-  },
-  "server/lib/migration-intake/adapters/registry.ts#AdapterMatch.adapterName": {
-    "kind": "deferred",
-    "reason": "Which adapter converted a file, discarded. The intake route reads `match.vendor` and `match.inspection` and stages the run with a comment reading \"Counts and provenance only\" — but the adapter's own identity, the thing you would want when a conversion turns out wrong, is not among the provenance it keeps."
-  },
-  "server/lib/migration-intake/adapters/registry.ts#AdapterMatch.adapterVersion": {
-    "kind": "deferred",
-    "reason": "The adapter VERSION that converted a file, discarded alongside its name. Two runs of the same vendor adapter can differ, and nothing records which one produced a given bundle."
   },
   "server/lib/migration-intake/bundle.ts#MigrationBundleV1.formatVersion": {
     "kind": "wire-shape",

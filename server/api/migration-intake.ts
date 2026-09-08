@@ -192,7 +192,7 @@ const migrationIntakeRoutes = createApiRouter()
         // export is routinely named after the person it is about.
         auditFromContext(c, 'migration.staged', 'migration_batch', {
             entityId: staged.batchId,
-            metadata: { intent, vendor: match.vendor, rows: staged.rows.length },
+            metadata: { intent, vendor: match.vendor, adapterName: match.adapterName, adapterVersion: match.adapterVersion, rows: staged.rows.length },
         });
         return c.json({
             success: true as const,

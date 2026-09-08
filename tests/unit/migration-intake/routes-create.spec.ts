@@ -264,6 +264,41 @@ describe('POST /api/imports', () => {
     });
 
     /**
+     * THE PROVENANCE NAMES THE ADAPTER, NOT ONLY THE VENDOR.
+     *
+     * The staged-run audit entry is deliberately narrow — its comment says
+     * "counts and provenance only. The file name is left out on purpose: an
+     * export is routinely named after the person it is about." Right, and it was
+     * recording the vendor the operator DECLARED while dropping which reader
+     * actually parsed the file and at which version.
+     *
+     * `AdapterMatch` carries both and nothing read either. They are the first
+     * thing anybody wants when a conversion turns out to have produced the wrong
+     * rows: two runs of the same vendor adapter can differ, and without the
+     * version there is no way to tell a bad file from a bad reader.
+     *
+     * Still no file name, and no row content — this adds the identity of OUR
+     * code, not anything about the third party in the file.
+     */
+    it('records which adapter, at which version, read the file', async () => {
+        const res = await post(
+            { role: 'owner', store },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true' },
+            { name: 'contacts.csv', text: CONTACTS_CSV },
+        );
+        expect(res.status).toBe(201);
+
+        const rows = await db.select().from(schema.auditLogs).all();
+        const staged = rows.find((r) => r.action === 'migration.staged');
+        expect(staged, 'no migration.staged audit entry').toBeDefined();
+        const meta = staged!.metadata as Record<string, unknown>;
+        expect(meta.adapterName).toBeTruthy();
+        expect(meta.adapterVersion).toBeTruthy();
+        // The narrowness the entry's own comment promises still holds.
+        expect(meta).not.toHaveProperty('fileName');
+    });
+
+    /**
      * A FILE THAT IS SIMPLY MIS-DECLARED GETS THE CORRECTION, NOT THE HUMAN.
      *
      * `describeVendorMismatch` exists to tell these two apart and says so in its
