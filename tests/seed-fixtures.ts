@@ -252,6 +252,15 @@ const DELIVERED_TEMPLATE_SNAPSHOT = {
             { id: 'satisfactory', label: 'Satisfactory', abbreviation: 'S', color: '#16a34a', severity: 'good',        isDefect: false },
             { id: 'monitor',      label: 'Monitor',      abbreviation: 'M', color: '#d97706', severity: 'marginal',    isDefect: false },
             { id: 'defect',       label: 'Defect',       abbreviation: 'D', color: '#dc2626', severity: 'significant', isDefect: true  },
+            // The two answers TREC's mandatory REI 7-6 gives separate checkboxes:
+            // NP when the component is not in the dwelling, NI when it is there
+            // and was not inspected. `getNaKind` reaches them only through
+            // `severity: 'minor'` + `isDefect: false`, and prefers the
+            // ABBREVIATION over the label — which is the case worth fixturing,
+            // because a workspace may label a level "N/A" while abbreviating it
+            // "NI", and then the rating pill alone cannot carry the difference.
+            { id: 'not-inspected', label: 'Not Inspected', abbreviation: 'NI', color: '#64748b', severity: 'minor', isDefect: false },
+            { id: 'not-present',   label: 'Not Present',   abbreviation: 'NP', color: '#64748b', severity: 'minor', isDefect: false },
         ],
     },
     sections: [
@@ -291,6 +300,25 @@ const DELIVERED_TEMPLATE_SNAPSHOT = {
                             },
                         ],
                     },
+                },
+                // The two unrated answers, one of each kind. They carry NO
+                // defects on purpose: `SEED_REPAIR_DEFECTS` is derived from
+                // `tabs.defects`, and the repair-builder specs count what it
+                // holds, so an item added here to exercise the REPORT must not
+                // change what the BUILDER is handed.
+                {
+                    id: 'attic-access',
+                    label: 'Attic Access',
+                    type: 'rich',
+                    ratingOptions: ['satisfactory', 'monitor', 'defect', 'not-inspected', 'not-present'],
+                    tabs: { information: [], limitations: [], defects: [] },
+                },
+                {
+                    id: 'solar-array',
+                    label: 'Solar Array',
+                    type: 'rich',
+                    ratingOptions: ['satisfactory', 'monitor', 'defect', 'not-inspected', 'not-present'],
+                    tabs: { information: [], limitations: [], defects: [] },
                 },
                 {
                     id: 'gutters',
@@ -403,6 +431,19 @@ const DELIVERED_RESULTS_DATA = {
     '_default:roof:gutters': {
         rating: 'monitor',
         tabs: { defects: [{ cannedId: 'gutters-d1', included: true, trade: 'qualified-handyman' }] },
+    },
+    // Not inspected, WITH the reason — the half TREC and ASTM actually care
+    // about. "Could not be inspected due to existing conditions" is worth
+    // nothing to a buyer unless the condition is named.
+    '_default:roof:attic-access': {
+        rating: 'not-inspected',
+        notInspectedReason: 'Attic hatch was padlocked and the owner could not produce a key.',
+    },
+    // Not present, and deliberately WITHOUT a reason: a component that is not
+    // in the dwelling needs no excuse for not being inspected, and the report
+    // must not invent a heading for one.
+    '_default:roof:solar-array': {
+        rating: 'not-present',
     },
     '_default:electrical:service-panel': {
         rating: 'defect',
@@ -802,6 +843,21 @@ export const SEED_CLIENT_ACCESS = {
     /** Absolute, for a human running `npm run dev`. */
     builderUrl:
         `http://localhost:8787/repair-builder/${TENANT_A_SLUG}/${SEED_INSPECTIONS.delivered}?token=${CLIENT_PORTAL_TOKEN}`,
+    /**
+     * The same delivered report as the CLIENT READS IT — root-relative, so a
+     * spec takes the origin from Playwright rather than hardcoding a port.
+     *
+     * This exists because it did not. `/repair-builder/…` had a paste-ready
+     * link and `/report-view/…` had none, so every change to the report surface
+     * was made without anybody opening the page: the only e2e that addresses it
+     * (`tests/e2e/report-viewer.spec.ts`) skips itself unless two env vars are
+     * supplied by hand, and no seed produces them.
+     */
+    reportPath:
+        `/report-view/${TENANT_A_SLUG}/${SEED_INSPECTIONS.delivered}?token=${CLIENT_PORTAL_TOKEN}`,
+    /** Absolute, for a human running `npm run dev`. */
+    reportUrl:
+        `http://localhost:8787/report-view/${TENANT_A_SLUG}/${SEED_INSPECTIONS.delivered}?token=${CLIENT_PORTAL_TOKEN}`,
 };
 
 /**
