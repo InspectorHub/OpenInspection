@@ -16,8 +16,8 @@
     "reason": "Computed and set by `usePhotoOps` (`pendingPlaceholder: !hasLocal && !baseKey`) and read by no renderer, so a tile standing in for a photo that has not arrived looks exactly like a photo that has."
   },
   "server/cron/types.ts#CronJob.maxBatch": {
-    "kind": "deferred",
-    "reason": "Every cron job declares one and nothing reads it. Its own doc says what it is for: a batch \"MUST fit the 10 ms Free CPU ceiling for one batch - that is what maxBatch bounds\". Neither dispatch.ts nor consumer.ts passes it to run(), and the sweep behind `maxBatch: 50` carries no LIMIT of its own — so the bound that exists to keep an invocation inside the ceiling is a number nobody enforces."
+    "kind": "invisible-read",
+    "reason": "Read as a STRING key by `scripts/check-cron-budget.mjs`, a registered pre-push gate whose REQUIRED_FIELDS list includes `maxBatch:` and which refuses a job that omits it. The CPU ceiling is not protected by passing this value to `run()` — that gate says outright \"CPU cannot be measured from source, so this gate gates the SHAPE that made the overrun possible\", and it separately refuses any unbounded table read on a cron path. `maxBatch` is the declared budget a human tunes; the bounding is gated elsewhere."
   },
   "server/lib/ai/output-classification.ts#ClassificationPosture.requiresReview": {
     "kind": "deferred",
@@ -69,7 +69,7 @@
   },
   "server/lib/compliance/retention-rule-types.ts#RetentionRule.rowWindowColumn": {
     "kind": "deferred",
-    "reason": "Rule mechanics for a sweep that does not exist. The manifest sets it (`rowWindowColumn: 'expires_at'`) and its own purpose prose asserts \"the per-row due date lives on the column named above and is what the sweep compares\" — but nothing under server/ or workers/ imports RETENTION_MANIFEST, so nothing compares anything. The gates validate it; no runtime reads it."
+    "reason": "Set in the manifest (`rowWindowColumn: 'expires_at'`) and read only by `tests/unit/privacy/migration-intake-retention.spec.ts`, which asserts the value. No product code reads it, and the manifest's own purpose prose says the per-row due date \"is what the sweep compares\" — there being no manifest-driven sweep, nothing compares anything. Unlike its sibling `timestampColumn`, no gate reads this one either."
   },
   "server/lib/compliance/retention-rule-types.ts#RetentionRule.timestampColumn": {
     "kind": "invisible-read",
