@@ -44,80 +44,80 @@
     "reason": "Written in app/components/agent/AgentNoticeBell.tsx, app/components/editor/CostItemsPanel.tsx, app/components/inspector-portal/ReportDeliveryList.tsx +42, and read by nothing — every mention there sets it or types it."
   },
   "server/lib/compliance/erasure-coverage.ts#ErasureCoverageDisclosure.manifestRuleCount": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/sync-events/registry.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Crosses the seam: this interface is what portal stores verbatim as `dsar_requests.coverage_json`, so the field is read there, not here. Its own doc line says so."
   },
   "server/lib/compliance/erasure-coverage.ts#ErasureCoverageDisclosure.outOfScopeCount": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/sync-events/registry.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Crosses the seam: this interface is what portal stores verbatim as `dsar_requests.coverage_json`, so the field is read there, not here. Its own doc line says so."
   },
   "server/lib/compliance/erasure-coverage.ts#ErasureCoverageDisclosure.catalogueIsAdvisory": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/sync-events/registry.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Crosses the seam into `dsar_requests.coverage_json`. A literal `true` whose whole job is to tell the reader of that record that the counts describe a document, not the run that produced it."
   },
   "server/lib/compliance/erasure-manifest.ts#ErasureRule.biometricStatus": {
-    "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/compliance/erasure-manifest.ts the name appears only in tests (tests/unit/privacy/classification-labels.spec.ts)."
+    "kind": "record",
+    "reason": "A PII classification carried per rule so the manifest states what kind of data a column holds. Its reader is review, not code; nothing branches on it and nothing should have to."
   },
   "server/lib/compliance/legal-hold-release.ts#RequeueOutcome.stillHeld": {
     "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/compliance/legal-hold-release.ts the name appears only in tests (tests/unit/privacy/legal-hold-release-requeues-erasure.spec.ts)."
+    "reason": "Returned by the legal-hold requeue and read by no caller, so nothing can distinguish \"still under hold\" from \"released and nothing was outstanding\" — both come back with `remaining: 0`. The discriminant exists; the caller that needs it does not."
   },
   "server/lib/compliance/report-pdf-retention.ts#RetentionJurisdictionFact.checkedOn": {
-    "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/compliance/report-pdf-retention.ts the name appears only in tests (tests/unit/privacy/report-pdf-retention.spec.ts)."
+    "kind": "record",
+    "reason": "When this jurisdiction's retention rule was last verified against its primary source. A fact with no date is a fact nobody can trust; its reader is the next person who has to re-check it."
   },
   "server/lib/compliance/retention-logs.ts#LogRetentionSummary.activeHolds": {
     "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/compliance/retention-logs.ts the name appears only in tests (tests/unit/privacy/legal-hold-sweep.spec.ts)."
+    "reason": "Filled from `holds.activeHoldCount` into a summary nothing consumes. A retention run that reports how many legal holds blocked it is only useful if somebody reads the report."
   },
   "server/lib/compliance/retention-policy.ts#RetentionPolicyHeader.effectiveAt": {
-    "kind": "deferred",
-    "reason": "Declared in server/lib/compliance/retention-policy.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
+    "kind": "record",
+    "reason": "Policy provenance — the date this version of the retention policy took effect. Read by whoever asks which policy was in force on a given day."
   },
   "server/lib/compliance/retention-policy.ts#RetentionPolicyHeader.approvedBy": {
-    "kind": "deferred",
-    "reason": "Written in scripts/publish-agent-terms.mjs, and read by nothing — every mention there sets it or types it."
+    "kind": "invisible-read",
+    "reason": "Read out of the source text by `scripts/publish-agent-terms.mjs`, which refuses to publish while the retention policy is unapproved. A regex over prose, which no name-based scan can follow."
   },
   "server/lib/compliance/retention-policy.ts#RetentionPolicyHeader.approvedAt": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/email/outbound-cooling-window.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "record",
+    "reason": "Policy provenance — when the approval named in `approvedBy` was given. Read by review; code has no business branching on it."
   },
   "server/lib/compliance/retention-rule-types.ts#RetentionRule.rowWindowColumn": {
     "kind": "deferred",
-    "reason": "Written in server/lib/compliance/retention-manifest.ts, server/lib/compliance/retention-windows.ts, and read by nothing — every mention there sets it or types it."
+    "reason": "Rule mechanics for a sweep that does not exist. The manifest sets it (`rowWindowColumn: 'expires_at'`) and its own purpose prose asserts \"the per-row due date lives on the column named above and is what the sweep compares\" — but nothing under server/ or workers/ imports RETENTION_MANIFEST, so nothing compares anything. The gates validate it; no runtime reads it."
   },
   "server/lib/compliance/retention-rule-types.ts#RetentionRule.timestampColumn": {
-    "kind": "deferred",
-    "reason": "Written in scripts/check-retention-manifest.mjs, scripts/check-retention-policy.mjs, scripts/fixtures/retention-gate-probe/probe-manifest-hold-mismatch.ts +5, and read by nothing — every mention there sets it or types it."
+    "kind": "invisible-read",
+    "reason": "Read by `check-retention-manifest.mjs` (as a required field name in a string array) and `check-retention-policy.mjs` (as the rule's digest anchor). ⚠️ It has no RUNTIME reader — see the deferred entries beside it; nothing under server/ imports RETENTION_MANIFEST."
   },
   "server/lib/compliance/retention-rule-types.ts#RetentionRule.tenantWindowColumnYears": {
     "kind": "deferred",
-    "reason": "Written in server/lib/compliance/retention-manifest.ts, and read by nothing — every mention there sets it or types it."
+    "reason": "Names the tenant-config column a per-tenant retention window would be read from (`report_pdf_retention_years`). No code reads that column against this manifest, because no manifest-driven sweep exists — the only runtime sweep in the tree is the hand-written e-sign one."
   },
   "server/lib/compliance/retention-sweep.ts#RetentionSweepSummary.purgedArtefacts": {
     "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/compliance/retention-sweep.ts the name appears only in tests (tests/unit/privacy/signature-retention-graph.spec.ts)."
+    "reason": "The e-sign sweep counts the R2 artefacts it deleted and returns the count to nobody. Its sibling counts are read; this one is the number that says how much storage the run actually reclaimed."
   },
   "server/lib/compliance/statutory-classifications.ts#StatutoryClassification.statutory_basis": {
-    "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/compliance/statutory-classifications.ts the name appears only in tests (tests/unit/privacy/classification-basis.spec.ts)."
+    "kind": "record",
+    "reason": "The legal-classification register. Its purpose is to be written down and reviewed; no code branches on the basis and none should."
   },
   "server/lib/compliance/statutory-classifications.ts#StatutoryClassification.spi_classification": {
-    "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/compliance/statutory-classifications.ts the name appears only in tests (tests/unit/privacy/classification-basis.spec.ts)."
+    "kind": "record",
+    "reason": "The legal-classification register — whether the field is sensitive personal information. Read in review, not by code."
   },
   "server/lib/compliance/statutory-classifications.ts#StatutoryClassification.review_status": {
-    "kind": "deferred",
-    "reason": "Written in app/components/portal/sections/report/DocumentReviewTable.tsx, and read by nothing — every mention there sets it or types it."
+    "kind": "record",
+    "reason": "Where this classification stands in review. A register field: it exists so the state of the review is written down."
   },
   "server/lib/compliance/statutory-classifications.ts#StatutoryClassification.ruling": {
-    "kind": "deferred",
-    "reason": "Written in scripts/check-no-private-review-refs.mjs, server/data/seed-templates/fl-oir-b1-1802-rev-04-26.gaps.md, server/lib/compliance/retention-policy.ts +3, and read by nothing — every mention there sets it or types it."
+    "kind": "invisible-read",
+    "reason": "Read by `check-no-private-review-refs.mjs`, the gate that keeps private review references out of this public repository. Its reader is a script, not the product."
   },
   "server/lib/compliance/statutory-classifications.ts#StatutoryClassification.erasure_coverage": {
-    "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/compliance/statutory-classifications.ts the name appears only in tests (tests/unit/privacy/classification-basis.spec.ts)."
+    "kind": "record",
+    "reason": "Which erasure rule covers this classification, recorded so the two catalogues can be cross-read by a person. Not a runtime link."
   },
   "server/lib/dashboard-columns.ts#DashboardColumn.mobileVisible": {
     "kind": "deferred",

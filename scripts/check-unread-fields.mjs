@@ -91,6 +91,15 @@ const KINDS = new Set([
     // A wire contract: the field exists because a third party or a stored
     // payload has it, whether or not this codebase reads it back.
     'wire-shape',
+    // Written down in order TO BE written down — a compliance classification, an
+    // approval, a citation, a jurisdiction fact and the date it was checked.
+    // Its readers are people and review, and code never having an opinion on it
+    // is the design rather than a gap.
+    //
+    // ⚠️ NOT a softer `deferred`. The test is whether a reader could name who
+    // consults it and when. "We might need it later" is `deferred`; "it is
+    // signed off in review and read in an audit" is a record.
+    'record',
     // Nobody wired it. Work owed. Counted separately on every run.
     'deferred',
 ]);
