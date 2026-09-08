@@ -263,6 +263,40 @@ describe('POST /api/imports', () => {
         expect(store.size).toBe(1);
     });
 
+    /**
+     * A FILE THAT IS SIMPLY MIS-DECLARED GETS THE CORRECTION, NOT THE HUMAN.
+     *
+     * `describeVendorMismatch` exists to tell these two apart and says so in its
+     * own header: "one offers a correction, the other offers the assisted path,
+     * and conflating them sends people down the wrong one." It was built, it was
+     * tested in adapter-contract.spec.ts — and nothing ever called it. The route
+     * answered every unmatched file with `openWaitingRun()`, which is the
+     * conflation that header warns about, and an expensive one: the assisted
+     * path needs an owner's decision, hands a third party's file to a person,
+     * and is refused outright on a deployment that has no support path. All
+     * because a picker was answered wrongly.
+     */
+    it('names the vendor a mis-declared file actually looks like, instead of parking it', async () => {
+        const res = await post(
+            { role: 'owner', store },
+            { intent: 'contacts.import', vendor: 'spectora', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { name: 'contacts.csv', text: CONTACTS_CSV },
+        );
+        expect(res.status).toBe(422);
+        expect(await message(res)).toMatch(/csv_generic/);
+    });
+
+    // The file is refused BEFORE it is stored: a correction the operator can act
+    // on in one click is no reason to keep a third party's data lying around.
+    it('does not store a file it is about to hand back for correction', async () => {
+        await post(
+            { role: 'owner', store },
+            { intent: 'contacts.import', vendor: 'spectora', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { name: 'contacts.csv', text: CONTACTS_CSV },
+        );
+        expect(store.size).toBe(0);
+    });
+
     it('parks an unreadable file for a person, on a platform that has one', async () => {
         const res = await post(
             { role: 'owner', store },

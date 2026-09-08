@@ -8,6 +8,7 @@ import { migrationBatches, migrationRows } from '../lib/db/schema';
 import type { VendorId } from '../lib/migration-intake/bundle';
 import { MIGRATION_BATCH_STATUS } from '../lib/status/migration-batch-status';
 import { assertSourceSizeWithin, limitsFor } from '../lib/migration-intake/limits';
+import { parkUnlessMisdeclared } from '../lib/migration-intake/adapters/vendor-correction';
 import {
     buildBundle,
     defaultMappingFor,
@@ -171,7 +172,7 @@ const migrationIntakeRoutes = createApiRouter()
         const declaredVendor: VendorId = form.vendor;
 
         const match = await matchAdapter(intent, declaredVendor, source);
-        if (!match) return openWaitingRun();
+        if (!match) return parkUnlessMisdeclared(intent, declaredVendor, source, openWaitingRun);
 
         const built = await buildBundle(match.vendor, source, defaultMappingFor(intent, match.inspection, source));
         if (!built.ok) throw Errors.UnprocessableEntity(built.error.message);

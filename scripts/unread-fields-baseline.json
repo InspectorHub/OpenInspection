@@ -139,17 +139,13 @@
     "kind": "deferred",
     "reason": "Written in server/lib/messaging/providers/telnyx-compliance.ts, server/lib/messaging/providers/twilio-compliance.ts, and read by nothing — every mention there sets it or types it."
   },
-  "server/lib/migration-intake/adapters/registry.ts#VendorMismatch.looksLike": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/migration-intake/bundle.ts, server/lib/migration-intake/row-problems.ts, and read by nothing — every mention there sets it or types it."
-  },
   "server/lib/migration-intake/adapters/registry.ts#AdapterMatch.adapterName": {
     "kind": "deferred",
-    "reason": "Written in server/lib/db/schema/migration-intake.ts, server/lib/migration-intake/staging-rows.ts, server/services/migration-intake/stage.service.ts, and read by nothing — every mention there sets it or types it."
+    "reason": "Which adapter converted a file, discarded. The intake route reads `match.vendor` and `match.inspection` and stages the run with a comment reading \"Counts and provenance only\" — but the adapter's own identity, the thing you would want when a conversion turns out wrong, is not among the provenance it keeps."
   },
   "server/lib/migration-intake/adapters/registry.ts#AdapterMatch.adapterVersion": {
     "kind": "deferred",
-    "reason": "Written in server/lib/db/schema/migration-intake.ts, server/lib/migration-intake/staging-rows.ts, server/services/migration-intake/stage.service.ts, and read by nothing — every mention there sets it or types it."
+    "reason": "The adapter VERSION that converted a file, discarded alongside its name. Two runs of the same vendor adapter can differ, and nothing records which one produced a given bundle."
   },
   "server/lib/migration-intake/bundle.ts#MigrationBundleV1.formatVersion": {
     "kind": "deferred",
@@ -157,15 +153,15 @@
   },
   "server/lib/preflight.ts#PreflightResult.propertyFactsComplete": {
     "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/preflight.ts the name appears only in tests (tests/e2e/subsystem-e-flows.spec.ts, tests/unit/platform/preflight.spec.ts)."
+    "reason": "Publish pre-flight. Not one field short of a consumer: `InspectionCoreService.computePreflight` has NO CALLER — no route, no loader — so the whole checklist that would tell an inspector what is missing before publishing is computed by a method nobody invokes. `lint:unwired` cannot see it because the service file is reachable through its other methods."
   },
   "server/lib/preflight.ts#PreflightResult.coverPhotoSet": {
     "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/preflight.ts the name appears only in tests (tests/e2e/subsystem-e-flows.spec.ts, tests/unit/platform/preflight.spec.ts)."
+    "reason": "Publish pre-flight. Not one field short of a consumer: `InspectionCoreService.computePreflight` has NO CALLER — no route, no loader — so the whole checklist that would tell an inspector what is missing before publishing is computed by a method nobody invokes. `lint:unwired` cannot see it because the service file is reachable through its other methods."
   },
   "server/lib/preflight.ts#PreflightResult.noOpenFields": {
     "kind": "deferred",
-    "reason": "Written but never read: outside server/lib/preflight.ts the name appears only in tests (tests/e2e/subsystem-e-flows.spec.ts)."
+    "reason": "Publish pre-flight. Not one field short of a consumer: `InspectionCoreService.computePreflight` has NO CALLER — no route, no loader — so the whole checklist that would tell an inspector what is missing before publishing is computed by a method nobody invokes. `lint:unwired` cannot see it because the service file is reachable through its other methods."
   },
   "server/lib/qr.ts#QrSvgOptions.margin": {
     "kind": "deferred",
@@ -212,20 +208,20 @@
     "reason": "Written but never read: outside server/portal/parked-fingerprint.ts the name appears only in tests (tests/workers/parked-cmd-redaction.spec.ts)."
   },
   "server/services/account.service.ts#AccountExport.exportedAt": {
-    "kind": "deferred",
-    "reason": "Written in server/api/admin/admin-data.ts, server/api/admin/admin-esign.ts, server/index.ts +4, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Part of the portability export the data subject downloads — `AccountExportResponseSchema` declares it and `GET /api/account/export` returns it. Nothing here reads it back because the reader is the person who asked for their data."
   },
   "server/services/account.service.ts#AccountExport.identityWithheld": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/compliance/account-export-manifest.ts, server/lib/validations/identity.schema.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Part of the portability export the data subject downloads, and deliberately so: the columns held back travel WITH their reasons, because an export that is silently incomplete is the under-disclosure this response shape exists to prevent."
   },
   "server/services/account.service.ts#AccountExport.memberships": {
-    "kind": "deferred",
-    "reason": "Written in server/api/identity.ts, server/lib/db/schema/tenant/integration.ts, server/lib/mcp/openapi-snapshot.json +2, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Part of the portability export the data subject downloads — `AccountExportResponseSchema` declares it and `GET /api/account/export` returns it. Nothing here reads it back because the reader is the person who asked for their data."
   },
   "server/services/account.service.ts#AccountDeleteResult.identityId": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/validations/identity.schema.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Declared on `AccountDeleteResponseSchema` and returned by the soft-delete endpoint, so the caller receives it. Nothing on this side reads it back."
   },
   "server/services/agent/terms-acceptance.ts#AgentTermsVersions.requiredContentHash": {
     "kind": "deferred",
@@ -265,19 +261,19 @@
   },
   "server/services/statutory/revision-impact.ts#RevisionImpact.publishedRevision": {
     "kind": "deferred",
-    "reason": "Declared in server/services/statutory/revision-impact.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
+    "reason": "`revisionImpact()` is exported from this module and called by nothing outside it. The statutory-revision impact answer — which published forms a revision touches, and when they were produced — is computed for a caller that does not exist."
   },
   "server/services/statutory/revision-impact.ts#RevisionImpact.productions": {
     "kind": "deferred",
-    "reason": "Written in server/lib/db/schema/index.ts, server/lib/db/schema/statutory-productions.ts, server/services/marketplace/platform-catalogue.ts +1, and read by nothing — every mention there sets it or types it."
+    "reason": "`revisionImpact()` is exported from this module and called by nothing outside it. The statutory-revision impact answer — which published forms a revision touches, and when they were produced — is computed for a caller that does not exist."
   },
   "server/services/statutory/revision-impact.ts#RevisionImpact.firstProducedAt": {
     "kind": "deferred",
-    "reason": "Declared in server/services/statutory/revision-impact.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
+    "reason": "`revisionImpact()` is exported from this module and called by nothing outside it. The statutory-revision impact answer — which published forms a revision touches, and when they were produced — is computed for a caller that does not exist."
   },
   "server/services/statutory/revision-impact.ts#RevisionImpact.lastProducedAt": {
     "kind": "deferred",
-    "reason": "Declared in server/services/statutory/revision-impact.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
+    "reason": "`revisionImpact()` is exported from this module and called by nothing outside it. The statutory-revision impact answer — which published forms a revision touches, and when they were produced — is computed for a caller that does not exist."
   },
   "server/services/subject-export.service.ts#SubjectExportManifest.photosEmbedded": {
     "kind": "deferred",

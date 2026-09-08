@@ -42,7 +42,7 @@ export const INTAKE_INTENTS = [
     'assisted.full',
 ] as const;
 
-type IntakeIntent = typeof INTAKE_INTENTS[number];
+export type IntakeIntent = typeof INTAKE_INTENTS[number];
 
 /**
  * An entry point that names an entity family, and therefore has something a
