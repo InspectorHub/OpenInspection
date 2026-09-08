@@ -8,8 +8,8 @@
     "reason": "Written in server/lib/pca-costs.ts, and read by nothing — every mention there sets it or types it."
   },
   "app/components/portal/sections/report/types.ts#StyleProfileClient.schemaVersion": {
-    "kind": "deferred",
-    "reason": "Written in app/components/template/types.ts, app/components/templates/types.ts, app/lib/editor/structure-ops.ts +37, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
   "app/components/portal/sections/report/types.ts#StyleProfileClient.colour": {
     "kind": "deferred",
@@ -20,12 +20,12 @@
     "reason": "Written in server/lib/report-utils.ts, server/services/inspection/inspection-report.service.ts, and read by nothing — every mention there sets it or types it."
   },
   "app/components/template/types.ts#TemplateSchema.schemaVersion": {
-    "kind": "deferred",
-    "reason": "Written in app/components/portal/sections/report/types.ts, app/components/templates/types.ts, app/lib/editor/structure-ops.ts +37, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
   "app/lib/editor/structure-ops.ts#Snapshot.schemaVersion": {
-    "kind": "deferred",
-    "reason": "Written in app/components/portal/sections/report/types.ts, app/components/template/types.ts, app/components/templates/types.ts +37, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
   "app/lib/inspection-media.ts#GalleryPhoto.pendingPlaceholder": {
     "kind": "deferred",
@@ -204,8 +204,8 @@
     "reason": "Written in app/components/RatingSystemEditor.tsx, app/components/editor-shared/CannedCommentRow.tsx, app/components/editor-shared/DefectCategoryChip.tsx +77, and read by nothing — every mention there sets it or types it."
   },
   "server/lib/report-style/profiles.ts#StyleProfile.schemaVersion": {
-    "kind": "deferred",
-    "reason": "Written in app/components/portal/sections/report/types.ts, app/components/template/types.ts, app/components/templates/types.ts +37, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
   "server/lib/report-style/profiles.ts#StyleProfile.colour": {
     "kind": "deferred",
@@ -232,8 +232,8 @@
     "reason": "Written in app/components/inspector-portal/VisitsCard.tsx, app/components/portal/sections/report/ReportSignatureBlock.tsx, app/lib/report-helpers.ts +25, and read by nothing — every mention there sets it or types it."
   },
   "server/lib/version-diff.ts#Snapshot.schemaVersion": {
-    "kind": "deferred",
-    "reason": "Written in app/components/portal/sections/report/types.ts, app/components/template/types.ts, app/components/templates/types.ts +37, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
   "server/portal/outbox.service.ts#OutboxRow.lastTriedAt": {
     "kind": "deferred",
@@ -276,8 +276,8 @@
     "reason": "Written in server/api/inspections/report-delivery.ts, and read by nothing — every mention there sets it or types it."
   },
   "server/services/inspection/report-schema-types.ts#SchemaData.schemaVersion": {
-    "kind": "deferred",
-    "reason": "Written in app/components/portal/sections/report/types.ts, app/components/template/types.ts, app/components/templates/types.ts +37, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
   "server/services/integrations.service.ts#IntegrationRow.lastSync": {
     "kind": "deferred",
@@ -319,65 +319,49 @@
     "kind": "deferred",
     "reason": "Written in server/api/bookings.ts, server/api/bookings/create.ts, server/api/inspections/agreements.ts +13, and read by nothing — every mention there sets it or types it."
   },
-  "server/types/hono.ts#AppEnv.BILLING_URL": {
-    "kind": "deferred",
-    "reason": "Declared in server/types/hono.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
-  },
-  "server/types/hono.ts#AppEnv.CF_ACCOUNT_ID": {
-    "kind": "deferred",
-    "reason": "Declared in server/types/hono.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
-  },
-  "server/types/hono.ts#AppEnv.CF_API_TOKEN": {
-    "kind": "deferred",
-    "reason": "Declared in server/types/hono.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
-  },
   "server/types/hono.ts#AppEnv.INSPECTOR_MCP": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/mcp/oauth-provider.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "invisible-read",
+    "reason": "Resolved by NAME at runtime: InspectorMcp.serve('/mcp', { binding: 'INSPECTOR_MCP' }) in mcp/oauth-provider.ts. The string is the read."
   },
   "server/types/hono.ts#AppEnv.OAUTH_KV": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/calendar/connection.ts, server/lib/compliance/destruction-scope.ts, server/lib/mcp/oauth-provider.ts, and read by nothing — every mention there sets it or types it."
-  },
-  "server/types/hono.ts#AppEnv.ESIGN_PUBLIC_VERIFY_BASE": {
-    "kind": "deferred",
-    "reason": "Declared in server/types/hono.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
+    "kind": "invisible-read",
+    "reason": "A hardcoded binding name required by @cloudflare/workers-oauth-provider, which looks it up itself — see the comment beside it in wrangler.jsonc. Nothing of ours reads it by name."
   },
   "server/types/hono.ts#HonoConfig.Variables": {
-    "kind": "deferred",
-    "reason": "Written in server/types/auth.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "A Hono framework contract key. The generic `Hono<HonoConfig>` reads it in the TYPE system; runtime code never writes `.Variables`, which is why a name scan cannot see it."
   },
   "server/types/hono.ts#AppEnv.JWT_PRIVATE_KEY_V1": {
-    "kind": "deferred",
-    "reason": "Written in scripts/ensure-jwt-secrets.mjs, scripts/gen-e2e-dev-vars.mjs, and read by nothing — every mention there sets it or types it."
+    "kind": "invisible-read",
+    "reason": "Read as `env[`JWT_PRIVATE_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts) — a template-literal lookup no name scan can see. Declaring V1..V3 is how the type says what that lookup may find."
   },
   "server/types/hono.ts#AppEnv.JWT_PUBLIC_KEY_V1": {
-    "kind": "deferred",
-    "reason": "Written in scripts/ensure-jwt-secrets.mjs, scripts/gen-e2e-dev-vars.mjs, and read by nothing — every mention there sets it or types it."
+    "kind": "invisible-read",
+    "reason": "Read as `env[`JWT_PUBLIC_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts) — a template-literal lookup no name scan can see. Declaring V1..V3 is how the type says what that lookup may find."
   },
   "server/types/hono.ts#AppEnv.JWT_PRIVATE_KEY_V2": {
-    "kind": "deferred",
-    "reason": "Written but never read: outside server/types/hono.ts the name appears only in tests (tests/unit/auth/jwt-keyring.spec.ts)."
+    "kind": "invisible-read",
+    "reason": "Read as `env[`JWT_PRIVATE_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts). Older versions stay declared through a rotation so existing tokens keep verifying."
   },
   "server/types/hono.ts#AppEnv.JWT_PUBLIC_KEY_V2": {
-    "kind": "deferred",
-    "reason": "Written but never read: outside server/types/hono.ts the name appears only in tests (tests/unit/auth/jwt-keyring.spec.ts)."
+    "kind": "invisible-read",
+    "reason": "Read as `env[`JWT_PUBLIC_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts). Older versions stay declared through a rotation so existing tokens keep verifying."
   },
   "server/types/hono.ts#AppEnv.JWT_PRIVATE_KEY_V3": {
-    "kind": "deferred",
-    "reason": "Declared in server/types/hono.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
+    "kind": "invisible-read",
+    "reason": "Read as `env[`JWT_PRIVATE_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts). The next rotation slot; provisioning it is a verify-only window before JWT_CURRENT_KID flips."
   },
   "server/types/hono.ts#AppEnv.JWT_PUBLIC_KEY_V3": {
-    "kind": "deferred",
-    "reason": "Declared in server/types/hono.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
+    "kind": "invisible-read",
+    "reason": "Read as `env[`JWT_PUBLIC_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts). The next rotation slot; provisioning it is a verify-only window before JWT_CURRENT_KID flips."
   },
   "server/types/template-schema.ts#TemplateSection.sharedComments": {
     "kind": "deferred",
     "reason": "Written in app/lib/editor/structure-ops.ts, and read by nothing — every mention there sets it or types it."
   },
   "server/types/template-schema.ts#TemplateSchemaV2.schemaVersion": {
-    "kind": "deferred",
-    "reason": "Written in app/components/portal/sections/report/types.ts, app/components/template/types.ts, app/components/templates/types.ts +37, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
   "server/types/template-schema.ts#TemplateSchemaV2.sectionAssignments": {
     "kind": "deferred",
