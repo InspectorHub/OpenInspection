@@ -60,6 +60,7 @@
   "media_viewer_annotate": "Annotate",
   "media_viewer_rotate": "Rotate",
   "media_viewer_revert": "Revert",
+  "media_viewer_pending_placeholder": "Waiting for this photo to upload from the device that took it.",
   "media_video_unavailable": "Video unavailable",
   "media_video_processing": "Processing…",
   "media_video_uploading": "Uploading…",

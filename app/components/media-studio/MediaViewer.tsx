@@ -89,17 +89,32 @@ export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSu
     mediaId?: string;
     alt: string;
   };
-  const slides = photos.map((p) =>
-    resolveMediaType(p) === "video"
-      ? ({
-          type: "video" as const,
-          provider: p.provider ?? "stream",
-          streamUid: p.streamUid,
-          mediaId: p.mediaId,
-          alt: p.label,
-        } as VideoSlide)
-      : ({ src: fullResUrl(p.url), alt: p.label }),
-  );
+  /**
+   * An entry whose blob is on ANOTHER device. `usePhotoOps` gives it an empty
+   * `url` on purpose — there is no local blob and no stored key to fall back on
+   * — so handing it to the lightbox as a `src` produced the one slide that
+   * rendered a broken-image glyph, and a photo that has not arrived looked
+   * exactly like a photo that failed.
+   *
+   * Keyed on `pendingPlaceholder`, never on `pending`: an entry uploading from
+   * THIS device has a local blob and must still be shown.
+   */
+  type PlaceholderSlide = { type: "placeholder"; alt: string };
+  const slides = photos.map((p) => {
+    if (resolveMediaType(p) === "video") {
+      return {
+        type: "video" as const,
+        provider: p.provider ?? "stream",
+        streamUid: p.streamUid,
+        mediaId: p.mediaId,
+        alt: p.label,
+      } as VideoSlide;
+    }
+    if (p.pendingPlaceholder) {
+      return { type: "placeholder" as const, alt: p.label } as PlaceholderSlide;
+    }
+    return { src: fullResUrl(p.url), alt: p.label };
+  });
 
   return (
     <PhotoLightbox
@@ -109,6 +124,17 @@ export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSu
       onClose={onClose}
       toolbarButtons={toolbar}
       renderSlide={(slide) => {
+        const ps = slide as PlaceholderSlide | undefined;
+        if (ps?.type === "placeholder") {
+          return (
+            <div
+              data-testid="media-pending-placeholder"
+              className="flex h-full w-full items-center justify-center p-8 text-center text-sm text-ih-fg-3"
+            >
+              {m.media_viewer_pending_placeholder()}
+            </div>
+          );
+        }
         const vs = slide as VideoSlide | undefined;
         if (vs?.type === "video") {
           if (vs.provider === "r2") {
