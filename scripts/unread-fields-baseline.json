@@ -11,10 +11,6 @@
     "kind": "wire-shape",
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
-  "app/lib/inspection-media.ts#GalleryPhoto.pendingPlaceholder": {
-    "kind": "deferred",
-    "reason": "Computed and set by `usePhotoOps` (`pendingPlaceholder: !hasLocal && !baseKey`) and read by no renderer, so a tile standing in for a photo that has not arrived looks exactly like a photo that has."
-  },
   "server/cron/types.ts#CronJob.maxBatch": {
     "kind": "invisible-read",
     "reason": "Read as a STRING key by `scripts/check-cron-budget.mjs`, a registered pre-push gate whose REQUIRED_FIELDS list includes `maxBatch:` and which refuses a job that omits it. The CPU ceiling is not protected by passing this value to `run()` — that gate says outright \"CPU cannot be measured from source, so this gate gates the SHAPE that made the overrun possible\", and it separately refuses any unbounded table read on a cron path. `maxBatch` is the declared budget a human tunes; the bounding is gated elsewhere."
@@ -82,10 +78,6 @@
   "server/lib/compliance/retention-sweep.ts#RetentionSweepSummary.purgedArtefacts": {
     "kind": "invisible-read",
     "reason": "Logged whole: `cron/jobs/agreements.ts` calls `logger.info('[cron] retention sweep purged signatures', summary)`, so every count in the summary reaches the structured log. The object is the argument; no field is named."
-  },
-  "server/lib/dashboard-columns.ts#DashboardColumn.mobileVisible": {
-    "kind": "deferred",
-    "reason": "Declares which dashboard columns survive a narrow viewport, and no layout consults it — so the responsive behaviour it describes is whatever the CSS happens to do."
   },
   "server/lib/google-calendar.ts#GoogleTokenResponse.token_type": {
     "kind": "wire-shape",
@@ -158,10 +150,6 @@
   "server/services/account.service.ts#AccountDeleteResult.identityId": {
     "kind": "wire-shape",
     "reason": "Declared on `AccountDeleteResponseSchema` and returned by the soft-delete endpoint, so the caller receives it. Nothing on this side reads it back."
-  },
-  "server/services/agent/terms-acceptance.ts#AgentTermsVersions.requiredContentHash": {
-    "kind": "deferred",
-    "reason": "The agent-terms gate is the only consumer and names its response fields one by one — `state`, `acceptedVersion`, `requiredVersion` — leaving this out. So a client is told WHICH VERSION it must accept but not the hash that pins the exact text, and cannot check that the document it renders is the one being required."
   },
   "server/services/automation/shared.ts#TriggerContext.reportBaseUrl": {
     "kind": "deferred",

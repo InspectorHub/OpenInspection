@@ -99,8 +99,14 @@ interface AgentTermsVersions {
     acceptedVersion: string | null;
     /** The version in force, or null when the deployment has published none. */
     requiredVersion: string | null;
-    /** SHA-256 hex of the body in force, or null. */
-    requiredContentHash: string | null;
+    /**
+     * ⚠️ NO CONTENT HASH HERE. A `requiredContentHash` sat beside these two and
+     * nothing read it: the comparison below uses `inForce.contentHash` direct,
+     * and what pins the exact WORDS is `shownContentHash`, which the accept
+     * route requires back and refuses when stale. Why a second copy from here
+     * would be worse, and the case that keeps it out:
+     * tests/unit/legal/agent-terms-gate.spec.ts.
+     */
 }
 
 /**
@@ -190,7 +196,6 @@ export async function agentTermsStatus(db: Db, userId: string): Promise<AgentTer
             state: 'UNREADABLE',
             acceptedVersion: null,
             requiredVersion: null,
-            requiredContentHash: null,
         };
     }
 
@@ -219,14 +224,12 @@ export async function agentTermsStatus(db: Db, userId: string): Promise<AgentTer
             state: 'NOT_IN_FORCE',
             acceptedVersion: accepted?.version ?? null,
             requiredVersion: null,
-            requiredContentHash: null,
         };
     }
 
     const base = {
         acceptedVersion: accepted?.version ?? null,
         requiredVersion: inForce.version,
-        requiredContentHash: inForce.contentHash,
     };
 
     if (!accepted?.contentHash) {
