@@ -1,8 +1,4 @@
 {
-  "app/components/portal/sections/report/types.ts#PcaReportData.sectionRegistry": {
-    "kind": "deferred",
-    "reason": "Written in app/components/portal/sections/report/PcaSkeleton.tsx, server/lib/pca-report-block.ts, and read by nothing — every mention there sets it or types it."
-  },
   "app/components/portal/sections/report/types.ts#StyleProfileClient.schemaVersion": {
     "kind": "wire-shape",
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
@@ -10,10 +6,6 @@
   "app/components/portal/sections/report/types.ts#StyleProfileClient.colour": {
     "kind": "deferred",
     "reason": "Written in app/components/agreements/AgreementRichText.tsx, app/components/calendar/InspectorSyncBadge.tsx, app/components/dashboard/OnboardingChecklist.tsx +44, and read by nothing — every mention there sets it or types it."
-  },
-  "app/components/portal/sections/report/types.ts#ReportItem.naKind": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/report-utils.ts, server/services/inspection/inspection-report.service.ts, and read by nothing — every mention there sets it or types it."
   },
   "app/components/template/types.ts#TemplateSchema.schemaVersion": {
     "kind": "wire-shape",
@@ -162,10 +154,6 @@
   "server/lib/migration-intake/bundle.ts#MigrationBundleV1.formatVersion": {
     "kind": "deferred",
     "reason": "Written in server/lib/migration-intake/adapters/csv-generic.ts, server/lib/migration-intake/adapters/home-inspector-pro.ts, server/lib/migration-intake/adapters/spectora.ts +1, and read by nothing — every mention there sets it or types it."
-  },
-  "server/lib/pca-report-block.ts#PcaReportBlock.sectionRegistry": {
-    "kind": "deferred",
-    "reason": "Written in app/components/portal/sections/report/PcaSkeleton.tsx, app/components/portal/sections/report/types.ts, and read by nothing — every mention there sets it or types it."
   },
   "server/lib/preflight.ts#PreflightResult.propertyFactsComplete": {
     "kind": "deferred",

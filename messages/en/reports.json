@@ -298,5 +298,7 @@
   "courtesy_translation_setting_label": "Courtesy translations",
   "courtesy_translation_setting_help": "Let this company produce a Spanish courtesy copy of a report at publish time. The English report is always the inspection record. Turning this off stops new translations being made; it never removes one already delivered.",
   "courtesy_translation_setting_off_note": "Translations already delivered stay available to their recipients.",
-  "courtesy_translation_confirm_cancel": "Cancel"
+  "courtesy_translation_confirm_cancel": "Cancel",
+  "report_item_not_inspected": "Not inspected",
+  "report_item_not_present": "Not present"
 }

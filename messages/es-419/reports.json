@@ -298,5 +298,7 @@
   "courtesy_translation_setting_label": "Traducciones de cortesía",
   "courtesy_translation_setting_help": "Permite que esta empresa produzca una copia de cortesía en español de un informe al publicarlo. El informe en inglés siempre es el registro de la inspección. Desactivarlo detiene la creación de nuevas traducciones; nunca elimina una ya entregada.",
   "courtesy_translation_setting_off_note": "Las traducciones ya entregadas siguen disponibles para sus destinatarios.",
-  "courtesy_translation_confirm_cancel": "Cancelar"
+  "courtesy_translation_confirm_cancel": "Cancelar",
+  "report_item_not_inspected": "No inspeccionado",
+  "report_item_not_present": "No presente"
 }

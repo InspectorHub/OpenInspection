@@ -75,9 +75,14 @@ function ChapterDivider({ id, title }: { id: string; title: string }) {
 /**
  * Commercial PCA Phase S report skeleton. Renders the ASTM §11 / real-PCA
  * front matter + Summary + Introduction structure above the system-chapter
- * body. Section names come from data.sectionRegistry (the single registry).
- * The §1.3 cost region is left EMPTY for Phase C; the §11.4.4 arm's-length
- * disclosure has a dedicated render slot in §2 (copy filled by Phase M).
+ * body. Section HEADINGS are the paraglide keys below, because they are copy
+ * and are translated; the ordered section LIST lives once on the server
+ * (`PCA_SECTION_REGISTRY`) and reaches the client already tier-gated and
+ * projected, as `data.outline` for the table of contents. This comment used to
+ * say the names came from `data.sectionRegistry`, a second ungated copy that
+ * nothing read and that listed sections `light_commercial` does not render.
+ * The §11.4.4 arm's-length disclosure has a dedicated render slot in §2 (copy
+ * filled by Phase M).
  */
 export function PcaSkeleton({
   data,

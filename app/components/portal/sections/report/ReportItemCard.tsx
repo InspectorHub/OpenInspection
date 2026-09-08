@@ -75,6 +75,28 @@ export function ReportItemCard({
           )}
         </div>
 
+        {/* WHICH KIND OF "no rating", and why.
+            The Texas REI 7-6 form gives NP and NI their own checkboxes and
+            defines them apart — NP means the component is not in the dwelling,
+            NI means it is there and was not inspected — and ASTM E2018 asks a
+            commercial walk-through to record what was not seen and why. The
+            pill above cannot carry this on its own: it shows the tenant's
+            LABEL, and `getNaKind` falls back to the label only after trying the
+            ABBREVIATION, precisely because a workspace may label a level "N/A"
+            while abbreviating it "NI". `naKind` is the value that always knows.
+            The reason is the half that matters to a buyer: a limitation nobody
+            states is a limitation nobody can act on. */}
+        {item.naKind && (
+          <p className="mb-2 text-[12px] text-ih-fg-3">
+            <span className="font-semibold text-ih-fg-2">
+              {item.naKind === "not_present"
+                ? m.report_item_not_present()
+                : m.report_item_not_inspected()}
+            </span>
+            {item.notInspectedReason ? ` — ${item.notInspectedReason}` : ""}
+          </p>
+        )}
+
         {/* Non-rich item value */}
         {item.type &&
           item.type !== "rich" &&

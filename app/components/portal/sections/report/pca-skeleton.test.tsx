@@ -5,10 +5,6 @@ import { PcaSkeleton } from '~/components/portal/sections/report/PcaSkeleton';
 import type { PcaReportData } from '~/components/portal/sections/report/types';
 
 const data: PcaReportData = {
-  sectionRegistry: [
-    { id: 'summary.deviations', level: 2, title: 'Deviations from the Guide', tiers: ['light', 'full'] },
-    { id: 'introduction.limitations-exceptions', level: 2, title: 'Limitations & Exceptions', tiers: ['light', 'full'] },
-  ],
   narrative: {
     transmittalLetter: 'TL copy', summaryGeneralDescription: 'GD', summaryPhysicalCondition: 'PC',
     summaryRecommendations: 'REC', purpose: 'PURP', scopeOfWork: 'SCOPE incl methodology',

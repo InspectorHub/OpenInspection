@@ -31,10 +31,31 @@ describe('buildPcaReportBlock — commercial gate', () => {
   it('assembles the full skeleton block for a commercial report', () => {
     const block = buildPcaReportBlock({ propertyType: 'commercial', pcaNarrative: null, sections });
     expect(block).not.toBeNull();
-    expect(block!.sectionRegistry[0].id).toBe('cover');
     expect(block!.narrative.purpose).toBe(PCA_NARRATIVE_SEED.purpose); // seed fallback
     expect(block!.systemsSummary[0]).toMatchObject({ systemId: 'site', worstSeverity: 'marginal', counts: { safety: 1, recommendation: 0, maintenance: 0 } });
     expect(block!.deviations).toEqual([]);
+  });
+
+  /**
+   * ONE PROJECTION OF THE SECTION LIST, AND IT IS TIER-GATED.
+   *
+   * This block used to ship `sectionRegistry: [...PCA_SECTION_REGISTRY]` — the
+   * WHOLE registry, ungated — beside the narrative. Nothing read it: the table
+   * of contents is `outline`, built server-side by
+   * `buildReportOutline(gatedSectionRegistry(tier))`, and the skeleton's own
+   * headings come from the paraglide message keys. The only thing keeping the
+   * field alive was an assertion in this file that it existed.
+   *
+   * A second copy of the section list is not merely redundant, it is wrong for
+   * `light_commercial`: `gatedSectionRegistry` drops the Transmittal Letter and
+   * the Systems Summary for that tier, and the ungated copy lists them anyway.
+   * A reader who ever trusted it would have been told the report contains
+   * sections it does not render.
+   */
+  it('ships no second, ungated copy of the section registry', () => {
+    const block = buildPcaReportBlock({ propertyType: 'commercial', pcaNarrative: null, sections });
+    expect(block).not.toBeNull();
+    expect('sectionRegistry' in (block as object)).toBe(false);
   });
 
   it('overlays stored narrative + carries stored deviations for a commercial report', () => {
