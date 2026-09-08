@@ -12,7 +12,6 @@ export interface ItemOptions {
  placeholder?: string;
  maxLength?: number | null;
  choices?: string[];
- minPhotos?: number | null;
 }
 
 interface CannedComment {

@@ -1,11 +1,7 @@
 {
-  "app/components/form/FormField.tsx#ItemOptions.minPhotos": {
+  "app/components/portal/sections/report/types.ts#PcaReportData.sectionRegistry": {
     "kind": "deferred",
-    "reason": "Written in app/components/template/types.ts, server/lib/mcp/openapi-snapshot.json, server/lib/validations/template.schema.ts +1, and read by nothing — every mention there sets it or types it."
-  },
-  "app/components/inspector-portal/ReportsCard.tsx#ReportRow.hasNarrative": {
-    "kind": "deferred",
-    "reason": "Written in server/api/inspections/reports.ts, server/lib/inspection/reports.ts, server/lib/validations/inspection/read.ts, and read by nothing — every mention there sets it or types it."
+    "reason": "Written in app/components/portal/sections/report/PcaSkeleton.tsx, server/lib/pca-report-block.ts, and read by nothing — every mention there sets it or types it."
   },
   "app/components/portal/sections/report/types.ts#BucketRollup.immediateCents": {
     "kind": "deferred",
@@ -15,6 +11,10 @@
     "kind": "deferred",
     "reason": "Written in app/components/template/types.ts, app/components/templates/types.ts, app/lib/editor/structure-ops.ts +37, and read by nothing — every mention there sets it or types it."
   },
+  "app/components/portal/sections/report/types.ts#StyleProfileClient.colour": {
+    "kind": "deferred",
+    "reason": "Written in app/components/agreements/AgreementRichText.tsx, app/components/calendar/InspectorSyncBadge.tsx, app/components/dashboard/OnboardingChecklist.tsx +44, and read by nothing — every mention there sets it or types it."
+  },
   "app/components/portal/sections/report/types.ts#ReportItem.naKind": {
     "kind": "deferred",
     "reason": "Written in server/lib/report-utils.ts, server/services/inspection/inspection-report.service.ts, and read by nothing — every mention there sets it or types it."
@@ -22,10 +22,6 @@
   "app/components/template/types.ts#TemplateSchema.schemaVersion": {
     "kind": "deferred",
     "reason": "Written in app/components/portal/sections/report/types.ts, app/components/templates/types.ts, app/lib/editor/structure-ops.ts +37, and read by nothing — every mention there sets it or types it."
-  },
-  "app/components/template/types.ts#ItemOptions.minPhotos": {
-    "kind": "deferred",
-    "reason": "Written in app/components/form/FormField.tsx, server/lib/mcp/openapi-snapshot.json, server/lib/validations/template.schema.ts +1, and read by nothing — every mention there sets it or types it."
   },
   "app/lib/editor/structure-ops.ts#Snapshot.schemaVersion": {
     "kind": "deferred",
@@ -54,6 +50,10 @@
   "server/lib/billing-summary.ts#BillingSummary.guests": {
     "kind": "deferred",
     "reason": "Written in server/api/billing.ts, server/lib/mcp/openapi-snapshot.json, and read by nothing — every mention there sets it or types it."
+  },
+  "server/lib/billing/cancellation-policy.ts#CancellationPolicy.remedy": {
+    "kind": "deferred",
+    "reason": "Written in app/components/agent/AgentNoticeBell.tsx, app/components/editor/CostItemsPanel.tsx, app/components/inspector-portal/ReportDeliveryList.tsx +42, and read by nothing — every mention there sets it or types it."
   },
   "server/lib/compliance/erasure-coverage.ts#ErasureCoverageDisclosure.manifestRuleCount": {
     "kind": "deferred",
@@ -135,6 +135,10 @@
     "kind": "deferred",
     "reason": "Declared in server/lib/dashboard-columns.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
   },
+  "server/lib/deployment-profile.ts#DeploymentProfile.hasPortalIntegrationApi": {
+    "kind": "deferred",
+    "reason": "Written in app/routes/marketplace.tsx, scripts/gen-deployment-modes-doc.ts, and read by nothing — every mention there sets it or types it."
+  },
   "server/lib/google-calendar.ts#GoogleTokenResponse.token_type": {
     "kind": "deferred",
     "reason": "Written in server/lib/validations/qbo.schema.ts, and read by nothing — every mention there sets it or types it."
@@ -142,10 +146,6 @@
   "server/lib/holidays/resolve-closed-dates.ts#HolidayDataCoverage.minYear": {
     "kind": "deferred",
     "reason": "Written but never read: outside server/lib/holidays/resolve-closed-dates.ts the name appears only in tests (tests/unit/holidays/resolve-closed-dates.spec.ts)."
-  },
-  "server/lib/inspection/reports.ts#ReportListItem.hasNarrative": {
-    "kind": "deferred",
-    "reason": "Written in app/components/inspector-portal/ReportsCard.tsx, server/api/inspections/reports.ts, server/lib/validations/inspection/read.ts, and read by nothing — every mention there sets it or types it."
   },
   "server/lib/messaging/compliance-provider.ts#ComplianceEvent.entitySid": {
     "kind": "deferred",
@@ -183,6 +183,10 @@
     "kind": "deferred",
     "reason": "Written in app/components/portal/sections/report/types.ts, and read by nothing — every mention there sets it or types it."
   },
+  "server/lib/pca-report-block.ts#PcaReportBlock.sectionRegistry": {
+    "kind": "deferred",
+    "reason": "Written in app/components/portal/sections/report/PcaSkeleton.tsx, app/components/portal/sections/report/types.ts, and read by nothing — every mention there sets it or types it."
+  },
   "server/lib/preflight.ts#PreflightResult.propertyFactsComplete": {
     "kind": "deferred",
     "reason": "Written but never read: outside server/lib/preflight.ts the name appears only in tests (tests/e2e/subsystem-e-flows.spec.ts, tests/unit/platform/preflight.spec.ts)."
@@ -195,9 +199,17 @@
     "kind": "deferred",
     "reason": "Written but never read: outside server/lib/preflight.ts the name appears only in tests (tests/e2e/subsystem-e-flows.spec.ts)."
   },
+  "server/lib/qr.ts#QrSvgOptions.margin": {
+    "kind": "deferred",
+    "reason": "Written in app/components/RatingSystemEditor.tsx, app/components/editor-shared/CannedCommentRow.tsx, app/components/editor-shared/DefectCategoryChip.tsx +77, and read by nothing — every mention there sets it or types it."
+  },
   "server/lib/report-style/profiles.ts#StyleProfile.schemaVersion": {
     "kind": "deferred",
     "reason": "Written in app/components/portal/sections/report/types.ts, app/components/template/types.ts, app/components/templates/types.ts +37, and read by nothing — every mention there sets it or types it."
+  },
+  "server/lib/report-style/profiles.ts#StyleProfile.colour": {
+    "kind": "deferred",
+    "reason": "Written in app/components/agreements/AgreementRichText.tsx, app/components/calendar/InspectorSyncBadge.tsx, app/components/dashboard/OnboardingChecklist.tsx +44, and read by nothing — every mention there sets it or types it."
   },
   "server/lib/sms/messaging-rules.ts#MessagingRule.identification": {
     "kind": "deferred",
@@ -303,6 +315,10 @@
     "kind": "deferred",
     "reason": "Written in server/lib/sync-events/registry.ts, server/portal/apply-subject-commands.ts, server/services/data-export.service.ts, and read by nothing — every mention there sets it or types it."
   },
+  "server/types/auth.ts#AuthVariables.requestedTenantSlug": {
+    "kind": "deferred",
+    "reason": "Written in server/api/bookings.ts, server/api/bookings/create.ts, server/api/inspections/agreements.ts +13, and read by nothing — every mention there sets it or types it."
+  },
   "server/types/hono.ts#AppEnv.BILLING_URL": {
     "kind": "deferred",
     "reason": "Declared in server/types/hono.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
@@ -354,10 +370,6 @@
   "server/types/hono.ts#AppEnv.JWT_PUBLIC_KEY_V3": {
     "kind": "deferred",
     "reason": "Declared in server/types/hono.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
-  },
-  "server/types/template-schema.ts#ItemOptions.minPhotos": {
-    "kind": "deferred",
-    "reason": "Written in app/components/form/FormField.tsx, app/components/template/types.ts, server/lib/mcp/openapi-snapshot.json +1, and read by nothing — every mention there sets it or types it."
   },
   "server/types/template-schema.ts#TemplateSection.sharedComments": {
     "kind": "deferred",

@@ -2865,11 +2865,6 @@
                                           "type": "string"
                                         },
                                         "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                      },
-                                      "minPhotos": {
-                                        "type": "number",
-                                        "nullable": true,
-                                        "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                       }
                                     },
                                     "additionalProperties": false,
@@ -3252,11 +3247,6 @@
                                           "type": "string"
                                         },
                                         "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                      },
-                                      "minPhotos": {
-                                        "type": "number",
-                                        "nullable": true,
-                                        "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                       }
                                     },
                                     "additionalProperties": false,
@@ -3469,11 +3459,6 @@
                                           "type": "string"
                                         },
                                         "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                      },
-                                      "minPhotos": {
-                                        "type": "number",
-                                        "nullable": true,
-                                        "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                       }
                                     },
                                     "additionalProperties": false,
@@ -3686,11 +3671,6 @@
                                           "type": "string"
                                         },
                                         "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                      },
-                                      "minPhotos": {
-                                        "type": "number",
-                                        "nullable": true,
-                                        "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                       }
                                     },
                                     "additionalProperties": false,
@@ -3903,11 +3883,6 @@
                                           "type": "string"
                                         },
                                         "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                      },
-                                      "minPhotos": {
-                                        "type": "number",
-                                        "nullable": true,
-                                        "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                       }
                                     },
                                     "additionalProperties": false,
@@ -4290,11 +4265,6 @@
                                           "type": "string"
                                         },
                                         "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                      },
-                                      "minPhotos": {
-                                        "type": "number",
-                                        "nullable": true,
-                                        "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                       }
                                     },
                                     "additionalProperties": false,
@@ -14212,11 +14182,6 @@
                                       "type": "string"
                                     },
                                     "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                  },
-                                  "minPhotos": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                   }
                                 },
                                 "additionalProperties": false,
@@ -14599,11 +14564,6 @@
                                       "type": "string"
                                     },
                                     "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                  },
-                                  "minPhotos": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                   }
                                 },
                                 "additionalProperties": false,
@@ -14816,11 +14776,6 @@
                                       "type": "string"
                                     },
                                     "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                  },
-                                  "minPhotos": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                   }
                                 },
                                 "additionalProperties": false,
@@ -15033,11 +14988,6 @@
                                       "type": "string"
                                     },
                                     "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                  },
-                                  "minPhotos": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                   }
                                 },
                                 "additionalProperties": false,
@@ -15250,11 +15200,6 @@
                                       "type": "string"
                                     },
                                     "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                  },
-                                  "minPhotos": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                   }
                                 },
                                 "additionalProperties": false,
@@ -15637,11 +15582,6 @@
                                       "type": "string"
                                     },
                                     "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                  },
-                                  "minPhotos": {
-                                    "type": "number",
-                                    "nullable": true,
-                                    "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                   }
                                 },
                                 "additionalProperties": false,
@@ -20818,11 +20758,6 @@
                                           "type": "string"
                                         },
                                         "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                      },
-                                      "minPhotos": {
-                                        "type": "number",
-                                        "nullable": true,
-                                        "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                       }
                                     },
                                     "additionalProperties": false,
@@ -21205,11 +21140,6 @@
                                           "type": "string"
                                         },
                                         "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                      },
-                                      "minPhotos": {
-                                        "type": "number",
-                                        "nullable": true,
-                                        "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                       }
                                     },
                                     "additionalProperties": false,
@@ -21422,11 +21352,6 @@
                                           "type": "string"
                                         },
                                         "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                      },
-                                      "minPhotos": {
-                                        "type": "number",
-                                        "nullable": true,
-                                        "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                       }
                                     },
                                     "additionalProperties": false,
@@ -21639,11 +21564,6 @@
                                           "type": "string"
                                         },
                                         "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                      },
-                                      "minPhotos": {
-                                        "type": "number",
-                                        "nullable": true,
-                                        "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                       }
                                     },
                                     "additionalProperties": false,
@@ -21856,11 +21776,6 @@
                                           "type": "string"
                                         },
                                         "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                      },
-                                      "minPhotos": {
-                                        "type": "number",
-                                        "nullable": true,
-                                        "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                       }
                                     },
                                     "additionalProperties": false,
@@ -22243,11 +22158,6 @@
                                           "type": "string"
                                         },
                                         "description": "TODO describe choices field for the OpenInspection MCP integration"
-                                      },
-                                      "minPhotos": {
-                                        "type": "number",
-                                        "nullable": true,
-                                        "description": "TODO describe minPhotos field for the OpenInspection MCP integration"
                                       }
                                     },
                                     "additionalProperties": false,

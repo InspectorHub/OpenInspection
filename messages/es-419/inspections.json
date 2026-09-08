@@ -122,6 +122,7 @@
   "inspections_hub_reports_status_in_progress": "En curso",
   "inspections_hub_reports_status_published": "Publicado",
   "inspections_hub_reports_published_on": "Publicado el {date}",
+  "inspections_hub_reports_no_narrative": "Resumen sin redactar",
   "inspections_hub_reports_versions_one": "1 versión firmada",
   "inspections_hub_reports_versions_other": "{count} versiones firmadas",
   "inspections_hub_reports_delete": "Eliminar",

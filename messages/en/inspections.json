@@ -122,6 +122,7 @@
   "inspections_hub_reports_status_in_progress": "In progress",
   "inspections_hub_reports_status_published": "Published",
   "inspections_hub_reports_published_on": "Published {date}",
+  "inspections_hub_reports_no_narrative": "Narrative not written yet",
   "inspections_hub_reports_versions_one": "1 signed version",
   "inspections_hub_reports_versions_other": "{count} signed versions",
   "inspections_hub_reports_delete": "Delete",

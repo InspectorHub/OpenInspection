@@ -123,9 +123,32 @@ const READ_ONLY_CORPUS = execFileSync('git', ['ls-files', 'scripts', 'workers'],
     .filter((f) => /\.(mjs|js|ts)$/.test(f))
     .filter((f) => !/\.(test|spec)\./.test(f));
 
+/**
+ * Prose is not a read.
+ *
+ * Caught by this gate turning on itself: the header above names
+ * `TemplateSchema.schemaVersion`, `ErasureRule.biometricStatus` and
+ * `RetentionPolicyHeader.approvedBy` as EXAMPLES of what it hunts, and once
+ * this file was tracked under `scripts/` it began counting its own
+ * documentation as evidence that those fields are used. Seven findings
+ * disappeared for no reason but that. A comment mentioning `.foo` HIDES a real
+ * finding, which is the expensive direction to be wrong in.
+ *
+ * Block comments go entirely — that is where prose lives. Line comments go only
+ * when the whole line is one, so a `https://…` inside a string is never mistaken
+ * for the start of a comment.
+ */
+function withoutComments(src) {
+    return src
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .split('\n')
+        .map((line) => (line.trimStart().startsWith('//') ? '' : line))
+        .join('\n');
+}
+
 const READERS = new Map([
-    ...SRC,
-    ...READ_ONLY_CORPUS.map((f) => [f, readFileSync(join(ROOT, f), 'utf8')]),
+    ...[...SRC].map(([f, src]) => [f, withoutComments(src)]),
+    ...READ_ONLY_CORPUS.map((f) => [f, withoutComments(readFileSync(join(ROOT, f), 'utf8'))]),
 ]);
 
 /* ------------------------------------------------------------------ */
@@ -256,14 +279,47 @@ if (LIST) {
     process.exit(0);
 }
 
+/**
+ * The reason a census entry carries, DERIVED rather than typed.
+ *
+ * Ninety-odd hand-written sentences is the debt this gate exists to expose, not
+ * a record of it — nobody checks them and they rot. So a new entry's reason
+ * states the evidence: where else in the tree the name appears at all, split
+ * into product code and tests. A reader can disagree with the conclusion and
+ * re-check the fact in one grep.
+ */
+function evidenceFor(f) {
+    let mentions = [];
+    try {
+        mentions = execFileSync('git', ['grep', '-l', '--', f.prop, 'app', 'server', 'scripts', 'tests', 'packages'],
+            { encoding: 'utf8', cwd: ROOT }).split('\n').filter(Boolean);
+    } catch { /* the declaration is the only mention */ }
+    const others = mentions.filter((m) => m !== f.file);
+    const tests = others.filter((m) => /(\.test\.|\.spec\.|^tests\/|__tests__)/.test(m));
+    const prod = others.filter((m) => !tests.includes(m));
+    const list = (xs) => `${xs.slice(0, 3).join(', ')}${xs.length > 3 ? ` +${xs.length - 3}` : ''}`;
+
+    if (prod.length === 0 && tests.length > 0) {
+        return `Written but never read: outside ${f.file} the name appears only in tests (${list(tests)}).`;
+    }
+    if (prod.length === 0) {
+        return `Declared in ${f.file} and mentioned nowhere else in app/, server/, scripts/ or tests/.`;
+    }
+    return `Written in ${list(prod)}, and read by nothing — every mention there sets it or types it.`;
+}
+
 if (UPDATE) {
     const prev = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {};
     const next = {};
     for (const f of findings) {
-        next[keyOf(f)] = prev[keyOf(f)] ?? { kind: 'deferred', reason: 'TODO: say why this field is unread.' };
+        next[keyOf(f)] = prev[keyOf(f)] ?? { kind: 'deferred', reason: evidenceFor(f) };
     }
     writeFileSync(BASELINE, `${JSON.stringify(next, null, 2)}\n`);
-    console.log(`unread-fields: census re-taken — ${findings.length} entries written to ${BASELINE}`);
+    const dropped = Object.keys(prev).filter((k) => !(k in next));
+    console.log(
+        `unread-fields: census re-taken — ${findings.length} entries`
+        + `${dropped.length ? `, ${dropped.length} dropped (fixed or gone)` : ''}`,
+    );
     process.exit(0);
 }
 

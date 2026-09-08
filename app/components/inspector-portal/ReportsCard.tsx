@@ -137,6 +137,20 @@ export function ReportsCard({
                                         {report.versionCount > 1
                                             && m.inspections_hub_reports_versions_other({ count: report.versionCount })}
                                     </span>
+                                    {/* What is still outstanding on this deliverable.
+                                        Spoken only when the narrative is MISSING and only
+                                        before publication: a badge on every finished row is
+                                        noise, and after delivery an unwritten narrative has
+                                        stopped being a to-do. Surveyed 2026-09-08 — Spectora
+                                        marks sections and items complete as they are filled,
+                                        so a completeness cue here is ordinary for the
+                                        category; this one shows the gap rather than the tick
+                                        because the gap is the actionable half. */}
+                                    {!published && !report.hasNarrative && (
+                                        <span className="mt-0.5 block text-[11px] text-ih-watch-fg">
+                                            {m.inspections_hub_reports_no_narrative()}
+                                        </span>
+                                    )}
                                 </span>
 
                                 {canManage && (

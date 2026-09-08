@@ -130,7 +130,6 @@ export interface ItemOptions {
     placeholder?: string;
     maxLength?: number | null;
     choices?: string[];
-    minPhotos?: number | null;
 }
 
 /** Provenance for templates imported from upstream platforms. */
