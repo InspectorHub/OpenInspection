@@ -3,10 +3,6 @@
     "kind": "wire-shape",
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
-  "app/components/portal/sections/report/types.ts#StyleProfileClient.colour": {
-    "kind": "deferred",
-    "reason": "Written in app/components/agreements/AgreementRichText.tsx, app/components/calendar/InspectorSyncBadge.tsx, app/components/dashboard/OnboardingChecklist.tsx +44, and read by nothing — every mention there sets it or types it."
-  },
   "app/components/template/types.ts#TemplateSchema.schemaVersion": {
     "kind": "wire-shape",
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
@@ -29,19 +25,15 @@
   },
   "server/lib/ai/provider.ts#AiRequest.topK": {
     "kind": "deferred",
-    "reason": "Written in server/lib/ai/providers/openai-compatible.ts, and read by nothing — every mention there sets it or types it."
+    "reason": "A sampling parameter the request shape accepts and the adapter never sends. A caller can set it and nothing will happen, which is worse than not offering it: `server/lib/ai/providers/openai-compatible.ts` is the single adapter and it builds its own body."
   },
   "server/lib/audit-registry.ts#AuditActionDef.altFamilies": {
     "kind": "deferred",
-    "reason": "Written in scripts/check-audit-registry.mjs, and read by nothing — every mention there sets it or types it."
+    "reason": "An action's alternative audit families, declared on the registry and consulted by nothing. Its own comment explains what it is for — an action that legitimately belongs to more than one family — so the check it was written for does not run."
   },
   "server/lib/billing-summary.ts#BillingSummary.guests": {
     "kind": "deferred",
     "reason": "Written in server/api/billing.ts, server/lib/mcp/openapi-snapshot.json, and read by nothing — every mention there sets it or types it."
-  },
-  "server/lib/billing/cancellation-policy.ts#CancellationPolicy.remedy": {
-    "kind": "deferred",
-    "reason": "Written in app/components/agent/AgentNoticeBell.tsx, app/components/editor/CostItemsPanel.tsx, app/components/inspector-portal/ReportDeliveryList.tsx +42, and read by nothing — every mention there sets it or types it."
   },
   "server/lib/compliance/erasure-coverage.ts#ErasureCoverageDisclosure.manifestRuleCount": {
     "kind": "wire-shape",
@@ -123,21 +115,17 @@
     "kind": "deferred",
     "reason": "Declared in server/lib/dashboard-columns.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
   },
-  "server/lib/deployment-profile.ts#DeploymentProfile.hasPortalIntegrationApi": {
-    "kind": "deferred",
-    "reason": "Written in app/routes/marketplace.tsx, scripts/gen-deployment-modes-doc.ts, and read by nothing — every mention there sets it or types it."
-  },
   "server/lib/google-calendar.ts#GoogleTokenResponse.token_type": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/validations/qbo.schema.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "The OAuth token response as the provider sends it — Google here, Intuit in `qbo.schema.ts`. Declared so the shape is honest about what arrives; nothing needs to branch on a value that is always \"Bearer\"."
   },
   "server/lib/holidays/resolve-closed-dates.ts#HolidayDataCoverage.minYear": {
     "kind": "deferred",
     "reason": "Written but never read: outside server/lib/holidays/resolve-closed-dates.ts the name appears only in tests (tests/unit/holidays/resolve-closed-dates.spec.ts)."
   },
   "server/lib/messaging/compliance-provider.ts#ComplianceEvent.entitySid": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/messaging/providers/telnyx-compliance.ts, server/lib/messaging/providers/twilio-compliance.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "The messaging provider's own identifier for the entity an event is about, carried through from Telnyx and Twilio. Ours to pass on and to log, not to interpret."
   },
   "server/lib/migration-intake/adapters/registry.ts#AdapterMatch.adapterName": {
     "kind": "deferred",
@@ -148,8 +136,8 @@
     "reason": "The adapter VERSION that converted a file, discarded alongside its name. Two runs of the same vendor adapter can differ, and nothing records which one produced a given bundle."
   },
   "server/lib/migration-intake/bundle.ts#MigrationBundleV1.formatVersion": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/migration-intake/adapters/csv-generic.ts, server/lib/migration-intake/adapters/home-inspector-pro.ts, server/lib/migration-intake/adapters/spectora.ts +1, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "The stored bundle's version discriminator, written by all three adapters. Nothing branches on it because there is one version so far, which is what it exists to make possible."
   },
   "server/lib/preflight.ts#PreflightResult.propertyFactsComplete": {
     "kind": "deferred",
@@ -170,10 +158,6 @@
   "server/lib/report-style/profiles.ts#StyleProfile.schemaVersion": {
     "kind": "wire-shape",
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
-  },
-  "server/lib/report-style/profiles.ts#StyleProfile.colour": {
-    "kind": "deferred",
-    "reason": "Written in app/components/agreements/AgreementRichText.tsx, app/components/calendar/InspectorSyncBadge.tsx, app/components/dashboard/OnboardingChecklist.tsx +44, and read by nothing — every mention there sets it or types it."
   },
   "server/lib/sms/messaging-rules.ts#MessagingRule.identification": {
     "kind": "deferred",
@@ -200,8 +184,8 @@
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
   "server/portal/outbox.service.ts#OutboxRow.lastTriedAt": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/db/schema/tenant/integration.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Mirrors the `last_tried_at` column on the outbox table. Written on every attempt so the row itself says when it was last tried; read by whoever inspects the table."
   },
   "server/portal/parked-fingerprint.ts#ParkedFingerprint.invalidFields": {
     "kind": "deferred",
@@ -225,15 +209,15 @@
   },
   "server/services/agent/terms-acceptance.ts#AgentTermsVersions.requiredContentHash": {
     "kind": "deferred",
-    "reason": "Declared in server/services/agent/terms-acceptance.ts and mentioned nowhere else in app/, server/, scripts/ or tests/."
+    "reason": "Set on every branch of the terms check (null when nothing is owed, the in-force hash when something is) and read by nobody. An agent told they must re-accept is not told WHICH version, which is the one thing that would let a client show them the right document."
   },
   "server/services/automation/shared.ts#TriggerContext.reportBaseUrl": {
     "kind": "deferred",
     "reason": "Written in server/api/bookings/agreement.ts, server/api/inspections/agreement-sign.ts, server/lib/sign-effects.ts +3, and read by nothing — every mention there sets it or types it."
   },
   "server/services/data-export.service.ts#ExportManifest.photosEmbedded": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/sync-events/registry.ts, server/portal/apply-subject-commands.ts, server/services/subject-export.service.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Part of the export manifest that travels with the archive and crosses the seam (portal reads the manifest on `cmd.subject.export`). The reader is the person holding the export, or portal's record of it."
   },
   "server/services/inspection/inspection-analytics.service.ts#RepairListEntry.recommendationLabel": {
     "kind": "deferred",
@@ -245,7 +229,7 @@
   },
   "server/services/integrations.service.ts#IntegrationRow.lastSync": {
     "kind": "deferred",
-    "reason": "Written in app/components/calendar/CalendarScopeToolbar.tsx, app/components/calendar/InspectorSyncBadge.tsx, app/components/settings/CalendarConnectPanel.tsx +28, and read by nothing — every mention there sets it or types it."
+    "reason": "Every integration row carries when it last synced, and no surface shows it. The calendar components render a staleness badge from a DIFFERENT field (`calendarLastSyncAt`), so the integrations list — the page that lists every connection — is the one place that has the number and does not use it."
   },
   "server/services/migration-intake/assistance.service.ts#ExpiryReminderSummary.finalReminded": {
     "kind": "deferred",
@@ -256,8 +240,8 @@
     "reason": "Written in server/api/migration-intake/route-definitions.ts, and read by nothing — every mention there sets it or types it."
   },
   "server/services/statutory/production-record.ts#ProductionInput.producedBy": {
-    "kind": "deferred",
-    "reason": "Written in server/api/inspections/statutory.ts, server/lib/db/schema/statutory-productions.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Written to `statutory_productions.produced_by` from the caller's own identity. A stored record of who produced a statutory form; nothing reads it back in this codebase."
   },
   "server/services/statutory/revision-impact.ts#RevisionImpact.publishedRevision": {
     "kind": "deferred",
@@ -276,12 +260,12 @@
     "reason": "`revisionImpact()` is exported from this module and called by nothing outside it. The statutory-revision impact answer — which published forms a revision touches, and when they were produced — is computed for a caller that does not exist."
   },
   "server/services/subject-export.service.ts#SubjectExportManifest.photosEmbedded": {
-    "kind": "deferred",
-    "reason": "Written in server/lib/sync-events/registry.ts, server/portal/apply-subject-commands.ts, server/services/data-export.service.ts, and read by nothing — every mention there sets it or types it."
+    "kind": "wire-shape",
+    "reason": "Part of the subject-export manifest that crosses the seam to portal, which stores it against the DSAR record. Read there, not here."
   },
   "server/types/auth.ts#AuthVariables.requestedTenantSlug": {
-    "kind": "deferred",
-    "reason": "Written in server/api/bookings.ts, server/api/bookings/create.ts, server/api/inspections/agreements.ts +13, and read by nothing — every mention there sets it or types it."
+    "kind": "invisible-read",
+    "reason": "A Hono context variable, read as `c.get('requestedTenantSlug')` — in bookings.ts, report-delivery.ts and portal.ts. The key is a string, which no name-based scan can follow."
   },
   "server/types/hono.ts#AppEnv.INSPECTOR_MCP": {
     "kind": "invisible-read",
