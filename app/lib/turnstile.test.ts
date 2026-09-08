@@ -49,14 +49,17 @@ afterEach(() => {
 });
 
 /** Mounts the hook against a real element and returns the render options. */
-function mountWith(scheme: string | null): { sitekey: string; theme?: string } {
+function mountWith(
+    scheme: string | null,
+    opts?: { theme?: "light" | "dark" | "auto" },
+): { sitekey: string; theme?: string } {
     if (scheme === null) {
         document.documentElement.removeAttribute("data-color-scheme");
     } else {
         document.documentElement.setAttribute("data-color-scheme", scheme);
     }
     const host = document.createElement("div");
-    renderHook(() => useTurnstileWidget(SITE_KEY, { current: host }, 3, () => {}));
+    renderHook(() => useTurnstileWidget(SITE_KEY, { current: host }, 3, () => {}, opts));
     expect(renderSpy).toHaveBeenCalledTimes(1);
     return renderSpy.mock.calls[0][1];
 }
@@ -86,5 +89,25 @@ describe("useTurnstileWidget theme", () => {
     // The sitekey must survive the change; a theme is not a substitute for it.
     it("still passes the sitekey", () => {
         expect(mountWith("dark").sitekey).toBe(SITE_KEY);
+    });
+
+    /**
+     * A caller that already knows its palette says so, and is believed.
+     *
+     * The booking EMBED needs this. It renders inside an iframe on someone
+     * else's site and carries its own `style=light|dark|branded` — a value that
+     * has nothing to do with the visitor's cookie. It does write that choice
+     * onto `<html data-color-scheme>`, but from an effect in the wizard, and a
+     * child's effect runs BEFORE its parent's: a widget deriving the theme for
+     * itself would read whatever the attribute held a moment earlier. The embed
+     * knows the answer outright, so it passes it.
+     */
+    it("lets a caller that knows its own palette say so", () => {
+        expect(mountWith("dark", { theme: "light" }).theme).toBe("light");
+    });
+
+    // POSITIVE CONTROL for the override: without one, the page still decides.
+    it("still derives from the page when no override is given", () => {
+        expect(mountWith("dark", {}).theme).toBe("dark");
     });
 });

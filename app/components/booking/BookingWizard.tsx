@@ -73,9 +73,9 @@ export function BookingWizard({
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [verifyUnavailable, setVerifyUnavailable] = useState(false);
 
-  useTurnstileWidget(profile.turnstileSiteKey, turnstileRef, step, setTurnstileToken, () =>
-    setVerifyUnavailable(true),
-  );
+  useTurnstileWidget(profile.turnstileSiteKey, turnstileRef, step, setTurnstileToken, {
+    onLoadFailed: () => setVerifyUnavailable(true),
+  });
 
   const showInspectorDropdown = inspectorOptions.length > 0;
   const serviceIds = [...selectedServices];

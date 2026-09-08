@@ -32,7 +32,10 @@ declare global {
  * the page — and goes on matching it if the OS flips mid-visit, which a value
  * frozen at render time would not.
  */
-function widgetTheme(): "light" | "dark" | "auto" {
+function widgetTheme(explicit?: "light" | "dark" | "auto"): "light" | "dark" | "auto" {
+  // A caller that already knows its palette is believed — see the `theme`
+  // option below for the one caller that does.
+  if (explicit) return explicit;
   if (typeof document === "undefined") return "auto";
   switch (document.documentElement.getAttribute("data-color-scheme")) {
     case "light":
@@ -58,16 +61,30 @@ export function useTurnstileWidget(
   turnstileRef: RefObject<HTMLDivElement | null>,
   step: number,
   onToken: (token: string) => void,
-  /**
-   * Called when the challenge SCRIPT itself cannot be fetched.
-   *
-   * Without this the failure is completely silent: `onTurnstileLoad` never
-   * fires, nothing renders where the widget should be, and the caller is left
-   * waiting for a token that can never arrive. On a network that cannot reach
-   * challenges.cloudflare.com that is a permanent dead end on a page whose
-   * whole job is to take a booking, so the caller needs to be able to say so.
-   */
-  onLoadFailed?: () => void,
+  options?: {
+    /**
+     * Called when the challenge SCRIPT itself cannot be fetched.
+     *
+     * Without this the failure is completely silent: `onTurnstileLoad` never
+     * fires, nothing renders where the widget should be, and the caller is
+     * left waiting for a token that can never arrive. On a network that cannot
+     * reach challenges.cloudflare.com that is a permanent dead end on a page
+     * whose whole job is to take a booking, so the caller needs to say so.
+     */
+    onLoadFailed?: () => void;
+    /**
+     * Force the widget's palette instead of reading it off the page.
+     *
+     * For the booking EMBED, which renders in an iframe on someone else's site
+     * under its own `style=light|dark|branded` — a choice the host made, not
+     * the visitor. It does write that onto `<html data-color-scheme>`, but from
+     * an effect in the wizard, and a child's effect runs BEFORE its parent's;
+     * deriving here would read whatever the attribute held a moment earlier.
+     * Read once at mount, like the theme itself — a page that changes palette
+     * mid-challenge keeps the widget it started with.
+     */
+    theme?: "light" | "dark" | "auto";
+  },
 ) {
   // Load Turnstile widget
   useEffect(() => {
@@ -77,14 +94,14 @@ export function useTurnstileWidget(
       const s = document.createElement("script");
       s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad";
       s.async = true;
-      s.onerror = () => onLoadFailed?.();
+      s.onerror = () => options?.onLoadFailed?.();
       document.head.appendChild(s);
     }
     window.onTurnstileLoad = () => {
       if (turnstileRef.current && window.turnstile) {
         window.turnstile.render(turnstileRef.current, {
           sitekey: siteKey,
-          theme: widgetTheme(),
+          theme: widgetTheme(options?.theme),
           callback: (token: string) => onToken(token),
         });
       }
@@ -92,7 +109,7 @@ export function useTurnstileWidget(
     if (window.turnstile && turnstileRef.current) {
       window.turnstile.render(turnstileRef.current, {
         sitekey: siteKey,
-        theme: widgetTheme(),
+        theme: widgetTheme(options?.theme),
         callback: (token: string) => onToken(token),
       });
     }
