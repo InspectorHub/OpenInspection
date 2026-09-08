@@ -134,6 +134,27 @@ const ALWAYS_ON_DASHBOARD_COLUMNS: ReadonlyArray<string> = DASHBOARD_COLUMNS
     .map(c => c.id);
 
 /**
+ * The ids `mobileVisible: false` names — dropped on a narrow viewport even when
+ * the user has them switched on.
+ *
+ * EXPORTED AS A SET RATHER THAN COPIED. The list the dashboard RENDERS from is
+ * `app/lib/dashboard-schema.ts`, a second array of the same twelve ids carrying
+ * the i18n labels; this one carries the validation rules and the persistence
+ * defaults. Repeating `mobileVisible` over there would have made a third copy
+ * of one fact, and two copies of a rule that read differently are how the next
+ * change lands on only one of them. The renderer reads this instead — which is
+ * also what turns `mobileVisible` from a documented intention into a field
+ * something consults.
+ *
+ * ⚠️ `mobileVisible` defaults to TRUE, so this is an opt-OUT set: a column
+ * missing from it is shown. Testing `=== false` rather than `!c.mobileVisible`
+ * is the difference.
+ */
+export const MOBILE_HIDDEN_COLUMNS: ReadonlySet<string> = new Set(
+    DASHBOARD_COLUMNS.filter(c => c.mobileVisible === false).map(c => c.id),
+);
+
+/**
  * Sanitises a candidate prefs array (unknown source — DB JSON, localStorage,
  * API payload) into a valid set of column ids. Drops unknown ids, dedupes,
  * and re-injects every always-on id even if the caller forgot it.

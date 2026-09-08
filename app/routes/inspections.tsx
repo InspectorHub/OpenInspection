@@ -41,6 +41,7 @@ import { InspectionsEmptyState } from "~/components/dashboard/InspectionsEmptySt
 import { InspectionsStatCards, STAT_TARGETS } from "~/components/dashboard/InspectionsStatCards";
 import { InspectionsFocusBar } from "~/components/dashboard/InspectionsFocusBar";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { useColumnPredicates } from "~/lib/dashboard-visible-columns";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
@@ -328,10 +329,9 @@ export default function InspectionsPage() {
     return DEFAULT_COLUMNS;
   });
 
-  const isColumnVisible = useCallback(
-    (id: string) => visibleColumns.includes(id),
-    [visibleColumns],
-  );
+  // Two predicates, deliberately different: the popover offers what the user
+  // chose, the rows draw what fits. See `useColumnPredicates` for why.
+  const { isColumnVisible, isColumnRendered } = useColumnPredicates(visibleColumns);
 
   const toggleColumn = useCallback((id: string) => {
     if (ALWAYS_ON.has(id)) return;
@@ -655,7 +655,7 @@ export default function InspectionsPage() {
       reportView={activeTab === "published" || activeTab === "to_review"}
       tenantSlug={tenantSlug}
       selectedIds={selectedIds}
-      isColumnVisible={isColumnVisible}
+      isColumnVisible={isColumnRendered}
       toggleSelect={toggleSelect}
       transitionStatus={transitionStatus}
       timeZone={displayTz}
