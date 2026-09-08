@@ -20,8 +20,8 @@
     "reason": "Read as a STRING key by `scripts/check-cron-budget.mjs`, a registered pre-push gate whose REQUIRED_FIELDS list includes `maxBatch:` and which refuses a job that omits it. The CPU ceiling is not protected by passing this value to `run()` — that gate says outright \"CPU cannot be measured from source, so this gate gates the SHAPE that made the overrun possible\", and it separately refuses any unbounded table read on a cron path. `maxBatch` is the declared budget a human tunes; the bounding is gated elsewhere."
   },
   "server/lib/ai/output-classification.ts#ClassificationPosture.requiresReview": {
-    "kind": "deferred",
-    "reason": "A posture says whether its output needs review before use, and nothing asks. The flag is set where the posture is defined and read nowhere, so the review it calls for is not requested by anything."
+    "kind": "record",
+    "reason": "States that model-assisted text of this class must be reviewed by a person before a client reads it. Its reader is review, not code, and nothing should branch on it - because on the path where it applies the review is STRUCTURAL rather than flag-driven. server/api/ai.ts writes nothing but the review row: the assist routes RETURN rewritten text and a person puts it into the report, and the route refuses to hand the UI a suggestion with no aiCallId precisely so that text an inspector cannot review is text they cannot accept. AiAssistPanel posts intent:\"review\" on acceptance, so the evidence row (ai_content_reviews, cited against ai_call_provenance) is written by the same action. CORRECTION: this entry used to read \"a posture says whether its output needs review before use, and nothing asks\", and the field doc beside it said the review SURFACE did not exist. Both were false - app/routes/resources/ai-assist.tsx calls POST /api/ai/reviews and AiAssistPanel reaches it. The field was also on all twelve postures including the eight that refuse the call; it now sits only on the four that may produce output. No rule this deployment is held to requires a publish-time review gate. The requirement that exists is narrower: machine translation must not be delivered as AUTHORITATIVE LEGAL TEXT without human legal review, and descriptive findings and ordinary narrative may be machine translated. The two classes that would have needed a reviewer, legal_text and repair_pricing, are prohibited on both sources instead - the requirement is met by refusal, not by review. The translation path stores machine output without per-segment review and answers the same rule structurally: English authoritative, notice attached, stale translations withheld."
   },
   "server/lib/ai/provider.ts#AiRequest.topK": {
     "kind": "wire-shape",
@@ -90,10 +90,6 @@
   "server/lib/google-calendar.ts#GoogleTokenResponse.token_type": {
     "kind": "wire-shape",
     "reason": "The OAuth token response as the provider sends it — Google here, Intuit in `qbo.schema.ts`. Declared so the shape is honest about what arrives; nothing needs to branch on a value that is always \"Bearer\"."
-  },
-  "server/lib/holidays/resolve-closed-dates.ts#HolidayDataCoverage.minYear": {
-    "kind": "deferred",
-    "reason": "How far back the holiday data reaches, reported alongside its upper bound and read by nothing. A date resolved outside the covered range is answered as confidently as one inside it."
   },
   "server/lib/messaging/compliance-provider.ts#ComplianceEvent.entitySid": {
     "kind": "wire-shape",
