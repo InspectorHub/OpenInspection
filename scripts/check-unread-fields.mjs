@@ -127,7 +127,31 @@ const FILES = execFileSync('git', ['ls-files', '--cached', '--others', '--exclud
     .filter((f) => !f.startsWith('app/paraglide/'))
     .filter((f) => !f.endsWith('.d.ts'));
 
-const SRC = new Map(FILES.map((f) => [f, readFileSync(join(ROOT, f), 'utf8')]));
+/**
+ * Modules `lint:unwired` already owns.
+ *
+ * A field in a module the product cannot reach is not a second finding — it is
+ * the same one, counted once per property, split across two baselines so that
+ * connecting the module would have to be signed off twice. `subtype-specials.ts`
+ * and `system-coverage.ts` were being reported here while sitting in the
+ * unwired census, and the finer grain actively misled: seeing only
+ * `SubtypeSpecialMounts.subItemIds` flagged (its sibling `sectionIds` is a
+ * common name read elsewhere, so the name scan could not see it) reads as
+ * "mounting a special drops its sub-items" when the truth is that nothing
+ * mounts anything.
+ *
+ * One module, one entry, one decision. This gate asks its question only of
+ * files the other gate says the product can reach.
+ */
+const UNWIRED_MODULES = new Set(
+    existsSync(join(ROOT, 'scripts', 'unwired-baseline.json'))
+        ? Object.keys(JSON.parse(readFileSync(join(ROOT, 'scripts', 'unwired-baseline.json'), 'utf8')))
+        : [],
+);
+
+const SRC = new Map(
+    FILES.filter((f) => !UNWIRED_MODULES.has(f)).map((f) => [f, readFileSync(join(ROOT, f), 'utf8')]),
+);
 
 /**
  * Extra places a field can be READ from, which declare none of their own.

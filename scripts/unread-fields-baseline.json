@@ -15,6 +15,10 @@
     "kind": "deferred",
     "reason": "Computed and set by `usePhotoOps` (`pendingPlaceholder: !hasLocal && !baseKey`) and read by no renderer, so a tile standing in for a photo that has not arrived looks exactly like a photo that has."
   },
+  "server/cron/types.ts#CronJob.maxBatch": {
+    "kind": "deferred",
+    "reason": "Every cron job declares one and nothing reads it. Its own doc says what it is for: a batch \"MUST fit the 10 ms Free CPU ceiling for one batch - that is what maxBatch bounds\". Neither dispatch.ts nor consumer.ts passes it to run(), and the sweep behind `maxBatch: 50` carries no LIMIT of its own — so the bound that exists to keep an invocation inside the ceiling is a number nobody enforces."
+  },
   "server/lib/ai/output-classification.ts#ClassificationPosture.requiresReview": {
     "kind": "deferred",
     "reason": "A posture says whether its output needs review before use, and nothing asks. The flag is set where the posture is defined and read nowhere, so the review it calls for is not requested by anything."
@@ -22,10 +26,6 @@
   "server/lib/ai/provider.ts#AiRequest.topK": {
     "kind": "deferred",
     "reason": "A sampling parameter the request shape accepts and the adapter never sends. A caller can set it and nothing will happen, which is worse than not offering it: `server/lib/ai/providers/openai-compatible.ts` is the single adapter and it builds its own body."
-  },
-  "server/lib/audit-registry.ts#AuditActionDef.altFamilies": {
-    "kind": "deferred",
-    "reason": "An action's alternative audit families, declared on the registry and consulted by nothing. Its own comment explains what it is for — an action that legitimately belongs to more than one family — so the check it was written for does not run."
   },
   "server/lib/billing-summary.ts#BillingSummary.guests": {
     "kind": "deferred",
@@ -46,10 +46,6 @@
   "server/lib/compliance/erasure-manifest.ts#ErasureRule.biometricStatus": {
     "kind": "record",
     "reason": "A PII classification carried per rule so the manifest states what kind of data a column holds. Its reader is review, not code; nothing branches on it and nothing should have to."
-  },
-  "server/lib/compliance/legal-hold-release.ts#RequeueOutcome.stillHeld": {
-    "kind": "deferred",
-    "reason": "Returned by the legal-hold requeue and read by no caller, so nothing can distinguish \"still under hold\" from \"released and nothing was outstanding\" — both come back with `remaining: 0`. The discriminant exists; the caller that needs it does not."
   },
   "server/lib/compliance/report-pdf-retention.ts#RetentionJurisdictionFact.checkedOn": {
     "kind": "record",
@@ -86,26 +82,6 @@
   "server/lib/compliance/retention-sweep.ts#RetentionSweepSummary.purgedArtefacts": {
     "kind": "deferred",
     "reason": "The e-sign sweep counts the R2 artefacts it deleted and returns the count to nobody. Its sibling counts are read; this one is the number that says how much storage the run actually reclaimed."
-  },
-  "server/lib/compliance/statutory-classifications.ts#StatutoryClassification.statutory_basis": {
-    "kind": "record",
-    "reason": "The legal-classification register. Its purpose is to be written down and reviewed; no code branches on the basis and none should."
-  },
-  "server/lib/compliance/statutory-classifications.ts#StatutoryClassification.spi_classification": {
-    "kind": "record",
-    "reason": "The legal-classification register — whether the field is sensitive personal information. Read in review, not by code."
-  },
-  "server/lib/compliance/statutory-classifications.ts#StatutoryClassification.review_status": {
-    "kind": "record",
-    "reason": "Where this classification stands in review. A register field: it exists so the state of the review is written down."
-  },
-  "server/lib/compliance/statutory-classifications.ts#StatutoryClassification.ruling": {
-    "kind": "invisible-read",
-    "reason": "Read by `check-no-private-review-refs.mjs`, the gate that keeps private review references out of this public repository. Its reader is a script, not the product."
-  },
-  "server/lib/compliance/statutory-classifications.ts#StatutoryClassification.erasure_coverage": {
-    "kind": "record",
-    "reason": "Which erasure rule covers this classification, recorded so the two catalogues can be cross-read by a person. Not a runtime link."
   },
   "server/lib/dashboard-columns.ts#DashboardColumn.mobileVisible": {
     "kind": "deferred",
@@ -166,14 +142,6 @@
   "server/lib/sms/sender-identity.ts#SmsSenderIdentity.tenantOnWhoseBehalf": {
     "kind": "wire-shape",
     "reason": "Stored in the `sender_identity` JSON column beside `platformSender` — the tenant a message was sent FOR. The pair is the record of who transmitted on whose behalf; nothing branches on it and nothing should."
-  },
-  "server/lib/subtype-specials.ts#SubtypeSpecialMounts.subItemIds": {
-    "kind": "deferred",
-    "reason": "The sub-items a commercial subtype's special mount brings with it, declared and consulted by nothing, so mounting a special adds the parent and silently drops what was meant to hang beneath it."
-  },
-  "server/lib/system-coverage.ts#SystemCoverage.attribution": {
-    "kind": "deferred",
-    "reason": "Where a system's coverage claim came from, carried beside the claim and read by nothing — so a coverage figure is shown, or would be, with no way to say what it was derived from."
   },
   "server/lib/version-diff.ts#Snapshot.schemaVersion": {
     "kind": "wire-shape",
@@ -302,6 +270,10 @@
   "server/types/template-schema.ts#TemplateSection.sharedComments": {
     "kind": "invisible-read",
     "reason": "Read by NAME as a string: `app/lib/editor/structure-ops.ts` lists `'sharedComments'` among the section keys it carries across a structure edit. A string in a list is a read no name-based scan can follow."
+  },
+  "server/types/template-schema.ts#TemplateStructure.buildings": {
+    "kind": "deferred",
+    "reason": "Read only by `inspection-resolvers.ts`, which `lint:unwired` already lists as unreachable — so the multi-building structure is consumed exclusively by code the product cannot get to. Surfaced once reads inside unwired modules stopped counting."
   },
   "server/types/template-schema.ts#TemplateSchemaV2.schemaVersion": {
     "kind": "wire-shape",
