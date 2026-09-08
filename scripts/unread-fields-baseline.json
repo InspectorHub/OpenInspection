@@ -104,16 +104,16 @@
     "reason": "The stored bundle's version discriminator, written by all three adapters. Nothing branches on it because there is one version so far, which is what it exists to make possible."
   },
   "server/lib/preflight.ts#PreflightResult.propertyFactsComplete": {
-    "kind": "deferred",
-    "reason": "Publish pre-flight. Not one field short of a consumer: `InspectionCoreService.computePreflight` has NO CALLER — no route, no loader — so the whole checklist that would tell an inspector what is missing before publishing is computed by a method nobody invokes. `lint:unwired` cannot see it because the service file is reachable through its other methods."
+    "kind": "wire-shape",
+    "reason": "Returned whole: `GET` on the results preflight route does `c.json({ data: out })` with the `PreflightResult` from `services.inspection.computePreflight`. Every field ships. Whether a surface RENDERS the checklist is a different question from whether the field is read."
   },
   "server/lib/preflight.ts#PreflightResult.coverPhotoSet": {
-    "kind": "deferred",
-    "reason": "Publish pre-flight. Not one field short of a consumer: `InspectionCoreService.computePreflight` has NO CALLER — no route, no loader — so the whole checklist that would tell an inspector what is missing before publishing is computed by a method nobody invokes. `lint:unwired` cannot see it because the service file is reachable through its other methods."
+    "kind": "wire-shape",
+    "reason": "Returned whole: `GET` on the results preflight route does `c.json({ data: out })` with the `PreflightResult` from `services.inspection.computePreflight`. Every field ships. Whether a surface RENDERS the checklist is a different question from whether the field is read."
   },
   "server/lib/preflight.ts#PreflightResult.noOpenFields": {
-    "kind": "deferred",
-    "reason": "Publish pre-flight. Not one field short of a consumer: `InspectionCoreService.computePreflight` has NO CALLER — no route, no loader — so the whole checklist that would tell an inspector what is missing before publishing is computed by a method nobody invokes. `lint:unwired` cannot see it because the service file is reachable through its other methods."
+    "kind": "wire-shape",
+    "reason": "Returned whole: `GET` on the results preflight route does `c.json({ data: out })` with the `PreflightResult` from `services.inspection.computePreflight`. Every field ships. Whether a surface RENDERS the checklist is a different question from whether the field is read."
   },
   "server/lib/qr.ts#QrSvgOptions.margin": {
     "kind": "invisible-read",
@@ -124,8 +124,8 @@
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
   "server/lib/sms/messaging-rules.ts#MessagingRule.identification": {
-    "kind": "deferred",
-    "reason": "The identification a rule requires a message to carry. Declared on the rule and consulted by nothing, so a rule that says a message must identify its sender does not make it happen."
+    "kind": "invisible-read",
+    "reason": "Read as a STRING key by `scripts/check-messaging-rules.mjs`, which lists it in REQUIREMENT_KEYS and validates its allowed values. `send-gate.ts` says outright that it does not enforce it and does not pretend to — it never sees the composed body and does not own the inbound path — and points at the register for where enforcement lives."
   },
   "server/lib/sms/sender-identity.ts#SmsSenderIdentity.platformSender": {
     "kind": "wire-shape",
@@ -165,7 +165,7 @@
   },
   "server/services/agent/terms-acceptance.ts#AgentTermsVersions.requiredContentHash": {
     "kind": "deferred",
-    "reason": "Set on every branch of the terms check (null when nothing is owed, the in-force hash when something is) and read by nobody. An agent told they must re-accept is not told WHICH version, which is the one thing that would let a client show them the right document."
+    "reason": "The agent-terms gate is the only consumer and names its response fields one by one — `state`, `acceptedVersion`, `requiredVersion` — leaving this out. So a client is told WHICH VERSION it must accept but not the hash that pins the exact text, and cannot check that the document it renders is the one being required."
   },
   "server/services/automation/shared.ts#TriggerContext.reportBaseUrl": {
     "kind": "deferred",
@@ -200,20 +200,20 @@
     "reason": "Written to `statutory_productions.produced_by` from the caller's own identity. A stored record of who produced a statutory form; nothing reads it back in this codebase."
   },
   "server/services/statutory/revision-impact.ts#RevisionImpact.publishedRevision": {
-    "kind": "deferred",
-    "reason": "`revisionImpact()` is exported from this module and called by nothing outside it. The statutory-revision impact answer — which published forms a revision touches, and when they were produced — is computed for a caller that does not exist."
+    "kind": "wire-shape",
+    "reason": "Returned whole: `server/portal/statutory-admin.routes.ts` calls `revisionImpact(...)` and answers `c.json({ success: true, data })`. The object is the payload."
   },
   "server/services/statutory/revision-impact.ts#RevisionImpact.productions": {
-    "kind": "deferred",
-    "reason": "`revisionImpact()` is exported from this module and called by nothing outside it. The statutory-revision impact answer — which published forms a revision touches, and when they were produced — is computed for a caller that does not exist."
+    "kind": "wire-shape",
+    "reason": "Returned whole: `server/portal/statutory-admin.routes.ts` calls `revisionImpact(...)` and answers `c.json({ success: true, data })`. The object is the payload."
   },
   "server/services/statutory/revision-impact.ts#RevisionImpact.firstProducedAt": {
-    "kind": "deferred",
-    "reason": "`revisionImpact()` is exported from this module and called by nothing outside it. The statutory-revision impact answer — which published forms a revision touches, and when they were produced — is computed for a caller that does not exist."
+    "kind": "wire-shape",
+    "reason": "Returned whole: `server/portal/statutory-admin.routes.ts` calls `revisionImpact(...)` and answers `c.json({ success: true, data })`. The object is the payload."
   },
   "server/services/statutory/revision-impact.ts#RevisionImpact.lastProducedAt": {
-    "kind": "deferred",
-    "reason": "`revisionImpact()` is exported from this module and called by nothing outside it. The statutory-revision impact answer — which published forms a revision touches, and when they were produced — is computed for a caller that does not exist."
+    "kind": "wire-shape",
+    "reason": "Returned whole: `server/portal/statutory-admin.routes.ts` calls `revisionImpact(...)` and answers `c.json({ success: true, data })`. The object is the payload."
   },
   "server/services/subject-export.service.ts#SubjectExportManifest.photosEmbedded": {
     "kind": "wire-shape",
