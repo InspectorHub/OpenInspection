@@ -52,8 +52,8 @@
     "reason": "When this jurisdiction's retention rule was last verified against its primary source. A fact with no date is a fact nobody can trust; its reader is the next person who has to re-check it."
   },
   "server/lib/compliance/retention-logs.ts#LogRetentionSummary.activeHolds": {
-    "kind": "deferred",
-    "reason": "Filled from `holds.activeHoldCount` into a summary nothing consumes. A retention run that reports how many legal holds blocked it is only useful if somebody reads the report."
+    "kind": "invisible-read",
+    "reason": "Logged whole: `daily-retention-tasks.ts` calls `logger.info('[cron] log retention sweep', logSummary)` on the success path and logs the partial summary on failure. The object is the argument."
   },
   "server/lib/compliance/retention-policy.ts#RetentionPolicyHeader.effectiveAt": {
     "kind": "record",
@@ -80,8 +80,8 @@
     "reason": "Names the tenant-config column a per-tenant retention window would be read from (`report_pdf_retention_years`). No code reads that column against this manifest, because no manifest-driven sweep exists — the only runtime sweep in the tree is the hand-written e-sign one."
   },
   "server/lib/compliance/retention-sweep.ts#RetentionSweepSummary.purgedArtefacts": {
-    "kind": "deferred",
-    "reason": "The e-sign sweep counts the R2 artefacts it deleted and returns the count to nobody. Its sibling counts are read; this one is the number that says how much storage the run actually reclaimed."
+    "kind": "invisible-read",
+    "reason": "Logged whole: `cron/jobs/agreements.ts` calls `logger.info('[cron] retention sweep purged signatures', summary)`, so every count in the summary reaches the structured log. The object is the argument; no field is named."
   },
   "server/lib/dashboard-columns.ts#DashboardColumn.mobileVisible": {
     "kind": "deferred",
@@ -144,8 +144,8 @@
     "reason": "Mirrors the `last_tried_at` column on the outbox table. Written on every attempt so the row itself says when it was last tried; read by whoever inspects the table."
   },
   "server/portal/parked-fingerprint.ts#ParkedFingerprint.invalidFields": {
-    "kind": "deferred",
-    "reason": "Which fields made a portal event unparseable, computed when it is parked and read by nobody. The parking lot records THAT a message could not be understood without recording WHAT about it could not be."
+    "kind": "invisible-read",
+    "reason": "Serialised whole: `parkedFingerprint()` returns `JSON.stringify(fingerprint)` and the parking write stores that string in `parked_cmd_events.envelope`. The field IS recorded; nothing writes `.invalidFields` because the consumer is the serialiser."
   },
   "server/services/account.service.ts#AccountExport.exportedAt": {
     "kind": "wire-shape",
@@ -188,8 +188,8 @@
     "reason": "Every integration row carries when it last synced, and no surface shows it. The calendar components render a staleness badge from a DIFFERENT field (`calendarLastSyncAt`), so the integrations list — the page that lists every connection — is the one place that has the number and does not use it."
   },
   "server/services/migration-intake/assistance.service.ts#ExpiryReminderSummary.finalReminded": {
-    "kind": "deferred",
-    "reason": "How many assisted runs got their FINAL expiry reminder, counted separately from the earlier one and then dropped. The distinction exists because the last warning before a third party's file is deleted is the one worth knowing about."
+    "kind": "invisible-read",
+    "reason": "Logged whole, and deliberately: `daily-retention-tasks.ts` logs the summary with the comment \"All THREE numbers, always — including on a pass that reminded nobody\", because a line that appeared only when something happened could not tell a quiet day from a job that had stopped looking."
   },
   "server/services/migration-intake/repair.service.ts#RemapResult.replacedRowCount": {
     "kind": "wire-shape",

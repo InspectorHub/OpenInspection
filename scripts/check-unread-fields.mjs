@@ -44,6 +44,19 @@
  * person writes that. The gate checks a reason EXISTS; it cannot check it is
  * true.
  *
+ * ⚠️ ITS LOUDEST FALSE POSITIVE IS THE OBJECT PASSED WHOLE. A field consumed by
+ * `JSON.stringify(x)`, by `logger.info(msg, x)`, or by any call that takes the
+ * containing object rather than the field is read by something this scan cannot
+ * see — it is looking for `.field`, and nobody wrote one. Four entries were
+ * classified `deferred` on that basis before anybody traced the callers:
+ * `ParkedFingerprint.invalidFields` is stringified into the parked row,
+ * and three cron summaries are handed to the structured logger whole, one of
+ * them with a comment insisting all its numbers be reported every run.
+ *
+ * The lesson is about the REASONS, not the count. "No `.field` read" is a fact;
+ * "the parking lot does not record what was invalid" is a story, and the story
+ * was false. Trace the consumer before writing a reason down.
+ *
  * ## How the instrument was checked, before its output was believed
  *
  * Against the tree with `EmbedData.siteKey` restored to its pre-fix state it
