@@ -59,7 +59,9 @@ POST /api/inspections/:id/upload
 Content-Type: multipart/form-data
 ```
 
-Worker stores the file in R2 under `{tenantId}/{inspectionId}/{filename}`. Files retrieved via `GET /api/inspections/files/:key` (tenant-scoped verification before proxying from R2).
+Worker stores the file in R2 under `{tenantId}/{inspectionId}/{filename}`. Photos are read back through `GET /api/inspections/:id/photo?key=<r2-key>` — role-guarded, and scoped to the caller's tenant and inspection by the key prefix. The R2 key contains `/`, which is why it travels as a query parameter rather than a path segment. The public report viewer has its own token-scoped twin in `public-report.ts`.
+
+(There is no `GET /api/inspections/files/:key`. This page named one for a long time and no such route has ever existed.)
 
 Photos can have annotations and captions (`inspection_media_pool` table).
 
@@ -84,7 +86,10 @@ Report viewer: `app/routes/public/report.tsx` (card-stack layout with section na
 | `POST /api/ai/comment-assist` | Professional rewrite of inspector's note |
 | `POST /api/ai/auto-summary` | Bullet-point summary of all defects |
 
-Both call Gemini 1.5 Flash. Temperature 0.2.
+Both go through the one OpenAI-compatible adapter, at whatever endpoint and
+model the deployment or the company configured — there is no compiled-in vendor
+or model, and with `AI_MODEL` / `AI_BASE_URL` unset both fail closed with a 503.
+See [AI](../integrations/ai.md).
 
 ## 6. Template Management
 
@@ -103,7 +108,7 @@ Bringing templates over from another product is not an endpoint on this router: 
 
 Inspectors manage weekly schedule + date overrides via `availability` / `availability_overrides` tables.
 
-Public booking: `GET /public/book/:tenant` returns the company booking page with all services and available slots; the system auto-assigns the first available qualified inspector. An optional inspector-choice dropdown is shown when the tenant enables "Allow clients to choose their inspector" (Settings → Online Booking → Booking policies). Customer submits via `POST /public/book` with Turnstile bot protection. Legacy per-inspector URLs `GET /public/book/:tenant/:slug` redirect 302 to the company page with that inspector pre-selected.
+Public booking: the page is a React Router route at `/book/:tenant`, and its data comes from `GET /api/public/book/:tenant` (all services and available slots). The system auto-assigns the first available qualified inspector. An optional inspector-choice dropdown is shown when the tenant enables "Allow clients to choose their inspector" (Settings → Online Booking → Booking policies). Customer submits via `POST /api/public/book` with Turnstile bot protection. Legacy per-inspector URLs `/book/:tenant/:slug` redirect 302 to the company page with that inspector pre-selected.
 
 ## 8. Execution Flow
 
@@ -114,13 +119,16 @@ Public booking: `GET /public/book/:tenant` returns the company booking page with
 2. Inspector opens inspection in the editor (/inspections/:id/edit)
    → template JSON parsed into interactive checklist
    → keyboard-driven: 1-5 ratings, / snippet picker, Cmd-K palette
-   → responses saved to IndexedDB immediately
+   → every edit lands in the Yjs results document, buffered in IndexedDB
 
 3. Inspector photographs defects
    → POST /api/inspections/:id/upload → R2
+   → binary upload needs a connection; offline it is declined, not queued
 
-4. Background sync pushes IndexedDB data
-   → PATCH /api/inspections/:id/results (field-level merge)
+4. The Durable Object merges and persists
+   → edits sync over the collab WebSocket; the DO is the only writer of
+     inspection_results.data, and it also stores the binary CRDT state
+   → offline edits merge on reconnect with no lost operations
 
 5. Inspector publishes report
    → report version snapshot created
@@ -139,8 +147,8 @@ Public booking: `GET /public/book/:tenant` returns the company booking page with
 | `server/api/inspections.ts` | Inspection + template CRUD |
 | `server/api/bookings.ts` | Public booking + availability |
 | `server/api/ai.ts` | AI comment assist + auto-summary |
-| `server/services/inspection.service.ts` | Core business logic (130KB) |
+| `server/services/inspection.service.ts` | Core business logic |
 | `server/lib/validations/template.schema.ts` | Template v2 schema validation |
 | `app/routes/inspection-edit.tsx` | 3-pane inspection editor (single fill surface) |
-| `app/hooks/useInspection.ts` | Inspection state management (866 LOC) |
+| `app/hooks/useInspection.ts` | Inspection state management |
 | `app/hooks/useCannedComments.ts` | Comment picker logic |

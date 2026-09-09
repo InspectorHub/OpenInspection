@@ -39,8 +39,30 @@ For the manual flow, see the **Quick start** section in the [README](../../READM
 | Images binding   | `IMAGES` (optional) | Downscales Appendix B photos before embedding them in Word (.docx) exports. |
 | Workflow         | `SIGN_COMPLETION_WORKFLOW` | Async e-sign pipeline (Spec 5H).                           |
 | Durable Objects  | `INSPECTION_PRESENCE`, `TENANT_PRESENCE` | Live presence for the editor.               |
+| Durable Object   | `INSPECTION_DOC` | The collaborative results document (Yjs CRDT). Absent → the editor's collab routes return `501` and collaborative editing does not engage. |
+| Durable Object   | `INSPECTOR_MCP`  | The remote MCP server. Only reached when `MCP_ENABLED` is set. |
+| KV namespace     | `OAUTH_KV`       | MCP OAuth grants. The binding NAME is fixed by `@cloudflare/workers-oauth-provider`. |
+| Queue            | `CRON_QUEUE`     | **Background jobs run on this queue, one job per invocation.** With it unbound the tick logs `CRON_QUEUE is not bound — no job will run` and every sweep, reminder and retention job stops. |
+| Queue            | `WORD_EXPORT_QUEUE` | Async `.docx` export. |
+| Stream binding   | `STREAM` (optional) | Cloudflare Stream video backend. Absent → video stays on R2, which is the default. |
 
-`npm run setup:cloudflare` provisions every binding listed above and writes their real IDs into a gitignored `wrangler.local.jsonc` (bootstrapped from the committed placeholder `wrangler.jsonc`).
+⚠️ **`npm run setup:cloudflare` does not provision all of them.** It creates the
+D1 database, **one** KV namespace (`TENANT_CACHE`) and the `PHOTOS` R2 bucket,
+and writes their real IDs into a gitignored `wrangler.local.jsonc` (bootstrapped
+from the committed placeholder `wrangler.jsonc`). The two queues and the second
+KV namespace are not created by it, and `wrangler.jsonc` carries a placeholder id
+for `OAUTH_KV`. Create them yourself before the first deploy:
+
+```bash
+npx wrangler queues create openinspection-cron
+npx wrangler queues create openinspection-word-export
+npx wrangler kv namespace create openinspection-oauth   # then paste the id over the
+                                                        # OAUTH_KV placeholder in
+                                                        # wrangler.local.jsonc
+```
+
+Durable Objects, the Workflow, `BROWSER`, `IMAGES` and `STREAM` are name-only
+bindings — declaring them in the config is all the provisioning they need.
 
 > **`IMAGES` is optional.** The committed `wrangler.jsonc` declares it (an
 > account-scoped, name-only binding). If your account has **Images →
@@ -74,7 +96,7 @@ npm run setup:cloudflare   # provisions D1/KV/R2 + writes real IDs to wrangler.l
 npm run deploy             # build + wrangler deploy (uses wrangler.local.jsonc)
 ```
 
-`npm run deploy` runs `react-router build` (bundling `server/` API + `app/` SSR into one worker) then `wrangler deploy` against the built `build/server/wrangler.json`, and finally `jwt:ensure` + `setup-code:ensure` (provision missing secrets). The build bakes whichever wrangler config wins (`WRANGLER_CONFIG` env > `wrangler.local.jsonc` > committed `wrangler.jsonc`). Apply remote D1 migrations with `npm run db:migrate:remote`.
+`npm run deploy` is the whole chain, in this order: `build` → `db:migrate:remote` → `db:lag` → `wrangler deploy` → `jwt:ensure` → `setup-code:ensure`. So **remote D1 migrations are applied by the deploy itself** — you do not need a separate `npm run db:migrate:remote` first, though running it on its own is a way to read the migration output before the build starts. `db:lag` sits between the migration and the deploy and aborts if the database and this checkout disagree about what has been applied. The build bakes whichever wrangler config wins (`WRANGLER_CONFIG` env > `wrangler.local.jsonc` > committed `wrangler.jsonc`).
 
 > **One-click**: the committed `wrangler.jsonc` carries placeholder IDs; the README's *Deploy to Cloudflare* button provisions resources and injects real IDs automatically — no manual `setup:cloudflare` needed for that path.
 

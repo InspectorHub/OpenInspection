@@ -1,6 +1,26 @@
 # API Reference
 
-All API routes are under `/api/`. Authenticated endpoints require a valid JWT either in the `Authorization: Bearer <token>` header or the `inspector_token` cookie.
+> ⚠️ **This page is a hand-written sample, not the API.** It describes a few
+> dozen endpoints; the deployment serves several hundred. The authoritative
+> surface is the **live OpenAPI document at `/doc`**, with Swagger UI at `/ui`,
+> both generated from the route definitions themselves — plus
+> `server/lib/mcp/openapi-snapshot.json`, the committed snapshot of the same
+> thing. Nothing generates or checks the page you are reading, and a 2026-09-09
+> audit found six endpoints on it that do not exist and three written under the
+> wrong prefix. **When this page and `/doc` disagree, `/doc` is right.**
+>
+> What is worth reading here is the part `/doc` does not carry: the auth model,
+> the response envelope, and the status-code vocabulary.
+
+Almost all API routes are under `/api/`. Inbound provider **webhooks** are the
+deliberate exception and mount at the top level (`/webhooks/{vendor}`), because
+the producer owns the body and the signature and none of the `/api/*` middleware
+applies to them. `/status`, `/photos/*`, `/.well-known/*`, `/sign/*`, `/sso`,
+`/m2m/*` and the ICS feed are also top-level.
+
+Authenticated endpoints require a valid JWT in the `__Host-inspector_token`
+HttpOnly cookie. The token is ES256-signed with a `kid` naming its keyring
+entry. A `Authorization: Bearer <token>` header is also accepted.
 
 Responses are JSON unless noted.
 
@@ -9,16 +29,26 @@ Responses are JSON unless noted.
 ## Public Endpoints (no auth)
 
 ### `GET /status`
-Health check.
+Health check. Its shape is load-bearing — `scripts/check-deploy-lag.mjs` reads
+`commit` and `branch` and refuses to report "no lag" for a status it cannot
+parse.
 
 **Response:**
 ```json
-{ "status": "Core Engine Online", "version": "1.0.0" }
+{
+  "status": "ok",
+  "app": "openinspection-core",
+  "version": "1.0.0",
+  "commit": "…",
+  "branch": "…",
+  "buildTime": "…",
+  "timestamp": "…"
+}
 ```
 
 ---
 
-### `GET /public/inspectors`
+### `GET /api/public/inspectors`
 List all inspectors for the current tenant (used by the booking page).
 
 **Response:**
@@ -32,7 +62,7 @@ List all inspectors for the current tenant (used by the booking page).
 
 ---
 
-### `GET /public/availability/:inspectorId?tenant=<slug>&start=YYYY-MM-DD&end=YYYY-MM-DD`
+### `GET /api/public/availability/:inspectorId?tenant=<slug>&start=YYYY-MM-DD&end=YYYY-MM-DD`
 Get an inspector's raw availability for a date range: base weekly windows, date overrides, and already-booked dates. Rate-limited per IP.
 
 **Query params:**
@@ -54,7 +84,7 @@ Get an inspector's raw availability for a date range: base weekly windows, date 
 
 ---
 
-### `POST /public/book`
+### `POST /api/public/book`
 Submit a booking request. Creates an inspection record with `status: 'draft'`.
 
 **Request body:**
@@ -135,24 +165,21 @@ template configured, responds `409` with `{ "code": "no_agreement_template" }`.
 
 ---
 
-### `POST /api/inspections/:id/checkout`
-Initiate a Stripe Checkout session to unlock the full report. Returns a redirect URL.
+### ~~`POST /api/inspections/:id/checkout`~~ — does not exist
 
-- If `STRIPE_SECRET_KEY` is configured, creates a real Stripe Checkout session.
-- If the tenant has a `stripeConnectAccountId`, the payment is routed through their Stripe Connect Express account with a 10% platform fee.
-- Falls back to a mock redirect if `STRIPE_SECRET_KEY` is absent or a placeholder.
-
-**Response:**
-```json
-{ "url": "https://checkout.stripe.com/..." }
-```
+**Removed from this page 2026-09-09: no such route has been found in the
+codebase.** The report pay-gate is driven from the public token track instead —
+`GET /api/public/checkout/:token` and
+`POST /api/public/inspections/:id/pay-intent`. See
+[`../integrations/stripe.md`](../integrations/stripe.md) for the payment flow
+and `/doc` for the current shapes.
 
 ---
 
 ## Auth Endpoints
 
 ### `POST /api/auth/login`
-Verify credentials and set the `inspector_token` httpOnly cookie.
+Verify credentials and set the `__Host-inspector_token` httpOnly cookie.
 
 **Request body:**
 ```json
@@ -161,17 +188,36 @@ Verify credentials and set the `inspector_token` httpOnly cookie.
 
 **Response:**
 ```json
-{ "success": true, "token": "eyJ...", "redirect": "/inspections" }
+{ "success": true, "data": { "redirect": "/inspections" } }
 ```
 
-Sets the `inspector_token` httpOnly cookie **and** returns the JWT in the response body so standalone clients can store it in `localStorage` for Bearer-authenticated API calls.
+The JWT is delivered **only** as the `__Host-inspector_token` HttpOnly cookie.
+It is not in the body, and browser JavaScript must never store a token —
+`CLAUDE.md` § JWT & Auth Security Rules makes both of those rules. The one
+exception is the server-side BFF: a caller sending `x-token-relay: 1` also gets
+`token` in `data`, because Workers `fetch()` may strip `Set-Cookie` on a
+server-to-server hop and the BFF has to put the token in its own session cookie.
+The browser never sends that header.
+
+**If the user has 2FA enabled, no session is granted here.** The response is
+`{ "success": true, "data": { "requires2fa": true, "challengeToken": "…" } }`
+with **no** `Set-Cookie` — challenge tokens travel JSON-only, so a stolen session
+cookie alone can never bypass the second factor. The challenge is valid for five
+minutes; post it back with the TOTP code to `POST /api/auth/login/2fa` to get a
+session.
 
 Returns `401` if credentials are invalid.
+
+### The rest of the 2FA surface
+
+`POST /api/auth/2fa/setup`, `/2fa/verify`, `/2fa/disable`,
+`/2fa/recovery-codes/regenerate`, and `POST /api/auth/login/2fa`. Shapes are in
+`/doc`; the server side lives in `server/api/auth/totp.ts`.
 
 ---
 
 ### `POST /api/auth/join`
-Accept a team invite token, create the user account, and set the `inspector_token` cookie.
+Accept a team invite token, create the user account, and set the `__Host-inspector_token` cookie.
 
 **Request body:**
 ```json
@@ -180,17 +226,18 @@ Accept a team invite token, create the user account, and set the `inspector_toke
 
 **Response:**
 ```json
-{ "success": true, "token": "eyJ...", "redirect": "/inspections" }
+{ "success": true, "data": { "redirect": "/inspections" } }
 ```
 
-Sets the `inspector_token` httpOnly cookie **and** returns the JWT in the response body. Store it in `localStorage` as `tenantToken` for subsequent authenticated API calls.
+Sets the `__Host-inspector_token` HttpOnly cookie. As with login, the JWT is not
+returned to a browser and must not be stored in `localStorage`.
 
 Returns `400` if the token is expired or already used.
 
 ---
 
 ### `POST /api/auth/change-password`
-Change the calling user's password. Requires a valid JWT or `inspector_token` cookie.
+Change the calling user's password. Requires a valid JWT or `__Host-inspector_token` cookie.
 
 **Request body:**
 ```json
@@ -297,7 +344,7 @@ Get a single inspection with its template schema.
 #### `POST /api/inspections`
 Create a new inspection.
 
-**Roles:** `owner`, `admin`, `inspector`
+**Roles:** `owner`, `manager`, `inspector`
 
 **Request body:**
 ```json
@@ -321,7 +368,7 @@ Create a new inspection.
 #### `DELETE /api/inspections/:id`
 Delete an inspection and its associated results. The inspection must belong to the caller's tenant.
 
-**Roles:** `admin`, `owner`
+**Roles:** `owner`, `manager`
 
 **Response:**
 ```json
@@ -335,7 +382,7 @@ Returns `404` if the inspection is not found or belongs to a different tenant.
 #### `PATCH /api/inspections/:id`
 Update editable metadata on an inspection. Only the fields included in the request body are changed.
 
-**Roles:** `owner`, `admin`, `inspector`
+**Roles:** `owner`, `manager`, `inspector`
 
 **Allowed fields:** `propertyAddress`, `clientName`, `clientEmail`, `date`, `inspectorId`, `price`, `status`
 
@@ -378,31 +425,25 @@ Get the field data collected for an inspection.
 
 ---
 
-#### `PATCH /api/inspections/:id/results`
-Save (upsert) field data for an inspection. The field form calls this continuously as the inspector fills in the checklist.
+#### ~~`PATCH /api/inspections/:id/results`~~ — does not exist
 
-**Roles:** `owner`, `admin`, `inspector`
+**There has never been a `PATCH` on `/{id}/results`; the only method there is
+`GET`.** The bulk write path is `POST /api/inspections/:id/results/batch`, and
+in normal editing nothing calls it per keystroke either: the editor's writes go
+into a Yjs document held in a Durable Object, and the DO is the only writer of
+`inspection_results.data`. See
+[`../concepts/collab-editing.md`](../concepts/collab-editing.md).
 
-**Request body:**
-```json
-{
-  "data": {
-    "roof_1": { "status": "Defect", "notes": "Missing shingles", "photos": [] }
-  }
-}
-```
-
-**Response:**
-```json
-{ "success": true }
-```
+This phantom route has cost real time before — `develop/testing.md` records an
+E2E spec that patched it, got a silent 404 on its seed step, and stayed green
+while testing nothing.
 
 ---
 
 #### `POST /api/inspections/:id/complete`
 Mark an inspection as completed and email the report link to the client.
 
-**Roles:** `owner`, `admin`, `inspector`
+**Roles:** `owner`, `manager`, `inspector`
 
 **Response:**
 ```json
@@ -414,7 +455,7 @@ Mark an inspection as completed and email the report link to the client.
 #### `POST /api/inspections/:id/upload`
 Upload a photo to R2 storage for a specific checklist item.
 
-**Roles:** `owner`, `admin`, `inspector`
+**Roles:** `owner`, `manager`, `inspector`
 
 **Request:** `multipart/form-data`
 - `file` — image file
@@ -427,8 +468,15 @@ Upload a photo to R2 storage for a specific checklist item.
 
 ---
 
-#### `GET /api/inspections/files/:key`
-Proxy for serving a photo from R2. The key must start with the caller's `tenantId` (enforced server-side).
+#### `GET /api/inspections/:id/photo?key=<r2-key>`
+Streams a photo from R2, scoped to the caller's tenant and inspection by the key
+prefix. `?download=1` forces an attachment named after the stored original;
+`?w=<px>` serves an on-the-fly thumbnail. The key contains `/`, which is why it
+travels as a query parameter rather than a path segment.
+
+The public report viewer has its own token-scoped twin in `public-report.ts`.
+(This section used to describe `GET /api/inspections/files/:key`, a route that
+does not exist.)
 
 ---
 
@@ -449,7 +497,7 @@ List all inspection templates for the tenant.
 #### `GET /api/inspections/inspectors`
 List all users (inspectors) in the tenant.
 
-**Roles:** `owner`, `admin`
+**Roles:** `owner`, `manager`
 
 **Response:**
 ```json
@@ -581,7 +629,7 @@ Delete a date override by ID.
 List all inspection templates for the tenant.
 
 #### `POST /api/inspections/templates`
-Create a new template. **Roles:** `admin`, `owner`
+Create a new template. **Roles:** `owner`, `manager`
 
 **Request body:**
 ```json
@@ -589,26 +637,26 @@ Create a new template. **Roles:** `admin`, `owner`
 ```
 
 #### `PUT /api/inspections/templates/:id`
-Update a template name or schema. Bumps `version`. **Roles:** `admin`, `owner`
+Update a template name or schema. Bumps `version`. **Roles:** `owner`, `manager`
 
 #### `DELETE /api/inspections/templates/:id`
-Delete a template. Returns `409` if any inspection references it. **Roles:** `admin`, `owner`
+Delete a template. Returns `409` if any inspection references it. **Roles:** `owner`, `manager`
 
 ---
 
 ### Google Calendar
 
 #### `GET /api/calendar/connect`
-Redirect the inspector's browser to Google OAuth consent. Requires `GOOGLE_CLIENT_ID` to be configured and a valid `inspector_token` cookie. Returns `501` if not configured.
+Redirect the inspector's browser to Google OAuth consent. Requires `GOOGLE_CLIENT_ID` to be configured and a valid `__Host-inspector_token` cookie. Returns `501` if not configured.
 
 #### `GET /api/calendar/callback`
 Public OAuth redirect from Google. Exchanges the authorization code for tokens, fetches the primary calendar ID, and stores `googleRefreshToken` + `googleCalendarId` on the `users` row. Redirects to `/inspections?calendar=connected`.
 
 #### `DELETE /api/calendar/disconnect`
-Clears stored Google tokens from the `users` row. Requires `inspector_token` cookie.
+Clears stored Google tokens from the `users` row. Requires `__Host-inspector_token` cookie.
 
 #### `POST /api/calendar/sync`
-Fetches the inspector's Google Calendar events for the next 30 days and inserts `availabilityOverrides` rows for any busy blocks. Existing overrides for the same date are skipped. Requires `inspector_token` cookie.
+Fetches the inspector's Google Calendar events for the next 30 days and inserts `availabilityOverrides` rows for any busy blocks. Existing overrides for the same date are skipped. Requires `__Host-inspector_token` cookie.
 
 **Response:**
 ```json
@@ -622,7 +670,7 @@ Fetches the inspector's Google Calendar events for the next 30 days and inserts 
 #### `GET /api/admin/export`
 Export all tenant data as JSON for backup or migration.
 
-**Roles:** `admin`, `owner`
+**Roles:** `owner`, `manager`
 
 **Response:**
 ```json
@@ -642,7 +690,7 @@ Export all tenant data as JSON for backup or migration.
 #### `POST /api/admin/invite`
 Create a 7-day team invite link. Sends a Resend email if `RESEND_API_KEY` is configured, otherwise logs the link to console.
 
-**Roles:** `admin`, `owner`
+**Roles:** `owner`, `manager`
 
 **Request body:** `{ "email": "new@example.com", "role": "inspector" }`
 
@@ -653,7 +701,7 @@ Create a 7-day team invite link. Sends a Resend email if `RESEND_API_KEY` is con
 #### `GET /api/admin/members`
 List workspace members and pending invites.
 
-**Roles:** `admin`, `owner`
+**Roles:** `owner`, `manager`
 
 **Response:**
 ```json
@@ -672,7 +720,7 @@ List workspace members and pending invites.
 #### `GET /api/admin/agreements`
 List all agreement templates for the tenant.
 
-**Roles:** `admin`, `owner`
+**Roles:** `owner`, `manager`
 
 **Response:**
 ```json
@@ -688,7 +736,7 @@ List all agreement templates for the tenant.
 #### `POST /api/admin/agreements`
 Create a new agreement template.
 
-**Roles:** `admin`, `owner`
+**Roles:** `owner`, `manager`
 
 **Request body:**
 ```json
@@ -705,7 +753,7 @@ Create a new agreement template.
 #### `PUT /api/admin/agreements/:id`
 Update an existing agreement template. Bumps the `version` field.
 
-**Roles:** `admin`, `owner`
+**Roles:** `owner`, `manager`
 
 **Request body** (all fields optional):
 ```json
@@ -724,7 +772,7 @@ Returns `404` if the agreement does not exist or does not belong to the caller's
 #### `DELETE /api/admin/agreements/:id`
 Delete an agreement template.
 
-**Roles:** `admin`, `owner`
+**Roles:** `owner`, `manager`
 
 **Response:**
 ```json
@@ -745,7 +793,7 @@ Returns `404` if the agreement does not exist or does not belong to the caller's
 #### `GET /api/agent/my-reports`
 List inspections referred by the calling agent. Admins and owners can pass `?agentId=<id>` to view any agent's reports.
 
-**Roles:** `agent`, `admin`, `owner`
+**Roles:** `agent`, `owner`, `manager`
 
 **Query params (admin/owner only):** `agentId`
 
@@ -759,7 +807,7 @@ List inspections referred by the calling agent. Admins and owners can pass `?age
 #### `GET /api/agent/leaderboard`
 Referral leaderboard — inspection counts grouped by `referredByAgentId`, descending.
 
-**Roles:** `admin`, `owner`
+**Roles:** `owner`, `manager`
 
 **Response:**
 ```json
@@ -773,13 +821,25 @@ Referral leaderboard — inspection counts grouped by `referredByAgentId`, desce
 
 ---
 
-## Error Responses
+## Response envelope
 
-All endpoints return JSON errors in this format:
+Both halves come from `server/lib/response.ts` (`sendSuccess` / `sendError`) and
+are the same on every endpoint that uses them:
 
 ```json
-{ "error": "Human-readable error message" }
+{ "success": true, "data": { }, "meta": { } }
 ```
+
+```json
+{ "success": false, "error": { "message": "…", "code": "…", "details": { } } }
+```
+
+`code` is the machine-readable half and is what a client should branch on;
+`message` is for a person. `details` carries whatever the specific failure can
+say — the AI refusals, for instance, put their reason vocabulary there.
+
+(The flat `{ "error": "…" }` shape this section described until 2026-09-09 was
+never what the code sends.)
 
 Common status codes:
 - `400` — Missing or invalid request fields

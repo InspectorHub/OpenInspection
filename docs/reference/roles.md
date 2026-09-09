@@ -84,9 +84,13 @@ returning `undefined` and granting by accident.
 
 Concretely, from the two tables plus the routes: their own sign-in
 (`/agent-login`, password or magic link) and sign-up (`/agent-signup`), their
-own chrome, and four pages — `/agent-dashboard`, `/agent-inspectors`,
-`/agent-repair-items`, `/agent-settings/profile` — scoped to the inspections
-they are attached to. Referral tracking runs off that attachment.
+own chrome, and five pages under the agent layout — `/agent-dashboard`,
+`/agent-inspectors`, `/agent-repair-items`, `/agent-settings/profile` and
+`/agent-settings/legal` (their own terms-acceptance record) — scoped to the
+inspections they are attached to. Referral tracking runs off that attachment.
+Two more sit outside that layout on purpose: `/agent-accept-terms`, which the
+layout's own loader redirects a gated agent to, and `/agent-logout`, which ends
+the session on the agent sign-in page rather than the staff one.
 
 > There are more role-shaped enums in this codebase than these two (assignment
 > is `lead`/`helper`, agreement signers are `client`/`co_client`/`agent`/`other`,

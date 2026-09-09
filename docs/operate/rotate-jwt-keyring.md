@@ -46,7 +46,8 @@ npm run rotate:jwt
 npm run deploy
 
 # 3. Wait at least the maximum JWT TTL since rotation
-#    (default ~24h; check your auth.ts setExpirationTime() value)
+#    (24h — the `exp` claim in server/api/auth.ts is `now + 60 * 60 * 24`;
+#     this project mints JWTs by hand, so there is no setExpirationTime() to read)
 
 # 4. Prune the previous kid
 node scripts/rotate-jwt-keys.js --prune-old-kid=v<old>

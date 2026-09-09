@@ -28,7 +28,7 @@ These are summarized from `CLAUDE.md` — read that file for the canonical, exha
 
 - **Language**: TypeScript with strict mode. All source code, comments, docs, commit messages, and user-facing strings in **English only**.
 - **Validation**: Every API endpoint uses Zod. Schemas live in `server/lib/validations/*.schema.ts`. No manual `if (!field)` checks.
-- **Auth**: HS256 JWT in HttpOnly cookie, PBKDF2 password hashing. Never use a fallback secret. Read `CLAUDE.md` § JWT & Auth Security Rules.
+- **Auth**: **ES256** JWT (a versioned keyring, `kid` in the header) in an HttpOnly `__Host-` cookie, PBKDF2-SHA256 password hashing. `JWT_SECRET` is KDF input only and never signs a JWT. Never use a fallback secret. Read `CLAUDE.md` § JWT & Auth Security Rules and [`docs/operate/rotate-jwt-keyring.md`](docs/operate/rotate-jwt-keyring.md).
 - **Multi-tenant**: Every D1 table includes `tenant_id`. Use `c.var.services.xxx` (DI proxy) — services auto-scope to the tenant.
 - **Logging**: Server-side code uses `import { logger } from '../lib/logger'`. Browser-side `console.*` is fine.
 - **CSS**: Tailwind v4 utilities + the Design System 0523 token layer defined in `app/styles/tailwind.css` (`bg-ih-*`, `text-ih-*`, `shadow-ih-*`). No raw palette classes (`bg-slate-200`, `shadow-lg`, ...) — enforced by `npm run lint:ds`. Full reference: [`docs/develop/design-system.md`](docs/develop/design-system.md).
@@ -76,7 +76,7 @@ OpenInspection follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.
 - Performance improvements with before/after benchmarks
 - Accessibility fixes with reproduction case
 - New seed templates (open-source license, ≥ 8 sections)
-- Translation contributions to public-facing strings (welcomed once i18n lands)
+- Translation contributions to public-facing strings — i18n has landed (paraglide, `messages/`); read [`docs/develop/conventions/i18n-glossary.md`](docs/develop/conventions/i18n-glossary.md) first, because term choices are fixed there and gated
 - Integration scaffolds (Zapier, QuickBooks, Make.com, etc.)
 
 ## What gets pushed back

@@ -24,20 +24,23 @@
 `@cloudflare/vitest-pool-workers` nesting an unrelated `zod@3.25.76` under itself.
 No `overrides` entry is needed for zod.
 
-### React 19 peer dep conflict (agents)
+### React peer dep (agents) — the original conflict is gone
 
-`agents@0.17.1` requires `react@^19.0.0` as a **peer dependency** (not listed in `peerDependenciesMeta`
-as optional). Our project is on `react@^18.3.1` and is not ready to upgrade to React 19 —
-that would be a large, unrelated breaking change.
+`agents@0.17.1` requires `react@^19.0.0` as a **peer dependency** (not listed in
+`peerDependenciesMeta` as optional).
 
-**Resolution:** Install with `--legacy-peer-deps`. The React 19 peer dep exists because
-`agents` ships frontend hooks (imported via `agents/react`) that target React 19's concurrent
-features. We only import from `agents/mcp` (the Durable Object base class) which has zero
-React runtime dependency. The peer dep requirement is a metadata-level constraint with no
-runtime impact for our server-side usage.
+⚠️ **This section recorded a conflict that no longer exists.** It was written when the
+project was on `react@^18.3.1` and said an upgrade was out of scope; the project has since
+moved to React 19 (`react@^19.2.8`), so the peer dependency is satisfied on its own terms.
 
-A project-root `.npmrc` with `legacy-peer-deps=true` is committed alongside `package.json`
-so `npm install` works for all developers and CI without passing the flag explicitly.
+The committed project-root `.npmrc` still carries `legacy-peer-deps=true`, and its comment
+still gives the React 18 reason. Nothing has been changed here on that basis — removing an
+install-wide flag is a dependency-tree decision, not a documentation one — but a reader
+should not take that comment as a current statement about React. Re-audit with
+`npm ls --depth=0` before assuming the flag is still load-bearing.
+
+We import only from `agents/mcp` (the Durable Object base class), which has no React runtime
+dependency; `agents/react` (the frontend hooks the peer dep exists for) is not imported.
 
 ---
 
@@ -151,7 +154,7 @@ Generic position: **Env, State, Props** (in that order). For a tenant-aware agen
 
 ```ts
 type MyProps = { tenantSlug: string; userId: string; scopes: string[] };
-class InspectionMcpAgent extends McpAgent<Env, never, MyProps> { ... }
+class InspectorMcp extends McpAgent<Env, never, MyProps> { ... }
 ```
 
 ### `serve()` signature
@@ -286,18 +289,22 @@ shared resource regardless of workspace, losing the per-workspace token isolatio
 
 For any MCP integration to work, the following must be present in wrangler.jsonc:
 
+What actually shipped, in the committed `wrangler.jsonc` — the binding name and class are
+**not** `McpAgent`'s defaults, and the migration tag is whichever one is next in that file's
+own chain (`v3` here, because two DO classes preceded it):
+
 ```jsonc
 {
   "durable_objects": {
     "bindings": [
-      { "name": "MCP_OBJECT", "class_name": "InspectionMcpAgent" }
+      { "name": "INSPECTOR_MCP", "class_name": "InspectorMcp" }
     ]
   },
   "kv_namespaces": [
     { "binding": "OAUTH_KV", "id": "<your-kv-id>" }
   ],
   "migrations": [
-    { "tag": "v2", "new_sqlite_classes": ["InspectionMcpAgent"] }
+    { "tag": "v3", "new_sqlite_classes": ["InspectorMcp"] }
   ]
 }
 ```
@@ -305,4 +312,5 @@ For any MCP integration to work, the following must be present in wrangler.jsonc
 The `OAUTH_KV` binding name is hardcoded in `@cloudflare/workers-oauth-provider` — it cannot be
 changed without forking the library.
 
-The `MCP_OBJECT` binding name can be changed: pass `{ binding: 'YOUR_BINDING' }` to `McpAgent.serve()`.
+`McpAgent.serve()` defaults its binding to `MCP_OBJECT`; this deployment overrides it by
+passing `{ binding: 'INSPECTOR_MCP' }`.

@@ -7,7 +7,7 @@ malformed metadata fails the build.
 
 This document codifies the standard. For the broader integration architecture
 see [mcp-oauth-notes.md](mcp-oauth-notes.md) (server internals) and
-[connecting-claude-mcp.md](../../integrations/mcp.md) (how a user connects Claude).
+[integrations/mcp.md](../../integrations/mcp.md) (how a user connects Claude).
 
 ## Required fields
 
@@ -41,18 +41,22 @@ Uniqueness: every `operationId` is globally unique across the app.
 
 ## `tags` controlled vocabulary
 
-Primary tag (required, exactly one of):
+Primary tag (required, exactly one of). **`VALID_TAGS` in
+`server/lib/route-metadata-standards.ts` is the vocabulary** — the gate reads it
+from there, and this block is a copy that has to be updated with it:
 
 ```
-auth         inspections   bookings      templates     team
-agents       ai            invoices      services      messages
-notifications contacts     metrics       admin         sysadmin
-audit        marketplace   recommendations  agreements webhooks
-public       calendar      tags          ratings       guest
-profile      identity      automations   integrations  qbo
+auth         inspections   bookings      templates        team
+agents       ai            invoices      services         messages
+notifications contacts     metrics       admin            sysadmin
+audit        marketplace   recommendations  contractor-types credentials
+role-profiles agreements   webhooks      public           calendar
+tags         ratings       profile       identity         automations
+integrations qbo           sms           imports
 ```
 
-Optional secondary tags: `public`, `m2m`, `beta`, `webhook`.
+Optional secondary tags (`VALID_SECONDARY_TAGS`): `public`, `m2m`, `beta`,
+`webhook`.
 
 ## `x-scopes` mapping
 
@@ -63,7 +67,7 @@ Default by HTTP method:
 Override when:
 - `/api/admin/*` or `/api/sysadmin/*` → `['admin']`
 - agent-specific routes → `['agent']`
-- public routes (`/public/*`, `/api/auth/*`, M2M) → `[]` and set `tier: 'excluded'`
+- public routes (`/api/public/*`, `/api/auth/*`, `/webhooks/*`, M2M) → `[]` and set `tier: 'excluded'`
 
 ## `x-tier` exposure
 

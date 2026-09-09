@@ -18,9 +18,9 @@ OpenInspection is a home inspection app deployed as a single Cloudflare Worker (
 | PDF rendering | Cloudflare Browser Run — `env.BROWSER.quickAction("pdf", { url })` (free tier, 10 min/day) |
 | E-signatures | Ed25519 per-tenant keypair + SHA-256 hash-chained audit log (ESIGN Act + UETA) |
 | Styling | Tailwind CSS v4 + Design System 0523 tokens |
-| Shared components | `packages/shared-ui/` — 12 token-based React components |
-| AI | Google Gemini API (optional) |
-| Email | Resend |
+| Shared components | `packages/shared-ui/` — token-based React components (`src/index.ts` is the list) |
+| AI | Any OpenAI-compatible endpoint (optional) — see [`../integrations/ai.md`](../integrations/ai.md) |
+| Email | Resend, SendGrid, Postmark or Mailgun (HTTP APIs only, no SMTP) |
 | Payments | Stripe Connect (optional) |
 | Auth | ES256 JWT in HttpOnly cookie + PBKDF2-SHA256 password hashing |
 
@@ -36,7 +36,7 @@ OpenInspection runs as ONE Cloudflare Worker. `workers/app.ts` is a Hono app tha
                     │  ┌──────────────────┐  ┌────────────────┐ │
                     │  │ /api/*, /status, │  │ everything else│ │
                     │  │ /sign/*, … →     │  │ → React Router │ │
-                    │  │ API app (server/)│  │ v7 SSR (app/)  │ │
+                    │  │ API app (server/)│  │ v8 SSR (app/)  │ │
                     │  │ in-process       │◄─┤ in-process     │ │
                     │  │ Hono+Drizzle+D1  │  │ API_WORKER     │ │
                     │  └──────────────────┘  └────────────────┘ │
@@ -45,10 +45,10 @@ OpenInspection runs as ONE Cloudflare Worker. `workers/app.ts` is a Hono app tha
                     └──────────────────────────────────────────┘
 ```
 
-- **`workers/app.ts`** — a Hono app is the worker entry. It routes API-owned paths (`/api/*`, `/status`, `/m2m/*`, `/photos/*`, `/.well-known/*`, `/doc`, `/sso`, `/sign/*`, `/webhooks/*`, the ICS feed) to the API app and sends everything else to the React Router v8 SSR handler. It injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding between workers).
+- **`workers/app.ts`** — a Hono app is the worker entry. It routes API-owned paths (`/api/*`, `/status`, `/m2m/*`, `/photos/*`, `/.well-known/*`, `/doc`, `/sso`, `/sign/*`, `/webhooks/*`, `/agent/magic-login`, the ICS feed) to the API app and sends everything else to the React Router v8 SSR handler. `/mcp` and `/mcp/{slug}` are deliberately absent from that list: when MCP is enabled the OAuth provider wrapper owns that prefix and the request never reaches this router; when it is off the path falls through to the SSR 404. It injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding between workers).
 - **`server/`** — Hono + Drizzle + D1. Handles all business logic, authentication, and data access. Exposes a typed JSON API.
 - **`app/`** — React Router v8 + React 19 + Tailwind v4. Server-side renders the React UI on the edge.
-- **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based React components (Button, Pill, Card, etc.).
+- **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based React components (Button, Pill, Card, etc.). `packages/shared-ui/src/index.ts` is the authoritative list; [`design-system.md`](design-system.md) describes each one.
 - **API Types** (`packages/api-types/`) — Re-exports the Hono app type so the web layer's `hono/client` gets full end-to-end type safety.
 
 The web layer uses a **Token Relay BFF** pattern: the React Router v8 server holds the JWT cookie and forwards it to the in-process API on every request, so the browser never sees the token directly.
@@ -87,7 +87,7 @@ apps/openinspection/
 │   │   ├── auth.ts                # /api/auth/{login,register,reset-password,...}
 │   │   ├── inspections.ts         # /api/inspections/* + share/print
 │   │   ├── ai.ts                  # /api/ai/{suggest-comment,comment/edit}
-│   │   ├── booking.ts             # /public/* (no auth) + /api/book
+│   │   ├── bookings.ts            # /api/public/* (no auth) — booking page data + submit
 │   │   └── ...
 │   ├── services/                  # Business logic, DB queries (Drizzle)
 │   ├── features/                  # Feature-scoped modules
@@ -111,8 +111,8 @@ apps/openinspection/
 │   ├── lib/                       # API client (hono/client over the in-process binding), session, helpers
 │   └── styles/tailwind.css        # Design System 0523 token layer
 ├── migrations/                    # D1 SQL migrations (drizzle-kit schema-first: one regenerated 0000_baseline.sql, forward files on top)
-├── tests/                         # API unit + integration + E2E tests
-├── tests/web/                     # Web E2E + unit tests
+├── tests/                         # unit / workers / contract / e2e — see develop/testing.md
+│                                  # (web unit specs are CO-LOCATED under app/; tests/web/ is retired)
 ├── packages/
 │   ├── shared-ui/src/             # shared React components
 │   └── api-types/                 # CoreApiType for hono/client
@@ -147,14 +147,24 @@ API request (from an RR loader/action via the in-process API_WORKER binding, or 
    ↓
 Cloudflare edge → single Worker (workers/app.ts) → Hono routes API-owned paths to the API app
    ↓
-Hono middleware stack (in order):
+Hono middleware stack, in the order `server/index.ts` registers it
+(pinned by tests/unit/platform/middleware-order.spec.ts):
    1. CSP / security headers
-   2. Branding resolver (KV → D1 fallback)
+   2. Context bootstrap
    3. Tenant router (standalone: pins the one fixed tenant)
-   4. JWT auth (skip on /api/auth, /api/public, /api/setup)
-   5. Bot protection (Turnstile + threat score)
-   6. Tier guard (subscription check, no-op in standalone)
-   7. DI proxy (lazy-instantiates services)
+   4. Branding resolver (KV → D1 fallback)
+   5. Tenant-active guard
+   6. JWT auth (skipped on the public prefixes)
+   7. Agent terms gate
+   8. Idempotency guard (mutating routes)
+   9. Integration secrets (merges the tenant's decrypted keys into a COPY of env)
+  10. DI proxy (lazy-instantiates services)
+  11. Inspector palette
+  12. Last-active touch (/api/* only)
+   ↓
+Bot protection (Turnstile) is NOT in this stack — it is applied per route, on
+the two surfaces an anonymous visitor can submit to. See
+[`../integrations/turnstile.md`](../integrations/turnstile.md).
    ↓
 Route handler reads validated input via c.req.valid('json')
    ↓
@@ -339,16 +349,21 @@ The DI proxy in `server/lib/middleware/di.ts` lazy-instantiates each service on 
 ## Frontend layer
 
 - **React Router v8 SSR**: Routes in `app/routes/` use `loader()` for data fetching and `action()` for mutations. Full server-side rendering on Cloudflare Workers.
-- **React components**: 59 components in `app/components/`, organized by domain (inspection, template, booking, etc.).
-- **Hooks**: 9 custom hooks handle complex state — `useInspection` (866 LOC), `useFindings`, `useKeyboard` (shortcuts), `useCannedComments`, `useOfflineQueue`, `usePresence` (WebSocket), `useTheme`, `useUnsavedChanges`, `useSessionContext`.
+- **React components**: `app/components/`, organized by domain (inspection, template, booking, media-studio, portal, …). Counts are not written here because they go stale between releases; `ls app/components` is the answer.
+- **Hooks**: `app/hooks/` holds the state hooks the editor is built from — `useInspection`, `useFindings`, `useKeyboard` (shortcuts), `useCannedComments`, `usePresence` (WebSocket), `useTheme`, `useUnsavedChanges`, `useSessionContext`, and the `findings/` and `inspection/` sub-hook directories.
 - **Design tokens**: Tailwind v4 with Design System 0523 tokens in `app/styles/tailwind.css`.
-- **Shared UI**: `packages/shared-ui/` provides 12 design-system components (Button, Pill, Card, etc.) consumed by the frontend.
+- **Shared UI**: `packages/shared-ui/` provides the design-system components (Button, Pill, Card, …) consumed by the frontend; its `src/index.ts` is the list.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
 
 ### Future app path
 
-1. **PWA** (current) — installable, offline-capable via Service Worker plus the
-   `useOfflineQueue` hook, which carries the photo-upload queue and field sync.
+1. **PWA** (current) — installable, and offline-capable for field data: the
+   results document is a Yjs CRDT buffered in IndexedDB and merged on reconnect
+   (see [`../concepts/collab-editing.md`](../concepts/collab-editing.md)). The
+   `useOfflineQueue` hook this line used to name was retired with the rest of
+   the bespoke offline layer in #181. Photo and video BINARY upload still
+   requires a connection — it writes to R2 — so that half is not offline-capable
+   and the editor says so rather than queueing.
 2. **A native client** (direction, unspecified) — designed for the field rather
    than inherited from the browser: capture, local storage, sync and conflict
    resolution are the requirement, not follow-ups to a shell.
@@ -363,8 +378,10 @@ responsive web is the field surface.
 ## Storage
 
 - **D1**: structured data (tenants, users, inspections, templates, comments, agreements, audit logs, ...)
-- **R2**: blobs. Bucket bindings: `PHOTOS` (field photos, logos) and `REPORTS` (pre-rendered report + e-sign PDFs). Accessed via signed URL or a Worker pass-through endpoint.
-- **KV**: short-lived signed tokens (agent share, password reset, magic link), tenant config cache, rate-limit counters.
+- **R2**: blobs. **One bucket binding, `PHOTOS`** — field photos, logos, pre-rendered report and certificate PDFs, and e-sign evidence packs all live in it. There is no `REPORTS` bucket; this document named one for a long time and `wrangler.jsonc` has never bound it. Accessed via signed URL or a Worker pass-through endpoint. (A SaaS deployment adds one more, `EXPORTS_BUCKET`, shared with the control plane for offboarding exports.)
+- **KV**: two namespaces. `TENANT_CACHE` holds short-lived signed tokens (agent share, password reset), the tenant config and branding caches, cron cursors and rate-limit counters — see [`../concepts/kv-cache.md`](../concepts/kv-cache.md). `OAUTH_KV` is owned by `@cloudflare/workers-oauth-provider` and holds MCP OAuth grants; its binding name is fixed by that library.
+- **Queues**: `CRON_QUEUE` (one background job per invocation — see [Background work](#background-work)) and `WORD_EXPORT_QUEUE` (async `.docx` export). Both are declared in `wrangler.jsonc`, producer and consumer, because neither is a SaaS-only feature.
+- **Durable Objects**: `INSPECTION_PRESENCE` and `TENANT_PRESENCE` (live presence), `INSPECTION_DOC` (the collaborative results document), `INSPECTOR_MCP` (the remote MCP server).
 
 ## Background work
 
@@ -376,7 +393,7 @@ responsive web is the field surface.
   |---|---|
   | `*/5 * * * *` | The main tick. It **probes and enqueues only** — see below. |
   | `0 3 * * *` | Daily R2 usage measurement (`r2-usage`). |
-  | `0 4 * * *` | Daily log-table retention sweep and intake expiry reminders (`retention-logs`). |
+  | `0 4 * * *` | Daily log-table retention sweep (`retention-logs`) and the statutory-form revision watch (`statutory-revision-watch`). |
 
   Cron Triggers are limited to **5 per account** on the Free plan, which is the budget these
   three are spent from.
@@ -404,9 +421,12 @@ this paragraph:
   the same script, which prints what it checked next to what it found on every run and treats
   "checked nothing" as a failure.
 - **Probe-then-enqueue, not enqueue-always.** The other Free ceiling is Queues at 10,000
-  operations/day, shared with the Word-export queue; enqueueing thirteen jobs unconditionally
-  would spend 7,488 of them a day on jobs with nothing to do. A single-inspector deployment's
-  ticks are almost all empty, so probing first sends almost nothing.
+  operations/day, shared with the Word-export queue. The five-minute tick fires 288 times a
+  day and every message costs two operations (the send and the read), so enqueueing each
+  tick-owned job unconditionally would spend roughly `jobs × 576` of that budget a day on
+  jobs with nothing to do — 6,912 at the twelve currently on the tick, and the count grows
+  with the registry. A single-inspector deployment's ticks are almost all empty, so probing
+  first sends almost nothing.
 
 Cursors live in Workers KV (`cron:cursor:<job>`), not in a column — they are bookkeeping, every
 paged job is idempotent, and a column would mean a migration in both deployment modes.
@@ -440,4 +460,14 @@ A solo inspector doing 50 inspections/month uses approximately 1-2% of Free tier
 | D1 reads | 5M/day | — |
 | R2 storage | 10 GB | — |
 
-React Router v8 SSR adds ~1-3ms CPU per request. The combined Worker bundle stays well within limits. Browser Run (server-side PDF) is on the Free tier (10 min/day); requires `compatibility_date >= "2026-03-24"` and the `browser` binding in `wrangler.jsonc`.
+⚠️ **The "~1-3ms CPU per request" figure that used to sit here is withdrawn** —
+it was an SSR microcost quoted as if it were the whole request. Measured against
+a live deployment over seven days of real traffic (2026-09-05): **p50 8ms, p95
+49ms, p99 106ms, max 494ms**, and a statutory-form render is ~470ms in workerd
+on its own. See [Why React Router v8](#why-react-router-v8) above; that section
+is where this number is maintained, and this one repeated a stale copy of it for
+long enough to be worth naming.
+
+The combined Worker bundle stays within the size limit. Browser Run (server-side
+PDF) is on the Free tier (10 min/day); it requires `compatibility_date >=
+"2026-03-24"` and the `browser` binding in `wrangler.jsonc`.

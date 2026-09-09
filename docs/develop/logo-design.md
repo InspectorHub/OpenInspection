@@ -29,9 +29,16 @@ This gradient is the same one used across the application for primary buttons, h
 
 ## Sizing & ViewBox
 
-- **ViewBox:** `236 227 552 420` — tight crop with 12px padding around the graphic
-- **Format:** SVG (vector, resolution-independent)
-- **Files:** `public/favicon.svg` (browser tab) and `public/logo.svg` (in-app branding)
+The two files carry **different** viewBoxes, on purpose — the favicon is squared
+so it does not letterbox in a browser tab, the wordmark-height logo is cropped
+tight:
+
+| File | Intrinsic size | ViewBox |
+|---|---|---|
+| `public/logo.svg` (in-app branding) | 46 × 35 | `236 227 552 420` — tight crop around the graphic |
+| `public/favicon.svg` (browser tab) | 32 × 32 | `230 155 564 564` — square |
+
+- **Format:** SVG (vector, resolution-independent). Both share the same three-stop gradient.
 
 ## Usage Rules
 

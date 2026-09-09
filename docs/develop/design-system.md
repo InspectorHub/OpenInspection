@@ -176,8 +176,9 @@ beyond the ad hoc pixel sizes already used throughout `app/components/`.
 
 ## 3. Component primitives
 
-`packages/shared-ui/src/` (exported from `index.ts`) — 25 components. **Check
-here before hand-rolling UI.** A new repeated pattern (a card variant used in
+`packages/shared-ui/src/` — everything exported from `index.ts`, which is the
+authoritative list; the table below describes each one. **Check there before
+hand-rolling UI.** A new repeated pattern (a card variant used in
 three places, a new pill tone) belongs in `shared-ui`, not copy-pasted across
 route files.
 
@@ -194,6 +195,7 @@ route files.
 | `Select` | Labeled single/multi select mirroring `Input`'s chrome; tokenized chevron in single-select mode | `label`, `error`, `hint`, `options` (`SelectOption[]`) or native `<option>` children, `multiple`, `bare`. Use for a fixed option list; use `Input` for free text |
 | `Checkbox` | Single checkbox with native `<label>` association; DS `accent-ih-primary` fill | `label`, `error`, `bare` (raw input only, e.g. inside `FormField`) |
 | `Radio` / `RadioGroup` | `RadioGroup` renders a `<fieldset>`/`role=radiogroup` set of options; `Radio` is the single control for custom layouts | `RadioGroup`: `name`, `value`, `onChange(value)`, `options` (`RadioOption[]`), `legend`, `error`, `hint`. Prefer `RadioGroup`; reach for bare `Radio` only for bespoke layouts |
+| `RadioCardGroup` | Card-style single select — a vertical stack of bordered cards, each a native `<label>`/`<input type=radio>`, with a title and optional description and badge. Selected card lifts to `border-ih-primary` | `name`, `value`, `onChange(value)`, `options` (`RadioCardOption[]` — `value`, `title`, `description`, `badge`, `disabled`), `legend`, `error`, `hint`. Arrow/Home/End move selection, skipping disabled options. Use when an option needs a description or a badge; use `SegmentedControl` or `RadioGroup` for short bare labels |
 | `Modal` | Centered dialog overlay (`role="dialog"` + `aria-modal`), full-screen `bg-ih-backdrop` scrim, Escape-to-close, click-outside-to-close, focus trap | `open`, `onClose`, `title`, `size`: `sm` \| `md` \| `lg` \| `xl`, `footer`. Use for confirm/decision moments and short forms (see §4) |
 | `Drawer` | Right-side slide-in panel sharing `Modal`'s dialog behavior + scrim | `open`, `onClose`, `title`, `footer`, `wide` (480px vs 360px; mobile always full-width), `initialFocusRef`. Use for "adjust while seeing the page" flows — filters, long side forms — NOT confirm moments (see §4) |
 | `Popover` | Anchored, non-blocking floating panel — no scrim, no scroll-lock, no hard focus-trap; Esc / click-outside close, focus restores to the anchor | `open`, `onClose`, `anchorRef` (trigger the panel positions against), `align`: `left` \| `right` (default `right`). Use for lightweight in-context choices (column toggles, dropdowns) where the page must stay visible (see §4) |
@@ -353,8 +355,10 @@ Save/Cancel (or Confirm/Cancel) actions in its `footer`.
 
 ## 5. Conformance tooling — `npm run lint:ds`
 
-`scripts/check-ds-tokens.mjs` scans `app/` and `packages/shared-ui/src/` for
-eight violation classes:
+`scripts/check-ds-tokens.mjs` scans `app/` and `packages/shared-ui/src/`. Nine
+violation classes live in its `RULES` array, and a tenth check — every `ih-*`
+alias resolves to a `@theme` entry — runs beside them (that is the one "How to
+add a token" step 4 describes):
 
 1. **Dead `-bg0` pseudo-token** — `ih-(ok|watch|bad|primary)-bg0` generates no
    utility and silently ships invisible elements.
@@ -375,6 +379,11 @@ eight violation classes:
 7. **`backdrop-blur`** — glass blur is not part of the DS surface language.
 8. **`bg-[rgba(...)]` scrims** — hand-rolled overlay tints. Use the single
    `bg-ih-backdrop` overlay token instead.
+9. **`text-white` on a `bg-ih-primary` fill** — it bypasses the theme flip. Dark
+   mode brightens `--ih-primary` and flips `--ih-fg-inverse` to a dark value
+   (≈5.8:1); white against the brightened primary is ≈2.9:1 and fails AA. 95
+   sites had hand-written white before this became a rule. Use
+   `text-ih-fg-inverse`.
 
 ### Escape hatches
 
@@ -384,20 +393,23 @@ eight violation classes:
 - **`print:`-variant utilities are ignored** — print output is intentionally
   fixed-color.
 - **File allowlist** — a short, justified list in `FILE_ALLOWLIST` inside the
-  script (currently: the printable agreement route, the email-template
-  preview, and the Media/Photo Studio chrome components, which are
-  intentionally fixed-dark regardless of theme). Keep this list short; prefer
-  a `ds-allow` comment for anything narrower than a whole file.
+  script. Every entry today is either the email-template preview (email bodies
+  render in external clients with no dark mode and no CSS variables) or one of
+  the Photo/Media Studio chrome components, which are intentionally fixed-dark
+  regardless of theme. Keep this list short; prefer a `ds-allow` comment for
+  anything narrower than a whole file.
 
 ### Where it runs
 
-- `npm run lint` (part of the aggregate lint script alongside `lint:svg`,
-  `lint:erasure`, `lint:migrefs`, `lint:filesize`, `lint:dup`,
-  `lint:tenant-scope`, `lint:tests`, and `lint:deadcode` — knip, which flags
-  unused exports so retired primitives don't linger in `shared-ui`).
-- Pre-commit (`.githooks/pre-commit`) — runs on every commit that touches
-  non-docs/tests files.
-- CI (`.github/workflows/ci.yml`, `verify` job) via `npm run lint`.
+- `npm run lint` — one of every gate in `scripts/lib/gate-registry.mjs`. That
+  registry is the list; among the ones worth knowing beside this gate are
+  `lint:contrast` (the arithmetic this one cannot do) and `lint:deadcode`
+  (knip, which flags unused exports so retired primitives don't linger in
+  `shared-ui`).
+- Pre-commit (`.githooks/pre-commit`) — it is at the `precommit` rung, so it
+  runs on **every** commit, docs-only ones included. Only the type-check tier is
+  skipped when nothing TypeScript is staged.
+- CI (`.github/workflows/ci.yml`, `lint-gates` job) via `npm run lint:gates-full`.
 
 ---
 

@@ -1,8 +1,10 @@
 # es-419 translation glossary
 
-One equivalent per term, decided once. The catalogue is 4,300 keys across 29
-module files in `messages/`; without a fixed term list the same noun acquires
-four translations across those files and the result reads as machine output.
+One equivalent per term, decided once. The catalogue is thousands of keys across
+three dozen module files in `messages/` — `npm run lint:i18n-glossary` prints
+the live key count on every run, so read it there rather than from a figure
+frozen into this sentence. Without a fixed term list the same noun acquires four
+translations across those files and the result reads as machine output.
 
 This file is **machine-read** — but only in part, and the difference matters.
 `npm run lint:i18n-glossary` (`scripts/check-i18n-glossary.mjs`) parses the
