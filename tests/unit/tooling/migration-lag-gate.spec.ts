@@ -57,11 +57,12 @@ let diffMigrations: (a: {
 }) => Diff;
 let renderReport: (a: Record<string, unknown>) => string;
 let isMissingMigrationsTable: (text: string) => boolean;
+let accountIdHint: (text: string) => string;
 
 beforeAll(async () => {
-    ({ parseAppliedNames, diffMigrations, renderReport, isMissingMigrationsTable } = await import(
-        /* @vite-ignore */ pathToFileURL(GATE).href
-    ));
+    ({
+        parseAppliedNames, diffMigrations, renderReport, isMissingMigrationsTable, accountIdHint,
+    } = await import(/* @vite-ignore */ pathToFileURL(GATE).href));
 });
 
 // This file's SUBJECT is migration filenames: they are fixture data and captured
@@ -290,5 +291,77 @@ describe('check-migration-lag: the CLI exit code is the contract', () => {
             encoding: 'utf8',
         });
         expect(r.status).toBe(1);
+    });
+});
+
+/**
+ * A 7403 is an UNRESOLVED ACCOUNT, and the gate must not let it read as a dead
+ * token.
+ *
+ * Hit 2026-09-09 during a release: `db:lag:saas` died on "The given account is
+ * not valid or is not authorized to access this service [code: 7403]" and the
+ * gate's fail-closed line ("Refusing to report no lag for a database this gate
+ * could not read") was correct but gave no cause. The obvious reading —
+ * expired credentials — was wrong: `wrangler whoami` exited 0 and
+ * `wrangler d1 list` printed the database seconds later. Setting
+ * CLOUDFLARE_ACCOUNT_ID, the only variable changed, made the query succeed.
+ *
+ * Fail-closed is the right behaviour and is asserted elsewhere in this file.
+ * What is asserted here is the CAUSE the operator is handed, at the one moment
+ * it decides whether a deploy proceeds.
+ */
+describe('accountIdHint', () => {
+    const KEY = 'CLOUDFLARE_ACCOUNT_ID';
+    const saved = process.env[KEY];
+    const unset = () => { delete process.env[KEY]; };
+    const restore = () => {
+        if (saved === undefined) delete process.env[KEY];
+        else process.env[KEY] = saved;
+    };
+
+    it('names the missing variable when 7403 arrives and it is unset', () => {
+        unset();
+        try {
+            const hint = accountIdHint('✘ The given account is not valid [code: 7403]');
+            expect(hint).toContain(KEY);
+            expect(hint).toContain('NOT an expired token');
+        } finally { restore(); }
+    });
+
+    it('matches the prose form as well as the bare code', () => {
+        unset();
+        try {
+            expect(accountIdHint('not authorized to access this service')).toContain(KEY);
+        } finally { restore(); }
+    });
+
+    /**
+     * POSITIVE CONTROL, and the one that carries the weight: a function that
+     * returned the hint for everything would pass both cases above and would
+     * then blame the account for every unrelated failure the gate reports —
+     * a network drop, a syntax error, a genuinely revoked token.
+     */
+    it('stays silent on an error that is not 7403', () => {
+        unset();
+        try {
+            expect(accountIdHint('D1_ERROR: no such column: trade_slug')).toBe('');
+            expect(accountIdHint('')).toBe('');
+        } finally { restore(); }
+    });
+
+    /**
+     * SECOND CONTROL: the hint is advice about an UNSET variable. Printing it
+     * when the variable is set would send the reader to check something they
+     * already did, and hide the real cause.
+     */
+    it('stays silent when the variable is already set', () => {
+        const had = process.env[KEY];
+        process.env[KEY] = '0aedc6b5';
+        try {
+            expect(accountIdHint('[code: 7403]')).toBe('');
+        } finally {
+            if (had === undefined) delete process.env[KEY];
+            else process.env[KEY] = had;
+        }
     });
 });

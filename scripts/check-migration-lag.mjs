@@ -72,6 +72,24 @@ export function isMissingMigrationsTable(text) {
 }
 
 /**
+ * Cloudflare answers an UNRESOLVED ACCOUNT with 7403 — "not valid or is not
+ * authorized to access this service" — which reads as a revoked token and sends
+ * you to `wrangler login`. Measured 2026-09-09, one variable changed: unset,
+ * this gate died on 7403 while `whoami` exited 0 and `d1 list` printed the very
+ * database seconds later; set, the same query succeeded. Fail-closed is right
+ * (asserted elsewhere); failing closed with a wrong CAUSE, at the moment a
+ * release decides whether production is behind, is what this fixes.
+ */
+export function accountIdHint(text) {
+  if (process.env.CLOUDFLARE_ACCOUNT_ID) return '';
+  if (!/\b7403\b|not authorized to access this service/i.test(String(text ?? ''))) return '';
+  return '\n\nHINT: CLOUDFLARE_ACCOUNT_ID is unset and Cloudflare returned 7403.'
+    + '\n  That is an unresolved account, NOT an expired token — `wrangler whoami`'
+    + '\n  and `wrangler d1 list` will still work. Take the id from `wrangler whoami`,'
+    + '\n  set CLOUDFLARE_ACCOUNT_ID, and re-run. Do not re-authenticate first.';
+}
+
+/**
  * Pull the FIRST balanced `[...]` out of wrangler's output that actually parses
  * as JSON.
  *
@@ -324,7 +342,8 @@ function main() {
     console.error(`\n⚠ ${label}: no d1_migrations table — treating the applied set as EMPTY.`);
     applied = [];
   } else if (r.status !== 0) {
-    die(`wrangler exited ${r.status} reading ${label}:\n${`${stderr}\n${r.stdout ?? ''}`.trim()}`);
+    const out = `${stderr}\n${r.stdout ?? ''}`;
+    die(`wrangler exited ${r.status} reading ${label}:\n${out.trim()}${accountIdHint(out)}`);
   } else {
     try {
       applied = parseAppliedNames(r.stdout);
