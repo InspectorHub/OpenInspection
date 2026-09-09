@@ -4,7 +4,7 @@ The open-source inspection engine. A single Cloudflare Worker (the
 cloudflare/react-router-hono-fullstack-template shape): a Hono entry that mounts the full
 API in-process and delegates page routes to React Router v8 SSR.
 
-**Docs**: `docs/README.md` is the map — `docs/operate/` (deploy, upgrade, configure) · `docs/develop/` (architecture, testing, design system) · `docs/reference/` (API, database, roles, deployment modes) · `docs/concepts/` (how the engine works) · `docs/integrations/` (external services) · `docs/compliance/` (data handling). Docs here cover the **engine**: deploying it, operating it, changing it, integrating it. Using the product day to day is documented at <https://inspectorhub.io/docs>, which serves self-hosted and hosted deployments alike.
+**Docs**: `docs/README.md` is the map — `docs/operate/` (deploy, upgrade, JWT-keyring rotation, SMS compliance) · `docs/develop/` (architecture, testing, design system) · `docs/reference/` (API, database, roles, deployment modes) · `docs/concepts/` (how the engine works) · `docs/integrations/` (external services) · `docs/compliance/` (data handling). Docs here cover the **engine**: deploying it, operating it, changing it, integrating it. Using the product day to day is documented at <https://inspectorhub.io/docs>, which serves self-hosted and hosted deployments alike.
 
 ## Commands
 
@@ -28,7 +28,8 @@ npm run dev:tunnel   # Like `dev`, but also exposed over a Cloudflare Quick Tunn
 npm run build        # react-router build — bundles server/ (API) + app/ (RR SSR) into one worker
 npm run deploy       # standalone: build + wrangler deploy (real ids via wrangler.local.jsonc)
 npm run deploy:saas  # saas: build + wrangler deploy with wrangler.saas.jsonc
-npm run type-check   # react-router typegen, then app + api tsc passes serially (lower peak RAM)
+npm run type-check   # i18n:compile + react-router typegen, then FOUR tsc passes serially
+                     # (app, api, e2e, tests) — serial to keep peak RAM down
 npm run type-check:app   # `tsc -b tsconfig.json` — the app/worker program
 npm run type-check:api   # `tsc -b tsconfig.api.json` — the server program; fastest loop for server/ work
 
@@ -65,7 +66,7 @@ One file per deploy target; the build bakes whichever config wins (vite `configP
 |---|---|---|
 | `wrangler.jsonc` | committed (PLACEHOLDER ids) | standalone + the **Deploy to Cloudflare** one-click default — CF auto-provisions D1/KV/R2 and injects real ids (no real ids in the repo). |
 | `wrangler.local.jsonc` | gitignored | your real standalone ids (written by `scripts/setup-cloudflare.js`). |
-| `wrangler.saas.jsonc` | gitignored | SaaS-mode config (`APP_MODE=saas`, `SYNC_QUEUE` producer + sync-DLQ consumer, crons, `*-saas` resources). Multi-tenant; absent in standalone. |
+| `wrangler.saas.jsonc` | gitignored | SaaS-mode config (`APP_MODE=saas`, `*-saas` resources, the same three crons). Carries three queue producers — `SYNC_QUEUE`, `WORD_EXPORT_QUEUE`, `CRON_QUEUE` — plus the sync-DLQ and cmd consumers, `OAUTH_KV`, the shared `EXPORTS_BUCKET`, and a `RATE_LIMITER` unsafe binding. Multi-tenant; absent in standalone. |
 
 `wrangler deploy` runs against the built `build/server/wrangler.json`. `scripts/wrangler.mjs`
 applies the same config resolution to direct wrangler commands (db:migrate).
@@ -89,7 +90,7 @@ Directory = suite; a spec's location alone decides which config runs it
 | `tests/workers/` | `test:workers` (CI) | `vitest.workers.config.ts` |
 | `tests/contract/<party>/*.contract.spec.ts` | `test:contract` (CI) | `vitest.contract.config.ts` |
 | `tests/contract/<party>/*.live.spec.ts` | `test:contract:live` (pre-push when `server/services/qbo/` changed; needs a connected sandbox) | `vitest.contract.live.config.ts` |
-| `tests/e2e/` | `test:e2e` (+ integration/remote modes) | `playwright.config.ts` (local, seeds D1) / `.integration` / `.remote` |
+| `tests/e2e/` | `test:e2e` · `test:e2e:seeded` (+ integration/remote/docs-shots modes) | `playwright.config.ts` (local, seeds D1) / `.seeded` / `.integration` / `.remote`. `npm run lint:e2e-coverage` prints which config OWNS each spec — read it there. |
 | `tests/docs-shots/**/*.shots.ts` | `docs:shots` (NOT a test suite) | `playwright.docs-shots.config.ts` |
 
 Choosing a home for a new spec:
@@ -161,7 +162,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 ### Standalone Engine (Single-Tenant)
 - Optimized for single-tenant deployments (Private Instances).
 - Resolves configuration via a fixed `SINGLE_TENANT_ID`.
-- Stable API surface designed to be extended by SaaS overlay branches (e.g., `saas` branch).
+- Stable API surface. The SaaS overlay is **not a branch** — it is `APP_MODE=saas` plus `server/portal/` in this same tree, read through `server/lib/deployment-profile.ts`. (This line named a `saas` branch; no such branch exists.)
 
 ### Inspection Engine
 - JSON-schema based inspection templates (`server/types/template-schema.ts`, single canonical v2 — see `server/lib/validations/template.schema.ts`).
@@ -176,10 +177,10 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - **Rendering**: Full SSR — RR v8 server renders on the edge, hydrates on the client.
 - **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`app/styles/tailwind.css`). Tailwind is v4-only (via `@tailwindcss/vite`); no separate server-side CSS build.
 - **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. RR v8 loader/action functions call the in-process API through the injected `API_WORKER` binding (`createApi(context)` in `app/lib/api-client.server.ts`) — no network hop.
-- **State management**: React hooks — `useInspection` (~900 LOC), `useFindings`, `useKeyboard`, `useCannedComments`, `useOfflineQueue`, `usePresence`, `useTheme`, `useUnsavedChanges`.
-- **Component library**: `packages/shared-ui/` provides 25 design-system components consumed by the frontend — Button, Pill, StatCard, Icon, Eyebrow, PageHeader, TabStrip, Input, Select, Textarea, Checkbox, Radio, RadioGroup, EmptyState, Skeleton, Card, Banner, Modal, Drawer, Popover, Pagination, FileDropzone, Table, SegmentedControl, Avatar. See `docs/develop/design-system.md`.
+- **State management**: React hooks in `app/hooks/` — `useInspection`, `useFindings`, `useKeyboard`, `useCannedComments`, `usePresence`, `useTheme`, `useUnsavedChanges`, plus the `findings/` and `inspection/` sub-hook directories. (`useOfflineQueue` was RETIRED with the rest of the bespoke offline layer in #181; do not reach for it.)
+- **Component library**: `packages/shared-ui/` — `src/index.ts` is the authoritative list (Button, IconButton, MenuItem, Pill, StatCard, Icon, Eyebrow, PageHeader, TabStrip, Input, Select, Textarea, Checkbox, Radio, RadioGroup, RadioCardGroup, EmptyState, Skeleton, Card, Banner, Modal, Drawer, Popover, Pagination, FileDropzone, Table, SegmentedControl, Avatar). Do not maintain a count here — read the file. See `docs/develop/design-system.md`.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
-- **Offline**: Service Worker + `useOfflineQueue` hook for photo upload queue and field sync.
+- **Offline**: Service Worker for the app shell; FIELD DATA is offline-capable through the Yjs results document, which `y-indexeddb` buffers locally and merges on reconnect (`docs/concepts/collab-editing.md`). Photo and video BINARY upload writes to R2 and therefore needs a connection — offline the editor declines it rather than queueing.
 
 ## Environment Variables
 
@@ -188,14 +189,13 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 | `JWT_CURRENT_KID` | Yes | Active JWT keypair version (e.g. `v1`). Names which `JWT_PRIVATE_KEY_V<N>`/`JWT_PUBLIC_KEY_V<N>` pair signs new tokens. |
 | `JWT_PRIVATE_KEY_V<N>` | Yes | PKCS8 PEM-encoded ES256 private key for version `vN`. At least V1 must be provisioned. |
 | `JWT_PUBLIC_KEY_V<N>` | Yes | SPKI PEM-encoded ES256 public key for version `vN`. Pairs with private key. Keep older versions in env during rotation so existing tokens stay valid. |
-| `JWT_SECRET` | Yes | KDF input for `config-crypto`, `qbo-crypto`, audit signing-key encryption, and M2M Bearer auth. **Not** used for JWT signing anymore — that moved to the ES256 keyring above. |
+| `JWT_SECRET` | Yes | KDF input, and only that: config/QBO secret crypto, audit signing-key encryption, and the several signed-URL and session HMACs (render tokens, portal sessions, video upload, unsubscribe, agent view, ICS links). **Never** used for JWT signing — that is the ES256 keyring above. It is also **not** the M2M credential: the portal→core `x-portal-m2m` HMAC key is HKDF-derived from `JWT_PRIVATE_KEY_V<N>` (`server/lib/m2m-auth.ts`), and there is no M2M Bearer token. |
 | `DB` | Yes | Cloudflare D1 Database binding |
 | `PHOTOS` | Yes | Cloudflare R2 Bucket for image storage |
 | `TENANT_CACHE`| Yes | Cloudflare KV for configuration caching |
-| `INSPECTION_DOC` | No | Durable Object binding (`class_name: InspectionDocDO`) for collaborative inspection editing (#181 — Yjs CRDT host; one DO per inspection, tenant-scoped `idFromName`). Declared in `wrangler.jsonc` (committed) and must be added to `wrangler.saas.jsonc` (gitignored) with the matching `v2` SQLite-class migration. When absent the collab routes return `501` and fail closed — editing falls back to a single-client Y.Doc with no realtime sync. See `docs/concepts/collab-editing.md`. |
-| `TURNSTILE_SECRET_KEY` | No | Server-side Turnstile verification — `POST /api/book` enforces this when set. Use test secret `1x0000000000000000000000000000000AA` for local dev. |
-| `APP_BASE_URL` | No | Public URL for OAuth and link generation |
-| `APP_BASE_URL` | No | Public origin used when building absolute links (reports, hosted `/legal/:tenant/…` Privacy & Terms). |
+| `INSPECTION_DOC` | No | Durable Object binding (`class_name: InspectionDocDO`) for collaborative inspection editing (#181 — Yjs CRDT host; one DO per inspection, tenant-scoped `idFromName`). Declared with its `v2` SQLite-class migration in `wrangler.jsonc` (committed) **and** in `wrangler.saas.jsonc` (gitignored) — both are wired; this line used to read as an outstanding task. When absent the collab routes return `501` and fail closed — editing falls back to a single-client Y.Doc with no realtime sync. See `docs/concepts/collab-editing.md`. |
+| `TURNSTILE_SECRET_KEY` | No | Server-side Turnstile verification on the two anonymous submit surfaces, `POST /api/public/book` and agent signup. Whether a challenge applies is the `botProtectionMandatory` capability, not whether this key is set: `saas` always enforces (falling back to Cloudflare's public test key), `standalone` challenges only when the key is present. Use test secret `1x0000000000000000000000000000000AA` for local dev. See `docs/integrations/turnstile.md`. |
+| `APP_BASE_URL` | No | Public origin used for OAuth redirect URIs and when building absolute links (reports, hosted `/legal/:tenant/…` Privacy & Terms). Must be the exact origin the deployment answers on — Intuit matches the QuickBooks redirect URI byte for byte. |
 | `RESEND_API_KEY`| No | Platform-default email delivery (Resend). Tenants may switch to their OWN Resend key + verified sender via Settings → Communication (per-tenant override; the email pipeline resolves own-vs-platform explicitly). |
 | `GEMINI_API_KEY`| No | The env name is legacy; it holds a workspace's own AI provider key whatever the provider is. Not the credential AI features run on by itself: `resolve-provider.ts` decides credentials, endpoint and model per call — a workspace's own stored key (Settings → Advanced → AI) always wins, and where `profile.hasManagedAi` holds, a deployment-provided key may serve workspaces granted managed access. Otherwise there is no managed path at all — the workspace's key or nothing. |
 | `AI_MODEL` | No | Model id every AI call uses, in the chosen backend's own naming. Through an AI gateway that is `{provider}/{model}`. **No default is compiled in**: when unset, AI features fail closed with a 503 rather than silently pinning whichever model was current when the code was written. Required for any AI feature to work, in every mode. A workspace may override it per company (Settings → Advanced → AI). |
@@ -212,7 +212,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 | `STRIPE_SECRET_KEY` | No | Stripe Connect (each tenant's OWN account; the platform never collects payments). Resolution is tenant-DB-preferred: a tenant's stored key always beats this env, so a platform-level binding can never hijack tenant payments. |
 | `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook HMAC verification |
 | `QBO_ENV` | No | Which Intuit host the QuickBooks Online integration calls: `sandbox` (`https://sandbox-quickbooks.api.intuit.com`) or `production` (`https://quickbooks.api.intuit.com`). **No default and no fallback** — when unset, every QuickBooks API call throws and `GET /api/integrations/qbo/callback` refuses to store a connection. That is deliberate: Intuit Development keys authenticate only against sandbox companies and Production keys only against real ones, so a guessed host is wrong for one of them and fails in a way that reads like a bad credential. Required (together with `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET`, which may instead be set per tenant in Settings → Integrations) for any QuickBooks sync. The OAuth authorize, token, and revoke endpoints are shared by both environments and are not affected by this setting. |
-| `GOOGLE_PLACES_API_KEY` | No | Google Places API key powering address autocomplete on the dashboard new-inspection wizard and the public `/book` page (proxied via `/api/places/*` and `/public/geocode`). When unset, both endpoints return `{ data: [], reason: 'NO_API_KEY' }` and the address inputs degrade gracefully to plain text — the customer can still type a free-form address and submit. |
+| `GOOGLE_PLACES_API_KEY` | No | Google Places API key powering address autocomplete on the dashboard new-inspection wizard and the public `/book` page (proxied via `/api/places/*` and `/api/public/geocode`). When unset, both endpoints return `{ data: [], reason: 'NO_API_KEY' }` and the address inputs degrade gracefully to plain text — the customer can still type a free-form address and submit. |
 | `ESTATED_API_KEY` | No | Estated.io public-records key for the `POST /api/inspections/:id/property-facts/autofill` endpoint. Resolves year built / sqft / foundation / lot size / bedrooms / bathrooms by address. When unset, returns `{ data: null, reason: 'NO_API_KEY' }` and the Property Facts card shows a polite "auto-fill not configured" hint while still accepting manual entry. Same graceful-degrade pattern as `GOOGLE_PLACES_API_KEY`. |
 | `STREAM` | No | Cloudflare Stream binding (binding name `STREAM`). Required only when the video backend is set to Stream (self-host: Settings → Integrations → Video; SaaS: paid tier). Absent in the default R2 configuration. |
 | `STREAM_CUSTOMER_SUBDOMAIN` | No | Your Cloudflare Stream customer subdomain (e.g. `customer-abc123`, the prefix before `.cloudflarestream.com`). Required in SaaS mode for paid tenants (plan-gated; free/trial tenants use R2). In self-host mode this is stored per-tenant in `integrationConfig` via Settings → Integrations → Video, not as an env var. |
@@ -229,12 +229,12 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 
 **Mandatory** for any code that touches authentication. Violations reintroduce critical vulnerabilities.
 
-- **ES256 keyring**: All JWT signing and verification MUST go through `server/lib/jwt-keyring.ts`. Direct `sign()` / `verify()` calls from `hono/jwt` are FORBIDDEN — the keyring pins the algorithm to ES256 (ECDSA P-256 SHA-256), stamps the `kid` header, and enforces multi-version verification. Per-request keyrings are pre-built in `diMiddleware` and exposed as `await c.var.keyringPromise`.
+- **ES256 keyring**: All JWT signing and verification MUST go through `server/lib/jwt-keyring.ts`. Direct `sign()` / `verify()` calls from `hono/jwt` are FORBIDDEN — the keyring pins the algorithm to ES256 (ECDSA P-256 SHA-256), stamps the `kid` header, and enforces multi-version verification. Per-request keyrings are pre-built in `contextBootstrap` (NOT `diMiddleware` — JWT auth needs the keyring before di runs) and exposed as `await c.var.keyringPromise`.
 - **kid required**: Every JWT MUST carry a `kid` header. `signJwt()` sets it from `JWT_CURRENT_KID`; `verifyJwt()` rejects tokens with no kid, or with a kid not in the keyring.
 - **iat claim**: `signJwt()` auto-injects `iat: Math.floor(Date.now() / 1000)` when the caller omits it. Without `iat`, KV session invalidation (`pwchanged:{userId}`) cannot work.
-- **No HS256 fallback**: There is NO legacy HS256 path. Pre-launch architectural choice — see rotation scripts and docs. The remaining `JWT_SECRET` env binding is now used only as KDF input for `config-crypto`, `qbo-crypto`, and audit signing-key encryption — never for JWT signing.
+- **No HS256 fallback**: There is NO legacy HS256 path. Pre-launch architectural choice — see rotation scripts and docs. The remaining `JWT_SECRET` env binding is KDF input only, never a JWT signing key. State it that way rather than listing its consumers: there are dozens of files reading it (secret crypto, signed-URL and session HMACs, token derivation), and every enumeration written here has gone stale.
 - **Key rotation flow**: To rotate, provision `JWT_PRIVATE_KEY_V<N+1>` + `JWT_PUBLIC_KEY_V<N+1>` first (verify-only window), then flip `JWT_CURRENT_KID` to the new version. Old tokens remain verifiable until V<N> is retired.
-- **Token NOT in response body**: Login, setup, and join endpoints MUST NOT return the JWT in the JSON response. Tokens are delivered exclusively via `Set-Cookie` (HttpOnly).
+- **Token NOT in response body — one carved-out exception.** Login, setup and join MUST NOT return the JWT to a browser; delivery is `Set-Cookie` (HttpOnly). The exception is the in-process BFF, which identifies itself with `x-token-relay: 1` and then receives `token` in the body, because Workers `fetch()` may strip `Set-Cookie` on a server-to-server hop and the BFF has to write its own session cookie. A browser never sends that header. Do not add a second exception without one here.
 - **Cookie name**: Always use `__Host-inspector_token` (enforces `Secure`, `Path=/`, no `Domain`).
 - **setCookie attributes**: Every `setCookie()` MUST include `httpOnly: true, secure: true, sameSite: 'Strict', path: '/'`.
 - **deleteCookie secure**: Every `deleteCookie()` MUST include `{ path: '/', secure: true }`. Omitting `secure` on `__Host-` cookies throws a runtime exception.
@@ -289,11 +289,11 @@ DB design policies (2026-06-04 DBA review). These apply to ALL new tables/column
 
 ## Quality gates
 
-Pre-commit and CI run the same logical checks; CI's `verify` job is the authoritative gate (wire it up as a required status check). The pre-commit hook is a fast local guard — bypass only with `--no-verify` (discouraged). Mechanism, steps, and Node version are aligned across the superproject and the portal/cms submodules.
+CI is a strict superset of pre-commit, not the same set: the hook runs the `precommit` rung of the gate registry and a tiered tsc, while CI runs every gate at both rungs plus the type-aware eslint pass, the full type-check and every suite. `verify` is the authoritative gate (wire it up as a required status check). The pre-commit hook is a fast local guard — bypass only with `--no-verify` (discouraged). Mechanism, steps, and Node version are aligned across the superproject and the portal/cms submodules.
 
 - **Hook mechanism**: `.githooks/pre-commit`, activated by the `prepare` npm script (`git config core.hooksPath .githooks`) on `npm install`/`npm ci` — native git hooks, **no husky**.
-- **Pre-commit** (`.githooks/pre-commit`): tiered type-check (scoped to staged files — skip / api-only / full) → `lint-staged` (eslint --fix) → DS-token conformance (`lint:ds`) → small-text contrast (`lint:contrast`) → migration-ref hygiene (`lint:migrefs`) → Worker bundle-size (gated to bundle-affecting changes). Docs/tests-only commits skip the heavy steps.
-- **CI** (`.github/workflows/ci.yml`, Node 22): `npm ci` → `gen-version` → `type-check` → `npm run lint` (eslint + `lint:ds` + `lint:contrast` + `lint:erasure` + `lint:migrefs`) → `db:check` (migration drift) → `test:unit` → `test:workers` → `test:web` → `build` → bundle-size gate. CodeQL runs separately (`codeql.yml`).
+- **Pre-commit** (`.githooks/pre-commit`): tiered type-check (scoped to staged files — skip / api-only / full) → `lint-staged` (eslint --fix, `ESLINT_FAST=1`) → every gate declared at the `precommit` rung in `scripts/lib/gate-registry.mjs`, run in ONE node process by `scripts/run-gates.mjs`. That is two dozen gates, not the three this line used to name; the registry is the list and must not be copied here. Commits with no staged `.ts`/`.tsx` skip the type-check entirely. The Worker bundle-size gate is NOT here — it lives in `.githooks/pre-push`.
+- **CI** (`.github/workflows/ci.yml`, Node 22): nine parallel jobs — `typecheck-app`, `lint-eslint`, `lint-gates` (+ `db:check`), `test-unit` (4 shards), `test-contract`, `test-workers`, `test-web` (4 shards), `build` (+ bundle size), and `e2e` (a 2-way matrix). `verify` does no work of its own: it is the aggregate job branch protection keys off, and it waits on all nine including `e2e`. CodeQL runs separately (`codeql.yml`). Details: `docs/develop/testing.md`.
 
 ## Comment Rules
 
@@ -302,7 +302,7 @@ Migration sequence numbers are an unstable, positional ordering token — squash
 - **No migration sequence numbers in code comments** (`migration 0045`, `0052_inspector_slug.sql`, `pre-migration 0040`, …). The only allowed reference is `0000_baseline.sql` — it never renumbers. Enforced by `npm run lint:migrefs` (`scripts/check-migration-refs.mjs`); also runs in `npm run lint` and pre-commit.
 - **State the invariant, not the history.** Put *why a column/index exists* next to its definition in `server/lib/db/schema/` (it travels with the field and survives any renumber). "the `lot_size` column on `inspections`" beats "the `lot_size` column added in migration 0045". History lives in `git blame`.
 - **For traceability, cite a stable id** — PR# / issue# (`see #144`) or a feature name — never a migration number. These never renumber and link to full context.
-- **"Must stay in sync with X" coupling → make it executable, not prose.** A comment that says "must match the inline DDL / the backfill list" is a latent bug; people forget. Prefer a shared constant both sides import, or a test that asserts the equality. Example: `tests/unit/inline-ddl-schema-sync.spec.ts` asserts the workers specs' hand-maintained `tenant_configs` DDL covers every Drizzle schema column — replacing the old "remember to sync this DDL" comment that blocked #164.
+- **"Must stay in sync with X" coupling → make it executable, not prose.** A comment that says "must match the inline DDL / the backfill list" is a latent bug; people forget. Prefer a shared constant both sides import, or a test that asserts the equality. Example: `tests/unit/platform/inline-ddl-schema-sync.spec.ts` asserts the workers specs' hand-maintained `tenant_configs` DDL covers every Drizzle schema column — replacing the old "remember to sync this DDL" comment that blocked #164.
 
 ## Cross-Portal Reuse
 
