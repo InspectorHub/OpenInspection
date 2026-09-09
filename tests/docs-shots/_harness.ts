@@ -57,6 +57,41 @@ export interface ShotOptions {
     mask?: Locator[];
     /** Capture the whole scrollable page rather than the viewport. */
     fullPage?: boolean;
+    /**
+     * Photograph ONE ELEMENT instead of the window.
+     *
+     * Playwright scrolls the element into view and captures all of it, even the
+     * part below the fold, so this is not "a viewport shot that happens to be
+     * pointed at something" — a 1200px-tall card comes back whole.
+     *
+     * Takes precedence over `fullPage`, which has no meaning once the frame is
+     * the element's own box.
+     */
+    element?: Locator;
+}
+
+/** One picture in a multi-picture capture. See `shot.sections`. */
+export interface ShotSection {
+    /**
+     * This part's OWN marker id.
+     *
+     * ⚠️ There is no such thing as "part 2 of shot X". The publisher joins
+     * `<id>.png` to `<!-- shot: <id> | … -->` by exact set equality
+     * (apps/portal/scripts/lib/docs-shots.mjs), so splitting one picture into
+     * three means the prose gains three markers and loses one. That is a change
+     * in BOTH repositories or it is a failed docs build — a capture the prose
+     * does not ask for is reported as "capture with no marker".
+     */
+    id: string;
+    /** The container to photograph. Must be a stable element, not a text node. */
+    element: Locator;
+    /** Extra regions to cover for this part only. */
+    mask?: Locator[];
+}
+
+export interface GuideShot {
+    (page: Page, id: string, options?: ShotOptions): Promise<void>;
+    sections(page: Page, sections: readonly ShotSection[]): Promise<void>;
 }
 
 /**
@@ -68,21 +103,89 @@ export interface ShotOptions {
  * The id is the join key with the prose. It must be url-safe kebab-case; the
  * validator rejects anything else rather than guessing.
  */
-export function shotsFor(guideSlug: string) {
-    return async function shot(page: Page, id: string, options: ShotOptions = {}): Promise<void> {
+export function shotsFor(guideSlug: string): GuideShot {
+    const shot = async (page: Page, id: string, options: ShotOptions = {}): Promise<void> => {
         const dir = path.join(SHOT_ROOT, guideSlug);
         mkdirSync(dir, { recursive: true });
-        await page.screenshot({
+        const common = {
             path: path.join(dir, `${id}.png`),
             mask: [...standingMasks(page), ...(options.mask ?? [])],
-            fullPage: options.fullPage ?? false,
             // Both of these are pure noise in a still image, and both differ
             // between runs: a caret blinks, and a transition caught mid-flight
             // photographs a control halfway to somewhere.
-            animations: 'disabled',
-            caret: 'hide',
-        });
+            animations: 'disabled' as const,
+            caret: 'hide' as const,
+        };
+        if (options.element) {
+            await options.element.screenshot(common);
+            return;
+        }
+        await page.screenshot({ ...common, fullPage: options.fullPage ?? false });
     };
+
+    /**
+     * Capture one long screen as SEVERAL pictures, one per container.
+     *
+     * THE PROBLEM THIS SOLVES. A settings page is often 3000+ CSS px tall. Shot
+     * full-page it becomes a strip that the guide displays 0.65x wide and
+     * scrolled past in one flick — a picture of everything, which points at
+     * nothing. Worse now than before: a narrower capture viewport reflows a long
+     * page TALLER, and at deviceScaleFactor 2 a page over ~8000 CSS px cannot be
+     * captured full-page at all (Chromium's ~16384px limit).
+     *
+     * WHY ELEMENT-SCOPED RATHER THAN SLICING BY VIEWPORT HEIGHT. A height slice
+     * is arithmetic, not meaning: it cuts wherever the number lands, so a
+     * heading arrives at the bottom of one picture and its form at the top of
+     * the next, and the cut moves every time the page's content changes length.
+     * A container is what the reader is being shown, and the pages that need
+     * splitting already have stable ones — `/settings/communication` carries
+     * `#email-delivery`, `#sms-delivery`, `#email-templates`, `#google-calendar`
+     * as scroll-spy anchors, guarded by settings-communication-nav.spec.ts. When
+     * a screen genuinely has no container to name, the honest fix is to give it
+     * one in the app, not to guess an offset here.
+     *
+     * WHAT IT COSTS. Each part is a separate marker id in the prose — see
+     * ShotSection.id. This is a two-repository change; there is no way to emit
+     * more files under one id without failing the publisher's exact-set check.
+     */
+    const sections = async (page: Page, entries: readonly ShotSection[]): Promise<void> => {
+        for (const entry of entries) {
+            // Fail here rather than photograph the wrong thing. `count()` is
+            // deliberately not consulted: a section that has silently stopped
+            // rendering must break the capture run, because the alternative is
+            // a guide that quietly loses a picture and a validator that then
+            // blames the prose.
+            await entry.element.first().scrollIntoViewIfNeeded();
+            await shot(page, entry.id, { element: entry.element.first(), mask: entry.mask });
+        }
+    };
+
+    return Object.assign(shot, { sections });
+}
+
+/**
+ * The panel a heading sits in — the frame for an element-scoped capture.
+ *
+ * A workspace screen is a column of panels, and they are NOT one component: most
+ * are `<Card>` from packages/shared-ui (`bg-ih-bg-card border border-ih-border
+ * rounded-ih-card shadow-ih-card`), while a few hand-roll the same surface —
+ * DocumentsSection is a `<section className="rounded-xl border border-ih-border
+ * bg-ih-bg-card p-5">`. The one class both spellings share is the BACKGROUND,
+ * so that is the anchor. `rounded-ih-card` would have matched two of the hub's
+ * three panels and thrown on the third.
+ *
+ * Nearest-ancestor, not first-in-document: `bg-ih-bg-card` also lands on inputs
+ * and selects, but a heading is never inside one, so the first ancestor carrying
+ * it is the panel.
+ *
+ * ⚠️ Anchoring on a utility class is a compromise, not a pattern. It beats the
+ * alternatives on offer — a text locator returns the `<h2>` itself, which
+ * photographs as one line of type — but if a panel needs framing precisely, give
+ * it a real id in the app and locate on that. This helper is for panels that
+ * have none.
+ */
+export function panelAround(heading: Locator): Locator {
+    return heading.locator('xpath=ancestor::*[contains(@class,"bg-ih-bg-card")][1]');
 }
 
 /**
