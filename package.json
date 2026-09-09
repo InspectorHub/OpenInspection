@@ -59,6 +59,7 @@
     "lint:loader-awaits": "node scripts/check-loader-awaits.mjs",
     "lint:middleware-budget": "node scripts/check-middleware-budget.mjs",
     "lint:migrefs": "node scripts/check-migration-refs.mjs",
+    "lint:lockreg": "node scripts/check-lockfile-registry.mjs",
     "lint:chrome-record": "node scripts/check-chrome-record.mjs --self-test",
     "lint:migchain": "node scripts/check-migration-chain.mjs",
     "lint:zero-tracking": "node scripts/check-zero-tracking.mjs",
