@@ -137,7 +137,18 @@ with your data intact, and the column stays until the situation is resolved.
 
 **Do this before `npm run db:migrate:remote` or `npm run deploy`, not after.**
 
-This release replaced a sixty-nine file migration chain with a single regenerated `migrations/0000_baseline.sql` — the same filename that was already there. `wrangler d1 migrations apply` compares filenames against the `d1_migrations` table in your database and applies whatever names are missing. Both sides now say `0000_baseline.sql`, so there is nothing missing, so nothing runs. Your schema stays where it was and the new Worker code is written against where it should have gone.
+A baseline rebuild replaces the *contents* of `migrations/0000_baseline.sql` with one regenerated file and deletes the forward files it now covers — keeping the same filename that was already there. `wrangler d1 migrations apply` compares filenames against the `d1_migrations` table in your database and applies whatever names are missing. After a rebuild both sides say `0000_baseline.sql`, so there is nothing missing, so nothing runs. Your schema stays where it was and the new Worker code is written against where it should have gone.
+
+**This has now happened twice, and which steps below apply to you depends on where you are coming from:**
+
+| rebuild | what it folded into `0000_baseline.sql` | columns it retired |
+|---|---|---|
+| **2026-08-13** | a sixty-nine file chain | **nine** — [step 5](#5-apply-the-column-retirements-by-hand) |
+| **2026-09-09** | the forty-eight file chain that grew after it | **none** |
+
+The 2026-09-09 rebuild changes no schema whatsoever, and that was measured rather than assumed: built independently into two throwaway databases, the forty-eight file chain and the single regenerated baseline produce the same **1263 columns** and the same **183 indexes**, with nothing on either side that the other lacks.
+
+So if you already reconciled across the 2026-08-13 rebuild, **step 5 does not apply to you** — there is nothing to retire. Step 3 still does, unless your ledger already names every file the pre-rebuild tree carried; that is exactly what step 3 checks, and running it when there is nothing to apply is a no-op. If you are crossing both rebuilds, do the whole thing.
 
 A fresh install is unaffected: it runs the new baseline once and is correct. Everything below is for a database that already exists.
 
@@ -161,15 +172,17 @@ Take the export **and** the Time Travel bookmark from [Before upgrading](#before
 
 ### 3. Bring your schema current on the pre-rebuild chain
 
-Do this **first**, and from your *old* checkout state — not from the new tag. The forward files this release removed are still in git history:
+Do this **first**, and from your *old* checkout state — not from the new tag. The forward files a rebuild removed are still in git history:
 
 ```bash
 git fetch --tags
-git log --oneline --diff-filter=D -1 -- 'migrations/*.sql'   # the commit that removed the chain
-git checkout <that-commit>^                                  # the last tree that still carried it
+git log --oneline --diff-filter=D -- 'migrations/*.sql'      # every commit that removed a chain
+git checkout <the newest of those>^                          # the last tree that still carried it
 npm ci
 npm run db:migrate:remote                                    # applies everything your database is missing
 ```
+
+⚠️ **That log now lists more than one commit — there have been two rebuilds.** Work backwards one rebuild at a time: reconcile onto the *oldest* chain your ledger has not yet crossed, then move to the next. Taking only the newest hands a database that never crossed the 2026-08-13 rebuild a set of filenames renumbered from the ones it remembers, and `wrangler` will try to apply files whose changes it already has.
 
 Then check out the release you are upgrading to (`git checkout vX.Y.Z && npm install`) and continue.
 
@@ -197,7 +210,9 @@ npx wrangler d1 execute DB --remote --command "INSERT INTO d1_migrations (name) 
 
 ### 5. Apply the column retirements by hand
 
-This release retires nine columns. Production got them from forward migrations that ran *before* the rebuild; those files no longer exist, so **no migration in this repo can drop them for you**. The new code does not bind any of the nine. Three of them are `NOT NULL` with no default, which means an insert that omits them fails outright rather than degrading:
+> **This step belongs to the 2026-08-13 rebuild only.** The 2026-09-09 rebuild retires nothing — see the table at the top of this section. If your database already crossed the 2026-08-13 reconcile, these nine columns are gone and you are done after step 4; go to step 6. Running the statements below anyway is not destructive, but every one of them will fail with `no such column`.
+
+The 2026-08-13 rebuild retires nine columns. Databases got them from forward migrations that ran *before* that rebuild; those files no longer exist, so **no migration in this repo can drop them for you**. The current code binds none of the nine. Three are `NOT NULL` with no default, which means an insert that omits them fails outright rather than degrading:
 
 | Table | Column | Old definition | What breaks if it stays |
 |---|---|---|---|
