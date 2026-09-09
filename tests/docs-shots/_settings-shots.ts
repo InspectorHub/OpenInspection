@@ -39,12 +39,41 @@ export function resetSettingsGuides(entries: readonly SettingsShot[]): void {
     for (const guide of new Set(entries.map((e) => e.guide))) resetGuide(guide);
 }
 
+/**
+ * ⚠️ THE LONG PAGES HERE STILL SHIP AS ONE STRIP, and cannot stop until the
+ * prose moves too.
+ *
+ * `/settings/communication` and `/settings/workspace` are several thousand CSS
+ * px tall, so one `fullPage: true` picture is displayed at ~0.65x in a 672px
+ * column and read by nobody. The mechanism to fix that exists — `shot.sections`
+ * in `_harness.ts`, element-scoped, and those two pages already carry the stable
+ * containers it needs (`#email-delivery`, `#sms-delivery`, `#email-templates`,
+ * `#google-calendar`, guarded by settings-communication-nav.spec.ts).
+ *
+ * What blocks it is the join, not the capture: the publisher matches `<id>.png`
+ * to `<!-- shot: <id> -->` by exact set equality, so turning `settings-
+ * communication` into four pictures means the guide in
+ * `apps/portal/docs/user-guide/` loses that marker and gains four. Emitting the
+ * extra PNGs first would fail the docs build with "capture with no marker",
+ * which is the check working. Convert a page here and its prose in the same
+ * change, never one without the other.
+ */
 export async function captureSettings(page: Page, entry: SettingsShot): Promise<void> {
     const shot = shotsFor(entry.guide);
     await page.goto(entry.path);
     // Assert, don't sleep: a settings page whose fetch failed still renders its
     // crumb and its heading, so waiting on "the URL changed" photographs the
     // empty state and calls it documentation.
-    await expect(page.getByText(entry.ready).first()).toBeVisible({ timeout: 20_000 });
+    //
+    // SCOPED TO `main`, and that is not tidiness. Unscoped, `/Team/i` matched
+    // the SIDEBAR's own "Team" link, which is present on every page — so the
+    // wait was satisfied by the navigation rather than by the page, and would
+    // have passed on a screen that never loaded. It only surfaced when the
+    // capture viewport came down to 960: the sidebar is `hidden lg:flex`, the
+    // first match became a display:none node, and the wait failed on a page
+    // that had in fact rendered. A readiness check answered by the chrome
+    // around the page is not a readiness check.
+    const content = page.getByRole('main');
+    await expect(content.getByText(entry.ready).first()).toBeVisible({ timeout: 20_000 });
     await shot(page, entry.id, { fullPage: true });
 }

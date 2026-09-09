@@ -91,7 +91,13 @@ export function Sidebar() {
             <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M16.5 10.5a6 6 0 11-12 0 6 6 0 0112 0z" /></svg>
             <span className="font-medium">{m.nav_action_search()}</span>
             <kbd className="ih-kbd ml-auto">
-              {typeof navigator !== "undefined" && navigator.platform?.startsWith("Mac") ? "⌘K" : "Ctrl /"}
+              {/* Ctrl+K, not Ctrl+/. The palette's own handler is
+                  `(metaKey || ctrlKey) && key === "k"` (CommandPalette.tsx), and
+                  `/` is taken: it opens the comment library inside the report
+                  editor (useKeyboard.ts). This label read "Ctrl /" on Windows,
+                  so the one hint the app gives about its search shortcut named
+                  a key that does something else. */}
+              {typeof navigator !== "undefined" && navigator.platform?.startsWith("Mac") ? "⌘K" : "Ctrl K"}
             </kbd>
           </button>
         </div>

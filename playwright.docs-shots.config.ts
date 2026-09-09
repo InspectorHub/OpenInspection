@@ -56,14 +56,60 @@ export default defineConfig({
             name: 'desktop',
             use: {
                 ...devices['Desktop Chrome'],
-                // Wide enough for the three-pane editor without a horizontal
-                // scrollbar, short enough that a full-page capture is readable
-                // at the width the portal renders it.
-                viewport: { width: 1440, height: 900 },
-                // Physical pixels stay 1:1 so an image is the size it says it
-                // is; a 2x capture doubles every file for no gain in a doc that
-                // is displayed at ~800px wide.
-                deviceScaleFactor: 1,
+                // 960 CSS px, and the number is derived, not chosen.
+                //
+                // WHAT WENT WRONG AT 1440. The published guide renders its
+                // prose — and therefore its images — inside a fixed column:
+                // `.ihp-prose` is `max-w-2xl` (42rem = 672px) and its images
+                // are `max-width: 100%`. A 1440px-wide capture is displayed at
+                // 672px, i.e. 0.47x, so the app's 14px UI text reached the
+                // reader at about 6.5px. Every screenshot in the manual was
+                // technically correct and practically unreadable.
+                //
+                // WHY 960 AND NOT MORE. Display scale is 672/width: 1440 gives
+                // 0.47, 1040 gives 0.65, 960 gives 0.70. True 1:1 would need a
+                // 672px viewport, which is a phone — the `mobile` project
+                // already documents that layout where a guide wants it.
+                //
+                // WHAT 960 COSTS, AND WHY IT IS NOW AFFORDABLE. Two hard edges
+                // sit just above it:
+                //   * the workspace sidebar is `hidden lg:flex`
+                //     (app/components/Sidebar.tsx) and Tailwind's `lg` is
+                //     1024px — this repo overrides no breakpoint. Below that
+                //     the shell swaps to MobileHeader + drawer.
+                //   * the report editor's shell is `min-w-[1024px]`
+                //     (app/routes/inspection-edit.tsx) — narrower than that and
+                //     the three-pane guide is photographed mid-horizontal-
+                //     scroll.
+                // Both used to force every capture wide, because the guides
+                // said "in the left-hand nav" and no page had ever shown the
+                // reader what that was. One guide now owns that explanation
+                // (`finding-your-way-around`), so the rest are free to be
+                // photographed at a width where their own content is legible.
+                //
+                // The two files that still NEED the wider shell say so
+                // themselves, with a `test.use({ viewport })` naming the reason
+                // — workspace-shell.shots.ts, which photographs the sidebar,
+                // and the editor block in staff-lifecycle.shots.ts. A project
+                // default cannot express "this guide, for this reason", and a
+                // second project would silently re-shoot every id under a
+                // different width.
+                viewport: { width: 960, height: 900 },
+                // 2x, and this is a consequence of the line above rather than
+                // an independent taste. The previous comment here argued that
+                // 1x costs nothing "in a doc that is displayed at ~800px wide",
+                // which held only while the capture was much wider than its
+                // display box. It no longer is: 1040 CSS px shown in a 672px
+                // column is 1344 DEVICE px on a 2x screen, so a 1x capture is
+                // UPSCALED 1.29x for most laptop readers and the text goes
+                // soft. At 2x the file is 2080 device px and downsamples
+                // cleanly on 1x and 2x alike.
+                //
+                // ⚠️ Full-page captures are now 2x tall in pixels as well.
+                // Chromium refuses a screenshot past ~16384px on either axis,
+                // so a page over ~8000 CSS px cannot be shot full-page at all —
+                // one more reason a long page should be captured as sections.
+                deviceScaleFactor: 2,
             },
         },
         {

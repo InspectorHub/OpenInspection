@@ -1,4 +1,4 @@
-import { test, shotsFor, expect } from './_harness';
+import { test, shotsFor, panelAround, expect } from './_harness';
 
 // Desktop only. The mobile project exists for the guides that document a phone
 // flow; running these there would overwrite every capture with a narrow one
@@ -54,33 +54,56 @@ test('the inspection page: overview, people, files, communication', async ({ pag
     await expect(page.getByRole('link', { name: /Open editor/i }).first()).toBeVisible();
     await HUB(page, 'hub-overview');
 
-    // The remaining three are regions of the SAME page, so each is scrolled to
-    // and photographed in the viewport rather than captured full-page — a
-    // full-page shot of a long hub shows everything and points at nothing.
-    for (const [id_, heading] of [
-        ['hub-people', /People/i],
-        ['hub-communication', /Communication/i],
-        ['hub-documents', /Documents/i],
-    ] as const) {
-        const section = page.getByText(heading).first();
-        if (!(await section.count())) continue;
-        await section.scrollIntoViewIfNeeded();
-        await HUB(page, id_);
-    }
+    // The remaining three are regions of the SAME page, and each is photographed
+    // as ITS OWN PANEL rather than as the viewport that happens to contain it.
+    //
+    // The previous version scrolled the heading into view and shot the window.
+    // That was already better than a full-page strip, but the frame was decided
+    // by scroll position: `scrollIntoViewIfNeeded` does nothing when the element
+    // is already visible, so a panel could arrive anywhere in the picture, with
+    // however many neighbours happened to be beside it — and near the foot of
+    // the page it could not be centred at all. Every id below is unchanged, so
+    // this changes the pictures and not the join with the prose.
+    //
+    // Located by ROLE, not by text: the old `getByText(/People/i)` matched any
+    // element whose text merely contained the word, which on this page includes
+    // the nav. Each panel's title is a real `<h2>` (BlockHeading), and the
+    // strings come from messages/en (`inspections_hub_block_people`,
+    // `comm_block_title`, `documents_heading`).
+    await HUB.sections(page, [
+        { id: 'hub-people', element: panelAround(page.getByRole('heading', { name: /^People$/i })) },
+        { id: 'hub-communication', element: panelAround(page.getByRole('heading', { name: /^Communication$/i })) },
+        { id: 'hub-documents', element: panelAround(page.getByRole('heading', { name: /^Documents$/i })) },
+    ]);
 });
 
-test('the editor: three panes, and an item being rated', async ({ page }) => {
-    const id = await setup(page);
-    await page.goto(`/inspections/${id}/edit`);
-    // The section list is the editor's leftmost pane and only exists once the
-    // template snapshot has loaded — "the URL changed" would photograph a shell.
-    await expect(page.getByText('Exterior').first()).toBeVisible({ timeout: 30_000 });
-    await EDITOR(page, 'editor-three-panes');
+/**
+ * Wider than the project default of 960, and the app decides that, not taste.
+ *
+ * The editor shell is `min-w-[1024px]` (app/routes/inspection-edit.tsx), so at
+ * the default width the three-pane picture is taken mid-horizontal-scroll and
+ * the guide's own subject is cut off. 1040 is that minimum plus room for
+ * Chromium's classic scrollbar.
+ *
+ * Scoped to this one test: every other picture in this file is a panel that
+ * reads better at 960.
+ */
+test.describe('the editor', () => {
+    test.use({ viewport: { width: 1040, height: 900 } });
 
-    await page.getByText('Roof covering').first().click();
-    await expect(page.getByText(/Satisfactory/i).first()).toBeVisible();
-    await page.getByText(/Satisfactory/i).first().click();
-    await EDITOR(page, 'editor-rating-an-item');
+    test('the editor: three panes, and an item being rated', async ({ page }) => {
+        const id = await setup(page);
+        await page.goto(`/inspections/${id}/edit`);
+        // The section list is the editor's leftmost pane and only exists once the
+        // template snapshot has loaded — "the URL changed" would photograph a shell.
+        await expect(page.getByText('Exterior').first()).toBeVisible({ timeout: 30_000 });
+        await EDITOR(page, 'editor-three-panes');
+
+        await page.getByText('Roof covering').first().click();
+        await expect(page.getByText(/Satisfactory/i).first()).toBeVisible();
+        await page.getByText(/Satisfactory/i).first().click();
+        await EDITOR(page, 'editor-rating-an-item');
+    });
 });
 
 test('the publish check', async ({ page }) => {
@@ -144,7 +167,12 @@ test('sending the report, and the delivery record', async ({ page }) => {
     await DELIVER(page, 'send-report');
 
     await page.keyboard.press('Escape');
-    const comms = page.getByText(/Communication/i).first();
-    await comms.scrollIntoViewIfNeeded();
-    await DELIVER(page, 'delivery-record');
+    // The delivery record lives in the Communication panel, so photograph the
+    // panel — same reasoning as the hub regions above, same unchanged id.
+    await DELIVER.sections(page, [
+        {
+            id: 'delivery-record',
+            element: panelAround(page.getByRole('heading', { name: /^Communication$/i })),
+        },
+    ]);
 });

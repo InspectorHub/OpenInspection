@@ -192,7 +192,13 @@ export async function ensureDocsInspection(page: Page, templateId: string): Prom
     if (listed.ok()) {
         const body = (await listed.json()) as { data?: Array<{ id: string; propertyAddress?: string }> };
         const found = (body.data ?? []).find((i) => i.propertyAddress === address);
-        if (found) return found.id;
+        if (found) {
+            // Also on the already-exists path: the service line is what makes
+            // the inspection billable, and a run against a database that
+            // already holds the inspection would otherwise skip it.
+            await ensureDocsInspectionIsBilled(page, found.id);
+            return found.id;
+        }
     }
     await apiPost(page, '/api/inspections', {
         propertyAddress: address,
@@ -204,7 +210,35 @@ export async function ensureDocsInspection(page: Page, templateId: string): Prom
     const body = (await after.json()) as { data?: Array<{ id: string; propertyAddress?: string }> };
     const created = (body.data ?? []).find((i) => i.propertyAddress === address);
     if (!created) throw new Error('docs fixture: inspection was created but does not list');
+    await ensureDocsInspectionIsBilled(page, created.id);
     return created.id;
+}
+
+/**
+ * Put a priced service line on the docs inspection.
+ *
+ * WITHOUT THIS THE INVOICING GUIDE CANNOT BE PHOTOGRAPHED. `POST
+ * /api/inspections` takes no service, so the inspection was worth $0.00 and its
+ * Invoice card offered "Set amount", not "Request payment" — the button the
+ * capture walk clicks. The guide's own alt text promises "the service lines
+ * carried across", which an inspection with no service can never show.
+ *
+ * Idempotent by the endpoint's own contract: adding a service the inspection
+ * already has returns the existing line unchanged, so a re-run costs one call
+ * and changes nothing.
+ */
+async function ensureDocsInspectionIsBilled(page: Page, inspectionId: string): Promise<void> {
+    const catalogue = await apiGet(page, '/api/services');
+    if (!catalogue.ok()) return;
+    const body = (await catalogue.json()) as { data?: Array<{ id: string; name: string }> };
+    const service = (body.data ?? []).find((s) => s.name === 'Full Home Inspection');
+    // Silent when the catalogue is empty rather than throwing: the caller that
+    // needs a price is the invoicing walk, and it asserts on the button it
+    // needs. A fixture that throws here would take down every guide that has
+    // nothing to do with money.
+    if (!service) return;
+    await apiPost(page, `/api/inspections/${inspectionId}/services`, { serviceId: service.id })
+        .catch(() => undefined);
 }
 
 /**
