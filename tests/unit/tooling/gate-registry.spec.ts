@@ -222,6 +222,35 @@ describe('gate registry', () => {
             // them. Cost: 310 ms over 4,002 files, measured against `rawnul`'s
             // 272 ms beside it.
             'eol',
+            // Added 2026-09-09 with the lockfile-registry gate, and the lock did
+            // its job again: registered at this rung without this entry, so the
+            // full run went red on a tree whose pre-commit hook and every one of
+            // the 78 gates were green. Worth stating plainly, because it is the
+            // reason this spec exists: `run-gates` selects by RUNG, not by
+            // changed paths, so a green ladder proves nothing about this list.
+            //
+            // It earns pre-commit on `gateregistry`'s argument — INVISIBLE BY
+            // CONSTRUCTION — in its purest form so far. A lockfile carrying a
+            // regional mirror's host installs correctly, passes every test, and
+            // produces a diff that reads as noise in a file nobody reviews line
+            // by line. Nothing downstream ever goes red. That is exactly how 843
+            // of 1024 entries accumulated across an unknown number of ordinary
+            // commits and surfaced only because someone opened the file for an
+            // unrelated reason.
+            //
+            // The rung is pre-commit rather than push because of WHO can still
+            // answer the question. The drift is written by `npm install`, and
+            // the author is the only person who knows whether the lockfile
+            // change they are committing was the point of the commit or a side
+            // effect of it. After the push it is not a stale line in a file — it
+            // is the install source every contributor and the CI runner resolve
+            // from, on a PUBLIC repository, pointing at an origin they did not
+            // choose and may not be able to reach.
+            //
+            // Cost: 115-132 ms over three runs, one file read and a loop over
+            // ~1030 entries. Measured beside `eol` on the same machine at the
+            // same time, which came in at 511 ms.
+            'lockreg',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);

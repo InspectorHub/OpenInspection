@@ -23,6 +23,10 @@ export const SCRIPT_GATES = [
     { key: 'contrast', label: 'Small-text WCAG AA contrast', script: 'check-contrast.mjs', fix: 'npm run lint:contrast', rung: PRECOMMIT },
     { key: 'svg', label: 'SVG dimensions', script: 'check-svg-dimensions.mjs', fix: 'npm run lint:svg', rung: PRECOMMIT },
     { key: 'migrefs', label: 'Migration-reference hygiene', script: 'check-migration-refs.mjs', fix: 'npm run lint:migrefs', rung: PRECOMMIT },
+    // PRECOMMIT rather than PUSH: the drift is written by `npm install`, so the
+    // commit that carries a lockfile change is the last moment it is still one
+    // person's local edit rather than everyone's install source.
+    { key: 'lockreg', label: 'Lockfile registry host', script: 'check-lockfile-registry.mjs', fix: 'npm run lint:lockreg', rung: PRECOMMIT },
     // Not the chrome-record gate itself -- that one runs at the commit-msg rung,
     // which this ladder does not model, because the thing it reads (the commit
     // message) does not exist until after pre-commit has finished. What runs
