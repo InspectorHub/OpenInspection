@@ -25,7 +25,7 @@
   "pca_cost_col_short_term": "Corto plazo",
   "pca_cost_es_long_term": "Largo plazo",
   "pca_cost_es_total": "Opinión de costos probables",
-  "pca_cost_es_excluded": "{count} elemento(s) quedan por debajo del umbral de reporte y se excluyen de estos totales.",
+  "pca_cost_es_excluded": "{count} elemento(s) quedan por debajo del umbral de informe y se excluyen de estos totales.",
   "pca_cost_col_comments": "Comentarios",
   "pca_cost_totals": "Totales",
   "pca_cost_reserve_title": "Programa de reservas para reemplazo de capital",
