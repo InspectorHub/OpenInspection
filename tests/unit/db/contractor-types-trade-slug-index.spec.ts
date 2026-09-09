@@ -33,6 +33,23 @@
  * workspace already has must fail loudly rather than leave two rows for one
  * trade, with `defectTrade -> contractorType` resolving to whichever the query
  * returned first.
+ *
+ * ── THIS FILE IS NOW THE ONLY GUARD ON THIS TABLE, ON PURPOSE ───────────────
+ * A sibling spec used to exercise the one-time backfill that completed
+ * `trade_slug` for workspaces predating the column. It read its subject out of
+ * `migrations/` by filename, and the 2026-09-09 baseline rebuild folded that
+ * file away, so the spec failed with "expected exactly one …, found 0".
+ *
+ * It was deleted rather than repointed at git history. What it tested was a
+ * completion that runs ONCE, against workspaces that already existed when it
+ * shipped; it has run everywhere it ever will, and a fresh install never needs
+ * it — the canonical set arrives from `CONTRACTOR_TYPES` at workspace
+ * creation, which is exactly what that migration's own comment said.
+ *
+ * What did NOT go away is the invariant, which is why it is worth saying here:
+ * the live rule is this index plus the application-level dedupe above, and both
+ * are exercised below against the current schema rather than against any file
+ * in `migrations/`. Do not restore the deleted spec; extend this one.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';

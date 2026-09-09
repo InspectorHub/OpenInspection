@@ -168,14 +168,59 @@ describe('output classification postures', () => {
         'maintenance_suggestion', 'legal_text', 'repair_pricing',
     ] as const;
 
-    it.each(ALL)('%s requires human review on both sources', (classification) => {
-        // Nothing enforces this field today — there is no review surface and
-        // nowhere to record that a review happened. So the ONLY thing standing
-        // between the rule and a silent `false` is this case. When the review
-        // surface lands, enforcement replaces the honour system; until then
-        // this is the honour system with a witness.
+    /**
+     * WHAT THIS FIELD MEANS NOW, after the claims around it were checked.
+     *
+     * It used to sit on every posture and read `true` on all twelve, under a
+     * comment saying nothing enforced it because "there is no review surface and
+     * nowhere to record that a review happened". Both halves were false by the
+     * time they were read:
+     *
+     *   - the record exists — `ai_content_reviews`, cited against the
+     *     `ai_call_provenance` id the chokepoint hands out;
+     *   - the surface exists and is wired — `AiAssistPanel` posts
+     *     `intent: "review"` to `/resources/ai-assist`, which calls
+     *     `POST /api/ai/reviews`.
+     *
+     * And review on the assist path is STRUCTURAL, not a flag anyone must
+     * honour: `server/api/ai.ts` writes nothing but the review row. A
+     * suggestion reaches a report only because a person put it there. The
+     * assist route refuses to hand the UI a suggestion with no call id for
+     * exactly this reason — text an inspector could not review is text they
+     * are structurally unable to accept.
+     *
+     * So the flag belongs where there IS output to review, and nowhere else.
+     */
+    it.each(ALL)('%s requires human review wherever it may be produced', (classification) => {
         for (const source of ['byo', 'managed'] as const) {
-            expect(posture(classification, source).requiresReview).toBe(true);
+            const p = posture(classification, source);
+            if (p.allowed) expect(p.requiresReview).toBe(true);
+        }
+    });
+
+    /**
+     * POSITIVE CONTROL. The case above is vacuously green if nothing is
+     * allowed anywhere — and eight of the twelve postures are denials, so this
+     * is a live risk rather than a theoretical one.
+     */
+    it('is asserting against postures that actually permit output', () => {
+        const allowed = ALL.flatMap((c) =>
+            (['byo', 'managed'] as const).map((s) => posture(c, s)),
+        ).filter((p) => p.allowed);
+        expect(allowed.length).toBeGreaterThan(0);
+    });
+
+    /**
+     * A denied posture carries no review flag, because there is no output to
+     * review. `{ allowed: false, denial: 'prohibited', requiresReview: true }`
+     * was a sentence about nothing.
+     */
+    it('says nothing about review where the call is refused', () => {
+        for (const classification of ALL) {
+            for (const source of ['byo', 'managed'] as const) {
+                const p = posture(classification, source);
+                if (!p.allowed) expect(p).not.toHaveProperty('requiresReview');
+            }
         }
     });
 

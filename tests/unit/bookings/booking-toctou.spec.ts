@@ -242,12 +242,24 @@ describe('B-28 booking TOCTOU', () => {
         expect(rows[0]!.date).toBe(SLOT_ISO);
     });
 
+    /**
+     * The second request names the SLOT, not the window.
+     *
+     * It used to send `timeSlot: 'morning'` twice and rely on both resolving to
+     * the identical clock reading, because `admitBooking` reduced every window
+     * to one. That identity is gone: a window is now satisfied by any free slot
+     * inside it, so a second Morning request against an 08:00-10:00 day
+     * legitimately lands at 08:30 and is accepted — which is the point of the
+     * change, not a hole in this one. `custom` still means one exact time, so
+     * it is what states "the same slot" now.
+     */
     it('sequential double-booking of the same slot is rejected with 409', async () => {
         const app = buildApp();
         expect((await postBook(app, bookingBody())).status).toBe(200);
 
         const res2 = await postBook(app, bookingBody({
             clientName: 'Client Two', clientEmail: 'client2@example.com',
+            timeSlot: 'custom', customTime: '08:00',
         }));
         expect(res2.status).toBe(409);
         expect(await db.select().from(inspections).all()).toHaveLength(1);

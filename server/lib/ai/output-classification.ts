@@ -87,15 +87,32 @@ export interface ClassificationPosture {
     /**
      * Whether a person must review this output before it reaches a client.
      *
-     * ⚠️ Recorded here and NOT yet enforced anywhere. This field is the policy;
-     * do not read it as a live gate. Of the two things enforcement needs, the
-     * place to record a review now exists — the `ai_content_reviews` table, and
-     * the chokepoint hands out the `ai_call_provenance` id a row there has to
-     * cite. What is still missing is the review SURFACE: no control writes such
-     * a row, so nothing consumes this flag. Wiring that up is what makes a review
-     * row mandatory rather than merely possible.
+     * PRESENT ONLY WHERE OUTPUT MAY BE PRODUCED. It used to sit on every
+     * posture reading `true`, including the ones that refuse the call — a
+     * denial carrying "this output must be reviewed" is a sentence about
+     * nothing, and it made the field look like an unkept promise when most of
+     * its occurrences described output that does not exist.
+     *
+     * ON THE ASSIST PATH THE REVIEW IS STRUCTURAL, not an honour system.
+     * `server/api/ai.ts` writes nothing but the review row: the routes RETURN
+     * `rewritten` / `suggestions` and a person puts the text into the report.
+     * The assist route additionally refuses to hand the UI a suggestion with no
+     * `aiCallId`, because text an inspector cannot review is text they are
+     * structurally unable to accept. `AiAssistPanel` posts `intent: "review"`
+     * on acceptance, so the evidence row is written by the same action.
+     *
+     * ON THE TRANSLATION PATH IT IS NOT, and deliberately so.
+     * `report-translation.service.ts` stores machine output with no per-segment
+     * review. What governs that is not review but the courtesy-translation
+     * architecture: the English stays authoritative, the notice travels with the
+     * translation, and a freshness hash withholds one made from text that has
+     * since changed. The rule that shape satisfies is that machine translation
+     * must not be DELIVERED AS AUTHORITATIVE LEGAL TEXT — a reader must never be
+     * left relying on a legal meaning no person checked. Marking the English as
+     * the record answers that; requiring a reviewer per segment of descriptive
+     * narrative would not, and is not what the rule asks for.
      */
-    readonly requiresReview: boolean;
+    readonly requiresReview?: boolean;
     /**
      * Conditions the output must satisfy, in the product's own words. Prose on
      * purpose — these constrain what a prompt may ASK FOR, which is a review
@@ -162,15 +179,15 @@ const POSTURE: Record<
         // key may only carry output classes whose provider record is complete
         // for the provider that would actually serve the call, and that record
         // is kept with the deployment rather than in this table.
-        managed: { allowed: false, denial: 'source_not_offered', requiresReview: true },
+        managed: { allowed: false, denial: 'source_not_offered' },
     },
     summary: {
         byo: { allowed: true, requiresReview: true, conditions: NO_NEW_ASSERTIONS },
-        managed: { allowed: false, denial: 'source_not_offered', requiresReview: true },
+        managed: { allowed: false, denial: 'source_not_offered' },
     },
     finding_explanation: {
         byo: { allowed: true, requiresReview: true, conditions: NO_NEW_ASSERTIONS },
-        managed: { allowed: false, denial: 'source_not_offered', requiresReview: true },
+        managed: { allowed: false, denial: 'source_not_offered' },
     },
     maintenance_suggestion: {
         byo: {
@@ -182,15 +199,15 @@ const POSTURE: Record<
                 'must state no repair interval, no cost, and no construction method',
             ],
         },
-        managed: { allowed: false, denial: 'source_not_offered', requiresReview: true },
+        managed: { allowed: false, denial: 'source_not_offered' },
     },
     legal_text: {
-        byo: { allowed: false, denial: 'prohibited', requiresReview: true },
-        managed: { allowed: false, denial: 'prohibited', requiresReview: true },
+        byo: { allowed: false, denial: 'prohibited' },
+        managed: { allowed: false, denial: 'prohibited' },
     },
     repair_pricing: {
-        byo: { allowed: false, denial: 'prohibited', requiresReview: true },
-        managed: { allowed: false, denial: 'prohibited', requiresReview: true },
+        byo: { allowed: false, denial: 'prohibited' },
+        managed: { allowed: false, denial: 'prohibited' },
     },
     template_inference: {
         // NOT RELEASED on either source today, and the two refusals say
@@ -206,7 +223,12 @@ const POSTURE: Record<
         byo: {
             allowed: false,
             denial: 'not_released',
-            requiresReview: true,
+            // No `requiresReview`: this class is not released, so there is no
+            // output. The review it WILL need when it ships is stated in the
+            // conditions below — "must not be treated as a template until a
+            // person has reviewed it" — which is where a not-yet-built
+            // capability's obligations belong, since conditions constrain what
+            // the prompt may ask for and this flag describes text that exists.
             conditions: [
                 'must produce section and item headings only: no comment text, no ratings, no severities',
                 'must introduce no section or item the supplied document does not contain',
@@ -220,7 +242,7 @@ const POSTURE: Record<
         // with the deployment rather than in this table. Releasing the class
         // above does NOT release it here — these are two entries, and they are
         // separate so that turning one on cannot turn the other on by accident.
-        managed: { allowed: false, denial: 'source_not_offered', requiresReview: true },
+        managed: { allowed: false, denial: 'source_not_offered' },
     },
 };
 

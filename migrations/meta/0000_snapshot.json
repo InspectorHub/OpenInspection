@@ -1,9 +1,84 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c7f116f3-72c9-4576-b067-ad759cb0df8a",
+  "id": "38205577-a1ac-4d65-8836-5721fa63a0a9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
+    "agent_terms_acceptances": {
+      "name": "agent_terms_acceptances",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "doc": {
+          "name": "doc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "accepted_at": {
+          "name": "accepted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ip": {
+          "name": "ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "country": {
+          "name": "country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_agent_terms_acceptances_user": {
+          "name": "idx_agent_terms_acceptances_user",
+          "columns": [
+            "user_id",
+            "accepted_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "agreement_requests": {
       "name": "agreement_requests",
       "columns": {
@@ -49,13 +124,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "token": {
-          "name": "token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "status": {
           "name": "status",
           "type": "text",
@@ -63,13 +131,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'pending'"
-        },
-        "signature_base64": {
-          "name": "signature_base64",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "signed_at": {
           "name": "signed_at",
@@ -186,13 +247,6 @@
         }
       },
       "indexes": {
-        "agreement_requests_token_unique": {
-          "name": "agreement_requests_token_unique",
-          "columns": [
-            "token"
-          ],
-          "isUnique": true
-        },
         "idx_agreement_requests_verify_token": {
           "name": "idx_agreement_requests_verify_token",
           "columns": [
@@ -445,6 +499,27 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "attribution_basis": {
+          "name": "attribution_basis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "attribution_source": {
+          "name": "attribution_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "attributed_at": {
+          "name": "attributed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -610,6 +685,13 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "endpoint": {
+          "name": "endpoint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -681,15 +763,6 @@
         }
       },
       "indexes": {
-        "idx_ai_content_reviews_tenant_artifact": {
-          "name": "idx_ai_content_reviews_tenant_artifact",
-          "columns": [
-            "tenant_id",
-            "artifact_type",
-            "artifact_id"
-          ],
-          "isUnique": false
-        },
         "idx_ai_content_reviews_ai_call": {
           "name": "idx_ai_content_reviews_ai_call",
           "columns": [
@@ -828,6 +901,13 @@
         "last_attempt_at": {
           "name": "last_attempt_at",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sender_identity": {
+          "name": "sender_identity",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1077,13 +1157,6 @@
         }
       },
       "indexes": {
-        "idx_availability_inspector": {
-          "name": "idx_availability_inspector",
-          "columns": [
-            "inspector_id"
-          ],
-          "isUnique": false
-        },
         "idx_availability_window_unique": {
           "name": "idx_availability_window_unique",
           "columns": [
@@ -1209,13 +1282,6 @@
         }
       },
       "indexes": {
-        "idx_avail_overrides_insp": {
-          "name": "idx_avail_overrides_insp",
-          "columns": [
-            "inspector_id"
-          ],
-          "isUnique": false
-        },
         "idx_avail_overrides_block_unique": {
           "name": "idx_avail_overrides_block_unique",
           "columns": [
@@ -1852,6 +1918,20 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "edited_at": {
+          "name": "edited_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "import_hash": {
+          "name": "import_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -1889,8 +1969,8 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "commercial_subtypes": {
-      "name": "commercial_subtypes",
+    "concierge_confirm_tokens": {
+      "name": "concierge_confirm_tokens",
       "columns": {
         "id": {
           "name": "id",
@@ -1906,82 +1986,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "based_on": {
-          "name": "based_on",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "is_disabled": {
-          "name": "is_disabled",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_commercial_subtypes_tenant_name": {
-          "name": "idx_commercial_subtypes_tenant_name",
-          "columns": [
-            "tenant_id",
-            "name"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "commercial_subtypes_tenant_id_tenants_id_fk": {
-          "name": "commercial_subtypes_tenant_id_tenants_id_fk",
-          "tableFrom": "commercial_subtypes",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "concierge_confirm_tokens": {
-      "name": "concierge_confirm_tokens",
-      "columns": {
-        "token": {
-          "name": "token",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
         "inspection_id": {
           "name": "inspection_id",
           "type": "text",
@@ -1989,15 +1993,15 @@
           "notNull": true,
           "autoincrement": false
         },
-        "tenant_id": {
-          "name": "tenant_id",
+        "client_email": {
+          "name": "client_email",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "client_email": {
-          "name": "client_email",
+        "token_hash": {
+          "name": "token_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -2013,13 +2017,6 @@
         "confirmed_at": {
           "name": "confirmed_at",
           "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "token_hash": {
-          "name": "token_hash",
-          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2048,21 +2045,7 @@
           "isUnique": true
         }
       },
-      "foreignKeys": {
-        "concierge_confirm_tokens_inspection_id_inspections_id_fk": {
-          "name": "concierge_confirm_tokens_inspection_id_inspections_id_fk",
-          "tableFrom": "concierge_confirm_tokens",
-          "tableTo": "inspections",
-          "columnsFrom": [
-            "inspection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -2304,13 +2287,6 @@
           "columns": [
             "tenant_id",
             "type"
-          ],
-          "isUnique": false
-        },
-        "idx_contacts_tenant": {
-          "name": "idx_contacts_tenant",
-          "columns": [
-            "tenant_id"
           ],
           "isUnique": false
         },
@@ -2702,6 +2678,75 @@
           "name": "idx_defect_categories_tenant",
           "columns": [
             "tenant_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "deployment_legal_versions": {
+      "name": "deployment_legal_versions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "doc": {
+          "name": "doc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "body_snapshot": {
+          "name": "body_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_deployment_legal_versions_doc_hash": {
+          "name": "uq_deployment_legal_versions_doc_hash",
+          "columns": [
+            "doc",
+            "content_hash"
+          ],
+          "isUnique": true
+        },
+        "idx_deployment_legal_versions_latest": {
+          "name": "idx_deployment_legal_versions_latest",
+          "columns": [
+            "doc",
+            "published_at"
           ],
           "isUnique": false
         }
@@ -3444,13 +3489,6 @@
           "autoincrement": false,
           "default": "'client'"
         },
-        "token": {
-          "name": "token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -3495,13 +3533,6 @@
         }
       },
       "indexes": {
-        "idx_iat_token": {
-          "name": "idx_iat_token",
-          "columns": [
-            "token"
-          ],
-          "isUnique": true
-        },
         "idx_iat_inspection": {
           "name": "idx_iat_inspection",
           "columns": [
@@ -4192,13 +4223,6 @@
         }
       },
       "indexes": {
-        "idx_ip_inspection": {
-          "name": "idx_ip_inspection",
-          "columns": [
-            "inspection_id"
-          ],
-          "isUnique": false
-        },
         "idx_ip_tenant": {
           "name": "idx_ip_tenant",
           "columns": [
@@ -4308,22 +4332,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "total_amount_cents": {
-          "name": "total_amount_cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "payment_status": {
-          "name": "payment_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'unpaid'"
         },
         "created_at": {
           "name": "created_at",
@@ -5461,24 +5469,10 @@
         }
       },
       "indexes": {
-        "idx_inspections_tenant": {
-          "name": "idx_inspections_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "idx_inspections_request": {
           "name": "idx_inspections_request",
           "columns": [
             "request_id"
-          ],
-          "isUnique": false
-        },
-        "idx_inspections_inspector": {
-          "name": "idx_inspections_inspector",
-          "columns": [
-            "inspector_id"
           ],
           "isUnique": false
         },
@@ -5510,6 +5504,15 @@
           "name": "idx_inspections_root",
           "columns": [
             "root_inspection_id"
+          ],
+          "isUnique": false
+        },
+        "idx_inspections_tenant_created": {
+          "name": "idx_inspections_tenant_created",
+          "columns": [
+            "tenant_id",
+            "created_at",
+            "id"
           ],
           "isUnique": false
         }
@@ -5722,21 +5725,6 @@
         }
       },
       "indexes": {
-        "idx_inspector_service_areas_tenant": {
-          "name": "idx_inspector_service_areas_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
-        "idx_inspector_service_areas_user": {
-          "name": "idx_inspector_service_areas_user",
-          "columns": [
-            "tenant_id",
-            "user_id"
-          ],
-          "isUnique": false
-        },
         "uq_inspector_service_areas": {
           "name": "uq_inspector_service_areas",
           "columns": [
@@ -5890,16 +5878,16 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "invoice_number": {
+          "name": "invoice_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
-        "idx_invoices_tenant": {
-          "name": "idx_invoices_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
         "idx_invoices_inspection": {
           "name": "idx_invoices_inspection",
           "columns": [
@@ -5914,6 +5902,14 @@
             "contact_id"
           ],
           "isUnique": false
+        },
+        "uq_invoices_tenant_number": {
+          "name": "uq_invoices_tenant_number",
+          "columns": [
+            "tenant_id",
+            "invoice_number"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {
@@ -6061,6 +6057,13 @@
         "inspection_kind": {
           "name": "inspection_kind",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "delisted_at": {
+          "name": "delisted_at",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -6214,13 +6217,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "subaccount_sid": {
-          "name": "subaccount_sid",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "customer_profile_sid": {
           "name": "customer_profile_sid",
           "type": "text",
@@ -6356,6 +6352,305 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "migration_batches": {
+      "name": "migration_batches",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "intent": {
+          "name": "intent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "vendor": {
+          "name": "vendor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "adapter_name": {
+          "name": "adapter_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "adapter_version": {
+          "name": "adapter_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "manifest": {
+          "name": "manifest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "conflict_policy": {
+          "name": "conflict_policy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'staged'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "applied_at": {
+          "name": "applied_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reverted_at": {
+          "name": "reverted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_key": {
+          "name": "source_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "upload_authorized_by": {
+          "name": "upload_authorized_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "upload_authorized_at": {
+          "name": "upload_authorized_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "upload_authorization_version": {
+          "name": "upload_authorization_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "staff_access_authorized_by": {
+          "name": "staff_access_authorized_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "staff_access_authorized_at": {
+          "name": "staff_access_authorized_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "staff_access_authorization_version": {
+          "name": "staff_access_authorization_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_migration_batches_tenant_created": {
+          "name": "idx_migration_batches_tenant_created",
+          "columns": [
+            "tenant_id",
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "idx_migration_batches_expires": {
+          "name": "idx_migration_batches_expires",
+          "columns": [
+            "expires_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "migration_rows": {
+      "name": "migration_rows",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entity": {
+          "name": "entity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload": {
+          "name": "payload",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "conflict_with": {
+          "name": "conflict_with",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolution": {
+          "name": "resolution",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_id": {
+          "name": "created_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "prior_state": {
+          "name": "prior_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "applied_at": {
+          "name": "applied_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_migration_rows_batch_status": {
+          "name": "idx_migration_rows_batch_status",
+          "columns": [
+            "batch_id",
+            "status"
+          ],
+          "isUnique": false
+        },
+        "idx_migration_rows_tenant": {
+          "name": "idx_migration_rows_tenant",
+          "columns": [
+            "tenant_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "notification_preferences": {
       "name": "notification_preferences",
       "columns": {
@@ -6434,15 +6729,6 @@
             "channel"
           ],
           "isUnique": true
-        },
-        "idx_notification_prefs_subject": {
-          "name": "idx_notification_prefs_subject",
-          "columns": [
-            "tenant_id",
-            "subject_kind",
-            "subject_id"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -6835,7 +7121,15 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "uq_qbo_connections_realm": {
+          "name": "uq_qbo_connections_realm",
+          "columns": [
+            "realm_id"
+          ],
+          "isUnique": true
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -7000,6 +7294,13 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},
@@ -7092,13 +7393,6 @@
             "slug"
           ],
           "isUnique": true
-        },
-        "idx_rating_systems_tenant": {
-          "name": "idx_rating_systems_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -7683,6 +7977,103 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "report_translations": {
+      "name": "report_translations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "report_id": {
+          "name": "report_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "locale": {
+          "name": "locale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "english_hash": {
+          "name": "english_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "translated_hash": {
+          "name": "translated_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "notice_version": {
+          "name": "notice_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ai_call_id": {
+          "name": "ai_call_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "generated_at": {
+          "name": "generated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_report_translations_report_locale": {
+          "name": "uq_report_translations_report_locale",
+          "columns": [
+            "tenant_id",
+            "report_id",
+            "locale"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "report_versions": {
       "name": "report_versions",
       "columns": {
@@ -7802,14 +8193,6 @@
         }
       },
       "indexes": {
-        "idx_report_versions_report": {
-          "name": "idx_report_versions_report",
-          "columns": [
-            "report_id",
-            "version_number"
-          ],
-          "isUnique": false
-        },
         "uq_report_versions_report_version": {
           "name": "uq_report_versions_report_version",
           "columns": [
@@ -8321,10 +8704,17 @@
     "signing_keys": {
       "name": "signing_keys",
       "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
         "tenant_id": {
           "name": "tenant_id",
           "type": "text",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -8371,15 +8761,32 @@
           "notNull": true,
           "autoincrement": false
         },
-        "rotated_at": {
-          "name": "rotated_at",
+        "retired_at": {
+          "name": "retired_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "uq_signing_keys_tenant_fingerprint": {
+          "name": "uq_signing_keys_tenant_fingerprint",
+          "columns": [
+            "tenant_id",
+            "fingerprint"
+          ],
+          "isUnique": true
+        },
+        "uq_signing_keys_tenant_active": {
+          "name": "uq_signing_keys_tenant_active",
+          "columns": [
+            "tenant_id"
+          ],
+          "isUnique": true,
+          "where": "retired_at IS NULL"
+        }
+      },
       "foreignKeys": {
         "signing_keys_tenant_id_tenants_id_fk": {
           "name": "signing_keys_tenant_id_tenants_id_fk",
@@ -8487,6 +8894,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": "''"
+        },
+        "disclosure_content_hash": {
+          "name": "disclosure_content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -8599,9 +9013,280 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "statutory_form_productions": {
+      "name": "statutory_form_productions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inspection_id": {
+          "name": "inspection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "form_id": {
+          "name": "form_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_hash": {
+          "name": "source_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "produced_by": {
+          "name": "produced_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "produced_at": {
+          "name": "produced_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_statutory_productions_form_version": {
+          "name": "idx_statutory_productions_form_version",
+          "columns": [
+            "form_id",
+            "version"
+          ],
+          "isUnique": false
+        },
+        "idx_statutory_productions_inspection": {
+          "name": "idx_statutory_productions_inspection",
+          "columns": [
+            "tenant_id",
+            "inspection_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "statutory_form_sightings": {
+      "name": "statutory_form_sightings",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "form_id": {
+          "name": "form_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "observed_hash": {
+          "name": "observed_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "verdict": {
+          "name": "verdict",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_statutory_form_sightings_seen": {
+          "name": "uq_statutory_form_sightings_seen",
+          "columns": [
+            "form_id",
+            "source_url",
+            "observed_hash"
+          ],
+          "isUnique": true
+        },
+        "idx_statutory_form_sightings_form": {
+          "name": "idx_statutory_form_sightings_form",
+          "columns": [
+            "form_id",
+            "last_seen_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "statutory_form_versions": {
+      "name": "statutory_form_versions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "form_id": {
+          "name": "form_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mandatory_from": {
+          "name": "mandatory_from",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "effective_until": {
+          "name": "effective_until",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_hash": {
+          "name": "source_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "object_key": {
+          "name": "object_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_by": {
+          "name": "published_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_statutory_form_versions_form_version": {
+          "name": "uq_statutory_form_versions_form_version",
+          "columns": [
+            "form_id",
+            "version"
+          ],
+          "isUnique": true
+        },
+        "idx_statutory_form_versions_form": {
+          "name": "idx_statutory_form_versions_form",
+          "columns": [
+            "form_id",
+            "effective_from"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -8662,13 +9347,6 @@
             "name"
           ],
           "isUnique": true
-        },
-        "idx_tags_tenant": {
-          "name": "idx_tags_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -8764,6 +9442,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "retired_at": {
+          "name": "retired_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -8855,14 +9540,6 @@
             "date"
           ],
           "isUnique": true
-        },
-        "idx_tenant_custom_holidays_tenant_date": {
-          "name": "idx_tenant_custom_holidays_tenant_date",
-          "columns": [
-            "tenant_id",
-            "date"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -8922,6 +9599,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "uninstalled_at": {
+          "name": "uninstalled_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -8932,13 +9616,6 @@
             "library_id"
           ],
           "isUnique": true
-        },
-        "idx_tenant_library_imports_tenant": {
-          "name": "idx_tenant_library_imports_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -9321,14 +9998,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "is_estimates_shown": {
-          "name": "is_estimates_shown",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
         "is_repair_list_enabled": {
           "name": "is_repair_list_enabled",
           "type": "integer",
@@ -9406,22 +10075,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": false
-        },
-        "is_apprentice_review_required": {
-          "name": "is_apprentice_review_required",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "is_guest_invites_enabled": {
-          "name": "is_guest_invites_enabled",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": true
         },
         "require_defect_fields": {
           "name": "require_defect_fields",
@@ -9725,48 +10378,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "ai_key_attestation_provider": {
-          "name": "ai_key_attestation_provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "ai_key_attestation_mode": {
-          "name": "ai_key_attestation_mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "ai_key_attestation_account_owner": {
-          "name": "ai_key_attestation_account_owner",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "ai_key_attestation_terms_version": {
-          "name": "ai_key_attestation_terms_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "ai_key_attestation_attested_at": {
-          "name": "ai_key_attestation_attested_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "ai_key_attestation_policy_version": {
-          "name": "ai_key_attestation_policy_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "repair_quick_phrases": {
           "name": "repair_quick_phrases",
           "type": "text",
@@ -9780,6 +10391,30 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "invoice_seq": {
+          "name": "invoice_seq",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1000
+        },
+        "report_pdf_retention_years": {
+          "name": "report_pdf_retention_years",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 7
+        },
+        "is_report_view_counting_enabled": {
+          "name": "is_report_view_counting_enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         }
       },
       "indexes": {},
@@ -9880,6 +10515,13 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "content_version": {
+          "name": "content_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -9891,6 +10533,172 @@
           "isUnique": true
         }
       },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "discovery_objections": {
+      "name": "discovery_objections",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email_hash": {
+          "name": "email_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "proved_by": {
+          "name": "proved_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "withdrawn_at": {
+          "name": "withdrawn_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_discovery_objections_email_hash": {
+          "name": "uq_discovery_objections_email_hash",
+          "columns": [
+            "email_hash"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "tenant_ai_attestations": {
+      "name": "tenant_ai_attestations",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_owner": {
+          "name": "account_owner",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "terms_version": {
+          "name": "terms_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attested_at": {
+          "name": "attested_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "policy_version": {
+          "name": "policy_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "tenant_ai_configs": {
+      "name": "tenant_ai_configs",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_enabled": {
+          "name": "is_enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "base_url": {
+          "name": "base_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_courtesy_translation_enabled": {
+          "name": "is_courtesy_translation_enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -10063,21 +10871,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "mentor_id": {
-          "name": "mentor_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "assigned_section_ids": {
-          "name": "assigned_section_ids",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'[]'"
         },
         "permission_overrides": {
           "name": "permission_overrides",
@@ -10256,28 +11049,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "mentor_id": {
-          "name": "mentor_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "assigned_section_ids": {
-          "name": "assigned_section_ids",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'[]'"
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "integer",
@@ -10347,6 +11118,20 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "statutory_license_type": {
+          "name": "statutory_license_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "statutory_qualification": {
+          "name": "statutory_qualification",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -10365,13 +11150,6 @@
           ],
           "isUnique": true,
           "where": "deleted_at IS NULL"
-        },
-        "idx_users_tenant": {
-          "name": "idx_users_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
         },
         "idx_users_slug_per_tenant": {
           "name": "idx_users_slug_per_tenant",
@@ -10479,6 +11257,21 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "actor_kind": {
+          "name": "actor_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'tenant_user'"
+        },
+        "platform_actor_id": {
+          "name": "platform_actor_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         }
       },
@@ -10998,6 +11791,50 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'completed'"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "record_version": {
+          "name": "record_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "stores_measured": {
+          "name": "stores_measured",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "store_results": {
+          "name": "store_results",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "incomplete_notified_at": {
+          "name": "incomplete_notified_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -11105,6 +11942,186 @@
             "tenant_id",
             "doc",
             "published_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "account_acceptances": {
+      "name": "account_acceptances",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor_identity_ref": {
+          "name": "actor_identity_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "doc": {
+          "name": "doc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "authority_basis": {
+          "name": "authority_basis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "accepted_at": {
+          "name": "accepted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_account_acceptances_user_doc_version": {
+          "name": "uq_account_acceptances_user_doc_version",
+          "columns": [
+            "user_id",
+            "doc",
+            "version"
+          ],
+          "isUnique": true
+        },
+        "idx_account_acceptances_tenant": {
+          "name": "idx_account_acceptances_tenant",
+          "columns": [
+            "tenant_id",
+            "accepted_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "legal_holds": {
+      "name": "legal_holds",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "matter": {
+          "name": "matter",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "placed_by": {
+          "name": "placed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "placed_at": {
+          "name": "placed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "released_at": {
+          "name": "released_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "released_by": {
+          "name": "released_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "release_reason": {
+          "name": "release_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_legal_holds_tenant_active": {
+          "name": "idx_legal_holds_tenant_active",
+          "columns": [
+            "tenant_id",
+            "released_at"
           ],
           "isUnique": false
         }
@@ -11224,6 +12241,179 @@
             "inspection_id"
           ],
           "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "statutory_form_entries": {
+      "name": "statutory_form_entries",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inspection_id": {
+          "name": "inspection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "form_id": {
+          "name": "form_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "values": {
+          "name": "values",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_statutory_form_entries_subject": {
+          "name": "uq_statutory_form_entries_subject",
+          "columns": [
+            "tenant_id",
+            "inspection_id",
+            "form_id"
+          ],
+          "isUnique": true
+        },
+        "idx_statutory_form_entries_inspection": {
+          "name": "idx_statutory_form_entries_inspection",
+          "columns": [
+            "tenant_id",
+            "inspection_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "statutory_inspection_details": {
+      "name": "statutory_inspection_details",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inspection_id": {
+          "name": "inspection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inspector_signature_date": {
+          "name": "inspector_signature_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "employee_printed_name": {
+          "name": "employee_printed_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "owner_name": {
+          "name": "owner_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "owner_email": {
+          "name": "owner_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "owner_mailing_address": {
+          "name": "owner_mailing_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "owner_home_phone": {
+          "name": "owner_home_phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "owner_work_phone": {
+          "name": "owner_work_phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "owner_cell_phone": {
+          "name": "owner_cell_phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_statutory_inspection_details_subject": {
+          "name": "uq_statutory_inspection_details_subject",
+          "columns": [
+            "tenant_id",
+            "inspection_id"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {},

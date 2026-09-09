@@ -41,11 +41,19 @@ function detectPolicy(publicPolicy: HolidayPublicPolicy): HolidayPolicyId | null
 export function HolidayClosedPanel({
   initialConfig,
   initialCustomHolidays,
+  dataMinYear,
   dataMaxYear,
   currentYear,
 }: {
   initialConfig: HolidayConfig;
   initialCustomHolidays: CustomHoliday[];
+  /**
+   * FIRST year the bundled catalog covers. Named in the same warning as the
+   * last one: "run through 2031" tells an operator where the data stops and
+   * leaves them unable to tell whether it ever started, and the resolver logs
+   * a lookup BELOW this bound exactly as loudly as one above it.
+   */
+  dataMinYear?: number;
   /** Last year the bundled holiday catalog covers; used to warn before the cliff. */
   dataMaxYear?: number;
   /** Current civil year (from the loader) — compared against `dataMaxYear`. */
@@ -213,7 +221,10 @@ export function HolidayClosedPanel({
       {coverageExpiring && (
         <div data-testid="holiday-coverage-warn">
           <Banner tone="warn">
-            {m.settings_holiday_coverage_warn({ year: dataMaxYear! })}
+            {m.settings_holiday_coverage_warn({
+              minYear: dataMinYear!,
+              maxYear: dataMaxYear!,
+            })}
           </Banner>
         </div>
       )}

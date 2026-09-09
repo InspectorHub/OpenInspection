@@ -14,6 +14,36 @@ describe('portal hub models', () => {
     const cards = statusCardModels({ inspectionStatus:'completed', agreementSigned:false, paymentStatus:'unpaid', reportPublished:false, progress:{completed:0,total:0}, unreadMessages:0, address:'', date:'' });
     expect(cards.find(c=>c.key==='report')!.value).toMatch(/Not published/i);
   });
+
+  // A published report the client cannot open yet is not "Published" from the
+  // client's seat. The Hub renders the lock notice ("Your report isn't
+  // available yet") directly above these cards, so a green "Published" tile
+  // beneath it told the client two opposite things at once.
+  it('report card does not claim Published while the agreement still gates it', () => {
+    const cards = statusCardModels({ inspectionStatus:'completed', agreementSigned:false, paymentStatus:'unpaid', reportPublished:true, progress:{completed:10,total:10}, unreadMessages:0, address:'', date:'' });
+    const report = cards.find(c=>c.key==='report')!;
+    expect(report.value).not.toMatch(/^Published$/i);
+    expect(report.value).toMatch(/sign/i);
+    expect(report.tone).not.toBe('ok');
+  });
+
+  it('report card names the payment gate when signed but unpaid', () => {
+    const cards = statusCardModels({ inspectionStatus:'completed', agreementSigned:true, paymentStatus:'unpaid', reportPublished:true, progress:{completed:10,total:10}, unreadMessages:0, address:'', date:'' });
+    const report = cards.find(c=>c.key==='report')!;
+    expect(report.value).not.toMatch(/^Published$/i);
+    expect(report.value).toMatch(/payment/i);
+    expect(report.tone).not.toBe('ok');
+  });
+
+  // POSITIVE CONTROL for the two assertions above: with nothing outstanding the
+  // tile must still read plainly "Published" in the ok tone. Without this, an
+  // implementation that reported "locked" unconditionally would pass.
+  it('report card still says Published when nothing gates it', () => {
+    const cards = statusCardModels({ inspectionStatus:'completed', agreementSigned:true, paymentStatus:'paid', reportPublished:true, progress:{completed:10,total:10}, unreadMessages:0, address:'', date:'' });
+    const report = cards.find(c=>c.key==='report')!;
+    expect(report.value).toMatch(/^Published$/i);
+    expect(report.tone).toBe('ok');
+  });
   it('hubSectionNavHref builds inline ?section= nav targets on the hub page', () => {
     expect(hubSectionNavHref('report', { tenant:'t', inspectionId:'i', token:'k' }))
       .toBe('/portal/t/i/i?section=report&token=k');

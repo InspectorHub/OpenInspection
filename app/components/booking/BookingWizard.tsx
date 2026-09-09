@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { stepLabels, type CompanyProfile } from "./booking-constants";
 import { useTurnstileWidget } from "~/lib/turnstile";
 import { PropertyStep, ServicesStep, ScheduleStep, ConfirmStep } from "./BookingSteps";
@@ -53,7 +54,28 @@ export function BookingWizard({
     rememberContact,
   } = form;
 
-  useTurnstileWidget(profile.turnstileSiteKey, turnstileRef, step, setTurnstileToken);
+  /**
+   * Why the last click could not go through, said out loud.
+   *
+   * The submit used to carry `disabled={submitting || (needsTurnstile &&
+   * !turnstileToken)}`, so on the confirm step — where every field is already
+   * filled — a client could meet a greyed-out button, no visible widget, and
+   * no explanation. If the challenge script cannot load at all, that state is
+   * permanent and silent, on the last button in the acquisition funnel.
+   *
+   * GOV.UK: "avoid them if possible". NN/g, the one authority that permits
+   * disabling: "A disabled control must not be a communication dead end", and
+   * for forms, "allow the primary action and show errors as needed". The staff
+   * wizard in this app already states its reason beside a disabled Next; the
+   * agent signup keeps its submit live and reports the unticked terms after
+   * the click. This is the client-facing flow catching up.
+   */
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verifyUnavailable, setVerifyUnavailable] = useState(false);
+
+  useTurnstileWidget(profile.turnstileSiteKey, turnstileRef, step, setTurnstileToken, {
+    onLoadFailed: () => setVerifyUnavailable(true),
+  });
 
   const showInspectorDropdown = inspectorOptions.length > 0;
   const serviceIds = [...selectedServices];
@@ -178,6 +200,25 @@ export function BookingWizard({
         </div>
       )}
 
+      {/* Why the form is not going through. `verifyUnavailable` announces
+          itself without waiting for a click: a challenge that cannot load is
+          not something the client can fix by trying harder, and leaving them
+          to discover it by pressing a button that does nothing is the silence
+          this replaces.
+
+          The copy names no direction. This paragraph renders BELOW the widget
+          it refers to, so an earlier "the verification below" pointed the
+          client past it at the footer — and any wording that encodes a
+          position goes stale the next time this block moves. */}
+      {step === 3 && (verifyError || verifyUnavailable) && (
+        <p
+          role="alert"
+          className="mt-3 text-center text-[13px] font-semibold text-ih-bad-fg"
+        >
+          {verifyError ?? m.booking_verify_unavailable()}
+        </p>
+      )}
+
       {/* Message display */}
       {message && !message.ok && (
         <div className="mt-6 p-3 rounded-md bg-ih-bad-bg text-center text-[13px] font-semibold text-ih-bad-fg">
@@ -210,8 +251,22 @@ export function BookingWizard({
                 {privacyUrl && <> {m.booking_privacy_see_our()} <a href={privacyUrl} target="_blank" rel="noreferrer" className="underline">{m.booking_link_privacy_policy()}</a>.</>}
               </p>
               <button
-                onClick={handleSubmit}
-                disabled={submitting || (needsTurnstile && !turnstileToken)}
+                onClick={() => {
+                  if (needsTurnstile && !turnstileToken) {
+                    setVerifyError(
+                      verifyUnavailable
+                        ? m.booking_verify_unavailable()
+                        : m.booking_verify_required(),
+                    );
+                    return;
+                  }
+                  setVerifyError(null);
+                  handleSubmit();
+                }}
+                // Only the in-flight guard remains: the action has already been
+                // taken and this stops it being sent twice, which is a
+                // different question from "you may not act yet".
+                disabled={submitting}
                 className="h-9 px-5 rounded-md bg-ih-primary text-ih-primary-fg font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {submitting ? m.booking_submitting() : m.booking_wizard_submit()}

@@ -127,9 +127,6 @@ export interface AppEnv {
 
     // Optional Configuration
     SINGLE_TENANT_ID?: string;
-    BILLING_URL?: string;
-    CF_ACCOUNT_ID?: string;
-    CF_API_TOKEN?: string;
     APP_MODE?: 'standalone' | 'saas';
     SETUP_CODE?: string;
     // Test/dev-only escape hatch: when '1', checkRateLimit no-ops. Set ONLY in
@@ -217,8 +214,6 @@ export interface AppEnv {
     // Optional so builds without a provisioned KV namespace boot cleanly.
     OAUTH_KV?: KVNamespace;
 
-    // Spec 5H — Public verifier base URL embedded in Certificate of Completion
-    ESIGN_PUBLIC_VERIFY_BASE?: string;
 
     // SaaS Portal Integration (browser redirects). NOTE: the PORTAL_SERVICE
     // Service Binding was RETIRED (2026-06-04) — its last functional use was

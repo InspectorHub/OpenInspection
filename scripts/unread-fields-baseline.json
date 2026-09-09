@@ -1,0 +1,250 @@
+{
+  "app/components/portal/sections/report/types.ts#StyleProfileClient.schemaVersion": {
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
+  },
+  "app/components/template/types.ts#TemplateSchema.schemaVersion": {
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
+  },
+  "app/lib/editor/structure-ops.ts#Snapshot.schemaVersion": {
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
+  },
+  "server/cron/types.ts#CronJob.maxBatch": {
+    "kind": "invisible-read",
+    "reason": "Read as a STRING key by `scripts/check-cron-budget.mjs`, a registered pre-push gate whose REQUIRED_FIELDS list includes `maxBatch:` and which refuses a job that omits it. The CPU ceiling is not protected by passing this value to `run()` — that gate says outright \"CPU cannot be measured from source, so this gate gates the SHAPE that made the overrun possible\", and it separately refuses any unbounded table read on a cron path. `maxBatch` is the declared budget a human tunes; the bounding is gated elsewhere."
+  },
+  "server/lib/ai/output-classification.ts#ClassificationPosture.requiresReview": {
+    "kind": "record",
+    "reason": "States that model-assisted text of this class must be reviewed by a person before a client reads it. Its reader is review, not code, and nothing should branch on it - because on the path where it applies the review is STRUCTURAL rather than flag-driven. server/api/ai.ts writes nothing but the review row: the assist routes RETURN rewritten text and a person puts it into the report, and the route refuses to hand the UI a suggestion with no aiCallId precisely so that text an inspector cannot review is text they cannot accept. AiAssistPanel posts intent:\"review\" on acceptance, so the evidence row (ai_content_reviews, cited against ai_call_provenance) is written by the same action. CORRECTION: this entry used to read \"a posture says whether its output needs review before use, and nothing asks\", and the field doc beside it said the review SURFACE did not exist. Both were false - app/routes/resources/ai-assist.tsx calls POST /api/ai/reviews and AiAssistPanel reaches it. The field was also on all twelve postures including the eight that refuse the call; it now sits only on the four that may produce output. No rule this deployment is held to requires a publish-time review gate. The requirement that exists is narrower: machine translation must not be delivered as AUTHORITATIVE LEGAL TEXT without human legal review, and descriptive findings and ordinary narrative may be machine translated. The two classes that would have needed a reviewer, legal_text and repair_pricing, are prohibited on both sources instead - the requirement is met by refusal, not by review. The translation path stores machine output without per-segment review and answers the same rule structurally: English authoritative, notice attached, stale translations withheld."
+  },
+  "server/lib/ai/provider.ts#AiRequest.topK": {
+    "kind": "wire-shape",
+    "reason": "On the provider-NEUTRAL request shape because other backends' APIs expose it natively; the OpenAI chat-completions schema has none, so the single adapter drops it rather than guessing at a near-equivalent. Its header says so and tests/unit/ai/openai-compatible.spec.ts pins the behaviour by passing topK and asserting the body carries none. A documented, tested decision, not work owed."
+  },
+  "server/lib/billing-summary.ts#BillingSummary.guests": {
+    "kind": "wire-shape",
+    "reason": "Returned whole: `GET /api/billing/summary` does `{ ...summary, portalUrl }` (or returns `summary` unchanged) and ships it. The spread reads every field. Whether the seat page RENDERS the guest count is a different question from whether the field is read."
+  },
+  "server/lib/compliance/erasure-coverage.ts#ErasureCoverageDisclosure.manifestRuleCount": {
+    "kind": "wire-shape",
+    "reason": "Crosses the seam: this interface is what portal stores verbatim as `dsar_requests.coverage_json`, so the field is read there, not here. Its own doc line says so."
+  },
+  "server/lib/compliance/erasure-coverage.ts#ErasureCoverageDisclosure.outOfScopeCount": {
+    "kind": "wire-shape",
+    "reason": "Crosses the seam: this interface is what portal stores verbatim as `dsar_requests.coverage_json`, so the field is read there, not here. Its own doc line says so."
+  },
+  "server/lib/compliance/erasure-coverage.ts#ErasureCoverageDisclosure.catalogueIsAdvisory": {
+    "kind": "wire-shape",
+    "reason": "Crosses the seam into `dsar_requests.coverage_json`. A literal `true` whose whole job is to tell the reader of that record that the counts describe a document, not the run that produced it."
+  },
+  "server/lib/compliance/erasure-manifest.ts#ErasureRule.biometricStatus": {
+    "kind": "record",
+    "reason": "A PII classification carried per rule so the manifest states what kind of data a column holds. Its reader is review, not code; nothing branches on it and nothing should have to."
+  },
+  "server/lib/compliance/report-pdf-retention.ts#RetentionJurisdictionFact.checkedOn": {
+    "kind": "record",
+    "reason": "When this jurisdiction's retention rule was last verified against its primary source. A fact with no date is a fact nobody can trust; its reader is the next person who has to re-check it."
+  },
+  "server/lib/compliance/retention-logs.ts#LogRetentionSummary.activeHolds": {
+    "kind": "invisible-read",
+    "reason": "Logged whole: `daily-retention-tasks.ts` calls `logger.info('[cron] log retention sweep', logSummary)` on the success path and logs the partial summary on failure. The object is the argument."
+  },
+  "server/lib/compliance/retention-policy.ts#RetentionPolicyHeader.effectiveAt": {
+    "kind": "record",
+    "reason": "Policy provenance — the date this version of the retention policy took effect. Read by whoever asks which policy was in force on a given day."
+  },
+  "server/lib/compliance/retention-policy.ts#RetentionPolicyHeader.approvedBy": {
+    "kind": "invisible-read",
+    "reason": "Read out of the source text by `scripts/publish-agent-terms.mjs`, which refuses to publish while the retention policy is unapproved. A regex over prose, which no name-based scan can follow."
+  },
+  "server/lib/compliance/retention-policy.ts#RetentionPolicyHeader.approvedAt": {
+    "kind": "record",
+    "reason": "Policy provenance — when the approval named in `approvedBy` was given. Read by review; code has no business branching on it."
+  },
+  "server/lib/compliance/retention-rule-types.ts#RetentionRule.rowWindowColumn": {
+    "kind": "invisible-read",
+    "reason": "Declares that migration_batches expires on each row own due date rather than on the rule outer window, and retention-migration-batches.ts does exactly that - it selects on expiresAt, not on the precomputed cutoff. The field is not read by property access because the executor hardcodes the column; the two are now held together by tests/unit/privacy/retention-logs.spec.ts, which asserts the column exists AND that a row 100 days old with a future due date survives while a row created today with a past one does not. Rewriting the executor to use the window makes those three fail. CORRECTION: this entry used to say \"there being no manifest-driven sweep, nothing compares anything\". There is one, it runs nightly, and it compares this column."
+  },
+  "server/lib/compliance/retention-rule-types.ts#RetentionRule.timestampColumn": {
+    "kind": "invisible-read",
+    "reason": "Read as a required field NAME by check-retention-manifest.mjs and as the digest anchor by check-retention-policy.mjs, and now bound to the schema by tests/unit/privacy/retention-logs.spec.ts, which fails if any rule names a column its table does not have. Its runtime consumer is the executor for that table, which hardcodes the same column in Drizzle form. CORRECTION: this entry used to end \"it has no RUNTIME reader - nothing under server/ imports RETENTION_MANIFEST\". That was false. retention-logs.ts:40 imports it and line 120 iterates every rule; server/cron/jobs/daily.ts runs the sweep nightly. The claim came from grepping for \".timestampColumn\" property access, which cannot see a module that imports the array whole - the same filtered-grep mistake three other entries here carried."
+  },
+  "server/lib/compliance/retention-rule-types.ts#RetentionRule.tenantWindowColumnYears": {
+    "kind": "invisible-read",
+    "reason": "Names the tenant_configs column carrying a per-tenant override in YEARS, where 0 means indefinite. retention-report-pdfs.ts reads exactly that column, resolving one window per distinct tenant. Not a property read for the same reason as its sibling - the executor hardcodes it - and now pinned by tests/unit/privacy/retention-logs.spec.ts: an override shorter than the default must delete, a longer one must keep, 0 must keep forever, and a missing config row must fall back to the disclosed default rather than to indefinite. CORRECTION: this entry used to say \"no manifest-driven sweep exists - the only runtime sweep in the tree is the hand-written e-sign one\". Both halves were false."
+  },
+  "server/lib/compliance/retention-sweep.ts#RetentionSweepSummary.purgedArtefacts": {
+    "kind": "invisible-read",
+    "reason": "Logged whole: `cron/jobs/agreements.ts` calls `logger.info('[cron] retention sweep purged signatures', summary)`, so every count in the summary reaches the structured log. The object is the argument; no field is named."
+  },
+  "server/lib/google-calendar.ts#GoogleTokenResponse.token_type": {
+    "kind": "wire-shape",
+    "reason": "The OAuth token response as the provider sends it — Google here, Intuit in `qbo.schema.ts`. Declared so the shape is honest about what arrives; nothing needs to branch on a value that is always \"Bearer\"."
+  },
+  "server/lib/messaging/compliance-provider.ts#ComplianceEvent.entitySid": {
+    "kind": "wire-shape",
+    "reason": "The messaging provider's own identifier for the entity an event is about, carried through from Telnyx and Twilio. Ours to pass on and to log, not to interpret."
+  },
+  "server/lib/migration-intake/bundle.ts#MigrationBundleV1.formatVersion": {
+    "kind": "wire-shape",
+    "reason": "The stored bundle's version discriminator, written by all three adapters. Nothing branches on it because there is one version so far, which is what it exists to make possible."
+  },
+  "server/lib/preflight.ts#PreflightResult.propertyFactsComplete": {
+    "kind": "wire-shape",
+    "reason": "Returned whole: `GET` on the results preflight route does `c.json({ data: out })` with the `PreflightResult` from `services.inspection.computePreflight`. Every field ships. Whether a surface RENDERS the checklist is a different question from whether the field is read."
+  },
+  "server/lib/preflight.ts#PreflightResult.coverPhotoSet": {
+    "kind": "wire-shape",
+    "reason": "Returned whole: `GET` on the results preflight route does `c.json({ data: out })` with the `PreflightResult` from `services.inspection.computePreflight`. Every field ships. Whether a surface RENDERS the checklist is a different question from whether the field is read."
+  },
+  "server/lib/preflight.ts#PreflightResult.noOpenFields": {
+    "kind": "wire-shape",
+    "reason": "Returned whole: `GET` on the results preflight route does `c.json({ data: out })` with the `PreflightResult` from `services.inspection.computePreflight`. Every field ships. Whether a surface RENDERS the checklist is a different question from whether the field is read."
+  },
+  "server/lib/qr.ts#QrSvgOptions.margin": {
+    "kind": "invisible-read",
+    "reason": "Read by the qrcode package's svg-tag renderer, which this module deep-imports and hands the whole options object to. Measured rather than assumed: margin 0 gives a 21-module viewBox and margin 8 gives 37. Pinned by tests/unit/platform/qr-options.spec.ts so the pass-through cannot break silently on an upgrade."
+  },
+  "server/lib/report-style/profiles.ts#StyleProfile.schemaVersion": {
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
+  },
+  "server/lib/sms/messaging-rules.ts#MessagingRule.identification": {
+    "kind": "invisible-read",
+    "reason": "Read as a STRING key by `scripts/check-messaging-rules.mjs`, which lists it in REQUIREMENT_KEYS and validates its allowed values. `send-gate.ts` says outright that it does not enforce it and does not pretend to — it never sees the composed body and does not own the inbound path — and points at the register for where enforcement lives."
+  },
+  "server/lib/sms/sender-identity.ts#SmsSenderIdentity.platformSender": {
+    "kind": "wire-shape",
+    "reason": "Stored, not computed-and-dropped: `SmsSenderIdentity` is the `$type` of the `sender_identity` JSON column on the automation schema, so every message's record carries who operated the transmission. Read by whoever reads the record."
+  },
+  "server/lib/sms/sender-identity.ts#SmsSenderIdentity.tenantOnWhoseBehalf": {
+    "kind": "wire-shape",
+    "reason": "Stored in the `sender_identity` JSON column beside `platformSender` — the tenant a message was sent FOR. The pair is the record of who transmitted on whose behalf; nothing branches on it and nothing should."
+  },
+  "server/lib/version-diff.ts#Snapshot.schemaVersion": {
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
+  },
+  "server/portal/outbox.service.ts#OutboxRow.lastTriedAt": {
+    "kind": "wire-shape",
+    "reason": "Mirrors the `last_tried_at` column on the outbox table. Written on every attempt so the row itself says when it was last tried; read by whoever inspects the table."
+  },
+  "server/portal/parked-fingerprint.ts#ParkedFingerprint.invalidFields": {
+    "kind": "invisible-read",
+    "reason": "Serialised whole: `parkedFingerprint()` returns `JSON.stringify(fingerprint)` and the parking write stores that string in `parked_cmd_events.envelope`. The field IS recorded; nothing writes `.invalidFields` because the consumer is the serialiser."
+  },
+  "server/services/account.service.ts#AccountExport.exportedAt": {
+    "kind": "wire-shape",
+    "reason": "Part of the portability export the data subject downloads — `AccountExportResponseSchema` declares it and `GET /api/account/export` returns it. Nothing here reads it back because the reader is the person who asked for their data."
+  },
+  "server/services/account.service.ts#AccountExport.identityWithheld": {
+    "kind": "wire-shape",
+    "reason": "Part of the portability export the data subject downloads, and deliberately so: the columns held back travel WITH their reasons, because an export that is silently incomplete is the under-disclosure this response shape exists to prevent."
+  },
+  "server/services/account.service.ts#AccountExport.memberships": {
+    "kind": "wire-shape",
+    "reason": "Part of the portability export the data subject downloads — `AccountExportResponseSchema` declares it and `GET /api/account/export` returns it. Nothing here reads it back because the reader is the person who asked for their data."
+  },
+  "server/services/account.service.ts#AccountDeleteResult.identityId": {
+    "kind": "wire-shape",
+    "reason": "Declared on `AccountDeleteResponseSchema` and returned by the soft-delete endpoint, so the caller receives it. Nothing on this side reads it back."
+  },
+  "server/services/data-export.service.ts#ExportManifest.photosEmbedded": {
+    "kind": "wire-shape",
+    "reason": "Part of the export manifest that travels with the archive and crosses the seam (portal reads the manifest on `cmd.subject.export`). The reader is the person holding the export, or portal's record of it."
+  },
+  "server/services/inspection/inspection-analytics.service.ts#RepairListEntry.recommendationLabel": {
+    "kind": "wire-shape",
+    "reason": "Part of the published response contract — `report-delivery.ts` declares it on the schema and the analytics service fills it from the slug map. It leaves the process; our own client does not render it, which is a separate question from whether the field is dead."
+  },
+  "server/services/inspection/report-schema-types.ts#SchemaData.schemaVersion": {
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
+  },
+  "server/services/integrations.service.ts#IntegrationRow.lastSync": {
+    "kind": "wire-shape",
+    "reason": "Returned whole: `GET /api/integrations` serialises the rows from `services.integrations.status(tenantId)` straight into the response. No field is named because the object is the payload."
+  },
+  "server/services/migration-intake/assistance.service.ts#ExpiryReminderSummary.finalReminded": {
+    "kind": "invisible-read",
+    "reason": "Logged whole, and deliberately: `daily-retention-tasks.ts` logs the summary with the comment \"All THREE numbers, always — including on a pass that reminded nobody\", because a line that appeared only when something happened could not tell a quiet day from a job that had stopped looking."
+  },
+  "server/services/migration-intake/repair.service.ts#RemapResult.replacedRowCount": {
+    "kind": "wire-shape",
+    "reason": "Declared on the route's response schema with its own description — \"How many entries it threw away, every one of which is gone\" — so the caller is told. Nothing on this side reads it back."
+  },
+  "server/services/statutory/production-record.ts#ProductionInput.producedBy": {
+    "kind": "wire-shape",
+    "reason": "Written to `statutory_productions.produced_by` from the caller's own identity. A stored record of who produced a statutory form; nothing reads it back in this codebase."
+  },
+  "server/services/statutory/revision-impact.ts#RevisionImpact.publishedRevision": {
+    "kind": "wire-shape",
+    "reason": "Returned whole: `server/portal/statutory-admin.routes.ts` calls `revisionImpact(...)` and answers `c.json({ success: true, data })`. The object is the payload."
+  },
+  "server/services/statutory/revision-impact.ts#RevisionImpact.productions": {
+    "kind": "wire-shape",
+    "reason": "Returned whole: `server/portal/statutory-admin.routes.ts` calls `revisionImpact(...)` and answers `c.json({ success: true, data })`. The object is the payload."
+  },
+  "server/services/statutory/revision-impact.ts#RevisionImpact.firstProducedAt": {
+    "kind": "wire-shape",
+    "reason": "Returned whole: `server/portal/statutory-admin.routes.ts` calls `revisionImpact(...)` and answers `c.json({ success: true, data })`. The object is the payload."
+  },
+  "server/services/statutory/revision-impact.ts#RevisionImpact.lastProducedAt": {
+    "kind": "wire-shape",
+    "reason": "Returned whole: `server/portal/statutory-admin.routes.ts` calls `revisionImpact(...)` and answers `c.json({ success: true, data })`. The object is the payload."
+  },
+  "server/services/subject-export.service.ts#SubjectExportManifest.photosEmbedded": {
+    "kind": "wire-shape",
+    "reason": "Part of the subject-export manifest that crosses the seam to portal, which stores it against the DSAR record. Read there, not here."
+  },
+  "server/types/auth.ts#AuthVariables.requestedTenantSlug": {
+    "kind": "invisible-read",
+    "reason": "A Hono context variable, read as `c.get('requestedTenantSlug')` — in bookings.ts, report-delivery.ts and portal.ts. The key is a string, which no name-based scan can follow."
+  },
+  "server/types/hono.ts#AppEnv.INSPECTOR_MCP": {
+    "kind": "invisible-read",
+    "reason": "Resolved by NAME at runtime: InspectorMcp.serve('/mcp', { binding: 'INSPECTOR_MCP' }) in mcp/oauth-provider.ts. The string is the read."
+  },
+  "server/types/hono.ts#AppEnv.OAUTH_KV": {
+    "kind": "invisible-read",
+    "reason": "A hardcoded binding name required by @cloudflare/workers-oauth-provider, which looks it up itself — see the comment beside it in wrangler.jsonc. Nothing of ours reads it by name."
+  },
+  "server/types/hono.ts#HonoConfig.Variables": {
+    "kind": "wire-shape",
+    "reason": "A Hono framework contract key. The generic `Hono<HonoConfig>` reads it in the TYPE system; runtime code never writes `.Variables`, which is why a name scan cannot see it."
+  },
+  "server/types/hono.ts#AppEnv.JWT_PRIVATE_KEY_V1": {
+    "kind": "invisible-read",
+    "reason": "Read as `env[`JWT_PRIVATE_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts) — a template-literal lookup no name scan can see. Declaring V1..V3 is how the type says what that lookup may find."
+  },
+  "server/types/hono.ts#AppEnv.JWT_PUBLIC_KEY_V1": {
+    "kind": "invisible-read",
+    "reason": "Read as `env[`JWT_PUBLIC_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts) — a template-literal lookup no name scan can see. Declaring V1..V3 is how the type says what that lookup may find."
+  },
+  "server/types/hono.ts#AppEnv.JWT_PRIVATE_KEY_V2": {
+    "kind": "invisible-read",
+    "reason": "Read as `env[`JWT_PRIVATE_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts). Older versions stay declared through a rotation so existing tokens keep verifying."
+  },
+  "server/types/hono.ts#AppEnv.JWT_PUBLIC_KEY_V2": {
+    "kind": "invisible-read",
+    "reason": "Read as `env[`JWT_PUBLIC_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts). Older versions stay declared through a rotation so existing tokens keep verifying."
+  },
+  "server/types/hono.ts#AppEnv.JWT_PRIVATE_KEY_V3": {
+    "kind": "invisible-read",
+    "reason": "Read as `env[`JWT_PRIVATE_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts). The next rotation slot; provisioning it is a verify-only window before JWT_CURRENT_KID flips."
+  },
+  "server/types/hono.ts#AppEnv.JWT_PUBLIC_KEY_V3": {
+    "kind": "invisible-read",
+    "reason": "Read as `env[`JWT_PUBLIC_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts). The next rotation slot; provisioning it is a verify-only window before JWT_CURRENT_KID flips."
+  },
+  "server/types/template-schema.ts#TemplateSection.sharedComments": {
+    "kind": "invisible-read",
+    "reason": "Read by NAME as a string: `app/lib/editor/structure-ops.ts` lists `'sharedComments'` among the section keys it carries across a structure edit. A string in a list is a read no name-based scan can follow."
+  },
+  "server/types/template-schema.ts#TemplateSchemaV2.schemaVersion": {
+    "kind": "wire-shape",
+    "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
+  }
+}

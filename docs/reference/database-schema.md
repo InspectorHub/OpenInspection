@@ -11,9 +11,9 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 |---|---|
 | Tables | 109 |
 | Columns | 1263 |
-| Indexes (excluding primary keys) | 181 |
+| Indexes (excluding primary keys) | 183 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 604 (48%) |
+| Columns carrying a source comment | 609 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -2242,21 +2242,28 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ---
 
-## `signing_keys_new`
+## `signing_keys`
 
-<sub>(no drizzle definition found) · 9 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/esign.ts · 9 columns · primary key `id`</sub>
+
+> Spec 5H — Self-built e-signature audit foundation. Per-tenant Ed25519 keypair, lazy-created on first sign attempt.
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
-| `tenant_id` | text | NN FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `public_key` | text | NN |  |  |  |
+| `tenant_id` | text | NN UQ FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `public_key` | text | NN |  |  | base64url SPKI. Stored in the clear on purpose: it is what a third party needs to check the seal, served as PEM from /.well-known and embedded in the audit-trail export so an offline verifier needs nothing from us. |
 | `private_key_enc` | text | NN |  |  | *Encrypted at rest (AES-GCM envelope).* |
-| `private_key_iv` | text | NN |  |  |  |
-| `fingerprint` | text | NN |  |  |  |
-| `algorithm` | text | NN | `'Ed25519'` |  |  |
+| `private_key_iv` | text | NN |  |  | base64url 12-byte AES-GCM IV for privateKeyEnc, freshly random per keypair. Not a secret, but not optional either: without it the private key cannot be decrypted and the tenant can never sign again under this fingerprint. |
+| `fingerprint` | text | NN UQ |  |  | SHA-256 hex of the raw SPKI bytes. Copied onto every audit row's key_fingerprint at append time and published by the verifier, so a reader can say WHICH key signed rather than trusting that one exists. |
+| `algorithm` | text | NN | `'Ed25519'` |  | NO READER FOUND. Every surface that reports an algorithm — /.well-known, the public verifier JSON, the audit-trail export — emits the 'Ed25519' literal instead of reading this column. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
-| `retired_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `retired_at` | integer |  |  |  | NULL = this is the tenant's active key, the one new signatures are made with. Set once, on rotation, and never unset. **[more]** |
+
+**Indexes**
+
+- **UNIQUE** `uq_signing_keys_tenant_fingerprint` (tenant_id, fingerprint)
+- **UNIQUE** `uq_signing_keys_tenant_active` (tenant_id) — partial, `WHERE retired_at IS NULL`
 
 ---
 
@@ -2600,7 +2607,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `default_profile_id` | text | NN | `'signature'` |  | Report Style Presets — default appearance profile id (built-in: signature\|meridian\|terra). |
 | `attention_thresholds` | text | NN | `'{"agreement_unsigned_h":72,"invoi…` |  | handoff-decisions §1 — per-team attention thresholds in hours. Default 72h applies uniformly to the three categories. |
 | `inspection_prefs` | text |  |  |  | Workflow shortcuts PR — { cloneDefault, autoAdvanceDelayMs, pinnedTagIds } Nullable; server applies hard-coded defaults when NULL. |
-| `is_repair_list_enabled` | integer | NN | `false` |  | `is_estimates_shown` was here. It gated a per-defect "Estimated cost" badge on the published report, and by the time it was dropped it gated nothing: `inspection-report.service.ts` pins the report payload's `showEstimates` to `false` unconditionally, so no tenant's setting ever reached a renderer. **[more]** |
+| `is_repair_list_enabled` | integer | NN | `false` |  | `is_estimates_shown` was here. It gated a per-defect "Estimated cost" badge and by the time it was dropped it gated nothing: no tenant's setting reached a renderer and the writer refused every enable. **[more]** |
 | `is_customer_repair_export_enabled` | integer | NN | `false` |  | Sprint 3 S3-2 — when true, the public report viewer surfaces a "Generate repair request" link that takes the customer to a print- friendly export they can hand off to a contractor (or email back to themselves). |
 | `is_unpaid_blocked` | integer | NN | `false` |  | Round-2 backlog #10 — when true, every NEW inspection inherits paymentRequired = true at creation time. |
 | `is_unsigned_agreement_blocked` | integer | NN | `false` |  | Round-2 backlog #10 — when true, every NEW inspection inherits agreementRequired = true at creation time. |

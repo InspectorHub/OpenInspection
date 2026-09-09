@@ -63,6 +63,45 @@ const deleteButtonFor = (title: string) =>
         .find((row) => row.textContent?.includes(title))!
         .querySelector("button")!;
 
+/**
+ * The report-level narrative's absence is SHOWN, having been computed, carried
+ * and ignored.
+ *
+ * `hasNarrative` is derived in `server/lib/inspection/reports.ts`, described at
+ * length in the API schema, declared on `ReportRow`, and rendered by nothing.
+ * The comment above the endpoint says "the hub carries hasNarrative"; the hub
+ * carried it and never showed it, which is the same shape as the embed's
+ * `siteKey` and is how the field-level census found it.
+ *
+ * WHY IT IS SHOWN AS A GAP RATHER THAN A TICK, and only before publication.
+ * Surveyed 2026-09-08: Spectora's field app marks sections and items with
+ * checkmarks as they are completed, so a completeness indicator on the
+ * inspector's working surface is ordinary for the category. What the inspector
+ * needs from a list of deliverables is what is still outstanding, so the row
+ * speaks only when the narrative is missing — a badge on every finished row is
+ * noise, and after publication an unwritten narrative is no longer a to-do.
+ */
+describe("report-level narrative indicator", () => {
+    it("says so when an unpublished report has no narrative", () => {
+        renderCard([PRIMARY]);
+        expect(screen.getByText(/narrative not written/i)).toBeTruthy();
+    });
+
+    // POSITIVE CONTROL: a label rendered unconditionally would pass the case
+    // above. A report whose narrative is written must stay quiet.
+    it("stays quiet once the narrative is written", () => {
+        renderCard([SEWER]);
+        expect(screen.queryByText(/narrative not written/i)).toBeNull();
+    });
+
+    // Published is finished. A to-do marker on a delivered report is nagging
+    // about work whose moment has passed.
+    it("stays quiet on a published report", () => {
+        renderCard([RADON]);
+        expect(screen.queryByText(/narrative not written/i)).toBeNull();
+    });
+});
+
 describe("ReportsCard", () => {
     it("lists every deliverable on the order", () => {
         renderCard([PRIMARY, SEWER, RADON]);

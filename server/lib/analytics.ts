@@ -162,7 +162,13 @@ function findingsColumnKey(label: string): string {
  */
 function isNonCondition(level: HeatmapLevel): boolean {
     if (level.isDefect || level.severity !== 'minor') return false;
-    const abbr = level.abbreviation.trim().toUpperCase();
+    // Guarded for the same reason as `getNaKind`, which this mirrors: the
+    // abbreviation is optional on the template schema a workspace authors, and
+    // a level that arrives without one must fall through to the label test
+    // rather than throw. Kept identical to the original on purpose — two copies
+    // of one rule that read differently are how the next fix lands on one of
+    // them.
+    const abbr = (level.abbreviation ?? '').trim().toUpperCase();
     if (abbr === 'NP' || abbr === 'NI') return true;
     const label = level.label.trim().toLowerCase();
     return /not\s*present/.test(label) || /not\s*inspected/.test(label);

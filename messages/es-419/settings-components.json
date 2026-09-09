@@ -68,7 +68,7 @@
   "settings_holiday_concierge_warn": "Las reservas pueden confirmarse sin revisión en las fechas de feriado.",
   "settings_holiday_confirm_title": "¿Permitir reservas en los feriados?",
   "settings_holiday_confirm_message": "Los clientes aún pueden reservar en los feriados de la lista. Confirme solo si es intencional.",
-  "settings_holiday_coverage_warn": "Las fechas de feriados integradas llegan hasta {year}. Las reservas posteriores no se marcarán como feriados automáticamente: agréguelas abajo como fechas personalizadas o actualice la aplicación para años más recientes.",
+  "settings_holiday_coverage_warn": "Las fechas de feriados integradas cubren de {minYear} a {maxYear}. Las reservas fuera de ese rango no se marcarán como feriados automáticamente: agréguelas abajo como fechas personalizadas o actualice la aplicación para años más recientes.",
   "settings_teamsched_heading": "Agendas del equipo",
   "settings_teamsched_desc": "El horario semanal y las ausencias están en Mi agenda",
   "settings_teamsched_members_count": " ({count} miembros programables)",

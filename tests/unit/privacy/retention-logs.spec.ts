@@ -10,7 +10,7 @@
  * test that restates the number cannot notice the number changing.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { eq, getTableName, is, Table } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
 import { asAnyDb } from '../helpers/test-db';
@@ -23,8 +23,11 @@ import {
     parkedCmdEvents,
     processedCmdEvents,
     processedWebhookEvents,
+    migrationBatches,
+    reportPdfs,
     smsConsentLog,
     syncOutbox,
+    tenantConfigs,
     tenants,
 } from '../../../server/lib/db/schema';
 import { runLogRetentionSweep, RETENTION_EXECUTOR_TABLES } from '../../../server/lib/compliance/retention-logs';
@@ -59,6 +62,110 @@ describe('manifest <-> executor binding', () => {
         const tables = new Set(RETENTION_MANIFEST.map((r) => r.table));
         const orphaned = RETENTION_EXECUTOR_TABLES.filter((t) => !tables.has(t));
         expect(orphaned, `executors with no rule: ${orphaned.join(', ')}`).toHaveLength(0);
+    });
+});
+
+/**
+ * The manifest names COLUMNS, and until now nothing checked they exist.
+ *
+ * The two above bind rules to executors by TABLE. Inside a rule, three fields
+ * name columns — `timestampColumn`, `rowWindowColumn`, `tenantWindowColumnYears`
+ * — and each executor hardcodes the same column again in Drizzle property form.
+ * Nothing held the two together, so a rename would leave the catalogue
+ * publishing a column that no longer exists while the code retained on a
+ * different clock, with every gate green. The catalogue is what the retention
+ * register and the privacy policy are generated from, so "the manifest is true"
+ * is the property worth enforcing.
+ *
+ * This is the NAME half only. It cannot see whether an executor READS the
+ * column it declares — that is the behavioural half, further down.
+ */
+function sqlColumnNames(table: unknown): Set<string> {
+    // Drizzle columns hang off the table object carrying their SQL `.name`.
+    // Read by shape rather than through a typed accessor so this walks tables
+    // it was not written against. Verified against `audit_logs`: 12 columns,
+    // snake_case, `created_at` among them.
+    const out = new Set<string>();
+    for (const value of Object.values(table as Record<string, unknown>)) {
+        const name = (value as { name?: unknown } | null)?.name;
+        if (typeof name === 'string') out.add(name);
+    }
+    return out;
+}
+
+/**
+ * SQL table name -> the Drizzle table object.
+ *
+ * ⚠️ `table._.name` is NOT it — measured `undefined`. `getTableName` is the
+ * public accessor and `is(v, Table)` is how a table is told from the types,
+ * constants and helpers that also live in the schema barrel. Verified: 109
+ * tables, the same count `lint:seed-sql` reports.
+ */
+const TABLES_BY_SQL_NAME: Map<string, Table> = new Map(
+    Object.values(schema as Record<string, unknown>)
+        .filter((v): v is Table => is(v, Table))
+        .map((t) => [getTableName(t), t]),
+);
+
+describe('every column the manifest names exists on its table', () => {
+    it('is measuring a real schema, not an empty barrel', () => {
+        // An empty map would make all three loops below pass vacuously.
+        expect(TABLES_BY_SQL_NAME.size).toBeGreaterThan(50);
+        expect(RETENTION_MANIFEST.length).toBeGreaterThan(10);
+    });
+
+    it('reports a column that is not there', () => {
+        // POSITIVE CONTROL for the column reader itself: if it returned
+        // everything (or nothing but truthy answers), the three checks below
+        // could not fail however wrong the manifest got.
+        const cols = sqlColumnNames(TABLES_BY_SQL_NAME.get('audit_logs'));
+        expect(cols.has('created_at')).toBe(true);
+        expect(cols.has('no_such_column_xyz')).toBe(false);
+    });
+
+    it('resolves every rule to a table in the schema', () => {
+        const missing = RETENTION_MANIFEST
+            .map((r) => r.table)
+            .filter((t) => !TABLES_BY_SQL_NAME.has(t));
+        expect(missing, `manifest names tables not in the schema: ${missing.join(', ')}`)
+            .toHaveLength(0);
+    });
+
+    it('every timestampColumn is a real column on its own table', () => {
+        const bad = RETENTION_MANIFEST
+            .filter((r) => {
+                const table = TABLES_BY_SQL_NAME.get(r.table);
+                return !table || !sqlColumnNames(table).has(r.timestampColumn);
+            })
+            .map((r) => `${r.table}.${r.timestampColumn}`);
+        expect(bad, `manifest names columns that do not exist: ${bad.join(', ')}`)
+            .toHaveLength(0);
+    });
+
+    it('every rowWindowColumn is a real column on its own table', () => {
+        const declared = RETENTION_MANIFEST.filter((r) => r.rowWindowColumn);
+        // The field is optional and rare, so an empty filter would make the
+        // assertion below green while checking nothing. It is on `migration_batches`.
+        expect(declared.length).toBeGreaterThan(0);
+        const bad = declared
+            .filter((r) => {
+                const table = TABLES_BY_SQL_NAME.get(r.table);
+                return !table || !sqlColumnNames(table).has(r.rowWindowColumn!);
+            })
+            .map((r) => `${r.table}.${r.rowWindowColumn}`);
+        expect(bad, `rowWindowColumn does not exist: ${bad.join(', ')}`).toHaveLength(0);
+    });
+
+    it('every tenantWindowColumnYears is a real column on tenant_configs', () => {
+        const declared = RETENTION_MANIFEST.filter((r) => r.tenantWindowColumnYears);
+        // Same reason: exactly one rule carries it (`report_pdfs`).
+        expect(declared.length).toBeGreaterThan(0);
+        const cols = sqlColumnNames(TABLES_BY_SQL_NAME.get('tenant_configs'));
+        const bad = declared
+            .filter((r) => !cols.has(r.tenantWindowColumnYears!))
+            .map((r) => `${r.table} -> tenant_configs.${r.tenantWindowColumnYears}`);
+        expect(bad, `per-tenant override column does not exist: ${bad.join(', ')}`)
+            .toHaveLength(0);
     });
 });
 
@@ -588,5 +695,214 @@ describe('runLogRetentionSweep', () => {
         expect(serialized).not.toContain('example.com');
         expect(serialized).not.toContain('u-123');
         expect(Object.values(summary.perTable).every((v) => typeof v === 'number')).toBe(true);
+    });
+});
+
+/**
+ * THE BEHAVIOURAL HALF: the executors really do read the columns the manifest
+ * declares.
+ *
+ * The name guard above proves `expires_at` and `report_pdf_retention_years`
+ * EXIST. It cannot tell an executor that compares them from one that ignores
+ * them and falls back to the rule's own window — which would be a silent over-
+ * or under-retention, correct against the schema and wrong against the
+ * catalogue the privacy policy is generated from.
+ *
+ * Both of these rules reach R2, so both demand a bucket the moment they have
+ * something to remove.
+ */
+function fakeBucket() {
+    const deleted: string[] = [];
+    return { deleted, delete: async (keys: string[]) => { deleted.push(...keys); } };
+}
+
+describe('rowWindowColumn is what the sweep compares', () => {
+    let db: BetterSQLite3Database<typeof schema>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let sqlite: any;
+
+    beforeEach(async () => {
+        const setup = createTestDb();
+        db = setup.db;
+        sqlite = setup.sqlite;
+        await setupSchema(sqlite);
+        await db.insert(tenants).values({ id: 't1', slug: 't1', createdAt: new Date(NOW) });
+    });
+    afterEach(() => sqlite.close());
+
+    async function seedBatch(id: string, createdAgoDays: number, expiresAt: Date | null) {
+        await db.insert(migrationBatches).values({
+            id,
+            tenantId: 't1',
+            createdBy: 'u-123',
+            intent: 'templates.create',
+            vendor: 'spectora',
+            adapterName: 'spectora-json',
+            adapterVersion: '1',
+            manifest: '{}',
+            status: 'staged',
+            createdAt: new Date(NOW - createdAgoDays * DAY_MS),
+            sourceKey: `intake/${id}.csv`,
+            expiresAt,
+        });
+    }
+
+    async function sweep() {
+        const bucket = fakeBucket();
+        // Cast at the call site, the way every other spec here stubs R2: the
+        // executors call `delete` and nothing else, and a stub that implemented
+        // `head`/`get`/`put` to satisfy the type would be five methods of
+        // fiction standing next to the one method under test.
+        await runLogRetentionSweep(asAnyDb(db), NOW, { photos: bucket as unknown as R2Bucket });
+        return bucket;
+    }
+
+    const batch = (id: string) =>
+        db.select().from(migrationBatches).where(eq(migrationBatches.id, id)).get();
+
+    /**
+     * The rule's declared window is 90 days. This row is 100 days old and its
+     * OWN due date has not arrived, so an executor measuring from the window
+     * would take it and an executor reading the named column will not.
+     */
+    it('leaves a row older than the window whose own due date has not passed', async () => {
+        await seedBatch('b-old-row-new-clock', 100, new Date(NOW + DAY_MS));
+        const bucket = await sweep();
+        const row = await batch('b-old-row-new-clock');
+        expect(row!.sourceKey).toBe('intake/b-old-row-new-clock.csv');
+        expect(row!.expiresAt).not.toBeNull();
+        expect(bucket.deleted).toHaveLength(0);
+    });
+
+    /**
+     * POSITIVE CONTROL for the case above, which an executor that swept nothing
+     * at all would also pass. A row whose own due date HAS passed must go, and
+     * being newly created must not save it.
+     */
+    it('takes a row whose own due date has passed, however new the row is', async () => {
+        await seedBatch('b-new-row-old-clock', 0, new Date(NOW - DAY_MS));
+        const bucket = await sweep();
+        const row = await batch('b-new-row-old-clock');
+        // The RECORD survives — this rule clears rather than deletes — but the
+        // file, the due date and the staged entries do not.
+        expect(row).toBeTruthy();
+        expect(row!.sourceKey).toBeNull();
+        expect(row!.expiresAt).toBeNull();
+        expect(row!.status).toBe('abandoned');
+        expect(bucket.deleted).toEqual(['intake/b-new-row-old-clock.csv']);
+    });
+
+    /**
+     * The executor states this itself: a row with no due date is a batch nothing
+     * has finished writing, not one that has been sitting for ninety days.
+     * Reading NULL as "due at the outer bound" would delete on a clock nobody
+     * ever set.
+     */
+    it('leaves a row with no due date alone, however old', async () => {
+        await seedBatch('b-no-clock', 200, null);
+        const bucket = await sweep();
+        const row = await batch('b-no-clock');
+        expect(row!.sourceKey).toBe('intake/b-no-clock.csv');
+        expect(row!.status).toBe('staged');
+        expect(bucket.deleted).toHaveLength(0);
+    });
+});
+
+describe('tenantWindowColumnYears is what the sweep reads', () => {
+    let db: BetterSQLite3Database<typeof schema>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let sqlite: any;
+
+    beforeEach(async () => {
+        const setup = createTestDb();
+        db = setup.db;
+        sqlite = setup.sqlite;
+        await setupSchema(sqlite);
+        await db.insert(tenants).values({ id: 't1', slug: 't1', createdAt: new Date(NOW) });
+    });
+    afterEach(() => sqlite.close());
+
+    async function seedPdf(id: string, renderedAgoDays: number) {
+        await db.insert(reportPdfs).values({
+            id,
+            tenantId: 't1',
+            inspectionId: 'i1',
+            type: 'full',
+            r2Key: `pdf/${id}.pdf`,
+            renderedAt: new Date(NOW - renderedAgoDays * DAY_MS),
+            sourceVersion: 1,
+            status: 'ready',
+        });
+    }
+
+    const setTenantYears = (years: number) =>
+        db.insert(tenantConfigs).values({
+            tenantId: 't1',
+            reportPdfRetentionYears: years,
+            updatedAt: new Date(NOW),
+        });
+
+    async function sweep() {
+        const bucket = fakeBucket();
+        // Cast at the call site, the way every other spec here stubs R2: the
+        // executors call `delete` and nothing else, and a stub that implemented
+        // `head`/`get`/`put` to satisfy the type would be five methods of
+        // fiction standing next to the one method under test.
+        await runLogRetentionSweep(asAnyDb(db), NOW, { photos: bucket as unknown as R2Bucket });
+        return bucket;
+    }
+
+    const pdf = (id: string) =>
+        db.select().from(reportPdfs).where(eq(reportPdfs.id, id)).get();
+
+    /**
+     * The disclosed default is seven years. A tenant that chose one must have an
+     * eighteen-month-old PDF taken; an executor ignoring the column would keep
+     * it for six more years than that tenant asked for.
+     */
+    it('honours an override SHORTER than the default', async () => {
+        await setTenantYears(1);
+        await seedPdf('p-short', 550);
+        const bucket = await sweep();
+        expect(await pdf('p-short')).toBeUndefined();
+        expect(bucket.deleted).toEqual(['pdf/p-short.pdf']);
+    });
+
+    /**
+     * POSITIVE CONTROL: an executor that deleted everything would pass the case
+     * above. A tenant that chose ten must KEEP an eight-year-old PDF that the
+     * default would already have taken.
+     */
+    it('honours an override LONGER than the default', async () => {
+        await setTenantYears(10);
+        await seedPdf('p-long', 2920);
+        const bucket = await sweep();
+        expect(await pdf('p-long')).toBeTruthy();
+        expect(bucket.deleted).toHaveLength(0);
+    });
+
+    /**
+     * Zero is a controller instruction — retain indefinitely — not a
+     * zero-length window. Treating it as a number would delete precisely what
+     * the tenant asked to be kept forever.
+     */
+    it('treats 0 as indefinite, not as immediate', async () => {
+        await setTenantYears(0);
+        await seedPdf('p-forever', 7300);
+        const bucket = await sweep();
+        expect(await pdf('p-forever')).toBeTruthy();
+        expect(bucket.deleted).toHaveLength(0);
+    });
+
+    /**
+     * A tenant with NO config row gets the disclosed default, not indefinite.
+     * Reading a missing row as 0 would silently convert every silent tenant to
+     * the opposite of the published number.
+     */
+    it('falls back to the disclosed default when no config row exists', async () => {
+        await seedPdf('p-default', 8 * 365);
+        const bucket = await sweep();
+        expect(await pdf('p-default')).toBeUndefined();
+        expect(bucket.deleted).toEqual(['pdf/p-default.pdf']);
     });
 });

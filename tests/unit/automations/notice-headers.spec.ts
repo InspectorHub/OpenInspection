@@ -79,7 +79,7 @@ describe('trigger() creates notice headers (C1)', () => {
         });
 
         await svc.trigger({ tenantId: TENANT, inspectionId: insp, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' });
+            companyName: 'Acme'});
 
         const logs = await allLogs(insp);
         expect(logs.length).toBe(4); // 2 recipients x 2 channels
@@ -109,7 +109,7 @@ describe('trigger() creates notice headers (C1)', () => {
             recipientRoleProfileId: null, delayMinutes: 0, channels: ['email'],
         });
         const fire = () => svc.trigger({ tenantId: TENANT, inspectionId: insp, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' });
+            companyName: 'Acme'});
 
         await fire();
         const after1 = (await allHeaders()).filter((h) => h.contactId != null).length;

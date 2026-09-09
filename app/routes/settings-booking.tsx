@@ -177,6 +177,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     clauseAgreements,
     members,
     customHolidays,
+    holidayDataMinYear: getHolidayDataCoverage().minYear,
     holidayDataMaxYear: getHolidayDataCoverage().maxYear,
     currentYear: new Date().getUTCFullYear(),
   };
@@ -364,6 +365,7 @@ export default function SettingsBookingPage() {
             conciergeReviewRequired: data.config.conciergeReviewRequired,
           }}
           initialCustomHolidays={data.customHolidays}
+          dataMinYear={data.holidayDataMinYear}
           dataMaxYear={data.holidayDataMaxYear}
           currentYear={data.currentYear}
         />

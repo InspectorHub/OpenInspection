@@ -6,7 +6,7 @@ import { HolidayClosedPanel, type HolidayConfig } from "./HolidayClosedPanel";
 
 function renderPanel(
   config: HolidayConfig,
-  coverage?: { dataMaxYear: number; currentYear: number },
+  coverage?: { dataMinYear?: number; dataMaxYear: number; currentYear: number },
 ) {
   const router = createMemoryRouter(
     [
@@ -16,6 +16,7 @@ function renderPanel(
           <HolidayClosedPanel
             initialConfig={config}
             initialCustomHolidays={[]}
+            dataMinYear={coverage?.dataMinYear}
             dataMaxYear={coverage?.dataMaxYear}
             currentYear={coverage?.currentYear}
           />
@@ -80,6 +81,38 @@ describe("HolidayClosedPanel", () => {
     const html = renderPanel(CATALOG_ON, { dataMaxYear: 2031, currentYear: 2031 });
     expect(html).toContain('data-testid="holiday-coverage-warn"');
     expect(html).toContain("2031");
+  });
+
+  /**
+   * The warning used to name only the upper bound, so it said where the data
+   * STOPS without saying where it starts — and an operator reading "run through
+   * 2031" cannot tell whether last year was covered either. The catalogue knows
+   * both bounds (`getHolidayDataCoverage` returns a range); only half of it was
+   * ever threaded through.
+   *
+   * This is the existing warning saying the whole thing, NOT a new always-on
+   * line: a panel that explains itself when nothing is wrong is noise.
+   */
+  it("names the whole covered range, not just where it ends", () => {
+    const html = renderPanel(CATALOG_ON, {
+      dataMinYear: 2026,
+      dataMaxYear: 2031,
+      currentYear: 2031,
+    });
+    expect(html).toContain("2026");
+    expect(html).toContain("2031");
+  });
+
+  // POSITIVE CONTROL: a panel that printed the range unconditionally would pass
+  // the case above. The bounds appear only inside the warning.
+  it("says nothing about coverage while covered years remain ahead", () => {
+    const html = renderPanel(CATALOG_ON, {
+      dataMinYear: 2026,
+      dataMaxYear: 2031,
+      currentYear: 2026,
+    });
+    expect(html).not.toContain('data-testid="holiday-coverage-warn"');
+    expect(html).not.toContain("2031");
   });
 
   it("stays quiet while covered years remain ahead", () => {

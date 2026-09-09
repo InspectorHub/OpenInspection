@@ -1,1 +1,0 @@
-ALTER TABLE `tenant_configs` ADD `is_courtesy_translation_enabled` integer DEFAULT false NOT NULL;

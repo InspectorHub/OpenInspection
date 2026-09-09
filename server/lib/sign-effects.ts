@@ -118,7 +118,7 @@ export async function runEnvelopeCompletionPipeline(
             inspectionId,
             triggerEvent: 'agreement.signed',
             companyName: await resolveAutomationCompanyName(drizzle(c.env.DB), tenantId),
-            reportBaseUrl: c.env.APP_BASE_URL || '',
+            
         }), 'automation trigger', { event: 'agreement.signed', tenantId });
     }
 

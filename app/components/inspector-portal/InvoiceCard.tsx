@@ -92,9 +92,28 @@ export function InvoiceCard({
                 <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_invoice_paid()}</p>
             ) : (
                 <div className="flex items-center gap-2 flex-wrap">
-                    <Button variant="secondary" size="sm" onClick={onRequestPayment}>
-                        {sent ? m.inspections_hub_invoice_resend() : m.inspections_hub_invoice_request()}
-                    </Button>
+                    {/* Asking a client to pay zero is not an action, so it is not
+                        offered. A $0 INVOICE is legitimate — Stripe finalizes a
+                        zero total straight to `paid` without collecting, ISN
+                        stamps PAID on one, and comped work is real — but a
+                        REQUEST to pay nothing is a dead end, and the modal
+                        behind this button gated only on the recipient's email,
+                        never on the amount. Say what to do instead rather than
+                        present a button that goes nowhere.
+
+                        `undefined` is NOT folded in with 0: it means money is
+                        redacted for this viewer (see the prop's own note), and
+                        who may request payment is a permission question this
+                        does not answer. */}
+                    {amountCents === 0 ? (
+                        <p className="text-[12px] text-ih-fg-3">
+                            {m.inspections_hub_invoice_nothing_to_request()}
+                        </p>
+                    ) : (
+                        <Button variant="secondary" size="sm" onClick={onRequestPayment}>
+                            {sent ? m.inspections_hub_invoice_resend() : m.inspections_hub_invoice_request()}
+                        </Button>
+                    )}
                     {/* IA-34 — the pay page is token-gated; copy the tokenized link the
                         server built, never a bare `/invoice/:id` (which now 401s). No
                         link when no primary client email exists to bind a token to. */}

@@ -211,7 +211,8 @@ describe('BrandingService — cancellation policy attestation gate', () => {
 
     // The writer used to carry a second refusal, on `is_estimates_shown`, which
     // it accepted `false` for and rejected `true` for. That column was dropped
-    // once it was established that nothing read it — the report payload pins
-    // `showEstimates` to false regardless — so the refusal and its tests went
-    // with it. The cancellation-policy gate above is now the only one here.
+    // once it was established that nothing read it, so the refusal and its tests
+    // went with it. Cost visibility was never a per-tenant choice and still is
+    // not: the report decides it from the report tier. The cancellation-policy
+    // gate above is now the only one here.
 });

@@ -36,7 +36,6 @@ const FULL_OUTLINE: ReportOutlineEntry[] = [
 ];
 
 const pcaReport: PcaReportData = {
-  sectionRegistry: [],
   narrative: {
     transmittalLetter: 'TL copy',
     summaryGeneralDescription: 'GD',

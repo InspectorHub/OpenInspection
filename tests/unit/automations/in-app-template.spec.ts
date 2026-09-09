@@ -78,7 +78,7 @@ describe('in-app notice wording (B3)', () => {
 
         await new AutomationService({} as D1Database).trigger({
             tenantId: T, inspectionId: INSP, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://app.example.com',
+            companyName: 'Acme',
         });
 
         const h = await header();
@@ -90,7 +90,7 @@ describe('in-app notice wording (B3)', () => {
 
         await new AutomationService({} as D1Database).trigger({
             tenantId: T, inspectionId: INSP, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://app.example.com',
+            companyName: 'Acme',
         });
 
         expect((await header())?.body).toBe('Published for Acme.');
@@ -105,7 +105,7 @@ describe('in-app notice wording (B3)', () => {
 
         await new AutomationService({} as D1Database).trigger({
             tenantId: T, inspectionId: INSP, triggerEvent: 'report.published',
-            companyName: 'Acme', reportBaseUrl: 'https://app.example.com',
+            companyName: 'Acme',
         });
 
         const h = await header();

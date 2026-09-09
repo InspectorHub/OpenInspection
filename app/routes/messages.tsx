@@ -29,6 +29,34 @@ export function meta() {
   return [{ title: m.messages_meta_title() }];
 }
 
+/**
+ * The newest line in a thread, and whether it was ours.
+ *
+ * `lastFromRole` was computed by the service, described in the API schema as
+ * "Who wrote the newest message", declared on `ThreadSummary` — and rendered by
+ * nothing, so a thread waiting on YOUR reply looked exactly like one you had
+ * already answered.
+ *
+ * Only OUR side is marked. The row is already headed with the counterparty's
+ * name, so saying "client:" beside it would repeat the heading; `inspector` is
+ * the staff author (the message schema's own comment says so) and every other
+ * role — client, agent, other — is them.
+ *
+ * A prefix on the preview rather than a badge: surveyed 2026-09-08, Spectora's
+ * Conversations documentation says a message's subtext "will always show when
+ * the message was sent, and who sent it", which is where every inbox puts it.
+ */
+export function ThreadPreview({ body, fromRole }: { body: string; fromRole: string }) {
+  return (
+    <span className="text-[12px] text-ih-fg-3 truncate">
+      {fromRole === "inspector" && (
+        <span className="text-ih-fg-2">{m.messages_last_from_you()} </span>
+      )}
+      {body}
+    </span>
+  );
+}
+
 interface ThreadSummary {
   contactId: string;
   contactName: string | null;
@@ -189,7 +217,7 @@ export default function MessagesPage() {
                           <span className="text-[11px] text-ih-fg-3 tabular-nums shrink-0">{threadTime(t.lastAt, locale, timeZone)}</span>
                         </span>
                         <span className="flex items-center justify-between gap-2">
-                          <span className="text-[12px] text-ih-fg-3 truncate">{t.lastBody}</span>
+                          <ThreadPreview body={t.lastBody} fromRole={t.lastFromRole} />
                           {t.unread > 0 && (
                             <span className="inline-flex items-center h-4 min-w-4 justify-center px-1 rounded-full bg-ih-primary text-ih-primary-fg text-[10px] font-bold tabular-nums shrink-0">
                               {t.unread}

@@ -496,7 +496,7 @@ const agreementRoutes = createApiRouter()
                 tenantId: result.tenantId,
                 inspectionId: result.inspectionId,
                 triggerEvent: 'agreement.signer_signed',
-                companyName: await resolveAutomationCompanyName(getDrizzle(c), result.tenantId), reportBaseUrl: c.env.APP_BASE_URL || '',
+                companyName: await resolveAutomationCompanyName(getDrizzle(c), result.tenantId),
             }), 'automation trigger', { event: 'agreement.signer_signed', tenantId: result.tenantId });
         }
 
@@ -572,7 +572,7 @@ const agreementRoutes = createApiRouter()
                 inspectionId: r.inspectionId,
                 triggerEvent: 'agreement.declined',
                 companyName: await resolveAutomationCompanyName(getDrizzle(c), r.tenantId),
-                reportBaseUrl: c.env.APP_BASE_URL || '',
+                
             }), 'automation trigger', { event: 'agreement.declined', tenantId: r.tenantId });
         }
 

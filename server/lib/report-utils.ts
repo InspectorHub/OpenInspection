@@ -169,7 +169,14 @@ export function getNaKind(
   if (!ratingId || levels.length === 0) return null;
   const level = levels.find((l) => l.id === ratingId);
   if (!level || level.isDefect || level.severity !== 'minor') return null;
-  const abbr = level.abbreviation.trim().toUpperCase();
+  // `abbreviation` is required by THIS interface and optional on the template
+  // schema a workspace authors (`z.string().optional()`), and the last of
+  // getReportData's rating-resolution paths assigns the template's own levels
+  // across without `mapRatingSystemLevels` to fill it in. So an unabbreviated
+  // level does reach here, and reading `.trim()` off it threw while rendering
+  // the report — the label test below is exactly the fallback such a level
+  // needs, and it never got the chance to run.
+  const abbr = (level.abbreviation ?? '').trim().toUpperCase();
   const label = level.label.trim().toLowerCase();
   if (abbr === 'NP') return 'not_present';
   if (abbr === 'NI') return 'not_inspected';

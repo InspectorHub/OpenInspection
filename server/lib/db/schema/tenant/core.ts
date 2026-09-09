@@ -119,9 +119,9 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     icsToken: text('ics_token'),
     // Cross-origin allowlist for the embeddable booking widget; an entry may
     // carry ONE `*` in the host (`https://*.acme.com`), and protocol/port must
-    // match exactly. NULL or [] is FAIL-CLOSED — `isOriginAllowed` returns false
-    // on an empty list, so the widget embeds nowhere until an origin is saved.
-    // Written only by WidgetService, never through the branding allowlist.
+    // match exactly. `isOriginAllowed` is FAIL-CLOSED on an empty list — right for
+    // its analytics caller; booking admission applies it only when a tenant saved
+    // origins, because no screen can. Written only by WidgetService, never branding.
     widgetAllowedOrigins: text('widget_allowed_origins', { mode: 'json' }).$type<string[]>(),
     // Report Style Presets — default appearance profile id (built-in: signature|meridian|terra).
     // Open-ended (Phase 2 adds tenant-authored profiles); resolveProfile falls back to 'signature'.
@@ -137,14 +137,15 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     inspectionPrefs: text('inspection_prefs', { mode: 'json' })
         .$type<{ cloneDefault: 'rating' | 'rating_notes' | 'all'; autoAdvanceDelayMs: number; pinnedTagIds: string[]; agentRepairAccess?: 'off' | 'read' | 'readwrite'; reportLinkTtl?: ReportLinkTtl }>(),
     // `is_estimates_shown` was here. It gated a per-defect "Estimated cost"
-    // badge on the published report, and by the time it was dropped it gated
-    // nothing: `inspection-report.service.ts` pins the report payload's
-    // `showEstimates` to `false` unconditionally, so no tenant's setting ever
-    // reached a renderer. The writer additionally refused every enable. A flag
-    // that cannot be turned on and is not read when it is on is not a setting.
-    // Repair estimates remain the buyer's to state, not the platform's — see
-    // `scripts/check-price-capability.mjs`, which still fails if a price-shaped
-    // column reappears on a finding.
+    // badge and by the time it was dropped it gated nothing: no tenant's
+    // setting reached a renderer and the writer refused every enable. Its
+    // removal stays right — a price on a FINDING is the contractor's to give
+    // (`scripts/check-price-capability.mjs` still fails if one reappears there).
+    // ⚠️ This note used to add that the report pins `showEstimates` false
+    // "unconditionally"; that outlived its truth. Visibility follows the report
+    // TIER (off residential, on `full_pca`, where ASTM E2018 makes the cost
+    // opinion part of what a lender relies on) — one boolean was answering two
+    // opposite obligations. Neither was ever per-tenant, so no column returns.
     // Track E1 (ITB §11, UC-ITB-07) — when true, the published report sub-nav
     // exposes a "Repair List" tab. Default OFF — opt-in for realtors who want
     // a separate punch-list view rather than the full narrative report.

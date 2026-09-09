@@ -1,1 +1,0 @@
-ALTER TABLE `qbo_sync_errors` ADD `resolved_at` integer;

@@ -1,1 +1,0 @@
-ALTER TABLE `tenants` ADD `content_version` text;

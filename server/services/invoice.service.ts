@@ -227,7 +227,7 @@ export class InvoiceService {
             }
             const automation = new AutomationService(this.db)
                 .trigger({ tenantId, inspectionId: data.inspectionId, triggerEvent: 'invoice.created',
-                    companyName: await resolveAutomationCompanyName(drizzle(this.db), tenantId), reportBaseUrl: '' })
+                    companyName: await resolveAutomationCompanyName(drizzle(this.db), tenantId)})
                 .catch(err => logger.error('automation trigger failed', { event: 'invoice.created' }, err instanceof Error ? err : undefined));
             if (onBackground) onBackground(automation);
             else await automation;

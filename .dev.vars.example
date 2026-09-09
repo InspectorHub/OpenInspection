@@ -61,11 +61,6 @@ APP_BASE_URL=http://127.0.0.1:8787
 # TERMS_URL / PRIVACY_URL removed — configure per-tenant Privacy & Terms in
 # Settings → Compliance (hosted /legal/:slug/… or custom website URLs).
 
-# Optional: Cloudflare account credentials — required for silo mode (per-tenant D1 databases)
-# Create an API token at dash.cloudflare.com → My Profile → API Tokens with D1:Edit permission
-CF_ACCOUNT_ID=your_cloudflare_account_id_here
-CF_API_TOKEN=your_cloudflare_api_token_here
-
 # Integration tests only: a pre-obtained Google OAuth refresh token for a test Google account.
 # Used by npm run test:integration to seed the DB and test POST /api/calendar/sync end-to-end.
 # Obtain by completing the Google OAuth flow (/api/calendar/connect) — credentials

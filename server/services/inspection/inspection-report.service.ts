@@ -506,11 +506,12 @@ export class InspectionReportService extends InspectionSubService {
             inspectorLicense = primaryLicenseOf(credentialSnapshot);
         }
 
-        // OFF for every tenant, unconditionally: costs are being rebuilt as a
-        // standalone deliverable rather than a section of the signed report.
-        // No tenant setting sits behind this — the column that looked like one
-        // was dropped once it was established that nothing ever read it.
-        const showEstimates = false;
+        // By report TIER, never by tenant: off for residential (a price is the
+        // contractor's to give), on for a full PCA (ASTM E2018 makes the cost
+        // opinion the half a lender underwrites from). ⚠️ The predicate is the
+        // TIER, not `propertyType`; this is NOT the per-finding price badge.
+        // Why, plus both controls: tests/unit/reports/pca-cost-visibility.spec.ts.
+        const showEstimates = inspection.reportTier === 'full_pca';
         // Report Style Presets — tenant's default appearance profile id (resolved below).
         let tenantDefaultProfileId: string | null = null;
         // Per-tenant report-feature flags surfaced to the published report so the

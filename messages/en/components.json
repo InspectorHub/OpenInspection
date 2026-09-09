@@ -109,6 +109,7 @@
   "hub_reinspect_help": "Choose which items to carry forward. Still-open flagged items are pre-selected.",
   "hub_reinspect_empty": "This report has no items available to carry forward.",
   "hub_publish_title": "Publish report",
+  "hub_publish_unresolved": "{count} item(s) still need attention. You can publish now, or resolve them in the editor first.",
   "hub_publish_pending": "Publishing…",
   "hub_publish_submit": "Publish report",
   "hub_publish_notify_client": "Notify client by email",

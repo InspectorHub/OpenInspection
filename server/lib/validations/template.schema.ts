@@ -67,7 +67,6 @@ const ItemOptionsSchema = z.object({
     placeholder: z.string().optional().describe('TODO describe placeholder field for the OpenInspection MCP integration'),
     maxLength:   z.number().nullable().optional().describe('TODO describe maxLength field for the OpenInspection MCP integration'),
     choices:     z.array(z.string()).optional().describe('TODO describe choices field for the OpenInspection MCP integration'),
-    minPhotos:   z.number().nullable().optional().describe('TODO describe minPhotos field for the OpenInspection MCP integration'),
 }).strict();
 
 /**

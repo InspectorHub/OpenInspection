@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { brandTokens, type TenantBrand } from "~/lib/brand";
+import { useTurnstileWidget } from "~/lib/turnstile";
 import { LanguageChoice } from "~/components/booking/LanguageChoice";
 import { m } from "~/paraglide/messages";
 
@@ -22,6 +23,12 @@ export interface EmbedData {
   /** Company name for the company embed. */
   inspectorName: string;
   tenantSlug: string;
+  /**
+   * Turnstile site key from `resolveTurnstileSiteKey`, or "" when this
+   * deployment challenges nobody. Empty is a real state, not a missing one:
+   * a standalone operator with no secret configured gets `enforced: false`
+   * server-side, and the form must submit with nothing attached.
+   */
   siteKey: string;
   theme: "light" | "dark" | "branded";
   brand: TenantBrand | null;
@@ -114,6 +121,44 @@ export function EmbedWizard({
 function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string | null }) {
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null);
+
+  /**
+   * The bot challenge this form never had.
+   *
+   * `data.siteKey` was resolved by the loader and then read by nobody, while
+   * the submit posted `fd.get("cf-turnstile-response")` — always null, because
+   * no widget had ever written that input. The server meanwhile demands a
+   * token on every saas deployment (`resolveTurnstile` reports `enforced`
+   * unconditionally there), so this form answered 403 on the hosted product
+   * rather than being merely unprotected.
+   *
+   * Empty `siteKey` means the deployment challenges nobody — the standalone
+   * default. Then nothing is mounted and nothing is demanded, matching what
+   * `admitBooking` will do.
+   */
+  const needsTurnstile = !!data.siteKey;
+  const turnstileRef = useRef<HTMLDivElement>(null);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verifyUnavailable, setVerifyUnavailable] = useState(false);
+
+  useTurnstileWidget(
+    data.siteKey || null,
+    turnstileRef,
+    // The main wizard passes its step here so the widget re-renders when the
+    // host element remounts. This form is one screen and never remounts it.
+    0,
+    setTurnstileToken,
+    {
+      onLoadFailed: () => setVerifyUnavailable(true),
+      // The embed's palette is the HOST site's `?style=`, not the visitor's.
+      // It does reach `<html data-color-scheme>`, but from an effect in
+      // EmbedWizard — a parent, whose effect runs after this child's — so
+      // deriving it here would read the previous value. `branded` renders
+      // light with the tenant's accent tokens; Turnstile has no third option.
+      theme: data.theme === "dark" ? "dark" : "light",
+    },
+  );
   // Not part of the FormData sweep below: a radio group with nothing selected
   // submits no entry at all, and "absent" would then be indistinguishable from
   // "the field is not on this form". Held in state so the unanswered case is
@@ -122,6 +167,17 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
+    // Enabled-and-explain, as on the main booking form: a submit that sits
+    // dead with no reason is worse than one that acts and reports. Refusing
+    // here also spares the visitor a 403 they could not have interpreted.
+    if (needsTurnstile && !turnstileToken) {
+      setVerifyError(
+        verifyUnavailable ? m.booking_verify_unavailable() : m.booking_verify_required(),
+      );
+      return;
+    }
+    setVerifyError(null);
     setSubmitting(true);
     setStatus(null);
 
@@ -129,7 +185,11 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
     try {
       // Omit inspectorId when empty so the server auto-assigns.
       const inspectorId = fd.get("inspectorId") || "";
-      const res = await fetch("/api/public/book", {
+      // `embed=1` is how `admitBooking` knows to apply the tenant's widget
+      // origin allowlist. Without it that block was unreachable and the
+      // allowlist had never run for a booking. The server enforces only a
+      // list a tenant actually configured, so saying so locks nobody out.
+      const res = await fetch("/api/public/book?embed=1", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -153,7 +213,7 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
           // a deposit means giving it service selection first. Tracked as its
           // own issue; see the booking-deposit plan, Risk 3.
           ...(locale ? { locale } : {}),
-          turnstileToken: fd.get("cf-turnstile-response") || undefined,
+          turnstileToken: turnstileToken || undefined,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -258,8 +318,27 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
         {m.booking_privacy_shared_notice({ name: data.inspectorName })}
         {privacyUrl && <> {m.booking_privacy_see_our()} <a href={privacyUrl} target="_blank" rel="noreferrer" className="underline">{m.booking_link_privacy_policy()}</a>.</>}
       </p>
+      {needsTurnstile && (
+        <div className="mb-3 flex justify-center">
+          <div ref={turnstileRef} />
+        </div>
+      )}
+
+      {/* Why the form is not going through. `verifyUnavailable` announces
+          itself without waiting for a click: a challenge that cannot load is
+          not something the visitor can fix by trying harder. The copy names no
+          direction — this sits BELOW the widget it refers to, and this form is
+          rendered at whatever width the host site gives it. */}
+      {(verifyError || verifyUnavailable) && (
+        <p role="alert" className="mb-3 text-center text-[13px] font-semibold text-ih-bad-fg">
+          {verifyError ?? m.booking_verify_unavailable()}
+        </p>
+      )}
+
       <button
         type="submit"
+        // Only the in-flight guard: the challenge is reported after the click,
+        // never pre-empted by a dead button.
         disabled={submitting}
         className="w-full px-4 py-3 bg-ih-primary text-ih-primary-fg rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
       >

@@ -154,14 +154,9 @@ export interface ReportSignature {
 
 /* Commercial PCA Phase S — report-skeleton types re-declared across the
    server/app boundary (app/ cannot import server/lib/). Shapes mirror
-   server/lib/pca-section-registry.ts, pca-narrative.ts, pca-systems-summary.ts,
-   pca-deviations.ts exactly. */
-interface PcaSectionEntry {
-  id: string;
-  level: number;
-  title: string;
-  tiers: ('light' | 'full')[];
-}
+   server/lib/pca-narrative.ts, pca-systems-summary.ts, pca-deviations.ts
+   exactly. The section registry has no mirror here on purpose: the client is
+   given the TOC already projected and tier-gated, as `outline`. */
 
 /* Commercial PCA Phase O — TOC projection re-declared across the server/app
    boundary (app/ cannot import server/lib/report-outline.ts). Shape mirrors
@@ -198,7 +193,6 @@ interface Deviation {
   reason: string;
 }
 export interface PcaReportData {
-  sectionRegistry: PcaSectionEntry[];
   narrative: PcaNarrativeData;
   systemsSummary: SystemsSummaryRow[];
   deviations: Deviation[];
@@ -284,7 +278,7 @@ interface ReserveSchedule {
   totalUninflatedCents: number; totalInflatedCents: number;
   perSfUninflatedAllYears: number | null; perSfInflatedAllYears: number | null; perSfInflatedPerYear: number | null;
 }
-interface BucketRollup { immediateCents: number; shortTermCents: number; reserveCents: number }
+export interface BucketRollup { immediateCents: number; shortTermCents: number; reserveCents: number }
 export interface CostTables {
   table1: Table1; reserveSchedule: ReserveSchedule | null;
   rollup: BucketRollup; droppedCount: number;

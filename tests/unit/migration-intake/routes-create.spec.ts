@@ -263,6 +263,75 @@ describe('POST /api/imports', () => {
         expect(store.size).toBe(1);
     });
 
+    /**
+     * THE PROVENANCE NAMES THE ADAPTER, NOT ONLY THE VENDOR.
+     *
+     * The staged-run audit entry is deliberately narrow — its comment says
+     * "counts and provenance only. The file name is left out on purpose: an
+     * export is routinely named after the person it is about." Right, and it was
+     * recording the vendor the operator DECLARED while dropping which reader
+     * actually parsed the file and at which version.
+     *
+     * `AdapterMatch` carries both and nothing read either. They are the first
+     * thing anybody wants when a conversion turns out to have produced the wrong
+     * rows: two runs of the same vendor adapter can differ, and without the
+     * version there is no way to tell a bad file from a bad reader.
+     *
+     * Still no file name, and no row content — this adds the identity of OUR
+     * code, not anything about the third party in the file.
+     */
+    it('records which adapter, at which version, read the file', async () => {
+        const res = await post(
+            { role: 'owner', store },
+            { intent: 'contacts.import', vendor: 'csv_generic', uploadAuthorized: 'true' },
+            { name: 'contacts.csv', text: CONTACTS_CSV },
+        );
+        expect(res.status).toBe(201);
+
+        const rows = await db.select().from(schema.auditLogs).all();
+        const staged = rows.find((r) => r.action === 'migration.staged');
+        expect(staged, 'no migration.staged audit entry').toBeDefined();
+        const meta = staged!.metadata as Record<string, unknown>;
+        expect(meta.adapterName).toBeTruthy();
+        expect(meta.adapterVersion).toBeTruthy();
+        // The narrowness the entry's own comment promises still holds.
+        expect(meta).not.toHaveProperty('fileName');
+    });
+
+    /**
+     * A FILE THAT IS SIMPLY MIS-DECLARED GETS THE CORRECTION, NOT THE HUMAN.
+     *
+     * `describeVendorMismatch` exists to tell these two apart and says so in its
+     * own header: "one offers a correction, the other offers the assisted path,
+     * and conflating them sends people down the wrong one." It was built, it was
+     * tested in adapter-contract.spec.ts — and nothing ever called it. The route
+     * answered every unmatched file with `openWaitingRun()`, which is the
+     * conflation that header warns about, and an expensive one: the assisted
+     * path needs an owner's decision, hands a third party's file to a person,
+     * and is refused outright on a deployment that has no support path. All
+     * because a picker was answered wrongly.
+     */
+    it('names the vendor a mis-declared file actually looks like, instead of parking it', async () => {
+        const res = await post(
+            { role: 'owner', store },
+            { intent: 'contacts.import', vendor: 'spectora', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { name: 'contacts.csv', text: CONTACTS_CSV },
+        );
+        expect(res.status).toBe(422);
+        expect(await message(res)).toMatch(/csv_generic/);
+    });
+
+    // The file is refused BEFORE it is stored: a correction the operator can act
+    // on in one click is no reason to keep a third party's data lying around.
+    it('does not store a file it is about to hand back for correction', async () => {
+        await post(
+            { role: 'owner', store },
+            { intent: 'contacts.import', vendor: 'spectora', uploadAuthorized: 'true', staffAccessAuthorized: 'true' },
+            { name: 'contacts.csv', text: CONTACTS_CSV },
+        );
+        expect(store.size).toBe(0);
+    });
+
     it('parks an unreadable file for a person, on a platform that has one', async () => {
         const res = await post(
             { role: 'owner', store },

@@ -60,6 +60,7 @@
   "media_viewer_annotate": "Anotar",
   "media_viewer_rotate": "Girar",
   "media_viewer_revert": "Revertir",
+  "media_viewer_pending_placeholder": "Esperando a que esta foto se cargue desde el dispositivo que la tomó.",
   "media_video_unavailable": "Video no disponible",
   "media_video_processing": "Procesando…",
   "media_video_uploading": "Subiendo…",

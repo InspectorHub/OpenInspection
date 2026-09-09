@@ -101,6 +101,8 @@
   "portal_status_agreement_unsigned": "No firmado",
   "portal_status_report_published": "Publicado",
   "portal_status_report_unpublished": "No publicado",
+  "portal_status_report_locked_agreement": "Listo. Firme para desbloquear.",
+  "portal_status_report_locked_payment": "Listo. Pago pendiente.",
   "portal_status_messages_unread": "{count} sin leer",
   "portal_status_messages_none": "No hay mensajes nuevos",
   "portal_list_empty_title": "Aún no hay inspecciones",
@@ -296,5 +298,7 @@
   "courtesy_translation_setting_label": "Traducciones de cortesía",
   "courtesy_translation_setting_help": "Permite que esta empresa produzca una copia de cortesía en español de un informe al publicarlo. El informe en inglés siempre es el registro de la inspección. Desactivarlo detiene la creación de nuevas traducciones; nunca elimina una ya entregada.",
   "courtesy_translation_setting_off_note": "Las traducciones ya entregadas siguen disponibles para sus destinatarios.",
-  "courtesy_translation_confirm_cancel": "Cancelar"
+  "courtesy_translation_confirm_cancel": "Cancelar",
+  "report_item_not_inspected": "No inspeccionado",
+  "report_item_not_present": "No presente"
 }

@@ -130,7 +130,6 @@ export interface ItemOptions {
     placeholder?: string;
     maxLength?: number | null;
     choices?: string[];
-    minPhotos?: number | null;
 }
 
 /** Provenance for templates imported from upstream platforms. */
@@ -249,22 +248,6 @@ interface RatingSystem {
     levels: RatingLevel[];
 }
 
-export interface TemplateUnit {
-    id: string;
-    name: string;
-    type: 'unit' | 'common';
-}
-
-export interface TemplateBuilding {
-    id: string;
-    name: string;
-    units: TemplateUnit[];
-}
-
-interface TemplateStructure {
-    buildings: TemplateBuilding[];
-}
-
 /**
  * A template's declaration that it produces an authority's own statutory form.
  *
@@ -315,13 +298,37 @@ export interface TemplateSchemaV2 {
     ratingSystem?: RatingSystem;
     propertyType?: 'single-family' | 'multi-unit' | 'commercial';
     commercialSubtype?: string;
-    structure?: TemplateStructure;
-    sectionAssignments?: {
-        common: string[];
-        unit: string[];
-    };
-    itemAssignments?: Record<string, string[]>;
-    propertyMetadataFields?: PropertyMetaField[];
+    /**
+     * ⚠️ FOUR KEYS WERE REMOVED FROM HERE, and none of them was work owed.
+     *
+     * `structure` described a per-template building/unit layout, so a template
+     * could ship a standard one and save an operator building it. That saving
+     * is already banked elsewhere: `UnitsManager` has a bulk-create form —
+     * floors × stacks, or a CSV paste — wired through `hierarchy.ts` to
+     * `UnitService.createMany`, with the generator in
+     * `server/lib/unit-pattern.ts`. A forty-unit building is one form fill.
+     * It took `TemplateBuilding` and `TemplateUnit` with it; nothing imported
+     * either.
+     *
+     * `sectionAssignments` restated, as two arrays of ids, exactly what the
+     * section-level `defaultScope: 'common' | 'unit'` already says per section —
+     * and that one is accepted by the validator and read by the editor.
+     *
+     * `itemAssignments` was a `Record<sectionId, itemIds[]>` map living outside
+     * the items it described. Item-level scope belongs on the item, in the same
+     * shape its section uses.
+     *
+     * `propertyMetadataFields` was superseded by the commercial subtype presets:
+     * `resolveActivePropertyPreset` feeds `PropertyInfoForm` from
+     * `loaderData.commercialPresets`, never from the template. It carried a
+     * PRIVATE second copy of `PropertyMetaField` with it; the live one is
+     * exported from `server/lib/commercial-subtypes.ts` and is untouched.
+     *
+     * All three described a per-template model that lost to a per-inspection
+     * one — see tests/unit/templates/multi-unit-lives-on-inspection-units.spec.ts,
+     * which pins where multi-unit actually lives so the next reader who finds
+     * `.strict()` refusing a template key does not read it as an absent feature.
+     */
     /**
      * Present only on a platform-supplied template that produces an authority's
      * own form. Absent on every template a workspace can author, and absent is
@@ -330,12 +337,3 @@ export interface TemplateSchemaV2 {
     statutoryForm?: StatutoryFormDeclaration;
 }
 
-interface PropertyMetaField {
-    id: string;
-    label: string;
-    type: 'text' | 'number' | 'select' | 'boolean' | 'date';
-    group?: string;
-    required?: boolean;
-    unit?: string;
-    options?: string[];
-}

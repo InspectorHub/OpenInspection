@@ -263,6 +263,40 @@ describe('the agent-terms gate', () => {
             expect(body.error?.details?.requiredVersion).toBe('2026-09-01');
         });
 
+        /**
+         * THE REFUSAL NAMES A VERSION, NOT A HASH — and that is the design, not
+         * an omission.
+         *
+         * The version says WHICH document to go and accept. What pins the exact
+         * words is `shownContentHash`, and the accept route takes it as
+         * REQUIRED and refuses a page whose hash no longer matches. So the
+         * client already cannot accept text it did not display, and it gets the
+         * hash from the endpoint that serves the body — the one place it can be
+         * true of what is actually on screen.
+         *
+         * Putting the hash here as well would be a second copy of that fact,
+         * arriving from a different endpoint at a different moment, which the
+         * client would then have to reconcile with the one it rendered. This
+         * case exists so the next reader who notices the absence finds the
+         * reason instead of the gap.
+         */
+        it('does not also ship the content hash, which belongs to the document', async () => {
+            const old = await publishTerms('2026-08-01', 'the first agent terms');
+            await seedAgent(old);
+            await publishTerms('2026-09-01', 'the second agent terms');
+
+            const app = buildApp();
+            const cookie = await passwordLoginCookie(app);
+            const res = await app.request(PROTECTED, { headers: { Cookie: cookie } });
+
+            const details = ((await res.json()) as ErrorBody).error?.details ?? {};
+            // POSITIVE CONTROL: an empty payload would satisfy the absence
+            // assertion below without proving anything about this one.
+            expect(details).toHaveProperty('requiredVersion');
+            expect(details).not.toHaveProperty('requiredContentHash');
+            expect(JSON.stringify(details)).not.toMatch(/[0-9a-f]{64}/);
+        });
+
         it('is NOT gated when the republished text is byte-identical', async () => {
             const first = await publishTerms('2026-08-01', 'the agent terms');
             await seedAgent(first);

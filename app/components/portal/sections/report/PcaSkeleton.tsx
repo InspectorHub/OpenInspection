@@ -6,7 +6,9 @@ import type {
   PsqView,
   DocReviewView,
   RelianceText,
+  CostTables as CostTablesData,
 } from "./types";
+import { OpinionOfCost } from "./OpinionOfCost";
 import { SystemsSummaryTable } from "./SystemsSummaryTable";
 import { ConformanceStatement } from "./ConformanceStatement";
 import { SignoffBlock } from "./SignoffBlock";
@@ -73,15 +75,22 @@ function ChapterDivider({ id, title }: { id: string; title: string }) {
 /**
  * Commercial PCA Phase S report skeleton. Renders the ASTM §11 / real-PCA
  * front matter + Summary + Introduction structure above the system-chapter
- * body. Section names come from data.sectionRegistry (the single registry).
- * The §1.3 cost region is left EMPTY for Phase C; the §11.4.4 arm's-length
- * disclosure has a dedicated render slot in §2 (copy filled by Phase M).
+ * body. Section HEADINGS are the paraglide keys below, because they are copy
+ * and are translated; the ordered section LIST lives once on the server
+ * (`PCA_SECTION_REGISTRY`) and reaches the client already tier-gated and
+ * projected, as `data.outline` for the table of contents. This comment used to
+ * say the names came from `data.sectionRegistry`, a second ungated copy that
+ * nothing read and that listed sections `light_commercial` does not render.
+ * The §11.4.4 arm's-length disclosure has a dedicated render slot in §2 (copy
+ * filled by Phase M).
  */
 export function PcaSkeleton({
   data,
   compliance,
   tier,
   reportTimeZone = "UTC",
+  costTables = null,
+  showEstimates = false,
 }: {
   data: PcaReportData | null;
   compliance?: PcaComplianceProps;
@@ -91,6 +100,12 @@ export function PcaSkeleton({
   tier?: "light_commercial" | "full_pca" | null;
   /** Tenant timezone (IANA) anchoring signoff dates. Defaults to UTC. */
   reportTimeZone?: string;
+  /** The payload `CostTables` is built from — §1.3 states its rollup and the
+   *  count §10.3.1's threshold excluded, so summary and tables cannot drift. */
+  costTables?: CostTablesData | null;
+  /** The report's money gate, the same flag `CostTables` is given. Defaults
+   *  to false so a caller that has not thought about it shows no figures. */
+  showEstimates?: boolean;
 }) {
   // Every id below is a table-of-contents target, so all of them are namespaced
   // per half — see report-half-scope. `showingTranslation` is read from the
@@ -150,10 +165,23 @@ export function PcaSkeleton({
       <h2 id={anchorId("summary")} className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-ih-fg-3 scroll-mt-4">{m.pca_skeleton_summary()}</h2>
       <Block id="summary.general-description" title={m.pca_skeleton_summary_general_description()}>{narrative.summaryGeneralDescription}</Block>
       <Block id="summary.physical-condition" title={m.pca_skeleton_summary_physical_condition()}>{narrative.summaryPhysicalCondition}</Block>
-      {/* 1.3 Opinion of Cost — prose + EMPTY cost region (Phase C fills numbers). */}
+      {/* 1.3 Opinion of Cost — prose + the totals computed for it.
+          The region was empty because two plans each assigned the join to the
+          other: Phase C "does not build the ES component… if Phase S has
+          landed, wire `rollup` into its ES component", Phase S "ES cost seam
+          left empty for Phase C". Both shipped their half. */}
       <section id={anchorId("summary.opinion-of-cost")} className="mb-5 print:break-inside-avoid scroll-mt-4">
         <h3 className="mb-1 text-sm font-semibold text-ih-fg-2">{m.pca_skeleton_summary_opinion_of_cost()}</h3>
-        <div data-pca-cost-region className="text-sm text-ih-fg-3" aria-hidden="true" />
+        {/* The hook the PDF/TOC pass keys on stays; `aria-hidden` does not —
+            it was right for a decorative empty slot and wrong the moment the
+            slot carries the report's headline figures. */}
+        <div data-pca-cost-region>
+          <OpinionOfCost
+            rollup={costTables?.rollup ?? null}
+            droppedCount={costTables?.droppedCount ?? 0}
+            show={showEstimates}
+          />
+        </div>
       </section>
       {/* 1.4 Deviations from the Guide — structured, with the ASTM conformance
           statement (Phase M) rendered adjacent. */}

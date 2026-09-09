@@ -1,1 +1,0 @@
-ALTER TABLE `tenant_library_imports` ADD `uninstalled_at` integer;
