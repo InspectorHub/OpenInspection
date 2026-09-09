@@ -20,6 +20,8 @@ Releases are cut automatically by [release-please](https://github.com/googleapis
 
    The export is your portable copy; the bookmark is the fastest way back (`wrangler d1 time-travel restore <your-d1-database-name> --bookmark=<bookmark>`) if a hand-run statement goes wrong. Time Travel is remote-only and needs the database **name** from your wrangler config, not the `DB` binding. Keep `backup.sql` somewhere safe until you have verified the new deploy.
 
+   ⚠️ **`wrangler d1 export --remote` takes the database offline while it runs.** Every request that touches D1 fails for the duration, which on a live deployment means the app is down. Run it in a window you have chosen, not casually — and note that the Time Travel bookmark costs nothing and takes no outage, so if you only need a way back, take the bookmark and skip the export.
+
 3. **Ask your database what it has actually applied.** The upgrade steps below assume its migration ledger and this checkout agree. Confirm that before trusting them — see [Upgrading across a rebuilt baseline](#upgrading-across-a-rebuilt-baseline).
 
 ---

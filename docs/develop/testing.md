@@ -1,8 +1,9 @@
 # Testing — apps/openinspection
 
 The single Worker serves both the typed JSON API and the React Router v8 UI, so
-tests cover both surfaces. There are five suites, each pinned to a **location**:
-a spec's directory alone decides which config runs it. This document is the
+tests cover both surfaces. There are six suites — web unit, api/service unit,
+worker-runtime, contract, end-to-end and type-level — each pinned to a
+**location**: a spec's directory alone decides which config runs it. This document is the
 canonical reference for the three things you need to get right: **where a spec
 lives**, **how to write it**, and **how the run is initialized**.
 
@@ -34,7 +35,7 @@ Collection is enforced in **both** directions, by two gates rather than one:
 | `tests/workers/**/*.spec.ts` | worker-runtime | `test:workers` | `vitest.workers.config.ts` | real `workerd` |
 | `tests/contract/<party>/*.contract.spec.ts` | contract (offline) | `test:contract` | `vitest.contract.config.ts` | node, no network |
 | `tests/contract/<party>/*.live.spec.ts` | contract (live) | `test:contract:live` | `vitest.contract.live.config.ts` | node + the real third-party API |
-| `tests/e2e/*.spec.ts` | end-to-end | `test:e2e` | `playwright.config.ts` (seeds real D1) | built worker + browser |
+| `tests/e2e/*.spec.ts` | end-to-end | `test:e2e` · `test:e2e:seeded` | `playwright.config.ts` (seeds real D1) · `playwright.seeded.config.ts` | built worker + browser |
 | `tests/**/*.spec-d.ts` | type-level | `test:types` | `vitest.typecheck.config.ts` | tsc typecheck |
 
 ### Choosing a home for a new spec
@@ -56,6 +57,11 @@ Collection is enforced in **both** directions, by two gates rather than one:
 4. **Full-stack / browser / anything that hits a running worker** →
    `tests/e2e/`. One flat directory; `globalSetup` seeds real D1 so every E2E
    exercises the actual database.
+
+More than one Playwright config reads that directory, and a spec belongs to
+exactly one of them. `npm run lint:e2e-coverage` prints the full list on every
+run — which config collects a spec, which one OWNS it, and which npm script (if
+any) runs it — so read its output rather than a list copied into this page.
 
 ### The rules the gate enforces
 
@@ -300,16 +306,32 @@ never cleared.
 
 ### CI (`.github/workflows/ci.yml`)
 
-Two parallel jobs:
+**`verify` does no work of its own.** It is an aggregate job that waits on every
+other job, so branch protection has one stable name to require. Its `if:
+always()` plus an explicit result test is load-bearing: under the default
+`success()` behaviour a SKIPPED or cancelled dependency would let it pass.
 
-- **`verify`** — `npm ci` → `gen-version` → `type-check` → `lint` (eslint +
-  `lint:ds` + `lint:erasure` + `lint:migrefs` + `lint:tests`) → `db:check` →
-  `test:unit` → `test:workers` → `test:web` → `build` → bundle-size.
-- **`e2e`** — `npm ci` → `gen-version` → `node scripts/gen-e2e-dev-vars.mjs` →
-  `playwright install chromium` → `npm run test:e2e`. Playwright's `webServer`
-  builds + boots the worker; `globalSetup` seeds D1.
+The jobs it waits on run in parallel:
 
-CodeQL runs separately (`codeql.yml`).
+| Job | Runs |
+|---|---|
+| `typecheck-app` | `type-check:app` → `type-check:tests` → `test:types` |
+| `lint-eslint` | `lint:eslint` (the type-aware pass) |
+| `lint-gates` | `lint:gates-full` (every conformance gate) → `db:check` |
+| `test-unit` | `test:unit`, sharded 4 ways |
+| `test-contract` | `test:contract` (offline half only — the live half never runs in CI) |
+| `test-workers` | `test:workers` |
+| `test-web` | `test:web`, sharded 4 ways |
+| `build` | `build` → `check:bundle` |
+| `e2e` | a 2-way matrix: `test:e2e` (seeded D1) and `test:e2e:seeded` (multi-user seed) |
+
+`e2e` was once absent from `verify`'s `needs`, which left a red E2E run reading
+green on the job branch protection keys off — the whole suite was advisory
+without anyone deciding it should be. It costs `verify` the wait for the longest
+job, which is the price of the name meaning what it says.
+
+Every job that touches generated types runs `gen-version`, `i18n:compile:cached`
+and `react-router typegen` first. CodeQL runs separately (`codeql.yml`).
 
 ---
 
@@ -409,6 +431,7 @@ npm run test:web                       # web unit (happy-dom, hermetic)
 npm run test:unit                      # api/service unit (node + better-sqlite3)
 npm run test:workers                   # real workerd (queues, DOs)
 npm run test:e2e                       # Playwright, seeds real D1
+npm run test:e2e:seeded                # the multi-user-seed projects (playwright.seeded.config.ts)
 npm run test:types                     # type-level (*.spec-d.ts)
 npm run lint:tests                     # layout gate (projects must resolve to files)
 npm run lint:e2e-coverage              # coverage gate (files must be collected by a config)

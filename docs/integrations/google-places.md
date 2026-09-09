@@ -15,8 +15,8 @@ costs nothing and limits the damage if it leaks.
 
 ## The key never reaches the browser
 
-Both surfaces call our own `/api/places/*` and `/public/geocode`, which proxy to
-Google server-side. The browser never sees the key, which is also why the
+Both surfaces call our own `/api/places/*` and `/api/public/geocode`, which
+proxy to Google server-side. The browser never sees the key, which is also why the
 restriction advice above is worth following: the key is only ever used from your
 Worker.
 

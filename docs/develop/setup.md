@@ -47,9 +47,14 @@ you are done.
 | `npm run db:check` | Drift gate — schema and `migrations/` must agree |
 
 Do not hand-run what the pre-commit hook already runs. The hook does a tiered
-type-check, `lint-staged`, and the design-system, contrast, and migration-ref
-gates; docs-only commits skip the heavy steps. Run the full suite once before
-pushing, not after every edit.
+type-check, `lint-staged`, and every conformance gate declared at the
+`precommit` rung in `scripts/lib/gate-registry.mjs` — two dozen of them, run in
+one node process by `scripts/run-gates.mjs`, not the three this paragraph used
+to name. Commits with no staged `.ts`/`.tsx` skip the type-check entirely. Run
+the full suite once before pushing, not after every edit.
+
+That registry is the list; do not maintain a copy of it here. `npm run lint`
+(pre-push and CI) runs every gate, at both rungs.
 
 ## Project structure
 

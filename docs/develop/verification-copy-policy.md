@@ -102,9 +102,12 @@ Two things about it are deliberate:
   this policy requires us to write, and both contain a banned phrase. The first
   version of the gate flagged them, which would have pressured an author to delete the
   disclaimer to get to green. A match counts only when the clause is not negated.
-- **Its self-test runs both ways.** Ten known-bad strings must be flagged and
-  seven careful ones must not. A regex that drifts in either direction turns a
-  clean scan into a false green, and the second direction is the expensive one.
+- **Its self-test runs both ways.** A set of known-bad strings must be flagged
+  and a set of carefully-worded ones must not. A regex that drifts in either
+  direction turns a clean scan into a false green, and the second direction is
+  the expensive one. The gate prints both counts and both sets' verdicts on
+  every run — read them there; the pair written into this sentence went stale
+  within two releases of being written.
 
 The banned list includes disguises that do not exist in the product yet —
 "Identity Verified", "Consent Verified", "Agreement Validated", "Legally

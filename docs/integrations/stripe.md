@@ -30,15 +30,24 @@ booking. The amount comes from the invoice, which is authoritative over the
 denormalized `inspections.price` cache — see the money authority chain in
 `CLAUDE.md`.
 
-**Inbound:** the webhook at `POST /api/stripe/webhook`, verified against
+**Inbound:** the webhook at `POST /webhooks/stripe`, verified against
 `STRIPE_WEBHOOK_SECRET`. A successful payment marks the invoice paid, which is
 what releases the report pay-gate.
 
 Point your Stripe webhook endpoint at:
 
 ```
-https://<your-host>/api/stripe/webhook
+https://<your-host>/webhooks/stripe
 ```
+
+Inbound webhooks are mounted at the **top level**, not under `/api/`: the
+producer owns the body, the headers and the signature, and none of the `/api/*`
+middleware applies to them.
+
+A second, workspace-scoped mount exists at `/webhooks/stripe/<workspace-slug>`.
+A standalone deployment does not need it — the bare path resolves the one fixed
+workspace — but a multi-workspace deployment does, because the verifier secret
+is per workspace and has to be resolved before the signature can be checked.
 
 ## Testing it
 

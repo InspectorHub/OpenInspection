@@ -30,11 +30,11 @@ OpenInspection is [open source home inspection software](https://inspectorhub.io
 - One deployable; React Router loaders/actions call the API directly through an in-process `API_WORKER` self-binding (no network hop, no second worker)
 
 ### Inspector workflow
-- 3-pane editor; a new workspace starts with 250+ canned comments, 80 repair items, 4 rating systems and 17 templates
+- 3-pane editor; a new workspace starts with 250+ canned comments, 80 repair items, 4 rating systems and 7 inspection templates (residential, pre-listing, new construction ×2, sewer scope, radon, mold)
 - Keyboard-driven: `1`-`5` ratings, `/` canned-comment library, `;` snippets, `?` cheatsheet, `⌘K` palette in the workspace
 - Simultaneous editing — inspection results are a Yjs CRDT in a Durable Object
-- Offline-capable PWA with photo upload queue
-- Migrate from Spectora in under 5 minutes via paste-JSON import
+- Installable PWA; field data is offline-capable (the results document buffers in IndexedDB and merges on reconnect). Photo and video *binary* upload needs a connection and says so rather than queueing
+- Migrate from Spectora through the import wizard, which shows what the conversion produced before anything is written
 
 ### Customer experience
 - Company-level public booking widget (`/book/<slug>`) with auto-assignment, optional inspector choice, and Turnstile bot protection
@@ -111,7 +111,7 @@ Deep dive: [`docs/operate/deploy.md`](docs/operate/deploy.md). Architecture over
 - **Drizzle ORM** + Cloudflare D1: SQLite at the edge
 - **Cloudflare R2 / KV**: object storage and config cache
 - **Tailwind CSS**: v4 only (via `@tailwindcss/vite`, design system tokens + utility CSS)
-- **Optional**: Gemini AI, Stripe Connect, Resend email, Google Places
+- **Optional**: any OpenAI-compatible AI endpoint, Stripe Connect, email (Resend / SendGrid / Postmark / Mailgun), SMS (Twilio / Telnyx), QuickBooks Online, Google or Apple calendar, Google Places
 
 ## Community
 
