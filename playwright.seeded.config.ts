@@ -58,5 +58,20 @@ export default defineConfig({
             name: 'statutory-coverage',
             testMatch: 'statutory-coverage.spec.ts',
         },
+        // The media viewer's pending-photo placeholder. Planned for
+        // `browser-collab` in the default config, and that was wrong: the
+        // default run is deliberately UNSEEDED (its `api` project asserts a
+        // fresh `POST /api/auth/setup`), so the fixture would not have existed
+        // and the spec would have failed for a reason unrelated to the viewer.
+        //
+        // It belongs here on `statutory-coverage`'s argument, sharpened: a
+        // photo whose `pendingId` names a blob in no local store is the one
+        // shape an upload cannot produce, because an upload always leaves the
+        // blob on the device that did it. Seeded before the worker starts, or
+        // not reachable at all.
+        {
+            name: 'media-viewer-pending',
+            testMatch: 'media-viewer-pending.spec.ts',
+        },
     ],
 });
