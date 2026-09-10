@@ -106,7 +106,6 @@ describe("PeopleEditor", () => {
   it("groups people by role kind — Client and Agents sections both render", () => {
     const { getByText } = render(
       <PeopleEditor
-        inspectionId="insp-1"
         people={[PRIMARY_CLIENT, AGENT_PERSON]}
         roleProfiles={[CLIENT_ROLE, AGENT_ROLE]}
         isAdmin
@@ -120,7 +119,7 @@ describe("PeopleEditor", () => {
 
   it("shows the Add person button", () => {
     const { getByText } = render(
-      <PeopleEditor inspectionId="insp-1" people={[]} roleProfiles={[CLIENT_ROLE]} isAdmin />,
+      <PeopleEditor people={[]} roleProfiles={[CLIENT_ROLE]} isAdmin />,
     );
     expect(getByText("Add person")).toBeTruthy();
   });
@@ -131,7 +130,6 @@ describe("PeopleEditor", () => {
   it("renders Remove on every row, including the primary client", () => {
     const { getByText, queryAllByText } = render(
       <PeopleEditor
-        inspectionId="insp-1"
         people={[PRIMARY_CLIENT, CO_CLIENT, AGENT_PERSON]}
         roleProfiles={[CLIENT_ROLE, AGENT_ROLE]}
         isAdmin
@@ -144,7 +142,6 @@ describe("PeopleEditor", () => {
   it("disables Remove for the ONLY client and says why, instead of hiding the button", () => {
     const { getByText, getAllByText } = render(
       <PeopleEditor
-        inspectionId="insp-1"
         people={[PRIMARY_CLIENT, AGENT_PERSON]}
         roleProfiles={[CLIENT_ROLE, AGENT_ROLE]}
         isAdmin
@@ -165,7 +162,6 @@ describe("PeopleEditor", () => {
   it("offers Make primary only on a non-primary CLIENT row — never on an agent", () => {
     const { getAllByText, queryAllByText } = render(
       <PeopleEditor
-        inspectionId="insp-1"
         people={[PRIMARY_CLIENT, CO_CLIENT, AGENT_PERSON]}
         roleProfiles={[CLIENT_ROLE, AGENT_ROLE]}
         isAdmin
@@ -183,7 +179,6 @@ describe("PeopleEditor", () => {
     submitMock.mockClear();
     const { getByText } = render(
       <PeopleEditor
-        inspectionId="insp-1"
         people={[PRIMARY_CLIENT, CO_CLIENT]}
         roleProfiles={[CLIENT_ROLE]}
         isAdmin
@@ -207,7 +202,6 @@ describe("PeopleEditor", () => {
     submitMock.mockClear();
     const { getAllByText, getByText } = render(
       <PeopleEditor
-        inspectionId="insp-1"
         people={[
           { ...PRIMARY_CLIENT, access: { status: "active", sentAt: 1_700_000_000_000, expiresAt: null } },
           AGENT_PERSON,
@@ -238,7 +232,6 @@ describe("PeopleEditor", () => {
     // working" in the one case where they have no working link is backwards.
     const { getAllByText, getByText, queryByText } = render(
       <PeopleEditor
-        inspectionId="insp-1"
         people={[
           { ...AGENT_PERSON, access: { status: "revoked", sentAt: 1_700_000_000_000, expiresAt: null } },
         ]}
@@ -257,7 +250,6 @@ describe("PeopleEditor", () => {
   it("offers Reset only to someone who actually has a link", () => {
     const { queryAllByText } = render(
       <PeopleEditor
-        inspectionId="insp-1"
         people={[
           { ...PRIMARY_CLIENT, access: { status: "active", sentAt: 1_700_000_000_000, expiresAt: null } },
           { ...AGENT_PERSON, access: { status: "not_sent", sentAt: null, expiresAt: null } },
@@ -275,7 +267,6 @@ describe("PeopleEditor", () => {
   it("shows per-recipient link state", () => {
     const { getByText } = render(
       <PeopleEditor
-        inspectionId="insp-1"
         people={[
           { ...PRIMARY_CLIENT, access: { status: "revoked", sentAt: 1_700_000_000_000, expiresAt: null } },
           { ...AGENT_PERSON, access: { status: "not_sent", sentAt: null, expiresAt: null } },
@@ -291,7 +282,7 @@ describe("PeopleEditor", () => {
   // IA-36 ⑭ — mailto stays, but it is labelled as leaving the product.
   it("labels the mailto link as opening the local mail app", () => {
     const { getByText } = render(
-      <PeopleEditor inspectionId="insp-1" people={[AGENT_PERSON]} roleProfiles={[AGENT_ROLE]} isAdmin />,
+      <PeopleEditor people={[AGENT_PERSON]} roleProfiles={[AGENT_ROLE]} isAdmin />,
     );
     const mail = getByText("amy@realty.com") as HTMLAnchorElement;
     expect(mail.getAttribute("href")).toBe("mailto:amy@realty.com");
@@ -303,7 +294,6 @@ describe("PeopleEditor", () => {
   it("offers the link-expiry control only once links have actually been sent", () => {
     const { queryByText } = render(
       <PeopleEditor
-        inspectionId="insp-1"
         people={[{ ...PRIMARY_CLIENT, access: { status: "not_sent", sentAt: null, expiresAt: null } }]}
         roleProfiles={[CLIENT_ROLE]}
         isAdmin
@@ -315,7 +305,6 @@ describe("PeopleEditor", () => {
   it("names the number of links the expiry would hit", () => {
     const { getByText } = render(
       <PeopleEditor
-        inspectionId="insp-1"
         people={[
           { ...PRIMARY_CLIENT, access: { status: "active", sentAt: 1_700_000_000_000, expiresAt: null } },
           { ...AGENT_PERSON, access: { status: "active", sentAt: 1_700_000_000_000, expiresAt: null } },
@@ -333,7 +322,6 @@ describe("PeopleEditor", () => {
   it("disables the expiry action when it would change nothing, and says so", () => {
     const { getByText } = render(
       <PeopleEditor
-        inspectionId="insp-1"
         people={[{ ...PRIMARY_CLIENT, access: { status: "active", sentAt: 1_700_000_000_000, expiresAt: null } }]}
         roleProfiles={[CLIENT_ROLE]}
         isAdmin
@@ -347,7 +335,6 @@ describe("PeopleEditor", () => {
   it("singularizes the expiry action for exactly one link", () => {
     const { getByText, queryByText } = render(
       <PeopleEditor
-        inspectionId="insp-1"
         people={[{ ...PRIMARY_CLIENT, access: { status: "active", sentAt: 1_700_000_000_000, expiresAt: 1_800_000_000_000 } }]}
         roleProfiles={[CLIENT_ROLE]}
         isAdmin
@@ -360,7 +347,7 @@ describe("PeopleEditor", () => {
   it("calls the add fetcher's submit with the person-add intent on inline-create submit", () => {
     submitMock.mockClear();
     const { getByText, getByPlaceholderText } = render(
-      <PeopleEditor inspectionId="insp-1" people={[]} roleProfiles={[CLIENT_ROLE, AGENT_ROLE]} isAdmin />,
+      <PeopleEditor people={[]} roleProfiles={[CLIENT_ROLE, AGENT_ROLE]} isAdmin />,
     );
 
     fireEvent.click(getByText("Add person"));

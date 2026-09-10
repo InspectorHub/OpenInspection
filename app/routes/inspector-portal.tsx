@@ -924,7 +924,6 @@ export default function InspectionHubPage() {
             (getPeopleCard) the rest of the page already uses. */}
         <div className="space-y-4">
           <PeopleEditor
-            inspectionId={inspection.id}
             people={people}
             roleProfiles={roleProfiles}
             isAdmin={isAdmin}

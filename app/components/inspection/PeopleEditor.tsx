@@ -104,12 +104,10 @@ function AccessLine({
  * is stated on a disabled button rather than expressed by hiding it.
  */
 export function PeopleEditor({
-  inspectionId,
   people,
   roleProfiles,
   isAdmin,
 }: {
-  inspectionId: string;
   people: PersonRow[];
   roleProfiles: RoleProfile[];
   isAdmin: boolean;
@@ -189,7 +187,7 @@ export function PeopleEditor({
         : m.inspections_hub_people_link_expiry_apply({ count: issuedCount });
 
   return (
-    <Card className="p-5" data-inspection-id={inspectionId}>
+    <Card className="p-5">
       {/* Shared heading, not a hand-copy of its markup — the duplicate is how
           this card's header came to hold a button while every neighbour's held
           a status pill. "Add person" now sits at the bottom with every other
