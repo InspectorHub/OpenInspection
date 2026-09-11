@@ -30,6 +30,20 @@ type SystemBlockKind = 'auditMetadata' | 'attachmentManifest' | 'icsHint' | 'vie
 export interface EmailTemplateDescriptor {
   trigger: string;
   name: string;
+  /**
+   * What this template is ABOUT — a filing axis for the template editor, not a
+   * statement about who receives the mail. It shares two words with
+   * `ROLE_KINDS` and is not it: `concierge` is a workflow rather than an
+   * audience, `system` is the platform speaking, and a recipient's actual kind
+   * is resolved per send from `contact_role_profiles.kind`.
+   *
+   * ⚠️ Known gap, kept visible rather than papered over: there is no category
+   * an `other`-kind role's template belongs to (attorney, transaction
+   * coordinator, insurance agent, title company all file under nothing). Giving
+   * it one is a product decision about how the editor groups templates — do NOT
+   * "fix" it by folding this axis into ROLE_KINDS, which would lose the
+   * `concierge` and `system` distinctions the editor depends on.
+   */
   category: 'client' | 'agent' | 'concierge' | 'system';
   editable: boolean;
   required: boolean;

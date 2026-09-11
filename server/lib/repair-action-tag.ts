@@ -4,11 +4,14 @@
  *
  * A LEAF module on purpose. The drizzle column, the request schema, the service
  * and the route all read the same vocabulary from here, so the four cannot
- * disagree; and because this file imports nothing, the UI can read the
- * predicate without dragging `drizzle-orm/d1` into the client bundle — the
- * shape `app/lib/people/agent-repair-access.ts` already establishes for the
- * agent repair policy.
+ * disagree; and because this file's only import is another leaf (`people/role-kinds`,
+ * which in turn imports only `auth/roles`), the UI can read the predicate
+ * without dragging `drizzle-orm/d1` into the client bundle — the shape
+ * `app/lib/people/agent-repair-access.ts` already establishes for the agent
+ * repair policy. Keep it that way: anything with a runtime dependency belongs
+ * on the other side of this module, not in it.
  */
+import { ROLE_KIND, type RepairCreatorKind } from './people/role-kinds';
 
 /**
  * The buyer's requested remedy. Four values, because that is what the market
@@ -38,9 +41,9 @@ export type RepairActionTag = (typeof REPAIR_ACTION_TAGS)[number];
  * by the UI, so no page can offer an action the API refuses.
  */
 export function mayAuthorRepairActionTag(
-    creatorKind: 'client' | 'agent' | 'inspector',
+    creatorKind: RepairCreatorKind,
 ): boolean {
-    return creatorKind === 'client' || creatorKind === 'agent';
+    return creatorKind === ROLE_KIND.CLIENT || creatorKind === ROLE_KIND.AGENT;
 }
 
 /**

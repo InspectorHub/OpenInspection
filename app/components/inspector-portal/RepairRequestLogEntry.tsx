@@ -28,6 +28,10 @@ import { Card, Pill } from "@core/shared-ui";
 import { RepairDefectRowView } from "~/components/portal/sections/repair/RepairDefectRowView";
 import { formatCents } from "~/lib/money";
 import type { RepairActionTag } from "~/lib/repair-action-tag";
+// The list-owner vocabulary, read from the module the COLUMN reads (a leaf:
+// plain data, no drizzle). A local union here is how a Pill ends up with a
+// case the API can no longer send, or missing one it can.
+import type { RepairCreatorKind } from "../../../server/lib/people/role-kinds";
 import { m } from "~/paraglide/messages";
 
 /** Not exported: it reaches every caller through `RepairRequestLogList.items`,
@@ -47,7 +51,7 @@ interface RepairRequestLogItem {
 
 export interface RepairRequestLogList {
   id: string;
-  createdByKind: "client" | "agent" | "inspector";
+  createdByKind: RepairCreatorKind;
   createdByRef: string;
   customIntro: string | null;
   /** Already formatted by the page, which owns the viewer's time zone. */

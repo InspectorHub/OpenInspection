@@ -37,7 +37,7 @@ const ROWS: ProblemRow[] = [
         entity: "contact",
         position: 3,
         field: "type",
-        reason: "A contact has to be one of agent, client, other.",
+        reason: "A contact has to be one of client, agent, other.",
         value: "vendor",
         suggestion: "client",
         payloadEcho: { name: "Bob", email: "b@example.test", type: "vendor" },
@@ -70,7 +70,7 @@ describe("RepairStage: what is wrong", () => {
     it("says it in the words the server used, rather than a category of its own", () => {
         renderStage();
         expect(screen.getByText(/This entry has no name/)).toBeTruthy();
-        expect(screen.getByText(/one of agent, client, other/)).toBeTruthy();
+        expect(screen.getByText(/one of client, agent, other/)).toBeTruthy();
     });
 
     it("points at the entry by its place in the operator's own file, counting from one", () => {
