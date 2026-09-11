@@ -327,7 +327,7 @@ export default function AgentSettingsProfilePage() {
             ...TIMEZONE_SELECT_OPTIONS,
           ]}
         />
-        <p className={`text-[12px] mt-2 ${tzError ? "text-ih-bad-fg" : "text-ih-fg-4"}`}>
+        <p className={`text-[12px] mt-2 ${tzError ? "text-ih-bad-fg" : "text-ih-fg-3"}`}>
           {tzError ?? (tzSaved ? m.agent_portal_settings_timezone_saved() : m.agent_portal_settings_timezone_hint())}
         </p>
         <BrowserTimezoneHint effectiveValue={tz} onUse={saveTimezone} />

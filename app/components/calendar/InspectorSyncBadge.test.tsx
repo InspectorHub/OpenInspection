@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { render } from "@testing-library/react";
 import { InspectorSyncBadge, syncBadgeState } from "./InspectorSyncBadge";
 import { formatRelativeTime } from "~/lib/format";
@@ -117,5 +119,50 @@ describe("InspectorSyncBadge", () => {
     expect(label?.getAttribute("aria-hidden")).toBe("true");
     const srOnly = container.querySelector(".sr-only");
     expect(srOnly?.textContent).toContain(m.calendar_sync_connected());
+  });
+
+  /**
+   * F34 — the not-connected label was `text-ih-fg-4` inside an 11px span:
+   * 2.56:1 on a light card, 3.07:1 on a dark one, both below AA for text at
+   * that size. `lint:contrast` cannot see it, because the colour is looked up
+   * from a `Record` rather than written into a class string, so the assertion
+   * has to live here.
+   *
+   * `text-ih-fg-3` (4.76 / 5.71 / 12.02 on `--ih-bg-card`) is the token the
+   * neighbouring fixes chose for text on the plain card surface — `.ih-eyebrow`
+   * in app/styles/tailwind.css says so in as many words. The fg-2 cases
+   * (`.ih-kbd`, `.ih-pill--ni`, the TabStrip count pill, the Stripe
+   * "Not connected" chip) are the ones that paint their OWN `--ih-bg-muted`
+   * background, where fg-3 falls to 4.34:1. This badge paints no background of
+   * its own, so it is an eyebrow-shaped case, not a chip-shaped one.
+   */
+  it("labels a missing connection with a token that clears AA at 11px", () => {
+    const { container } = renderBadge(false, null);
+    const label = container.querySelector("[data-sync-label]") as HTMLElement;
+    // The failing token, named so a regression cannot pass by being "some other grey".
+    expect(label.className).not.toContain("text-ih-fg-4");
+    expect(label.className).toContain("text-ih-fg-3");
+  });
+
+  // Positive control for the assertion above: the other two states were already
+  // readable and must not be flattened into the same grey by this fix.
+  it("leaves the readable states on the tokens they already had", () => {
+    expect(
+      (renderBadge(true, NOW - HOUR).container.querySelector("[data-sync-label]") as HTMLElement)
+        .className,
+    ).toContain("text-ih-fg-3");
+    expect(
+      (renderBadge(true, NOW - 30 * HOUR).container
+        .querySelector("[data-sync-label]") as HTMLElement).className,
+    ).toContain("text-ih-watch-fg");
+  });
+
+  // ⚠️ A Tailwind colour class whose token does not exist compiles to NO RULE AT
+  // ALL and is invisible everywhere but a browser. Assert the alias is declared
+  // rather than trusting that the class string looks plausible.
+  it("uses a colour token that the stylesheet actually declares", () => {
+    const css = readFileSync(join(import.meta.dirname, "../../styles/tailwind.css"), "utf8");
+    expect(css).toContain("--color-ih-fg-3:");
+    expect(css).toMatch(/--ih-fg-3:\s*#/);
   });
 });

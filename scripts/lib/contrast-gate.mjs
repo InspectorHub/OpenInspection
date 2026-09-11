@@ -43,18 +43,17 @@ export const MAX_SMALL_PX = 14;
  * found in `file`, otherwise the gate fails.
  */
 export const KNOWN_DEBT = [
-  {
-    // A REAL failure, recorded rather than repaired, and for a scheduling reason
-    // rather than a design one: `text-ih-fg-4` at 12px on the card is 2.56:1 in
-    // light and 3.07:1 in dark. The fix is the same one-token change applied at
-    // the other 30 sites in this sweep — `text-ih-fg-3` (4.76 / 5.71 / 12.02) —
-    // and it was left out only because `app/routes/agent/` was being edited
-    // concurrently by another agent when this gate was extended. Not an approval.
-    // The staleness guard retires this entry the moment the line is fixed.
-    file: "app/routes/agent/settings-profile.tsx",
-    match: 'tzError ? "text-ih-bad-fg" : "text-ih-fg-4"',
-    ratio: { light: 2.56, dark: 3.07 },
-  },
+  // EMPTY, and that is the point. The one entry this list ever carried —
+  // `text-ih-fg-4` at 12px in `app/routes/agent/settings-profile.tsx`, 2.56:1
+  // light and 3.07:1 dark — was repaired on 2026-09-11 with the same one-token
+  // change (`text-ih-fg-3`) its own comment had prescribed. It had been recorded
+  // rather than fixed only because that directory was being edited concurrently
+  // when this gate was extended.
+  //
+  // The staleness guard is what closed it: once the line was fixed, the gate
+  // reported the exemption itself as stale and refused to pass until the entry
+  // came out. An exemption list that cannot go stale becomes a list of things
+  // nobody will ever look at again — keep that guard if you ever add an entry.
 ];
 
 /** Path comparison that survives the separator differing between Windows and CI. */

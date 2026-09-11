@@ -26,6 +26,20 @@ export function syncBadgeState(
 // Connected stays quiet (muted text, green dot) so a healthy row reads calm;
 // stale/never use amber text that pops precisely because everything else is
 // muted; not-connected is a neutral "not set up", not an error, so it stays grey.
+//
+// Grey, but fg-3 rather than fg-4. fg-4 is the DECORATION tier — chevrons,
+// dividers, placeholders, and the dot below — measuring 2.56:1 on a light card
+// and 3.07:1 on a dark one, which is under AA for the 11px text this label is.
+// fg-3 is 4.76 / 5.71 / 12.02 on the same surface. That is the choice
+// `.ih-eyebrow` states in app/styles/tailwind.css for text sitting on the plain
+// card; the fg-2 cases next to it (`.ih-kbd`, `.ih-pill--ni`, the TabStrip count
+// pill, the Stripe "Not connected" chip) are the ones that paint their own
+// --ih-bg-muted background, where fg-3 drops to 4.34:1. This badge paints no
+// background, so it follows the eyebrow.
+//
+// `lint:contrast` cannot see any of this: it reads colour tokens out of class
+// STRINGS, and these live in a lookup table, so the assertion is in
+// InspectorSyncBadge.test.tsx instead.
 const DOT: Record<SyncBadgeState, string> = {
   connected: "bg-ih-ok-fg",
   stale: "bg-ih-watch-fg",
@@ -34,7 +48,7 @@ const DOT: Record<SyncBadgeState, string> = {
 const TEXT: Record<SyncBadgeState, string> = {
   connected: "text-ih-fg-3",
   stale: "text-ih-watch-fg",
-  "not-connected": "text-ih-fg-4",
+  "not-connected": "text-ih-fg-3",
 };
 
 function stateLabel(state: SyncBadgeState): string {

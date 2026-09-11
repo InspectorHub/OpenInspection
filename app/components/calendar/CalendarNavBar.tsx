@@ -37,7 +37,28 @@ export function CalendarNavBar({
   const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
-    <div className="flex items-center justify-between">
+    // The same three rules as `PageHeader` (packages/shared-ui/src/PageHeader.tsx),
+    // applied here because these controls are NOT page-header actions: /calendar
+    // passes `PageHeader` a title and meta only, and the month/week/day buttons
+    // live in this row. The header fix therefore never reached this page.
+    //
+    // `flex-wrap` on the row: without it the row is `nowrap`, so once the three
+    // groups (~110px of prev/next/today, a `text-xl` month title, three view
+    // buttons) stop fitting, the view buttons have nowhere to go but off the
+    // right edge — taking a horizontal scrollbar on the document with them.
+    //
+    // `min-w-0` on the title column: a flex item's automatic minimum size is its
+    // min-content width, so a long localized month title refuses to shrink below
+    // its longest word and keeps the space the view buttons needed.
+    //
+    // The view-mode block wraps INTERNALLY and stays shrinkable (no
+    // `flex-shrink-0`), so at the narrowest widths it reflows within itself
+    // rather than holding its full width against the row.
+    //
+    // `gap-y-2` only matters once the row wraps — it keeps the wrapped line off
+    // the one above. `gap-x-3` is a MINIMUM between groups, so `justify-between`
+    // still spreads them exactly as before on a wide screen.
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -63,7 +84,7 @@ export function CalendarNavBar({
           {m.calendar_nav_today()}
         </button>
       </div>
-      <div className="relative">
+      <div className="relative min-w-0">
         <button
           ref={titleRef}
           type="button"
@@ -85,7 +106,7 @@ export function CalendarNavBar({
           locale={locale}
         />
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center justify-end gap-1">
         {(["month", "week", "day"] as const).map((mode) => (
           <button
             key={mode}
