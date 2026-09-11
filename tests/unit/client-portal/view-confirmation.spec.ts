@@ -117,7 +117,7 @@ describe('OI #271 — report view confirmation', () => {
                 portalAccess,
                 inspection: {
                     getReportData: vi.fn().mockResolvedValue({ inspectionId: INSP, sections: [] }),
-                    resolveAgentViewToken: vi.fn().mockResolvedValue(null),
+                    resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken: vi.fn().mockResolvedValue(null),
                 },
                 reportVersion: { getLatestPublished: vi.fn().mockResolvedValue(null) },
             } as unknown as HonoConfig['Variables']['services']);

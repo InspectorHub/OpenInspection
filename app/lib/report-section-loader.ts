@@ -53,7 +53,13 @@ export async function loadReportSection(
         cookie: request.headers.get("cookie") ?? undefined,
       }),
     ]);
-    const body = res.ok ? await res.json() : {};
+    const body = res.ok ? await res.json() : await res.json().catch(() => ({}));
+    // A 403 has TWO causes and they are different facts to a reader. The report
+    // is not published (there is nothing to show yet), or it IS published and
+    // the workspace is holding it for a signed agreement or a payment. Reporting
+    // the second as the first tells a client who owes money that their inspector
+    // has not finished — which is both wrong and the opposite of actionable.
+    const refusal = ((body as { error?: { code?: string } }).error?.code) ?? null;
     const d = ((body as Record<string, unknown>).data ?? {}) as unknown as ReportLoaderResult | undefined;
     const meta = d as unknown as {
       inspection?: { propertyAddress?: string | null; date?: string | null; inspectorName?: string | null };
@@ -71,14 +77,14 @@ export async function loadReportSection(
       outline: (raw?.outline as ReportLoaderResult["outline"] | undefined) ?? [],
       showEstimates: d?.showEstimates ?? false,
       costTables: (raw?.costTables as ReportLoaderResult["costTables"] | undefined) ?? null,
-      enableRepairList: d?.enableRepairList ?? false,
       enableCustomerRepairExport: d?.enableCustomerRepairExport ?? false,
       reportTimeZone: d?.reportTimeZone ?? "UTC",
       isDelivered: d?.isDelivered ?? false,
       viewTrackingObjected,
       brand,
       error: res.ok ? null : m.helper_section_report_not_found(),
-      notPublished: (res.status as number) === 403,
+      notPublished: (res.status as number) === 403 && refusal !== "REPORT_GATED",
+      reportHeld: (res.status as number) === 403 && refusal === "REPORT_GATED",
       linkInactive: (res.status as number) === 410,
       styleProfile: raw?.styleProfile as ReportLoaderResult["styleProfile"],
       inspectorCredentials: raw?.inspectorCredentials as ReportLoaderResult["inspectorCredentials"],
@@ -119,13 +125,13 @@ export async function loadReportSection(
       outline: [],
       showEstimates: false,
       costTables: null,
-      enableRepairList: false,
       enableCustomerRepairExport: false,
       reportTimeZone: "UTC",
       isDelivered: false,
       brand: EMPTY_BRAND,
       error: m.helper_section_service_unavailable(),
       notPublished: false,
+      reportHeld: false,
       linkInactive: false,
       initialFilter,
       printMode,

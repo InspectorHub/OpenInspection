@@ -53,6 +53,20 @@ export async function runBuilderGate(
         );
     }
 
+    // THE RELEASE GATE APPLIES HERE TOO, and for the same reason it applies to
+    // the report itself: what this route serves IS report content. The builder
+    // hands a client every defect in the inspection, so a workspace holding the
+    // report for a signed agreement or an outstanding payment would have the
+    // whole substance of it walk out through this door while the report page
+    // beside it correctly refused. One rule, every door that opens onto it.
+    const releaseGate = await c.var.services.inspection.resolveReleaseGate(id, tenantId);
+    if (releaseGate) {
+        return c.json(
+            { success: false as const, error: { code: 'REPORT_GATED', message: 'This report has not been released yet.' } },
+            403,
+        );
+    }
+
     return null;
 }
 

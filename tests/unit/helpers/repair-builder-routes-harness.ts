@@ -71,6 +71,8 @@ export function makeUnpublishedDb() {
 export function makeServices(overrides: {
     portalAccessResolveToken?: ReturnType<typeof vi.fn>;
     resolveAgentViewToken?: ReturnType<typeof vi.fn>;
+    /** F77 — the builder gate's agreement/payment hold. Default: nothing held. */
+    resolveReleaseGate?: ReturnType<typeof vi.fn>;
     getRepairList?: ReturnType<typeof vi.fn>;
     listMine?: ReturnType<typeof vi.fn>;
     listMineWithItems?: ReturnType<typeof vi.fn>;
@@ -102,6 +104,11 @@ export function makeServices(overrides: {
         inspection: {
             resolveAgentViewToken: overrides.resolveAgentViewToken ?? defaultAgent,
             getRepairList:         overrides.getRepairList ?? defaultRepairList,
+            // F77 — the builder gate asks whether the report is being held for a
+            // signed agreement or an outstanding payment. Null = nothing held
+            // back, which is what these cases are about; the hold itself has its
+            // own spec.
+            resolveReleaseGate:    overrides.resolveReleaseGate ?? vi.fn().mockResolvedValue(null),
             // IA-35 / IA-73 — tenant agent-repair policy; default readwrite.
             getAgentRepairAccess:  overrides.getAgentRepairAccess ?? vi.fn().mockResolvedValue('readwrite'),
         },
@@ -212,7 +219,7 @@ export function makeShareServices(overrides: {
 } = {}) {
     return {
         portalAccess: { resolveToken: vi.fn().mockResolvedValue(null) },
-        inspection:   { resolveAgentViewToken: vi.fn().mockResolvedValue(null) },
+        inspection:   { resolveAgentViewToken: vi.fn().mockResolvedValue(null), resolveReleaseGate: vi.fn().mockResolvedValue(null) },
         repairRequest: {
             getByShareToken: overrides.getByShareToken ?? vi.fn().mockResolvedValue(null),
             creditTotal:     overrides.creditTotal ?? vi.fn().mockResolvedValue(0),

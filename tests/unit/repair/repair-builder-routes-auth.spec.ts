@@ -144,7 +144,7 @@ describe('GET /api/public/repair-builder/:tenant/:id/source', () => {
         const listMine = vi.fn().mockResolvedValue([]);
 
         const { app } = buildApp({
-            services: makeServices({ resolveAgentViewToken, listMine }),
+            services: makeServices({ resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken, listMine }),
             reportStatus: 'published',
             enableCustomerRepairExport: true,
         });

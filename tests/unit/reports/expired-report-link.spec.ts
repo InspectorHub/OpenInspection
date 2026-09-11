@@ -50,7 +50,7 @@ describe('GET /api/public/report/:tenant/:id with a link we took offline', () =>
             (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
             c.set('services', {
                 portalAccess: { resolveToken: async () => row },
-                inspection: { getReportData: async () => ({ inspectionId: 'insp1' }), resolveAgentViewToken: async () => null },
+                inspection: { getReportData: async () => ({ inspectionId: 'insp1' }), resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken: async () => null },
             } as never);
             await next();
         });

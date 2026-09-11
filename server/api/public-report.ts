@@ -248,6 +248,28 @@ const reportGateRoute = createRoute(withMcpMetadata({
     description: 'Public, no-login report-gate status resolved by tenant slug + inspection id. Returns the outstanding gate (agreement before payment) with branding, inspector contact, and amount due — or null when the report is not gated.',
 }, { scopes: [], tier: 'extended' }));
 
+/**
+ * The outstanding release gate for a public request, or null when nothing holds
+ * the report back.
+ *
+ * Skipped entirely on the bypass paths rather than computed and discarded: the
+ * predicate ignores it there, and asking anyway would put two database reads on
+ * every page the headless PDF renderer loads.
+ *
+ * Takes the service structurally so this module needs no new import, and so a
+ * test can hand it a stub without constructing the whole service graph.
+ */
+async function releaseGateFor(
+    services: { inspection: { resolveReleaseGate(inspectionId: string, tenantId: string): Promise<{ reason: 'payment' | 'agreement' } | null> } },
+    id: string,
+    tenantId: string,
+    bypass: boolean,
+): Promise<'payment' | 'agreement' | null> {
+    if (bypass) return null;
+    const gate = await services.inspection.resolveReleaseGate(id, tenantId);
+    return gate?.reason ?? null;
+}
+
 const publicReportRoutes = createApiRouter()
     .route('/', publicVerifyRoutes)
     .route('/', publicViewTrackingRoutes)
@@ -332,8 +354,15 @@ const publicReportRoutes = createApiRouter()
             .from(inspections)
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
             .get();
-        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: gateRow?.reportStatus })) {
-            return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+        // TWO gates, not one. `releaseGate` is the agreement/payment hold the
+        // client Hub already reports; this endpoint used to check only whether
+        // the report was published, so a workspace that required payment got a
+        // Hub saying the report was held back and this endpoint handing it over.
+        const releaseGate = await releaseGateFor(c.var.services, id, tenantId, renderMode || ownerPreview);
+        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: gateRow?.reportStatus, releaseGate })) {
+            return c.json(releaseGate
+                ? { success: false as const, error: { code: 'REPORT_GATED', message: 'This report has not been released yet.' } }
+                : { success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
         }
         // OI #271 — delivery confirmation, after the publish gate (a blocked
         // request is not an open). Grant/renderMode/ownerPreview are resolved
@@ -415,7 +444,9 @@ const publicReportRoutes = createApiRouter()
             .from(inspections)
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
             .get();
-        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: photoGate?.reportStatus })) {
+        // A gate that holds the report but serves its photographs is not a gate.
+        const photoReleaseGate = await releaseGateFor(c.var.services, id, tenantId, renderMode || ownerPreview);
+        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: photoGate?.reportStatus, releaseGate: photoReleaseGate })) {
             return c.notFound();
         }
         // Ownership: keys are `${tenantId}/inspections/${inspectionId}/...` — reject
@@ -452,7 +483,12 @@ const publicReportRoutes = createApiRouter()
         if (!insp) return c.notFound();
         // Publish gate: this is a pure client-facing endpoint (no owner-preview, no
         // render token), so block whenever the report is not currently published.
-        if (!publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: insp.reportStatus })) {
+        // Same two gates. This is the pure client-facing download; the headless
+        // renderer reaches the report through its own render token above, so
+        // gating here does not block the PDF from being BUILT, only from being
+        // handed to a client who has not cleared the hold.
+        const pdfReleaseGate = await releaseGateFor(c.var.services, id, tenantId, false);
+        if (!publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: insp.reportStatus, releaseGate: pdfReleaseGate })) {
             return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
         }
         // Everyday download always tracks current content (versionNumber: null →

@@ -32,12 +32,33 @@ export interface ReportUnavailableProps {
   /** The loader's error string (non-null, or the report would have rendered). */
   error: string;
   notPublished: boolean;
+  /**
+   * The report is finished and published, and the workspace is holding it for a
+   * signed agreement or an outstanding payment. Checked BEFORE `notPublished`
+   * below, because the two are different facts and this one is the actionable
+   * half: telling a client who owes money that their inspector has not finished
+   * sends them to the wrong person.
+   */
+  reportHeld?: boolean;
   /** The link was real but has expired or been revoked (API 410). */
   linkInactive?: boolean;
   brand: TenantBrand;
 }
 
-export function ReportUnavailable({ error, notPublished, linkInactive, brand }: ReportUnavailableProps) {
+export function ReportUnavailable({ error, notPublished, reportHeld, linkInactive, brand }: ReportUnavailableProps) {
+  if (reportHeld) {
+    // No CTA here on purpose. The Hub's own overview already renders the gate
+    // notice with the right next step (sign, or pay) and the link to reach it;
+    // a second button built from this component's thinner data would be a
+    // second authority for the same question, which is the defect that produced
+    // this whole change.
+    return (
+      <ErrorState
+        title={m.report_view_held_title()}
+        message={m.report_view_held_message()}
+      />
+    );
+  }
   if (notPublished) {
     return (
       <ErrorState

@@ -82,6 +82,70 @@ export class InspectionPublishService extends InspectionSubService {
      * no signing URL to offer, and the CTA routes to the report rather than to a
      * link that cannot resolve.
      */
+    /**
+     * THE RELEASE GATE, on its own, with no presentation attached.
+     *
+     * Whether a client may be handed this inspection's report at all. Separate
+     * from `getReportGate` below — which answers the same question and then
+     * builds the branded page that explains it — because the ENFORCEMENT points
+     * need only the answer, and making them pay for branding, an inspector
+     * lookup and an invoice read to get a boolean is how an enforcement point
+     * ends up skipping the check instead.
+     *
+     * ⚠️ This method is the single authority. `getReportGate` calls it rather
+     * than re-deciding, because the defect that produced it was exactly two
+     * readers of one condition: the client Hub read the gate and said the report
+     * was held back, while `GET /api/public/report/:tenant/:id` checked only the
+     * PUBLISH gate and served the report anyway. The interface and the
+     * enforcement point contradicted each other in public, and the enforcement
+     * point was the wrong half. Do not add a third reading — call this.
+     *
+     * Returns null when nothing is holding the report back.
+     */
+    async resolveReleaseGate(inspectionId: string, tenantId: string): Promise<{
+        reason: 'payment' | 'agreement';
+        /** True when payment is ALSO outstanding — the combined "Sign & pay" case. */
+        paymentOutstanding: boolean;
+    } | null> {
+        const db = this.getDrizzle();
+        const insp = await db.select({
+            paymentRequired:   inspections.paymentRequired,
+            paymentStatus:     inspections.paymentStatus,
+            agreementRequired: inspections.agreementRequired,
+            unlockedAt:        inspections.unlockedAt,
+        }).from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        // NO ROW IS NOT AN OPEN GATE. A missing inspection is the caller's 404 to
+        // raise; answering "not gated" here would turn a lookup miss into a
+        // release. The callers all resolve the inspection before asking.
+        if (!insp) return null;
+
+        // A manual unlock releases the gate for this whole inspection, which is
+        // the same scope the gate itself has.
+        if (insp.unlockedAt) return null;
+
+        // Agreement before payment (signed first).
+        let reason: 'payment' | 'agreement' | null = null;
+        if (insp.agreementRequired === true) {
+            const signed = await db.select({ id: agreementRequests.id })
+                .from(agreementRequests)
+                .where(and(
+                    eq(agreementRequests.inspectionId, inspectionId),
+                    eq(agreementRequests.tenantId, tenantId),
+                    eq(agreementRequests.status, 'signed'),
+                ))
+                .limit(1);
+            if (signed.length === 0) reason = 'agreement';
+        }
+        // Computed independently of `reason` so the dual-gate (agreement AND
+        // payment) case can route to combined checkout.
+        const paymentOutstanding = insp.paymentRequired === true && insp.paymentStatus !== 'paid';
+        if (!reason && paymentOutstanding) reason = 'payment';
+        if (!reason) return null;
+        return { reason, paymentOutstanding };
+    }
+
     async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string, agreementService?: AgreementService): Promise<{
         reason: 'payment' | 'agreement';
         companyName: string;
@@ -136,28 +200,13 @@ export class InspectionPublishService extends InspectionSubService {
         // table with a retention rule, to solve what one override solves.
         if (insp.unlockedAt) return null;
 
-        // Resolve the outstanding gate. Agreement before payment (signed first).
-        let reason: 'payment' | 'agreement' | null = null;
-        if (insp.agreementRequired === true) {
-            const signed = await db.select({ id: agreementRequests.id })
-                .from(agreementRequests)
-                .where(and(
-                    eq(agreementRequests.inspectionId, inspectionId),
-                    eq(agreementRequests.tenantId, tenantId),
-                    eq(agreementRequests.status, 'signed'),
-                ))
-                .limit(1);
-            if (signed.length === 0) {
-                reason = 'agreement';
-            }
-        }
-        // Payment-outstanding is computed independently of `reason` so the
-        // dual-gate (agreement AND payment) case can route to combined checkout.
-        const paymentOutstanding = insp.paymentRequired === true && insp.paymentStatus !== 'paid';
-        if (!reason && paymentOutstanding) {
-            reason = 'payment';
-        }
-        if (!reason) return null;   // not gated — nothing to surface
+        // ONE READING OF THE RULE. Everything above this line is the page's own
+        // data; WHETHER the page should exist at all is `resolveReleaseGate`,
+        // which the enforcement points call too. See its comment for why that
+        // matters.
+        const gate = await this.resolveReleaseGate(inspectionId, tenantId);
+        if (!gate) return null;   // not gated — nothing to surface
+        const { reason, paymentOutstanding } = gate;
 
         // Track I-a Task 7 — both gates outstanding → combined "Sign & pay".
         const bothOutstanding = reason === 'agreement' && paymentOutstanding;
@@ -558,14 +607,14 @@ export class InspectionPublishService extends InspectionSubService {
     /**
      * Publishes one of an inspection's reports (transitions to delivered status).
      *
-     * `reportId` names WHICH deliverable — a standard report today, the radon
-     * report on Thursday. Omitted, it means the order's primary report, which is
-     * what every caller predating multi-report delivery intends.
+     * `reportId` names WHICH deliverable — a standard report today, the radon report
+     * on Thursday. Omitted, it means the order's primary report, which is what every
+     * caller predating multi-report delivery intends. No notify flags (F79):
+     * `notifyClient`/`notifyAgent` were declared here, read by nothing. Delivery is
+     * the `report.published`/`report.amended` rules' call — never add a second.
      */
     async publishInspection(inspectionId: string, tenantId: string, _options: {
         theme: string;
-        notifyClient: boolean;
-        notifyAgent: boolean;
         requireSignature: boolean;
         requirePayment: boolean;
         // Round-2 F1 — optional per-recipient delivery list. Older callers
