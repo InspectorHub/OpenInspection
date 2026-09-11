@@ -156,6 +156,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'inspection.pca_narrative.update': { family: 'inspection', label: 'audit_action_inspection_pca_narrative_update', meta: { fields: 'name' }, status: { kind: 'live' } },
     'inspection.property_facts.autofill': { family: 'inspection', label: 'audit_action_inspection_property_facts_autofill', meta: { reason: 'reason', source: 'name' }, status: { kind: 'live' } },
     'inspection.property_facts.update': { family: 'inspection', label: 'audit_action_inspection_property_facts_update', meta: { fields: 'name' }, status: { kind: 'live' } },
+    'inspection.published': { family: 'inspection', label: 'audit_action_inspection_published', meta: { notifyAgent: 'flag', notifyClient: 'flag', reportId: 'id' }, status: { kind: 'live' } },
     'inspection.rating_system.switch': { family: 'inspection', label: 'audit_action_inspection_rating_system_switch', meta: { mode: 'name', ratingSystemId: 'id' }, status: { kind: 'live' } },
     'inspection.report_narrative.update': { family: 'inspection', label: 'audit_action_inspection_report_narrative_update', meta: { cleared: 'flag', length: 'count', reportId: 'id' }, status: { kind: 'live' } },
     'inspection.report_relocked': { family: 'inspection', label: 'audit_action_inspection_report_relocked', meta: {}, status: { kind: 'live' } },

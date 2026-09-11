@@ -216,14 +216,24 @@ export function auditFromContext(
  *
  * ⚠️ The list was written to be forward-compatible — "when emitters for these
  * events appear, call writeAuditLogWithSlug" — and closing `AuditAction` turned
- * that into a contradiction. FIVE of the six names below are not members of the
- * union (`user.slug.set`, `inspection.created`, `inspection.published`,
- * `invoice.sent`, `invoice.paid`), so no caller can pass them any more, and the
- * sixth (`agreement.sent`) is declared `in-esign-log` — its record is the
- * hash-chained row, not an `audit_logs` one. The consequence is that
- * `inspector_slug` cannot be populated by anything writable today. It is a
- * `Set<string>` rather than `Set<AuditAction>` deliberately, so this file states
- * the gap instead of hiding it behind a cast; pinned by
+ * that into a contradiction. FOUR of the six names below are not members of the
+ * union (`user.slug.set`, `inspection.created`, `invoice.sent`, `invoice.paid`),
+ * so no caller can pass them any more, and `agreement.sent` is declared
+ * `in-esign-log` — its record is the hash-chained row, not an `audit_logs` one.
+ *
+ * `inspection.published` is the one that changed: it joined the union with a
+ * `live` registry entry when the publish route started emitting it. That closes
+ * half the gap and leaves the other half visible — the emitter is
+ * `auditFromContext`, which writes through `writeAuditRow` and never touches
+ * `inspector_slug`. So the column is still NULL on every row, now because of the
+ * WRITER rather than the vocabulary. Routing publish through
+ * `writeAuditLogWithSlug` instead would populate it and lose `actorKind` /
+ * `platformActorId`, which matters more on a publish: a support session shipping
+ * a workspace's report must not read as the workspace doing it. Closing this
+ * properly means teaching one writer both, not swapping which half is missing.
+ *
+ * It is a `Set<string>` rather than `Set<AuditAction>` deliberately, so this
+ * file states the gap instead of hiding it behind a cast; pinned by
  * `tests/unit/tenancy/audit-inspector-slug.spec.ts`.
  */
 export const INSPECTOR_SLUG_AUDIT_ALLOWLIST = new Set<string>([

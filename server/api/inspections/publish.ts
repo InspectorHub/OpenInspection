@@ -377,6 +377,23 @@ const publishRoutes = createApiRouter()
         };
         const result = await service.publishInspection(id, tenantId, publishOptions);
 
+        // The only record that a PERSON published this, and the only one that
+        // survives a later unpublish. Written HERE rather than beside the
+        // `return`: everything between is best-effort follow-on work, and the
+        // PDF pipeline's slug/hash/footer lookups are awaited outside a try — a
+        // throw there would drop the row for a publish that already happened.
+        // `notifyClient`/`notifyAgent` ride along because publishing and telling
+        // somebody are different events, and the publish that told nobody is the
+        // interesting one when a report never reaches a client.
+        auditFromContext(c, 'inspection.published', 'inspection', {
+            entityId: id,
+            metadata: {
+                reportId: body.reportId,
+                notifyClient: body.notifyClient,
+                notifyAgent: body.notifyAgent,
+            },
+        });
+
         // #23 — the courtesy translation, when the publisher asked for one on
         // THIS publish. Never blocks: a translation that could not be produced
         // leaves the English report published and correct, which is the state

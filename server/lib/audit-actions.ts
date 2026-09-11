@@ -17,6 +17,15 @@ export type AuditAction =
     | 'inspection.delete'
     | 'inspection.status_change'
     | 'inspection.complete'
+    // The report actually shipped. Declared in this vocabulary from the start
+    // and emitted by nothing, which left the delivery funnel unobservable: the
+    // publish path writes `inspections.report_status` and `reports.published_at`,
+    // and neither of those says WHO published, WHEN a publish was attempted, or
+    // whether anyone was told. Without this row the only answerable question is
+    // "is it published now", never "did publishing ever happen here".
+    // `POST /{id}/publish` is the sole caller of `publishInspection`, so one
+    // emitter on that route is the whole coverage.
+    | 'inspection.published'
     | 'inspection.send_pdf'
     // The order-wide report gate released for one inspection, and put back.
     // Audited because an unlock hands a client a report the tenant's own rules
