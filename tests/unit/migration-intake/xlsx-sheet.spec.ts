@@ -105,4 +105,135 @@ describe('readXlsxSheet', () => {
         const bytes = await zipOf({ 'TabbedPanes.tpl': '<java/>' });
         expect(await readXlsxSheet(bytes)).toBeNull();
     });
+
+    /**
+     * The script-written workbook, which is a different file from the vendor
+     * export the cases above are measured against. Its shape is taken from a
+     * real upload: openpyxl, `t="inlineStr"` on every string, and not one `<v>`
+     * in the whole sheet. The failure it used to produce is the reason these are
+     * separate cases rather than one — a grid of the right SIZE full of empty
+     * strings passes every structural check a caller can make.
+     */
+    describe('inline strings (`t="inlineStr"`, no `<v>` anywhere)', () => {
+        const INLINE = `<?xml version="1.0"?>
+<worksheet><sheetData>
+<row r="1"><c r="A1" s="4" t="inlineStr"><is><t>ROOF</t></is></c></row>
+<row r="2"><c r="A2" s="5" t="inlineStr"><is><t>Roof covering: Materials, condition and visible defects</t></is></c><c r="B2" s="6" t="n"></c></row>
+<row r="3"><c r="A3" s="7" t="inlineStr"><is><t>Inspected</t></is></c><c r="B3" s="7" t="inlineStr"><is><t>Monitor</t></is></c></row>
+</sheetData></worksheet>`;
+
+        it('reads the text instead of returning blanks', async () => {
+            const bytes = await zipOf({ 'xl/worksheets/sheet1.xml': INLINE });
+            const rows = await readXlsxSheet(bytes);
+            expect(rows).not.toBeNull();
+            expect(rows![0][0]).toBe('ROOF');
+            expect(rows![1][0]).toBe('Roof covering: Materials, condition and visible defects');
+            expect(rows![2]).toEqual(['Inspected', 'Monitor']);
+        });
+
+        it('NEGATIVE CONTROL — a blank read would have the same row count', async () => {
+            // Why the case above asserts CONTENT and not shape. Before inline
+            // strings were read, this file produced three rows of empty strings:
+            // `rows.length` was right, the zero-rows guard never fired, and the
+            // only visible symptom was a run reporting nothing to import.
+            const bytes = await zipOf({ 'xl/worksheets/sheet1.xml': INLINE });
+            const rows = await readXlsxSheet(bytes);
+            expect(rows!.length, 'the shape a blank read also satisfies').toBe(3);
+            expect(rows!.flat().some((cell) => cell !== ''), 'something was actually read').toBe(true);
+        });
+
+        it('joins rich-text runs into one value', async () => {
+            // One string split across runs. Taking the first `<t>` alone
+            // truncates it, and a truncated section name is harder to notice
+            // than an empty one.
+            const sheet = `<?xml version="1.0"?><worksheet><sheetData>
+<row r="1"><c r="A1" t="inlineStr"><is><r><t>Attic / </t></r><r><t>Insulation</t></r></is></c></row>
+</sheetData></worksheet>`;
+            const bytes = await zipOf({ 'xl/worksheets/sheet1.xml': sheet });
+            const rows = await readXlsxSheet(bytes);
+            expect(rows![0][0]).toBe('Attic / Insulation');
+        });
+
+        it('reads a `<t>` that carries xml:space="preserve"', async () => {
+            // The attribute is how a writer keeps significant whitespace, so it
+            // appears on exactly the values where dropping the cell would
+            // change the text.
+            const sheet = `<?xml version="1.0"?><worksheet><sheetData>
+<row r="1"><c r="A1" t="inlineStr"><is><t xml:space="preserve">  Gutters </t></is></c></row>
+</sheetData></worksheet>`;
+            const bytes = await zipOf({ 'xl/worksheets/sheet1.xml': sheet });
+            const rows = await readXlsxSheet(bytes);
+            expect(rows![0][0]).toBe('  Gutters ');
+        });
+
+        it('decodes entities in an inline string the same way as a `<v>` one', async () => {
+            // The decode is shared deliberately: an inline string that took a
+            // different path would print `&amp;` where the other prints `&`.
+            const sheet = `<?xml version="1.0"?><worksheet><sheetData>
+<row r="1"><c r="A1" t="inlineStr"><is><t>Doors &amp;amp; Windows</t></is></c></row>
+</sheetData></worksheet>`;
+            const bytes = await zipOf({ 'xl/worksheets/sheet1.xml': sheet });
+            const rows = await readXlsxSheet(bytes);
+            expect(rows![0][0]).toBe('Doors & Windows');
+        });
+
+        it('decodes the numeric references a script-written file is full of', async () => {
+            // `&#9744;` is a ballot box and `&#8212;` an em dash; a real form used
+            // both, one per rating column and one per item label. Undecoded they
+            // import as literal `&#8212;`, which reads as a typo in somebody
+            // else's template rather than as a decoding bug.
+            const sheet = `<?xml version="1.0"?><worksheet><sheetData>
+<row r="1"><c r="A1" t="inlineStr"><is><t>HEIDEN &#8212; FIELD FORM</t></is></c><c r="B1" t="inlineStr"><is><t>&#9744; Inspected</t></is></c></row>
+</sheetData></worksheet>`;
+            const bytes = await zipOf({ 'xl/worksheets/sheet1.xml': sheet });
+            const rows = await readXlsxSheet(bytes);
+            expect(rows![0]).toEqual(['HEIDEN — FIELD FORM', '☐ Inspected']);
+        });
+
+        it('decodes the HEX spelling of the same reference', async () => {
+            // `&#x2014;` is the same em dash. A rule that handled only decimal
+            // would be right on one writer's output and wrong on the next.
+            const sheet = `<?xml version="1.0"?><worksheet><sheetData>
+<row r="1"><c r="A1" t="inlineStr"><is><t>A &#x2014; B</t></is></c></row>
+</sheetData></worksheet>`;
+            const bytes = await zipOf({ 'xl/worksheets/sheet1.xml': sheet });
+            const rows = await readXlsxSheet(bytes);
+            expect(rows![0][0]).toBe('A — B');
+        });
+
+        it('decodes a DOUBLE-escaped numeric reference, like the named ones', async () => {
+            // The two-pass bound has to know a numeric reference is an entity or
+            // it stops after the first pass and leaves `&#8212;` in the text.
+            const sheet = `<?xml version="1.0"?><worksheet><sheetData>
+<row r="1"><c r="A1" t="inlineStr"><is><t>A &amp;#8212; B</t></is></c></row>
+</sheetData></worksheet>`;
+            const bytes = await zipOf({ 'xl/worksheets/sheet1.xml': sheet });
+            const rows = await readXlsxSheet(bytes);
+            expect(rows![0][0]).toBe('A — B');
+        });
+
+        it('leaves a reference that is not a character alone instead of throwing', async () => {
+            // `fromCodePoint` throws above U+10FFFF, and a lone surrogate is
+            // representable but is not a character. One malformed cell must not
+            // fail the other forty thousand; the reference stays visible so the
+            // operator can see what their file actually says.
+            const sheet = `<?xml version="1.0"?><worksheet><sheetData>
+<row r="1"><c r="A1" t="inlineStr"><is><t>over &#1114112; and lone &#55296;</t></is></c></row>
+</sheetData></worksheet>`;
+            const bytes = await zipOf({ 'xl/worksheets/sheet1.xml': sheet });
+            const rows = await readXlsxSheet(bytes);
+            expect(rows![0][0]).toBe('over &#1114112; and lone &#55296;');
+        });
+
+        it('still prefers `<v>` when a cell has one', async () => {
+            // The ordinary case must not change. `<v>` is what every shared
+            // string and every number resolves to.
+            const sheet = `<?xml version="1.0"?><worksheet><sheetData>
+<row r="1"><c r="A1" t="str"><v>from v</v></c></row>
+</sheetData></worksheet>`;
+            const bytes = await zipOf({ 'xl/worksheets/sheet1.xml': sheet });
+            const rows = await readXlsxSheet(bytes);
+            expect(rows![0][0]).toBe('from v');
+        });
+    });
 });
