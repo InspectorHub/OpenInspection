@@ -23,6 +23,12 @@ import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { bulkNotificationChoice, grantNotificationSms, loadNotificationScreen, saveNotificationChoice } from "~/lib/settings-notifications.server";
 import { m } from "~/paraglide/messages";
 
+// F68 — with no `meta` this page's browser tab reads only "OpenInspection".
+// Why it is a catalogue key and not a literal: settings-meta-titles.test.ts.
+export function meta() {
+  return [{ title: m.settings_profile_meta_title() }];
+}
+
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */

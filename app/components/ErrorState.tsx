@@ -10,6 +10,8 @@
  * no-login report links). Pass `action` only where there is a sensible place to
  * send the user; public report errors omit it.
  */
+import { ContactChannels } from "./ContactChannels";
+
 interface ErrorStateAction {
   label: string;
   href: string;
@@ -73,27 +75,13 @@ export function ErrorState({ code, title, message, action, contacts }: ErrorStat
           </a>
         )}
         {hasContacts && (
-          <div className="mt-6 pt-5 border-t border-ih-border flex flex-col items-center gap-1.5">
-            {email && (
-              <a
-                href={`mailto:${email}`}
-                className="text-[14px] font-medium text-ih-primary-text hover:underline break-all"
-              >
-                {email}
-              </a>
-            )}
-            {phone && (
-              /* tel: is the one deep-link that is reliably handled everywhere —
-                 every phone dials it and desktop browsers degrade to showing
-                 the number as text. */
-              <a
-                href={`tel:${phone.replace(/[^\d+]/g, "")}`}
-                className="text-[14px] font-medium text-ih-primary-text hover:underline"
-              >
-                {phone}
-              </a>
-            )}
-          </div>
+          /* The channel block itself is shared with the closed booking page
+             (F37) — see ContactChannels. Only the surround is this component's. */
+          <ContactChannels
+            email={email}
+            phone={phone}
+            className="mt-6 pt-5 border-t border-ih-border"
+          />
         )}
       </div>
     </div>

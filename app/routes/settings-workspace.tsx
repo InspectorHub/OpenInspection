@@ -29,6 +29,12 @@ import { DateTimeFormatFields } from "~/components/settings/DateTimeFormatFields
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
+// F68 — with no `meta` this page's browser tab reads only "OpenInspection".
+// Why it is a catalogue key and not a literal: settings-meta-titles.test.ts.
+export function meta() {
+  return [{ title: m.settings_workspace_meta_title() }];
+}
+
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */

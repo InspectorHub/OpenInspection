@@ -45,7 +45,11 @@ import { m } from "~/paraglide/messages";
  * tier would offer a manager a form whose every submission answers 403.
  */
 export function meta() {
-    return [{ title: m.statutory_source_page_title() }];
+    // F68 — the page heading (used in the breadcrumb below) is
+    // "Statutory form PDFs"; the TAB needs the " - Settings - OpenInspection"
+    // suffix every other page carries, which is why this is its own key
+    // rather than the heading reused.
+    return [{ title: m.settings_statutory_meta_title() }];
 }
 
 /** The GET's body, exactly as the route module declares it. */

@@ -29,6 +29,16 @@ export interface SessionContext {
     termsUrl: string | null;
     /** Tenant default display timezone (IANA name; 'UTC' when unset). */
     defaultTimezone: string;
+    /**
+     * Where this workspace works: `US`, `US-TX`, or null when it has not said.
+     *
+     * `tenant_configs.holiday_region` — added for the company holiday catalogue
+     * and the only structured statement a workspace makes about its own
+     * jurisdiction. Read by the New Inspection template picker so a general
+     * template leads unless the workspace's own state is known
+     * (`app/lib/template-order.ts`).
+     */
+    holidayRegion: string | null;
     /** Tenant default display locale (BCP-47; 'en-US' when unset). */
     defaultLocale: string;
     /** Tenant transaction/display currency (ISO 4217; 'USD' when unset). */
@@ -134,6 +144,57 @@ export function useSessionContext(): SessionContext | null {
 export function useDisplayTimeZone(): string {
   const ctx = useSessionContext();
   return ctx?.user.timezone || ctx?.branding.defaultTimezone || "UTC";
+}
+
+/**
+ * The COMPANY's timezone — the authority for a business record.
+ *
+ * Distinct from `useDisplayTimeZone` by one deliberate omission: the per-user
+ * override is NOT consulted. A payment's date, a ledger day, anything a second
+ * member of staff will later read back as a fact about the company must not
+ * depend on which zone the person who typed it happened to be standing in. Two
+ * people recording the same cash on the same afternoon have to produce the same
+ * day, and only the company zone does that.
+ *
+ * Falls back to 'UTC' because that is literally what the column holds when
+ * nobody has declared a zone (`tenant_configs.default_timezone` is NOT NULL
+ * DEFAULT 'UTC'). That fallback is still SHARED by every member of staff, which
+ * is the property being defended here; the onboarding checklist is what gets it
+ * replaced with a real one.
+ */
+export function useCompanyTimeZone(): string {
+  return useSessionContext()?.branding.defaultTimezone || "UTC";
+}
+
+/**
+ * The zone a NEW time is authored in: the viewer's own override, else the
+ * company's, else the BROWSER's own zone — never UTC by accident.
+ *
+ * Why the browser and not UTC: this value is both the zone a wall-clock entry
+ * is read in and the zone named on screen beside it, so the operator can see
+ * and change whatever it resolved to. UTC there was a silent wrong answer for
+ * every user outside it — the wizard defaulted an inspection to "9:00 AM UTC"
+ * while the home checklist was, on the same screen, still asking the workspace
+ * to set a timezone. The browser's zone is a real IANA id, is right far more
+ * often than UTC is, and agrees with the calendar day the date field already
+ * defaults to.
+ *
+ * NOT for reading stored instants back (use `useDisplayTimeZone`, which the
+ * server's calendar bucketing matches) and NOT for business records (use
+ * `useCompanyTimeZone`, which does not vary per viewer).
+ */
+export function useSchedulingTimeZone(): string {
+  const ctx = useSessionContext();
+  if (ctx?.user.timezone) return ctx.user.timezone;
+  if (ctx?.branding.defaultTimezone && ctx.branding.defaultTimezone !== "UTC") {
+    return ctx.branding.defaultTimezone;
+  }
+  try {
+    // i18n-lint-ok: reads the environment's own zone id; nothing is displayed
+    return new Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
 }
 
 /** Resolved display locale for the current viewer: user override, else tenant
