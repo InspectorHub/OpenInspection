@@ -4,7 +4,7 @@ import { useContactSearch } from "~/hooks/useContactSearch";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { buildWizardSteps, stepBlockedReason, todayLocalISO, type WizardStepId } from "~/lib/wizard-steps";
 import { summariseNewInspection } from "~/lib/wizard-review";
-import { buildWizardCreatePayload } from "~/lib/wizard-submit";
+import { buildWizardCreatePayload, INSPECTION_PROPERTY_TYPES } from "~/lib/wizard-submit";
 import { PropertyStep } from "./new-inspection/PropertyStep";
 import { PeopleStep } from "./new-inspection/PeopleStep";
 import { ServicesStep } from "./new-inspection/ServicesStep";
@@ -139,7 +139,7 @@ export function NewInspectionWizard({
   }>();
 
   const [stepIdx, setStepIdx] = useState(0);
-  const [propertyType, setPropertyType] = useState("single_family");
+  const [propertyType, setPropertyType] = useState<string>(INSPECTION_PROPERTY_TYPES[0]);
   const [address, setAddress] = useState("");
   // #198 — structured, geocoded address captured when the inspector picks a
   // Places suggestion. Cleared when they edit the text back to free-form, so we

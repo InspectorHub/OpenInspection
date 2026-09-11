@@ -5,6 +5,7 @@ import { StatutoryCoveragePanel } from "~/components/statutory/StatutoryCoverage
 import { PcaNarrativePanel } from "~/components/inspection/PcaNarrativePanel";
 import { CompliancePanel } from "~/components/inspection-edit/CompliancePanel";
 import { CommercialReportControls, type ReportTier } from "~/components/editor/CommercialReportControls";
+import { PropertyTypeControl } from "~/components/editor/PropertyTypeControl";
 
 /**
  * The "Inspection Details" overview — property facts, the statutory form
@@ -80,6 +81,24 @@ export function InspectionOverview({
                 previewHref={statutoryPreviewHref}
             />
             <StatutoryDetailsHost details={statutoryDetails} />
+            {/* Reclassification. UNGATED on purpose — every other control in this
+                block appears only once `propertyType === 'commercial'`, so a
+                selector hidden behind the same gate could never be what gets an
+                inspection there. Sits immediately above the commercial controls it
+                unlocks, because the order of operations is: classify, then pick the
+                subtype, then the tier. Owns its own fetcher (like the narrative and
+                compliance panels below) and its own lossy-confirm modal. */}
+            <div className="mt-8 border-t border-ih-border pt-6">
+                <PropertyTypeControl
+                    inspectionId={String(bag.id)}
+                    propertyType={(bag.propertyType as string | null | undefined) ?? null}
+                    commercialSubtype={(bag.commercialSubtype as string | null | undefined) ?? null}
+                    reportTier={reportTier}
+                    perUnitMode={bag.unitInspectionMode === "per_unit"}
+                    hasPcaNarrative={Object.values(pcaNarrative ?? {})
+                        .some((v) => typeof v === "string" && v.trim().length > 0)}
+                />
+            </div>
             {/* Commercial PCA Phase T — subtype + report tier selectors. Gated on
                 the same propertyType === 'commercial' flag section-applicability.ts
                 uses to decide PCA-only sections apply. Sits above the narrative

@@ -44,6 +44,21 @@ import { civilToInstantISO } from "./civil-time";
 export interface CreateInspectionJson {
   propertyAddress: string;
   templateId: string;
+  /**
+   * Step 1's property type. Forwarded as the raw slug the wizard posted — the
+   * API's `CreateInspectionSchema` owns the vocabulary, so an unrecognised value
+   * comes back as a 400 the wizard shows rather than being dropped here, which
+   * is how this field spent its whole life being silently discarded.
+   *
+   * ⚠️ `string`, and NOT the narrow enum union, on purpose. The typed client
+   * derives that union from the server's zod schema, so the call site in
+   * `app/routes/inspections.tsx` carries a localized assertion to bridge the two
+   * (the same shape as the TODO(C-10) assertion already in that file). Narrowing
+   * the field here instead would make the BFF drop a bad value silently — which
+   * is the defect, not the fix. The enforcement point is the schema, and it is
+   * supposed to be reached.
+   */
+  propertyType?: string;
   // #198 — structured, geocoded address from Places autocomplete. All optional;
   // omitted for hand-typed free-form addresses. The server stamps
   // addressGeocodedAt when addressPlaceId is present.
@@ -82,6 +97,7 @@ export function dollarsToCents(value: string | number | null | undefined): numbe
 export function buildCreateInspectionJson(formData: FormData): CreateInspectionJson {
   const address = String(formData.get("address") || "");
   const templateId = String(formData.get("templateId") || "");
+  const propertyType = String(formData.get("propertyType") || "").trim();
 
   // #198 — structured address fields (present only when a Places suggestion was
   // picked). Empty strings collapse to omitted; lat/lng parse to finite numbers.
@@ -162,6 +178,7 @@ export function buildCreateInspectionJson(formData: FormData): CreateInspectionJ
   return {
     propertyAddress: address,
     templateId,
+    ...(propertyType ? { propertyType } : {}),
     ...(addressPlaceId ? { addressPlaceId } : {}),
     ...(addressStreet ? { addressStreet } : {}),
     ...(addressCity ? { addressCity } : {}),
