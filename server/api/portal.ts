@@ -32,6 +32,9 @@ import { signJwt } from '../lib/jwt-keyring';
 import { findGlobalAgentByEmail } from '../services/agent/account';
 import type { HonoConfig } from '../types/hono';
 import { authCookieOptions, AUTH_COOKIE_NAME, portalSessionCookieOptions, PORTAL_SESSION_COOKIE_NAME } from '../lib/auth-helpers';
+import {
+    RecipientInspectionSchema, HubOverviewResponseSchema, ObserveSchema,
+} from '../lib/validations/portal.schema';
 
 
 /** Resolves the path-derived tenantId, or null when the slug is unknown. */
@@ -58,46 +61,6 @@ const RequestLinkBody = z.object({
         '`notifications` = the notification settings page, for a reader arriving from ' +
         'the privacy policy or terms.',
     ),
-});
-
-const RecipientInspectionSchema = z.object({
-    inspectionId:     z.string().describe('Inspection identifier the recipient can access.'),
-    address:          z.string().describe('Property address for the inspection.'),
-    date:             z.string().describe('Inspection date (ISO date string).'),
-    inspectionStatus: z.string().describe('Lifecycle status of the inspection.'),
-    reportPublished:  z.boolean().describe('Whether the report has been published.'),
-    paymentStatus:    z.string().describe('Payment status of the inspection.'),
-});
-
-const HubOverviewSchema = z.object({
-    address:          z.string().describe('Property address for the inspection.'),
-    date:             z.string().describe('Inspection date (ISO date string).'),
-    inspectionStatus: z.string().describe('Lifecycle status of the inspection.'),
-    agreementSigned:  z.boolean().describe('Whether the inspection agreement is signed.'),
-    paymentStatus:    z.string().describe('Payment status of the inspection.'),
-    reportPublished:  z.boolean().describe('Whether the report has been published.'),
-    progress:         z.object({
-        completed: z.number().describe('Number of completed report items.'),
-        total:     z.number().describe('Total number of report items.'),
-    }).describe('Observation progress for the inspection report.'),
-    unreadMessages:   z.number().describe('Count of unread inspector messages.'),
-});
-
-const HubOverviewResponseSchema = HubOverviewSchema.extend({
-    token: z.string().describe('Persistent per-inspection access token for building section deep-links.'),
-    signerToken: z.string().nullable().describe("The recipient's OWN agreement signer token (email-matched) for the inline Agreement section. Null when the recipient is not a signer."),
-});
-
-const ObserveSchema = z.object({
-    address:        z.string().describe('Property address for the inspection.'),
-    date:           z.string().nullable().describe('Inspection date (ISO date string), or null.'),
-    inspectorName:  z.string().describe('Name of the assigned inspector.'),
-    status:         z.string().describe('Lifecycle status of the inspection.'),
-    sections:       z.array(z.object({
-        name:           z.string().describe('Section title.'),
-        totalItems:     z.number().describe('Total number of items in the section.'),
-        completedItems: z.number().describe('Number of completed items in the section.'),
-    })).describe('Per-section observation progress.'),
 });
 
 // ---------------------------------------------------------------------------

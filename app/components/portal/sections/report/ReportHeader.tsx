@@ -100,13 +100,24 @@ export function ReportHeader({
           >
             {m.report_view_print()}
           </button>
+          {/* TWO CONTROLS MAY NOT SHARE A NAME.
+              This button used to render `m.portal_hub_nav_repair()` — the exact
+              label on the Hub's "Repair Request" tab, which posts to the
+              repair-builder API and reaches the inspector. This one opens a
+              client-side panel over the report listing the items the reader
+              ticked, and prints them. Under one name, ticking a box and pressing
+              this read as submitting a request: `repair_requests` gained zero
+              rows while the client believed they had sent one. The panel links
+              onward to the real builder when the company has it enabled (see
+              ReportRepairPanel's builderHref), so the capability is not being
+              hidden — only the name that claimed it. */}
           {!hideClientActions && (
             <button
               type="button"
               onClick={onToggleRepairPanel}
               className="px-4 py-2 text-sm font-semibold rounded-lg bg-ih-primary text-ih-primary-fg flex items-center gap-2"
             >
-              {m.portal_hub_nav_repair()}
+              {m.portal_report_selection_title()}
             </button>
           )}
         </div>

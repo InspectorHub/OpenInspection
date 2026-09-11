@@ -14,6 +14,16 @@ export interface StatusOverview {
   unreadMessages: number;
   address: string;
   date: string;
+  /** Whether this inspection HAS an agreement gate / a payment gate at all, and
+   *  whether a manual unlock has released them. See HubOverview in
+   *  server/services/portal.service.ts — these are the server gate's own inputs. */
+  agreementRequired: boolean;
+  paymentRequired: boolean;
+  reportUnlocked: boolean;
+  /** A live (non-voided) invoice exists for this inspection. */
+  hasInvoice: boolean;
+  /** The repair-request builder is enabled for this company. */
+  repairRequestEnabled: boolean;
 }
 
 type CardTone = "ok" | "warn" | "bad" | "neutral";
@@ -35,11 +45,38 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function paymentTone(status: string): CardTone {
-  const s = status.toLowerCase();
-  if (s === "paid") return "ok";
+/**
+ * The payment tile answers "do I owe this company money", and it may only say
+ * yes when there is a bill.
+ *
+ * `inspections.payment_status` is 'unpaid' from the moment the inspection is
+ * created, invoice or no invoice, so rendering it verbatim in a warning colour
+ * told clients they were in arrears on inspections nobody had billed — while the
+ * Payment tab one click away said "No invoice yet". Both readings came from the
+ * same row; only one of them was true.
+ *
+ * Paid is paid. With a live invoice, whatever the row says is a real balance and
+ * keeps the nudge colour. With no invoice there is nothing to pay, and the tile
+ * says so in the Hub's existing words (`label_hub_invoice_none`).
+ */
+function paymentCardState(ov: StatusOverview): { value: string; tone: CardTone } {
+  const s = ov.paymentStatus.toLowerCase();
+  if (s === "paid") return { value: capitalize(ov.paymentStatus), tone: "ok" };
+  if (!ov.hasInvoice) return { value: m.label_hub_invoice_none(), tone: "neutral" };
   // partial / unpaid (and anything else) surface as a warning to nudge action.
-  return "warn";
+  return { value: capitalize(ov.paymentStatus), tone: "warn" };
+}
+
+/**
+ * The agreement tile, same rule one column over. "Not signed" in a warning
+ * colour reads as an outstanding obligation; on an inspection with
+ * `agreementRequired` false there is no agreement to sign, and on 36 of 37
+ * production inspections that is the state.
+ */
+function agreementCardState(ov: StatusOverview): { value: string; tone: CardTone } {
+  if (ov.agreementSigned) return { value: m.portal_status_agreement_signed(), tone: "ok" };
+  if (!ov.agreementRequired) return { value: m.label_hub_agreement_not_required(), tone: "neutral" };
+  return { value: m.portal_status_agreement_unsigned(), tone: "warn" };
 }
 
 /**
@@ -90,14 +127,12 @@ export function statusCardModels(ov: StatusOverview): StatusCardModel[] {
     {
       key: "agreement",
       label: m.portal_status_agreement_label(),
-      value: ov.agreementSigned ? m.portal_status_agreement_signed() : m.portal_status_agreement_unsigned(),
-      tone: ov.agreementSigned ? "ok" : "warn",
+      ...agreementCardState(ov),
     },
     {
       key: "payment",
       label: m.portal_status_payment_label(),
-      value: capitalize(ov.paymentStatus),
-      tone: paymentTone(ov.paymentStatus),
+      ...paymentCardState(ov),
     },
     {
       key: "report",
@@ -131,14 +166,39 @@ export function statusCardModels(ov: StatusOverview): StatusCardModel[] {
  * Pure so the overview can render a "here's why + next step" notice without a
  * second server round-trip; the retired /report-gate page's explanation now
  * lives inline on the Hub the client already reaches.
+ *
+ * ⚠️ A GATE IS A SWITCH, NOT A STATE. This used to read
+ *
+ *     if (!ov.agreementSigned) return { reason: "agreement", ... };
+ *     if (ov.paymentStatus.toLowerCase() !== "paid") return { reason: "payment", ... };
+ *
+ * which is the question "is the paperwork done", not "is the report being held
+ * back". `is_agreement_required` and `is_payment_required` both default to
+ * false, so on an inspection that asks for neither the notice still fired and
+ * sent the client to an Agreement section with nothing in it — while the Report
+ * tab beside it served the whole report, because the REAL gate
+ * (InspectionPublishService.getReportGate) reads these flags and returned "not
+ * gated". Three readers, one of them guessing.
+ *
+ * The inputs below are that server gate's inputs, in its order: a manual unlock
+ * releases everything; otherwise each half applies only when its own flag is on.
+ * Keep the two in step — this predicate exists so the page can say it without a
+ * round trip, not so it can decide it independently.
  */
 export type ReportLockReason = "agreement" | "payment";
 
 export function reportLockNotice(
-  ov: Pick<StatusOverview, "agreementSigned" | "paymentStatus">,
+  ov: Pick<
+    StatusOverview,
+    "agreementSigned" | "paymentStatus" | "agreementRequired" | "paymentRequired" | "reportUnlocked"
+  >,
 ): { reason: ReportLockReason; section: "agreement" | "payment" } | null {
-  if (!ov.agreementSigned) return { reason: "agreement", section: "agreement" };
-  if (ov.paymentStatus.toLowerCase() !== "paid") return { reason: "payment", section: "payment" };
+  // A named person released the order-wide gate. Same scope the gate has.
+  if (ov.reportUnlocked) return null;
+  if (ov.agreementRequired && !ov.agreementSigned) return { reason: "agreement", section: "agreement" };
+  if (ov.paymentRequired && ov.paymentStatus.toLowerCase() !== "paid") {
+    return { reason: "payment", section: "payment" };
+  }
   return null;
 }
 

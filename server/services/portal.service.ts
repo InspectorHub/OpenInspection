@@ -15,7 +15,7 @@
  */
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, inArray, isNull, or, gt } from 'drizzle-orm';
-import { inspectionAccessTokens, inspections, agreementRequests, inspectionMessages, contactRoleProfiles } from '../lib/db/schema';
+import { inspectionAccessTokens, inspections, agreementRequests, inspectionMessages, contactRoleProfiles, invoices, tenantConfigs } from '../lib/db/schema';
 import { isReportPublished } from '../lib/status/report-status';
 import { PeopleService } from './people.service';
 
@@ -59,6 +59,27 @@ export interface HubOverview {
     reportPublished: boolean;
     progress: { completed: number; total: number };
     unreadMessages: number;
+    /**
+     * WHETHER A GATE EXISTS, not whether it is satisfied.
+     *
+     * `agreementSigned` / `paymentStatus` answer "is it done". On their own they
+     * cannot tell "owed and outstanding" from "never owed", and both gate
+     * columns default to false — so the Hub read an unsigned-and-unrequired
+     * agreement as a lock and told the client to go sign a document that did
+     * not exist. These three are what the server's own gate reads
+     * (InspectionPublishService.getReportGate): either flag OFF means that half
+     * of the gate does not apply, and `reportUnlocked` releases both.
+     */
+    agreementRequired: boolean;
+    paymentRequired: boolean;
+    reportUnlocked: boolean;
+    /** A live (non-voided) invoice exists. `paymentStatus` is 'unpaid' on an
+     *  inspection nobody has invoiced, which is not a debt. */
+    hasInvoice: boolean;
+    /** The repair-request builder is on for this company — the SAME column
+     *  `runBuilderGate` enforces, so the nav can stop offering a tab whose every
+     *  endpoint answers 403. */
+    repairRequestEnabled: boolean;
 }
 
 export class PortalService {
@@ -180,6 +201,29 @@ export class PortalService {
             )
             .get();
 
+        // IS THERE ANYTHING TO PAY. Voided invoices are excluded everywhere else
+        // money is counted (see contact-detail.ts), and they are excluded here for
+        // the same reason: a withdrawn invoice is not a balance.
+        const liveInvoice = await db
+            .select({ id: invoices.id })
+            .from(invoices)
+            .where(and(
+                eq(invoices.tenantId, tenantId),
+                eq(invoices.inspectionId, inspectionId),
+                isNull(invoices.voidedAt),
+            ))
+            .get();
+
+        // The repair-builder feature switch. Read here rather than in the nav so
+        // the UI never has to guess: capabilities are decided where they are
+        // ENFORCED (CLAUDE.md, Cross-Portal Reuse) and this is the same column
+        // `server/lib/repair-gates.ts` refuses on.
+        const cfg = await db
+            .select({ enableCustomerRepairExport: tenantConfigs.enableCustomerRepairExport })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+
         const unread = await db
             .select({ id: inspectionMessages.id })
             .from(inspectionMessages)
@@ -215,6 +259,11 @@ export class PortalService {
             reportPublished: isReportPublished(insp.reportStatus),
             progress,
             unreadMessages: unread.length,
+            agreementRequired: insp.agreementRequired === true,
+            paymentRequired: insp.paymentRequired === true,
+            reportUnlocked: insp.unlockedAt != null,
+            hasInvoice: liveInvoice != null,
+            repairRequestEnabled: Boolean(cfg?.enableCustomerRepairExport),
         };
     }
 

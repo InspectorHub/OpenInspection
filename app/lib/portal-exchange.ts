@@ -38,6 +38,15 @@ const EMPTY_STATUS_OVERVIEW: StatusOverview = {
   unreadMessages: 0,
   address: "",
   date: "",
+  // The gate flags default OFF here for the same reason every other field is
+  // empty: this stand-in is never read by a status card or a lock notice (agent
+  // mode renders neither), and "no gate" is the only honest value for a payload
+  // that was never fetched. A `true` would assert a gate nobody looked up.
+  agreementRequired: false,
+  paymentRequired: false,
+  reportUnlocked: false,
+  hasInvoice: false,
+  repairRequestEnabled: false,
 };
 
 export interface PortalSessionResolution {
