@@ -83,6 +83,18 @@ const bookingProfileRoutes = createApiRouter()
         // Same predicate the submit path refuses on (see booking-admission), so
         // the page and the POST can never disagree about whether booking is on.
         const bookingOpen = hourIds.length > 0 && hasDeclaredTenantTimeZone(config?.defaultTimezone);
+        // WHICH half is missing, decided HERE, from the two locals the boolean
+        // above is already made of. The admin surface that configures this page
+        // (`/settings/booking`) has to name the blocker, and a second reader
+        // computing "is there an hour row" for itself is how two surfaces end up
+        // disagreeing about whether booking is on. Hours take precedence when
+        // both are missing: a wall clock with no hours to anchor is not yet the
+        // operator's next step.
+        const bookingClosedReason = bookingOpen
+            ? null
+            : hourIds.length === 0
+                ? 'no_inspector_hours' as const
+                : 'no_company_timezone' as const;
 
         let inspectors: Array<{ id: string; name: string | null; photoUrl: string | null }> = [];
         if (allowChoice && hourIds.length > 0) {
@@ -97,6 +109,9 @@ const bookingProfileRoutes = createApiRouter()
                 company: tenantRow.name,
                 turnstileSiteKey: resolveTurnstileSiteKey(c.env),
                 bookingOpen,
+                // Operator diagnostic, not visitor copy: the public page says
+                // only that booking is closed, and says it from `bookingOpen`.
+                bookingClosedReason,
                 allowInspectorChoice: allowChoice,
                 conciergeReviewRequired: !!config?.conciergeReviewRequired,
                 inspectors,

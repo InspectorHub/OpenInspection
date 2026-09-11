@@ -9,6 +9,7 @@ import { BookingPoliciesPanel } from "~/components/settings/BookingPoliciesPanel
 import { EmbedWidgetPanel } from "~/components/settings/EmbedWidgetPanel";
 import { ManageTeamSchedulesBar } from "~/components/settings/ManageTeamSchedulesBar";
 import { CompanyBookingLinksPanel } from "~/components/settings/CompanyBookingLinksPanel";
+import { readCompanyBookingOpenState } from "~/lib/settings/booking-open.server";
 import { SectionNav } from "~/components/settings/SectionNav";
 import {
   BookingSlotRulesPanel,
@@ -83,7 +84,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const api = createApi(context, { token });
 
-  const [configRes, membersRes, holidaysRes, brandingRes, routingRes, areasRes, agreementsRes] = await Promise.all([
+  const [configRes, membersRes, holidaysRes, brandingRes, routingRes, areasRes, agreementsRes, bookingOpenState] = await Promise.all([
     api.admin["tenant-config"].$get().catch(() => null),
     api.admin.members.$get().catch(() => null),
     (api.admin as unknown as {
@@ -99,6 +100,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // needs the templates by name. Read here rather than in the panel: a
     // component that fetches is a component that cannot be server-rendered.
     api.admin.agreements.$get().catch(() => null),
+    readCompanyBookingOpenState(api),
   ]);
 
   let config: TenantConfig = {
@@ -168,6 +170,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const areasByUser = areasRes?.ok ? parseServiceAreaBody(await areasRes.json()) : {};
 
   return {
+    bookingOpenState,
     routing: parsed.routing,
     origins: parsed.origins,
     areasByUser,
@@ -350,7 +353,7 @@ export default function SettingsBookingPage() {
         members={schedulingMembers.map((m) => ({ id: m.id, email: m.email }))}
       />
       <div id="booking-links" className="scroll-mt-12">
-        <CompanyBookingLinksPanel tenant={tenant} />
+        <CompanyBookingLinksPanel tenant={tenant} booking={data.bookingOpenState} />
       </div>
       <div id="booking-policies" className="scroll-mt-12">
         <BookingPoliciesPanel initialConfig={data.config} />
