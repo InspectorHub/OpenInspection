@@ -2,6 +2,7 @@ import { useState } from "react";
 import { stepLabels, type CompanyProfile } from "./booking-constants";
 import { useTurnstileWidget } from "~/lib/turnstile";
 import { PropertyStep, ServicesStep, ScheduleStep, ConfirmStep } from "./BookingSteps";
+import { BOOKING_DROPDOWN_OBSTACLE_ATTR } from "./PublicAddressAutocomplete";
 import type { useBookingFormState } from "./useBookingFormState";
 import { m } from "~/paraglide/messages";
 
@@ -45,6 +46,9 @@ export function BookingWizard({
     currency,
     needsTurnstile,
     canNext,
+    dateIssue,
+    setDateUnbookable,
+    selectedServiceNames,
     inspectorOptions,
     chosenInspectorName,
     handleSubmit,
@@ -168,6 +172,8 @@ export function BookingWizard({
           contactIsSelf={rememberContact}
           prefilledFromDevice={prefilledFromDevice}
           onClearRememberedContact={clearRememberedContact}
+          dateIssue={dateIssue}
+          onDateBookableChange={setDateUnbookable}
         />
       )}
 
@@ -180,6 +186,7 @@ export function BookingWizard({
           timeWindow={timeWindow}
           customTime={customTime}
           selectedServices={selectedServices}
+          selectedServiceNames={selectedServiceNames}
           showInspectorDropdown={showInspectorDropdown}
           chosenInspectorName={chosenInspectorName}
           totalPrice={totalPrice}
@@ -226,9 +233,17 @@ export function BookingWizard({
         </div>
       )}
 
-      {/* Navigation footer */}
+      {/* Navigation footer.
+
+          The obstacle attribute is load-bearing, not decorative: the address
+          typeahead reads it to keep its suggestion list off Continue (F41). The
+          list used to cover the button completely, so a visitor reaching for it
+          picked a different address instead and was never told. */}
       {!(step === 3 && message?.ok) && (
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-ih-border">
+        <div
+          {...{ [BOOKING_DROPDOWN_OBSTACLE_ATTR]: "" }}
+          className="flex items-center justify-between mt-8 pt-6 border-t border-ih-border"
+        >
           <button
             onClick={() => step > 0 ? setStep(step - 1) : undefined}
             disabled={step === 0}

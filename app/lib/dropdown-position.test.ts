@@ -78,6 +78,63 @@ describe("anchoredDropdownPlacement — running out of room", () => {
     });
 });
 
+/**
+ * F41 — the list covered the Continue button on the public booking page, and no
+ * viewport measurement could have noticed. Measured at 1280x720: field bottom
+ * 457, button top 530, viewport floor 720. A viewport-only budget gives the list
+ * 255px and it lands on the button; the button's own top is the only number that
+ * says otherwise.
+ */
+describe("anchoredDropdownPlacement — an obstacle below the field", () => {
+    it("keeps off the Continue button in the geometry that was measured", () => {
+        // Field [.., 457], button top 530, viewport 720. 61px before the button
+        // is not a list, so this flips — and either way it must not cover it.
+        const p = anchoredDropdownPlacement(anchor(421, 36), 720, { obstacle: { top: 530 } });
+        expect(p.top + p.maxHeight).toBeLessThanOrEqual(530);
+        // Without the obstacle the list ran to 685 and straight over the button.
+        const blind = anchoredDropdownPlacement(anchor(421, 36), 720);
+        expect(blind.top + blind.maxHeight).toBeGreaterThan(530);
+    });
+
+    it("shortens a list that still fits before the obstacle", () => {
+        // 152px before the button: a usable list, just not the preferred height.
+        const p = anchoredDropdownPlacement(anchor(300, 36), 720, { obstacle: { top: 500 } });
+        expect(p.placement).toBe("below");
+        expect(p.top + p.maxHeight).toBeLessThanOrEqual(500);
+        expect(p.maxHeight).toBeLessThan(
+            anchoredDropdownPlacement(anchor(300, 36), 720).maxHeight,
+        );
+    });
+
+    it("flips above the field when the obstacle leaves no usable room", () => {
+        // Button 40px under the field: not a list. 380px above it is.
+        const p = anchoredDropdownPlacement(anchor(380, 36), 900, { obstacle: { top: 456 } });
+        expect(p.placement).toBe("above");
+        expect(p.top + p.maxHeight).toBeLessThanOrEqual(380);
+    });
+
+    it("still shows whole rows rather than covering, when above is worse too", () => {
+        // Field near the top with the button right under it: nowhere is roomy.
+        // Staying below is fine; covering the button is not.
+        const p = anchoredDropdownPlacement(anchor(20, 36), 900, { obstacle: { top: 96 } });
+        expect(p.top + p.maxHeight).toBeLessThanOrEqual(96);
+        expect(p.maxHeight).toBeGreaterThan(0);
+    });
+
+    it("ignores an obstacle that is no longer below the field", () => {
+        // Scrolled so the footer sits ABOVE the field. Clamping to it would
+        // produce a negative budget and a 1px list for no reason.
+        const withObstacle = anchoredDropdownPlacement(anchor(400, 36), 900, { obstacle: { top: 120 } });
+        const plain = anchoredDropdownPlacement(anchor(400, 36), 900);
+        expect(withObstacle).toEqual(plain);
+    });
+
+    it("behaves exactly as before when no obstacle is named", () => {
+        expect(anchoredDropdownPlacement(anchor(421, 36), 720, { obstacle: null }))
+            .toEqual(anchoredDropdownPlacement(anchor(421, 36), 720));
+    });
+});
+
 describe("anchoredDropdownPlacement — horizontal", () => {
     it("keeps a wide anchor's width (the list is the field, widened by nothing)", () => {
         expect(anchoredDropdownPlacement(anchor(100, 36, 40, 900), 800).width).toBe(900);

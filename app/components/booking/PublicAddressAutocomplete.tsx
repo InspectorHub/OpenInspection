@@ -1,5 +1,18 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useAnchoredDropdown } from "~/hooks/useAnchoredDropdown";
 import { m } from "~/paraglide/messages";
+
+/**
+ * What the suggestion list is not allowed to cover (F41).
+ *
+ * The wizard's navigation footer carries this attribute; the list is budgeted
+ * against its top edge and flips above the field when that leaves no room. A
+ * page with no such element keeps the plain viewport behaviour, so the embedded
+ * widget and any future host need no change.
+ */
+export const BOOKING_DROPDOWN_OBSTACLE_ATTR = "data-booking-dropdown-obstacle";
+const OBSTACLE_SELECTOR = `[${BOOKING_DROPDOWN_OBSTACLE_ATTR}]`;
 
 /** One suggestion from `GET /api/public/geocode`. */
 export interface PublicAddressSuggestion {
@@ -30,6 +43,14 @@ export interface PublicAddressSuggestion {
  * dropdown never opens, and this behaves as the plain text input it replaces.
  * The booking still submits; it simply carries no ZIP, which the server
  * reports rather than treating as a filter that passed.
+ *
+ * PLACEMENT IS NOT FORKED. The data source is (the public endpoint above, not
+ * the session-bound `/resources/places` BFF), but where the list goes comes from
+ * `~/lib/dropdown-position` like every other typeahead in the app. This file
+ * used to hand-roll an `absolute` list with no viewport awareness at all, which
+ * is how it came to cover the Continue button completely (F41): a visitor
+ * reaching for Continue hit a suggestion instead and silently replaced the
+ * address they had just chosen with a different house number.
  */
 export function PublicAddressAutocomplete({
   value,
@@ -110,10 +131,16 @@ export function PublicAddressAutocomplete({
   }
 
   const listboxId = `${id}-listbox`;
+  const dropdownOpen = open && suggestions.length > 0;
+  const { anchorRef: inputRef, style: dropdownStyle } = useAnchoredDropdown<HTMLInputElement>(
+    dropdownOpen,
+    { obstacleSelector: OBSTACLE_SELECTOR },
+  );
 
   return (
     <div className="relative">
       <input
+        ref={inputRef}
         id={id}
         type="text"
         role="combobox"
@@ -129,11 +156,12 @@ export function PublicAddressAutocomplete({
         onBlur={() => setTimeout(() => setOpen(false), 120)}
         className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
       />
-      {open && suggestions.length > 0 && (
+      {dropdownOpen && dropdownStyle && createPortal(
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover py-1"
+          style={dropdownStyle}
+          className="z-50 overflow-y-auto rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover py-1"
         >
           {suggestions.map((s, i) => (
             <li
@@ -159,7 +187,8 @@ export function PublicAddressAutocomplete({
               )}
             </li>
           ))}
-        </ul>
+        </ul>,
+        document.body,
       )}
       <p className="mt-1 text-[11px] text-ih-fg-3">{m.booking_field_address_hint()}</p>
     </div>

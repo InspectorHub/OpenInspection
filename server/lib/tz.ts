@@ -29,9 +29,50 @@ export function isValidTimeZone(tz: string): boolean {
   }
 }
 
-/** The stored tenant tz if valid, else 'UTC' (fail-safe; existing-tenant default). */
+/**
+ * THE SENTINEL. `tenant_configs.default_timezone` is `NOT NULL DEFAULT 'UTC'`,
+ * so a workspace that has never opened Settings and a workspace that genuinely
+ * operates in UTC store the same five characters. There is no third state to
+ * read, which is why this value has to be named: 'UTC' in that column means
+ * "nobody has declared a company timezone", and the onboarding checklist
+ * already reads it that way (`Set your timezone` is incomplete while it equals
+ * this). A tenant that really is in UTC can say so with 'Etc/UTC', which
+ * `isValidTimeZone` accepts and this sentinel is not.
+ */
+export const UNDECLARED_TENANT_TIMEZONE = 'UTC';
+
+/** True when the workspace has actually declared a company timezone — i.e. the
+ *  stored value is a real IANA region zone AND not the NOT-NULL-default
+ *  sentinel. The only honest test of "did a human choose this?". */
+export function hasDeclaredTenantTimeZone(raw: string | null | undefined): boolean {
+  return !!raw && raw !== UNDECLARED_TENANT_TIMEZONE && isValidTimeZone(raw);
+}
+
+/**
+ * The declared company timezone, or `null` when none has been declared.
+ *
+ * USE THIS, NOT `resolveTenantTimeZone`, anywhere the result turns a wall-clock
+ * into an instant that a CLIENT is then told — a booked appointment, the ICS
+ * invite carrying it, the confirmation email naming it. Those callers must fail
+ * closed on `null`: an hour nobody anchored is an hour nobody should send.
+ * Guessing UTC there is how "Morning, 8:00 AM" left as 08:00Z and arrived in a
+ * client's calendar at 4 AM.
+ */
+export function requireDeclaredTenantTimeZone(raw: string | null | undefined): string | null {
+  return hasDeclaredTenantTimeZone(raw) ? raw as string : null;
+}
+
+/**
+ * The stored tenant tz if valid, else the UTC sentinel.
+ *
+ * DISPLAY AND INTERNAL ATTRIBUTION ONLY. This function cannot distinguish an
+ * undeclared workspace from a UTC one, so its answer is a best effort at
+ * "which day/hour do we show this in", never an authority on "which instant did
+ * we promise someone". Callers that mint a client-facing appointment instant
+ * must use `requireDeclaredTenantTimeZone` and refuse on null instead.
+ */
 export function resolveTenantTimeZone(raw: string | null | undefined): string {
-  return raw && isValidTimeZone(raw) ? raw : 'UTC';
+  return raw && isValidTimeZone(raw) ? raw : UNDECLARED_TENANT_TIMEZONE;
 }
 
 /** The signed numeric UTC offset (minutes) that `ianaTz` has at instant `ms`. */

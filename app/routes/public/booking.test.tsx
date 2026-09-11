@@ -13,6 +13,21 @@ import { createRoutesStub } from "react-router";
 
 import BookingPage from "~/routes/public/booking";
 
+/**
+ * A date the booking rules accept, computed rather than written down.
+ *
+ * These fixtures used to hardcode `2026-09-01`, which silently became a date in
+ * the past and — once F42 started refusing those — stopped the wizard at the
+ * schedule step. A booking fixture cannot carry a literal date: the rule it has
+ * to satisfy is relative to today.
+ */
+function bookableDate(): string {
+  const d = new Date(Date.now() + 30 * 86_400_000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+
 const PROFILE = {
   company: "Acme Inspections",
   services: [{ id: "svc-1", name: "Full Inspection", price: 45000, description: null, durationMinutes: 180 }],
@@ -154,7 +169,7 @@ describe("BookingPage — language preference", () => {
       await toScheduleStep();
 
       const date = document.querySelector("input[type='date']") as HTMLInputElement;
-      fireEvent.change(date, { target: { value: "2026-09-01" } });
+      fireEvent.change(date, { target: { value: bookableDate() } });
       fireEvent.change(screen.getByPlaceholderText("Jane Doe"), { target: { value: "Sarah Buyer" } });
       fireEvent.change(screen.getByPlaceholderText("jane@example.com"), { target: { value: "sarah@example.com" } });
       fireEvent.click(screen.getByRole("radio", { name: /español/i }));
@@ -180,7 +195,7 @@ describe("BookingPage — language preference", () => {
       await toScheduleStep();
 
       const date = document.querySelector("input[type='date']") as HTMLInputElement;
-      fireEvent.change(date, { target: { value: "2026-09-01" } });
+      fireEvent.change(date, { target: { value: bookableDate() } });
       fireEvent.change(screen.getByPlaceholderText("Jane Doe"), { target: { value: "Sarah Buyer" } });
       fireEvent.change(screen.getByPlaceholderText("jane@example.com"), { target: { value: "sarah@example.com" } });
       fireEvent.click(await screen.findByText("Continue"));
@@ -232,7 +247,7 @@ describe("BookingPage — signed-in agent", () => {
     fireEvent.click(await findByText("Continue"));
 
     const date = container.querySelector("input[type='date']") as HTMLInputElement;
-    fireEvent.change(date, { target: { value: "2026-09-01" } });
+    fireEvent.change(date, { target: { value: bookableDate() } });
     fireEvent.change(getByPlaceholderText("Jane Doe"), { target: { value: "Sarah Buyer" } });
     fireEvent.change(getByPlaceholderText("jane@example.com"), { target: { value: "sarah@example.com" } });
     fireEvent.click(await findByText("Continue"));

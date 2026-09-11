@@ -1,11 +1,11 @@
 import type { Context } from 'hono';
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { users, inspections, tenantConfigs } from '../../lib/db/schema';
+import { users, inspections } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
 import { CredentialService } from '../credential.service';
 import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
-import { resolveTenantTimeZone, wallClockToEpochMs } from '../../lib/tz';
+import { wallClockToEpochMs } from '../../lib/tz';
 import { getBookingHost, getBaseUrl } from '../../lib/url';
 import type { HonoConfig } from '../../types/hono';
 import type { PublicBookingSchema } from '../../lib/validations/booking.schema';
@@ -33,6 +33,14 @@ export interface BookingConfirmationInput {
     inspectionId: string;
     /** Null when the contact upsert was skipped or failed; suppresses the opt-in link. */
     bookingClientContactId: string | null;
+    /**
+     * The DECLARED company timezone `requestedTime` was read in, carried from
+     * the booking claim. Not re-resolved here on purpose: this leg runs detached
+     * and its only unstamped path is the fallback below, which is precisely
+     * where a fresh `resolveTenantTimeZone` would have quietly reintroduced the
+     * UTC sentinel and mailed the client an hour nobody chose.
+     */
+    tenantTz: string;
 }
 
 /**
@@ -57,7 +65,7 @@ export async function dispatchBookingConfirmation(
     body: BookingBody,
     input: BookingConfirmationInput,
 ): Promise<void> {
-    const { inspectorId, requestedTime, inspectionId, bookingClientContactId } = input;
+    const { inspectorId, requestedTime, inspectionId, bookingClientContactId, tenantTz } = input;
     const windowLabel = windowLabelFor(body);
 
     const inspector = await db.select().from(users).where(eq(users.id, inspectorId)).get();
@@ -88,10 +96,6 @@ export async function dispatchBookingConfirmation(
     }).from(inspections)
         .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
         .get();
-
-    const tzRow = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
-        .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
-    const tenantTz = resolveTenantTimeZone(tzRow?.defaultTimezone);
 
     const stampedStart = booked?.scheduledStartMs instanceof Date ? booked.scheduledStartMs.getTime() : null;
     const stampedEnd = booked?.scheduledEndMs instanceof Date ? booked.scheduledEndMs.getTime() : null;

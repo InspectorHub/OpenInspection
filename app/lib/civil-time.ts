@@ -51,6 +51,31 @@ function isUsableZone(timeZone: string): boolean {
 }
 
 /**
+ * Today's calendar day in `timeZone`, as `YYYY-MM-DD`.
+ *
+ * The companion to civilToInstantISO, and it has to be: a form that reads the
+ * typed time in one zone while defaulting the date from another can be a day
+ * out near either end of the day, and the pair would disagree without anyone
+ * touching a control. `todayLocalISO` answers this for the browser's own zone
+ * only, which is the right answer exactly when the authoring zone IS the
+ * browser's.
+ *
+ * Unknown zone → the browser's own day, never a silent UTC day: a UTC day is
+ * already tomorrow for a third of the planet and yesterday for much of the rest.
+ */
+export function todayInZone(timeZone: string, now: Date = new Date()): string {
+    if (!isUsableZone(timeZone)) {
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    }
+    // Reuse the one reader that already knows how to pull civil fields in a zone;
+    // its result is the wall clock read as if UTC, so the ISO prefix is the day.
+    // tz-lint-ok: the instant here is ALREADY shifted into `timeZone`, so this
+    // slice is that zone's calendar day, not a UTC day.
+    return new Date(civilFieldsAsUtcMs(now.getTime(), timeZone)).toISOString().slice(0, 10);
+}
+
+/**
  * @param date `YYYY-MM-DD` as typed
  * @param time `HH:MM` as typed
  * @param timeZone IANA zone the typed values are read in; blank or unknown → UTC

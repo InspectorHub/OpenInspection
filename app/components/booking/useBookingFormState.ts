@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useFetcher } from "react-router";
 import type { CompanyProfile } from "./booking-constants";
 import type { PublicAddressSuggestion } from "./PublicAddressAutocomplete";
+import { validateBookingDate } from "./booking-date-rules";
 import { resolveOrderDeposit } from "../../../server/lib/billing/deposit-policy";
 import { m } from "~/paraglide/messages";
 
@@ -123,11 +124,38 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
   // An authenticated agent is not an anonymous visitor, so the bot challenge
   // does not apply to them; every anonymous submit still faces it.
   const needsTurnstile = !!profile?.turnstileSiteKey && !agentBooking;
+
+  /**
+   * F42 — why the chosen date cannot be submitted, or null.
+   *
+   * Recomputed on every render rather than stored: a value the visitor typed
+   * (which several browsers accept past `min`), a tab left open across midnight
+   * and a date pasted into the field all reach the same check this way. The
+   * server re-decides in the company's timezone; this is what stops the visitor
+   * filling in three more steps first.
+   */
+  const dateIssue = validateBookingDate(inspectionDate);
+  /** Set by the schedule step from `/api/public/slots`: nothing bookable that day. */
+  const [dateUnbookable, setDateUnbookable] = useState(false);
+
   const canNext =
     step === 0 ? address.length > 2 :
     step === 1 ? selectedServices.size > 0 :
-    step === 2 ? inspectionDate.length > 0 && clientName.length > 0 && clientEmail.length > 0 :
+    step === 2 ? inspectionDate.length > 0 && !dateIssue && !dateUnbookable
+      && clientName.length > 0 && clientEmail.length > 0 :
     needsTurnstile ? !!turnstileToken : true;
+
+  /**
+   * F44 — what the total actually buys.
+   *
+   * The confirm step said `Services  1 selected` with `$450.00` on the next
+   * line, so the one number the client is agreeing to had no subject. The names
+   * come from the same catalogue rows the prices do.
+   */
+  const selectedServiceNames = useMemo(
+    () => (profile?.services ?? []).filter((s) => selectedServices.has(s.id)).map((s) => s.name),
+    [profile, selectedServices],
+  );
 
   const inspectorOptions = useMemo(() => {
     const base = profile?.allowInspectorChoice && profile.inspectors.length > 0 ? [...profile.inspectors] : [];
@@ -251,6 +279,9 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
     currency: profile?.currency ?? "USD",
     needsTurnstile,
     canNext,
+    dateIssue,
+    dateUnbookable, setDateUnbookable,
+    selectedServiceNames,
     inspectorOptions,
     chosenInspectorName,
     handleSubmit,

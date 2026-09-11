@@ -1,8 +1,8 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, inArray } from 'drizzle-orm';
-import { inspections, inspectionRequests, tenantConfigs, services as servicesTable } from '../../lib/db/schema';
-import { wallClockToEpochMs, resolveTenantTimeZone } from '../../lib/tz';
+import { inspections, inspectionRequests, services as servicesTable } from '../../lib/db/schema';
+import { wallClockToEpochMs } from '../../lib/tz';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { writeAuditLogWithSlug } from '../../lib/audit';
@@ -53,7 +53,7 @@ export async function fulfillBooking(
     const service = c.var.services.booking;
     const db = drizzle(c.env.DB);
 
-    const { inspectorId, requestedTime, isWidgetSubmit, originHeader, place, routing } =
+    const { inspectorId, requestedTime, tenantTz, isWidgetSubmit, originHeader, place, routing } =
         await admitBooking(c, db, deps.d1, tenantId, body);
 
     const resolvedAgentContactId = await resolveBookingAgentReferral(db, tenantId, body.agentRefSlug);
@@ -246,9 +246,11 @@ export async function fulfillBooking(
     // it still keys the HH:MM busy-checks via slice(11,16). Non-fatal: the
     // inspection rows already committed, so a stamp failure must not 500 the
     // booker (conflict detection just falls back to the hour-bucket).
-    const tzRow = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
-        .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
-    const tenantTz = resolveTenantTimeZone(tzRow?.defaultTimezone);
+    //
+    // The zone comes from the CLAIM, not from a second read of tenant_configs.
+    // It is the same value admission already refused the booking over, so this
+    // line cannot silently degrade to the UTC sentinel the way it used to — and
+    // there is no second place left where that degradation could reappear.
     const scheduledStartMs = wallClockToEpochMs(body.date, requestedTime, tenantTz);
     const slotWindowMin =
         body.timeSlot === 'all-day' ? 540
@@ -310,6 +312,7 @@ export async function fulfillBooking(
         requestedTime,
         inspectionId,
         bookingClientContactId,
+        tenantTz,
     }));
 
     if (isWidgetSubmit) {

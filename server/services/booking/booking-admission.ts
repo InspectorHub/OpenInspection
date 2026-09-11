@@ -1,8 +1,9 @@
 import type { Context } from 'hono';
 import { eq, and } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { users } from '../../lib/db/schema';
+import { users, tenantConfigs } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
+import { requireDeclaredTenantTimeZone } from '../../lib/tz';
 import { logger } from '../../lib/logger';
 import { resolveTurnstile, TURNSTILE_TEST_KEY_WARNING } from '../../lib/middleware/bot-protection';
 import { resolvePublicHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
@@ -16,6 +17,14 @@ import type { RoutingDecision } from '../../lib/booking/routing';
 export interface BookingClaim {
     inspectorId: string;
     requestedTime: string;
+    /**
+     * The workspace's DECLARED company timezone — the zone `requestedTime` is
+     * read in. Resolved here, once, and carried rather than re-read downstream:
+     * admission is the only place a booking can still be refused without
+     * compensation, so it is the only place the "no zone declared" answer is
+     * cheap. Never the UTC sentinel — admission throws first.
+     */
+    tenantTz: string;
     /** Carried through for the widget success/error telemetry the caller emits. */
     isWidgetSubmit: boolean;
     originHeader: string | undefined;
@@ -178,6 +187,27 @@ export async function admitBooking(
         throw Errors.Conflict('Online booking is not open yet. Please contact the company directly to schedule.');
     }
 
+    // A SLOT TIME WITH NO DECLARED ZONE IS NOT A TIME.
+    //
+    // `requestedTime` is a wall clock off the tenant's own opening hours. Read
+    // in a zone nobody declared it becomes an instant nobody chose, and that
+    // instant is what the ICS invite and the confirmation email tell the
+    // client — the 08:00 booking that arrived in a calendar as 4 AM. So this
+    // fails closed in the same breath as "nobody configured hours", for the
+    // same reason and with the same copy: what is missing is the company's
+    // configuration, and the stranger filling in the form cannot supply it.
+    //
+    // Deliberately BEFORE the first write. A booking refused here costs a
+    // lead; a booking accepted here costs the appointment, and there is no
+    // version of this product where a 4 AM invite is the better outcome.
+    const tzRow = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+        .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+    const tenantTz = requireDeclaredTenantTimeZone(tzRow?.defaultTimezone);
+    if (!tenantTz) {
+        logger.warn('booking.timezone.undeclared', { tenantId });
+        throw Errors.Conflict('Online booking is not open yet. Please contact the company directly to schedule.');
+    }
+
     const holiday = await resolvePublicHolidayEffect(d1, tenantId, body.date);
     if (holiday.effect === 'block') {
         throw Errors.BadRequest(
@@ -237,5 +267,5 @@ export async function admitBooking(
         if (!inspectorId) throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
     }
 
-    return { inspectorId, requestedTime, isWidgetSubmit, originHeader, place, routing };
+    return { inspectorId, requestedTime, tenantTz, isWidgetSubmit, originHeader, place, routing };
 }

@@ -22,6 +22,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 // eslint-disable-next-line import/order
 import { bookingsRoutes } from '../../../server/api/bookings';
 import { makeExecutionContext } from '../helpers/exec-ctx';
+import { nextWeekday } from '../helpers/bookable-date';
 
 vi.mock('../../../server/lib/rate-limit', () => ({
     checkRateLimit: vi.fn().mockResolvedValue(undefined),
@@ -30,7 +31,7 @@ vi.mock('../../../server/lib/rate-limit', () => ({
 const TENANT_ID = 'aaaaaaaa-0000-0000-0000-0000000000s1';
 const TENANT_SLUG = 'scheduled-instant';
 /** 2026-07-17 is a Friday (dayOfWeek 5); not a US federal holiday. */
-const FRIDAY = '2026-07-17';
+const FRIDAY = nextWeekday(5);
 const TENANT_TZ = 'America/New_York';
 
 const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];

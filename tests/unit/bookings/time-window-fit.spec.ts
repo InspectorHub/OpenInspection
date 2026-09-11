@@ -33,6 +33,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { createTestDb, setupSchema } from '../db';
 import {
     tenants, users, availability, inspections, inspectionInspectors,
+    tenantConfigs,
 } from '../../../server/lib/db/schema';
 import * as schema from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -50,9 +51,10 @@ vi.mock('../../../server/lib/rate-limit', () => ({
 // eslint-disable-next-line import/order
 import { bookingsRoutes } from '../../../server/api/bookings';
 import { makeExecutionContext } from '../helpers/exec-ctx';
+import { nextWeekday } from '../helpers/bookable-date';
 
 /** 2026-06-08 is a Monday (dayOfWeek = 1). */
-const MONDAY = '2026-06-08';
+const MONDAY = nextWeekday(1);
 const T1 = 'aaaaaaaa-0000-4000-8000-000000000001';
 const U1 = 'bbbbbbbb-0000-4000-8000-000000000001';
 
@@ -106,6 +108,11 @@ async function seedNineToFive(db: BetterSQLite3Database<typeof schema>) {
     await db.insert(availability).values({
         id: 'a1', tenantId: T1, inspectorId: U1, dayOfWeek: 1,
         startTime: '09:00', endTime: '17:00', createdAt: new Date(),
+    } as never);
+    // A DECLARED company timezone. Public booking refuses a workspace that never
+    // set one (the NOT NULL default 'UTC' is the unset sentinel).
+    await db.insert(tenantConfigs).values({
+        tenantId: T1, updatedAt: new Date(), defaultTimezone: 'America/New_York',
     } as never);
 }
 

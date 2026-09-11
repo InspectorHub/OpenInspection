@@ -11,6 +11,7 @@ import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import type { ScopedDB } from '../../lib/db/scoped';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
+import { epochMsToWallClockYmd, resolveTenantTimeZone } from '../../lib/tz';
 import { InspectionSubService } from './base';
 
 /** Parse a report_versions.snapshotJson payload (snapshotOnPublish serialises
@@ -124,6 +125,28 @@ export class InspectionReinspectionService extends InspectionSubService {
 
         const id = crypto.randomUUID();
         const createdAt = new Date();
+        // THE DATE IS A DAY, NOT THE MOMENT THE BUTTON WAS PRESSED.
+        //
+        // This used to write `createdAt.toISOString()`, so a round created at
+        // 09:37 was scheduled, to the millisecond, at 09:37 — a precise
+        // appointment nobody made. The dialog has no date field (it offers item
+        // selection, Cancel and Create), so there is no chosen time to record,
+        // and inventing one makes every downstream consumer of an instant
+        // repeat it: the calendar places the card at that minute, and the .ics
+        // feed publishes it.
+        //
+        // `inspections.date` holds two shapes on purpose — a civil day
+        // (`YYYY-MM-DD`) and a full instant — and the day-only shape is the one
+        // that says "this date, time not set". scheduled_start_ms is left NULL
+        // for the same reason, which is what makes the calendar and the ICS feed
+        // fall back to the tenant's default business-hours start instead of a
+        // millisecond. The day is read in the COMPANY's zone, because a
+        // re-inspection booked at 18:00 on the US west coast is not tomorrow.
+        const tzRow = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+        const scheduledDay = epochMsToWallClockYmd(
+            createdAt.getTime(), resolveTenantTimeZone(tzRow?.defaultTimezone),
+        );
         // Quota is consumed only after every precondition check above (baseline
         // existence, published-baseline gate, inspector ownership) has passed
         // and immediately before the insert that actually creates the
@@ -147,7 +170,7 @@ export class InspectionReinspectionService extends InspectionSubService {
             templateId:              baseline.templateId,
             templateSnapshot:        baseline.templateSnapshot,
             templateSnapshotVersion: baseline.templateSnapshotVersion,
-            date:                    createdAt.toISOString(),
+            date:                    scheduledDay,
             status:                  INSPECTION_STATUS.REQUESTED,
             paymentStatus:           'unpaid',
             price:                   0,

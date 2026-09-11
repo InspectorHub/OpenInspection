@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { brandTokens, type TenantBrand } from "~/lib/brand";
 import { PublicLegalFooter } from "~/components/PublicLegalFooter";
+import { ContactChannels, hasContactChannel } from "~/components/ContactChannels";
 import type { CompanyProfile } from "./booking-constants";
 import { m } from "~/paraglide/messages";
 
@@ -17,8 +18,23 @@ export function BookingErrorState({ error }: { error: string | null }) {
   );
 }
 
-// B-16 — the company hasn't configured working hours yet: show an honest
-// not-open state instead of a wizard whose submit can only fail.
+/**
+ * B-16 — the company hasn't configured working hours yet: show an honest
+ * not-open state instead of a wizard whose submit can only fail.
+ *
+ * F37 — and say something a visitor can act on. This page told them to "contact
+ * them directly" and then offered a Privacy Policy and a Terms link: a potential
+ * customer arriving from a shared booking link reached a dead end with the
+ * company named and no way to reach it. The contact details were not missing from
+ * the product — `TenantBrand` has carried `supportEmail` and `companyPhone` since
+ * IA-36 ⑨ and this component was already being handed the brand — they were
+ * simply never rendered. (The walkthrough looked at `CompanyProfile`, which does
+ * not have them, and concluded the loader had to be changed; it does not.)
+ *
+ * When the company really has set neither channel, the copy changes instead of
+ * the block disappearing: telling someone to make contact and showing them
+ * nothing to contact is worse than not mentioning it.
+ */
 export function BookingNotOpenState({
   profile,
   brand,
@@ -30,13 +46,22 @@ export function BookingNotOpenState({
   privacyUrl?: string | null;
   termsUrl?: string | null;
 }) {
+  const contacts = { email: brand.supportEmail, phone: brand.companyPhone };
+  const reachable = hasContactChannel(contacts);
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-ih-bg-app px-4" style={brandTokens(brand.primaryColor)}>
       <div className="max-w-md w-full text-center p-8 bg-ih-bg-card border border-ih-border rounded-xl">
         <h1 className="text-xl font-bold text-ih-fg-1">{m.booking_not_open_heading()}</h1>
         <p className="text-[14px] text-ih-fg-3 mt-3 leading-relaxed">
-          {m.booking_not_open_body({ company: profile.company })}
+          {reachable
+            ? m.booking_not_open_body({ company: profile.company })
+            : m.booking_not_open_body_no_contact({ company: profile.company })}
         </p>
+        <ContactChannels
+          email={contacts.email}
+          phone={contacts.phone}
+          className="mt-5 pt-5 border-t border-ih-border"
+        />
       </div>
       <PublicLegalFooter
         privacyUrl={privacyUrl ?? brand.privacyUrl}

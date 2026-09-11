@@ -1,6 +1,7 @@
-import { timeWindows, type CompanyProfile } from "./booking-constants";
+import type { CompanyProfile } from "./booking-constants";
 import { PublicAddressAutocomplete, type PublicAddressSuggestion } from "./PublicAddressAutocomplete";
 import { BookingDepositPanel } from "./BookingDepositPanel";
+import { BookingSummaryCard } from "./BookingSummaryCard";
 import { formatCurrency } from "~/lib/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
@@ -122,6 +123,7 @@ export function ConfirmStep({
   timeWindow,
   customTime,
   selectedServices,
+  selectedServiceNames = [],
   showInspectorDropdown,
   chosenInspectorName,
   totalPrice,
@@ -139,6 +141,8 @@ export function ConfirmStep({
   timeWindow: string;
   customTime: string;
   selectedServices: Set<string>;
+  /** F44 — the names behind the total. Empty falls back to the count. */
+  selectedServiceNames?: string[];
   showInspectorDropdown: boolean;
   chosenInspectorName: string;
   totalPrice: number;
@@ -153,17 +157,47 @@ export function ConfirmStep({
   companyName: string;
 }) {
   const locale = useDisplayLocale();
+  const summary = (
+    <BookingSummaryCard
+      address={address}
+      inspectionDate={inspectionDate}
+      timeWindow={timeWindow}
+      customTime={customTime}
+      serviceCount={selectedServices.size}
+      serviceNames={selectedServiceNames}
+      showInspector={showInspectorDropdown}
+      chosenInspectorName={chosenInspectorName}
+      totalPrice={totalPrice}
+      depositQuoteCents={depositQuoteCents}
+      clientName={clientName}
+      clientEmail={clientEmail}
+      currency={currency}
+      locale={locale}
+    />
+  );
   return (
     <section className="space-y-5">
       {message?.ok ? (
-        <div className="text-center py-8">
-          <div className="w-16 h-16 rounded-full bg-ih-ok-bg flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-ih-ok-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+        <div className="py-8 space-y-5">
+          <div className="text-center">
+            <div className="w-16 h-16 rounded-full bg-ih-ok-bg flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-ih-ok-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-ih-fg-1 mb-2">{m.booking_confirm_submitted_heading()}</h2>
+            <p className="text-[14px] text-ih-fg-3">{message.text}</p>
           </div>
-          <h2 className="text-xl font-bold text-ih-fg-1 mb-2">{m.booking_confirm_submitted_heading()}</h2>
-          <p className="text-[14px] text-ih-fg-3">{message.text}</p>
+          {/* F44 — the confirmation used to be a tick and a sentence. The client
+              leaves this page with a date in their calendar and a deposit on
+              their card; it has to say which appointment that was. Same rows as
+              the review step, from the same values, so the two cannot disagree. */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-2">
+              {m.booking_confirm_whats_booked_heading()}
+            </p>
+            {summary}
+          </div>
           {/* Only once the server has said what it froze, and only if it froze
               anything. A workspace with no deposit sees no payment step. */}
           {bookedInspectionId && depositDueCents != null && depositDueCents > 0 && (
@@ -181,52 +215,7 @@ export function ConfirmStep({
             <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">{m.booking_confirm_details_heading()}</h2>
             <p className="text-[13px] text-ih-fg-3">{m.booking_confirm_subtitle()}</p>
           </div>
-          <div className="bg-ih-bg-muted rounded-md p-4 space-y-3 text-[13px]">
-            <div className="flex justify-between">
-              <span className="text-ih-fg-3">{m.booking_confirm_row_address()}</span>
-              <span className="font-medium text-ih-fg-1">{address}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ih-fg-3">{m.booking_confirm_row_date()}</span>
-              <span className="font-medium text-ih-fg-1">{inspectionDate}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ih-fg-3">{m.booking_confirm_row_time()}</span>
-              <span className="font-medium text-ih-fg-1">
-                {timeWindow === "custom" ? customTime : timeWindows().find((w) => w.id === timeWindow)?.label}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ih-fg-3">{m.booking_confirm_row_services()}</span>
-              <span className="font-medium text-ih-fg-1">{m.booking_confirm_services_selected({ count: selectedServices.size })}</span>
-            </div>
-            {showInspectorDropdown && (
-              <div className="flex justify-between">
-                <span className="text-ih-fg-3">{m.booking_field_inspector_label()}</span>
-                <span className="font-medium text-ih-fg-1">{chosenInspectorName}</span>
-              </div>
-            )}
-            <div className="flex justify-between border-t border-ih-border pt-3">
-              <span className="font-bold text-ih-fg-2">{m.booking_confirm_row_total()}</span>
-              <span className="font-bold text-ih-fg-1">${totalPrice.toFixed(2)}</span>
-            </div>
-            {depositQuoteCents > 0 && (
-              <div className="flex justify-between">
-                <span className="text-ih-fg-3">{m.booking_confirm_row_deposit()}</span>
-                <span className="font-medium text-ih-fg-1 tabular-nums">
-                  {formatCurrency(depositQuoteCents, { locale, currency })}
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-ih-fg-3">{m.booking_confirm_row_name()}</span>
-              <span className="font-medium text-ih-fg-1">{clientName}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ih-fg-3">{m.booking_field_email_label()}</span>
-              <span className="font-medium text-ih-fg-1">{clientEmail}</span>
-            </div>
-          </div>
+          {summary}
           {depositQuoteCents > 0 && (
             <p className="text-[12px] text-ih-fg-3 leading-relaxed">
               {m.booking_deposit_confirm_note({

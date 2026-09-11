@@ -19,6 +19,21 @@ import { createRoutesStub } from "react-router";
 
 import BookingPage from "~/routes/public/booking";
 
+/**
+ * A date the booking rules accept, computed rather than written down.
+ *
+ * These fixtures used to hardcode `2026-09-01`, which silently became a date in
+ * the past and — once F42 started refusing those — stopped the wizard at the
+ * schedule step. A booking fixture cannot carry a literal date: the rule it has
+ * to satisfy is relative to today.
+ */
+function bookableDate(): string {
+  const d = new Date(Date.now() + 30 * 86_400_000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+
 type DepositPolicy = { type: "none" | "percent" | "fixed"; percent?: number; amountCents?: number } | null;
 type BookingService = { id: string; name: string; price: number; duration: number; depositPolicy: DepositPolicy };
 
@@ -65,7 +80,7 @@ async function walkTo(step: "services" | "confirm") {
   fireEvent.change(screen.getByPlaceholderText("Jane Doe"), { target: { value: "Jane Doe" } });
   fireEvent.change(screen.getByPlaceholderText("jane@example.com"), { target: { value: "jane@example.com" } });
   const date = document.querySelector("input[type='date']") as HTMLInputElement;
-  fireEvent.change(date, { target: { value: "2026-09-10" } });
+  fireEvent.change(date, { target: { value: bookableDate() } });
   fireEvent.click(await screen.findByText("Continue"));
 }
 
