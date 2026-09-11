@@ -181,17 +181,31 @@ export class InspectionPhotoService extends InspectionSubService {
         // canned/custom defect arrays. Mirrors the same shape used by
         // getReportData(). The walk is delegated to the pure
         // collectAttachedPhotos helper so it stays unit-testable.
-        const resultsRow = await db.select().from(inspectionResults)
+        //
+        // EVERY results row for this inspection, not "whichever one D1 hands
+        // back first" (F57). Uniqueness on `inspection_results` is per REPORT —
+        // `uq_results_report`, because one order can deliver a standard report
+        // and a radon report — so an inspection can own several documents, and a
+        // `.get()` over `inspection_id` answered about an arbitrary one of them.
+        // That is how the editor's photo drawer said "No photos in this
+        // inspection yet" while the item strip beside it showed two and the tab
+        // badge said four: the strip and badge read the document that is OPEN,
+        // this read a sibling document that happened to be empty. The question
+        // the drawer asks is about the inspection, so answer for the inspection.
+        //
+        // A photo that somehow appears in two documents arrives twice; the
+        // callers dedupe by R2 key (`flattenMedia`), which is the only identity
+        // a photo has here.
+        const resultsRows = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
-            .get();
-        const resultData = parseResultData(resultsRow?.data);
+            .all();
 
-        const attached = collectAttachedPhotos(
-            resultData,
+        const attached = resultsRows.flatMap((row) => collectAttachedPhotos(
+            parseResultData(row.data),
             itemMeta,
             (key) => `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`,
             (k) => { const pk = parseFindingKey(k); return { itemId: pk.itemId, sectionId: pk.sectionId }; },
-        );
+        ));
 
         // Pool — loose uploads, ordered newest first.
         const poolRows = await db.select().from(inspectionMediaPool)

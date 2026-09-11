@@ -82,6 +82,21 @@ function submitButton() {
   return screen.getByText("Send").closest("button") as HTMLButtonElement;
 }
 
+/**
+ * Un-tick everyone the dialog pre-selected.
+ *
+ * The tests below that are about the one-off recipient, or about the disabled
+ * submit, predate the pre-selection and are still about what they were about —
+ * so they start from an empty selection EXPLICITLY rather than relying on the
+ * dialog opening empty, which it no longer does.
+ */
+function clearPreselected(container: HTMLElement) {
+  for (const id of ["p1", "p2"]) {
+    const box = container.querySelector(`input[data-testid="send-report-person-${id}"]`) as HTMLInputElement;
+    if (box.checked) fireEvent.click(box);
+  }
+}
+
 describe("SendReportModal", () => {
   it("renders the inspection's people grouped by role; a person without an email is disabled", () => {
     const { container } = render(
@@ -102,7 +117,63 @@ describe("SendReportModal", () => {
   });
 
   it("submit is disabled when nothing is selected or entered", () => {
-    render(<SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />);
+    const { container } = render(
+      <SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
+    );
+    clearPreselected(container);
+    expect(submitButton().disabled).toBe(true);
+  });
+
+  /* ---------------------------------------------------------------- */
+  /*  Who is pre-selected                                             */
+  /* ---------------------------------------------------------------- */
+
+  it("opens with the client and the agents already ticked, and ready to send", () => {
+    // The dialog used to open with nobody ticked and the Send button disabled,
+    // for an inspection whose client and agent were on file WITH email
+    // addresses — so the product asked the inspector to re-nominate the people
+    // they had entered themselves.
+    const { container } = render(
+      <SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
+    );
+    const box = (id: string) =>
+      container.querySelector(`input[data-testid="send-report-person-${id}"]`) as HTMLInputElement;
+
+    expect(box("p1").checked).toBe(true);
+    expect(box("p2").checked).toBe(true);
+    expect(recipientsField(container)).toEqual(
+      expect.arrayContaining([
+        { contactId: "c1", roleKey: "client" },
+        { contactId: "c2", roleKey: "buyer_agent" },
+      ]),
+    );
+    expect(submitButton().disabled).toBe(false);
+  });
+
+  it("leaves the `other` bucket un-ticked", () => {
+    // The half that makes the test above discriminating: "tick everyone" would
+    // satisfy it and would send the report to whoever else is on the order — an
+    // attorney, a contractor — which cannot be taken back. (Carol also has no
+    // email, so this pins the kind rule and the email rule at once; the
+    // disabled-row assertion lives in the first test.)
+    const { container } = render(
+      <SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
+    );
+    const carol = container.querySelector('input[data-testid="send-report-person-p3"]') as HTMLInputElement;
+    expect(carol.checked).toBe(false);
+    expect(recipientsField(container)).toHaveLength(2);
+  });
+
+  it("never pre-ticks a person the endpoint would skip for having no email", () => {
+    const agentNoEmail: PersonRow[] = [
+      { ...people[1], id: "p9", contactId: "c9", name: "Dana Agent", email: null },
+    ];
+    const { container } = render(
+      <SendReportModal people={agentNoEmail} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
+    );
+    const box = container.querySelector('input[data-testid="send-report-person-p9"]') as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    expect(recipientsField(container)).toEqual([]);
     expect(submitButton().disabled).toBe(true);
   });
 
@@ -111,6 +182,9 @@ describe("SendReportModal", () => {
       <SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
     );
 
+    // Ticked -> unticked -> ticked: the serialization is asserted on a selection
+    // the test performed, not on the one the dialog opened with.
+    clearPreselected(container);
     fireEvent.click(container.querySelector('input[data-testid="send-report-person-p1"]') as HTMLInputElement);
     fireEvent.click(container.querySelector('input[data-testid="send-report-person-p2"]') as HTMLInputElement);
 
@@ -130,6 +204,7 @@ describe("SendReportModal", () => {
       <SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
     );
 
+    clearPreselected(container);
     fireEvent.change(screen.getByPlaceholderText("name@example.com"), {
       target: { value: "extra@example.com" },
     });
@@ -144,6 +219,7 @@ describe("SendReportModal", () => {
     const { container } = render(
       <SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
     );
+    clearPreselected(container);
     fireEvent.change(screen.getByPlaceholderText("name@example.com"), {
       target: { value: "extra@example.com" },
     });

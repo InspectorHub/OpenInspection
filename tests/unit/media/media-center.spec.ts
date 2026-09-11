@@ -193,6 +193,72 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
         expect(after.attached.filter(p => p.itemId === 'item-cover')).toHaveLength(2);
     });
 
+    /**
+     * F57 — the editor's photo drawer said "No photos in this inspection yet"
+     * on an inspection whose item strip showed two photos and whose tab badge
+     * showed four.
+     *
+     * The two sides were asking different questions. The strip and the badge
+     * read the Y.Doc that is OPEN — one document, one report. This read
+     * `inspection_results` with `.get()` over `inspection_id`, and uniqueness on
+     * that table is per REPORT (`uq_results_report`, so one order can deliver a
+     * standard report and a radon report). With more than one row, `.get()`
+     * answers about an arbitrary one of them — and an empty sibling document
+     * renders as "this inspection has no photos".
+     *
+     * The discriminating fixture is therefore TWO results rows where the FIRST
+     * one inserted is empty: a single-row test passes either way.
+     */
+    it('getMediaCenter sees photos in every report document, not just the first row', async () => {
+        await testDb.insert(schema.inspectionResults).values([
+            {
+                id:           'res-radon',
+                tenantId:     TENANT,
+                inspectionId: INSPECTION_ID,
+                reportId:     'report-radon',
+                // The sibling document, and deliberately first: a radon report
+                // carries no photos of the roof.
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                data:         {} as any,
+                lastSyncedAt: new Date(),
+            },
+            {
+                id:           'res-standard',
+                tenantId:     TENANT,
+                inspectionId: INSPECTION_ID,
+                reportId:     'report-standard',
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                data:         {
+                    'item-cover': { photos: [{ key: 'k-cover-1' }, { key: 'k-cover-2' }] },
+                    'item-panel': { photos: [{ key: 'k-panel-1' }] },
+                } as any,
+                lastSyncedAt: new Date(),
+            },
+        ]);
+
+        const out = await svc.getMediaCenter(INSPECTION_ID, TENANT);
+
+        expect(out.attached.map(p => p.key).sort()).toEqual(['k-cover-1', 'k-cover-2', 'k-panel-1']);
+        // And the labels still resolve, so this is the inspection's own media
+        // rather than a bag of keys.
+        expect(out.attached.find(p => p.key === 'k-panel-1')?.sectionTitle).toBe('Electrical');
+    });
+
+    it('getMediaCenter still answers for an inspection whose only document is empty', async () => {
+        await testDb.insert(schema.inspectionResults).values({
+            id:           'res-only',
+            tenantId:     TENANT,
+            inspectionId: INSPECTION_ID,
+            reportId:     'report-only',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            data:         {} as any,
+            lastSyncedAt: new Date(),
+        });
+
+        const out = await svc.getMediaCenter(INSPECTION_ID, TENANT);
+        expect(out.attached).toEqual([]);
+    });
+
     it('deletePoolPhoto removes the row and calls r2.delete', async () => {
         const pool = await svc.uploadPoolPhoto(INSPECTION_ID, TENANT, new File([new Uint8Array([3])], 'r.jpg', { type: 'image/jpeg' }));
         await svc.deletePoolPhoto(INSPECTION_ID, TENANT, pool.id);

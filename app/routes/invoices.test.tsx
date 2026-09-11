@@ -137,6 +137,68 @@ describe("/invoices — IA-97", () => {
     expect(queryByRole("alert")).toBeNull();
   });
 
+  it("does not call a cash figure REVENUE, and does not omit a partial payment (F28)", async () => {
+    // TWO pages said "REVENUE" and the two numbers disagreed: /metrics totals
+    // what was BILLED, this card totals what was RECEIVED, and nothing on
+    // either page said so. Revenue is the billed figure, so /metrics keeps the
+    // word and this card names the cash.
+    //
+    // The card also has to BE the cash. It used to sum the full amount of
+    // invoices whose status was `paid`, so $200 banked against a $450 invoice —
+    // status `partial` — counted as nothing at all.
+    const { findByText, container } = renderInvoices([
+      // Paid in full, $450 in.
+      { ...BILLED, amountPaidCents: 45000 },
+      // $200 of $450 in. The money that used to vanish from this card.
+      { ...UNPAID, id: "inv-p", status: "partial" as const, amountPaidCents: 20000 },
+      // Voided: never counts, whatever it once carried.
+      { ...BILLED, id: "inv-v", status: "void" as const, amountPaidCents: 45000 },
+      // A pre-ledger row marked paid with no recorded figure: its total IS what
+      // came in, and reading the null as zero would erase a real payment.
+      { ...BILLED, id: "inv-legacy", amountPaidCents: null },
+    ]);
+
+    const label = await findByText("COLLECTED");
+    // The word this page must NOT use for cash.
+    expect(container.textContent).not.toContain("REVENUE");
+    // $450 + $200 + $450 = $1,100. The void invoice's $450 is excluded.
+    expect(label.parentElement?.textContent).toContain("$1,100");
+  });
+
+  it("does not promise that Mark paid unlocks the report (F49)", async () => {
+    // The footer said so unconditionally. The gate is `inspections.paymentRequired`,
+    // `notNull().default(false)`, set only at publish time by an explicit
+    // `requirePayment` — so for a tenant who never checks that box, the promised
+    // effect never happens once.
+    const { container, findByRole } = renderInvoices([BILLED]);
+    await findByRole("heading", { name: "Invoices" });
+    const text = container.textContent ?? "";
+
+    expect(text).toContain("Mark paid");
+    // The unconditional claim, verbatim as it shipped.
+    expect(text).not.toContain("and unlocks the report");
+    // Replaced by a conditional one that names the condition.
+    expect(text).toContain("published with payment required");
+  });
+
+  it("spells the payment method one way (F49)", async () => {
+    // The method dropdown said American "Check" while the note placeholder
+    // beside it said British "Cheque" — same modal, same thing, two spellings.
+    const { findAllByRole, container } = renderInvoices([UNPAID]);
+    const payments = (await findAllByRole("button")).find((b) => b.textContent === "Payments");
+    if (!payments) throw new Error("no Payments button");
+    fireEvent.click(payments);
+
+    const placeholders = Array.from(container.querySelectorAll("input"))
+      .map((el) => el.getAttribute("placeholder") ?? "")
+      .join(" ");
+    // Proves the modal is actually open, so the absence below is an absence of
+    // the WORD and not an absence of the field.
+    expect(placeholders).toContain("number, reference");
+    expect(placeholders).not.toContain("Cheque");
+    expect(placeholders).toContain("Check number");
+  });
+
   it("still offers a standalone invoice something to do (IA-123)", async () => {
     // This used to assert the opposite — "with nowhere to go, the dash is
     // honest, keep it". It was not honest, it was a dead end: an invoice with

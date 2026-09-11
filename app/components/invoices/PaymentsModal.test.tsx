@@ -12,12 +12,19 @@
  * total, refunds subtracting, so a correction moves it without anything reading
  * the cached column.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { PaymentsModal, type PaymentRow } from "./PaymentsModal";
 import type { GuardedSubmit } from "~/hooks/useGuardedSubmit";
 
 const INVOICE = { id: "inv-1", clientName: "Dana Reyes", amountCents: 45000, currency: "USD" };
+
+/**
+ * The company is on the US east coast. Every test renders with this, and the
+ * machine running the test is somewhere else — which is the only configuration
+ * in which "whose zone did the conversion use" is an answerable question.
+ */
+const COMPANY_TZ = "America/New_York";
 
 const CASH: PaymentRow = {
     id: "pay-1", kind: "balance", amountCents: 20000, method: "cash", provider: null,
@@ -44,7 +51,19 @@ function guardedSubmit() {
     return vi.fn<GuardedSubmit>(() => true);
 }
 
-function renderModal(payments: PaymentRow[], fetcher = mockFetcher(), submit = guardedSubmit(), busy = false) {
+/**
+ * The company zone is a PARAMETER of every render here, because it is the thing
+ * this surface must not guess. Tests that left it implicit could only ever
+ * observe the runner's own zone, which is how a browser-zone conversion stayed
+ * invisible: on a machine sitting in the company's zone the two are equal.
+ */
+function renderModal(
+    payments: PaymentRow[],
+    fetcher = mockFetcher(),
+    submit = guardedSubmit(),
+    busy = false,
+    companyTimeZone = COMPANY_TZ,
+) {
     const utils = render(
         <PaymentsModal
             invoice={INVOICE}
@@ -55,17 +74,22 @@ function renderModal(payments: PaymentRow[], fetcher = mockFetcher(), submit = g
             submit={submit}
             busy={busy}
             locale="en-US"
+            companyTimeZone={companyTimeZone}
             onClose={() => {}}
         />,
     );
     return { ...utils, fetcher, submit };
 }
 
-/** The browser's own calendar day, the same way the component computes it. */
-function todayLocal(): string {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+/** The company's own calendar day for a given instant — what the field must show. */
+function dayIn(zone: string, at: Date = new Date()): string {
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(at);
+}
+
+function todayInCompanyZone(): string {
+    return dayIn(COMPANY_TZ);
 }
 
 describe("PaymentsModal — the date", () => {
@@ -73,7 +97,7 @@ describe("PaymentsModal — the date", () => {
         const { container } = renderModal([]);
         const date = container.querySelector('input[type="date"]') as HTMLInputElement;
         expect(date).toBeTruthy();
-        expect(date.value).toBe(todayLocal());
+        expect(date.value).toBe(todayInCompanyZone());
         expect(date.disabled).toBe(false);
         expect(date.readOnly).toBe(false);
     });
@@ -90,21 +114,116 @@ describe("PaymentsModal — the date", () => {
         const sent = submit.mock.calls[0][0] as Record<string, string>;
         expect(sent.intent).toBe("record-payment");
         expect(sent.amount).toBe("200");
-        // A full instant on the wire, and it is Tuesday's — in the browser's own
-        // zone, which is the only place that mapping can honestly be made.
+        // A full instant on the wire, and it is Tuesday's — read in the COMPANY's
+        // zone, which is the only zone two members of staff can both agree on.
         const submitted = new Date(sent.occurredAt);
         expect(Number.isNaN(submitted.getTime())).toBe(false);
-        expect(submitted.getFullYear()).toBe(2026);
-        expect(submitted.getMonth()).toBe(2);
-        expect(submitted.getDate()).toBe(3);
+        expect(dayIn(COMPANY_TZ, submitted)).toBe("2026-03-03");
         // …and emphatically not today's, which is what a defaulted field would send.
-        expect(`${submitted.getFullYear()}-03-03`).not.toBe(todayLocal());
+        expect(`${submitted.getFullYear()}-03-03`).not.toBe(todayInCompanyZone());
     });
 
     it("will not offer a future day to pick", () => {
         const { container } = renderModal([]);
         const date = container.querySelector('input[type="date"]') as HTMLInputElement;
-        expect(date.getAttribute("max")).toBe(todayLocal());
+        expect(date.getAttribute("max")).toBe(todayInCompanyZone());
+    });
+});
+
+/**
+ * WHOSE ZONE MAPS THE DAY TO THE INSTANT.
+ *
+ * The conversion from a calendar day to a stored instant was done in the
+ * RECORDER's zone, and the docblock explaining it only justified the rounding
+ * direction ("local midnight of a day that has begun is always in the past"),
+ * never the choice of zone. So a member of staff one zone east of the office
+ * recording today's cash stored the office's YESTERDAY, and two people in two
+ * cities recording the same afternoon's payment filed it on different days. That
+ * date is a financial record: it is the accounting period, and it is what the
+ * QuickBooks push reads back.
+ *
+ * These cases pick a company zone (`America/New_York`) that is NOT the test
+ * runner's own, so "which zone did it use" has a different answer in each, and
+ * they do it on both sides of both DST transitions — a conversion that captured
+ * one offset is right for half the year.
+ */
+describe("PaymentsModal — whose zone the date is read in", () => {
+    const ORIGINAL_TZ = process.env.TZ;
+    afterEach(() => {
+        if (ORIGINAL_TZ === undefined) delete process.env.TZ;
+        else process.env.TZ = ORIGINAL_TZ;
+    });
+
+    it("maps the picked day to midnight in the COMPANY zone, not the browser's", () => {
+        const { container, getByText, submit } = renderModal([]);
+        fireEvent.change(container.querySelector('input[type="number"]')!, { target: { value: "100" } });
+        // 2026-07-01 is EDT: midnight in New York is 04:00Z. The browser here is
+        // not in New York, so a browser-zone conversion cannot produce this.
+        fireEvent.change(container.querySelector('input[type="date"]')!, { target: { value: "2026-07-01" } });
+        fireEvent.click(getByText("Record payment"));
+
+        const sent = submit.mock.calls[0][0] as Record<string, string>;
+        expect(sent.occurredAt).toBe("2026-07-01T04:00:00.000Z");
+        // The property the old docblock was actually defending, re-asserted: the
+        // stored instant is the START of that company day, so it can never be
+        // read back as the day after.
+        expect(dayIn(COMPANY_TZ, new Date(sent.occurredAt))).toBe("2026-07-01");
+    });
+
+    it("produces the same instant whichever zone the RECORDER is sitting in", () => {
+        // THE DISCRIMINATING ASSERTION for F48, and it needs the recorder's zone
+        // to actually move. Rendering twice in one browser cannot show this — both
+        // renders would get the same wrong answer — so the process zone is flipped
+        // between them: one member of staff in Los Angeles, one in Tokyo, one
+        // company in New York. With the browser-zone conversion these differ by
+        // seventeen hours and land on different DAYS.
+        function record() {
+            // Scoped to this render's own container: both modals end up mounted,
+            // so a document-wide query would find two buttons and say nothing
+            // about either.
+            const { container, submit } = renderModal([]);
+            fireEvent.change(container.querySelector('input[type="number"]')!, { target: { value: "100" } });
+            fireEvent.change(container.querySelector('input[type="date"]')!, { target: { value: "2026-07-01" } });
+            fireEvent.click([...container.querySelectorAll("button")]
+                .find((b) => b.textContent === "Record payment")!);
+            return (submit.mock.calls[0][0] as Record<string, string>).occurredAt;
+        }
+
+        process.env.TZ = "America/Los_Angeles";
+        const fromLosAngeles = record();
+        process.env.TZ = "Asia/Tokyo";
+        const fromTokyo = record();
+
+        // Both numbers printed side by side, and both pinned to the company's
+        // own midnight — so "they agree" cannot be satisfied by agreeing wrongly.
+        expect([fromLosAngeles, fromTokyo]).toEqual(["2026-07-01T04:00:00.000Z", "2026-07-01T04:00:00.000Z"]);
+    });
+
+    describe("across both DST transitions", () => {
+        // US Eastern: EDT (-04:00) → EST (-05:00) on 2026-11-01, and back on
+        // 2027-03-14. Midnight moves with the zone; a fixed offset gets two of
+        // these four wrong by an hour, which is a whole day for a date that lands
+        // on a month boundary.
+        const cases: Array<[string, string]> = [
+            ["2026-10-30", "2026-10-30T04:00:00.000Z"], // EDT
+            ["2026-11-02", "2026-11-02T05:00:00.000Z"], // EST
+            ["2027-03-12", "2027-03-12T05:00:00.000Z"], // EST
+            ["2027-03-16", "2027-03-16T04:00:00.000Z"], // EDT
+        ];
+
+        for (const [day, expected] of cases) {
+            it(`${day} midnight Eastern is ${expected}`, () => {
+                const { container, getByText, submit } = renderModal([]);
+                fireEvent.change(container.querySelector('input[type="number"]')!, { target: { value: "100" } });
+                fireEvent.change(container.querySelector('input[type="date"]')!, { target: { value: day } });
+                fireEvent.click(getByText("Record payment"));
+                const sent = submit.mock.calls[0][0] as Record<string, string>;
+                expect(sent.occurredAt).toBe(expected);
+                // Round-trips to the day that was picked — the only thing a
+                // reader of the ledger actually cares about.
+                expect(dayIn(COMPANY_TZ, new Date(sent.occurredAt))).toBe(day);
+            });
+        }
     });
 });
 

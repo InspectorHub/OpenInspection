@@ -10,6 +10,25 @@ const FORM_ID = "ih-send-report-form";
 
 const GROUP_ORDER = ["client", "agent", "other"] as const;
 
+/**
+ * Whose box is ticked when the dialog opens.
+ *
+ * The client and the agents on the inspection ARE the report's addressees — they
+ * were entered on this job for that reason, and opening the dialog with nobody
+ * selected made the product ask a question it already had the answer to: the
+ * inspector had to re-nominate, by hand, the two people whose email addresses
+ * they had typed in themselves. Worse, the submit button is disabled until
+ * something is ticked, so the one-gesture case ("send it to the people on this
+ * job") was the one that needed the most clicks.
+ *
+ * `other` is deliberately NOT pre-ticked. It is the bucket for an attorney, a
+ * contractor, a transaction coordinator — people on the order who are not
+ * automatically addressees of the whole report. The two mistakes are not
+ * symmetrical: a missing tick costs one click, and a wrong one discloses a
+ * document to somebody and cannot be taken back.
+ */
+const PRECHECKED_KINDS: ReadonlySet<PersonRow["kind"]> = new Set(["client", "agent"]);
+
 function groupLabel(kind: PersonRow["kind"]): string {
   switch (kind) {
     case "client":
@@ -54,7 +73,16 @@ export function SendReportModal({
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
   onClose: () => void;
 }) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Computed in a lazy initializer, which holds only because this component is
+  // MOUNTED per open (`{sendReportOpen && <SendReportModal …>}`) — so every
+  // opening re-reads the current people. If it is ever kept mounted behind an
+  // `open` prop, this has to become an effect keyed on the dialog opening, or the
+  // ticks freeze at whoever was on the inspection the first time the page
+  // rendered. A person with no email is never pre-ticked: the endpoint would skip
+  // them and the row is rendered disabled.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    () => new Set(people.filter((p) => p.email && PRECHECKED_KINDS.has(p.kind)).map((p) => p.id)),
+  );
   const [oneOffEmail, setOneOffEmail] = useState("");
   const [oneOffRoleKey, setOneOffRoleKey] = useState("");
 

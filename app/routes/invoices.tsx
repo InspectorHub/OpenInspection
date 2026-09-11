@@ -5,8 +5,9 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, StatCard, Button, EmptyState, Table, Banner, Modal } from "@core/shared-ui";
 import { formatCurrency, formatDate } from "~/lib/format";
+import { collectedCents } from "~/lib/invoice-totals";
 import { InvoiceAmountCell } from "~/components/invoices/InvoiceAmountCell";
-import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
+import { useDisplayLocale, useDisplayCurrency, useCompanyTimeZone } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
@@ -206,6 +207,7 @@ export default function InvoicesPage() {
   const { fetcher, submit, busy } = useGuardedSubmit<typeof action>();
   const locale = useDisplayLocale();
   const currency = useDisplayCurrency();
+  const companyTimeZone = useCompanyTimeZone();
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
 
@@ -227,7 +229,11 @@ export default function InvoicesPage() {
   const total = invoices.length;
   const paid = invoices.filter((i) => i.status === "paid").length;
   const unpaid = invoices.filter((i) => i.status !== "paid").length;
-  const revenue = invoices.filter((i) => i.status === "paid").reduce((s, i) => s + (i.amountCents || 0), 0);
+  // F28 — money RECEIVED, which is a different figure from /metrics' "Total
+  // Revenue" (money BILLED). Both pages used to call their figure REVENUE.
+  // See app/lib/invoice-totals.ts for which word belongs where, and why a
+  // partial payment used to count as nothing at all.
+  const collected = collectedCents(invoices);
 
   const countLabel = `${total} ${total === 1 ? m.invoices_meta_singular() : m.invoices_meta_plural()}`;
   // Only mention unpaid when there are some — "0 unpaid" is noise on a clean
@@ -286,6 +292,7 @@ export default function InvoicesPage() {
         submit={submitPayment}
         busy={paymentBusy}
         locale={locale}
+        companyTimeZone={companyTimeZone}
         onClose={() => setPaymentsFor(null)}
       />
 
@@ -324,7 +331,7 @@ export default function InvoicesPage() {
           { label: m.invoices_stat_total(), value: String(total) },
           { label: m.invoices_stat_unpaid(), value: String(unpaid) },
           { label: m.invoices_stat_paid(), value: String(paid) },
-          { label: m.invoices_stat_revenue(), value: formatCurrency(revenue, { locale, currency }) },
+          { label: m.invoices_stat_collected(), value: formatCurrency(collected, { locale, currency }) },
         ].map((s) => (
           <StatCard key={s.label} label={s.label} value={s.value} />
         ))}
