@@ -10,14 +10,14 @@ import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { InviteLinkModal, type InviteLinkTarget } from "~/components/modals/InviteLinkModal";
 import { ResetTwoFactorDialog, type ResetTwoFactorTarget } from "~/components/modals/ResetTwoFactorDialog";
 import { resetMemberTwoFactor } from "./team.reset-two-factor.server";
-import { useSessionContext } from "~/hooks/useSessionContext";
+import { useDisplayLocale, useSessionContext } from "~/hooks/useSessionContext";
 import { importEntryHref } from "~/lib/import-entry-points";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table, Banner } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { isAdminRole } from "~/lib/access";
-import { ROLE_TONES, expiryLabel, type Member, type LoaderActiveUser, type LoaderInvite } from "./team.shapes";
+import { ROLE_TONES, expiryLabel, lastActiveLabel, type Member, type LoaderActiveUser, type LoaderInvite } from "./team.shapes";
 
 export function meta() {
   return [{ title: m.settings_team_meta_title() }];
@@ -54,7 +54,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const body = (await res.json()) as unknown as { data?: { members?: LoaderActiveUser[]; invites?: LoaderInvite[] } };
     const active: Member[] = (body.data?.members ?? []).map((u) => ({
       id: u.id, name: u.name ?? null, email: u.email, role: u.role,
-      status: "active", lastActiveAt: null, token: null, expiresAt: null,
+      // LAST ACTIVE, layer 2 of 2 — this hardcoded null; layer 1 is the service projection, which explains both.
+      status: "active", lastActiveAt: u.lastActiveAt ?? null, token: null, expiresAt: null,
       inviteLink: null,
       permissionOverrides: u.permissionOverrides ?? null,
       totpEnabled: u.totpEnabled === true,
@@ -106,6 +107,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 export default function TeamPage() {
   const { members, canManage, isOwner, loadFailed } = useLoaderData<typeof loader>();
+  // `members` is active + pending, so the heading read "2 members" above one
+  // person. The seat banner adds invites deliberately: a quota reserves every
+  // claimable seat while a heading says who is here. They must not be unified.
+  const activeMemberCount = members.filter((x) => x.status !== "pending").length;
   // #106 - cancelling an invite burns the token; a second cancel would 404
   // and read as a failure. `resendFetcher` below is a <Form>, not a submit.
   const { submit: submitCancel, busy: cancelBusy } = useGuardedSubmit<{ ok?: boolean }>();
@@ -122,6 +127,7 @@ export default function TeamPage() {
   // copying it.
   const [linkInvite, setLinkInvite] = useState<InviteLinkTarget | null>(null);
   const sessionCtx = useSessionContext();
+  const locale = useDisplayLocale();
   const [activeTab, setActiveTab] = useState("active");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editMember, setEditMember] = useState<EditableMember | null>(null);
@@ -170,9 +176,10 @@ export default function TeamPage() {
           workspace. Say when it is not a real answer. */}
       {loadFailed && <Banner tone="danger">{m.settings_team_load_failed()}</Banner>}
 
+      {/* People, not rows — the seat banner counts the other way ON PURPOSE. */}
       <PageHeader
         title={m.settings_team_heading()}
-        meta={`${members.length} ${members.length === 1 ? m.settings_team_member_singular() : m.settings_team_member_plural()}`}
+        meta={`${activeMemberCount} ${activeMemberCount === 1 ? m.settings_team_member_singular() : m.settings_team_member_plural()}`}
         actions={
           <div className="flex items-center gap-2">
             {/* Secondary first, primary second — the order /contacts and
@@ -232,7 +239,7 @@ export default function TeamPage() {
                   </span>
                 ),
               },
-              { label: m.settings_team_col_last_active(), cell: (member) => <span className="text-ih-fg-3">{member.lastActiveAt || "—"}</span> },
+              { label: m.settings_team_col_last_active(), cell: (member) => <span className="text-ih-fg-3">{lastActiveLabel(member.lastActiveAt, locale)}</span> },
               {
                 label: "",
                 align: "right",

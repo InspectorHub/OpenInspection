@@ -40,7 +40,7 @@
     "type-check:app": "node --max-old-space-size=12288 ./node_modules/typescript/bin/tsc -b tsconfig.json",
     "type-check:api": "node --max-old-space-size=12288 ./node_modules/typescript/bin/tsc -b tsconfig.api.json",
     "type-check:e2e": "node --max-old-space-size=12288 ./node_modules/typescript/bin/tsc -b tsconfig.api.json && node --max-old-space-size=2048 ./node_modules/typescript/bin/tsc -p tsconfig.playwright.json --noEmit",
-    "type-check:tests": "node --max-old-space-size=12288 ./node_modules/typescript/bin/tsc -b tsconfig.api.json && node --max-old-space-size=1536 ./node_modules/typescript/bin/tsc -p tsconfig.tests.json --noEmit",
+    "type-check:tests": "node --max-old-space-size=12288 ./node_modules/typescript/bin/tsc -b tsconfig.api.json && node --max-old-space-size=3072 ./node_modules/typescript/bin/tsc -p tsconfig.tests.json --noEmit",
     "lint": "cross-env NODE_OPTIONS=--max-old-space-size=12288 eslint . --cache --cache-strategy content && node scripts/run-gates.mjs",
     "lint:advisories": "node scripts/check-advisories.mjs --level=high",
     "lint:ds": "node scripts/check-ds-tokens.mjs",

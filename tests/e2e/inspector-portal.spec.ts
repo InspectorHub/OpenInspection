@@ -177,20 +177,13 @@ test.describe.serial('Inspector Portal (#111)', () => {
     await expect(page.getByRole('link', { name: 'Open editor' })).toBeVisible();
   });
 
-  test('/reports redirects to published tab', async ({ request, page }) => {
-    // (a) /reports issues the retirement redirect. Assert the raw response
-    // (the request context re-sends our auth header across the hop, like
-    // curl -L) so we pin the exact 301 → /inspections?workflow=published target.
-    const res = await request.get(`${BASE_URL}/reports`, {
-      headers: { Cookie: `__Host-inspector_token=${adminToken}` },
-      maxRedirects: 0,
-    });
-    expect(res.status()).toBe(301);
-    expect(res.headers()['location']).toBe('/inspections?workflow=published');
-
-    // (b) The redirect target renders the Published tab as active. (Asserting
-    // this on a direct browser nav avoids a Chromium quirk where a header set
-    // via setExtraHTTPHeaders is dropped on a server-side-followed redirect.)
+  // The `/reports` alias that used to 301 here has been DELETED, and with it the
+  // half of this test that pinned the redirect. What survives is the half that
+  // was always the point: the address the alias pointed at renders the Published
+  // tab as active. Asserting on a direct browser nav rather than through a
+  // redirect also avoids a Chromium quirk where a header set via
+  // setExtraHTTPHeaders is dropped on a server-side-followed hop.
+  test('the published workflow address renders the Published tab as active', async ({ page }) => {
     await gotoAuth(page, '/inspections?workflow=published', adminToken);
     expect(page.url()).toMatch(/\/inspections\?workflow=published$/);
 

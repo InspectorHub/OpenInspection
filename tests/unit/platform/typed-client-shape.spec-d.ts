@@ -30,7 +30,7 @@ describe('typed client method-level shapes', () => {
         expectTypeOf(api.login.$post).toBeFunction();
     });
 
-    it('CoreAuthApi: api.me.$get exists (used by settings-account.tsx migration)', () => {
+    it('CoreAuthApi: api.me exposes the current-user read the dashboard loader needs', () => {
         const api = hc<CoreAuthApi>('http://localhost');
         expectTypeOf(api.me).not.toBeNever();
         expectTypeOf(api.me.$get).not.toBeNever();

@@ -31,7 +31,7 @@ function makeStrongPassword() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Account (settings-account.tsx)                                     */
+/*  Account deletion (rendered by the security settings page)          */
 /* ------------------------------------------------------------------ */
 
 /**

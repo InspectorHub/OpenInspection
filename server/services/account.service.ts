@@ -3,7 +3,7 @@
  *
  *  - `exportAccount(db, userId)` returns the user record + agent-tenant
  *    memberships + inspections they ran, used by the GDPR/CCPA "download my
- *    data" affordance in /settings/account. The user record is filtered through
+ *    data" affordance in /settings/security. The user record is filtered through
  *    the account-export classification, which withholds the three
  *    authentication credentials on the row and names what it withheld.
  *  - `softDeleteAccount(db, userId, confirmEmail)` marks `users.deleted_at`

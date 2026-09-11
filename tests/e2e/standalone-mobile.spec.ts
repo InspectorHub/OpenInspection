@@ -129,10 +129,11 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
     // inflated the skip count. Coverage of the live editor-shell message FAB
     // belongs in a spec written against that shell.
 
-    // M-06 deleted in the 2026-07 tests-reorg dedup: the /reports 301 redirect is
-    // covered more strongly by inspector-portal.spec.ts (raw 301 + exact Location
-    // + active-tab styling). A server-side redirect is viewport-independent, so
-    // there is nothing mobile-specific left to assert.
+    // M-06 deleted in the 2026-07 tests-reorg dedup, which covered the /reports
+    // 301 redirect from inspector-portal.spec.ts instead. That alias has since
+    // been deleted outright, so there is no redirect left for either spec to
+    // assert — recorded rather than removed, because the skip count is the only
+    // other trace this test ever existed.
 
     // M-07 deleted (2026-08-11): it asserted that /library/marketplace renders,
     // which stopped being true for standalone in the round this spec last ran

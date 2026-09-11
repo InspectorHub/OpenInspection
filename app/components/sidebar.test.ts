@@ -54,9 +54,10 @@ describe('Sidebar', () => {
     const sidebarSrc = await import('~/components/Sidebar?raw');
     const sidebarText = (sidebarSrc as unknown as { default: string }).default;
     const text = navText + sidebarText;
-    // #111: the standalone Reports page is retired — its nav item is removed and
-    // /reports now 301-redirects to the dashboard Published tab. The sidebar must
-    // no longer surface a Reports entry.
+    // #111: the standalone Reports page is retired. Its nav item went first and
+    // its path followed — /reports used to 301 to the dashboard's Published tab
+    // and that alias has since been deleted outright, so the address no longer
+    // resolves at all. The sidebar must not surface a Reports entry.
     expect(text).not.toContain('"/reports"');
     // Labels are now Paraglide messages (m.nav_item_*), so assert on the route +
     // the externalized message key rather than the raw English literal.
