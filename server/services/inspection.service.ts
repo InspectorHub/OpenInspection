@@ -138,7 +138,7 @@ export class InspectionService {
     async createReinspection(
         tenantId: string,
         baselineId: string,
-        opts: { selectedItemIds: string[]; inspectorId?: string | undefined },
+        opts: Parameters<InspectionCoreService['createReinspection']>[2],
     ): ReturnType<InspectionCoreService['createReinspection']> {
         return this.core.createReinspection(tenantId, baselineId, opts);
     }
