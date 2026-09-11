@@ -85,7 +85,14 @@ describe('seedStarterContent', () => {
         expect(second.contractorTypesSeeded).toBe(0);
     });
 
-    it('agreement template content starts with bolded disclaimer', async () => {
+    it('agreement template content starts with the bolded disclaimer, in HTML', async () => {
+        // F46 — this assertion used to pin the MARKDOWN form (`**…**`). The
+        // signing page renders the stored content through an HTML sanitizer, so
+        // those asterisks were shown to the customer verbatim. The requirement is
+        // unchanged — the disclaimer leads the document and is emphasised — only
+        // the markup that can express it is. Emphasis is asserted as a TAG now,
+        // so a silent slide back to Markdown fails here as well as in
+        // tests/unit/agreements/starter-agreement-markup.spec.ts.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await seedStarterContent({} as any, tenantId);
         const row = await testDb.select({ content: schema.agreements.content })
@@ -93,8 +100,9 @@ describe('seedStarterContent', () => {
             .where(eq(schema.agreements.tenantId, tenantId))
             .get();
         expect(row).toBeDefined();
-        expect(row!.content.startsWith('**⚠️ Review before sending to real customers.**')).toBe(true);
-        expect(row!.content).toContain('not legal advice');
+        expect(row!.content.startsWith('<p><strong>⚠️ Review before sending to real customers.</strong>')).toBe(true);
+        expect(row!.content).toContain('<strong>not legal advice</strong>');
+        expect(row!.content).not.toContain('**');
     });
 
     it('event_types align with inspection-template names', async () => {

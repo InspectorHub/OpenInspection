@@ -5,7 +5,8 @@
  * has to report:
  *
  *   - which local rows came from the catalogue, and from which entry;
- *   - which retired rows were retired by an UNINSTALL rather than by an update.
+ *   - which retired rows were retired by an UNINSTALL rather than by an update;
+ *   - which jurisdiction the entry a row came from is written to, if any.
  *
  * ── THE RETIREMENT REASON IS DERIVED, NOT STORED ────────────────────────────
  * An update mints a new local row and re-points the marker at it, so the row it
@@ -23,7 +24,7 @@
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 
 import { eq } from 'drizzle-orm';
-import { tenantLibraryImports } from '../../lib/db/schema/marketplace';
+import { marketplaceLibraries, tenantLibraryImports } from '../../lib/db/schema/marketplace';
 
 /** Whatever `drizzle(env.DB)` this caller holds. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,6 +35,18 @@ export interface ImportMarkers {
     catalogIdByLocalId: Map<string, string>;
     /** local template ids whose marker carries an uninstall stamp. */
     uninstalledLocalIds: Set<string>;
+    /**
+     * local template id -> the jurisdiction its catalogue entry is written to.
+     *
+     * Only rows whose entry names one appear here. A template a workspace
+     * authored itself names no entry and is general by definition, so its
+     * absence from this map IS the answer rather than a missing lookup.
+     *
+     * Read for ORDERING, not for gating: it decides which template the New
+     * Inspection picker offers first (`app/lib/template-order.ts`), so a
+     * workspace is never recommended another state's statutory form.
+     */
+    jurisdictionByLocalId: Map<string, string>;
 }
 
 /**
@@ -45,23 +58,32 @@ export async function readImportMarkers(
     db: AnyDrizzle,
     tenantId: string,
 ): Promise<ImportMarkers> {
+    // LEFT join, not inner: a marker whose catalogue entry has been delisted —
+    // or is somehow missing — must still report which local row it produced.
+    // Losing the import marker would make a catalogue template read as one the
+    // workspace authored, which is a bigger lie than an unknown jurisdiction.
     const rows = await db.select({
         localEntityId: tenantLibraryImports.localEntityId,
         libraryId:     tenantLibraryImports.libraryId,
         uninstalledAt: tenantLibraryImports.uninstalledAt,
+        jurisdiction:  marketplaceLibraries.jurisdiction,
     })
         .from(tenantLibraryImports)
+        .leftJoin(marketplaceLibraries, eq(marketplaceLibraries.id, tenantLibraryImports.libraryId))
         .where(eq(tenantLibraryImports.tenantId, tenantId))
         .all();
 
     const catalogIdByLocalId = new Map<string, string>();
     const uninstalledLocalIds = new Set<string>();
+    const jurisdictionByLocalId = new Map<string, string>();
     for (const row of rows) {
         if (!row.localEntityId) continue;
         catalogIdByLocalId.set(row.localEntityId as string, row.libraryId as string);
         if (row.uninstalledAt !== null) uninstalledLocalIds.add(row.localEntityId as string);
+        const jurisdiction = (row.jurisdiction as string | null)?.trim();
+        if (jurisdiction) jurisdictionByLocalId.set(row.localEntityId as string, jurisdiction);
     }
-    return { catalogIdByLocalId, uninstalledLocalIds };
+    return { catalogIdByLocalId, uninstalledLocalIds, jurisdictionByLocalId };
 }
 
 export interface TemplateRetirement {

@@ -3,7 +3,7 @@ import { Link, useFetcher, useLoaderData, useNavigate, useSearchParams } from "r
 import type { Route } from "./+types/marketplace";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination, Banner } from "@core/shared-ui";
+import { PageHeader, TabStrip, Card, Button, EmptyState, Pagination, Banner } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { usePagination } from "~/hooks/usePagination";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
@@ -11,6 +11,8 @@ import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 import { StatutoryUpdateConfirm } from "~/components/marketplace/StatutoryUpdateConfirm";
 import { UninstallConfirm } from "~/components/marketplace/UninstallConfirm";
+import { MarketplaceCardMeta } from "~/components/marketplace/MarketplaceCardMeta";
+import { narrowEntry } from "~/components/marketplace/marketplace-entry";
 import type { StatutoryUpdateImpact } from "../../server/services/marketplace/statutory-update-impact";
 import { MARKETPLACE_KINDS } from "../../server/lib/marketplace-kinds";
 
@@ -268,7 +270,12 @@ export default function MarketplacePage() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {templates.map((raw) => {
-              const t = raw as unknown as { id: string; name?: string; title?: string; description?: string; category?: string; author?: string; kind?: string; hasUpdate?: boolean; importedSemver?: string | null };
+              // NARROWED, not asserted. The double cast this replaced invented
+              // `description` / `category` / `author` — three fields the
+              // response has never carried — so the card's branches for them
+              // were unreachable and the six fields it DOES carry were read by
+              // nothing. One shape, written down in `marketplace-entry.ts`.
+              const t = narrowEntry(raw);
               // #348 — an imported comment pack with a newer release does not
               // get an Install button, because installing is not what is on
               // offer: the review page shows what an update would overwrite
@@ -283,25 +290,15 @@ export default function MarketplacePage() {
               const installed = typeof t.importedSemver === "string";
               return (
               <Card key={t.id} className="p-4">
-                <p className="text-[13px] font-semibold text-ih-fg-1">{t.name || t.title}</p>
-                {t.description && (
-                  <p className="text-[13px] text-ih-fg-3 mt-1 line-clamp-2">{t.description}</p>
-                )}
-                <div className="flex items-center justify-between mt-3">
-                  <div className="flex items-center gap-2">
-                    {t.category && (
-                      <Pill tone="gen">{t.category}</Pill>
-                    )}
-                    {t.author && (
-                      <span className="text-[11px] text-ih-fg-3">{t.author}</span>
-                    )}
-                  </div>
+                <p className="text-[13px] font-semibold text-ih-fg-1">{t.name}</p>
+                <MarketplaceCardMeta entry={t} />
+                <div className="flex items-center justify-end mt-3">
                   <div className="flex items-center gap-2">
                     {statutoryUpdate ? (
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => reviewStatutoryUpdate(t.id, t.name || t.title || "")}
+                        onClick={() => reviewStatutoryUpdate(t.id, t.name)}
                       >
                         {m.marketplace_review_update()}
                       </Button>
@@ -327,7 +324,7 @@ export default function MarketplacePage() {
                       <Button
                         variant="danger-link"
                         size="sm"
-                        onClick={() => setUninstalling({ id: t.id, name: t.name || t.title || "", kind: t.kind ?? null })}
+                        onClick={() => setUninstalling({ id: t.id, name: t.name, kind: t.kind ?? null })}
                         disabled={removing}
                       >
                         {m.marketplace_uninstall()}

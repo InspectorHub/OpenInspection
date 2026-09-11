@@ -29,6 +29,28 @@ export function parseLibraryComments(schema: unknown): LibraryCommentEntry[] {
     return Array.isArray(comments) ? comments as LibraryCommentEntry[] : [];
 }
 
+/**
+ * The pack's own one-paragraph "what is this" line, if it carries one.
+ *
+ * It lives INSIDE the schema blob rather than in a `marketplace_libraries`
+ * column, which is why a browse row never had one: `browseCatalogue` drops the
+ * blob (~50KB a row) before answering, and nothing lifted this string out of it
+ * first. The browse card meanwhile had a render branch for `description` that
+ * could not fire, so seventeen catalogue entries showed a name and nothing else
+ * and two comment packs were indistinguishable before installing.
+ *
+ * Lifted here, beside the item count, because this is where the blob is already
+ * parsed — the cost is one property read, not a second pass.
+ */
+export function parseLibraryDescription(schema: unknown): string | null {
+    const parsed = parseSchema(schema);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const description = (parsed as { description?: unknown }).description;
+    return typeof description === 'string' && description.trim().length > 0
+        ? description
+        : null;
+}
+
 /** Count the importable items a catalogue entry advertises. */
 export function countLibrarySchemaItems(schema: unknown): number {
     return parseLibraryComments(schema).length;

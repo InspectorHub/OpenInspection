@@ -242,7 +242,7 @@ export class TemplateService {
         // The unified catalogue's import markers (#293) — which rows came from
         // the catalogue, and which retired rows an uninstall retired rather
         // than an update. ./template/import-markers explains both.
-        const { catalogIdByLocalId, uninstalledLocalIds } = await readImportMarkers(db, tenantId);
+        const { catalogIdByLocalId, uninstalledLocalIds, jurisdictionByLocalId } = await readImportMarkers(db, tenantId);
         const mapped = rows.map(row => ({
             id: row.id,
             name: row.name,
@@ -250,6 +250,13 @@ export class TemplateService {
             itemCount: this.countSchemaItems(row.schema as never),
             source: catalogIdByLocalId.has(row.id as string) ? 'marketplace' as const : 'custom' as const,
             marketplaceLibraryId: catalogIdByLocalId.get(row.id as string) ?? null,
+            // The state or country this template is written to, or null for one
+            // written to none. The New Inspection picker orders on it so that a
+            // workspace is not offered another state's statutory form first —
+            // `app/lib/template-order.ts` states the rule. The ORDER here stays
+            // `created_at DESC`: which template to offer first is a question
+            // about one picker, not a property of the list.
+            jurisdiction: jurisdictionByLocalId.get(row.id as string) ?? null,
             ...retirementOf(row.retiredAt, uninstalledLocalIds.has(row.id as string)),
         }));
         return { rows: mapped, total };

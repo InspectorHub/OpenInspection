@@ -38,4 +38,4 @@
  *      section with no role to assign, on a deployment where nothing had
  *      failed.
  */
-export const STARTER_CONTENT_VERSION = 'c1';
+export const STARTER_CONTENT_VERSION = 'c2';

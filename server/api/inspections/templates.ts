@@ -42,6 +42,12 @@ const listTemplatesRoute = createRoute(withMcpMetadata({
                                 .describe('When this template stopped being offered for new inspections, epoch ms, or null'),
                             retiredReason: z.enum(['superseded', 'uninstalled']).nullable()
                                 .describe('Why it stopped being offered. The two differ in what anybody can do about it'),
+                            // Ordering data, not a filter: the New Inspection
+                            // picker leads with a general template unless the
+                            // workspace's own state is known and a template is
+                            // written to it. See app/lib/template-order.ts.
+                            jurisdiction: z.string().nullable()
+                                .describe('The state or country whose rules this template is written to, or null when it is written to none'),
                         })),
                         meta: PaginatedMetaSchema,
                     }),

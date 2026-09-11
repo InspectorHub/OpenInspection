@@ -119,7 +119,7 @@ export default function TemplatesPage() {
   const { fetcher, submit, busy: writing } = useGuardedSubmit();
   const displayTz = useDisplayTimeZone();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { setPage, setPageSize } = usePagination();
 
   // Capabilities are decided where they are ENFORCED (the four gates on
@@ -137,7 +137,12 @@ export default function TemplatesPage() {
   const [searchQuery, setSearchQuery] = useState(loaderQ);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>("name");
-  const [createOpen, setCreateOpen] = useState(false);
+  // F65 — `?new=1` opens the create dialog. The command palette's "New
+  // Template" action has pointed here with that parameter all along and nothing
+  // read it, so the action landed on the list page and stopped. Gated on
+  // `canCreate` like the button is: an address must not open a dialog whose
+  // submit the API would refuse.
+  const [createOpen, setCreateOpen] = useState(canCreate && searchParams.get("new") === "1");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
 
@@ -319,10 +324,19 @@ export default function TemplatesPage() {
         onPageSizeChange={setPageSize}
       />
 
-      {/* Create modal */}
+      {/* Create modal. Closing drops `?new=1`: the parameter is an instruction
+          that has been carried out, and left in the address it reopens the
+          dialog on every reload and on Back. */}
       <CreateTemplateModal
         open={createOpen}
-        setCreateOpen={setCreateOpen}
+        setCreateOpen={(open) => {
+          setCreateOpen(open);
+          if (!open && searchParams.get("new")) {
+            const next = new URLSearchParams(searchParams);
+            next.delete("new");
+            setSearchParams(next, { replace: true, preventScrollReset: true });
+          }
+        }}
         newName={newName}
         setNewName={setNewName}
         handleCreate={handleCreate}

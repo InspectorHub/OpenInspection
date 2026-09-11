@@ -28,6 +28,13 @@ export const MAX_ITEM_DEPTH = 3;
 export interface HierarchyNode {
     id: string;
     parentId?: string | null;
+    /**
+     * The printed label, when the caller has one.
+     *
+     * Read by `outlineNumbers` ONLY, to notice that a label already prints its
+     * own enumerator. Optional so every other caller is unaffected.
+     */
+    label?: string;
 }
 
 /** A parent id that actually resolves inside this list, or null. */
@@ -255,6 +262,21 @@ function topLabel(index: number): string {
 }
 
 /**
+ * The enumerator a label PRINTS FOR ITSELF, or null.
+ *
+ * Matches a short leading run of letters or digits closed by `.` or `)` and
+ * followed by space — `A. Foundations`, `12) Panel`, `IV. Plumbing`. Nothing is
+ * inferred about the numbering SYSTEM, because nothing needs to be: the only
+ * caller compares the token against the outline it was about to print, and two
+ * strings either match or they do not.
+ */
+export function leadingOutlineToken(label: string | undefined): string | null {
+    if (!label) return null;
+    const match = /^([0-9A-Za-z]{1,4})[.)]\s/.exec(label);
+    return match ? (match[1] as string) : null;
+}
+
+/**
  * The outline number to print beside each row: `A`, `A.1`, `A.1.a`.
  *
  * DERIVED, never stored. `TemplateItem.number` is a separate, author-written
@@ -276,7 +298,20 @@ export function outlineNumbers<T extends HierarchyNode>(
         childrenOf(items, parentId).forEach((child, index) => {
             const own = label(depth, index);
             const full = prefix ? `${prefix}.${own}` : own;
-            out.set(child.id, full);
+            // A LABEL THAT ALREADY CARRIES THIS EXACT ENUMERATOR GETS NO BADGE.
+            //
+            // A statutory template writes the authority's own letters into the
+            // item text, because that text is the form's printed wording and is
+            // not ours to edit. Printing a derived `A` beside a label that
+            // begins `A. Foundations` reads as `AA. Foundations`, on all 41 rows
+            // of the TREC form at once.
+            //
+            // Suppression is conditional on EQUALITY with what we were about to
+            // print, so it cannot hide a genuinely different outline: a label
+            // whose own numbering disagrees with its position keeps both, which
+            // is the case worth seeing. Nothing is suppressed for an ordinary
+            // template, whose labels carry no enumerator at all.
+            out.set(child.id, leadingOutlineToken(child.label) === full ? '' : full);
             if (depth + 1 < MAX_ITEM_DEPTH) walk(child.id, full, depth + 1);
         });
     };
