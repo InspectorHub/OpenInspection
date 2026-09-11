@@ -100,7 +100,10 @@ describe('SP2 delivery characterization — Report Ready output unchanged after 
         const vars: Record<string, string> = {
             client_name:          'Jane',
             property_address:     '1 Main St',
-            scheduled_date:       '2026-06-01',
+            // The FORMATTED column, not the stored one (F44): this workspace has
+            // no tenant_configs row, so the display pair is the documented
+            // fallback pair — 'en-US' and the UTC sentinel.
+            scheduled_date:       'Jun 1, 2026',
             report_url:           reportUrl(appHost, 'acme', inspId),
             company_name:         'Acme Inspections',
             // Extra vars delivery adds for the email path — harmless for Report Ready

@@ -30,7 +30,7 @@ import {
   type FilterId,
   type TabKey,
 } from "~/lib/dashboard-schema";
-import { matchesFilter, matchesWorkflow, tabMatches, statFocusIds, isStatFocus, type StatFocus } from "~/lib/dashboard-filters";
+import { matchesFilter, matchesWorkflow, tabMatches, statFocusIds, isStatFocus, shouldShowListControls, type StatFocus } from "~/lib/dashboard-filters";
 import { dedupeBucketMembership, emptyDashboard } from "~/lib/dashboard-buckets";
 import { useOfflinePurgeOnDelete } from "~/hooks/useOfflinePurgeOnDelete";
 import { DashboardInspectionRow } from "~/components/dashboard/DashboardInspectionRow";
@@ -607,14 +607,6 @@ export default function InspectionsPage() {
     ? Object.values(filteredBuckets).flat().length
     : filteredInspections.length;
 
-  // A workspace with no inspections in it at all. Every list control below is
-  // furniture for a busy workspace — four stat cards reading 0, two rows of
-  // seventeen filter chips, a search box, Filters, Columns — and a new operator
-  // walked past all of it to reach a card telling them to create their first
-  // inspection. Nothing here is removed from the product; it returns the moment
-  // there is a list to narrow.
-  const workspaceEmpty = allInspections.length === 0;
-
   // Everything that can narrow the list — read by the empty state to tell
   // "nothing here" from "nothing matching", and cleared as a set below.
   const listFilterState = {
@@ -627,6 +619,14 @@ export default function InspectionsPage() {
     agentId: filterAgentId,
     search: searchQuery,
   };
+
+  // Every list control below is furniture for a busy workspace — four stat
+  // cards reading 0, two rows of seventeen filter chips, a search box, Filters,
+  // Columns — and a new operator walked past all of it to reach a card telling
+  // them to create their first inspection. Nothing is removed from the product;
+  // it returns the moment there is a list worth narrowing. Where that line is
+  // drawn, and why it is not `=== 0`, is at shouldShowListControls.
+  const listTooShortToNarrow = !shouldShowListControls(allInspections.length, listFilterState);
 
   // The workflow tab and the stat-card focus live in the URL, not in state — ONE
   // writer for both, because two setSearchParams calls in a tick each start from
@@ -735,7 +735,7 @@ export default function InspectionsPage() {
             {/* Page-level actions only. List controls (search / filters /
                 columns) live in the table toolbar strip below — DS two-layer
                 actions convention. */}
-            {!workspaceEmpty && (
+            {!listTooShortToNarrow && (
               <Button variant="secondary" size="sm" onClick={exportCsv}>
                 {m.inspections_list_action_export()}
               </Button>
@@ -748,7 +748,7 @@ export default function InspectionsPage() {
       />
 
       {/* Stat cards — quick-jump to buckets. Four zeroes are not a summary. */}
-      {!workspaceEmpty && <InspectionsStatCards counts={counts} targets={STAT_TARGETS} />}
+      {!listTooShortToNarrow && <InspectionsStatCards counts={counts} targets={STAT_TARGETS} />}
 
       {/* IA-12 — Onboarding checklist (hidden when dismissed or allDone) */}
       <OnboardingChecklist
@@ -765,7 +765,7 @@ export default function InspectionsPage() {
       />
 
       {/* Everything that narrows a list, hidden while there is no list. */}
-      {!workspaceEmpty && (<>
+      {!listTooShortToNarrow && (<>
       <InspectionsFocusBar focus={activeFocus} />
 
       {/* Workflow tabs */}

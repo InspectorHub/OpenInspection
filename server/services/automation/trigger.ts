@@ -13,6 +13,7 @@ import type { AutomationChannel, RecipientKind, Constructor, TriggerContext } fr
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { createRecipientLocaleResolver, type RecipientLocaleResolver } from '../../lib/i18n/recipient-locale';
+import { readTenantDisplay } from '../../lib/inspection/scheduled-date-display';
 
 /**
  * Trigger mixin: fan out pending automation_log rows when a domain event fires,
@@ -182,9 +183,16 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                     // Wording lives in notice-wording.ts — the in-app template
                     // per (rule, recipient LANGUAGE), falling back to the
                     // built-in titles.
+                    // The workspace's locale + timezone, read ONCE for the
+                    // firing however many rules and recipients it fans out to
+                    // — `{{scheduled_date}}` is rendered in them, and the
+                    // notice is written from cron or a queue consumer where
+                    // there is no request to take either from.
+                    const display = await readTenantDisplay(db, ctx.tenantId);
                     const wordingFor = createNoticeWordingResolver({
                         store, tenantId: ctx.tenantId, triggerEvent: ctx.triggerEvent,
                         companyName: ctx.companyName, inspection: insp, rules: filteredRules,
+                        display,
                     });
                     // The class comes from the RULE, like the wording — two rules
                     // on one event are two different things to have a preference

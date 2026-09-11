@@ -38,6 +38,7 @@ import { logger } from '../../lib/logger';
 import { currentPeriodKey } from '../../lib/usage/period';
 import { interpolate, type FlushInspection } from './shared';
 import { buildBaseTemplateVars } from './template-vars';
+import { readTenantDisplay } from '../../lib/inspection/scheduled-date-display';
 import type { ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
 import { smsSendGate } from '../../lib/sms/send-gate';
 import type { RoleKind } from '../../lib/people/role-kinds';
@@ -172,8 +173,12 @@ export async function sendOneSms(args: SendOneSmsArgs): Promise<void> {
     if (!resolved) return void (await skip('sms not configured'));
     const { provider, from, messagingServiceSid } = resolved;
 
+    // Workspace locale + timezone — what `{{scheduled_date}}` is rendered in.
+    // A text message is the surface where the raw column read worst: there is
+    // no subject line or layout to explain "2026-09-16T08:00:00Z" away.
+    const display = await readTenantDisplay(db, inspection.tenantId);
     const vars: Record<string, string> = {
-        ...buildBaseTemplateVars(inspection, tenant, appName, appHost),
+        ...buildBaseTemplateVars(inspection, tenant, appName, appHost, display),
         company_phone: gate.companyPhone ?? '',
     };
     // SUBORDINATE TO THE GATE, and no longer the first answer. The gate refuses
