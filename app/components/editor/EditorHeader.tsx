@@ -127,10 +127,10 @@ export function EditorHeader({
   <span
   className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${
    state.saveStatus === "saving"
-   ? "text-ih-watch"
+   ? "text-ih-watch-fg"
    : state.saveStatus === "saved"
-   ? "text-ih-ok"
-   : "text-ih-bad"
+   ? "text-ih-ok-fg"
+   : "text-ih-bad-fg"
   }`}
   >
   {state.saveStatus === "saving" ? (

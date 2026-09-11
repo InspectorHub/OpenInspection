@@ -185,7 +185,7 @@ export default function SettingsInspectionTypes() {
                   className={`text-[11px] font-bold px-2.5 py-1 rounded-md border ${
  pt.enabled
  ? "border-ih-ok-fg/20 bg-ih-ok-bg text-ih-ok-fg"
- : "border-ih-border bg-ih-bg-muted text-ih-fg-3"
+ : "border-ih-border bg-ih-bg-muted text-ih-fg-2"
  }`}
                 >
                   {pt.enabled ? m.settings_inspection_types_status_enabled() : m.settings_inspection_types_status_disabled()}

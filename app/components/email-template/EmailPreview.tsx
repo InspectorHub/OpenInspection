@@ -43,7 +43,7 @@ export function EmailPreview({ subject, blocks }: { trigger: string; subject: st
     <div className="lg:sticky lg:top-4">
       <div className="flex items-center justify-between mb-2">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.email_preview_label()}</p>
-        <span className={`text-[10px] uppercase tracking-widest ${loading ? "text-ih-watch-fg" : "text-ih-fg-4"}`}>{loading ? m.email_preview_updating() : m.email_preview_sample()}</span>
+        <span className={`text-[10px] uppercase tracking-widest ${loading ? "text-ih-watch-fg" : "text-ih-fg-3"}`}>{loading ? m.email_preview_updating() : m.email_preview_sample()}</span>
       </div>
       {/* ds-allow: email surface — the simulated client window and iframe body
           stay white in both themes because real email clients render light with

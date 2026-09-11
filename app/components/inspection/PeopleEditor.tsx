@@ -298,7 +298,7 @@ export function PeopleEditor({
                           disabled={busy || sole}
                           title={sole ? m.inspections_hub_people_remove_sole_reason() : undefined}
                           className={`text-[11px] font-bold disabled:opacity-50 disabled:cursor-not-allowed ${
-                            sole ? "text-ih-fg-4" : "text-ih-bad-fg hover:underline"
+                            sole ? "text-ih-fg-3" : "text-ih-bad-fg hover:underline"
                           }`}
                         >
                           {m.inspections_hub_people_remove()}

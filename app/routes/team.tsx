@@ -241,7 +241,7 @@ export default function TeamPage() {
                     <div className="flex items-center justify-end gap-3">
                       <span className={`text-[11px] ${
                         member.expiresAt && new Date(member.expiresAt).getTime() <= Date.now()
-                          ? "text-ih-bad-fg" : "text-ih-fg-4"
+                          ? "text-ih-bad-fg" : "text-ih-fg-3"
                       }`}>
                         {expiryLabel(member.expiresAt)}
                       </span>

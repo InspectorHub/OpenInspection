@@ -156,7 +156,7 @@ export function SendReportModal({
                           key={person.id}
                           htmlFor={inputId}
                           className={`flex items-start gap-2.5 text-[13px] ${
-                            hasEmail ? "text-ih-fg-1 cursor-pointer" : "text-ih-fg-4 cursor-not-allowed"
+                            hasEmail ? "text-ih-fg-1 cursor-pointer" : "text-ih-fg-3 cursor-not-allowed"
                           }`}
                         >
                           <Checkbox

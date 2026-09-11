@@ -99,7 +99,7 @@ export function OnboardingChecklist({
               <span
                 className={`text-[13px] transition-colors ${
                   step.done
-                    ? "line-through text-ih-fg-4"
+                    ? "line-through text-ih-fg-3"
                     : "text-ih-fg-1 group-hover:text-ih-primary-text"
                 }`}
               >

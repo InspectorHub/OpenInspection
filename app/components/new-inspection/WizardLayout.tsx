@@ -67,14 +67,14 @@ export function WizardLayout({
                             <div key={s} className="flex items-center gap-1 flex-1">
                                 <div
                                     className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                                        i <= stepIdx ? "bg-ih-primary text-ih-fg-inverse" : "bg-ih-bg-muted text-ih-fg-4"
+                                        i <= stepIdx ? "bg-ih-primary text-ih-fg-inverse" : "bg-ih-bg-muted text-ih-fg-2"
                                     }`}
                                 >
                                     {i + 1}
                                 </div>
                                 <span
                                     className={`text-[11px] font-medium hidden sm:inline ${
-                                        i <= stepIdx ? "text-ih-primary-text" : "text-ih-fg-4"
+                                        i <= stepIdx ? "text-ih-primary-text" : "text-ih-fg-3"
                                     }`}
                                 >
                                     {stepLabel(s)}

@@ -44,7 +44,7 @@ export function StepPill({ index, label, state }: { index: number; label: string
                         ? "bg-ih-ok-bg text-ih-ok-fg"
                         : active
                           ? "bg-ih-primary text-ih-primary-fg"
-                          : "bg-ih-bg-muted text-ih-fg-4"
+                          : "bg-ih-bg-muted text-ih-fg-2"
                 }`}
             >
                 {done ? (
@@ -55,7 +55,7 @@ export function StepPill({ index, label, state }: { index: number; label: string
                     index
                 )}
             </span>
-            <span className={`text-[13px] font-semibold ${done ? "text-ih-fg-2" : active ? "text-ih-fg-1" : "text-ih-fg-4"}`}>
+            <span className={`text-[13px] font-semibold ${done ? "text-ih-fg-2" : active ? "text-ih-fg-1" : "text-ih-fg-3"}`}>
                 {label}
                 {state === "na" && <span className="text-ih-fg-4 font-normal">{m.checkout_step_suffix_not_required()}</span>}
                 {state === "waiting" && <span className="text-ih-fg-4 font-normal">{m.checkout_step_suffix_waiting()}</span>}

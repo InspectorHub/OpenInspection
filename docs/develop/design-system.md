@@ -223,9 +223,32 @@ placeholders — not a text tier: at 11px it measures 2.56:1 on a light card and
 3.07:1 on a dark one, against WCAG AA's 4.5:1 for normal-size text. `ih-fg-3`
 clears it in all three themes (4.76:1 light, 5.71:1 dark, 12.02:1 field).
 
+On `bg-ih-bg-muted` even `ih-fg-3` falls short (4.34:1 in light), so a chip or
+pill that paints its own muted background takes **`text-ih-fg-2`**.
+
 `lint:ds` cannot see this — it validates token *names*, and `ih-fg-4` is a
 legitimate name. `npm run lint:contrast` (`scripts/check-contrast.mjs`) does the
-arithmetic instead, and runs in pre-commit and CI.
+arithmetic instead, and runs in pre-commit and CI. It reads four things, not just
+class strings: utility class strings, **class fragments inside a template
+literal's `${…}`** (the size is usually in the template around them), **colours
+set in this stylesheet's own rules** (`.ih-eyebrow`, `.ih-kbd`, `.ih-pill--*`),
+and the token VALUES themselves. Every run prints a checked count *and* a skipped
+count per dimension — read both; a verdict alone does not say how much of the
+tree was looked at.
+
+### Text on a filled brand button: `ih-primary-fg`
+
+`bg-ih-primary` is a different colour in each theme, so the foreground that sits
+on it is a per-theme token too — `--ih-primary-fg`, declared in all three blocks
+and checked against `--ih-primary` by `TOKEN_INVARIANTS`. It has no `@theme`
+fallback on purpose: it once had one, was declared nowhere, and therefore painted
+a single fixed colour in every theme, which can only be correct in one of them.
+`brandTokens()` re-points it per tenant at request time by measured ratio.
+
+`text-ih-fg-inverse` is **not** a substitute on a surface that does not follow
+the theme. It flips between near-white and near-black, so on fixed-dark chrome
+(the photo studio) it disappears in half the themes; those surfaces use raw
+`white/*` behind a `ds-allow` comment.
 
 ---
 

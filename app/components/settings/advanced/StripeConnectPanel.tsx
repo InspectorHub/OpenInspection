@@ -18,7 +18,7 @@ export function StripeConnectPanel({ stripeConnected, stripeAccountId, stripeFor
         <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
  stripeConnected
  ? "bg-ih-ok-bg text-ih-ok-fg"
- : "bg-ih-bg-muted text-ih-fg-3"
+ : "bg-ih-bg-muted text-ih-fg-2"
  }`}>
           {stripeConnected ? m.settings_conn_status_connected() : m.settings_stripeconnect_not_connected()}
         </span>

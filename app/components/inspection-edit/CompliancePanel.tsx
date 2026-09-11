@@ -209,7 +209,7 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
     <div className="rounded-ih-card border border-ih-border bg-ih-bg-card p-3 space-y-2" data-testid={`signoff-${role}`}>
       <div className="flex items-center justify-between">
         <span className="text-[12px] font-bold text-ih-fg-2">{roleLabel(role)}</span>
-        <span className={`text-[11px] font-bold ${existing ? "text-ih-ok-fg" : "text-ih-fg-4"}`}>
+        <span className={`text-[11px] font-bold ${existing ? "text-ih-ok-fg" : "text-ih-fg-3"}`}>
           {existing ? m.editor_compliance_signed() : m.editor_compliance_not_signed()}
         </span>
       </div>

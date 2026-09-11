@@ -227,7 +227,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
         <span className="text-[11px] font-bold uppercase tracking-[0.09em] text-ih-fg-3">{m.media_signature_heading()}</span>
         <span
           className={`ml-auto font-mono text-[10px] font-bold px-2 py-0.5 rounded-md ${
-            isPen ? "bg-ih-ok-bg text-ih-ok-fg" : "bg-ih-bg-muted text-ih-fg-4"
+            isPen ? "bg-ih-ok-bg text-ih-ok-fg" : "bg-ih-bg-muted text-ih-fg-2"
           }`}
         >
           {penLabel}

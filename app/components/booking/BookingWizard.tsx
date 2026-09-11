@@ -109,10 +109,10 @@ export function BookingWizard({
             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
               i <= step
                 ? "bg-ih-primary text-ih-primary-fg"
-                : "bg-ih-bg-muted text-ih-fg-4"
+                : "bg-ih-bg-muted text-ih-fg-2"
             }`}>{i + 1}</div>
             <span className={`text-[11px] font-medium hidden sm:inline ${
-              i <= step ? "text-ih-primary-text" : "text-ih-fg-4"
+              i <= step ? "text-ih-primary-text" : "text-ih-fg-3"
             }`}>{s}</span>
             {i < stepLabels().length - 1 && (
               <div className={`flex-1 h-px mx-1 ${i < step ? "bg-ih-primary" : "bg-ih-bg-muted"}`} />

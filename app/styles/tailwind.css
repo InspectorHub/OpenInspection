@@ -14,11 +14,22 @@
   --color-ih-primary-700: var(--ih-primary-700);
   --color-ih-primary-tint: var(--ih-primary-tint);
   --color-ih-primary-glow: var(--ih-primary-glow);
-  /* Readable foreground for content on `bg-ih-primary`. Defaults to white
-     (the stock primary is dark); brandTokens() re-points it per surface by
-     measuring both candidate WCAG ratios, so a bright brand color flips to
-     dark text. */
-  --color-ih-primary-fg: var(--ih-primary-fg, #ffffff);
+  /* Readable foreground for content on `bg-ih-primary`. brandTokens() re-points
+     it per tenant by measuring both candidate WCAG ratios, so a bright brand
+     color flips to dark text.
+
+     NO FALLBACK, deliberately. This read `var(--ih-primary-fg, #ffffff)` and
+     `--ih-primary-fg` was declared in no theme block at all, so every
+     deployment without a tenant brand colour painted white — 4.53:1 on the light
+     primary, but 2.98:1 on the dark and field one, which is what the dark
+     primary buttons and active tab pills actually rendered. A fallback here is
+     strictly worse than none: it is one fixed colour answering a question that
+     has three per-theme answers, and because the token itself resolved to
+     nothing, `lint:contrast` read every call site as unmeasurable and skipped 78
+     of them in silence. The three theme blocks below are now the only source;
+     `checkAliasDefinitions` in scripts/lib/palette-invariants.mjs fails the gate
+     if one of them goes missing again. */
+  --color-ih-primary-fg: var(--ih-primary-fg);
   /* The brand as TEXT — a different role from the brand as FILL. A tenant's
      "my colour" means buttons and accent bars, and `--ih-primary` keeps their
      exact hex for those; this one may move along the lightness axis until it
@@ -109,6 +120,10 @@
      --ih-bg-card; a tenant colour that does not is moved down the lightness
      axis by brandTokens() until it does. */
   --ih-primary-text: #6265f0;
+  /* Text ON the primary fill. White measures 4.53:1 on #6265f0 here; #0f172a
+     would be 3.94:1, so light is the one theme where white is the right answer —
+     which is exactly why the old fixed `#ffffff` fallback looked correct. */
+  --ih-primary-fg: #ffffff;
 
   --ih-fg-1: #0f172a;
   --ih-fg-2: #475569;
@@ -172,6 +187,12 @@ html[data-color-scheme="dark"], html[data-color-scheme="field"], .dark {
      The derivation's direction reverses in dark: a failing brand colour is
      moved UP the lightness axis, not down. */
   --ih-primary-text: #818cf8;
+  /* The fill is LIGHTER here (#818cf8), so the readable foreground flips to
+     near-black: 5.98:1, against 2.98:1 for white. Same value and same reason as
+     --ih-fg-inverse in this block — the engine's own primary button already
+     writes `text-ih-fg-inverse` and was therefore never broken, while the client
+     portal wrote `text-ih-primary-fg` and was. */
+  --ih-primary-fg: #0f172a;
 
   --ih-fg-1: #f1f5f9;
   --ih-fg-2: #cbd5e1;
@@ -228,6 +249,13 @@ html[data-color-scheme="field"] {
 
   /* Restated (field's card is darker, #0f172a): 5.99:1 here. */
   --ih-primary-text: #818cf8;
+  /* Restated for explicitness, not because it differs: field does not re-declare
+     --ih-primary, so the fill is the dark block's #818cf8 and the answer is the
+     same #0f172a at 5.98:1. Stated here so the high-contrast theme's on-fill
+     colour can be read off its own block instead of inferred from the cascade.
+     TOKEN_INVARIANTS measures all three themes, so if field ever takes its own
+     --ih-primary these two stop agreeing and the gate says so. */
+  --ih-primary-fg: #0f172a;
 
   --ih-fg-1: #ffffff;
   --ih-fg-2: #e2e8f0;
@@ -253,7 +281,13 @@ html[data-color-scheme="field"] {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  color: var(--ih-fg-4);
+  /* fg-3, not fg-4. This is a section LABEL — the sidebar's "Workspace" heading
+     — so it is text, and fg-4 is the decoration tier (chevrons, dividers,
+     placeholders): 2.56:1 on a light card and 3.07:1 on a dark one. fg-3 is
+     4.76 / 5.71 / 12.02. The rule was invisible to `lint:contrast` because the
+     gate read Tailwind class strings only and this colour is set in CSS; that is
+     now covered by `cssTextRules`. */
+  color: var(--ih-fg-3);
 }
 
 .ih-input {
@@ -305,7 +339,10 @@ html[data-color-scheme="field"] {
   border: 1px solid var(--ih-border-color);
   font-family: var(--font-ih-mono);
   font-size: 11px;
-  color: var(--ih-fg-3);
+  /* fg-2, not fg-3, because this rule paints its OWN muted background: fg-3 on
+     --ih-bg-muted is 4.34:1 in light, 0.16 short. This is the "Ctrl K" hint next
+     to sidebar search — the one place the app names its search shortcut. */
+  color: var(--ih-fg-2);
 }
 
 .ih-pill {
@@ -320,7 +357,11 @@ html[data-color-scheme="field"] {
 .ih-pill--sat { background: var(--ih-status-ok-bg); color: var(--ih-status-ok-fg); }
 .ih-pill--monitor { background: var(--ih-status-watch-bg); color: var(--ih-status-watch-fg); }
 .ih-pill--defect { background: var(--ih-status-bad-bg); color: var(--ih-status-bad-fg); }
-.ih-pill--ni { background: var(--ih-bg-muted); color: var(--ih-fg-3); }
+/* fg-2, not fg-3: the three tone modifiers above each pair a -fg token with its
+   own tinted background, but this one sits on --ih-bg-muted, where fg-3 is
+   4.34:1 in light. Its size comes from `.ih-pill` (11px), which is why the gate
+   has to read a modifier's BEM base class to know what it is measuring. */
+.ih-pill--ni { background: var(--ih-bg-muted); color: var(--ih-fg-2); }
 
 /* ── Agreement body typography (#67) ──
    The ONE place the shape of an agreement is described, shared by the editor

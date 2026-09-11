@@ -61,7 +61,7 @@ export function DiscountCodesPanel({ discounts }: { discounts: Discount[] }) {
                   <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
  d.active
  ? "bg-ih-ok-bg text-ih-ok-fg"
- : "bg-ih-bg-muted text-ih-fg-3"
+ : "bg-ih-bg-muted text-ih-fg-2"
  }`}>
                     {d.active ? m.settings_discount_active() : m.settings_discount_disabled()}
                   </span>

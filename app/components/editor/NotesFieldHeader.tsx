@@ -69,7 +69,7 @@ export function NotesFieldHeader({
       )}
       <span
         className={`ml-auto text-[10px] font-mono tabular-nums ${
-          charCount > NOTES_SOFT_LIMIT ? "text-ih-bad-fg" : "text-ih-fg-4"
+          charCount > NOTES_SOFT_LIMIT ? "text-ih-bad-fg" : "text-ih-fg-3"
         }`}
       >
         {m.editor_item_notes_chars({ count: charCount })}

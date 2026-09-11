@@ -481,7 +481,7 @@ export default function TemplateEditPage() {
           {/* Bespoke: active "watch" tone would fight Button's ghost hover/selected treatment. */}
           <button
             onClick={() => setPreviewMode(!previewMode)}
-            className={`h-7 px-3 rounded-md text-[12px] font-bold transition-colors ${previewMode ? "bg-ih-watch-bg text-ih-watch-fg" : "bg-ih-bg-muted text-ih-fg-3"}`}
+            className={`h-7 px-3 rounded-md text-[12px] font-bold transition-colors ${previewMode ? "bg-ih-watch-bg text-ih-watch-fg" : "bg-ih-bg-muted text-ih-fg-2"}`}
           >
             {previewMode ? m.templates_edit_exit_preview() : m.templates_edit_preview()}
           </button>

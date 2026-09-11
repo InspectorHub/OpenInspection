@@ -47,6 +47,18 @@ const REGEX_PREDECESSOR = /[(,=:!&|?{;+*%^~[]/;
  * Returns `{ strings, comments }`, each entry `{ text, line }` with a 1-based
  * line. `strings` carries the literal's BODY (quotes removed, `${…}`
  * substitutions blanked, since a runtime value is not a class name we can read).
+ *
+ * A template literal additionally carries `parts`: the string literals found
+ * INSIDE its `${…}` substitutions, flattened, with absolute lines. They used to
+ * be dropped entirely — the substitution was skipped character by character and
+ * nothing inside it was ever lexed — which is the whole reason the "assembled
+ * from several literals" blind spot existed. The common shape is a ternary:
+ *
+ *   `… text-[10px] … ${active ? "bg-ih-primary-tint …" : "bg-ih-bg-muted text-ih-fg-4"}`
+ *
+ * The size is in the template, the colour and the surface are in a branch, and
+ * neither half is measurable on its own. Emitting the branches as `parts` lets
+ * the gate pair them back up with the template that contains them.
  */
 export function lex(source) {
   const strings = [];
@@ -127,6 +139,7 @@ export function lex(source) {
       let j = i + 1;
       let body = "";
       let depth = 0; // `${…}` nesting inside a template
+      const parts = [];
       while (j < source.length) {
         const c = source[j];
         if (c === "\\") {
@@ -136,7 +149,9 @@ export function lex(source) {
         }
         if (ch === "`" && c === "$" && source[j + 1] === "{") {
           depth = 1;
+          const interpLine = line;
           j += 2;
+          const interpStart = j;
           body += " ";
           while (j < source.length && depth > 0) {
             if (source[j] === "{") depth++;
@@ -144,6 +159,18 @@ export function lex(source) {
             else if (source[j] === "\n") line++;
             j++;
           }
+          // `j` now sits one past the closing `}` (or at EOF). Re-lex the
+          // substitution's source so its own string literals, comments and
+          // nested templates are seen instead of skipped. Recursion is bounded
+          // by the slice shrinking on every level.
+          const interpEnd = Math.max(interpStart, j - 1);
+          const off = interpLine - 1;
+          const inner = lex(source.slice(interpStart, interpEnd));
+          for (const s of inner.strings) {
+            parts.push({ text: s.text, line: s.line + off });
+            for (const p of s.parts ?? []) parts.push({ text: p.text, line: p.line + off });
+          }
+          for (const cm of inner.comments) comments.push({ text: cm.text, line: cm.line + off });
           continue;
         }
         if (c === ch) break;
@@ -157,7 +184,7 @@ export function lex(source) {
         body += c;
         j++;
       }
-      strings.push({ text: body, line: startLine });
+      strings.push({ text: body, line: startLine, parts });
       i = j + 1;
       prev = ch;
       continue;
@@ -170,11 +197,24 @@ export function lex(source) {
   return { strings, comments };
 }
 
-/** String literals that could plausibly be a class list, with 1-based lines. */
+/**
+ * String literals that could plausibly be a class list, with 1-based lines.
+ *
+ * Each entry also carries `context`: for a fragment that lives inside a template
+ * literal's `${…}`, the ENCLOSING template's body. The gate reads a missing size
+ * or a missing surface out of it, because in an assembled class string the two
+ * halves are routinely in different literals. `context` is null for a top-level
+ * literal.
+ */
 export function classChunks(source) {
-  return lex(source)
-    .strings.filter((s) => s.text.includes("text-"))
-    .map((s) => ({ text: s.text, line: s.line }));
+  const out = [];
+  for (const s of lex(source).strings) {
+    if (s.text.includes("text-")) out.push({ text: s.text, line: s.line, context: null });
+    for (const p of s.parts ?? []) {
+      if (p.text.includes("text-")) out.push({ text: p.text, line: p.line, context: s.text });
+    }
+  }
+  return out;
 }
 
 const NAMED_SIZES = { "text-xs": 12, "text-sm": 14, "text-base": 16, "text-lg": 18 };
@@ -220,31 +260,52 @@ export function backgroundTokens(chunk) {
  * we invented is how a gate ends up confidently measuring the wrong thing.
  */
 export function resolveSurface({ chunk, alias, annotation, reference }) {
-  const named = annotation
-    ? { token: annotation.token, origin: "annotation" }
-    : (() => {
-        // An alpha modifier makes the surface a blend with whatever is behind
-        // it, which is exactly the thing we cannot see.
-        if (/(?<![-:\w])bg-ih-[a-z0-9-]+\/\d/.test(chunk)) return { alpha: true };
-        const bgs = backgroundTokens(chunk);
-        if (bgs.length === 0) return null;
-        if (bgs.length > 1) return { ambiguous: bgs };
-        return { token: bgs[0], origin: "element" };
-      })();
+  // An alpha modifier makes the surface a blend with whatever is behind it,
+  // which is exactly the thing we cannot see.
+  const alpha = /(?<![-:\w])bg-ih-[a-z0-9-]+\/\d/.test(chunk);
+  const bgs = backgroundTokens(chunk);
+  // The element's OWN resting background, when it names exactly one and that one
+  // is readable, and it OUTRANKS an annotation. The annotation exists for the one
+  // thing this scanner cannot work out — the surface an ANCESTOR paints — so
+  // where the element paints its own there is nothing left to override.
+  //
+  // The precedence matters because a ternary's two branches sit on ONE line, and
+  // an annotation is keyed by line, so it necessarily covers both. The photo
+  // studio toolbar is the case: the inactive branch needs the fixed-dark chrome
+  // named, while the active branch carries `bg-ih-primary` itself — and letting
+  // the annotation win there would have scored the dark theme's near-black
+  // `--ih-fg-inverse` against a near-black chrome at 1.00:1, inventing a failure
+  // out of an override meant to remove one.
+  const own = !alpha && bgs.length === 1 ? bgs[0] : null;
 
-  if (named?.alpha) return { unresolved: "background has an alpha modifier" };
-  if (named?.ambiguous) {
-    return { unresolved: `two backgrounds on one element (${named.ambiguous.join(", ")})` };
+  const resolveToken = (token, origin) => {
+    const prop = alias.get(token);
+    if (!prop) return { unresolved: `bg-ih-${token} is not in the @theme block` };
+    return { prop, origin, token };
+  };
+
+  if (own !== null) return resolveToken(own, "element");
+  if (annotation) {
+    // A literal hex annotation, for a surface no token describes: the photo
+    // studio chrome is `style={{ background: "rgba(15,23,42,0.85)" }}` and stays
+    // dark in every theme, so no `bg-ih-*` is honest about it. Measured against
+    // that one colour in all three themes, which is what the element does.
+    if (annotation.token.startsWith("#")) {
+      return { hex: annotation.token, origin: "annotation", token: annotation.token };
+    }
+    return resolveToken(annotation.token, "annotation");
   }
-  if (!named) return { prop: reference, origin: "default" };
-
-  const prop = alias.get(named.token);
-  if (!prop) return { unresolved: `bg-ih-${named.token} is not in the @theme block` };
-  return { prop, origin: named.origin, token: named.token };
+  if (alpha) return { unresolved: "background has an alpha modifier" };
+  if (bgs.length > 1) return { unresolved: `two backgrounds on one element (${bgs.join(", ")})` };
+  return { prop: reference, origin: "default" };
 }
 
-/** `contrast-surface: bg-ih-<token>` — the call-site surface override. */
-const ANNOTATION = /contrast-surface:\s*(bg-ih-[a-z0-9-]+)/;
+/**
+ * `contrast-surface: bg-ih-<token>` — or `contrast-surface: #0f172a` for a
+ * surface no design token describes (a fixed-dark chrome painted by an inline
+ * style). The call-site surface override.
+ */
+const ANNOTATION = /contrast-surface:\s*(bg-ih-[a-z0-9-]+|#[0-9a-fA-F]{3,6}\b)/;
 
 /**
  * Surface annotations by line, read from COMMENTS only.
@@ -264,7 +325,7 @@ export function surfaceAnnotations(source) {
   for (const c of lex(source).comments) {
     const m = ANNOTATION.exec(c.text);
     if (!m) continue;
-    const token = m[1].slice("bg-ih-".length);
+    const token = m[1].startsWith("#") ? m[1] : m[1].slice("bg-ih-".length);
     const span = c.text.split("\n").length - 1;
     for (let d = 0; d <= 2; d++) map.set(c.line + span + d, { token, line: c.line });
   }

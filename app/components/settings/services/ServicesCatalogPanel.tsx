@@ -138,7 +138,7 @@ export function ServicesCatalogPanel({
               <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
                 svc.active
                   ? "bg-ih-ok-bg text-ih-ok-fg"
-                  : "bg-ih-bg-muted text-ih-fg-3"
+                  : "bg-ih-bg-muted text-ih-fg-2"
               }`}>
                 {svc.active ? m.settings_discount_active() : m.settings_services_inactive()}
               </span>

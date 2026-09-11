@@ -47,12 +47,18 @@ export function AnnotationToolbar({ tool, caption, onSelectTool, onCaptionChange
       style={{ background: "rgba(15,23,42,0.85)", borderTop: "1px solid rgba(255,255,255,0.08)" }}
     >
       <div className="flex items-center gap-1">
+        {/* ds-allow: fixed-dark photo-studio chrome — raw white/* on the inline
+            rgba(15,23,42,0.85) toolbar, matching the sibling controls in
+            PhotoAnnotator. The inactive state read `text-ih-fg-inverse/60`, and
+            that token FLIPS: white in light, #0f172a in dark and field — so it
+            painted near-black glyphs on a near-black toolbar at 1.00:1. A chrome
+            that does not follow the theme cannot take a foreground that does. */}
         {TOOLS.map((t) => (
           <button
             key={t.id}
             onClick={() => onSelectTool(t.id)}
             className={`h-9 px-3 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-colors ${
-              tool === t.id ? "bg-ih-primary text-ih-fg-inverse" : "text-ih-fg-inverse/60 hover:bg-white/10 hover:text-ih-fg-inverse/80"
+              tool === t.id ? "bg-ih-primary text-ih-fg-inverse" : "text-white/60 hover:bg-white/10 hover:text-white/80"
             }`}
             title={toolLabel(t.id)}
           >

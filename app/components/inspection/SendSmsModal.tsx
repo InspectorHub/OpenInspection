@@ -114,7 +114,7 @@ export function SendSmsModal({
                             onChange={() => toggle(person.id)}
                             className="mt-0.5"
                           />
-                    <label htmlFor={inputId} className={`text-[13px] ${disabled ? "text-ih-fg-4" : "text-ih-fg-1"}`}>
+                    <label htmlFor={inputId} className={`text-[13px] ${disabled ? "text-ih-fg-3" : "text-ih-fg-1"}`}>
                       <span className="font-medium">{person.name}</span>
                       <span className="text-ih-fg-4"> · {person.roleLabel}</span>
                       {disabled && (
