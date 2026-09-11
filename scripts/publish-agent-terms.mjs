@@ -31,14 +31,37 @@
  * different words.
  */
 
-import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SOURCE = join(ROOT, 'app', 'content', 'legal', 'agent-terms.md');
+
+// The body, with a DEPLOYMENT-LOCAL override.
+//
+// `agent-terms.md` is tracked, and it is a template: §1 names the counterparty as
+// "{{OPERATOR_NAME}} … which operates this deployment". Who that is differs for
+// every deployment, which is why the operator fields are placeholders and why the
+// gate below refuses to publish while any survive. Filling them in the tracked
+// file would make every deployment built from this repository publish terms
+// naming whoever happened to edit it — wrong for everyone else, and a change each
+// operator would have to carry as a permanent local diff.
+//
+// So an operator writes their own body to `agent-terms.local.md`, which is
+// gitignored beside `wrangler.*.jsonc` and `.dev.vars*` for the same reason: it is
+// deployment identity, not source. When present it wins; otherwise the template is
+// read and the gate stops the publish, which is the correct outcome for a
+// deployment that has not written its own terms yet.
+//
+// Start from the template (`cp agent-terms.md agent-terms.local.md`), fill the
+// operator fields, and clear the draft status line. The header line printed below
+// names whichever file was actually read, so a publish can never leave you
+// guessing which text was hashed.
+const TEMPLATE = join(ROOT, 'app', 'content', 'legal', 'agent-terms.md');
+const OVERRIDE = join(ROOT, 'app', 'content', 'legal', 'agent-terms.local.md');
+const SOURCE = existsSync(OVERRIDE) ? OVERRIDE : TEMPLATE;
 const DOC = 'agent_terms';
 
 const argv = process.argv.slice(2);

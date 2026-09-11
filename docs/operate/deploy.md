@@ -109,6 +109,57 @@ First-run `/setup` is gated **solely** on the `SETUP_CODE` secret — the server
 
 Then visit `https://<your-worker>.workers.dev/setup` and enter that value to bootstrap your first admin account.
 
+### Publish the agent terms
+
+The agent portal is **off until the deployment publishes a document written for
+agents**, and nothing inside the product turns it on. A deployment that has not
+published such a document cannot record anyone's agreement to one, so
+`POST /api/agent-signup` refuses and the signup page closes itself. This is a
+deployment-level document (`deployment_legal_versions`, doc `agent_terms`), not a
+per-workspace one: no workspace administrator can supply it, and the gate does not
+branch on `APP_MODE`, so a `saas` deploy needs it exactly as a self-hosted one does.
+
+```bash
+npm run agent-terms:publish -- --version YYYY-MM-DD            # local D1
+npm run agent-terms:publish -- --version YYYY-MM-DD --remote   # remote D1
+```
+
+The tracked `app/content/legal/agent-terms.md` is a **template**: §1 names the
+counterparty as "{{OPERATOR_NAME}} … which operates this deployment", and who that
+is differs for every deployment. Write your own body to
+`app/content/legal/agent-terms.local.md` instead — it is gitignored beside
+`wrangler.*.jsonc` and `.dev.vars*` for the same reason, and the publisher prefers
+it when present:
+
+```bash
+cp app/content/legal/agent-terms.md app/content/legal/agent-terms.local.md
+# fill the operator fields, clear the draft status line, then publish
+```
+
+Editing the tracked template instead would make every deployment built from this
+repository publish terms naming whoever edited it, and leave you carrying the
+change as a permanent local diff. The header line the publisher prints names
+whichever file it actually read, so a publish never leaves you guessing which text
+was hashed.
+
+`--version` is the date the text was **approved**, not today: it is shown to every
+signer and stored on every acceptance, so deriving it from the clock would stamp
+the deploy date onto a document approved on another day.
+
+The script refuses rather than publish something half-finished. It strips HTML
+comments first (the review status and the open questions live in comments so they
+travel with the text under review without reaching a signer), then rejects a body
+that still contains a `{{PLACEHOLDER}}`, or whose status line still says draft.
+A liability cap reading `{{LIABILITY_FLOOR}}` is worse than no cap, because it
+reads as a term. Publishing is idempotent on the **content hash**: the same words
+published twice return the existing version, and changing the body under an
+already-published version string is refused, because a version people accepted
+cannot come to mean different words.
+
+> **Symptom if you skip this**: everything else works and nothing logs an error,
+> but agents reach *"Agent sign-up is not available yet"* with no way forward, and
+> the agent portal stays unreachable for every workspace on the deployment.
+
 ### How the single worker is wired
 
 The Worker entry at `workers/app.ts` is a Hono app. It routes API-owned paths (`/api/*`, `/status`, `/sign/*`, …) to the API app (`server/`) in-process, and sends every other path to React Router via `createRequestHandler` with `import("virtual:react-router/server-build")`, passing `{ cloudflare: { env, ctx } }` as the `AppLoadContext`. Before delegating to SSR it injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app directly — no network hop, no second worker. `@cloudflare/vite-plugin` integrates the React Router SSR build with wrangler, so the standard `wrangler deploy` pipeline ships everything.

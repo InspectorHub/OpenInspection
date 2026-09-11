@@ -34,6 +34,30 @@ One had drifted when this was last checked, which is the argument for keeping th
 
 ---
 
+<!--
+CLAUSE INDEX - machine-readable, and not part of the agreement.
+
+Each section below is preceded by a comment naming one clause these terms are
+required to carry.
+`scripts/check-agent-terms.mjs` reads those names; `npm run lint:agent-terms` is
+red while any of the seven is absent. The names are identifiers, never titles: a
+title is copy an editor may reword.
+
+Comments on purpose, and never prose. `publish-agent-terms.mjs` strips comments
+BEFORE hashing, so a signer sees the same bytes and the version keeps the same
+content hash with these names present or absent. A name in the prose would change
+both, and would show a reader an identifier they cannot use.
+
+The MAPPING is a reading of this document and should be confirmed by whoever owns
+the text. A name on the wrong section points the gate at the wrong words, which
+is a quieter failure than a missing clause and still a wrong answer.
+
+Do not quote the comment syntax inside this block: a comment ends at its first
+closing delimiter, so an example written here would close the block early and be
+read as a real name. That is not hypothetical, it happened when this was written.
+-->
+
+<!-- clause: not_the_customer -->
 ## 1. Who these terms are between
 
 These Terms are between **you**, as the individual who creates or uses an Agent
@@ -94,6 +118,7 @@ on the contact row, so the account spans every company holding you as a contact 
 `server/api/agent/notices.ts`. The acceptance is recorded once per version, against
 the deployment's document rather than against a company — `deployment_legal_versions`.)*
 
+<!-- clause: authorized_access -->
 ## 4. How access is granted and revoked
 
 You see an inspection because an Inspection Company added you as an agent contact
@@ -115,6 +140,7 @@ breach of these Terms by anyone.
 `server/api/contacts.ts`. An account may be deleted or demoted from the agent role
 between sign-in attempts — `server/services/agent/account.ts`.)*
 
+<!-- clause: no_misuse -->
 ## 5. Permitted use of the Service
 
 Depending on what each Inspection Company has published, an Agent account may let
@@ -141,6 +167,7 @@ authenticates **you**, so forwarding one hands over the account.
 *(Code: `GET /api/agent/referrals`, `GET /api/agent/my-repair-items`, the
 repair-builder share-by-email route, `server/api/agent/notification-preferences.ts`.)*
 
+<!-- clause: confidentiality_and_permitted_use -->
 ## 6. Reports, confidentiality and no professional advice
 
 A Report is the Inspection Company's work product. It was written for **their
@@ -175,6 +202,7 @@ information, and whether the obligation ever ends — a whole NDA's worth of
 questions this document does not need, because §7 already carries the restriction
 that does the work.)*
 
+<!-- clause: no_resale_or_unauthorized_data_use -->
 ## 7. Sharing Reports and transaction information
 
 **You may use and disclose a Report only as reasonably necessary for the
@@ -288,6 +316,7 @@ not a single word, and the Privacy Notice is where that map lives.
 The Privacy Notice at {{PRIVACY_URL}} covers how we handle personal data, including
 how to reach us about access, correction, or deletion.
 
+<!-- clause: credential_security -->
 ## 11. Sign-in and account security
 
 You may be able to sign in with a password, with a code emailed to your address,
@@ -353,6 +382,7 @@ disclosure of a Report, use of Report contents prohibited by §7, or an unlawful
 message sent under §8. This indemnity does not extend to your ordinary,
 good-faith use of the Service, nor to every breach of these Terms.
 
+<!-- clause: termination -->
 ## 15. Suspension and termination
 
 You may stop using the account at any time and may ask us to close it. We may
