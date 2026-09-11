@@ -73,6 +73,7 @@ conventions common to all of them: [`integrations/README.md`](integrations/READM
 | [`develop/setup.md`](develop/setup.md) | Run it locally, the command table, how to add a page or an endpoint |
 | [`develop/architecture.md`](develop/architecture.md) | Single-worker architecture, request flow, module map, cost model |
 | [`develop/testing.md`](develop/testing.md) | Five suites, where a spec lives, how to run each one |
+| [`develop/gates.md`](develop/gates.md) | The conformance gates — the registry, the two rungs, and the conventions a new gate has to meet |
 | [`develop/integration-adapters.md`](develop/integration-adapters.md) | Writing code that talks to somebody else's API — shape, credentials, failure recording, contract tests |
 | [`develop/design-system.md`](develop/design-system.md) | Tokens, `packages/shared-ui`, dark mode, the `lint:ds` gate |
 | [`develop/logo-design.md`](develop/logo-design.md) | Logo construction and brand asset spec |
