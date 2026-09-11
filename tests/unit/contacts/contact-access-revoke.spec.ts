@@ -115,6 +115,62 @@ describe('contact access (IA-100)', () => {
     expect(await svc.listAccess(CONTACT, '22222222-2222-2222-2222-222222222222')).toBeNull();
   });
 
+  describe('role labels (IA-119)', () => {
+    // `inspection_access_tokens.role` is a role-profile KEY, and the tenant's
+    // `contact_role_profiles` row is the only place its display label lives —
+    // the same join `report-view-status.ts` does for the delivery list. The
+    // panel was printing the key, so an operator read `buyer_agent`.
+    async function seedRoles() {
+      await db.insert(schema.contactRoleProfiles).values([
+        { id: 'rp-ba', tenantId: T, key: 'buyer_agent', label: "Buyer's Agent", kind: 'agent',
+          isSystem: true, sortOrder: 30, active: true, createdAt: new Date(), updatedAt: new Date() },
+        { id: 'rp-la', tenantId: T, key: 'listing_agent', label: 'Listing Agent', kind: 'agent',
+          isSystem: true, sortOrder: 40, active: false, createdAt: new Date(), updatedAt: new Date() },
+      ] as never);
+    }
+
+    it("resolves the key to the tenant's own label", async () => {
+      await seedRoles();
+      await db.update(schema.inspectionAccessTokens)
+        .set({ role: 'buyer_agent' })
+        .where(eq(schema.inspectionAccessTokens.id, 't1'));
+
+      const row = (await svc.listAccess(CONTACT, T))?.find((a) => a.inspectionId === 'i1');
+
+      // POSITIVE CONTROL: the key is still carried, so a change that dropped
+      // the column instead of labelling it cannot pass.
+      expect(row?.role).toBe('buyer_agent');
+      expect(row?.roleLabel).toBe("Buyer's Agent");
+    });
+
+    it('says null rather than inventing a label for a retired role', async () => {
+      // A deactivated or deleted profile has no label to show. The panel falls
+      // back to the key, which is ugly but true; a guessed label would not be.
+      await seedRoles();
+      await db.update(schema.inspectionAccessTokens)
+        .set({ role: 'listing_agent' })
+        .where(eq(schema.inspectionAccessTokens.id, 't1'));
+
+      const row = (await svc.listAccess(CONTACT, T))?.find((a) => a.inspectionId === 'i1');
+      expect(row?.role).toBe('listing_agent');
+      expect(row?.roleLabel).toBeNull();
+    });
+
+    it('will not borrow another tenant label for the same key', async () => {
+      await db.insert(schema.contactRoleProfiles).values({
+        id: 'rp-other', tenantId: '22222222-2222-2222-2222-222222222222',
+        key: 'buyer_agent', label: 'SOMEBODY ELSE', kind: 'agent',
+        isSystem: true, sortOrder: 30, active: true, createdAt: new Date(), updatedAt: new Date(),
+      } as never);
+      await db.update(schema.inspectionAccessTokens)
+        .set({ role: 'buyer_agent' })
+        .where(eq(schema.inspectionAccessTokens.id, 't1'));
+
+      const row = (await svc.listAccess(CONTACT, T))?.find((a) => a.inspectionId === 'i1');
+      expect(row?.roleLabel).toBeNull();
+    });
+  });
+
   describe('archiving', () => {
     async function archive() {
       // A referenced contact soft-archives; deleteContact hard-deletes only

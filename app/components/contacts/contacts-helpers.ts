@@ -9,6 +9,9 @@
  * instead (`/settings/imports?intent=contacts.import`), and the answer travels
  * with a run that can be reviewed and undone.
  */
+import type { RoleKind } from "../../../server/lib/people/role-kinds";
+import { m } from "~/paraglide/messages";
+
 export interface Contact {
   id: string;
   name: string;
@@ -28,7 +31,7 @@ export interface RoleProfile {
   id: string;
   key: string;
   label: string;
-  kind: "client" | "agent" | "other";
+  kind: RoleKind;
   emailTemplateId: string | null;
   smsTemplateId: string | null;
   isSystem: boolean;
@@ -44,3 +47,18 @@ export interface MessageTemplateOption {
   name: string;
   channel: "email" | "sms";
 }
+
+/**
+ * What each contact-party kind is CALLED on the contacts screens.
+ *
+ * A `Record<RoleKind, …>`, and shared rather than per-screen: the Roles table
+ * and the role modal render the same three words, and a picker that offered
+ * fewer kinds than the schema accepts is the drift this vocabulary was
+ * consolidated to remove. Resolved at call time so paraglide's locale scope is
+ * the request's, not module-load's.
+ */
+export const KIND_LABEL: Record<RoleKind, () => string> = {
+  client: () => m.contacts_roles_kind_client(),
+  agent: () => m.contacts_roles_kind_agent(),
+  other: () => m.contacts_roles_kind_other(),
+};

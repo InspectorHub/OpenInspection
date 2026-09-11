@@ -3,18 +3,12 @@ import { useFetcher } from "react-router";
 import { Card, Table, Pill, Button, EmptyState, Popover, type PillTone } from "@core/shared-ui";
 import { CapabilityMatrix } from "./CapabilityMatrix";
 import { m } from "~/paraglide/messages";
-import type { RoleProfile } from "./contacts-helpers";
+import { KIND_LABEL, type RoleProfile } from "./contacts-helpers";
 
 const KIND_TONE: Record<RoleProfile["kind"], PillTone> = {
   client: "info",
   agent: "primary",
   other: "neutral",
-};
-
-const KIND_LABEL: Record<RoleProfile["kind"], () => string> = {
-  client: () => m.contacts_roles_kind_client(),
-  agent: () => m.contacts_roles_kind_agent(),
-  other: () => m.contacts_roles_kind_other(),
 };
 
 /**

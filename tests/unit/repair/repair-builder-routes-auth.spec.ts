@@ -151,8 +151,13 @@ describe('GET /api/public/repair-builder/:tenant/:id/source', () => {
 
         const res = await app.request('/api/public/repair-builder/t2/insp1/source?token=kvtok');
         expect(res.status).toBe(200);
-        // Creator should be {kind:'agent', ref: token string}
-        expect(listMine).toHaveBeenCalledWith('t2', 'insp1', { kind: 'agent', ref: 'kvtok' });
+        // Creator is {kind:'agent', ref: a digest of the link} — never the token
+        // itself, which would put a live credential in created_by_ref. What the
+        // digest is and why lives in repair-builder-legacy-agent-ref.spec.ts.
+        expect(listMine).toHaveBeenCalledWith('t2', 'insp1', {
+            kind: 'agent',
+            ref: expect.stringMatching(/^legacy-share:[0-9a-f]{64}$/),
+        });
     });
 
     it('403 NOT_PUBLISHED for owner-preview on an unpublished (in_progress) report', async () => {
