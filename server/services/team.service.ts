@@ -81,7 +81,16 @@ export class TeamService {
                 // reset. The flag alone — never the secret or the recovery
                 // codes, which have no business leaving the row.
                 totpEnabled: users.totpEnabled,
-                createdAt: users.createdAt
+                createdAt: users.createdAt,
+                // LAYER 1 of the two that dropped this column. The /team page has a
+                // LAST ACTIVE column; `touchLastActiveMiddleware` updates the row on
+                // every authenticated /api/* request and the compliance manifests
+                // describe it as the seat-accounting signal — but this projection
+                // omitted it, so the only query that feeds that column could not
+                // have answered it. (Layer 2 was the route loader, which then
+                // hardcoded null.) A projection is a contract: a column the page
+                // renders has to be in it.
+                lastActiveAt: users.lastActiveAt
             }).from(users).where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt))),
             db.select().from(tenantInvites)
                 .where(and(eq(tenantInvites.tenantId, tenantId), eq(tenantInvites.status, 'pending'))),

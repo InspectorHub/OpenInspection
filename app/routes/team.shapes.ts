@@ -1,3 +1,4 @@
+import { formatRelativeTime } from "~/lib/format";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -35,7 +36,7 @@ export interface Member {
   totpEnabled: boolean;
 }
 
-export interface LoaderActiveUser { id: string; email: string; role: string; name?: string | null; permissionOverrides?: Record<string, boolean> | null; totpEnabled?: boolean }
+export interface LoaderActiveUser { id: string; email: string; role: string; name?: string | null; permissionOverrides?: Record<string, boolean> | null; totpEnabled?: boolean; lastActiveAt?: string | null }
 export interface LoaderInvite { id: string; email: string; role: string; expiresAt: string; inviteLink?: string }
 
 export const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "monitor" | "sat" | "gen"> = {
@@ -47,6 +48,28 @@ export const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warnin
   agent: "warning",
   office: "gen",
 };
+
+/**
+ * The LAST ACTIVE cell's text: a relative "5 minutes ago" from the serialised
+ * `users.last_active_at`, or an em dash when there is nothing to show.
+ *
+ * An em dash is the honest answer for exactly two rows — a pending invite
+ * (nobody has signed in yet) and a member who has not made a request since the
+ * column was introduced. It used to be the answer for EVERY row, at every
+ * moment, because neither the service projection nor the loader carried the
+ * value; the dash was therefore not reporting an absence, it was reporting its
+ * own two dropped mappings.
+ *
+ * `now` is injected so a test can pin the gap rather than assert on wall clock.
+ */
+export function lastActiveLabel(
+  iso: string | null,
+  locale: string,
+  now?: number,
+): string {
+  if (!iso) return "—";
+  return formatRelativeTime(iso, now === undefined ? { locale } : { locale, now }) || "—";
+}
 
 /**
  * Human "expires in Nd" / "expired Nd ago" from an ISO expiry. Whole-day
