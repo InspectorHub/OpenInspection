@@ -25,7 +25,7 @@
   "server/lib/messaging/providers/telnyx-compliance.ts": 657,
   "app/components/editor/ItemEditor.tsx": 651,
   "app/components/inspection-edit/CompliancePanel.tsx": 638,
-  "server/api/public-report.ts": 622,
+  "server/api/public-report.ts": 628,
   "server/api/auth.ts": 611,
   "app/hooks/useInspection.ts": 600,
   "server/services/concierge.service.ts": 596,

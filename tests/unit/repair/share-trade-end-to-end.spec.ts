@@ -77,7 +77,13 @@ describe('repair share round trip — trade (IA-57)', () => {
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
             c.env = { DB: ENV_DB } as HonoConfig['Bindings'];
-            c.set('services', { repairRequest } as unknown as HonoConfig['Variables']['services']);
+            c.set('services', {
+                repairRequest,
+                // F77 — the share gate asks whether the report is held for a signed
+                // agreement or an outstanding payment. Null = nothing held back;
+                // this case is about the trade surviving the round trip.
+                inspection: { resolveReleaseGate: async () => null },
+            } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
         app.route('/api/public', repairBuilderRoutes);

@@ -201,6 +201,30 @@ export async function runShareGate(
         );
     }
 
+    // THE RELEASE GATE APPLIES TO THE SHARE TRACK TOO, and this door is the one
+    // most easily missed: its credential is a share token minted when the list
+    // was built, so a link created BEFORE a company switched on "require
+    // payment" keeps working forever unless the hold is checked on every read.
+    // The hold is per-inspection and can be switched on at any time, so a link
+    // that was legitimate yesterday is not evidence that it is legitimate now.
+    //
+    // What it serves is the same report-derived defect content `runBuilderGate`
+    // above is gated for — the item list, its PDF, and the email that carries
+    // them — 130 lines apart in this same file. It was left out of the first
+    // pass by oversight, not by an argument; the one door that IS deliberately
+    // exempt (the per-version verify endpoint) carries its reasoning at its own
+    // check, which is the standard any future exemption has to meet.
+    const releaseGate = await c.var.services.inspection.resolveReleaseGate(
+        request.inspectionId,
+        request.tenantId,
+    );
+    if (releaseGate) {
+        return c.json(
+            { success: false as const, error: { code: 'REPORT_GATED', message: 'This report has not been released yet.' } },
+            403,
+        );
+    }
+
     return {
         request,
         items,

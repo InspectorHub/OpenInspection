@@ -28,7 +28,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 import publicReportRoutes from '../../../server/api/public-report';
 import { publicReportAccessAllowed } from '../../../server/lib/report-access';
-import { runBuilderGate } from '../../../server/lib/repair-gates';
+import { runBuilderGate, runShareGate } from '../../../server/lib/repair-gates';
 import { InspectionService } from '../../../server/services/inspection.service';
 import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
@@ -307,5 +307,68 @@ describe('the repair builder is a door onto the same report', () => {
         // POSITIVE CONTROL: the feature is switched on for this workspace, so a
         // refusal here would mean the gate refuses everybody.
         expect(await builderAnswer(null)).toBe('PASSED');
+    });
+});
+
+describe('the repair-request SHARE track is the fifth door', () => {
+    // Missed by the first pass, and the easiest one to miss: its credential is a
+    // share token minted when the list was built. A link created BEFORE a company
+    // switched on "require payment" would otherwise keep working forever, and the
+    // hold is per-inspection and can be switched on at any time — so a link that
+    // was legitimate yesterday is no evidence that it is legitimate now.
+    let sqlite: { close(): void };
+    const SHARE_TOKEN = 'share-tok';
+
+    beforeEach(async () => {
+        const setup = createTestDb();
+        sqlite = setup.sqlite as { close(): void };
+        await setupSchema(sqlite as never);
+        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(setup.db);
+        const db = setup.db as BetterSQLite3Database<typeof schema>;
+        await db.insert(schema.tenants).values({
+            id: TENANT_ID, slug: SLUG, status: 'active',
+            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        } as never);
+        await db.insert(schema.inspections).values({
+            id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St', clientName: 'Jane',
+            clientEmail: 'jane@test.com', date: '2026-06-01', status: 'completed',
+            reportStatus: 'published', paymentStatus: 'unpaid', price: 50000,
+            agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        } as never);
+    });
+    afterEach(() => sqlite.close());
+
+    async function shareAnswer(releaseGate: 'payment' | 'agreement' | null): Promise<string> {
+        const app = new Hono<HonoConfig>();
+        app.get('/share', async (c) => {
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
+            c.set('services', {
+                repairRequest: {
+                    getByShareToken: async () => ({
+                        request: { id: 'rr1', tenantId: TENANT_ID, inspectionId: INSP_ID, customIntro: null },
+                        items: [],
+                    }),
+                },
+                inspection: {
+                    resolveReleaseGate: async () => (releaseGate ? { reason: releaseGate, paymentOutstanding: false } : null),
+                },
+            } as unknown as HonoConfig['Variables']['services']);
+            const gate = await runShareGate(c, SHARE_TOKEN);
+            if (gate instanceof Response) return gate;
+            return c.json({ gate: 'PASSED' });
+        });
+        const res = await app.request('/share');
+        const body = await res.json() as { gate?: string; error?: { code?: string } };
+        return body.gate === 'PASSED' ? 'PASSED' : (body.error?.code ?? `HTTP_${res.status}`);
+    }
+
+    it('refuses a shared list while the report it came from is held', async () => {
+        expect(await shareAnswer('payment')).toBe('REPORT_GATED');
+        expect(await shareAnswer('agreement')).toBe('REPORT_GATED');
+    });
+
+    it('serves the shared list when nothing holds the report', async () => {
+        // POSITIVE CONTROL: without this, a gate refusing everybody passes.
+        expect(await shareAnswer(null)).toBe('PASSED');
     });
 });

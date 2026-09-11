@@ -489,7 +489,13 @@ const publicReportRoutes = createApiRouter()
         // handed to a client who has not cleared the hold.
         const pdfReleaseGate = await releaseGateFor(c.var.services, id, tenantId, false);
         if (!publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: insp.reportStatus, releaseGate: pdfReleaseGate })) {
-            return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+            // Same two meanings as the payload door above. Answering NOT_PUBLISHED
+            // for a held report tells a client who owes money that their inspector
+            // has not finished — the wrong fact, and it points them at the wrong
+            // person to fix it.
+            return c.json(pdfReleaseGate
+                ? { success: false as const, error: { code: 'REPORT_GATED', message: 'This report has not been released yet.' } }
+                : { success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
         }
         // Everyday download always tracks current content (versionNumber: null →
         // content-hash cache, renders live data). Frozen per-version PDFs are only
