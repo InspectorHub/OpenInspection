@@ -44,7 +44,10 @@ interface ContactDetail {
   }>;
   stats: {
     inspectionCount: number;
+    /** Paid invoices billed to THIS contact. */
     totalRevenueCents: number;
+    /** Paid invoices on this contact's inspections billed to someone else. */
+    billedToOthersCents: number;
   };
 }
 
@@ -235,6 +238,22 @@ export default function ContactDetailPage() {
                 {formatCents(stats.totalRevenueCents)}
               </p>
             </div>
+            {/* THE SAME MONEY MAY NOT CARRY THE SAME WORD TWICE.
+                An agent is on the job and is not billed for it, so their revenue
+                is zero and the payment their referral produced is this tile. Both
+                records used to print the one $450 under "TOTAL REVENUE"; adding
+                them gave $900 of revenue from a single payment. Hidden at zero,
+                which is the ordinary case for a client. */}
+            {stats.billedToOthersCents > 0 && (
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3 mb-1">
+                  {m.contacts_detail_billed_to_others_label()}
+                </p>
+                <p className="text-[24px] font-bold text-ih-fg-1 tabular-nums">
+                  {formatCents(stats.billedToOthersCents)}
+                </p>
+              </div>
+            )}
           </div>
         </Card>
       </div>

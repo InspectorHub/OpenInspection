@@ -208,5 +208,10 @@
   "public_unsubscribe_back_heading": "You are subscribed again",
   "public_unsubscribe_back_body": "You will receive",
   "public_unsubscribe_error": "That did not save. Try again in a moment.",
-  "public_unsubscribe_already_heading": "You are already unsubscribed"
+  "public_unsubscribe_already_heading": "You are already unsubscribed",
+  "report_item_unrated": "Unrated",
+  "report_item_unrated_body": "No finding was recorded for this item. That is not the same as an item inspected and found sound, and not the same as an item marked not inspected.",
+  "portal_report_selection_title": "My selected items",
+  "portal_report_selection_print_only": "This list is yours to print or keep. Nothing on it is sent to your inspector.",
+  "contacts_detail_billed_to_others_label": "Billed to others"
 }

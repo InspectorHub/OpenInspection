@@ -126,11 +126,16 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function ContactsPage() {
   const { contacts, filterType, archivedView } = useLoaderData<typeof loader>();
   const contactList = contacts as Contact[];
-  const [modalOpen, setModalOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // F65 — `?new=1` opens the add-contact dialog. The command palette's "New
+  // Contact" action has addressed this page that way all along and nothing read
+  // the parameter, so the action landed on the list and stopped. Read at mount
+  // rather than in an effect, so the dialog is there in the first paint instead
+  // of appearing a frame later.
+  const [modalOpen, setModalOpen] = useState(searchParams.get("new") === "1");
   const [editContact, setEditContact] = useState<Contact | null>(null);
   const [typeFilter, setTypeFilter] = useState(filterType || "");
   const [pendingArchive, setPendingArchive] = useState<Contact | null>(null);
-  const [searchParams, setSearchParams] = useSearchParams();
   // #106 - archiving a contact can revoke every report they can still open,
   // and restore puts it back. One guard: both fire from row controls that
   // are disabled while it is busy.
@@ -165,7 +170,12 @@ export default function ContactsPage() {
   // What is left is one list and one filter. The count follows the filter, so
   // the meta line says what is being shown AND out of how many — otherwise a
   // filtered page just looks like a small address book.
-  const totalLabel = m.contacts_list_meta_count({ count: contactList.length });
+  // "1 contacts" read off the page. Two keys rather than a `{plural}` suffix:
+  // Spanish changes the stem on some of these nouns, not just the tail, and the
+  // /invoices header already settled on this shape.
+  const totalLabel = `${contactList.length} ${
+    contactList.length === 1 ? m.contacts_list_meta_count_singular() : m.contacts_list_meta_count_plural()
+  }`;
   const metaLine = typeFilter
     ? `${m.contacts_list_meta_showing({ count: filtered.length })} · ${totalLabel}`
     : totalLabel;
@@ -243,7 +253,21 @@ export default function ContactsPage() {
         archivedView={archivedView}
       />
 
-      <ContactModal open={modalOpen} onClose={() => setModalOpen(false)} contact={editContact} />
+      {/* Closing drops `?new=1` with it: the parameter is an instruction that
+          has been carried out, and leaving it in the address reopens the dialog
+          on every reload and on Back. */}
+      <ContactModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          if (searchParams.get("new")) {
+            const next = new URLSearchParams(searchParams);
+            next.delete("new");
+            setSearchParams(next, { replace: true, preventScrollReset: true });
+          }
+        }}
+        contact={editContact}
+      />
 
       {/* IA-100 — say what archiving does and does not withdraw. A report link
           is a per-inspection token that works with no account, so archiving

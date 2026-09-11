@@ -76,7 +76,8 @@ const ContactDetailSchema = z.object({
     })).describe('Inspection history for this contact, newest first'),
     stats: z.object({
         inspectionCount:   z.number().describe('Total linked inspections'),
-        totalRevenueCents: z.number().describe('Sum of PAID invoice amounts in cents'),
+        totalRevenueCents: z.number().describe('Sum of PAID invoice amounts in cents that were BILLED TO THIS CONTACT (invoices.contact_id). One invoice has one billed party, so this is safe to sum across contacts — it previously counted every paid invoice on every inspection the contact appeared on, which reported one payment as revenue on the client AND on the agent.'),
+        billedToOthersCents: z.number().describe("Sum of PAID invoice amounts in cents on this contact's inspections that were billed to a DIFFERENT contact (or to none). Money this contact is associated with but was not charged — an agent's referred volume, not their revenue."),
     }).describe('Aggregate stats'),
 }).openapi('ContactDetail');
 

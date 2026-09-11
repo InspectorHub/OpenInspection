@@ -35,12 +35,34 @@ const AGENT = {
 const CLIENT = { ...AGENT, id: "c2", name: "Tomas Beck", type: "client", agency: null, inspectionCount: 1, referralCount: 0 };
 const OTHER = { ...AGENT, id: "c3", name: "Priya Anand", type: "other", agency: null, inspectionCount: 2, referralCount: 0 };
 
-function renderContacts(contacts: unknown[], filterType = "") {
+function renderContacts(contacts: unknown[], filterType = "", url = "/contacts") {
   const Stub = createRoutesStub([
     { path: "/contacts", Component: ContactsPage, loader: () => ({ contacts, filterType }) },
   ]);
-  return render(<Stub initialEntries={["/contacts"]} />);
+  return render(<Stub initialEntries={[url]} />);
 }
+
+/**
+ * F65 — the command palette's "New Contact" action has always navigated to
+ * `/contacts?new=1`, and nothing in the repository read that parameter
+ * (`searchParams.get("new")` → 0 hits), so the action landed on the list and
+ * stopped: no dialog, and nothing to say why.
+ */
+describe("/contacts — ?new=1", () => {
+  it("opens the add-contact dialog", async () => {
+    renderContacts([AGENT], "", "/contacts?new=1");
+
+    // Queried off the document: the modal renders through a portal.
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+  });
+
+  it("does not open it without the parameter", async () => {
+    renderContacts([AGENT]);
+    await screen.findByText("Rosa Lindqvist");
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
 
 describe("/contacts — IA-96", () => {
   it("has no tab strip: one list, not three", async () => {
