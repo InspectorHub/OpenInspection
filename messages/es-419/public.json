@@ -173,6 +173,8 @@
   "agent_portal_nav_inspectors": "Inspectores",
   "agent_portal_layout_badge": "Portal del agente",
   "agent_portal_layout_logout": "Cerrar sesión",
+  "agent_portal_user_menu_aria": "Menú de la cuenta",
+  "agent_portal_user_menu_role": "Agente",
   "oauth_authorize_meta_title": "Autorizar el acceso - OpenInspection",
   "oauth_authorize_client_fallback": "Una aplicación",
   "oauth_authorize_heading": "Autorizar el acceso",

@@ -6,7 +6,8 @@ import { createApi } from "~/lib/api-client.server";
 import { createSessionWithToken } from "~/lib/session.server";
 import { makeAgentSignupSchema } from "~/lib/forms/auth.schema";
 import { safeReturnTo } from "../../../server/lib/mcp/safe-return-to";
-import { AgentTermsConsent, type AgentTermsInForce } from "~/components/agent/AgentTermsConsent";
+import { AgentTermsConsent, AgentSignupClosedNotice, type AgentTermsInForce } from "~/components/agent/AgentTermsConsent";
+import { AgentSignupPanel } from "~/components/agent/AgentSignupPanel";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -154,32 +155,6 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Value proposition items                                            */
-/* ------------------------------------------------------------------ */
-
-// Built by a factory (called per render) so the copy resolves against the
-// active locale rather than freezing at module import time.
-function makeValueProps() {
-  return [
-    {
-      num: "1",
-      bold: m.auth_agent_signup_prop1_bold(),
-      text: m.auth_agent_signup_prop1_text(),
-    },
-    {
-      num: "2",
-      bold: m.auth_agent_signup_prop2_bold(),
-      text: m.auth_agent_signup_prop2_text(),
-    },
-    {
-      num: "3",
-      bold: m.auth_agent_signup_prop3_bold(),
-      text: m.auth_agent_signup_prop3_text(),
-    },
-  ];
-}
-
-/* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -188,6 +163,9 @@ export default function AgentSignupPage() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
+  // No published agent terms = signup closed, server-side. The form must not be
+  // usable: see AgentSignupClosedNotice for what this state actually is.
+  const closed = !terms;
 
   // Success returns a `{ redirect }` sentinel; errors return a Conform
   // SubmissionResult. Only the latter feeds `useForm`.
@@ -213,42 +191,7 @@ export default function AgentSignupPage() {
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
       {/* Left: editorial value-prop */}
-      {/* ds-allow: fixed-dark marketing panel */}
-      <aside className="relative flex flex-col justify-center px-8 py-12 lg:px-12 bg-slate-900 text-white overflow-hidden">
-        <div className="absolute w-[480px] h-[480px] -right-[120px] -top-[160px] bg-ih-primary blur-[140px] opacity-35 pointer-events-none" />
-        <div className="relative z-10 max-w-[460px] mx-auto">
-          <div className="flex items-center gap-3 mb-12">
-            <img src="/logo.svg" alt="" className="w-8 h-8" width={32} height={32} />
-            <span className="font-serif font-bold text-lg tracking-tight">
-              OpenInspection
-            </span>
-          </div>
-          <h1 className="font-serif font-bold text-[2.75rem] leading-[1.05] tracking-tight mb-5">
-            {m.auth_agent_signup_heading()}
-          </h1>
-          {/* ds-allow: light tint text on the fixed-dark marketing panel */}
-          <p className="text-base leading-relaxed text-stone-300 mb-8">
-            {m.auth_agent_signup_panel_text()}
-          </p>
-          <ul className="space-y-0">
-            {makeValueProps().map((v) => (
-              <li
-                key={v.num}
-                className="flex gap-3.5 py-4 border-t border-white/[0.08] last:border-b"
-              >
-                <span className="w-7 h-7 rounded-full bg-ih-primary text-ih-fg-inverse flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                  {v.num}
-                </span>
-                {/* ds-allow: light tint text on the fixed-dark marketing panel */}
-                <span className="text-[15px] leading-relaxed text-stone-200">
-                  <strong className="text-white font-semibold">{v.bold}</strong>{" "}
-                  {v.text}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </aside>
+      <AgentSignupPanel />
 
       {/* Right: form */}
       <section className="flex flex-col justify-center px-8 py-12 lg:px-12 bg-ih-bg-card">
@@ -259,6 +202,12 @@ export default function AgentSignupPage() {
           <p className="text-[15px] text-ih-fg-3 leading-relaxed mb-8">
             {m.auth_agent_signup_form_subtitle()}
           </p>
+
+          {closed && (
+            <div id="agent-signup-closed" className="mb-6">
+              <AgentSignupClosedNotice />
+            </div>
+          )}
 
           <Form method="post" autoComplete="off" id={form.id} onSubmit={form.onSubmit} noValidate>
             {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
@@ -275,6 +224,7 @@ export default function AgentSignupPage() {
                   id={fields.name.id}
                   name={fields.name.name}
                   placeholder={m.auth_agent_name_placeholder()}
+                  disabled={closed}
                   aria-invalid={fields.name.errors ? true : undefined}
                   className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-ih-primary focus:shadow-ih-focus transition-all text-ih-fg-1"
                 />
@@ -295,6 +245,7 @@ export default function AgentSignupPage() {
                   name={fields.email.name}
                   defaultValue={email}
                   placeholder={m.auth_agent_signup_email_placeholder()}
+                  disabled={closed}
                   aria-invalid={fields.email.errors ? true : undefined}
                   className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-ih-primary focus:shadow-ih-focus transition-all text-ih-fg-1"
                 />
@@ -314,6 +265,7 @@ export default function AgentSignupPage() {
                   id={fields.password.id}
                   name={fields.password.name}
                   placeholder={m.auth_agent_password_placeholder()}
+                  disabled={closed}
                   aria-invalid={fields.password.errors ? true : undefined}
                   className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-ih-primary focus:shadow-ih-focus transition-all text-ih-fg-1"
                 />
@@ -330,18 +282,24 @@ export default function AgentSignupPage() {
               submitted; the version and content hash of the text shown are
               recorded server-side from the document in force.
             */}
-            <div className="mt-6">
-              <AgentTermsConsent
-                terms={terms}
-                checkboxId={fields.agentTerms.id}
-                checkboxName={fields.agentTerms.name}
-                error={fields.agentTerms.errors?.[0]}
-              />
-            </div>
+            {!closed && (
+              <div className="mt-6">
+                <AgentTermsConsent
+                  terms={terms}
+                  checkboxId={fields.agentTerms.id}
+                  checkboxName={fields.agentTerms.name}
+                  error={fields.agentTerms.errors?.[0]}
+                />
+              </div>
+            )}
 
+            {/* `aria-describedby` points at the notice above rather than adding a
+                second sentence under the button: a disabled control has to say
+                why, and the why is already on the page. */}
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || closed}
+              aria-describedby={closed ? "agent-signup-closed" : undefined}
               className="w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-ih-fg-inverse bg-ih-primary rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
             >
               {submitting ? m.auth_agent_signup_submit_pending() : m.auth_agent_signup_submit()}

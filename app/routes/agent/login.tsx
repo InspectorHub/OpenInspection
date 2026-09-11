@@ -34,13 +34,16 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (submission.status !== "success") {
       return submission.reply();
     }
-    const { email } = submission.value;
+    // `linkEmail` on the wire, `email` in the request body: the form field is
+    // named apart from the password form's so the two inputs on this one page
+    // cannot be confused, while the API keeps its single `{ email }` contract.
+    const { linkEmail } = submission.value;
 
     try {
       const api = createApi(context);
       // Fire-and-forget: the API always answers { sent: true } whether or
       // not the account exists (anti-enumeration). We never inspect it.
-      await api.agentLogin["login-link"].$post({ json: { email } });
+      await api.agentLogin["login-link"].$post({ json: { email: linkEmail } });
     } catch {
       // Even a transport error must not reveal anything — fall through to
       // the same confirmation state.
@@ -182,6 +185,16 @@ export default function AgentLoginPage() {
         <div className="h-px flex-1 bg-ih-border" />
       </div>
 
+      {/*
+        There is no agent password-reset route in this app, and this is the
+        recovery path — so it has to read like one. It used to be a second
+        identically-labelled email box under a CTA ending in "instead", which
+        reads as a login PREFERENCE; a person who could not remember their
+        password found nothing on the page addressed to them. The heading names
+        the situation and the button names the way out of it. No reset link is
+        offered, because no reset route exists: a link to one would be a promise
+        this deployment cannot keep.
+      */}
       <Form
         method="post"
         id={linkForm.id}
@@ -189,14 +202,15 @@ export default function AgentLoginPage() {
         noValidate
         className="space-y-2"
       >
+        <h2 className="text-sm font-bold text-ih-fg-1">{m.auth_agent_login_link_heading()}</h2>
         <input type="hidden" name="intent" value="link" />
         <Input
-          id={linkFields.email.id}
-          name={linkFields.email.name}
+          id={linkFields.linkEmail.id}
+          name={linkFields.linkEmail.name}
           type="email"
-          label={m.auth_login_email_label()}
-          aria-invalid={linkFields.email.errors ? true : undefined}
-          error={linkFields.email.errors?.[0]}
+          label={m.auth_agent_login_link_email_label()}
+          aria-invalid={linkFields.linkEmail.errors ? true : undefined}
+          error={linkFields.linkEmail.errors?.[0]}
         />
         <Button type="submit" variant="link" size="sm" disabled={isSubmittingLink} className="px-0">
           {isSubmittingLink ? m.auth_agent_login_link_submit_pending() : m.auth_agent_login_link_cta()}

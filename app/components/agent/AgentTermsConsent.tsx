@@ -37,19 +37,39 @@ interface Props {
     error?: string | undefined;
 }
 
+/**
+ * Why signup cannot proceed — hoisted ABOVE the form by the page.
+ *
+ * This used to render in the tick's own place, between the password field and the
+ * `Create account` button, while all three inputs and the button stayed fully
+ * enabled. Somebody filling the form top-to-bottom therefore read "an account
+ * cannot be created" only AFTER choosing a password, and then pressed a primary
+ * button that could not succeed. Position and disabled-state are the whole fix:
+ * the page renders this first and disables the form behind it.
+ *
+ * The copy it carries is a DEPLOYMENT-level fact. Three screens describe this one
+ * state; this was the only one that called it a workspace and sent the reader to
+ * the inspecting company's administrator. `deployment_legal_versions` is not
+ * per-tenant and `scripts/publish-agent-terms.mjs` is its only writer, so no
+ * tenant admin can resolve it however they configure their company — the page
+ * that said otherwise sent a real reader round a loop that had no exit.
+ */
+export function AgentSignupClosedNotice() {
+    // No tick is offered either (see AgentTermsConsent): a checkbox against an
+    // absent document is exactly the acceptance the gate refuses to record. The
+    // server refuses too — this only stops the form pretending otherwise.
+    return (
+        <Banner tone="warn">
+            <span className="font-semibold">{m.auth_agent_terms_unavailable_title()}</span>
+            <span className="mt-1 block">{m.auth_agent_terms_unavailable_body()}</span>
+        </Banner>
+    );
+}
+
 export function AgentTermsConsent({ terms, checkboxId, checkboxName, error }: Props) {
-    if (!terms) {
-        // Nothing published, so there is nothing to accept and signup is closed.
-        // No tick is offered: a checkbox against an absent document is
-        // exactly the acceptance the gate refuses to record. The server refuses
-        // too — this only stops the form pretending otherwise.
-        return (
-            <Banner tone="warn">
-                <span className="font-semibold">{m.auth_agent_terms_unavailable_title()}</span>
-                <span className="mt-1 block">{m.auth_agent_terms_unavailable_body()}</span>
-            </Banner>
-        );
-    }
+    // Nothing published, so there is nothing to accept. The explanation is not
+    // rendered here — it belongs above the form, as `AgentSignupClosedNotice`.
+    if (!terms) return null;
 
     return (
         <>

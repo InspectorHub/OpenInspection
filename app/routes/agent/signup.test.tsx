@@ -20,6 +20,8 @@
  *     into the agent's referrals.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render } from "@testing-library/react";
+import { createRoutesStub } from "react-router";
 
 const agentSignupPost = vi.fn();
 
@@ -32,6 +34,7 @@ vi.mock("~/lib/api-client.server", () => ({
 }));
 
 import { loader, action } from "~/routes/agent/signup";
+import AgentSignupPage from "~/routes/agent/signup";
 
 type LoaderArgs = Parameters<typeof loader>[0];
 type ActionArgs = Parameters<typeof action>[0];
@@ -180,5 +183,123 @@ describe("the agent terms tick is required", () => {
     expect(body.termsAccepted).toBe(true);
     expect(Object.keys(body)).not.toContain("version");
     expect(Object.keys(body)).not.toContain("contentHash");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  Rendering — the blocked state, and the copy that describes it      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * F71 / F72 / F73, audited 2026-09-10 against a deployment that had never
+ * published agent terms.
+ *
+ * F72: the page said "an account cannot be created" and left all three inputs
+ * and a full-strength `Create account` button enabled, with the explanation
+ * wedged BETWEEN the password field and the button — so a reader filling the
+ * form top-to-bottom chose a password first, read the blocker second, and
+ * pressed a button that could not succeed third.
+ *
+ * F71: that explanation was also wrong in the two ways that mattered. It called
+ * a DEPLOYMENT-level fact a workspace one, and sent the agent to the inspecting
+ * company's administrator — who cannot publish agent terms however they
+ * configure their company, because `deployment_legal_versions` is not
+ * per-tenant and `scripts/publish-agent-terms.mjs` is its only writer. A real
+ * session went round that loop: signup refused → ask the company → the company's
+ * admin finds no such setting → back to the start.
+ */
+const TERMS = { version: "2026-09-01", contentHash: "a".repeat(64), body: "Agent terms text." };
+
+function renderSignup(terms: typeof TERMS | null) {
+  const Stub = createRoutesStub([
+    {
+      path: "/agent-signup",
+      Component: AgentSignupPage,
+      loader: () => ({ email: "", returnTo: "", terms }),
+      action: async () => ({}),
+    },
+  ]);
+  return render(<Stub initialEntries={["/agent-signup"]} />);
+}
+
+describe("agent signup page — when signup cannot succeed", () => {
+  it("disables every input and the submit button", async () => {
+    const { findByLabelText, getByLabelText, getByText } = renderSignup(null);
+    expect((await findByLabelText("Full name") as HTMLInputElement).disabled).toBe(true);
+    expect((getByLabelText("Work email") as HTMLInputElement).disabled).toBe(true);
+    expect((getByLabelText("Password") as HTMLInputElement).disabled).toBe(true);
+    expect((getByText("Create account") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("says WHY, above the form rather than inside it", async () => {
+    const { findByText, container } = renderSignup(null);
+    await findByText(/Agent sign-up is not available yet/);
+    // Reading order, which is the half of F72 a disabled-attribute assertion
+    // cannot see: the blocker used to sit between the password field and the
+    // button, so it was read third. (Position is compared through rendered text
+    // rather than compareDocumentPosition, which happy-dom answers 0 to.)
+    const text = container.textContent ?? "";
+    const notice = text.indexOf("Agent sign-up is not available yet");
+    const password = text.indexOf("Password");
+    expect(notice).toBeGreaterThan(-1);
+    expect(password).toBeGreaterThan(-1);
+    expect(notice).toBeLessThan(password);
+  });
+
+  it("points the disabled button at that explanation", async () => {
+    const { findByText } = renderSignup(null);
+    const button = await findByText("Create account");
+    expect(button.getAttribute("aria-describedby")).toBe("agent-signup-closed");
+    expect(document.getElementById("agent-signup-closed")).toBeTruthy();
+  });
+
+  it("describes a deployment, not a workspace, and names nobody who cannot fix it", async () => {
+    const { findByText, container } = renderSignup(null);
+    await findByText(/Agent sign-up is not available yet/);
+    const text = container.textContent ?? "";
+    expect(text).toMatch(/This deployment has not published its agent terms/);
+    // The two errors, each asserted as an absence — with the presence assertion
+    // above as the control, so a page that rendered nothing cannot pass.
+    expect(text).not.toMatch(/This workspace has not published/);
+    expect(text).not.toMatch(/contact their administrator/);
+  });
+
+  it("offers no tick against an absent document", async () => {
+    const { findByText, container } = renderSignup(null);
+    await findByText(/Agent sign-up is not available yet/);
+    expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+  });
+});
+
+describe("agent signup page — when signup CAN succeed (the control)", () => {
+  it("leaves the form usable and shows the terms with their tick", async () => {
+    const { findByLabelText, getByLabelText, getByText, container } = renderSignup(TERMS);
+    expect((await findByLabelText("Full name") as HTMLInputElement).disabled).toBe(false);
+    expect((getByLabelText("Work email") as HTMLInputElement).disabled).toBe(false);
+    expect((getByLabelText("Password") as HTMLInputElement).disabled).toBe(false);
+    expect((getByText("Create account") as HTMLButtonElement).disabled).toBe(false);
+    expect(container.querySelector('input[type="checkbox"]')).toBeTruthy();
+    expect(getByText(TERMS.body)).toBeTruthy();
+  });
+
+  it("does not show the blocked notice", async () => {
+    const { findByText, queryByText } = renderSignup(TERMS);
+    await findByText("Create account");
+    expect(queryByText(/Agent sign-up is not available yet/)).toBeNull();
+  });
+});
+
+describe("agent signup page — copy aimed at an external agent (F73)", () => {
+  it("uses a dash and the product's own container word", async () => {
+    const { findByText, container } = renderSignup(TERMS);
+    await findByText("Create account");
+    const text = container.textContent ?? "";
+    expect(text).toMatch(/it pre-fills the right company/);
+    // `tenant` is the internal word (CLAUDE.md terminology: Company), and it was
+    // on the first screen an external real-estate agent ever sees.
+    expect(text).not.toMatch(/the right tenant/);
+    // Rendered as two hyphens, not an em dash — the only place on the page that
+    // punctuation appeared.
+    expect(text).not.toMatch(/instead --/);
   });
 });

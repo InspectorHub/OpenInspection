@@ -177,11 +177,19 @@ export function makeAgentLoginSchema() {
 
 /**
  * Task 5 — core agent login's magic-link fallback form (`/agent-login`,
- * secondary form). Mirrors the API's `AgentLoginLinkSchema`: email only.
+ * secondary form). One address, same validation as the password form's.
+ *
+ * The field is `linkEmail`, not `email`, and that is the fix for a real defect
+ * rather than a naming preference: `/agent-login` renders BOTH forms at once, so
+ * two inputs carried the name `email` and the same "Email address" label, one
+ * above the other with only an `OR` rule between them. A password manager sees
+ * one page with two identical fields, and a person filling top-to-bottom cannot
+ * tell which button belongs to which box. The API body is still `{ email }` —
+ * the route maps it — because nothing outside this page has the ambiguity.
  */
 export function makeAgentLoginLinkSchema() {
   return z.object({
-    email: requiredText(m.auth_validation_email_required())
+    linkEmail: requiredText(m.auth_validation_email_required())
       .min(1, m.auth_validation_email_required())
       .email(m.auth_validation_email_invalid()),
   });
