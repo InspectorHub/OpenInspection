@@ -1,4 +1,5 @@
 import { Skeleton } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 /**
  * Generic content-pane loading skeleton shown while a sidebar navigation's
@@ -11,7 +12,10 @@ import { Skeleton } from "@core/shared-ui";
 export function PageLoadingSkeleton() {
   return (
     <div aria-busy="true" aria-live="polite">
-      <span className="sr-only">Loading page…</span>
+      {/* Screen-reader only, and therefore easy to miss in a sweep: a Spanish
+          reader heard this announcement in English while the rest of the page
+          was translated. Invisible text is still user-facing text. */}
+      <span className="sr-only">{m.common_loading_page()}</span>
 
       {/* Header bar: eyebrow + title + a trailing action pill */}
       <div className="flex items-start justify-between gap-4 mb-6">

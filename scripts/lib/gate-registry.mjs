@@ -261,6 +261,10 @@ export const SCRIPT_GATES = [
     { key: 'i18n', label: 'lint:i18n', script: 'check-i18n.mjs', fix: 'npm run lint:i18n', rung: PUSH },
     { key: 'i18ncatalog', label: 'lint:i18n-catalog', script: 'check-i18n-catalog.mjs', fix: 'npm run lint:i18n-catalog', rung: PUSH },
     { key: 'i18nglossary', label: 'lint:i18n-glossary', script: 'check-i18n-glossary.mjs', fix: 'npm run lint:i18n-glossary', rung: PUSH },
+    // The rollout-3 sweep's own definition of done ('no user-facing JSX string is
+    // a raw literal') had no enforcement for months. The three gates above guard
+    // the CATALOGUE; none of them reads JSX. This one does.
+    { key: 'i18nliterals', label: 'lint:i18n-literals', script: 'check-i18n-literals.mjs', fix: 'npm run lint:i18n-literals', rung: PUSH },
     { key: 'naming', label: 'lint:naming', script: 'check-naming.mjs', fix: 'npm run lint:naming', rung: PUSH },
     { key: 'agentroutes', label: 'lint:agent-routes', script: 'check-agent-routes.mjs', fix: 'npm run lint:agent-routes', rung: PUSH },
     { key: 'doclinks', label: 'lint:doclinks', script: 'check-doc-links.mjs', fix: 'npm run lint:doclinks', rung: PUSH },

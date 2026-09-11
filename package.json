@@ -108,6 +108,7 @@
     "lint:i18n": "node scripts/check-i18n.mjs",
     "lint:i18n-catalog": "node scripts/check-i18n-catalog.mjs",
     "lint:i18n-glossary": "node scripts/check-i18n-glossary.mjs",
+    "lint:i18n-literals": "node scripts/check-i18n-literals.mjs",
     "check:ts-range": "node scripts/check-ts-range.mjs",
     "lint:fix": "eslint . --fix --cache",
     "security-scan": "npm audit --audit-level=high",

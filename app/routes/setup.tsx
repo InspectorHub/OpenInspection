@@ -203,6 +203,8 @@ export default function SetupPage() {
             on it. */}
         <p className="mt-6 pt-4 border-t border-ih-border text-[12px] text-ih-fg-3">
           {m.auth_setup_agent_terms_note()}{" "}
+          {/* i18n-literal-ok: a shell command. Translating it would produce a
+              command that does not exist. */}
           <code className="px-1 py-0.5 bg-ih-bg-muted rounded text-ih-fg-2 font-mono text-[10px]">npm run agent-terms:publish</code>{" "}
           {m.auth_setup_agent_terms_docs()}
         </p>
