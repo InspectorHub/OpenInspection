@@ -98,6 +98,24 @@ const SNAPSHOT_EVERY = 20;
 const RESTORE_ORIGIN: unique symbol = Symbol('collab-restore-origin');
 
 /**
+ * Origin for the DO-storage read-back in `hydrate()`. Reading state out of
+ * storage is not a change to it, and this is what lets `onDocUpdate` tell the
+ * two apart.
+ *
+ * Without it the read-back looked like an edit, and `hydrate()` runs in the
+ * CONSTRUCTOR — so every reconstruction persisted state straight back to the
+ * storage it came from (and to D1), armed a 1s alarm that WOKE THE DO into
+ * hydrating again, and counted toward `SNAPSHOT_EVERY`. Measured over 24h on an
+ * idle deployment: 7,015 alarms against 1,284 fetches, ten documents, all day.
+ *
+ * ⚠️ NOT for `doHydrateFromD1`: that runs once per DO lifetime and genuinely
+ * introduces state DO storage lacks (the template seed; the results blob when
+ * there was no prior collab state), which SHOULD persist. Only the storage
+ * read-back is a no-op by construction.
+ */
+const HYDRATE_ORIGIN: unique symbol = Symbol('collab-hydrate-origin');
+
+/**
  * One persisted projection snapshot — a point-in-time copy of the doc projected
  * to the `inspection_results.data` JSON shape. Snapshots are doc-replacement
  * restore points (Condition B): restore rebuilds a fresh Y.Doc from `projection`
@@ -267,6 +285,11 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
      * counting it would cause a snapshot storm.
      */
     private onDocUpdate = (update: Uint8Array, origin: unknown): void => {
+        // Before the broadcast as well as before the persist: a socket that
+        // survived hibernation already applied these updates, and one
+        // reconnecting gets them through sync — there is nobody to tell.
+        if (origin === HYDRATE_ORIGIN) return;
+
         this.broadcastDocUpdate(update, origin);
         this.schedulePersist();
 
@@ -788,7 +811,8 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         ]);
 
         if (stored instanceof Uint8Array && stored.length > 0) {
-            Y.applyUpdate(this.doc, stored);
+            // HYDRATE_ORIGIN, not a bare apply — see the symbol.
+            Y.applyUpdate(this.doc, stored, HYDRATE_ORIGIN);
             // NO-WIPE guard: prior collab state existed. The D1 blob must never be
             // imported on top of it (see hadStoredState + doHydrateFromD1).
             this.hadStoredState = true;
