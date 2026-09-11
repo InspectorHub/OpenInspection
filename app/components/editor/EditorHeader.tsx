@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { useInspectionState } from "~/hooks/useInspection";
 import { Button, IconButton, Icon } from "@core/shared-ui";
 import { usePdfExport, pdfActionLabel } from "~/hooks/usePdfExport";
@@ -7,6 +7,7 @@ import { ProgressStripText } from "~/components/editor/ProgressStripText";
 import { TemplateMenu } from "~/components/editor/TemplateMenu";
 import { PreviewMenu } from "~/components/editor/PreviewMenu";
 import { HEADER_OVERFLOW } from "~/components/editor/header-visibility";
+import { runWithPending } from "~/components/editor/publish-pending";
 import { HeaderOverflowMenu } from "~/components/editor/HeaderOverflowMenu";
 import { m } from "~/paraglide/messages";
 
@@ -19,8 +20,17 @@ export interface EditorHeaderProps {
  tenantSlug?: string | null;
  /** Opens the manual sign modal. */
  setSignModalOpen: (open: boolean) => void;
- /** Publish button click handler. */
- handlePublishClick: () => void;
+ /**
+  * Publish button click handler.
+  *
+  * Typed as returning `unknown` rather than `void` so this component can AWAIT
+  * it when it returns a promise — the editor's handler runs a readiness check
+  * over the network before the publish dialog opens, and that took about three
+  * seconds with no spinner and no disabled state. A primary action that looks
+  * like it did nothing invites a second click, on the one button in the product
+  * where a second click is expensive.
+  */
+ handlePublishClick: () => unknown;
  /** Marks the on-site work complete (advisory order-lifecycle move). */
  handleFinishFieldwork: () => void;
  /** Whether the finish-fieldwork request is in flight. */
@@ -63,6 +73,20 @@ export function EditorHeader({
 }: EditorHeaderProps) {
  // Shared Browser Rendering rate-limit UX for the on-demand PDF preview.
  const pdf = usePdfExport();
+ /**
+  * True while the pre-publish readiness check is in flight.
+  *
+  * The guard is this state and not a ref: unlike a double-submit (which has to
+  * be refused inside a single render pass), the thing being prevented here is a
+  * second click SECONDS later, and the same flag has to be visible on the button
+  * — an invisible guard would leave the button looking just as unresponsive as
+  * before, which is the actual complaint.
+  */
+ const [openingPublish, setOpeningPublish] = useState(false);
+ function onPublishClick() {
+  if (openingPublish) return;
+  runWithPending(handlePublishClick, setOpeningPublish);
+ }
  return (
  // z-40 (below the z-50 overlay layer): this fixed header is page chrome, so
  // modals and right-side Drawers (both z-50) must paint OVER it. At an equal
@@ -337,7 +361,9 @@ export function EditorHeader({
  {/* Publish button */}
  <Button
   variant="primary"
-  onClick={handlePublishClick}
+  onClick={onPublishClick}
+  disabled={openingPublish}
+  data-testid="editor-publish-btn"
   icon={
    <svg
    className="w-3.5 h-3.5"
@@ -354,7 +380,7 @@ export function EditorHeader({
    </svg>
   }
  >
-  {m.editor_header_publish()}
+  {openingPublish ? m.report_publish_checking() : m.editor_header_publish()}
  </Button>
  </div>
 

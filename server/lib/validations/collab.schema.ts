@@ -19,6 +19,26 @@ export const CollabRestoreRequestSchema = z.object({
 }).openapi('CollabRestoreRequest');
 
 /**
+ * Body of `POST /:id/collab/followup` — one carried item's follow-up verdict.
+ *
+ * `status` is a STATUS KEY from the workspace's re-inspection status set, and
+ * this schema deliberately does not enumerate them: the set is per-tenant
+ * (`tenant_configs.reinspection_statuses`, defaults in
+ * `server/lib/reinspection-status.ts`), so membership is checked by the handler
+ * against the tenant's own list rather than baked in here. `null` is valid and
+ * means "no conclusion recorded" — the state a carried item starts in, so
+ * clearing an answer has to be expressible.
+ *
+ * `notes` is optional and ABSENT means "leave the note alone"; an empty string
+ * clears it. Recording a status must not silently erase a note.
+ */
+export const CollabFollowupRequestSchema = z.object({
+    itemId: z.string().min(1),
+    status: z.string().min(1).nullable(),
+    notes:  z.string().max(4000).optional(),
+}).openapi('CollabFollowupRequest');
+
+/**
  * Path param of `GET /:id/collab/snapshots/:seq` — the snapshot `seq` to fetch.
  *
  * The path segment arrives as a string; `coerce` parses it and the int /

@@ -35,6 +35,7 @@ const props = {
   onPublish: () => {},
   autoSign: false,
   onAutoSignToggle: () => {},
+  isAmendment: false,
 };
 
 describe('PublishModal — outbound cooling window', () => {

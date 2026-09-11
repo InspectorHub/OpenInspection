@@ -300,5 +300,11 @@
   "courtesy_translation_setting_off_note": "Las traducciones ya entregadas siguen disponibles para sus destinatarios.",
   "courtesy_translation_confirm_cancel": "Cancelar",
   "report_item_not_inspected": "No inspeccionado",
-  "report_item_not_present": "No presente"
+  "report_item_not_present": "No presente",
+  "report_publish_body_finalize": "Publicar finaliza este informe y registra una nueva versión.",
+  "report_publish_body_delivery": "No envía el informe por sí mismo. Los avisos del informe se ponen en cola según sus automatizaciones y salen en la próxima tanda de envíos — para que el informe llegue ahora a la bandeja de alguien, use Enviar informe en la página de la inspección.",
+  "report_publish_receipt_title": "Informe publicado",
+  "report_publish_receipt_nothing_sent": "El informe es definitivo y se registró una nueva versión. Este paso no envió ningún correo.",
+  "report_publish_receipt_goto": "Ir a la inspección",
+  "report_publish_checking": "Comprobando…"
 }

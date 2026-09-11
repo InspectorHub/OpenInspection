@@ -28,6 +28,9 @@ const baseProps = {
   isSubmitting: false,
   onClose: vi.fn(),
   onPublish: vi.fn(),
+  // Not a revision: the auto-sign checkbox these tests match on is the ONLY
+  // checkbox in the dialog, and a revision adds a textarea above it.
+  isAmendment: false,
 };
 
 describe('PublishModal — Auto-sign checkbox', () => {

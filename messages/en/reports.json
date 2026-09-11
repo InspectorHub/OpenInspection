@@ -300,5 +300,11 @@
   "courtesy_translation_setting_off_note": "Translations already delivered stay available to their recipients.",
   "courtesy_translation_confirm_cancel": "Cancel",
   "report_item_not_inspected": "Not inspected",
-  "report_item_not_present": "Not present"
+  "report_item_not_present": "Not present",
+  "report_publish_body_finalize": "Publishing finalizes this report and records a new version.",
+  "report_publish_body_delivery": "It does not send the report itself. Report notices are queued to your automations and go out on the next delivery pass — to put the report in someone's inbox now, use Send report on the inspection page.",
+  "report_publish_receipt_title": "Report published",
+  "report_publish_receipt_nothing_sent": "The report is final and a new version is recorded. Nothing has been emailed by this step.",
+  "report_publish_receipt_goto": "Go to the inspection",
+  "report_publish_checking": "Checking…"
 }

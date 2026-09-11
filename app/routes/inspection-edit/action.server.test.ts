@@ -132,3 +132,64 @@ describe('editor action — auto-sign on publish', () => {
         expect(calls).toEqual(['publish']);
     });
 });
+
+/**
+ * The revision reason has to LEAVE the action.
+ *
+ * `summary` is the per-publish revision reason: max 500 chars, stored on the new
+ * `report_versions` row, and surfaced both as the reason in the report's
+ * amendment trail and as the "what changed" line of the amendment email. This
+ * action used to publish with an empty body no matter what, so every revision
+ * ever published from the editor recorded `null` — measured on a real inspection
+ * as two versions both carrying `summary: null`.
+ */
+describe('editor action — the revision reason travels with the publish', () => {
+    beforeEach(() => {
+        completePost.mockReset().mockResolvedValue(new Response(null, { status: 200 }));
+        publishPost.mockReset().mockResolvedValue(new Response(null, { status: 200 }));
+        inspectionPatch.mockReset().mockResolvedValue(new Response(null, { status: 200 }));
+    });
+
+    it('forwards a typed reason in the publish body', async () => {
+        await post({ intent: 'publish', summary: 'Corrected the roof rating.' });
+        expect(publishPost).toHaveBeenCalledWith({
+            param: { id: 'insp-1' },
+            json: { summary: 'Corrected the roof rating.' },
+        });
+    });
+
+    it('sends NO summary key when the field is absent', async () => {
+        // The discriminating half. An always-present `summary: ''` would write an
+        // empty reason over the endpoint's NULL default, and the amendment trail
+        // renders a present-but-empty reason as one somebody wrote.
+        await post({ intent: 'publish' });
+        expect(publishPost).toHaveBeenCalledWith({ param: { id: 'insp-1' }, json: {} });
+    });
+
+    it('sends no summary key for a whitespace-only reason', async () => {
+        await post({ intent: 'publish', summary: '   ' });
+        expect(publishPost).toHaveBeenCalledWith({ param: { id: 'insp-1' }, json: {} });
+    });
+
+    it('trims the reason it does send', async () => {
+        await post({ intent: 'publish', summary: '  Reworded the summary.  ' });
+        expect(publishPost).toHaveBeenCalledWith({
+            param: { id: 'insp-1' },
+            json: { summary: 'Reworded the summary.' },
+        });
+    });
+
+    it('still orders the auto-sign write before the publish that carries a reason', async () => {
+        calls.length = 0;
+        completePost.mockImplementation(async () => { calls.push('complete'); return new Response(null, { status: 200 }); });
+        publishPost.mockImplementation(async () => { calls.push('publish'); return new Response(null, { status: 200 }); });
+        inspectionPatch.mockImplementation(async () => { calls.push('patch'); return new Response(null, { status: 200 }); });
+
+        await post({ intent: 'publish', autoSignOnPublish: 'true', summary: 'Fixed a typo.' });
+        expect(calls).toEqual(['patch', 'publish']);
+        expect(publishPost).toHaveBeenCalledWith({
+            param: { id: 'insp-1' },
+            json: { summary: 'Fixed a typo.' },
+        });
+    });
+});

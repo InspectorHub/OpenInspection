@@ -47,6 +47,7 @@ import {
     removeFindingKeys,
 } from '../lib/collab/results-doc';
 import type { ResultsProjection } from '../lib/collab/results-doc.types';
+import { applyFollowupPatch, resolveCarriedFindingKey } from '../lib/collab/followup-patch';
 import { findingKeysFromTemplateSnapshot } from '../lib/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
@@ -437,6 +438,46 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
             await this.restructure();
             return Response.json({ ok: true });
+        }
+
+        // #119 — record a carried item's follow-up disposition. Same identity
+        // headers and same trust boundary as /restructure above. The D1 hydration
+        // is NOT optional: this is the one mutating path that can reach a DO with
+        // no prior state, and patching an empty document and persisting it would
+        // write an empty projection over the round's carried items.
+        if (url.pathname.endsWith('/followup') && req.method === 'POST') {
+            const headerTenantId     = req.headers.get('x-tenant-id');
+            const headerInspectionId = req.headers.get('x-inspection-id');
+            const headerReportId     = req.headers.get('x-report-id');
+            if (headerTenantId)     this.tenantId     = headerTenantId;
+            if (headerInspectionId) this.inspectionId = headerInspectionId;
+            if (headerReportId)     this.reportId     = headerReportId;
+            if (!this.tenantId || !this.inspectionId) {
+                return new Response('missing tenant/inspection identity', { status: 400 });
+            }
+
+            let body: { itemId?: unknown; status?: unknown; notes?: unknown };
+            try {
+                body = (await req.json()) as typeof body;
+            } catch {
+                return new Response('invalid body', { status: 400 });
+            }
+            const itemId = typeof body.itemId === 'string' ? body.itemId : '';
+            if (!itemId) return new Response('invalid itemId', { status: 400 });
+            const status = typeof body.status === 'string' && body.status.length > 0 ? body.status : null;
+            const notes  = typeof body.notes === 'string' ? body.notes : undefined;
+
+            await this.hydrateFromD1Once();
+            const resolved = resolveCarriedFindingKey(this.doc, itemId);
+            if (!resolved.ok) {
+                return Response.json(
+                    { ok: false, reason: resolved.reason },
+                    { status: resolved.reason === 'ambiguous' ? 409 : 404 },
+                );
+            }
+            applyFollowupPatch(this.doc, resolved.findingKey, notes === undefined ? { status } : { status, notes });
+            await this.persist();
+            return Response.json({ ok: true, findingKey: resolved.findingKey });
         }
 
         // Destruction. Called by TenantPurgeService for every report the tenant

@@ -9,6 +9,7 @@ import { METADATA_PRESETS, type PropertyMetaField } from "../../../server/lib/co
 import type { CompliancePanelData } from "~/components/inspection-edit/CompliancePanel";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { revisionStatusForInspection } from "../../../server/lib/statutory/revision-status";
+import { isReportPublished } from "~/lib/status";
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
  const token = await requireToken(context, request);
@@ -362,5 +363,13 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
    statutoryCoverage = body.data ?? null;
  }
 
- return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage };
+ // IA-40 — a report that is ALREADY published gets a new version number on the
+ // next publish, so that publish is a revision and the dialog has to ask what
+ // changed. Derived here rather than in the component because the answer is a
+ // server fact, and the publish-result effect revalidates — so the first publish
+ // of the session flips this for the second. The hub asks the same question of
+ // `report_versions.length`; both mean "a version already exists".
+ const nextPublishIsAmendment = isReportPublished(inspection.reportStatus);
+
+ return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage, nextPublishIsAmendment };
 }
