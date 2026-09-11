@@ -3,7 +3,7 @@ import { inspections, inspectionResults, tenantConfigs, invoices, agreementReque
 import { contacts } from '../../lib/db/schema/contact';
 import { parseFindingKey } from '../../lib/finding-key';
 import { getEffectivePriceCents } from '../../lib/effective-price';
-import { RECOMMENDATION_CATEGORIES } from '../../lib/recommendation-categories';
+import { RECOMMENDATION_CATEGORY_LABELS } from '../../lib/recommendation-categories';
 import { DEFECT_TRADE_LABELS, isDefectTrade } from '../../types/defect-fields';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../../lib/status/report-status';
@@ -171,10 +171,9 @@ export class InspectionAnalyticsService extends InspectionSubService {
             }
         }
 
-        // Resolve recommendation slug → label once.
-        const labelBySlug = new Map<string, string>(
-            RECOMMENDATION_CATEGORIES.map(c => [c.id, c.label]),
-        );
+        // Resolve recommendation slug → label from the catalog's own map,
+        // which is already built once at module load.
+        const labelBySlug = RECOMMENDATION_CATEGORY_LABELS;
 
         // RepairListEntry is declared at module scope (top of this file) — it is
         // this method's element type, so a declaration-emitting project cannot

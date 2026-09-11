@@ -10665,8 +10665,8 @@
           "schema": {
             "type": "string",
             "enum": [
-              "agent",
               "client",
+              "agent",
               "other"
             ],
             "example": "agent",

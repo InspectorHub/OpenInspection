@@ -23,7 +23,8 @@ import { buildReportOutline } from '../../lib/report-outline';
 import { resolveProfile } from '../../lib/report-style/resolve';
 import type { Deviation } from '../../lib/pca-deviations';
 import type { DefectCommentState } from '../../types/inspection-item-state';
-import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS, requireTemplateSnapshot } from './shared';
+import { resolveCoverUrl, resolveDefectMustacheVars, requireTemplateSnapshot } from './shared';
+import { RECOMMENDATION_CATEGORY_LABELS } from '../../lib/recommendation-categories';
 import { reportContentHash, resolveRenderedReportId, resolveResultsRow, type TranslationIdentity } from './report-grain';
 import { resolveReportPdfFooterContext, type ReportPdfFooterContext } from './report-pdf-footer';
 import { InspectionSubService } from './base';
@@ -392,11 +393,8 @@ export class InspectionReportService extends InspectionSubService {
                     ));
                     if (slugs.length > 0) {
                         // Resolve labels from the catalog, joined with bullet.
-                        // Lazy require so the import isn't pulled into every
-                        // service consumer that doesn't render a report.
-                        const cats = (RECOMMENDATION_CATEGORY_LABELS as Map<string, string>);
                         itemRecommendation = slugs
-                            .map(s => cats.get(s) ?? s)
+                            .map(s => RECOMMENDATION_CATEGORY_LABELS.get(s) ?? s)
                             .join(' · ');
                     }
                 }

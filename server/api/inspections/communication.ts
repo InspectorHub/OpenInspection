@@ -26,6 +26,7 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { requireCapability } from '../../lib/middleware/require-capability';
 import { and, eq } from 'drizzle-orm';
 import { inspections } from '../../lib/db/schema';
+import { MESSAGE_FROM_ROLES } from '../../lib/db/schema/message';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
 import { listReportLinkStatus } from '../../lib/report-view-status';
@@ -73,7 +74,10 @@ const MessageSchema = z.object({
     id: z.string().describe('Message id.'),
     direction: z.enum(['in', 'out']).describe("'out' when staff wrote it, 'in' when a counterparty did."),
     contactId: z.string().describe('The counterparty whose thread this message belongs to.'),
-    fromRole: z.string().describe("Author's side: 'inspector' | 'client' | 'agent' | 'other'."),
+    // `z.enum`, not a `z.string()` whose description LISTS the values: the
+    // prose form was a fourth copy of the vocabulary with nothing checking it,
+    // and it is the copy a client integrator actually reads.
+    fromRole: z.enum(MESSAGE_FROM_ROLES).describe("Author's side: the staff seat, or the counterparty's role kind."),
     fromName: z.string().nullable().describe('Display name of the author.'),
     body: z.string().describe('Message text.'),
     attachments: z.array(z.object({

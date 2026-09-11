@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requiredText } from "~/lib/forms/required-text";
+import { ROLE_KINDS } from "../../../server/lib/people/role-kinds";
 // i18n — locale-aware validation messages, built by a FACTORY (never a
 // module-level const) so the active locale is resolved per validation call,
 // mirroring app/lib/forms/contacts.schema.ts.
@@ -19,7 +20,7 @@ import { m } from "~/paraglide/messages";
 export function makeRoleProfileSchema() {
   return z.object({
     label: requiredText(m.validation_role_label_required()).trim().min(1, m.validation_role_label_required()).max(80),
-    kind: z.enum(["client", "agent", "other"]).optional(),
+    kind: z.enum(ROLE_KINDS).optional(),
     emailTemplateId: z.string().optional(),
     smsTemplateId: z.string().optional(),
     // Capability controls (checkboxes submit "on"; absent means unchecked).

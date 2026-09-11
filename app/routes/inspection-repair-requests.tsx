@@ -28,6 +28,9 @@ import {
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import type { RepairActionTag } from "~/lib/repair-action-tag";
+// Same vocabulary the column and the response schema read — see the note in
+// <RepairRequestLogEntry>.
+import type { RepairCreatorKind } from "../../server/lib/people/role-kinds";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -53,7 +56,7 @@ interface ApiItem {
 
 interface ApiList {
   id: string;
-  createdByKind: "client" | "agent" | "inspector";
+  createdByKind: RepairCreatorKind;
   createdByRef: string;
   customIntro: string | null;
   createdAt: number;

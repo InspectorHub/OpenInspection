@@ -12,9 +12,11 @@
  * explains it. Hiding the button instead would leave the operator guessing,
  * which is the pattern this audit item exists to remove.
  */
+import type { RoleKind } from './role-kinds';
+
 export interface PersonKindLike {
     id: string;
-    kind: 'client' | 'agent' | 'other';
+    kind: RoleKind;
 }
 
 /**

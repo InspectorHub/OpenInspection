@@ -25,6 +25,7 @@ import { getDrizzle, getTenantId } from '../../lib/route-helpers';
 import { inspections } from '../../lib/db/schema';
 import { isReportPublished } from '../../lib/status/report-status';
 import { REPAIR_ACTION_TAGS } from '../../lib/repair-action-tag';
+import { REPAIR_CREATOR_KINDS } from '../../lib/people/role-kinds';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import type { RepairRequestWithItems } from '../../services/repair-request.service';
 
@@ -45,7 +46,7 @@ const LogItemSchema = z.object({
 
 const LogListSchema = z.object({
     id: z.string(),
-    createdByKind: z.enum(['client', 'agent', 'inspector']),
+    createdByKind: z.enum(REPAIR_CREATOR_KINDS),
     // WHO built the list, as `lib/repair-access.ts` resolved them — usually an
     // email address (see the column comment in schema/repair-request.ts). It is
     // the tenant's own client's address on the tenant's own inspection, which

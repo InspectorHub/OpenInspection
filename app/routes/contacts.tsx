@@ -12,7 +12,24 @@ import { ContactModal } from "~/components/contacts/ContactModal";
 import { ContactsTable } from "~/components/contacts/ContactsTable";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { ROLE_KINDS, type RoleKind } from "../../server/lib/people/role-kinds";
 import { m } from "~/paraglide/messages";
+
+/**
+ * The filter dropdown's label per contact type.
+ *
+ * A `Record<RoleKind, …>`, so a fourth kind is a COMPILE error here rather than
+ * an option quietly missing from the filter — which is the shape of the bug
+ * IA-96 fixed the last time this list and `contact_role_profiles.kind`
+ * disagreed: a person filed under a contractor/other role showed up as a
+ * Client because the type had only two values. Labels cannot be derived (each
+ * is its own translated string), but completeness can be enforced.
+ */
+const TYPE_FILTER_LABEL: Record<RoleKind, () => string> = {
+  client: () => m.contacts_label_clients(),
+  agent: () => m.contacts_label_agents(),
+  other: () => m.contacts_label_other(),
+};
 
 export function meta() {
   return [{ title: m.contacts_meta_title() }];
@@ -217,13 +234,10 @@ export default function ContactsPage() {
                 onChange={(e) => setTypeFilter(e.target.value)}
                 options={[
                   { value: "", label: m.contacts_filter_all_types() },
-                  { value: "agent", label: m.contacts_label_agents() },
-                  { value: "client", label: m.contacts_label_clients() },
-                  // IA-96 — `contact_role_profiles.kind` has always had three
-                  // values; `contacts.type` had two, so a person added under a
-                  // contractor/other role was filed as a Client. The type now
-                  // matches the roles that produce it.
-                  { value: "other", label: m.contacts_label_other() },
+                  // Offered in vocabulary order, from the vocabulary itself —
+                  // see TYPE_FILTER_LABEL above for why the labels sit in a
+                  // Record rather than being listed here.
+                  ...ROLE_KINDS.map((kind) => ({ value: kind, label: TYPE_FILTER_LABEL[kind]() })),
                 ]}
               />
             </div>

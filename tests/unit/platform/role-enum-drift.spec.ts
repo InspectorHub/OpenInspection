@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
-import { ROLES } from '../../../server/lib/auth/roles';
-import { ROLE_KIND } from '../../../server/lib/people/role-kinds';
+import { ROLES, ROLE } from '../../../server/lib/auth/roles';
+import { ROLE_KIND, ROLE_KINDS, REPAIR_CREATOR_KINDS } from '../../../server/lib/people/role-kinds';
+import { CONSENT_RECIPIENT_TYPES } from '../../../server/lib/sms/consent-basis';
+import { MESSAGE_FROM_ROLES } from '../../../server/lib/db/schema/message';
 import { DEFAULT_ROLE_PROFILES } from '../../../server/lib/people/default-role-profiles';
-import { users, tenantInvites, contacts, contactRoleProfiles } from '../../../server/lib/db/schema';
+import {
+    users, tenantInvites, contacts, contactRoleProfiles,
+    repairRequests, inspectionMessages, smsConsentLog,
+} from '../../../server/lib/db/schema';
 import {
     CreateContactSchema,
     ContactResponseSchema,
@@ -128,9 +133,89 @@ describe('role enum drift — contact-party axis (ROLE_KIND)', () => {
 });
 
 /**
- * NOT covered here: the `GROUP_ORDER` literals in
- * app/components/inspection/{PeopleEditor,SendReportModal}.tsx and the inline
- * kind tuple in SendSmsModal.tsx. None is exported, and importing the modules
- * to reach them would pull a React tree into a node-env server suite. Export
- * them (or move the order into a shared constant) and they belong above.
+ * The cases above compare MEMBERS, which is the weaker of the two checks: two
+ * hand-written lists that happen to agree pass while both are wrong together,
+ * and they keep passing right up until someone edits one of them. The cases
+ * below compare the ARRAY ITSELF. `toBe` can only pass if the declaration
+ * imported the vocabulary instead of retyping it, so it is evidence about the
+ * code's shape rather than about today's values.
+ *
+ * Keep both: membership catches a drift the identity check cannot see (a zod
+ * enum copies its input, so no reference survives), identity catches the drift
+ * membership cannot (a correct copy that is still a copy).
+ */
+describe('role vocabularies are derived, not retyped', () => {
+    it('users.role reads the ROLES array itself', () => {
+        expect(columnEnum(users, 'role')).toBe(ROLES);
+    });
+
+    it('contacts.type reads the ROLE_KINDS array itself', () => {
+        expect(columnEnum(contacts, 'type')).toBe(ROLE_KINDS);
+    });
+
+    it('contact_role_profiles.kind reads the ROLE_KINDS array itself', () => {
+        expect(columnEnum(contactRoleProfiles, 'kind')).toBe(ROLE_KINDS);
+    });
+
+    it('inspection_messages.from_role reads MESSAGE_FROM_ROLES itself', () => {
+        expect(columnEnum(inspectionMessages, 'from_role')).toBe(MESSAGE_FROM_ROLES);
+    });
+
+    it('sms_consent_log.recipient_type reads CONSENT_RECIPIENT_TYPES itself', () => {
+        expect(columnEnum(smsConsentLog, 'recipient_type')).toBe(CONSENT_RECIPIENT_TYPES);
+    });
+
+    it('repair_requests.created_by_kind reads REPAIR_CREATOR_KINDS itself', () => {
+        expect(columnEnum(repairRequests, 'created_by_kind')).toBe(REPAIR_CREATOR_KINDS);
+    });
+
+    // The zod enums cannot be checked by identity (z.enum copies), so assert
+    // ORDER as well as membership: a hand-written copy in this codebase was
+    // spelled agent/client/other while the vocabulary reads client/agent/other,
+    // and an order-insensitive check is exactly what let that sit there.
+    it('every contact/role-profile zod enum is ROLE_KINDS in ROLE_KINDS order', () => {
+        const inOrder = [...ROLE_KINDS];
+        expect(enumOptions(CreateContactSchema.shape.type)).toEqual(inOrder);
+        expect(enumOptions(ContactResponseSchema.shape.type)).toEqual(inOrder);
+        expect(enumOptions(ContactListQuerySchema.shape.type)).toEqual(inOrder);
+        expect(enumOptions((ContactDetailResponseSchema.shape.data as any).shape.contact.shape.type)).toEqual(inOrder);
+        expect(enumOptions((ContactImportSchema.shape.mapping as any).shape.type)).toEqual(inOrder);
+        expect(enumOptions(CreateRoleProfileSchema.shape.kind)).toEqual(inOrder);
+        expect(enumOptions(RoleProfileSchema.shape.kind)).toEqual(inOrder);
+    });
+});
+
+/**
+ * The vocabularies that are NEIGHBOURS of ROLE_KIND without being it. Each is
+ * pinned here against the members it is actually allowed to have, so a future
+ * "these look the same, unify them" reads as a failing test rather than as a
+ * plausible refactor. The reason each one differs lives at its declaration.
+ */
+describe('neighbouring vocabularies stay distinct', () => {
+    it('repair_requests.created_by_kind is client+agent+inspector — never `other`', () => {
+        expect([...REPAIR_CREATOR_KINDS]).toEqual([ROLE_KIND.CLIENT, ROLE_KIND.AGENT, ROLE.INSPECTOR]);
+        // `repair-access.ts` resolves an `other`-kind portal grant (attorney,
+        // title company, …) to NO builder role at all, so a column that
+        // accepted it would be recording an actor the resolver cannot produce.
+        expect(REPAIR_CREATOR_KINDS as readonly string[]).not.toContain(ROLE_KIND.OTHER);
+    });
+
+    it('inspection_messages.from_role is every kind plus the staff side', () => {
+        expect([...MESSAGE_FROM_ROLES]).toEqual([ROLE.INSPECTOR, ...ROLE_KINDS]);
+    });
+
+    it('sms_consent_log.recipient_type is every kind plus staff', () => {
+        expect([...CONSENT_RECIPIENT_TYPES]).toEqual([...ROLE_KINDS, 'staff']);
+        // Staff is a BASIS, not a contact-party kind: it exists so a staff STOP
+        // can be recorded without entering the consumer consent evidence.
+        expect(ROLE_KINDS as readonly string[]).not.toContain('staff');
+    });
+});
+
+/**
+ * NOT covered here: the group ordering used by
+ * app/components/inspection/{PeopleEditor,SendReportModal,SendSmsModal}.tsx.
+ * All three now map over the imported `ROLE_KINDS` rather than a local tuple,
+ * so there is no second list left to compare; reaching them from here would
+ * pull a React tree into a node-env server suite for no added evidence.
  */

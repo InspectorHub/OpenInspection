@@ -10,7 +10,7 @@ import { and, eq } from 'drizzle-orm';
 import { reportVersions } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
-import { RECOMMENDATION_CATEGORIES, RECOMMENDATION_CATEGORY_IDS } from '../../lib/recommendation-categories';
+import { RECOMMENDATION_CATEGORY_IDS } from '../../lib/recommendation-categories';
 import { deleteRepairPriceKeys } from '../../lib/repair-price-keys';
 import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../../types/defect-fields';
 import { listUnresolved } from '../../lib/mustache';
@@ -157,11 +157,6 @@ export function resolveCoverUrl(
   return key ? makePhotoUrl(key) : null;
 }
 
-/** Slug → label map for resolving aggregated recommendation badges in
- *  getReportData. Built once at module load. */
-export const RECOMMENDATION_CATEGORY_LABELS = new Map<string, string>(
-    RECOMMENDATION_CATEGORIES.map(c => [c.id, c.label]),
-);
 
 /**
  * Sprint 2 S2-3 — sanitize the per-defect fields on every inspection-results

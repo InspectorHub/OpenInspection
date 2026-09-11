@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
+import { ROLE_KINDS } from '../../../people/role-kinds';
 
 // Tenant-configurable people roles (Spectora "Additional Inspection People"
 // parity). `kind` is the ONLY semantic switch — capabilities derive from it in
@@ -15,7 +16,9 @@ export const contactRoleProfiles = sqliteTable('contact_role_profiles', {
     // portal visibility, repair-list access. Read by capabilitiesForKind, which
     // FAILS CLOSED — a value outside the enum grants nothing rather than
     // defaulting, because callers cast the DB string through `as RoleKind`.
-    kind:            text('kind', { enum: ['client', 'agent', 'other'] }).notNull(),
+    // THE contact-party axis column — `ROLE_KINDS` exists for this one, so it
+    // is read rather than restated. Type-layer only; the DDL is plain text.
+    kind:            text('kind', { enum: ROLE_KINDS }).notNull(),
     emailTemplateId: text('email_template_id'),          // → message_templates.id (optional)
     smsTemplateId:   text('sms_template_id'),
     isSystem:        integer('is_system', { mode: 'boolean' }).notNull().default(false),

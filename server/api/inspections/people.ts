@@ -24,6 +24,7 @@ import { contacts, contactRoleProfiles, inspections } from '../../lib/db/schema'
 import { AddPersonSchema } from '../../lib/validations/role-profile.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { isSoleClient } from '../../lib/people/primary-client';
+import { ROLE_KINDS } from '../../lib/people/role-kinds';
 import { reportLinkExpiresAt } from '../../lib/report-link-ttl';
 import { ReportLinkTtlSchema } from '../../lib/validations/report-link-ttl.schema';
 import { auditFromContext } from '../../lib/audit';
@@ -61,7 +62,7 @@ const PersonRowSchema = z.object({
     roleProfileId: z.string().describe('The role profile this contact occupies on the inspection.'),
     roleKey: z.string().describe('Stable machine key of the role profile (e.g. "client", "co_client").'),
     roleLabel: z.string().describe('Tenant-editable display label of the role profile.'),
-    kind: z.enum(['client', 'agent', 'other']).describe('Capability class the role derives from.'),
+    kind: z.enum(ROLE_KINDS).describe('Capability class the role derives from.'),
     name: z.string().describe('Contact display name.'),
     email: z.string().nullable().describe('Contact email, if any.'),
     phone: z.string().nullable().describe('Contact phone, if any.'),

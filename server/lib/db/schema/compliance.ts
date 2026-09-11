@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { CONSENT_RECIPIENT_TYPES } from '../../sms/consent-basis';
 
 /**
  * Track I-a GDPR (spec §4) — append-only DSAR (data-subject erasure) decision
@@ -78,7 +79,10 @@ export const smsDisclosureVersions = sqliteTable('sms_disclosure_versions', {
 // consent state = latest event per (tenant_id, contact_id). Never updated/deleted.
 //
 // Communication A3.2 — `recipient_type` widened from `['client']` to mirror
-// RoleKind so non-client rows can be stamped honestly. Consent BASIS per kind
+// RoleKind so non-client rows can be stamped honestly. It now READS that
+// mirror (`CONSENT_RECIPIENT_TYPES` = every RoleKind plus `staff`) instead of
+// restating it, so "mirrors RoleKind" is a fact about the code rather than a
+// note asking a human to keep two lists equal. Consent BASIS per kind
 // (express vs implied) lives in `server/lib/sms/consent-basis.ts` (D5):
 //   client → express (TCPA recorded grant required)
 //   agent  → implied (B2B phone-on-file)
@@ -103,7 +107,7 @@ export const smsConsentLog = sqliteTable('sms_consent_log', {
      * staff STOP can be recorded without polluting the consumer consent
      * evidence a carrier or regulatory filing rests on.
      */
-    recipientType:     text('recipient_type', { enum: ['client', 'agent', 'other', 'staff'] }).notNull(),
+    recipientType:     text('recipient_type', { enum: CONSENT_RECIPIENT_TYPES }).notNull(),
     // The consent VERDICT. The latest row per subject is the whole answer the
     // send gate reads (`sms/send-gate.ts`, `notifications/channel-consent.ts`):
     // one 'revoked' blocks every later SMS until a new 'granted' is appended.

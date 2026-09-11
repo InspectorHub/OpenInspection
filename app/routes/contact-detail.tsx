@@ -8,6 +8,7 @@ import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import { formatCents } from "~/lib/hub-blocks";
 import { humanizeStatus, capitalize } from "~/lib/status";
 import { Breadcrumb } from "~/components/Breadcrumb";
+import type { RoleKind } from "../../server/lib/people/role-kinds";
 import { ReportAccessPanel, type AccessRow } from "~/components/contacts/ReportAccessPanel";
 import { PageHeader, Card, Pill, EmptyState } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
@@ -25,7 +26,7 @@ interface ContactDetail {
   contact: {
     id: string;
     // IA-96 widened this to match contact_role_profiles.kind.
-    type: "agent" | "client" | "other";
+    type: RoleKind;
     name: string;
     email: string | null;
     phone: string | null;

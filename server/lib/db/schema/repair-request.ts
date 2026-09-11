@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { REPAIR_ACTION_TAGS } from '../../repair-action-tag';
+import { REPAIR_CREATOR_KINDS } from '../../people/role-kinds';
 
 /** A buyer/agent/inspector-built repair-request list for a published report.
  * Multiple lists may exist per inspection (one+ per creator) — Spectora parity. */
@@ -10,7 +11,13 @@ export const repairRequests = sqliteTable('repair_requests', {
   // With `created_by_ref`, the list's OWNER identity: `listMine` filters on the
   // pair and `assertCanEdit` refuses on a mismatch of either, so this is an
   // authorization input, not a label. Also the Pill on the inspector's log entry.
-  createdByKind: text('created_by_kind', { enum: ['client', 'agent', 'inspector'] }).notNull(),
+  //
+  // `REPAIR_CREATOR_KINDS` and not `ROLE_KINDS`: this vocabulary crosses the
+  // two axes on purpose (two contact-party kinds plus the staff seat) and
+  // omits `other` on purpose (`repair-access.ts` gives an attorney/title-company
+  // grant no builder role at all). The reason lives at the declaration in
+  // `server/lib/people/role-kinds.ts`; do not widen it here.
+  createdByKind: text('created_by_kind', { enum: REPAIR_CREATOR_KINDS }).notNull(),
   // WHO built this list, as resolved by `repair-access.ts`. NOT an opaque id:
   // on the portal-token path (how a client always arrives, and most agents) it
   // is the recipient's EMAIL ADDRESS. It is a userId only for the owner-preview

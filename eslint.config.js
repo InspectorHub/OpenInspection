@@ -338,14 +338,31 @@ export default tseslint.config(
         //
         // server/lib/auth/roles.ts       — source of truth; defines the literals
         // server/lib/db/schema/**        — drizzle column defs; also has non-user-role
-        //                                  enums (signer/contact roles) which use 'agent'
+        //                                  enums (signer/contact roles) which use 'agent'.
+        //                                  NARROWED by the IA-107 convergence: contacts.type,
+        //                                  contact_role_profiles.kind, inspection_messages.from_role,
+        //                                  sms_consent_log.recipient_type and
+        //                                  repair_requests.created_by_kind now read shared arrays,
+        //                                  and both users.role defaults read ROLE.*. What is LEFT
+        //                                  is five declarations that must stay distinct, each
+        //                                  carrying its reason at the column: agreement_signers.role
+        //                                  (adds co_client), client_uploads UPLOADER_KINDS (portal
+        //                                  SEATS, not kinds), automations.recipient_kind (a fan-out
+        //                                  selector), tenant point_of_contact ('inspector'|'company'),
+        //                                  and the message/uploader arrays themselves.
         // server/data/**                 — seed/fixture data; literals are authoritative
         // server/lib/middleware/rbac.ts  — requireRole(...roles:Role[]) definition;
         //                                  the Role type already enforces call sites
         // server/lib/auth/jwt-claims.ts  — uses 'agent' as a JWT kind discriminant
         // server/lib/public-access.ts    — PortalRole ('client'|'co_client'|'agent') is
         //                                  a non-RBAC signer role (≠ users.role)
-        // server/durable-objects/**      — presence role ('inspector'|'observer') ≠ RBAC
+        // server/durable-objects/**      — presence role ≠ RBAC. (This line said
+        //                                  "('inspector'|'observer')"; 'observer' has no hits
+        //                                  anywhere in the tree — the presence role is the single
+        //                                  value 'inspector'. Three hits remain in
+        //                                  inspection-presence.ts, two of them type positions the
+        //                                  selector already excludes, so ONE value-position literal
+        //                                  is what this glob is still buying.)
         // server/lib/email-templates/**  — email category ('agent'|'client') ≠ RBAC
         // server/lib/integration/**      — bootstrap insert; drizzle column enum enforces
         // server/portal/**               — credential upsert; drizzle column enum enforces

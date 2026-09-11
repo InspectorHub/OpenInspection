@@ -5,10 +5,10 @@ import type { action } from "~/routes/inspector-portal";
 import type { PersonRow } from "./PeopleEditor";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { m } from "~/paraglide/messages";
+// Grouped in vocabulary order — see the note in <PeopleEditor>.
+import { ROLE_KINDS } from "../../../server/lib/people/role-kinds";
 
 const FORM_ID = "ih-send-report-form";
-
-const GROUP_ORDER = ["client", "agent", "other"] as const;
 
 /**
  * Whose box is ticked when the dialog opens.
@@ -127,7 +127,7 @@ export function SendReportModal({
     if (succeeded) onClose();
   }, [succeeded, onClose]);
 
-  const groups = GROUP_ORDER.map((kind) => ({
+  const groups = ROLE_KINDS.map((kind) => ({
     kind,
     rows: people.filter((p) => p.kind === kind),
   })).filter((g) => g.rows.length > 0);

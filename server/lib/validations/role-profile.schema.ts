@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ROLE_KINDS } from '../people/role-kinds';
 
 // Field-for-field mirror of RoleCapabilities (server/lib/people/capabilities.ts).
 // All fields optional: overrides layer on the kind baseline, so a partial
@@ -13,7 +14,7 @@ const CapabilityOverridesSchema = z.object({
 
 export const CreateRoleProfileSchema = z.object({
     label: z.string().trim().min(1).max(80).describe('Tenant-editable display label for the new role profile, e.g. "Property Manager".'),
-    kind: z.enum(['client', 'agent', 'other']).describe('Capability class the role derives from: client, agent, or other.'),
+    kind: z.enum(ROLE_KINDS).describe('Capability class the role derives from: client, agent, or other.'),
     emailTemplateId: z.string().optional().describe('Optional message-template id used for email notices to this role.'),
     smsTemplateId: z.string().optional().describe('Optional message-template id used for SMS notices to this role.'),
     capabilityOverrides: CapabilityOverridesSchema,
@@ -41,7 +42,7 @@ export const RoleProfileSchema = z.object({
     tenantId: z.string().describe('Owning tenant.'),
     key: z.string().describe('Stable machine-readable key, unique per tenant.'),
     label: z.string().describe('Tenant-editable display label, e.g. "Buyer\'s Agent".'),
-    kind: z.enum(['client', 'agent', 'other']).describe('Capability class the role derives from (client, agent, or other).'),
+    kind: z.enum(ROLE_KINDS).describe('Capability class the role derives from (client, agent, or other).'),
     emailTemplateId: z.string().nullable().describe('Optional message-template id used for email notices to this role.'),
     smsTemplateId: z.string().nullable().describe('Optional message-template id used for SMS notices to this role.'),
     capabilityOverrides: z.unknown().nullable().optional().describe('Per-profile capability overrides layered on the kind baseline; resolve with capabilitiesForProfile.'),

@@ -21,6 +21,7 @@ import { createRoutesStub } from "react-router";
 
 import ContactsPage from "~/routes/contacts";
 import { asSelect } from "../../tests/helpers/dom";
+import { ROLE_KINDS } from "../../server/lib/people/role-kinds";
 
 const AGENT = {
   id: "c1",
@@ -90,7 +91,10 @@ describe("/contacts — IA-96", () => {
     const select = asSelect(await findByLabelText(/type/i), "the contact-type picker");
 
     const values = [...select.options].map((o) => o.value);
-    expect(values).toEqual(["", "agent", "client", "other"]);
+    // Derived, not retyped: the picker offers the blank "all" entry followed by
+    // the vocabulary in its own order. A literal list here would keep agreeing
+    // with whatever it was copied from after the vocabulary moved on.
+    expect(values).toEqual(["", ...ROLE_KINDS]);
   });
 
   it("does not repeat the same count in the title and the meta line", async () => {

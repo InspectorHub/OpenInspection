@@ -8,9 +8,10 @@
  */
 import type { repairRequests, repairRequestItems } from '../lib/db/schema';
 import type { RepairActionTag } from '../lib/repair-action-tag';
+import type { RepairCreatorKind } from '../lib/people/role-kinds';
 
 /** Who built a list. `ref` is a contact id, an agent id, or a staff user id. */
-export type Creator = { kind: 'client' | 'agent' | 'inspector'; ref: string };
+export type Creator = { kind: RepairCreatorKind; ref: string };
 
 /**
  * One repair request with its items attached.

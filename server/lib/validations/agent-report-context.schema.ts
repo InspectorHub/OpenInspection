@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from './shared.schema';
+import { ROLE_KINDS } from '../people/role-kinds';
 
 /**
  * Spec 3 Task 3 — response shape for POST /api/agent/report-context, the
@@ -17,7 +18,7 @@ import { createApiResponseSchema } from './shared.schema';
  */
 export const AgentReportContextResponseSchema = createApiResponseSchema(
     z.object({
-        kind: z.enum(['agent', 'client', 'other']).nullable()
+        kind: z.enum(ROLE_KINDS).nullable()
             .describe('The report token recipient\'s role kind, or null when the token is invalid/expired/mismatched.'),
         recipientEmail: z.string().optional()
             .describe('Present only when kind is "agent" — the token holder is inherently that recipient, so echoing it back is not enumeration.'),

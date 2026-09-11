@@ -20,11 +20,12 @@
 import type { Route } from "./+types/contact-search";
 import { getToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import type { RoleKind } from "../../../server/lib/people/role-kinds";
 
 export interface ContactSearchItem {
     id: string;
     name: string;
-    type: "agent" | "client" | "other";
+    type: RoleKind;
     email: string | null;
 }
 
@@ -50,7 +51,7 @@ export async function loader({ request, context }: Route.LoaderArgs): Promise<{ 
     if (!res?.ok) return { contacts: [] };
 
     const body = (await res.json()) as {
-        data?: Array<{ id: string; name: string; type: "agent" | "client" | "other"; email: string | null }>;
+        data?: Array<{ id: string; name: string; type: RoleKind; email: string | null }>;
     };
 
     return {
