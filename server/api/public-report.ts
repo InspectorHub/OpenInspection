@@ -28,6 +28,28 @@ import { readCourtesyTranslationForReport } from '../lib/translation/read-for-re
 import { COURTESY_TRANSLATION_LOCALE, PublicReportResponseSchema } from '../lib/validations/courtesy-translation.schema';
 
 /**
+ * The outstanding release gate for a public request, or null when nothing holds
+ * the report back.
+ *
+ * Skipped entirely on the bypass paths rather than computed and discarded: the
+ * predicate ignores it there, and asking anyway would put two database reads on
+ * every page the headless PDF renderer loads.
+ *
+ * Takes the service structurally so this module needs no new import, and so a
+ * test can hand it a stub without constructing the whole service graph.
+ */
+async function releaseGateFor(
+    services: { inspection: { resolveReleaseGate(inspectionId: string, tenantId: string): Promise<{ reason: 'payment' | 'agreement' } | null> } },
+    id: string,
+    tenantId: string,
+    bypass: boolean,
+): Promise<'payment' | 'agreement' | null> {
+    if (bypass) return null;
+    const gate = await services.inspection.resolveReleaseGate(id, tenantId);
+    return gate?.reason ?? null;
+}
+
+/**
  * Shared client-facing tenant resolution for the public report endpoints:
  * the persistent per-(recipient, order) portal token, falling back to the
  * legacy KV agent-view-token bridge (`?view=agent&token=`). Returns the
@@ -247,28 +269,6 @@ const reportGateRoute = createRoute(withMcpMetadata({
     operationId: 'getPublicReportGate',
     description: 'Public, no-login report-gate status resolved by tenant slug + inspection id. Returns the outstanding gate (agreement before payment) with branding, inspector contact, and amount due — or null when the report is not gated.',
 }, { scopes: [], tier: 'extended' }));
-
-/**
- * The outstanding release gate for a public request, or null when nothing holds
- * the report back.
- *
- * Skipped entirely on the bypass paths rather than computed and discarded: the
- * predicate ignores it there, and asking anyway would put two database reads on
- * every page the headless PDF renderer loads.
- *
- * Takes the service structurally so this module needs no new import, and so a
- * test can hand it a stub without constructing the whole service graph.
- */
-async function releaseGateFor(
-    services: { inspection: { resolveReleaseGate(inspectionId: string, tenantId: string): Promise<{ reason: 'payment' | 'agreement' } | null> } },
-    id: string,
-    tenantId: string,
-    bypass: boolean,
-): Promise<'payment' | 'agreement' | null> {
-    if (bypass) return null;
-    const gate = await services.inspection.resolveReleaseGate(id, tenantId);
-    return gate?.reason ?? null;
-}
 
 const publicReportRoutes = createApiRouter()
     .route('/', publicVerifyRoutes)

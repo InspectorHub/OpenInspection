@@ -6,8 +6,8 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 144,
-    "dollarMethods": 565,
+    "files": 145,
+    "dollarMethods": 567,
     "apiWorker": 9
   },
   "fanOut": {
@@ -69,6 +69,10 @@
     },
     "app/lib/settings-notifications.server.ts": {
       "dollarMethods": 4,
+      "apiWorker": 0
+    },
+    "app/lib/settings/booking-open.server.ts": {
+      "dollarMethods": 2,
       "apiWorker": 0
     },
     "app/lib/settings/booking-policy-actions.ts": {
