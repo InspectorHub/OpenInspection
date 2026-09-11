@@ -100,6 +100,9 @@ export interface LoadedEmailConfig {
     aiEnabled?: boolean;
     aiBaseUrl?: string | null;
     aiModel?: string | null;
+    /** Whether this workspace counts report opens — decides whether a delivery email
+     *  may say so. Read as FALSE when absent; see `RendererConfig.viewCountingEnabled`. */
+    reportViewCountingEnabled?: boolean;
 }
 
 /**
@@ -116,6 +119,9 @@ export function assembleTenantEmailService(
     tenantTier?: string,
 ): EmailService {
     const { emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider } = cfg;
+    // The ONE place an absent answer becomes `false` (a platform-default
+    // construction, with no tenant, never opted into counting).
+    const viewCountingEnabled = cfg.reportViewCountingEnabled ?? false;
 
     // Determine whether the selected BYO provider's creds are present.
     const byoProvider = emailByoProvider ?? 'resend';
@@ -189,6 +195,7 @@ export function assembleTenantEmailService(
             primaryColor: platformColor,
         },
         ...(emailOverrides ? { overrides: emailOverrides } : {}),
+        viewCountingEnabled,
     });
     // `ownReady` already captures "the resolved config is own-mode with usable
     // creds" — reuse it both to tag the meter (email vs email_byo) and to gate
@@ -325,7 +332,7 @@ export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: stri
     const emailConfigReadPromise = (async () => {
         try {
             return await drizzle(env.DB)
-                .select({ emailByoProvider: tenantConfigs.emailByoProvider })
+                .select({ emailByoProvider: tenantConfigs.emailByoProvider, reportViewCountingEnabled: tenantConfigs.reportViewCountingEnabled })
                 .from(tenantConfigs)
                 .where(eq(tenantConfigs.tenantId, tenantId))
                 .get();
@@ -367,6 +374,8 @@ export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: stri
         aiEnabled: aiConfigRow?.aiEnabled ?? true,
         aiBaseUrl: aiConfigRow?.aiBaseUrl ?? null,
         aiModel: aiConfigRow?.aiModel ?? null,
+        // Missing or unreadable reads as OFF: never opened is never opted in.
+        reportViewCountingEnabled: configRow?.reportViewCountingEnabled ?? false,
     };
 }
 

@@ -6,8 +6,8 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 142,
-    "dollarMethods": 563,
+    "files": 144,
+    "dollarMethods": 565,
     "apiWorker": 9
   },
   "fanOut": {
@@ -160,6 +160,10 @@
       "apiWorker": 0
     },
     "app/routes/forgot-password.tsx": {
+      "dollarMethods": 1,
+      "apiWorker": 0
+    },
+    "app/routes/inspection-edit/action-followup.server.ts": {
       "dollarMethods": 1,
       "apiWorker": 0
     },
@@ -341,6 +345,10 @@
     },
     "app/routes/resources/contact-access.tsx": {
       "dollarMethods": 2,
+      "apiWorker": 0
+    },
+    "app/routes/resources/contact-search.tsx": {
+      "dollarMethods": 1,
       "apiWorker": 0
     },
     "app/routes/resources/cost-export.tsx": {

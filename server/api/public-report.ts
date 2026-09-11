@@ -2,14 +2,14 @@ import type { Context } from 'hono';
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq, and } from 'drizzle-orm';
 import type { HonoConfig } from '../types/hono';
-import { inspections, tenants, tenantConfigs } from '../lib/db/schema';
+import { inspections, tenants } from '../lib/db/schema';
 import { resolveRenderAccess } from '../lib/render-token';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { resolvePortalAccess, resolveOwnerPreview, classifyPortalAccess } from '../lib/public-access';
 import { resolveClientActor } from '../lib/portal-client-actor';
-import { recordReportView } from '../lib/report-views';
+import { recordReportView, readReportViewCountingEnabled } from '../lib/report-views';
 import publicViewTrackingRoutes from './public/view-tracking';
 // Re-exported for existing importers (tests); both now live in lib/.
 export { resolveOwnerPreviewToken } from '../lib/public-access';
@@ -344,13 +344,13 @@ const publicReportRoutes = createApiRouter()
         // its supposed beneficiary cannot decline). A missing config row reads
         // as OFF, which is the same direction as the column default: a tenant
         // who has never opened the settings page has not opted in.
-        const viewCfg = await getDrizzle(c)
-            .select({ enabled: tenantConfigs.reportViewCountingEnabled })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
+        // Read through the shared reader, which is also what decides whether the
+        // delivery email may state that opens are recorded. Two readings of one
+        // column is how the email came to describe processing this branch was
+        // not doing.
+        const countingEnabled = await readReportViewCountingEnabled(getDrizzle(c), tenantId);
         await recordReportView(getDrizzle(c), { tenantId, inspectionId: id }, {
-            countingEnabled: viewCfg?.enabled ?? false,
+            countingEnabled,
             accessTokenId: clientGrant?.accessTokenId ?? null, renderMode, ownerPreview,
             method: c.req.header('x-oi-client-method') ?? c.req.method,
             purpose: c.req.header('purpose'), secPurpose: c.req.header('sec-purpose'),

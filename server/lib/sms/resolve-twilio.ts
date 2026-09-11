@@ -62,18 +62,43 @@ export function resolveTwilio(
 }
 
 /**
+ * The credential set that would actually be used, as a label. NOT the tenant's
+ * selected mode — a tenant can have selected a tier whose credentials do not
+ * exist, which is exactly the case `managed` was added for.
+ */
+export type TwilioEffectiveSource = 'own' | 'platform' | 'managed' | 'none';
+
+/**
  * Track L (D) — which credential set `resolveTwilio` would pick, as a label, for
  * the Settings "effective source" line. Mirrors resolveTwilio's decision exactly
- * (own wins only with mode==='own' + complete tenant creds; else platform; else
- * tenant fallback; else none) WITHOUT exposing any secret value.
- * Return type is the *effective credential source* (own/platform/none) — a different
- * concept from the tenant's selected mode; do not conflate the two.
+ * WITHOUT exposing any secret value.
+ *
+ * ⚠️ F58 — THE MANAGED ARGUMENT IS NOT OPTIONAL IN SPIRIT. This function used to
+ * take only (mode, tenant, platform) and had no managed branch at all, while
+ * `resolveTwilio` above resolves a managed mode from a COMPLETELY DIFFERENT
+ * credential set: an API-key triple plus a Messaging Service SID, none of which
+ * is the `TWILIO_FROM_NUMBER`-shaped bag this function inspects. So a
+ * `managed_shared` tenant whose deployment HAS a working managed pool was
+ * labelled `none`, and the Settings page then told them to go and set provider
+ * credentials — credentials that are not missing, on a panel that is not even
+ * rendered in managed mode.
+ *
+ * The `managed` parameter stays optional only for call sites that genuinely have
+ * no env to build a bag from (and for the own/platform tests that predate it).
+ * Any caller serving a UI must pass it — `buildManagedBag` is exported for that.
  */
 export function resolveTwilioSource(
     mode: 'platform' | 'own' | 'managed_shared' | 'managed_dedicated',
     tenant: CredBag,
     platform: CredBag,
-): 'own' | 'platform' | 'none' {
+    managed?: ManagedBag,
+): TwilioEffectiveSource {
+    // Mirrors resolveTwilio's first branch, field for field. If these two ever
+    // disagree the UI reports a source the sender does not use.
+    if ((mode === 'managed_shared' || mode === 'managed_dedicated') && managed) {
+        const { sid, token, authSid, messagingServiceSid } = managed;
+        if (sid && token && authSid && messagingServiceSid) return 'managed';
+    }
     const isComplete = (b: CredBag) =>
         Boolean(b.TWILIO_ACCOUNT_SID && b.TWILIO_AUTH_TOKEN && b.TWILIO_FROM_NUMBER);
     const ownComplete = isComplete(tenant);
@@ -143,6 +168,36 @@ async function buildManagedBag(
  * (for dedicated) the tenant's messagingCompliance row.
  * Use loadProviderForTenant for provider-aware dispatch (BYO Twilio or Telnyx).
  */
+/**
+ * The Settings "effective source" label for one tenant, with the managed pool
+ * taken into account.
+ *
+ * F58 — this exists so the managed-pool knowledge stays in ONE module. The
+ * Settings endpoint used to call `resolveTwilioSource` with only the
+ * account/token/from bags, which cannot describe a managed tier at all: the
+ * managed send path resolves an API-key triple plus a Messaging Service SID.
+ * A tenant on `managed_shared` was therefore labelled from credentials their
+ * sends never touch, and on a deployment with no managed pool the page told
+ * them to supply credentials of their own — the wrong party, and a panel that
+ * managed mode does not render.
+ *
+ * `buildManagedBag` is deliberately not exported: a caller that had to assemble
+ * the bag itself would be a second place for the four-field rule to drift.
+ */
+export async function resolveTwilioSourceForTenant(
+    env: TwilioLoaderEnv,
+    tenantId: string,
+    mode: 'platform' | 'own' | 'managed_shared' | 'managed_dedicated',
+    tenant: CredBag,
+    platform: CredBag,
+): Promise<TwilioEffectiveSource> {
+    const managed = (mode === 'managed_shared' || mode === 'managed_dedicated')
+        // A failed read is "no managed pool", never a 500 on a settings page.
+        ? await buildManagedBag(env, mode, tenantId).catch(() => undefined)
+        : undefined;
+    return resolveTwilioSource(mode, tenant, platform, managed);
+}
+
 export async function loadTwilioForTenant(env: TwilioLoaderEnv, tenantId: string): Promise<TwilioCreds | null> {
     const db = drizzle(env.DB);
     const cfg = await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs)

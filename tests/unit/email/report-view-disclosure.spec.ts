@@ -20,7 +20,7 @@
  *     survives it.
  */
 import { describe, it, expect } from 'vitest';
-import { EmailTemplateRenderer } from '../../../server/lib/email-templates/renderer';
+import { EmailTemplateRenderer, reportDeliverySystemBlocks } from '../../../server/lib/email-templates/renderer';
 import { getDescriptor } from '../../../server/lib/email-templates/registry';
 import { REPORT_VIEW_DISCLOSURE } from '../../../server/lib/legal/report-view-disclosure';
 import type { TemplateBrand, TemplateOverride } from '../../../server/lib/email-templates/types';
@@ -39,11 +39,24 @@ const REPORT_LINK_TRIGGERS = ['report-ready', 'report-ready-pdf', 'agent-share-l
 
 const brand: TemplateBrand = { name: 'Acme Inspections', logoUrl: null, primaryColor: '#123456' };
 
-function render(trigger: string, data: Record<string, unknown> = {}, overrides?: Map<string, TemplateOverride>) {
+/**
+ * `viewCountingEnabled` defaults to TRUE here because every assertion below is
+ * about the workspace the notice is OWED TO — one that turned open-counting on.
+ * The workspace that did not is its own describe block at the foot of the file,
+ * and it is what makes these assertions discriminating: without it, hiding the
+ * notice unconditionally would satisfy that half and fail this one.
+ */
+function render(
+    trigger: string,
+    data: Record<string, unknown> = {},
+    overrides?: Map<string, TemplateOverride>,
+    viewCountingEnabled = true,
+) {
     const renderer = new EmailTemplateRenderer({
         tenantBrand: brand,
         platformBrand: brand,
         ...(overrides ? { overrides } : {}),
+        viewCountingEnabled,
     });
     return renderer.render(trigger, { address: '1 Main St', agentName: 'Dana', propertyAddress: '1 Main St', reportUrl: 'https://acme.test/report-view/acme/insp-1?token=abc', ...data });
 }
@@ -132,5 +145,53 @@ describe('OI #271 — the Art. 13 disclosure rides every report-link email', () 
         // make it noise, and the LIA only asks for it where a report link is
         // being handed over.
         expect(render('payment-request').html).not.toContain(REPORT_VIEW_DISCLOSURE.fact);
+    });
+});
+
+/**
+ * The claim must not outlive the processing it describes.
+ *
+ * `tenant_configs.is_report_view_counting_enabled` defaults to FALSE and is the
+ * first thing `shouldCountReportView` checks, so in a workspace that never opted
+ * in NOTHING is recorded when a report is opened. The delivery email said
+ * otherwise to every one of them — stating, in the message that hands over the
+ * report, that opens are recorded, when, and how many times. Safer than
+ * understating the design, but not true, and not checkable by the one person it
+ * is addressed to.
+ */
+describe('a workspace that does not count opens makes no claim that it does', () => {
+    it.each(REPORT_LINK_TRIGGERS)('%s carries no recording claim when counting is off', (trigger) => {
+        const { html } = render(trigger, {}, undefined, /* viewCountingEnabled */ false);
+        expect(html).not.toContain(REPORT_VIEW_DISCLOSURE.fact);
+        // The heading alone would still announce a measurement, and the version
+        // stamp would attest to a disclosure nobody was given.
+        expect(html).not.toContain(REPORT_VIEW_DISCLOSURE.heading);
+        expect(html).not.toContain('data-disclosure-version');
+    });
+
+    it('still renders the rest of the message', () => {
+        // The block goes, the email does not. A notice suppressed by hiding the
+        // report link would be a different and worse bug.
+        const { html } = render('report-ready', {}, undefined, false);
+        expect(html).toContain('1 Main St');
+        expect(html).toContain('https://acme.test/report-view/acme/insp-1?token=abc');
+    });
+
+    it('reaches the same verdict on the rule-authored path, which renders no descriptor', () => {
+        // An automation rule supplying its own copy never goes through
+        // `render()`, so the two painters have to agree: this is the path the
+        // cron flush uses for a published report.
+        const url = 'https://acme.test/report-view/acme/insp-1?token=abc';
+        const off = reportDeliverySystemBlocks({ reportUrl: url, hasAttachment: true, viewCountingEnabled: false });
+        expect(off).not.toContain(REPORT_VIEW_DISCLOSURE.fact);
+        // The attachment manifest is a different block about a different fact,
+        // and it must survive — otherwise this reads as "turn counting off and
+        // lose the sentence saying the PDF is attached".
+        expect(off).toContain('attached to this email');
+
+        const on = reportDeliverySystemBlocks({ reportUrl: url, hasAttachment: true, viewCountingEnabled: true });
+        expect(on).toContain(REPORT_VIEW_DISCLOSURE.fact);
+        expect(on).toContain(REPORT_VIEW_DISCLOSURE.limit);
+        expect(on).toContain(REPORT_VIEW_DISCLOSURE.exit);
     });
 });

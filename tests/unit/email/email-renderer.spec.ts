@@ -3,7 +3,7 @@ import { EmailTemplateRenderer } from '../../../server/lib/email-templates/rende
 
 const tenantBrand = { name: 'Acme', logoUrl: null, primaryColor: '#F55A1A' };
 const platformBrand = { name: 'OpenInspection', logoUrl: null, primaryColor: '#4f46e5' };
-function mk() { return new EmailTemplateRenderer({ tenantBrand, platformBrand }); }
+function mk() { return new EmailTemplateRenderer({ tenantBrand, platformBrand, viewCountingEnabled: false }); }
 
 describe('EmailTemplateRenderer', () => {
   it('renders subject + html from registry defaults with variables substituted', () => {

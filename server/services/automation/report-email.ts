@@ -11,6 +11,7 @@ import { createRecipientLocaleResolver } from '../../lib/i18n/recipient-locale';
 import { automationClassId } from '../../lib/notifications/automation-classes';
 import { coolingWindowUnlockAtMs, deferUntilCoolingWindowOpens } from './cooling-window';
 import { reportDeliverySystemBlocks } from '../../lib/email-templates/renderer';
+import { readReportViewCountingEnabled } from '../../lib/report-views';
 import type { FlushInspection } from './shared';
 import type { EmailService } from '../email.service';
 import type { PortalAccessService } from '../portal-access.service';
@@ -180,8 +181,14 @@ export async function deliverReportEmail(
             // the Art. 13 notice (OI #271, LIA conditions 4/5) has to survive a
             // tenant who empties the template, which it can only do if nothing
             // tenant-editable can reach it.
+            // Whether this workspace counts opens decides whether the notice
+            // about counting them is true here. Read per call rather than per
+            // batch: this path already does a per-log template resolution, and
+            // the PDF render it waits on costs orders of magnitude more than one
+            // indexed row read.
+            const viewCountingEnabled = await readReportViewCountingEnabled(db, inspection.tenantId);
             const html = interpolate(ruleCopy.body, vars)
-                + reportDeliverySystemBlocks({ reportUrl: linkUrl, hasAttachment: !!pdf });
+                + reportDeliverySystemBlocks({ reportUrl: linkUrl, hasAttachment: !!pdf, viewCountingEnabled });
             const attachments = pdf
                 ? [{ filename: `${address.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60)}-report.pdf`, content: pdf }]
                 : undefined;

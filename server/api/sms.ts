@@ -40,7 +40,7 @@ import { resolveOptinToken } from '../lib/sms/optin-token';
 import { resolveSmsBrand } from '../lib/sms/brand-name';
 import { normalizeE164 } from '../lib/sms/phone';
 import { subjectsForPhone } from '../lib/sms/consent-subjects';
-import { loadProviderForTenant, resolveTwilioSource } from '../lib/sms/resolve-twilio';
+import { loadProviderForTenant, resolveTwilioSourceForTenant } from '../lib/sms/resolve-twilio';
 import { resolveComplianceProvider } from '../lib/sms/resolve-compliance-provider';
 import { recordIntegrationTest } from '../lib/integration-test-results';
 import { smsSendGate } from '../lib/sms/send-gate';
@@ -368,13 +368,13 @@ const smsConfigRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: z.object({
             success: z.literal(true),
             data: z.object({
-                mode: z.enum(['platform', 'own']),
-                effectiveSource: z.enum(['platform', 'own', 'none']),
+                mode: z.enum(['platform', 'own', 'managed_shared', 'managed_dedicated']),
+                effectiveSource: z.enum(['platform', 'own', 'managed', 'none']),
             }),
         }) } }, description: 'Effective SMS configuration' },
     },
     operationId: 'getSmsConfig',
-    description: 'Returns the tenant SMS sender mode and the effective credential source (platform env, tenant own, or none) WITHOUT leaking any secret values. Drives the "Using platform SMS" / "Using your Twilio" line in Settings.',
+    description: 'Returns the tenant SMS sender mode and the effective credential source (platform env, tenant own, the platform-managed pool, or none) WITHOUT leaking any secret values. Drives the "Using platform SMS" / "Using your Twilio" / managed-unavailable line in Settings; "managed" is resolved from the API-key triple + Messaging Service SID the managed send path uses, not from the account/token/from bag (see resolveTwilioSourceForTenant).',
 }, { scopes: ['read'], tier: 'extended' }));
 
 const consentStatusRoute = createRoute(withMcpMetadata({
@@ -587,7 +587,7 @@ export const smsAdminRoutes = createApiRouter()
         const cfg = await memoOnce(c.env, `sms-mode:${tenantId}`, async () =>
             await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs)
                 .where(eq(tenantConfigs.tenantId, tenantId)).get()).catch(() => null);
-        const mode = (cfg?.smsMode as 'platform' | 'own') ?? 'platform';
+        const mode = (cfg?.smsMode as 'platform' | 'own' | 'managed_shared' | 'managed_dedicated') ?? 'platform';
         // Decrypt the tenant's own Twilio secrets to test PRESENCE only (never echoed).
         const dec = (await loadTenantSecrets(
             c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
@@ -602,7 +602,7 @@ export const smsAdminRoutes = createApiRouter()
             TWILIO_AUTH_TOKEN: c.env.TWILIO_AUTH_TOKEN,
             TWILIO_FROM_NUMBER: c.env.TWILIO_FROM_NUMBER,
         };
-        const effectiveSource = resolveTwilioSource(mode, tenantBag, platformBag);
+        const effectiveSource = await resolveTwilioSourceForTenant(c.env, tenantId, mode, tenantBag, platformBag);
         return c.json({ success: true as const, data: { mode, effectiveSource } }, 200);
     })
     .openapi(complianceRoute, async (c) => {

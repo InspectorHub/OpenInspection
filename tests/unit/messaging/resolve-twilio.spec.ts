@@ -125,3 +125,54 @@ describe('resolveTwilioSource — effective-source label (Settings UI, no secret
         expect(resolveTwilioSource('own', {}, {})).toBe('none');
     });
 });
+
+/**
+ * F58 — this label function had NO managed branch while `resolveTwilio` did, so
+ * it described a credential set the sender does not use. A `managed_shared`
+ * tenant got `none` whenever the platform had no `TWILIO_FROM_NUMBER` — whether
+ * or not the managed pool the send actually goes through was configured — and
+ * Settings then told that tenant to supply credentials of their own, on a panel
+ * managed mode does not even render.
+ *
+ * Every case below is paired with the same call to `resolveTwilio`, because the
+ * defect was not a wrong answer, it was two functions answering differently.
+ * Asserting this one against a literal would have passed before and after.
+ */
+describe('resolveTwilioSource — managed tiers (F58)', () => {
+    for (const mode of ['managed_shared', 'managed_dedicated'] as const) {
+        it(`${mode} + a complete managed pool → managed, and agrees with the sender`, () => {
+            expect(resolveTwilioSource(mode, {}, {}, COMPLETE_MANAGED)).toBe('managed');
+            // The sender resolves the same input to the managed pool.
+            expect(resolveTwilio(mode, {}, {}, COMPLETE_MANAGED)?.messagingServiceSid).toBe('MGtenant');
+        });
+
+        it(`${mode} with a complete pool is managed even when platform creds exist`, () => {
+            // Previously 'platform' — the answer the sender never gives.
+            expect(resolveTwilioSource(mode, SOURCE_OWN, SOURCE_PLATFORM, COMPLETE_MANAGED)).toBe('managed');
+            expect(resolveTwilio(mode, SOURCE_OWN, SOURCE_PLATFORM, COMPLETE_MANAGED)?.authSid).toBe('SKkey');
+        });
+
+        it(`${mode} with NO managed pool and nothing else → none (this deployment)`, () => {
+            // The walkthrough's actual state: the tenant sits on a managed tier
+            // that the platform never provisioned. `none` is right here — what
+            // was wrong was the UI telling the TENANT to fix it.
+            expect(resolveTwilioSource(mode, {}, {}, undefined)).toBe('none');
+            expect(resolveTwilio(mode, {}, {}, undefined)).toBeNull();
+        });
+
+        it(`${mode} with an INCOMPLETE managed pool falls through, never claiming managed`, () => {
+            // One missing field at a time: each must fall through exactly as the
+            // sender's own four-field guard does.
+            for (const missing of ['sid', 'token', 'authSid', 'messagingServiceSid'] as const) {
+                const partial: ManagedBag = { ...COMPLETE_MANAGED, [missing]: '' };
+                expect(resolveTwilioSource(mode, {}, {}, partial)).not.toBe('managed');
+                expect(resolveTwilio(mode, {}, {}, partial)?.messagingServiceSid).toBeUndefined();
+            }
+        });
+    }
+
+    it('never reports managed for a non-managed mode, pool or no pool', () => {
+        expect(resolveTwilioSource('own', SOURCE_OWN, {}, COMPLETE_MANAGED)).toBe('own');
+        expect(resolveTwilioSource('platform', {}, SOURCE_PLATFORM, COMPLETE_MANAGED)).toBe('platform');
+    });
+});

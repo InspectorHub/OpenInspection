@@ -7,7 +7,7 @@ const brands = {
   platformBrand: { name: 'OpenInspection', logoUrl: null, primaryColor: '#4f46e5' },
 };
 function withOverrides(list: TemplateOverride[]) {
-  return new EmailTemplateRenderer({ ...brands, overrides: new Map(list.map(o => [o.trigger, o])) });
+  return new EmailTemplateRenderer({ ...brands, overrides: new Map(list.map(o => [o.trigger, o])), viewCountingEnabled: false });
 }
 
 describe('renderer override-merge', () => {
@@ -44,7 +44,7 @@ describe('renderer override-merge', () => {
     expect(out.html).toContain('&lt;script&gt;');
   });
   it('with no overrides map, renders defaults (Phase 2 behavior unchanged)', () => {
-    const r = new EmailTemplateRenderer(brands);
+    const r = new EmailTemplateRenderer({ ...brands, viewCountingEnabled: false });
     const out = r.render('report-ready', { address: 'A', reportUrl: 'u' });
     expect(out.enabled).toBe(true);
     expect(out.subject).toBe('Property Inspection Report: A');

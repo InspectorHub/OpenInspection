@@ -50,6 +50,21 @@ beforeEach(async () => {
     vi.spyOn(svc, 'ensureSeeds').mockResolvedValue();
 });
 
+/**
+ * Turn report-open counting ON for this workspace.
+ *
+ * `tenant_configs.is_report_view_counting_enabled` defaults to FALSE, and the
+ * delivery email's Art. 13 notice is rendered off that column — the notice is
+ * owed where opens are recorded and is a false statement where they are not. So
+ * a test about the notice has to state which kind of workspace it is about, and
+ * the fixture's SILENCE (no row at all) is the opted-out one.
+ */
+async function enableViewCounting() {
+    await db.insert(schema.tenantConfigs).values({
+        tenantId: TENANT, reportViewCountingEnabled: true, updatedAt: new Date(),
+    } as never);
+}
+
 async function seedInspection(id: string, over: Partial<typeof schema.inspections.$inferInsert> = {}) {
     await db.insert(schema.inspections).values({
         id, tenantId: TENANT, propertyAddress: '1 Main St',
@@ -358,6 +373,7 @@ describe('AutomationService.flush — report.published uses the RULE\'s template
 
     it('carries the Art. 13 report-view disclosure that tenant copy cannot reach (OI #271, condition 5)', async () => {
         const insp = 'insp-rule-tpl-disclosure';
+        await enableViewCounting();
         await seedInspection(insp);
         // A template whose body says nothing at all — the adversarial case for a
         // notice that is supposed to be unreachable from tenant copy.
@@ -381,6 +397,36 @@ describe('AutomationService.flush — report.published uses the RULE\'s template
         expect(html).toContain(REPORT_VIEW_DISCLOSURE.limit);
         expect(html).toContain(REPORT_VIEW_DISCLOSURE.exit);
         expect(html).toContain(`data-disclosure-version="${REPORT_VIEW_DISCLOSURE.version}"`);
+    });
+
+    it('makes no recording claim for a workspace that does not count opens', async () => {
+        // The mirror of the test above, and what makes it discriminating: the
+        // notice states as fact that opens are recorded, when, and how many
+        // times. Counting is opt-in and defaults off, so on this path the
+        // sentence described a measurement that was not taking place — in the one
+        // message the recipient has no way to check.
+        const insp = 'insp-rule-tpl-no-disclosure';
+        await seedInspection(insp);
+        const tpl = await seedTemplate({
+            id: 'tpl-empty-off', name: 'Report Ready — Email', subject: 'Ready', body: '<p>Your report.</p>',
+        });
+        const ruleId = await seedRule({
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
+            name: 'Report Ready', emailTemplateId: tpl,
+        });
+        await seedLog({ ruleId, inspectionId: insp, recipient: 'client@example.com', recipientRoleKey: 'client' });
+
+        const { reportDelivery } = makeReportDelivery();
+        const { emailFor, sendEmail } = makeEmailSvc();
+
+        await svc.flush(emailFor, 'Acme', 'https://acme.example.com', undefined, 50, undefined, undefined, reportDelivery);
+
+        const { REPORT_VIEW_DISCLOSURE } = await import('../../../server/lib/legal/report-view-disclosure');
+        const html = sendEmail.mock.calls[0][2] as string;
+        expect(html).not.toContain(REPORT_VIEW_DISCLOSURE.fact);
+        expect(html).not.toContain('data-disclosure-version');
+        // The report still goes out, with the tenant's own words and its link.
+        expect(html).toContain('Your report.');
     });
 
     it("labels the send with the rule's OWN notification class, so a mutable seed stays mutable", async () => {
