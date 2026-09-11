@@ -1,4 +1,4 @@
-import type { useFetcher } from "react-router";
+import { Link, type useFetcher } from "react-router";
 import { Modal } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
 import { m } from "~/paraglide/messages";
@@ -105,12 +105,27 @@ export function PublishReportModal({
         )}
         {/* No theme picker — rides the editor's effective default (server
             'modern'); the action sends theme:"modern" explicitly. */}
-        <ToggleRow
-          name="notifyClient"
-          label={isAmendment ? m.hub_publish_notify_client_amendment() : m.hub_publish_notify_client()}
-          defaultChecked
-        />
-        <ToggleRow name="notifyAgent" label={m.hub_publish_notify_agent()} defaultChecked={false} />
+
+        {/* F79 — this STATES who will be told, where two switches used to ask.
+            `notifyClient` / `notifyAgent` were posted, accepted, and read by
+            nothing: delivery is the workspace's `report.published` automation
+            rules' decision, and the publish audit row recorded the flag as given,
+            so a publish ticked "notify nobody" was written down as one that
+            notified nobody while every rule fired anyway.
+            Dropping the switches silently would leave the question they asked
+            unanswered, so the answer — and the address that decides it — is said
+            plainly instead. Sentence, not a disabled control: there is nothing
+            here to operate. */}
+        <p
+          data-testid="publish-notify-automation"
+          className="rounded-md border border-ih-border bg-ih-bg-muted px-3 py-2 text-[12px] text-ih-fg-2"
+        >
+          {m.hub_publish_notify_automation()}{" "}
+          <Link to="/settings/automations" className="font-bold text-ih-primary hover:underline">
+            {m.hub_publish_notify_automation_link()}
+          </Link>
+        </p>
+
         <ToggleRow
           name="requireSignature"
           label={m.hub_publish_require_signature()}

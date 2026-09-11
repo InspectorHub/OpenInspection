@@ -367,8 +367,6 @@ const publishRoutes = createApiRouter()
         // `recipients: X[] | undefined` against the service's optional param.
         const publishOptions: Parameters<typeof service.publishInspection>[2] = {
             theme: body.theme,
-            notifyClient: body.notifyClient,
-            notifyAgent: body.notifyAgent,
             requireSignature: body.requireSignature,
             requirePayment: body.requirePayment,
             sendAgreementCopy: body.sendAgreementCopy,
@@ -382,16 +380,18 @@ const publishRoutes = createApiRouter()
         // `return`: everything between is best-effort follow-on work, and the
         // PDF pipeline's slug/hash/footer lookups are awaited outside a try — a
         // throw there would drop the row for a publish that already happened.
-        // `notifyClient`/`notifyAgent` ride along because publishing and telling
-        // somebody are different events, and the publish that told nobody is the
-        // interesting one when a report never reaches a client.
+        // F79 — says WHAT was published, deliberately not WHO was told. It used to
+        // copy `notifyClient`/`notifyAgent` out of the body and nothing honoured
+        // them: `publishInspection` never read those options, and delivery is the
+        // workspace's `report.published` automation rules' decision. A publish
+        // marked "notify nobody" was therefore RECORDED as having notified nobody
+        // while every rule fired and the mail went out — the record stating the
+        // opposite of the event, in the artefact someone later reads to answer "who
+        // was told, and when". An always-guessed field is worse than an absent one;
+        // who was told is recorded in the automation logs and the delivery rows.
         auditFromContext(c, 'inspection.published', 'inspection', {
             entityId: id,
-            metadata: {
-                reportId: body.reportId,
-                notifyClient: body.notifyClient,
-                notifyAgent: body.notifyAgent,
-            },
+            metadata: { reportId: body.reportId },
         });
 
         // #23 — the courtesy translation, when the publisher asked for one on

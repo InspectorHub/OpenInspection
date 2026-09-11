@@ -268,16 +268,21 @@ const PublishRecipientSchema = z.object({
   channels:  z.array(z.enum(['email', 'text'])).default([]).describe('TODO describe channels field for the OpenInspection MCP integration'),
 }).openapi('PublishRecipient');
 
+// F79 — there are deliberately NO `notifyClient` / `notifyAgent` fields here.
+// They were accepted, defaulted to true, passed down, and read by nothing: who
+// receives a published report is decided by the workspace's `report.published`
+// automation rules. Having them on the wire is what let the publish audit row
+// state a notification decision the rules had already made differently. Zod
+// strips unknown keys, so a client still posting them is accepted and the flags
+// ignored — no 400, no contract break. Do not re-add them to give the UI
+// something to bind to; the UI now names the automation rules instead.
 export const PublishInspectionSchema = z.object({
   theme: z.enum(['modern', 'classic', 'minimal']).default('modern').describe('TODO describe theme field for the OpenInspection MCP integration'),
-  notifyClient: z.boolean().default(true).describe('TODO describe notifyClient field for the OpenInspection MCP integration'),
-  notifyAgent: z.boolean().default(true).describe('TODO describe notifyAgent field for the OpenInspection MCP integration'),
   requireSignature: z.boolean().default(false).describe('TODO describe requireSignature field for the OpenInspection MCP integration'),
   requirePayment: z.boolean().default(false).describe('TODO describe requirePayment field for the OpenInspection MCP integration'),
   // Round-2 F1 — multi-recipient publish modal payload. Optional because
   // legacy clients still post the flat shape above. When present, the
-  // server uses this list to drive per-recipient delivery (email + text)
-  // instead of the broad notifyClient/notifyAgent flags.
+  // server uses this list to drive per-recipient delivery (email + text).
   recipients: z.array(PublishRecipientSchema).optional().describe('TODO describe recipients field for the OpenInspection MCP integration'),
   // Whether the modal sent a copy of the agreement alongside the report.
   // Stored only for audit/notification fan-out — does not change how the

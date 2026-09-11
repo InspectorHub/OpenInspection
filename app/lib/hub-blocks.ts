@@ -12,7 +12,6 @@
  */
 
 import { isReportPublished, INSPECTION_STATUS } from '~/lib/status';
-import { ROLE_KIND } from '../../server/lib/people/role-kinds';
 import { formatCurrency } from '~/lib/format';
 import { m } from '~/paraglide/messages';
 // Type-only — erased at build, so the API's zod module never reaches the client
@@ -221,25 +220,16 @@ export function latestPublishedAt(versions: Array<{ publishedAt: number | null }
     return stamps.length ? Math.max(...stamps) : null;
 }
 
-/**
- * Who publishing actually emailed, read off the submitted publish form.
- *
- * The hub payload records that a report is published; it records nothing about
- * delivery. Publishing takes `notifyClient` / `notifyAgent` checkboxes, so the
- * form is the only place the answer exists — and 'none' is a real outcome, not an
- * error: an inspector may publish to have the link, and send it later.
+/*
+ * F79 — `publishNotified()` used to live here: it turned the publish form's
+ * `notifyClient` / `notifyAgent` checkboxes into "both | client | agent | none"
+ * for the post-publish banner. Both the helper and the switches are gone. The
+ * flags reached a service that never read them — delivery is decided by the
+ * workspace's `report.published` automation rules — so the answer it computed was
+ * a guess about somebody else's decision, and the banner printed it as fact.
+ * There is no replacement: this module sees the submitted form, and the form is
+ * not where that question is answered. Do not reintroduce one from the form.
  */
-export function publishNotified(flags: {
-    notifyClient?: boolean | undefined;
-    notifyAgent?: boolean | undefined;
-}): 'both' | (typeof ROLE_KIND)['CLIENT' | 'AGENT'] | 'none' {
-    const client = flags.notifyClient === true;
-    const agent = flags.notifyAgent === true;
-    if (client && agent) return 'both';
-    if (client) return ROLE_KIND.CLIENT;
-    if (agent) return ROLE_KIND.AGENT;
-    return 'none';
-}
 
 /**
  * The party an invoice is FROM.

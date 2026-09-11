@@ -10,7 +10,6 @@ import {
   formatCents,
   isReportShipped,
   latestPublishedAt,
-  publishNotified,
   type HubPayload,
 } from "~/lib/hub-blocks";
 import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
@@ -483,14 +482,10 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     // so a first publish rides the server default.
     const summary = String(formData.get("summary") ?? "").trim();
     const translateTo = String(formData.get("translateTo") ?? "").trim();
-    const notifyClient = formData.get("notifyClient") === "on";
-    const notifyAgent = formData.get("notifyAgent") === "on";
     const res = await api.inspections[":id"].publish.$post({
       param: { id },
       json: {
         theme: "modern",
-        notifyClient,
-        notifyAgent,
         requireSignature: formData.get("requireSignature") === "on",
         requirePayment: formData.get("requirePayment") === "on",
         ...(summary ? { summary } : {}),
@@ -499,12 +494,12 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         ...(translateTo ? { translateTo } : {}),
       },
     });
-    // Publishing succeeded silently: the modal closed and the card flipped to a
-    // sentence claiming the client had the report, whether or not anyone was
-    // emailed. The answer only exists in this form, so it travels back with the
-    // result rather than being guessed at on the client.
-    const published = await toActionResult(res, "publish", m.inspections_hub_error_publish());
-    return { ...published, notified: publishNotified({ notifyClient, notifyAgent }) };
+    // F79 — nothing about WHO was emailed travels back, because this form does
+    // not know. The publish modal's notify switches posted two flags the service
+    // never read; delivery is the workspace's `report.published` automation rules'
+    // decision. `PublishNotice` confirms the publish and names that authority,
+    // which is all either side can honestly say.
+    return await toActionResult(res, "publish", m.inspections_hub_error_publish());
   }
 
   if (intent === "submit") {
@@ -797,11 +792,11 @@ export default function InspectionHubPage() {
   // claiming a delivery nothing here records.
   const publishedAt = latestPublishedAt(versions);
 
-  // Post-publish confirmation: the action reports who it emailed, PublishNotice
-  // owns the dismissal.
-  const publishData = publishModal.fetcher.data;
-  const publishNotice =
-    publishModal.succeeded && publishData && "notified" in publishData ? publishData.notified : null;
+  // Post-publish confirmation. `succeeded` is already this intent's own success
+  // (`useModalFetcher` checks `data.intent === "publish" && data.ok`), so no
+  // payload field has to be probed to discriminate it. PublishNotice owns the
+  // dismissal.
+  const publishNotice = publishModal.succeeded;
 
   // `publish` is the user's permission; the report's own eligibility lives in
   // canPublish, which reportShipped above reads.
@@ -890,7 +885,7 @@ export default function InspectionHubPage() {
         }
       />
 
-      <PublishNotice notified={publishNotice} />
+      <PublishNotice show={publishNotice} />
 
       {/* Six blocks — responsive 2-col grid (1-col on mobile).
           `items-start`: grid rows stretch their items to equal height by

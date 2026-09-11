@@ -37,16 +37,18 @@ export interface PublishModalProps {
   * revision ever published from the editor recorded `null`, and the amendment
   * email's "what changed" line was blank by construction.
   *
-  * ── WHY THE NOTIFY FLAGS ARE NOT HERE ───────────────────────────────────────
-  * The same endpoint accepts `notifyClient` / `notifyAgent`, and a switch for
-  * them looks like the obvious companion to this field. They are deliberately
-  * absent: the publish service reads only the report id out of those options, so
-  * the flags change nothing about who is told — delivery is decided by the
-  * workspace's own report-published automation rules. Offering the switches would
-  * ship two controls that do nothing, and worse, the publish audit entry records
-  * the flag as given, so a publish marked "do not notify" would read as one that
-  * notified nobody while every rule fired as usual. The fix for that is the
-  * service, not this dialog.
+  * ── WHY THERE ARE NO NOTIFY FLAGS ───────────────────────────────────────────
+  * A "notify the client / the agent" switch looks like the obvious companion to
+  * this field, and this dialog never offered one. F79 settled the question for
+  * the whole product: the endpoint no longer accepts `notifyClient` /
+  * `notifyAgent` at all, the publish service no longer declares them, and the
+  * hub's publish modal — which did render them — lost them too. They changed
+  * nothing about who was told (delivery is decided by the workspace's own
+  * report-published automation rules) while the publish audit entry recorded the
+  * flag as given, so a publish marked "do not notify" read as one that notified
+  * nobody while every rule fired as usual. Do not add such a switch here: there
+  * is no longer a field on the wire for it to bind to, and adding one back would
+  * make this dialog a second authority over a decision the rules already own.
   */
  isAmendment: boolean;
  /** Whether to auto-sign the report on publish. */
