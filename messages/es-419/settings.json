@@ -162,8 +162,6 @@
   "settings_workspace_quick_phrases_preview_label": "Lo que verán sus clientes",
   "settings_workspace_quick_phrases_empty_warning": "Sin frases: los clientes no verán botones rápidos debajo del campo de nota.",
   "settings_workspace_report_features_heading": "Funciones del informe",
-  "settings_workspace_repair_list_title": "Mostrar la pestaña de lista de reparaciones",
-  "settings_workspace_repair_list_desc": "Muestra una pestaña de Lista de reparaciones resumida en el informe publicado del cliente.",
   "settings_workspace_repair_export_title": "Permitir que los clientes generen solicitudes de reparación",
   "settings_workspace_repair_export_desc": "Permite que los clientes, los agentes y los inspectores generen, a partir de un informe publicado, un anexo de solicitud de reparación que se puede compartir.",
   "settings_workspace_report_pdf_heading": "PDF del informe",

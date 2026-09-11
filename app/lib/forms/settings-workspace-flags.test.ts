@@ -4,8 +4,8 @@ import { parseWithZod } from '@conform-to/zod/v4';
 import { makeWorkspaceSchema } from '../../../app/lib/forms/settings.schema';
 
 /**
- * Regression: the "Report Features" checkboxes (enableRepairList /
- * enableCustomerRepairExport) are conform-native checkboxes — a SINGLE input with
+ * Regression: the "Report Features" checkbox (enableCustomerRepairExport) is a
+ * conform-native checkbox — a SINGLE input with
  * value "on" and NO hidden "false" sibling. A checked box submits one "on" value
  * that conform coerces to a boolean in submission.value; an unchecked box submits
  * nothing (→ undefined → treated as false in the action).

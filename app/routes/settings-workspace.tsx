@@ -49,7 +49,6 @@ interface Branding {
   logoUrl?: string | null;
   customReferralSources?: string[];
   repairQuickPhrases?: string[] | null;
-  enableRepairList?: boolean | null;
   enableCustomerRepairExport?: boolean | null;
   companyAddress?: string | null;
   pdfShowFooter?: boolean | null;
@@ -375,10 +374,7 @@ export default function SettingsWorkspacePage() {
           repairQuickPhrases={branding.repairQuickPhrases}
         />
 
-        <ReportFeaturesPanel
-          enableRepairList={branding.enableRepairList}
-          enableCustomerRepairExport={branding.enableCustomerRepairExport}
-        />
+        <ReportFeaturesPanel enableCustomerRepairExport={branding.enableCustomerRepairExport} />
 
         <ReportPdfPanel
           addressField={fields.companyAddress}
