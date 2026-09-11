@@ -318,6 +318,17 @@ export const PublishInspectionSchema = z.object({
 export const CreateReinspectionSchema = z.object({
   selectedItemIds: z.array(z.string().min(1)).min(1).describe('Item ids carried forward into the re-inspection (the still-open flagged items the inspector chose).'),
   inspectorId: z.string().optional().describe('Inspector assigned to the re-inspection; defaults to the baseline inspector.'),
+  // F47 — the day the round is filed on. A CIVIL DAY and deliberately not an
+  // instant: `inspections.date` carries the date and `scheduled_start_ms` stays
+  // NULL, so the calendar and the ICS feed fall back to business-hours start
+  // rather than publishing an hour nobody chose.
+  //
+  // Optional, because the dialog prefills today and the one-click path must keep
+  // working. Absent means "today for this company" — which the service can only
+  // answer for a workspace that has DECLARED a timezone, and refuses to guess at
+  // otherwise (see InspectionReinspectionService.companyToday).
+  scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'scheduledDate must be YYYY-MM-DD').optional()
+    .describe('Civil day (YYYY-MM-DD) the re-inspection is scheduled for. Absent means today in the company timezone, which requires one to have been declared.'),
 }).openapi('CreateReinspection');
 
 /**

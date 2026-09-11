@@ -11,7 +11,7 @@ import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import type { ScopedDB } from '../../lib/db/scoped';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
-import { epochMsToWallClockYmd, resolveTenantTimeZone } from '../../lib/tz';
+import { epochMsToWallClockYmd, requireDeclaredTenantTimeZone } from '../../lib/tz';
 import { InspectionSubService } from './base';
 
 /** Parse a report_versions.snapshotJson payload (snapshotOnPublish serialises
@@ -66,6 +66,46 @@ export class InspectionReinspectionService extends InspectionSubService {
     }
 
     /**
+     * "Today", for a company that did not say which day it wanted — and the
+     * refusal when nobody has said what "today" means either.
+     *
+     * WHICH TIMEZONE TIER THIS IS, and why it moved (F47).
+     *
+     * `resolveTenantTimeZone` is the DISPLAY tier: it cannot tell an undeclared
+     * workspace from one that genuinely runs on UTC, so it answers 'UTC' for
+     * both. That was tolerable while this value was only ever a fallback nobody
+     * could see or change — but it is not a display. It is written to
+     * `inspections.date`, which IS the appointment: the calendar draws it, the
+     * ICS feed publishes it, the report prints it, and the client is told it. A
+     * stored commitment gets the authoritative tier, so this reads
+     * `requireDeclaredTenantTimeZone` and refuses on null rather than guessing.
+     *
+     * Concretely, the guess was wrong, not merely imprecise: a US-west operator
+     * creating a round after 17:00 local got TOMORROW's date, silently, and then
+     * had to go and reschedule it.
+     *
+     * Refusing is affordable now and was not before. The create dialog carries a
+     * date field prefilled with the operator's own today, so a human never
+     * reaches this branch — they submit a day and none of this runs. What lands
+     * here is a caller that named neither a date nor a company timezone, and for
+     * that there is no answer to compute, only a coin to flip. A 400 naming both
+     * remedies beats a wrong date on someone's calendar.
+     */
+    private companyToday(
+        config: { defaultTimezone: string | null } | null,
+        now: Date,
+    ): string {
+        const zone = requireDeclaredTenantTimeZone(config?.defaultTimezone);
+        if (!zone) {
+            throw new Error(
+                'Cannot date this re-inspection: no company timezone has been set. ' +
+                'Choose a date for the re-inspection, or set the company timezone in Settings.',
+            );
+        }
+        return epochMsToWallClockYmd(now.getTime(), zone);
+    }
+
+    /**
      * #119 — Re-inspection. Creates a NEW draft inspection linked to a published
      * baseline (the original OR a prior re-inspection). Seeds inspection_results.data
      * for ONLY the selected items, each `{ original, followupStatus: null }`, where
@@ -74,11 +114,21 @@ export class InspectionReinspectionService extends InspectionSubService {
      * a re-inspection).
      *
      * GATE: the baseline must be published — i.e. have ≥1 report_versions row.
+     *
+     * `scheduledDate` (F47) is the civil day the round is filed on, as chosen by
+     * the operator in the create dialog. Omitted means "today for this company",
+     * which `companyToday` resolves — see its note for why that path now refuses
+     * rather than guessing.
      */
     async createReinspection(
         tenantId: string,
         baselineId: string,
-        opts: { selectedItemIds: string[]; inspectorId?: string | undefined },
+        opts: {
+            selectedItemIds: string[];
+            inspectorId?: string | undefined;
+            /** Civil day `YYYY-MM-DD`. Never an instant: the round carries a date, not an hour. */
+            scheduledDate?: string | undefined;
+        },
     ): Promise<CreatedReinspection> {
         const db = this.getDrizzle();
 
@@ -129,23 +179,20 @@ export class InspectionReinspectionService extends InspectionSubService {
         //
         // This used to write `createdAt.toISOString()`, so a round created at
         // 09:37 was scheduled, to the millisecond, at 09:37 — a precise
-        // appointment nobody made. The dialog has no date field (it offers item
-        // selection, Cancel and Create), so there is no chosen time to record,
-        // and inventing one makes every downstream consumer of an instant
-        // repeat it: the calendar places the card at that minute, and the .ics
-        // feed publishes it.
+        // appointment nobody made, and one that every downstream consumer of an
+        // instant then repeats: the calendar places the card at that minute, and
+        // the .ics feed publishes it.
         //
         // `inspections.date` holds two shapes on purpose — a civil day
         // (`YYYY-MM-DD`) and a full instant — and the day-only shape is the one
         // that says "this date, time not set". scheduled_start_ms is left NULL
         // for the same reason, which is what makes the calendar and the ICS feed
         // fall back to the tenant's default business-hours start instead of a
-        // millisecond. The day is read in the COMPANY's zone, because a
-        // re-inspection booked at 18:00 on the US west coast is not tomorrow.
-        const tzRow = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
-            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
-        const scheduledDay = epochMsToWallClockYmd(
-            createdAt.getTime(), resolveTenantTimeZone(tzRow?.defaultTimezone),
+        // millisecond.
+        const scheduledDay = opts.scheduledDate ?? this.companyToday(
+            await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+                .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get() ?? null,
+            createdAt,
         );
         // Quota is consumed only after every precondition check above (baseline
         // existence, published-baseline gate, inspector ownership) has passed

@@ -1,5 +1,6 @@
+import { useId } from "react";
 import type { useFetcher } from "react-router";
-import { Modal } from "@core/shared-ui";
+import { Input, Modal } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
 import type { ReinspectCandidate } from "~/lib/inspector-portal-helpers";
 import { m } from "~/paraglide/messages";
@@ -9,6 +10,24 @@ import { m } from "~/paraglide/messages";
 /* ------------------------------------------------------------------ */
 
 const FORM_ID = "ih-create-reinspection-form";
+
+/**
+ * Today as the OPERATOR's browser sees it, `YYYY-MM-DD`.
+ *
+ * Not `toISOString().slice(0, 10)`: that is the UTC day, which is already
+ * tomorrow for a US-west evening — the exact off-by-one this field exists to
+ * stop the server making (F47).
+ *
+ * Safe to compute during render even though the value changes with the clock:
+ * `Modal` returns null while closed, so this subtree is only ever created after
+ * the operator opens the dialog — client-side, post-hydration. There is no
+ * server render of it to mismatch against.
+ */
+function localToday(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 export function CreateReinspectionModal({
   open,
@@ -26,6 +45,7 @@ export function CreateReinspectionModal({
   onClose: () => void;
 }) {
   const hasCandidates = candidates.length > 0;
+  const dateId = useId();
   return (
     <Modal
       open={open}
@@ -53,6 +73,17 @@ export function CreateReinspectionModal({
     >
       <fetcher.Form id={FORM_ID} method="post" className="space-y-3">
         <input type="hidden" name="intent" value="create-reinspection" />
+        {/* F47 — the day the round is filed on. Outside the candidates branch on
+            purpose: an empty baseline is exactly when an operator is scheduling
+            by hand, so the field must not vanish with the checkbox list. */}
+        <Input
+          id={dateId}
+          type="date"
+          name="scheduledDate"
+          label={m.hub_reinspect_date_label()}
+          hint={m.hub_reinspect_date_hint()}
+          defaultValue={localToday()}
+        />
         {hasCandidates ? (
           <>
             <p className="text-[12px] text-ih-fg-3">

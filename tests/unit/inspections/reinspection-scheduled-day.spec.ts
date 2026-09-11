@@ -77,7 +77,7 @@ describe('createReinspection writes a company-zone DAY, not the creation instant
         sqlite.close();
     });
 
-    async function createAt(nowIso: string, companyZone?: string) {
+    async function createAt(nowIso: string, companyZone?: string, scheduledDate?: string) {
         if (companyZone !== undefined) {
             await testDb.insert(schema.tenantConfigs).values({
                 tenantId: TENANT, updatedAt: new Date(), defaultTimezone: companyZone,
@@ -90,6 +90,7 @@ describe('createReinspection writes a company-zone DAY, not the creation instant
         const svc = new InspectionService({} as D1Database, undefined, sdb);
         const out = await svc.createReinspection(TENANT, BASELINE, {
             selectedItemIds: ['item-a'], inspectorId: 'user-a',
+            ...(scheduledDate === undefined ? {} : { scheduledDate }),
         });
         const row = await testDb.select().from(schema.inspections)
             .where(eq(schema.inspections.id, out.id)).get();
@@ -139,12 +140,55 @@ describe('createReinspection writes a company-zone DAY, not the creation instant
         }
     });
 
-    it('still writes a day, not an instant, for a workspace with no config row', async () => {
-        // The undeclared case degrades to the UTC day — still a DAY. Refusing
-        // here would block a follow-up round over a settings omission, and
-        // unlike a booking nobody outside the company is told this hour.
-        const row = await createAt('2026-11-05T03:30:00.000Z');
-        expect(String(row.date)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-        expect(row.date).toBe('2026-11-05');
+    /**
+     * F47 — THE OPERATOR CAN NOW NAME THE DAY, WHICH CHANGES WHO ANSWERS.
+     *
+     * Everything above describes the DEFAULT: nobody said which day, so the
+     * service works one out. The dialog now carries a date field prefilled with
+     * the operator's own today, so the ordinary path supplies a day outright and
+     * no inference happens at all.
+     *
+     * That in turn retires the undeclared-timezone guess. This suite used to
+     * assert that a workspace with no config row "degrades to the UTC day",
+     * reasoning that refusing would block a follow-up round over a settings
+     * omission. That reasoning expired with this field: nobody is blocked any
+     * more, because the dialog always sends a day. What is left in the refusing
+     * branch is a caller that supplied neither a date nor a declared company
+     * timezone — which is not a question anything can answer, only guess at, and
+     * the guess is WRONG for every workspace west of Greenwich after ~17:00
+     * local. A silent wrong date on a scheduled appointment is worse than a 400.
+     */
+    describe('an explicitly chosen day', () => {
+        it('is stored verbatim, whatever the clock or the company zone says', async () => {
+            // 19:30 Pacific on the 4th — the "today" branch would have written
+            // 2026-11-04, and UTC would have written 2026-11-05. Neither wins.
+            const row = await createAt('2026-11-05T03:30:00.000Z', PACIFIC, '2026-12-01');
+            expect(row.date).toBe('2026-12-01');
+        });
+
+        it('needs no declared company timezone, because nothing is being inferred', async () => {
+            const row = await createAt('2026-11-05T03:30:00.000Z', undefined, '2026-12-01');
+            expect(row.date).toBe('2026-12-01');
+        });
+
+        it('still claims no time of day', async () => {
+            const row = await createAt('2026-11-05T03:30:00.000Z', PACIFIC, '2026-12-01');
+            expect(String(row.date)).not.toContain('T');
+            expect(row.scheduledStartMs).toBeNull();
+            expect(row.scheduledEndMs).toBeNull();
+        });
+    });
+
+    it('refuses to invent a day when no date was chosen and no company zone was declared', async () => {
+        await expect(createAt('2026-11-05T03:30:00.000Z')).rejects.toThrow(/timezone/i);
+    });
+
+    it('still defaults to the company day when the zone IS declared and no date was chosen', async () => {
+        // The positive control for the test above: the refusal must be about the
+        // UNDECLARED zone specifically, not about the absent date. Without this
+        // pair, a service that simply threw on every dateless call would look
+        // correct.
+        const row = await createAt('2026-11-05T03:30:00.000Z', PACIFIC);
+        expect(row.date).toBe('2026-11-04');
     });
 });

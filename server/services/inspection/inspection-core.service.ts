@@ -419,7 +419,7 @@ export class InspectionCoreService extends InspectionSubService {
     async createReinspection(
         tenantId: string,
         baselineId: string,
-        opts: { selectedItemIds: string[]; inspectorId?: string | undefined },
+        opts: Parameters<InspectionReinspectionService['createReinspection']>[2],
     ): Promise<CreatedReinspection> {
         return this.reinspection.createReinspection(tenantId, baselineId, opts);
     }

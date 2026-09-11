@@ -39,7 +39,7 @@ import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { publishCapFromMe, viewCommunicationCapFromMe } from "~/lib/inspector-portal-helpers";
 import { COURTESY_TRANSLATION_LOCALE } from "~/lib/courtesy-locale";
 import {
-  toActionResult,
+  toActionResult, reinspectionDay,
   handlePersonAdd,
   handlePersonRemove,
   handlePersonResetAccess,
@@ -552,7 +552,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     }
     const res = await api.inspections[":id"].reinspect.$post({
       param: { id },
-      json: { selectedItemIds },
+      json: { selectedItemIds, ...reinspectionDay(formData) },
     });
     if (!res.ok) {
       const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;

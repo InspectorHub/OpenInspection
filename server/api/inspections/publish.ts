@@ -485,10 +485,10 @@ const publishRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const body = c.req.valid('json');
         try {
-            const created = await c.var.services.inspection.createReinspection(tenantId, id, {
-                selectedItemIds: body.selectedItemIds,
-                inspectorId: body.inspectorId,
-            });
+            // The validated body IS the options object (selectedItemIds +
+            // optional inspectorId/scheduledDate); restating the fields here is
+            // how F47's scheduledDate could have been added and silently dropped.
+            const created = await c.var.services.inspection.createReinspection(tenantId, id, body);
             return c.json({ success: true, data: { id: created.id, reinspectionRound: created.reinspectionRound } }, 200);
         } catch (err) {
             return c.json({ success: false, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to create re-inspection' } }, 400);

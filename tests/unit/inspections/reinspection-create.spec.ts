@@ -16,6 +16,14 @@ const TENANT   = '00000000-0000-0000-0000-000000000099';
 const ORIGINAL = '11111111-1111-1111-1111-111111111111';
 const DRAFT    = '22222222-2222-2222-2222-222222222222';
 const CLIENT_CONTACT = '33333333-3333-3333-3333-333333333333';
+/**
+ * These specs are about LINKAGE (root/round/people/seeding), not about dates,
+ * so every call names the day outright. Since F47 a dateless create is only
+ * answerable for a workspace that has DECLARED a company timezone, and this
+ * fixture deliberately has no tenant_configs row — the date contract has its
+ * own suite in reinspection-scheduled-day.spec.ts.
+ */
+const DAY = '2026-06-02';
 
 async function seed(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.tenants).values({
@@ -96,7 +104,7 @@ describe('InspectionService.createReinspection (#119)', () => {
 
     it('creates a linked re-inspection seeding only the selected items', async () => {
         const out = await svc.createReinspection(TENANT, ORIGINAL, {
-            selectedItemIds: ['item-a'], inspectorId: 'user-a',
+            selectedItemIds: ['item-a'], inspectorId: 'user-a', scheduledDate: DAY,
         });
         expect(out.sourceInspectionId).toBe(ORIGINAL);
         expect(out.rootInspectionId).toBe(ORIGINAL);
@@ -114,7 +122,7 @@ describe('InspectionService.createReinspection (#119)', () => {
 
     it('CRITICAL (Task 7c) — carries the baseline client forward into inspection_people, so getInspection resolves it', async () => {
         const out = await svc.createReinspection(TENANT, ORIGINAL, {
-            selectedItemIds: ['item-a'], inspectorId: 'user-a',
+            selectedItemIds: ['item-a'], inspectorId: 'user-a', scheduledDate: DAY,
         });
 
         const people = await new PeopleService({ DB: {} as D1Database }).listPeople(TENANT, out.id);
@@ -129,9 +137,9 @@ describe('InspectionService.createReinspection (#119)', () => {
     });
 
     it('a second re-inspection based on the first keeps root + increments round', async () => {
-        const r1 = await svc.createReinspection(TENANT, ORIGINAL, { selectedItemIds: ['item-a'], inspectorId: 'user-a' });
+        const r1 = await svc.createReinspection(TENANT, ORIGINAL, { selectedItemIds: ['item-a'], inspectorId: 'user-a', scheduledDate: DAY });
         await reportVersionSvc.snapshotOnPublish(TENANT, r1.id, 'user-a');
-        const r2 = await svc.createReinspection(TENANT, r1.id, { selectedItemIds: ['item-a'], inspectorId: 'user-a' });
+        const r2 = await svc.createReinspection(TENANT, r1.id, { selectedItemIds: ['item-a'], inspectorId: 'user-a', scheduledDate: DAY });
         expect(r2.rootInspectionId).toBe(ORIGINAL);
         expect(r2.reinspectionRound).toBe(2);
     });
@@ -143,11 +151,11 @@ describe('InspectionService.createReinspection (#119)', () => {
     // and what is actually in `inspections.reinspection_round`. A default that
     // ever fires shows up here as 1 next to 3.
     it('a third round reports 3, and the returned round is exactly the persisted column', async () => {
-        const r1 = await svc.createReinspection(TENANT, ORIGINAL, { selectedItemIds: ['item-a'], inspectorId: 'user-a' });
+        const r1 = await svc.createReinspection(TENANT, ORIGINAL, { selectedItemIds: ['item-a'], inspectorId: 'user-a', scheduledDate: DAY });
         await reportVersionSvc.snapshotOnPublish(TENANT, r1.id, 'user-a');
-        const r2 = await svc.createReinspection(TENANT, r1.id, { selectedItemIds: ['item-a'], inspectorId: 'user-a' });
+        const r2 = await svc.createReinspection(TENANT, r1.id, { selectedItemIds: ['item-a'], inspectorId: 'user-a', scheduledDate: DAY });
         await reportVersionSvc.snapshotOnPublish(TENANT, r2.id, 'user-a');
-        const r3 = await svc.createReinspection(TENANT, r2.id, { selectedItemIds: ['item-a'], inspectorId: 'user-a' });
+        const r3 = await svc.createReinspection(TENANT, r2.id, { selectedItemIds: ['item-a'], inspectorId: 'user-a', scheduledDate: DAY });
 
         expect([r1.reinspectionRound, r2.reinspectionRound, r3.reinspectionRound]).toEqual([1, 2, 3]);
         expect(r3.rootInspectionId).toBe(ORIGINAL);
@@ -172,7 +180,7 @@ describe('InspectionService.createReinspection (#119)', () => {
 
     it('accepts a valid seeded tenant user as inspectorId', async () => {
         const out = await svc.createReinspection(TENANT, ORIGINAL, {
-            selectedItemIds: ['item-a'], inspectorId: 'user-a',
+            selectedItemIds: ['item-a'], inspectorId: 'user-a', scheduledDate: DAY,
         });
         expect(out.inspectorId).toBe('user-a');
     });
