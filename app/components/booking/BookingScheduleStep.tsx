@@ -184,6 +184,10 @@ export function ScheduleStep({
           <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.booking_field_inspection_date_label()}</span>
           <input
             type="date"
+            // IA-88 ⑥ — the native picker reads `lang` off the control, not off
+            // `<html>`. The echo below stays: it is the reading in the page's
+            // language, and it carries the weekday the control never shows.
+            lang="en"
             value={inspectionDate}
             // F42 — the picker itself refuses the past and the far future, so
             // the commonest two mistakes are not made rather than reported. It

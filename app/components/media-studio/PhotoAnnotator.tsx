@@ -10,7 +10,9 @@ import {
   type Point,
 } from "./annotations";
 import { AnnotationToolbar, type ToolId } from "./AnnotationToolbar";
+import { AnnotatorPlaceholder } from "./AnnotatorPlaceholder";
 import { MeasureCalibration } from "./MeasureCalibration";
+import { usePhotoSource } from "./usePhotoSource";
 import { m } from "~/paraglide/messages";
 
 const STROKE = 4; // logical px (natural-resolution); divided by scale when rendered
@@ -56,10 +58,12 @@ export function PhotoAnnotator({
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [caption, setCaption] = useState(sectionName || "");
 
-  // The loaded source image at natural resolution + the fit scale (natural -> display).
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
-  const [natural, setNatural] = useState<{ w: number; h: number }>({ w: 600, h: 400 });
-  const [fitScale, setFitScale] = useState(1);
+  // The source photo at natural resolution + the fit scale (natural -> display),
+  // and — N6 — whether the request for it came back a failure.
+  const { image, natural, fitScale, failed: loadFailed, retry: retryLoad } = usePhotoSource(
+    photoUrl,
+    open && mounted,
+  );
 
   // Two-click arrow / measure state (in natural px).
   const [arrowStart, setArrowStart] = useState<Point | null>(null);
@@ -118,32 +122,6 @@ export function PhotoAnnotator({
     setCalibKnown("");
     setCalibUnit(doc.calibration?.calibUnit ?? "in");
   }, [open, sectionName, initialAnnotationsJson]);
-
-  /* -------------------------------------------------------------- */
-  /* Load the source image at natural resolution + compute fit       */
-  /* -------------------------------------------------------------- */
-  useEffect(() => {
-    if (!open || !mounted) return;
-    if (!photoUrl) {
-      setImage(null);
-      setNatural({ w: 600, h: 400 });
-      setFitScale(1);
-      return;
-    }
-    const img = new window.Image();
-    img.crossOrigin = "anonymous"; // allow toBlob export of cross-origin photos
-    img.onload = () => {
-      const w = img.naturalWidth || 600;
-      const h = img.naturalHeight || 400;
-      const maxW = window.innerWidth * 0.9;
-      const maxH = window.innerHeight * 0.7;
-      const fit = Math.min(maxW / w, maxH / h, 1);
-      setImage(img);
-      setNatural({ w, h });
-      setFitScale(fit);
-    };
-    img.src = photoUrl;
-  }, [open, mounted, photoUrl]);
 
   /* -------------------------------------------------------------- */
   /* Focus label input when it appears                               */
@@ -597,21 +575,7 @@ export function PhotoAnnotator({
               )}
             </div>
           ) : (
-            <div
-              className="w-[600px] h-[400px] rounded-lg flex items-center justify-center"
-              style={{
-                background: "linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.15) 100%)",
-                border: "1px solid rgba(255,255,255,0.06)",
-              }}
-            >
-              <div className="text-center text-white/40">
-                <svg className="w-12 h-12 mx-auto mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z" />
-                </svg>
-                <p className="text-[13px]">{m.media_annotate_empty_title()}</p>
-                <p className="text-[11px] mt-1">{m.media_annotate_empty_subtitle()}</p>
-              </div>
-            </div>
+            <AnnotatorPlaceholder photoUrl={photoUrl} failed={loadFailed} onRetry={retryLoad} />
           )}
         </div>
 

@@ -105,8 +105,11 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                     return (
                         <div key={key} className="col-span-6 md:col-span-3">
                             <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-3 mb-0.5">{attr.name}</label>
+                            {/* IA-88 ⑥ — see FiltersDrawer: the native picker
+                                reads `lang` off the control, not off `<html>`. */}
                             <input
                                 type="date"
+                                lang="en"
                                 value={typeof v === 'string' ? v : ''}
                                 onChange={e => onChange(itemId, attr.id, e.target.value || null)}
                                 className="w-full px-2 py-1 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
