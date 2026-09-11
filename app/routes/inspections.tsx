@@ -195,7 +195,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     // never reaches the created record.
     const idempotencyKey = String(formData.get(IDEMPOTENCY_FIELD) || "").trim();
     const res = await api.inspections.index.$post(
-      { json: buildCreateInspectionJson(formData) as Parameters<typeof api.inspections.index.$post>[0]["json"] },
+      { json: buildCreateInspectionJson(formData) },
       idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : undefined,
     );
     if (res.ok) {

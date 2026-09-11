@@ -41,6 +41,8 @@ interface ServiceSelection {
 
 import { civilToInstantISO } from "./civil-time";
 
+import type { InspectionPropertyType } from '../../server/lib/inspection-property-type';
+
 export interface CreateInspectionJson {
   propertyAddress: string;
   templateId: string;
@@ -50,15 +52,20 @@ export interface CreateInspectionJson {
    * comes back as a 400 the wizard shows rather than being dropped here, which
    * is how this field spent its whole life being silently discarded.
    *
-   * ⚠️ `string`, and NOT the narrow enum union, on purpose. The typed client
-   * derives that union from the server's zod schema, so the call site in
-   * `app/routes/inspections.tsx` carries a localized assertion to bridge the two
-   * (the same shape as the TODO(C-10) assertion already in that file). Narrowing
-   * the field here instead would make the BFF drop a bad value silently — which
-   * is the defect, not the fix. The enforcement point is the schema, and it is
-   * supposed to be reached.
+   * ⚠️ Declared as the narrow union so the typed client accepts it, but the
+   * VALUE is asserted rather than validated — see the single read site below,
+   * where the reason sits with the cast. Do not "tighten" this by rejecting an
+   * unknown slug here: dropping a bad value in the BFF is the defect this field
+   * is being fixed for.
+   *
+   * The assertion is kept next to the form read rather than at the client call,
+   * and that placement is load-bearing for a reason worth recording: a cast at
+   * the call site had to name the client method a second time, and the
+   * middleware-budget gate counts those names as API fan-out. It read as a new
+   * call that was not one. ⚠️ Naming the method in THIS comment does it too —
+   * a content gate cannot tell prose from code, so describe it, do not spell it.
    */
-  propertyType?: string;
+  propertyType?: InspectionPropertyType;
   // #198 — structured, geocoded address from Places autocomplete. All optional;
   // omitted for hand-typed free-form addresses. The server stamps
   // addressGeocodedAt when addressPlaceId is present.
@@ -178,7 +185,13 @@ export function buildCreateInspectionJson(formData: FormData): CreateInspectionJ
   return {
     propertyAddress: address,
     templateId,
-    ...(propertyType ? { propertyType } : {}),
+    // The assertion is HERE, next to the reason, and it is deliberate. The value
+    // is forwarded as the raw slug the wizard posted so an unrecognised one
+    // REACHES the API and comes back as a 400 the wizard shows. Narrowing it for
+    // real would make this whitelist drop a bad value silently, which is the
+    // defect this field is being fixed for, not the fix. The enforcement point is
+    // the server's zod schema, and it is supposed to be reached.
+    ...(propertyType ? { propertyType: propertyType as InspectionPropertyType } : {}),
     ...(addressPlaceId ? { addressPlaceId } : {}),
     ...(addressStreet ? { addressStreet } : {}),
     ...(addressCity ? { addressCity } : {}),
