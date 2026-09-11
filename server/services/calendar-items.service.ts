@@ -97,6 +97,45 @@ function timedIso(date: string, time: string, tz: string): string {
 }
 
 /**
+ * The civil day and wall-clock start that an `inspections.date` value carries.
+ *
+ * That column is TEXT and three shapes are in circulation, all of them written
+ * by code that is still live:
+ *
+ *   `2026-09-10`                 a day and nothing else
+ *   `2026-09-10T09:00`           PATCH /inspections/:id/schedule — `${civilDate}T${hm}`,
+ *                                where `hm` is already the TENANT wall clock
+ *   `YYYY-MM-DDTHH:MM:SS.sssZ`   every create path — `scheduledAt.toISOString()`
+ *                                (booking fulfilment, multi-service requests)
+ *
+ * This feed used to copy `row.date` straight into `civilDate` and hardcode
+ * `allDay: true`. Both are wrong for the last two shapes, and each one broke a
+ * different surface without raising anything:
+ *
+ *   - the calendar grids key their cells with `civilDateOf()` = `YYYY-MM-DD`, so
+ *     a `civilDate` carrying the full timestamp matched no cell. A tenant whose
+ *     inspections all carry a time saw an entirely blank month while the very
+ *     same rows sat in the page's own loader payload.
+ *   - the dispatch board places a card only when the item has a `startTime`, so
+ *     every timed inspection fell into the all-day strip and the 7am–7pm grid
+ *     stayed empty — while the ICS feed, reading the SAME column at
+ *     `slice(11, 16)` (see `ics.service.window`), published the right hour.
+ *
+ * The time is read by STRING SLICE, never by parsing the value as an instant.
+ * That is the interpretation `ics.service` and the booking busy checks already
+ * apply to this column, so the three consumers agree on one answer; and a slice
+ * has no timezone in it, so it cannot shift a civil day the way UTC bucketing
+ * does. An unparseable suffix yields no time rather than a guessed hour.
+ */
+export function inspectionWallClock(rawDate: string): { civilDate: string; startTime: string | null } {
+    const hm = rawDate.slice(11, 16);
+    return {
+        civilDate: rawDate.slice(0, 10),
+        startTime: /^\d{2}:\d{2}$/.test(hm) ? hm : null,
+    };
+}
+
+/**
  * Virtual company-holiday calendar items whenever holiday_region is set and
  * the civil date is in the resolved catalog (independent of public policy).
  */
@@ -191,14 +230,21 @@ export async function listCalendarItems(
     for (const row of inspectionRows) {
         if (inspectionItems.has(row.id)) continue;
         const userId = row.assignedUserId ?? row.inspectorId;
+        // `inspections.date` is not a civil date — see `inspectionWallClock`. The
+        // raw column value is a cell key no grid asks for, and discarding its
+        // time suffix is what emptied the dispatch time axis.
+        const { civilDate: day, startTime } = inspectionWallClock(row.date);
+        const allDay = startTime === null;
+        const instant = allDay ? day : timedIso(day, startTime, effectiveTz);
         inspectionItems.set(row.id, {
             id: row.id,
             kind: 'inspection',
             title: row.propertyAddress,
-            start: row.date,
-            end: row.date,
-            civilDate: row.date,
-            allDay: true,
+            start: instant,
+            end: instant,
+            civilDate: day,
+            ...(allDay ? {} : { startTime }),
+            allDay,
             inspectionId: row.id,
             ...(userId ? { userId } : {}),
             meta: { status: row.status },

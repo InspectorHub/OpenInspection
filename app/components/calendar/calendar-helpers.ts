@@ -161,6 +161,25 @@ export function blockFormSeed(block: CalendarEvent | null, dateSeed: string | nu
   };
 }
 
+/** Whether this item belongs in the all-day strip rather than on the time axis.
+ *  The server decides: `allDay` travels in `extendedProps` straight from the
+ *  feed. Views must not infer it from a missing time — an inspection whose
+ *  `startTime` the feed forgot to resolve is a BUG to be seen, not an all-day
+ *  appointment. */
+export function isAllDayEvent(ev: CalendarEvent): boolean {
+  return ev.extendedProps?.allDay === true;
+}
+
+/** Hour (0-23) a timed event starts at, read off its effective-tz wall clock.
+ *
+ *  NaN when there is no usable `startTime`, and that is deliberate: hour rows
+ *  match on `eventStartHour(ev) === h`, so NaN matches no row. Returning 0
+ *  instead would park an unresolved event at midnight, which looks like a
+ *  scheduling answer rather than a missing one. */
+export function eventStartHour(ev: CalendarEvent): number {
+  return ev.startTime ? parseInt(ev.startTime.slice(0, 2), 10) : NaN;
+}
+
 /** Groups events by their server-provided `civilDate`. Views look cells up by
  *  the same civil string (see `civilDateOf`) — no Date/UTC math on either side. */
 export function bucketEventsByCivilDate(events: CalendarEvent[]): Map<string, CalendarEvent[]> {

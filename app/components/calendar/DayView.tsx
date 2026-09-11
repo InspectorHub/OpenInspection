@@ -1,4 +1,11 @@
-import { civilDateOf, eventColor, isEventDraggable, type CalendarEvent } from "~/components/calendar/calendar-helpers";
+import {
+  civilDateOf,
+  eventColor,
+  eventStartHour,
+  isAllDayEvent,
+  isEventDraggable,
+  type CalendarEvent,
+} from "~/components/calendar/calendar-helpers";
 import { m } from "~/paraglide/messages";
 
 export function DayView({
@@ -17,7 +24,7 @@ export function DayView({
   handleEventClick: (ev: CalendarEvent) => void;
 }) {
   const dateStr = civilDateOf(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-  const allDayEvents = getEventsForDate(dateStr).filter((ev) => ev.extendedProps?.allDay === true);
+  const allDayEvents = getEventsForDate(dateStr).filter(isAllDayEvent);
   return (
     <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
           <div className="flex min-h-[48px] border-b border-ih-border">
@@ -41,10 +48,9 @@ export function DayView({
           </div>
           <div className="max-h-[600px] overflow-y-auto">
             {hours.map((h) => {
-              const dayEvents = getEventsForDate(dateStr).filter((ev) => {
-                if (ev.extendedProps?.allDay === true) return false;
-                return ev.startTime ? parseInt(ev.startTime.slice(0, 2), 10) === h : false;
-              });
+              const dayEvents = getEventsForDate(dateStr).filter(
+                (ev) => !isAllDayEvent(ev) && eventStartHour(ev) === h,
+              );
               return (
                 <div key={h} className="flex border-b border-ih-border min-h-[56px]">
                   <div className="w-16 text-[11px] font-bold text-ih-fg-3 text-right pr-3 pt-2 shrink-0">

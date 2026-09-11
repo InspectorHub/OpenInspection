@@ -157,6 +157,57 @@ export function bucketColumn(items: DispatchItem[], inspectorId: string): Column
   return { timed, untimed };
 }
 
+/* ------------------------------------------------------------------ */
+/*  All-day strip geometry                                             */
+/* ------------------------------------------------------------------ */
+
+/** One strip entry: `px-2 py-0.5 text-[11px]` measured at ~20.5px in Chrome. */
+const ALL_DAY_ENTRY_PX = 21;
+/** `space-y-1` between entries. */
+const ALL_DAY_GAP_PX = 4;
+/** The strip's own `p-1`, top and bottom. */
+const ALL_DAY_PADDING_PX = 8;
+/** The original fixed `h-10`, kept as the FLOOR so an empty board looks the same. */
+export const ALL_DAY_MIN_PX = 40;
+/** Beyond this the strip scrolls instead of growing — a strip taller than the
+ *  axis turns a time board into a list. */
+export const ALL_DAY_MAX_ENTRIES = 5;
+
+/**
+ * Height of the all-day strip for a column holding `maxEntries` untimed items.
+ *
+ * The strip was a fixed `h-10`. Measured in Chrome with TWO entries: height 40,
+ * scrollHeight 53 — already 13px over, so the second job of the day was behind a
+ * scroll on a board whose entire purpose is to show a day at once.
+ *
+ * This is arithmetic over a count rather than `h-auto` because the height must be
+ * ONE number shared by the hour gutter and every column. Each of those is an
+ * independent vertical stack (heading, strip, axis), so a strip that sizes itself
+ * per column leaves the busier column's axis an all-day row lower than its
+ * neighbour's — and then every card in it reads an hour off, which is a worse
+ * failure than clipping. Hence `maxUntimedCount` across the whole roster.
+ */
+export function allDayStripPx(maxEntries: number): number {
+  const shown = Math.min(Math.max(maxEntries, 0), ALL_DAY_MAX_ENTRIES);
+  if (shown === 0) return ALL_DAY_MIN_PX;
+  const content =
+    ALL_DAY_PADDING_PX + shown * ALL_DAY_ENTRY_PX + (shown - 1) * ALL_DAY_GAP_PX;
+  return Math.max(ALL_DAY_MIN_PX, content);
+}
+
+/** The busiest column's untimed count — the number the shared strip sizes on. */
+export function maxUntimedCount(
+  items: DispatchItem[],
+  inspectors: DispatchInspector[],
+): number {
+  let max = 0;
+  for (const inspector of inspectors) {
+    const count = bucketColumn(items, inspector.id).untimed.length;
+    if (count > max) max = count;
+  }
+  return max;
+}
+
 /** Design-system tone per item kind, mirroring the calendar's `eventColor`. */
 export function cardTone(kind: string): string {
   if (kind === "calendar_block") return "bg-ih-fg-3 text-ih-fg-inverse";

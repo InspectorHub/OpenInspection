@@ -1,10 +1,13 @@
-import { civilDateOf, eventColor, isEventDraggable, isSameDay, type CalendarEvent } from "~/components/calendar/calendar-helpers";
+import {
+  civilDateOf,
+  eventColor,
+  eventStartHour,
+  isAllDayEvent,
+  isEventDraggable,
+  isSameDay,
+  type CalendarEvent,
+} from "~/components/calendar/calendar-helpers";
 import { m } from "~/paraglide/messages";
-
-/** Hour (0-23) a timed event starts at, from its effective-tz wall clock. */
-function eventStartHour(ev: CalendarEvent): number {
-  return ev.startTime ? parseInt(ev.startTime.slice(0, 2), 10) : NaN;
-}
 
 export function WeekView({
   weekDays,
@@ -45,7 +48,7 @@ export function WeekView({
             <div className="text-[10px] font-bold text-ih-fg-3 text-right pr-2 pt-2">{m.calendar_all_day()}</div>
             {weekDays.map((d) => {
               const dateStr = civilDateOf(d.getFullYear(), d.getMonth(), d.getDate());
-              const allDayEvents = getEventsForDate(dateStr).filter((ev) => ev.extendedProps?.allDay === true);
+              const allDayEvents = getEventsForDate(dateStr).filter(isAllDayEvent);
               return (
                 <div
                   key={`all-day-${civilDateOf(d.getFullYear(), d.getMonth(), d.getDate())}`}
@@ -76,10 +79,9 @@ export function WeekView({
                 </div>
                 {weekDays.map((d) => {
                   const dateStr = civilDateOf(d.getFullYear(), d.getMonth(), d.getDate());
-                  const dayEvents = getEventsForDate(dateStr).filter((ev) => {
-                    if (ev.extendedProps?.allDay === true) return false;
-                    return eventStartHour(ev) === h;
-                  });
+                  const dayEvents = getEventsForDate(dateStr).filter(
+                    (ev) => !isAllDayEvent(ev) && eventStartHour(ev) === h,
+                  );
                   return (
                     <div
                       key={dateStr + h}
