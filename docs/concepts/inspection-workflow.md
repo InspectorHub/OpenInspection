@@ -33,6 +33,8 @@ Form structure as JSON in the `schema` column. Each tenant has one or more templ
 
 Schema is validated by `server/lib/validations/template.schema.ts` (single canonical v2 format).
 
+`items` is a flat, ordered array even when the form it represents is nested: an item nests by naming another item in the same section as its `parentId`, and the array stays in pre-order. Before adding a field to an item, or writing anything that walks `section.items`, read [`template-item-hierarchy.md`](template-item-hierarchy.md) — both have a failure mode that prints less rather than throwing.
+
 ### `inspection_results`
 
 Inspector's field responses as JSON in `data`. One row per inspection.

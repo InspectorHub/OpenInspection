@@ -71,7 +71,7 @@ conventions common to all of them: [`integrations/README.md`](integrations/READM
 | Doc | Topic |
 |---|---|
 | [`develop/setup.md`](develop/setup.md) | Run it locally, the command table, how to add a page or an endpoint |
-| [`develop/architecture.md`](develop/architecture.md) | Single-worker architecture, request flow, module map, cost model |
+| [`develop/architecture.md`](develop/architecture.md) | Single-worker architecture, request flow, module map, the shared mode-aware editor surfaces, cost model |
 | [`develop/testing.md`](develop/testing.md) | Five suites, where a spec lives, how to run each one |
 | [`develop/gates.md`](develop/gates.md) | The conformance gates — the registry, the two rungs, and the conventions a new gate has to meet |
 | [`develop/integration-adapters.md`](develop/integration-adapters.md) | Writing code that talks to somebody else's API — shape, credentials, failure recording, contract tests |
@@ -105,6 +105,7 @@ Why things are built the way they are. Read these when the reference told you
 | Doc | Topic |
 |---|---|
 | [`concepts/inspection-workflow.md`](concepts/inspection-workflow.md) | Template-driven JSON schema, results, versioned report snapshots |
+| [`concepts/template-item-hierarchy.md`](concepts/template-item-hierarchy.md) | Nesting template items with a parent pointer — why not a nested array, the depth cap, and the seven places that decide an item's keys |
 | [`concepts/commercial-pca-report.md`](concepts/commercial-pca-report.md) | The two commercial tiers, the ASTM vocabulary, and why the reserve schedule is opt-in |
 | [`concepts/collab-editing.md`](concepts/collab-editing.md) | Yjs CRDT in a Durable Object; what happens when the binding is absent |
 | [`concepts/kv-cache.md`](concepts/kv-cache.md) | What `TENANT_CACHE` holds and when it is invalidated |
