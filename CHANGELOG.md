@@ -7,6 +7,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.0.0...openinspection-v2.1.0) (2026-09-12)
+
+
+### Features
+
+* **agent-terms:** gate the clauses, and tell operators the portal needs publishing ([216f548](https://github.com/InspectorHub/OpenInspection/commit/216f5489aa1cd0e5066734327409ed266ba9845b))
+* **audit:** emit inspection.published, so the delivery funnel is observable ([7a5bd38](https://github.com/InspectorHub/OpenInspection/commit/7a5bd381db4de1ccb2f93feb23eafcca931b01c8))
+* enhance InspectionDocDO to support reportId and add purge endpoint for orphaned documents ([3707e0f](https://github.com/InspectorHub/OpenInspection/commit/3707e0f16caa65bba8d7edafa2ba0449ec84b9fd))
+* **gates:** enforce the rule the i18n sweep declared done and never guarded ([e9f4b6b](https://github.com/InspectorHub/OpenInspection/commit/e9f4b6b70aea87d56b6bab7e30df1f2e7110bd08))
+
+
+### Bug Fixes
+
+* **agent:** refuse non-agents at the portal, and say who is signed in ([bb518f3](https://github.com/InspectorHub/OpenInspection/commit/bb518f3969087d9dfd9ba44c74c34b57fd71af6a))
+* **booking:** say the booking page is closed before offering it to share ([8c280d6](https://github.com/InspectorHub/OpenInspection/commit/8c280d6f672b64a88fcc156441135786dde06be2))
+* **booking:** stop the address list covering the button, and say what the client ([ded8d2b](https://github.com/InspectorHub/OpenInspection/commit/ded8d2bc092098463c06b0b20417f3c9d339f2e5))
+* **calendar:** one predicate was hiding every inspection and flattening every time ([1acd80e](https://github.com/InspectorHub/OpenInspection/commit/1acd80e8ee492860c45cafa5e193d621594dcc1b))
+* **calendar:** wrap the nav row, and clear the last contrast exemption ([078fc53](https://github.com/InspectorHub/OpenInspection/commit/078fc53626c5b6f0192b6f75004bd33e502564c8))
+* **collab:** persist report identity and purge orphaned inspection documents ([541eab3](https://github.com/InspectorHub/OpenInspection/commit/541eab3b1deb3a8c1efcffa7f19a4a0dec51c500))
+* **collab:** stop the document DO treating a storage read-back as an edit ([b91c4db](https://github.com/InspectorHub/OpenInspection/commit/b91c4db88cca872c14a7e0405eca895de7ebd3f4))
+* **contacts:** stop double-counting revenue, and make the palette's actions real ([d5ba166](https://github.com/InspectorHub/OpenInspection/commit/d5ba166b68f1b33f9177de318b827daf1b3e5906))
+* **ds:** declare --ih-primary-fg, and close the four silences that hid it ([5e36d52](https://github.com/InspectorHub/OpenInspection/commit/5e36d526c6cf9942e5d0b6d2907320f070b7e593))
+* **e2e:** promote 375px into VIEWPORTS, and update the agent-login link-form locator ([56ca37e](https://github.com/InspectorHub/OpenInspection/commit/56ca37e151c38d7428bef70a7a120eee97f00133))
+* **e2e:** wait for lightbox to mount before counting pending placeholders ([354c834](https://github.com/InspectorHub/OpenInspection/commit/354c834f431ce88d60512e8b9683d58dc9d1d92c))
+* **editor:** say what publishing does, give the empty pane a first action, and ([9ea7eea](https://github.com/InspectorHub/OpenInspection/commit/9ea7eeaa3f427d8491c8e39dc5480e7d7a7939dc))
+* **gates:** clear the four CI-tier gates the last four changes tripped ([0416a1d](https://github.com/InspectorHub/OpenInspection/commit/0416a1d7fc7bcb28523c45a4a6a409ba1baf8879))
+* **inspections:** give property_type a write path, at intake and afterwards ([78ec21e](https://github.com/InspectorHub/OpenInspection/commit/78ec21e6d03f84fbfbf688cadfc25add21d4f3a1))
+* **inspections:** say what the money is, what the photos are, and what an empty ([2f68158](https://github.com/InspectorHub/OpenInspection/commit/2f6815837aaa542ef6ed08ed1c2410d16f3667e0))
+* **intake:** read inlineStr cells, which looked exactly like an empty sheet ([6c3cfd0](https://github.com/InspectorHub/OpenInspection/commit/6c3cfd081466aa25e7531197144655e4bb1ca0c6))
+* **library:** print the statutory form's own letters once, and give the ([c72ed34](https://github.com/InspectorHub/OpenInspection/commit/c72ed344827787a9dd9142f58e2ab376063af408))
+* **mcp:** offer S256 only — plain PKCE was being advertised and accepted ([ec1562d](https://github.com/InspectorHub/OpenInspection/commit/ec1562dede88b999e16d5de8bb12361db20cbf78))
+* **media:** tell a failed photo load apart from an empty one, and from a choice ([0b2f349](https://github.com/InspectorHub/OpenInspection/commit/0b2f349ca4010d48900573c98d67f613fc37900e))
+* **metrics:** name the months, count in the singular, and let a name input be as ([753cbf1](https://github.com/InspectorHub/OpenInspection/commit/753cbf1d0f831493b4d83797c4a3365f12b0ef6d))
+* **notices:** read a date to a person, and stop showing filter chips to a list of four ([41e1adb](https://github.com/InspectorHub/OpenInspection/commit/41e1adb223d62ce8222242a44e387700e0f12d07))
+* **openapi:** bound the cost of GET /doc with a limiter and a cache header ([99e92f6](https://github.com/InspectorHub/OpenInspection/commit/99e92f62e33a7077d46a299c21d2c0bf42086ce8))
+* **portal:** stop the client Hub claiming gates and bills that do not exist ([057c46e](https://github.com/InspectorHub/OpenInspection/commit/057c46e7e5e645657f8ad568aac46a90da2b8733))
+* **publish:** stop recording who was notified, since nothing read the answer ([6fb1ba2](https://github.com/InspectorHub/OpenInspection/commit/6fb1ba2b9ba4ef952cc826c8987e276fc9a57636))
+* **reinspections:** let the operator pick the date, and refuse rather than guess it ([b3d4ef0](https://github.com/InspectorHub/OpenInspection/commit/b3d4ef03dfa1d98cd7dc3a54612c04f49ed1edde))
+* **repair:** stop storing and showing a live share credential, and label a role ([363e300](https://github.com/InspectorHub/OpenInspection/commit/363e300fd8513f4e7250e20823689099a4d202a4))
+* **reports:** enforce the agreement and payment hold where the report is served ([f2ad257](https://github.com/InspectorHub/OpenInspection/commit/f2ad257059861c67594853aebe42ea5d215174f7))
+* **reports:** gate the fifth door onto report content, which I said I had counted ([a1541b7](https://github.com/InspectorHub/OpenInspection/commit/a1541b7ff15381f2398e2ed446b6f134f840c497))
+* **reports:** mark an item the inspector never answered, and stop the delivery ([ab98e4e](https://github.com/InspectorHub/OpenInspection/commit/ab98e4ec47a5838ae4a770ebd88aef955f82d718))
+* **reports:** name the company in a sent report, not its URL slug ([efc96e9](https://github.com/InspectorHub/OpenInspection/commit/efc96e9fed0fbf40d9680c019617360c309584af))
+* **retention:** enforce the declared window, and let a translation die with its report ([09541da](https://github.com/InspectorHub/OpenInspection/commit/09541da737b46fb3f91a7447ba72dbea0d9e07a6))
+* **settings:** retire the repair-list switch, which gated nothing ([91246c5](https://github.com/InspectorHub/OpenInspection/commit/91246c5ee6ba517e449091bdd795ac06cb628e5a))
+* **ui:** keep page headers inside a phone screen, and stop billing telling a ([e4a0ef3](https://github.com/InspectorHub/OpenInspection/commit/e4a0ef3dcc3fbe93b54acd51f211d2846d57e986))
+* **wizard:** say how the template and the services relate, and name the setup step that leaves the agent portal dead ([b786dc6](https://github.com/InspectorHub/OpenInspection/commit/b786dc6f140f404ff8b238f54ba2a203db49cd5a))
+
+
+### Performance Improvements
+
+* **docs:** let the edge hold /ui, which renders the same bytes for everyone ([377056b](https://github.com/InspectorHub/OpenInspection/commit/377056b4a71b186a5692452397fdaee440f54a83))
+
 ## [2.0.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v1.0.0...openinspection-v2.0.0) (2026-09-09)
 
 ### ⚠ BREAKING CHANGES
