@@ -189,6 +189,8 @@ function projectionsEqual(a: ResultsProjection, b: ResultsProjection): boolean {
 interface PersistedIdentity {
     tenantId:     string;
     inspectionId: string;
+    /** Optional for identities written before report-grained documents shipped. */
+    reportId?:    string | null;
 }
 
 /**
@@ -332,10 +334,11 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             // I1: persist identity to DO storage on the first WS accept so a
             // hibernation-reconstructed DO knows its tenant/inspection even
             // before the next client connects (alarm() can then flush to D1).
-            if (!this.identityPersisted) {
+            if (!this.identityPersisted || headerReportId) {
                 await this.ctx.storage.put<PersistedIdentity>(IDENTITY_KEY, {
                     tenantId:     this.tenantId,
                     inspectionId: this.inspectionId,
+                    reportId:     this.reportId,
                 });
                 this.identityPersisted = true;
             }
@@ -492,6 +495,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         // back — every persistence path in this class writes through storage
         // that has just been emptied, and the object is evicted once idle.
         if (purgePathMatches(url.pathname) && req.method === 'POST') {
+            await this.ctx.storage.deleteAlarm();
             await this.ctx.storage.deleteAll();
             return Response.json({ purged: true });
         }
@@ -547,6 +551,10 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
      * hibernation before it could fire.
      */
     async alarm(): Promise<void> {
+        // An older DO may have identity without reportId. Do not fall back to
+        // an inspection-scoped D1 write from an alarm: that can target the
+        // wrong report or repeatedly collide with the report-grained index.
+        if (!this.reportId) return;
         await this.persist();
     }
 
@@ -581,6 +589,15 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             // Identity not yet known (DO awakened before first WS connect).
             // Skip D1 write — DO storage is sufficient until a client connects.
             return;
+        }
+
+        if (this.reportId) {
+            await this.ctx.storage.put<PersistedIdentity>(IDENTITY_KEY, {
+                tenantId,
+                inspectionId,
+                reportId: this.reportId,
+            });
+            this.identityPersisted = true;
         }
 
         const db: DrizzleD1Database = drizzle(this.env.DB);
@@ -864,7 +881,8 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         if (identity) {
             this.tenantId          = identity.tenantId;
             this.inspectionId      = identity.inspectionId;
-            this.identityPersisted = true; // already in storage — skip the put
+            this.reportId          = identity.reportId ?? null;
+            this.identityPersisted = true; // already in storage — WS repairs legacy identities
         }
     }
 

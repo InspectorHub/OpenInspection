@@ -31,6 +31,11 @@ const SyncRedriveSchema = z.object({
     ids: z.array(z.string()).optional(),
 });
 
+/** Body for the one-object cleanup used when a report row is already gone. */
+const InspectionDocPurgeSchema = z.object({
+    durableObjectId: z.string().regex(/^[0-9a-f]{64}$/i),
+});
+
 /**
  * PATCH /api/platform/tenants/:slug
  * Triggered by Portal when tenant information changes.
@@ -125,6 +130,54 @@ api.post('/tenants/:slug/purge', requireServiceBinding, async (c) => {
     } catch (error: unknown) {
         logger.error('Tenant purge failed', { slug }, error instanceof Error ? error : undefined);
         return c.json({ success: false, error: { message: 'Purge failed' } }, 500);
+    }
+});
+
+/**
+ * POST /api/platform/tenants/:slug/inspection-doc/purge
+ * Clear one orphaned InspectionDocDO by its Cloudflare durable object id.
+ *
+ * This is deliberately narrower than tenant purge: it does not touch D1, R2,
+ * KV, or any other Durable Object. The tenant check confirms the caller named
+ * a real tenant; the exact DO id comes from Workers Logs because an id cannot
+ * be reversed into the report name after that report has been deleted.
+ */
+api.post('/tenants/:slug/inspection-doc/purge', requireServiceBinding, async (c) => {
+    const slug = c.req.param('slug');
+    if (!slug) return c.json({ success: false, error: { message: 'Tenant slug is required' } }, 400);
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ success: false, error: { message: 'Invalid input' } }, 400);
+    }
+    const parsed = InspectionDocPurgeSchema.safeParse(body);
+    if (!parsed.success) {
+        return c.json({ success: false, error: { message: 'Invalid input' } }, 400);
+    }
+
+    const d = drizzle(c.env.DB);
+    const t = await d.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).get();
+    if (!t) return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
+
+    const ns = c.env.INSPECTION_DOC;
+    if (!ns) return c.json({ success: false, error: { message: 'Inspection documents are not enabled' } }, 503);
+
+    try {
+        const stub = ns.get(ns.idFromString(parsed.data.durableObjectId));
+        const response = await stub.fetch('https://do/purge', { method: 'POST' });
+        if (!response.ok) throw new Error(`purge returned ${response.status}`);
+        return c.json({
+            success: true,
+            data: { purged: true, durableObjectId: parsed.data.durableObjectId },
+        });
+    } catch (error: unknown) {
+        logger.error(
+            'Inspection document purge failed',
+            { slug, durableObjectId: parsed.data.durableObjectId },
+            error instanceof Error ? error : undefined,
+        );
+        return c.json({ success: false, error: { message: 'Purge failed' } }, 502);
     }
 });
 
