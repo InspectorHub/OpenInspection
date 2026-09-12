@@ -1,6 +1,7 @@
 import type React from "react";
 import { PageHeader } from "@core/shared-ui";
 import { Breadcrumb } from "../Breadcrumb";
+import { ADDRESS_DROPDOWN_OBSTACLE_ATTR } from "../address/AddressAutocomplete";
 import type { WizardStepId } from "~/lib/wizard-steps";
 import { m } from "~/paraglide/messages";
 
@@ -67,14 +68,14 @@ export function WizardLayout({
                             <div key={s} className="flex items-center gap-1 flex-1">
                                 <div
                                     className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                                        i <= stepIdx ? "bg-ih-primary text-ih-fg-inverse" : "bg-ih-bg-muted text-ih-fg-4"
+                                        i <= stepIdx ? "bg-ih-primary text-ih-fg-inverse" : "bg-ih-bg-muted text-ih-fg-2"
                                     }`}
                                 >
                                     {i + 1}
                                 </div>
                                 <span
                                     className={`text-[11px] font-medium hidden sm:inline ${
-                                        i <= stepIdx ? "text-ih-primary-text" : "text-ih-fg-4"
+                                        i <= stepIdx ? "text-ih-primary-text" : "text-ih-fg-3"
                                     }`}
                                 >
                                     {stepLabel(s)}
@@ -92,7 +93,19 @@ export function WizardLayout({
                         no overflow ancestor to be clipped by. */}
                     <div className="px-6 py-5">{children}</div>
 
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-ih-border">
+                    {/* Navigation footer.
+
+                        The obstacle attribute is load-bearing, not decorative:
+                        the address typeahead reads it to keep its suggestion
+                        list off Next/Create (F1). Removing the panel's inner
+                        scroll stopped the list being clipped, which let the
+                        full-height list reach the footer instead — and no
+                        viewport measurement can see that, because there is room
+                        below by every viewport measure. */}
+                    <div
+                        {...{ [ADDRESS_DROPDOWN_OBSTACLE_ATTR]: "" }}
+                        className="flex items-center justify-between px-6 py-4 border-t border-ih-border"
+                    >
                         <button
                             onClick={onBack}
                             className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted"

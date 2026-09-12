@@ -118,7 +118,9 @@ describe('createInspection — results row', () => {
             publishedAt: new Date(), publishedBy: 'tester', createdAt: new Date(),
         } as never);
 
-        const reinspection = await inspectionSvc.createReinspection(TENANT, baseline.id, { selectedItemIds: [] });
+        // scheduledDate is named because this spec is about the RESULTS ROW, not the
+        // date; since F47 a dateless create needs a declared company timezone.
+        const reinspection = await inspectionSvc.createReinspection(TENANT, baseline.id, { selectedItemIds: [], scheduledDate: '2026-06-02' });
 
         const report = await testDb
             .select()

@@ -98,7 +98,9 @@ describe('Inspection creation consumes the free-tier quota (Task 3)', () => {
             publishedAt: new Date(), publishedBy: 'user-a',
             createdAt: new Date(),
         });
-        await svc.createReinspection(TENANT, a.id, { selectedItemIds: [] }); // 3
+        // scheduledDate is named because this spec is about the QUOTA COUNTER, not
+        // the date; since F47 a dateless create needs a declared company timezone.
+        await svc.createReinspection(TENANT, a.id, { selectedItemIds: [], scheduledDate: '2026-06-02' }); // 3
 
         expect(await new MeteringService(testD1).lifetimeTotal(TENANT, 'inspections')).toBe(3);
     });

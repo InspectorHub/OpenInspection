@@ -1,9 +1,11 @@
 /**
- * The bundle format restates two vocabularies that also live elsewhere: the
+ * The bundle format names two vocabularies that also live elsewhere: the
  * contact-type set (a database column) and the role set (the role taxonomy).
- * The restatement is deliberate — an adapter's import graph must stay free of
- * the ORM — so the agreement is asserted here rather than asked for in a
- * comment. A comment that says "keep these in sync" is a latent bug.
+ * An adapter's import graph must stay free of the ORM, which is why the bundle
+ * reads the LEAF modules (`people/role-kinds`, `auth/roles`) rather than the
+ * schema — and why the agreement with the column is still asserted here rather
+ * than asked for in a comment. A comment saying "keep these in sync" is a
+ * latent bug.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -22,6 +24,9 @@ import { describeRowProblem } from '../../../server/lib/migration-intake/row-pro
 describe('bundle vocabularies', () => {
     it('BUNDLE_CONTACT_TYPES is exactly the contacts.type column enum', () => {
         expect([...BUNDLE_CONTACT_TYPES].sort()).toEqual([...contacts.type.enumValues].sort());
+        // And not by coincidence: both now read the same array, so this is
+        // reference identity rather than two lists that happen to agree today.
+        expect(BUNDLE_CONTACT_TYPES).toBe(contacts.type.enumValues);
     });
 
     it('the member roles a bundle may carry are the roles minus agent', () => {

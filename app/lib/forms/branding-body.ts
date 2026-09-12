@@ -50,10 +50,9 @@ export function brandingUpdateBody(v: WorkspaceFormValues): Record<string, unkno
     body.repairQuickPhrases = parseQuickPhraseLines(v.repairQuickPhrases ?? "");
   }
 
-  // Boolean feature flags — conform-native checkboxes coerce to boolean in
+  // Boolean feature flag — a conform-native checkbox coerces to boolean in
   // submission.value (checked → true, absent → undefined). Always send an explicit
   // boolean so unchecking persists false.
-  body.enableRepairList = v.enableRepairList ?? false;
   body.enableCustomerRepairExport = v.enableCustomerRepairExport ?? false;
 
   // Report PDF settings. companyAddress is free text (trim; empty string clears).

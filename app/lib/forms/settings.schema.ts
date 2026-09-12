@@ -31,7 +31,7 @@ function makeStrongPassword() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Account (settings-account.tsx)                                     */
+/*  Account deletion (rendered by the security settings page)          */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -149,11 +149,10 @@ export function makeWorkspaceSchema() {
     // that would make every save without the panel wipe a configured list.
     repairQuickPhrases: z.string().optional(),
     repairQuickPhrasesPresent: z.string().optional(),
-    // Report-feature flags. Rendered as conform-native checkboxes (single input,
+    // The report-feature flag. Rendered as a conform-native checkbox (single input,
     // value "on", NO hidden "false" sibling) so a checked box submits ONE value that
     // conform coerces to a boolean — read from submission.value in the action. (An
     // earlier hidden+checkbox pair submitted two values and broke z.boolean parsing.)
-    enableRepairList: z.boolean().optional(),
     enableCustomerRepairExport: z.boolean().optional(),
     // Report PDF print-layout settings (mirror UpdateBrandingSchema). companyAddress
     // is a free-text field (empty string clears it); the three toggles are

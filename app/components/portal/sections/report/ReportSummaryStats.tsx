@@ -17,6 +17,7 @@
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import { m } from "~/paraglide/messages";
+import { itemIsUnrated } from "~/lib/report-helpers";
 import { PRINT_CARD_CLASS, type ReportSection } from "./types";
 import { useAnchorId } from "./report-half-scope";
 
@@ -27,7 +28,15 @@ export function ReportSummaryStats({ sections, total }: { sections: ReportSectio
   const anchorId = useAnchorId();
   const ratingTally = new Map<string, { label: string; color: string; bucket: string; count: number; seen: number }>();
   let seenOrder = 0;
+  // THE RESIDUAL HAS TO BE ON THE ROW TOO. `continue` here is correct — an
+  // unanswered item belongs to no rating level and must not be tallied under one
+  // — but it used to be the END of the story: a 40-item report with 4 ratings
+  // printed "40 TOTAL · 3 SATISFACTORY · 1 DEFECT" and the other 36 appeared in
+  // no column, so the row's own numbers did not add up to its own total and
+  // nothing said why. Counted separately below, under its own name.
+  let unrated = 0;
   for (const it of sections.flatMap((s) => s.items)) {
+    if (itemIsUnrated(it)) unrated++;
     if (!it.rating) continue;
     const ex = ratingTally.get(it.rating);
     if (ex) ex.count++;
@@ -38,6 +47,9 @@ export function ReportSummaryStats({ sections, total }: { sections: ReportSectio
     ...[...ratingTally.values()]
       .sort((a, b) => (BUCKET_RANK[a.bucket] ?? 9) - (BUCKET_RANK[b.bucket] ?? 9) || a.seen - b.seen)
       .map((l) => ({ label: l.label, value: l.count, color: l.color })),
+    // Last, and with no rating colour: it is the absence of a rating, not a
+    // fifth severity. Omitted entirely when every item was answered.
+    ...(unrated > 0 ? [{ label: m.report_item_unrated(), value: unrated, color: null }] : []),
   ];
 
   return (

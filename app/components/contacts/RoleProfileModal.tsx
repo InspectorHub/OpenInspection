@@ -5,8 +5,11 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import { makeRoleProfileSchema } from "~/lib/forms/role-profile.schema";
 import { Modal, Button, Input, Select, Checkbox } from "@core/shared-ui";
 import { capabilitiesForProfile, type RoleCapabilities } from "../../../server/lib/people/capabilities";
+// The picker offers the vocabulary itself: an option it rendered that the
+// form schema refuses would save nothing and say nothing.
+import { ROLE_KINDS } from "../../../server/lib/people/role-kinds";
 import { m } from "~/paraglide/messages";
-import type { MessageTemplateOption, RoleProfile } from "./contacts-helpers";
+import { KIND_LABEL, type MessageTemplateOption, type RoleProfile } from "./contacts-helpers";
 
 /**
  * Create/edit modal for a tenant role profile (Roles tab, admin-only). `kind`
@@ -154,11 +157,7 @@ export function RoleProfileModal({
           onChange={(e) => rebaseKind(e.target.value as RoleProfile["kind"])}
           disabled={kindLocked}
           hint={kindLocked ? m.contacts_roles_modal_kind_hint() : undefined}
-          options={[
-            { value: "client", label: m.contacts_roles_kind_client() },
-            { value: "agent", label: m.contacts_roles_kind_agent() },
-            { value: "other", label: m.contacts_roles_kind_other() },
-          ]}
+          options={ROLE_KINDS.map((k) => ({ value: k, label: KIND_LABEL[k]() }))}
         />
 
         <Select

@@ -76,7 +76,7 @@ vi.mock('~/hooks/useSessionContext', () => ({
             capabilities: getCapabilities('inspector', null),
         },
         branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC',
-                defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h' },
+                defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h', holidayRegion: null },
         deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false },
         seatUsage: null, outboundCoolingWindow: null,
     })),
@@ -159,7 +159,7 @@ beforeEach(() => {
             capabilities: getCapabilities('inspector', null),
         },
         branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC',
-                defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h' },
+                defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h', holidayRegion: null },
         deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true, videoBackendManaged: false, hasManagedCompliance: false, hasAssistedMigration: false },
         seatUsage: null, outboundCoolingWindow: null,
     });
@@ -306,7 +306,7 @@ describe('SettingsConnectedApps component render', () => {
                 capabilities: getCapabilities('owner', null),
             },
             branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC',
-                defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h' },
+                defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h', holidayRegion: null },
             deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true, videoBackendManaged: false, hasManagedCompliance: false, hasAssistedMigration: false },
             seatUsage: null, outboundCoolingWindow: null,
         });

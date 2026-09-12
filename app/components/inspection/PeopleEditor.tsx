@@ -7,6 +7,11 @@ import { AddPersonModal } from "./AddPersonModal";
 import { BlockHeading } from "~/components/inspector-portal/BlockHeading";
 import { LinkExpiryControl } from "./LinkExpiryControl";
 import { PRIMARY_CLIENT_KEY } from "../../../server/lib/people/default-role-profiles";
+// The contact-party vocabulary AND the order people are grouped in: the person
+// the inspection is for, then whoever represents them, then everyone else. The
+// order is a property of the vocabulary, so it is declared once beside it
+// rather than re-listed by each surface that groups by kind.
+import { ROLE_KINDS, type RoleKind } from "../../../server/lib/people/role-kinds";
 import { isSoleClient } from "../../../server/lib/people/primary-client";
 import type { ReportLinkTtl } from "../../../server/lib/report-link-ttl";
 import { formatDate } from "~/lib/format";
@@ -24,7 +29,7 @@ export interface PersonRow {
   roleProfileId: string;
   roleKey: string;
   roleLabel: string;
-  kind: "client" | "agent" | "other";
+  kind: RoleKind;
   name: string;
   email: string | null;
   phone: string | null;
@@ -37,8 +42,6 @@ export interface PersonRow {
     expiresAt: number | null;
   };
 }
-
-const GROUP_ORDER = ["client", "agent", "other"] as const;
 
 function groupLabel(kind: PersonRow["kind"]): string {
   switch (kind) {
@@ -164,7 +167,7 @@ export function PeopleEditor({
 
   const busy = removeBusy || resetBusy || primaryBusy;
 
-  const groups = GROUP_ORDER.map((kind) => ({
+  const groups = ROLE_KINDS.map((kind) => ({
     kind,
     rows: people.filter((p) => p.kind === kind),
   })).filter((g) => g.rows.length > 0);
@@ -298,7 +301,7 @@ export function PeopleEditor({
                           disabled={busy || sole}
                           title={sole ? m.inspections_hub_people_remove_sole_reason() : undefined}
                           className={`text-[11px] font-bold disabled:opacity-50 disabled:cursor-not-allowed ${
-                            sole ? "text-ih-fg-4" : "text-ih-bad-fg hover:underline"
+                            sole ? "text-ih-fg-3" : "text-ih-bad-fg hover:underline"
                           }`}
                         >
                           {m.inspections_hub_people_remove()}

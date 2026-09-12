@@ -22,6 +22,7 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
+import { nextWeekday } from '../helpers/bookable-date';
 import { makeExecutionContext } from '../helpers/exec-ctx';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -73,7 +74,11 @@ describe('ConciergeService.createBooking consumes the free-tier quota', () => {
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.tenantConfigs).values({
+            // A DECLARED timezone is now a precondition for taking a booking at
+            // all — an undeclared one is refused rather than silently read as
+            // UTC. This spec is about quota, so it declares one and moves on.
             tenantId: T1, conciergeReviewRequired: false, updatedAt: new Date(),
+            defaultTimezone: 'America/New_York',
         });
         await testDb.insert(schema.users).values([
             { id: INSPECTOR, tenantId: T1, email: 'mike@acme.com', name: 'Mike Reynolds',
@@ -97,7 +102,7 @@ describe('ConciergeService.createBooking consumes the free-tier quota', () => {
 
     const baseParams = () => ({
         tenantId: T1, agentUserId: AGENT, inspectorContactId: CONTACT_INSP,
-        date: '2026-06-15', timeSlot: '10:00', propertyAddress: '1 Main St',
+        date: nextWeekday(1), timeSlot: '10:00', propertyAddress: '1 Main St',
         clientName: 'Sarah Buyer', clientEmail: 'sarah@example.com',
         agreementRequired: true, paymentRequired: false,
     });
@@ -249,7 +254,7 @@ describe('InspectionRequestService consumes the free-tier quota', () => {
 // ---------------------------------------------------------------------------
 describe('POST /book consumes the free-tier quota (public self-serve booking)', () => {
     const T1 = 'aaaaaaaa-1000-4000-8000-000000000001';
-    const MONDAY = '2026-06-08'; // a Monday — mirrors booking-autoassign.spec.ts
+    const MONDAY = nextWeekday(1); // the NEXT Monday — a frozen date rots into the past-date refusal
 
     const FAKE_ENV: HonoConfig['Bindings'] = { DB: {} as D1Database } as unknown as HonoConfig['Bindings'];
     const FAKE_EXEC_CTX: ExecutionContext = makeExecutionContext().ctx;
@@ -308,6 +313,14 @@ describe('POST /book consumes the free-tier quota (public self-serve booking)', 
         await testDb.insert(schema.tenants).values({
             id: T1, slug: 'acme', tier: 'free', status: 'active',
             maxUsers: 10, deploymentMode: 'shared', createdAt: new Date(),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+        // A DECLARED timezone is a precondition for taking a booking at all —
+        // an undeclared one is now refused rather than silently read as UTC.
+        // This block is about the quota gate, so it declares one and moves on;
+        // without it every booking here is refused before quota is consulted.
+        await testDb.insert(schema.tenantConfigs).values({
+            tenantId: T1, updatedAt: new Date(), defaultTimezone: 'America/New_York',
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
         // 6 qualified inspectors, all with the same Monday 08:00-10:00 window,

@@ -23,6 +23,7 @@ import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { RolesTable } from "~/components/contacts/RolesTable";
 import { RoleProfileModal } from "~/components/contacts/RoleProfileModal";
 import type { RoleProfile, MessageTemplateOption } from "~/components/contacts/contacts-helpers";
+import type { RoleKind } from "../../server/lib/people/role-kinds";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -74,11 +75,11 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "role-create") {
     const label = String(form.get("label") ?? "").trim();
-    const kind = String(form.get("kind") ?? "") as "client" | "agent" | "other";
+    const kind = String(form.get("kind") ?? "") as RoleKind;
     if (!label || !kind) return { ok: false };
     const emailTemplateId = String(form.get("emailTemplateId") ?? "").trim();
     const smsTemplateId = String(form.get("smsTemplateId") ?? "").trim();
-    const body: { label: string; kind: "client" | "agent" | "other"; emailTemplateId?: string; smsTemplateId?: string; capabilityOverrides?: ReturnType<typeof capabilityOverridesFrom> } = { label, kind };
+    const body: { label: string; kind: RoleKind; emailTemplateId?: string; smsTemplateId?: string; capabilityOverrides?: ReturnType<typeof capabilityOverridesFrom> } = { label, kind };
     if (emailTemplateId) body.emailTemplateId = emailTemplateId;
     if (smsTemplateId) body.smsTemplateId = smsTemplateId;
     body.capabilityOverrides = capabilityOverridesFrom(form);

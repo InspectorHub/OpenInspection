@@ -8,6 +8,12 @@ import { AccessDenied } from "~/components/AccessDenied";
 import { Modal } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
+// F68 — with no `meta` this page's browser tab reads only "OpenInspection".
+// Why it is a catalogue key and not a literal: settings-meta-titles.test.ts.
+export function meta() {
+  return [{ title: m.settings_inspection_types_meta_title() }];
+}
+
 interface ApiInspectionType {
   id: string;
   name: string;
@@ -185,7 +191,7 @@ export default function SettingsInspectionTypes() {
                   className={`text-[11px] font-bold px-2.5 py-1 rounded-md border ${
  pt.enabled
  ? "border-ih-ok-fg/20 bg-ih-ok-bg text-ih-ok-fg"
- : "border-ih-border bg-ih-bg-muted text-ih-fg-3"
+ : "border-ih-border bg-ih-bg-muted text-ih-fg-2"
  }`}
                 >
                   {pt.enabled ? m.settings_inspection_types_status_enabled() : m.settings_inspection_types_status_disabled()}

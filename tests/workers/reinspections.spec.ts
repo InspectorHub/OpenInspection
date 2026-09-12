@@ -232,7 +232,10 @@ describe('#119 re-inspections — end-to-end (real workerd)', () => {
         const svc = inspectionService();
 
         // 2) createReinspection over all 5 → round 1.
-        const r1 = await svc.createReinspection(TENANT, ORIGINAL, { selectedItemIds: itemIds, inspectorId: INSPECTOR });
+        // scheduledDate named: this fixture wipes tenant_configs, and since F47 a
+        // dateless create refuses rather than guess a company day. The date
+        // contract itself is covered in tests/unit/inspections/reinspection-scheduled-day.spec.ts.
+        const r1 = await svc.createReinspection(TENANT, ORIGINAL, { selectedItemIds: itemIds, inspectorId: INSPECTOR, scheduledDate: '2026-06-02' });
         expect(r1.reinspectionRound).toBe(1);
         expect(r1.rootInspectionId).toBe(ORIGINAL);
         expect(r1.sourceInspectionId).toBe(ORIGINAL);
@@ -264,7 +267,7 @@ describe('#119 re-inspections — end-to-end (real workerd)', () => {
         expect(closedIds).toEqual(['d1', 'd2', 'd3']);
 
         // 5) createReinspection over the 2 open → round 2, same root.
-        const r2 = await svc.createReinspection(TENANT, r1.id, { selectedItemIds: ['d4', 'd5'], inspectorId: INSPECTOR });
+        const r2 = await svc.createReinspection(TENANT, r1.id, { selectedItemIds: ['d4', 'd5'], inspectorId: INSPECTOR, scheduledDate: '2026-06-03' });
         expect(r2.reinspectionRound).toBe(2);
         expect(r2.rootInspectionId).toBe(ORIGINAL);
         expect(r2.sourceInspectionId).toBe(r1.id);

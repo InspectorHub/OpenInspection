@@ -47,7 +47,7 @@ export function TabStrip({ tabs, activeId, onChange, orientation = "horizontal" 
             <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold tabular-nums ${
               activeId === tab.id
                 ? "bg-ih-primary-tint text-ih-primary-text"
-                : "bg-ih-bg-muted text-ih-fg-4"
+                : "bg-ih-bg-muted text-ih-fg-2"
             }`}>
               {tab.count}
             </span>

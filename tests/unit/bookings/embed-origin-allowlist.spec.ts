@@ -48,8 +48,9 @@ vi.mock('../../../server/lib/rate-limit', () => ({
 // eslint-disable-next-line import/order
 import { bookingsRoutes } from '../../../server/api/bookings';
 import { makeExecutionContext } from '../helpers/exec-ctx';
+import { nextWeekday } from '../helpers/bookable-date';
 
-const MONDAY = '2026-06-08';
+const MONDAY = nextWeekday(1);
 const T1 = 'aaaaaaaa-0000-4000-8000-000000000001';
 const U1 = 'bbbbbbbb-0000-4000-8000-000000000001';
 const HOST = 'https://acme-inspections.example';
@@ -99,6 +100,11 @@ async function seed(db: BetterSQLite3Database<typeof schema>) {
         id: 'a1', tenantId: T1, inspectorId: U1, dayOfWeek: 1,
         startTime: '09:00', endTime: '17:00', createdAt: new Date(),
     } as never);
+    // A DECLARED company timezone. Public booking refuses a workspace that never
+    // set one (the NOT NULL default 'UTC' is the unset sentinel).
+    await db.insert(tenantConfigs).values({
+        tenantId: T1, updatedAt: new Date(), defaultTimezone: 'America/New_York',
+    } as never);
 }
 
 /** What the embedded widget posts: the flag, and the host page's Origin. */
@@ -137,9 +143,13 @@ describe('embedded booking submissions and the origin allowlist', () => {
     afterEach(() => sqlite.close());
 
     async function saveOrigins(origins: string[]) {
+        // An UPSERT now: the seed already wrote this row to declare the company
+        // timezone, and a second plain insert would collide with it.
         await db.insert(tenantConfigs).values({
             tenantId: T1, widgetAllowedOrigins: origins, updatedAt: new Date(),
-        } as never);
+        } as never).onConflictDoUpdate({
+            target: tenantConfigs.tenantId, set: { widgetAllowedOrigins: origins },
+        });
     }
 
     /**

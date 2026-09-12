@@ -121,7 +121,7 @@ export function SecretField({
         {!editing && (
           <span
             className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-widest ${
-              isSet ? "text-ih-ok-fg" : "text-ih-fg-4"
+              isSet ? "text-ih-ok-fg" : "text-ih-fg-3"
             }`}
           >
             {isSet ? "Set" : emptyBadge}

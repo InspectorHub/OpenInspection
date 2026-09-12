@@ -312,7 +312,6 @@ export interface ReportLoaderResult {
   sections: ReportSection[];
   showEstimates: boolean;
   costTables: CostTables | null;
-  enableRepairList: boolean;
   enableCustomerRepairExport: boolean;
   /** Tenant timezone (IANA) that anchors ALL report times. 'UTC' when unset. */
   reportTimeZone: string;
@@ -320,6 +319,13 @@ export interface ReportLoaderResult {
   brand: TenantBrand;
   error: string | null;
   notPublished: boolean;
+  /**
+   * The report IS published and the workspace is holding it for a signed
+   * agreement or an outstanding payment. Distinct from `notPublished`, which
+   * says there is nothing to show yet — the two send a reader to different
+   * places, and only one of them is something the reader can act on.
+   */
+  reportHeld?: boolean;
   /** IA-36 ⑨ — the link was real but has expired or been revoked (API 410). */
   linkInactive?: boolean;
   /**

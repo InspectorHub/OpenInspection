@@ -30,8 +30,9 @@ import {
   type FilterId,
   type TabKey,
 } from "~/lib/dashboard-schema";
-import { matchesFilter, matchesWorkflow, tabMatches, statFocusIds, isStatFocus, type StatFocus } from "~/lib/dashboard-filters";
+import { matchesFilter, matchesWorkflow, tabMatches, statFocusIds, isStatFocus, shouldShowListControls, type StatFocus } from "~/lib/dashboard-filters";
 import { dedupeBucketMembership, emptyDashboard } from "~/lib/dashboard-buckets";
+import { useOfflinePurgeOnDelete } from "~/hooks/useOfflinePurgeOnDelete";
 import { DashboardInspectionRow } from "~/components/dashboard/DashboardInspectionRow";
 import { FiltersDrawer } from "~/components/dashboard/FiltersDrawer";
 import { ColumnsPopover } from "~/components/dashboard/ColumnsPopover";
@@ -64,7 +65,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // service linking). They are best-effort: a failure must not break the
     // dashboard, so each falls back to an empty list.
     // meRes: best-effort fetch for onboardingState.checklistDismissed (IA-12).
-    // The TODO(C-10) cast mirrors settings-account.tsx — hono/client collapses
+    // The TODO(C-10) cast is the house pattern for this seam — hono/client collapses
     // the typed union; assertion is localized here and does not affect safety.
     const meGet = api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>;
     const [dashRes, tagsRes, templatesRes, servicesRes, meRes, membersRes, usageRes, scheduleSet] = await Promise.all([
@@ -544,11 +545,17 @@ export default function InspectionsPage() {
   const clearSelection = () => setSelectedIds(new Set());
 
   /* ---- Batch actions ---- */
+  // F55 — a deleted inspection's field data used to survive on the device
+  // indefinitely; the hook clears it once the server confirms the delete.
+  const purgeOfflineData = useOfflinePurgeOnDelete(fetcher);
+
   const batchDelete = () => {
     if (selectedIds.size === 0) return;
-    for (const id of selectedIds) {
+    const ids = [...selectedIds];
+    for (const id of ids) {
       fetcher.submit({ intent: "delete", id }, { method: "post" });
     }
+    purgeOfflineData(ids);
     clearSelection();
   };
 
@@ -612,6 +619,14 @@ export default function InspectionsPage() {
     agentId: filterAgentId,
     search: searchQuery,
   };
+
+  // Every list control below is furniture for a busy workspace — four stat
+  // cards reading 0, two rows of seventeen filter chips, a search box, Filters,
+  // Columns — and a new operator walked past all of it to reach a card telling
+  // them to create their first inspection. Nothing is removed from the product;
+  // it returns the moment there is a list worth narrowing. Where that line is
+  // drawn, and why it is not `=== 0`, is at shouldShowListControls.
+  const listTooShortToNarrow = !shouldShowListControls(allInspections.length, listFilterState);
 
   // The workflow tab and the stat-card focus live in the URL, not in state — ONE
   // writer for both, because two setSearchParams calls in a tick each start from
@@ -720,9 +735,11 @@ export default function InspectionsPage() {
             {/* Page-level actions only. List controls (search / filters /
                 columns) live in the table toolbar strip below — DS two-layer
                 actions convention. */}
-            <Button variant="secondary" size="sm" onClick={exportCsv}>
-              {m.inspections_list_action_export()}
-            </Button>
+            {!listTooShortToNarrow && (
+              <Button variant="secondary" size="sm" onClick={exportCsv}>
+                {m.inspections_list_action_export()}
+              </Button>
+            )}
             <Button variant="primary" size="sm" icon={<Icon name="plus" size={14} />} onClick={() => navigate("/inspections/new")}>
               {m.inspections_list_action_new()}
             </Button>
@@ -730,8 +747,8 @@ export default function InspectionsPage() {
         }
       />
 
-      {/* Stat cards — quick-jump to buckets */}
-      <InspectionsStatCards counts={counts} targets={STAT_TARGETS} />
+      {/* Stat cards — quick-jump to buckets. Four zeroes are not a summary. */}
+      {!listTooShortToNarrow && <InspectionsStatCards counts={counts} targets={STAT_TARGETS} />}
 
       {/* IA-12 — Onboarding checklist (hidden when dismissed or allDone) */}
       <OnboardingChecklist
@@ -747,6 +764,8 @@ export default function InspectionsPage() {
         onOpenWizard={() => navigate("/inspections/new")}
       />
 
+      {/* Everything that narrows a list, hidden while there is no list. */}
+      {!listTooShortToNarrow && (<>
       <InspectionsFocusBar focus={activeFocus} />
 
       {/* Workflow tabs */}
@@ -776,6 +795,7 @@ export default function InspectionsPage() {
         onToggleColumns={() => setColumnsOpen((v) => !v)}
         columnsBtnRef={columnsBtnRef}
       />
+      </>)}
 
       {/* Batch actions bar */}
       {selectedIds.size > 0 && (

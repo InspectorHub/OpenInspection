@@ -72,6 +72,29 @@ export const SCRIPT_GATES = [
     // Parses ~12 source files with the TypeScript parser: single-digit
     // milliseconds, among the cheapest entries here.
     { key: 'agenttermsclass', label: 'Agent-terms route classification', script: 'check-agent-terms-classification.mjs', fix: 'npm run lint:agent-terms-classification', rung: PRECOMMIT },
+    // The document side of the same subject: the gate above asks whether a ROUTE
+    // has been classified, this one whether the TEXT still carries every clause
+    // it must, whether the publisher still refuses a draft, and whether an
+    // acceptance can be written anywhere but the one function.
+    //
+    // PRECOMMIT because three of its four checks read files edited by hand and
+    // rarely -- the terms document, the publisher, the gate middleware -- where
+    // a well-meant edit (reword a heading, simplify a condition, "clean up" an
+    // exemption) removes a control nothing else asserts, and only the author
+    // will ever know whether it was deliberate. The fourth walks server/ for a
+    // bypassing insert, which is a keystroke too. ~200 ms after node startup,
+    // most of it that walk; the runner pays the startup once for all gates.
+    //
+    // ⚠️ Armed on the day it first read green, which is the only day it should
+    // have been: registering it while a check was red would fail every commit
+    // in the repo until somebody finished the document.
+    { key: 'agentterms', label: 'Agent-terms compliance', script: 'check-agent-terms.mjs', fix: 'npm run lint:agent-terms', rung: PRECOMMIT },
+    // Its positive control, for the reason the chrome-record self-test is one:
+    // every check above reports by SEARCHING, and a search that has quietly
+    // stopped matching reports the same "nothing wrong" as a clean tree. Fifteen
+    // assertions in both directions over literal fixtures, ~30 ms, and the only
+    // thing here that can tell a green agent-terms run from a blind one.
+    { key: 'agenttermsselftest', label: 'Agent-terms gate self-test', script: 'check-agent-terms.mjs', fix: 'npm run lint:agent-terms:self-test', rung: PRECOMMIT, args: ['--self-test'] },
     // Pre-commit and not CI because a collision is created at exactly one moment
     // -- when a file is added or renamed -- and this is the rung that sees that
     // moment. It is also the rung where the fix is free: renaming a file nobody
@@ -238,6 +261,10 @@ export const SCRIPT_GATES = [
     { key: 'i18n', label: 'lint:i18n', script: 'check-i18n.mjs', fix: 'npm run lint:i18n', rung: PUSH },
     { key: 'i18ncatalog', label: 'lint:i18n-catalog', script: 'check-i18n-catalog.mjs', fix: 'npm run lint:i18n-catalog', rung: PUSH },
     { key: 'i18nglossary', label: 'lint:i18n-glossary', script: 'check-i18n-glossary.mjs', fix: 'npm run lint:i18n-glossary', rung: PUSH },
+    // The rollout-3 sweep's own definition of done ('no user-facing JSX string is
+    // a raw literal') had no enforcement for months. The three gates above guard
+    // the CATALOGUE; none of them reads JSX. This one does.
+    { key: 'i18nliterals', label: 'lint:i18n-literals', script: 'check-i18n-literals.mjs', fix: 'npm run lint:i18n-literals', rung: PUSH },
     { key: 'naming', label: 'lint:naming', script: 'check-naming.mjs', fix: 'npm run lint:naming', rung: PUSH },
     { key: 'agentroutes', label: 'lint:agent-routes', script: 'check-agent-routes.mjs', fix: 'npm run lint:agent-routes', rung: PUSH },
     { key: 'doclinks', label: 'lint:doclinks', script: 'check-doc-links.mjs', fix: 'npm run lint:doclinks', rung: PUSH },

@@ -10,6 +10,7 @@ import { RATING_PRESETS } from "~/components/template/types";
 import type { RatingLevel, RatingSystem, TemplateItem, TemplateSchema, TemplateSection, CannedComment } from "~/components/template/types";
 import { RatingSystemEditor } from "~/components/RatingSystemEditor";
 import { toEditorLevel, fromEditorLevel } from "~/lib/editor/rating-level-adapter";
+import { textInputSize } from "~/lib/text-input-width";
 import { ItemPropertiesPanel } from "~/components/template/ItemPropertiesPanel";
 import { ItemCommentsPanel } from "~/components/template/ItemCommentsPanel";
 import { ItemPreviewPanel } from "~/components/template/ItemPreviewPanel";
@@ -466,12 +467,26 @@ export default function TemplateEditPage() {
       ) : null}
       {/* Toolbar */}
       <header className="flex items-center justify-between h-12 px-4 border-b border-ih-border bg-ih-bg-card shrink-0">
-        <div className="flex items-center gap-3">
-          <Link to="/library/templates" className="inline-flex items-center gap-1 text-ih-fg-3 hover:text-ih-fg-2 text-[13px]"><Icon name="chevL" size={14} /> {m.templates_breadcrumb_current()}</Link>
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <Link to="/library/templates" className="inline-flex items-center gap-1 shrink-0 text-ih-fg-3 hover:text-ih-fg-2 text-[13px]"><Icon name="chevL" size={14} /> {m.templates_breadcrumb_current()}</Link>
+          {/* F38 — this was `w-48`: a 192px box for a name that is routinely
+              longer. "Standard Residential Inspection" rendered as "Standard
+              Residential Inspec", clipped by 31px with `text-overflow: clip`,
+              so there was not even an ellipsis to say something was missing —
+              while ~600px of toolbar sat empty to the right of it.
+
+              `size` asks the input to be as wide as its CONTENT, which is the
+              actual requirement ("I can read the name I am editing"), floored
+              so an empty name is still a visible target and capped so a very
+              long one cannot push the toolbar's buttons around. `min-w-0`
+              lets it give that width back when the toolbar is genuinely
+              short of room. */}
           <input
             value={templateName}
             onChange={(e) => setTemplateName(e.target.value)}
-            className="text-[14px] font-bold bg-transparent border-b border-transparent focus:border-ih-primary outline-none text-ih-fg-1 w-48"
+            size={textInputSize(templateName)}
+            aria-label={m.templates_name_label()}
+            className="text-[14px] font-bold bg-transparent border-b border-transparent focus:border-ih-primary outline-none text-ih-fg-1 min-w-0 max-w-full"
           />
           <span className="text-[10px] font-mono text-ih-fg-3">v{initialVersion}</span>
         </div>
@@ -481,7 +496,7 @@ export default function TemplateEditPage() {
           {/* Bespoke: active "watch" tone would fight Button's ghost hover/selected treatment. */}
           <button
             onClick={() => setPreviewMode(!previewMode)}
-            className={`h-7 px-3 rounded-md text-[12px] font-bold transition-colors ${previewMode ? "bg-ih-watch-bg text-ih-watch-fg" : "bg-ih-bg-muted text-ih-fg-3"}`}
+            className={`h-7 px-3 rounded-md text-[12px] font-bold transition-colors ${previewMode ? "bg-ih-watch-bg text-ih-watch-fg" : "bg-ih-bg-muted text-ih-fg-2"}`}
           >
             {previewMode ? m.templates_edit_exit_preview() : m.templates_edit_preview()}
           </button>

@@ -162,6 +162,7 @@ function ReportHalf(props: ReportViewProps & { forcedHalf?: "en" | "translated" 
       <ReportUnavailable
         error={data.error}
         notPublished={data.notPublished}
+        reportHeld={data.reportHeld}
         linkInactive={data.linkInactive}
         brand={data.brand}
       />

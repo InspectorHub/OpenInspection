@@ -29,7 +29,6 @@ const PROTECTED = [
   '/settings',
   '/invoices',
   '/team',
-  '/reports',
 ];
 
 /**

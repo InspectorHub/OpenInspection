@@ -49,10 +49,12 @@ export const UpdateBrandingSchema = z.object({
     supportEmail: z.string().email('Invalid email address').optional().openapi({ example: 'support@example.com' }).describe('TODO describe supportEmail field for the OpenInspection MCP integration'),
     billingUrl: z.string().url('Invalid URL').or(z.literal('')).optional().openapi({ example: 'https://example.com/billing' }).describe('TODO describe billingUrl field for the OpenInspection MCP integration'),
     defaultProfileId: z.string().optional().openapi({ example: 'signature' }).describe('Default report appearance profile id (built-in: signature|meridian|terra)'),
-    // Track E1 (ITB §11) — gate the "Repair List" tab on the published report.
-    enableRepairList: z.boolean().optional().openapi({ example: true }).describe('TODO describe enableRepairList field for the OpenInspection MCP integration'),
     // Sprint 3 S3-2 — gate the customer-driven "Generate repair request"
-    // export link on the published report. Independent of enableRepairList.
+    // export link on the published report. This is the ONLY repair-feature
+    // switch a request may set: `enableRepairList`
+    // (`tenant_configs.is_repair_list_enabled`) was removed from this schema,
+    // which is what drains the column — `WRITABLE_TENANT_CONFIG_COLUMNS` is
+    // derived from these shapes, so an absent field is a refused write.
     enableCustomerRepairExport: z.boolean().optional().openapi({ example: true }).describe('TODO describe enableCustomerRepairExport field for the OpenInspection MCP integration'),
     // Round-2 backlog #10 — tenant-wide default for the per-inspection
     // paywall introduced in Sprint 1 D-7 (ReportGatePage). When true, every

@@ -138,7 +138,7 @@ export class InspectionService {
     async createReinspection(
         tenantId: string,
         baselineId: string,
-        opts: { selectedItemIds: string[]; inspectorId?: string | undefined },
+        opts: Parameters<InspectionCoreService['createReinspection']>[2],
     ): ReturnType<InspectionCoreService['createReinspection']> {
         return this.core.createReinspection(tenantId, baselineId, opts);
     }
@@ -469,6 +469,18 @@ export class InspectionService {
      * (tier-2 link); when it is absent or yields no outstanding signer the gate
      * falls back to the legacy single-gate agreement URL.
      */
+    /**
+     * The release gate alone, with no page attached — what the PUBLIC
+     * enforcement points call. See InspectionPublishService.resolveReleaseGate
+     * for why the enforcement points must not re-decide this themselves.
+     */
+    async resolveReleaseGate(inspectionId: string, tenantId: string): Promise<{
+        reason: 'payment' | 'agreement';
+        paymentOutstanding: boolean;
+    } | null> {
+        return this.publish.resolveReleaseGate(inspectionId, tenantId);
+    }
+
     async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string, agreementService?: AgreementService): Promise<{
         reason: 'payment' | 'agreement';
         companyName: string;
@@ -617,12 +629,11 @@ export class InspectionService {
 
     /**
      * Publishes one of an inspection's reports (transitions to delivered status).
-     * `reportId` defaults to the order's primary report.
+     * `reportId` defaults to the order's primary report. No notify flags — see
+     * `InspectionPublishService.publishInspection` (F79).
      */
     async publishInspection(inspectionId: string, tenantId: string, _options: {
         theme: string;
-        notifyClient: boolean;
-        notifyAgent: boolean;
         requireSignature: boolean;
         requirePayment: boolean;
         // Round-2 F1 — optional per-recipient delivery list. Older callers

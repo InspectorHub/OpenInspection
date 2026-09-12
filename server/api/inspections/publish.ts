@@ -367,8 +367,6 @@ const publishRoutes = createApiRouter()
         // `recipients: X[] | undefined` against the service's optional param.
         const publishOptions: Parameters<typeof service.publishInspection>[2] = {
             theme: body.theme,
-            notifyClient: body.notifyClient,
-            notifyAgent: body.notifyAgent,
             requireSignature: body.requireSignature,
             requirePayment: body.requirePayment,
             sendAgreementCopy: body.sendAgreementCopy,
@@ -376,6 +374,25 @@ const publishRoutes = createApiRouter()
             ...(body.reportId ? { reportId: body.reportId } : {}),
         };
         const result = await service.publishInspection(id, tenantId, publishOptions);
+
+        // The only record that a PERSON published this, and the only one that
+        // survives a later unpublish. Written HERE rather than beside the
+        // `return`: everything between is best-effort follow-on work, and the
+        // PDF pipeline's slug/hash/footer lookups are awaited outside a try — a
+        // throw there would drop the row for a publish that already happened.
+        // F79 — says WHAT was published, deliberately not WHO was told. It used to
+        // copy `notifyClient`/`notifyAgent` out of the body and nothing honoured
+        // them: `publishInspection` never read those options, and delivery is the
+        // workspace's `report.published` automation rules' decision. A publish
+        // marked "notify nobody" was therefore RECORDED as having notified nobody
+        // while every rule fired and the mail went out — the record stating the
+        // opposite of the event, in the artefact someone later reads to answer "who
+        // was told, and when". An always-guessed field is worse than an absent one;
+        // who was told is recorded in the automation logs and the delivery rows.
+        auditFromContext(c, 'inspection.published', 'inspection', {
+            entityId: id,
+            metadata: { reportId: body.reportId },
+        });
 
         // #23 — the courtesy translation, when the publisher asked for one on
         // THIS publish. Never blocks: a translation that could not be produced
@@ -468,10 +485,10 @@ const publishRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const body = c.req.valid('json');
         try {
-            const created = await c.var.services.inspection.createReinspection(tenantId, id, {
-                selectedItemIds: body.selectedItemIds,
-                inspectorId: body.inspectorId,
-            });
+            // The validated body IS the options object (selectedItemIds +
+            // optional inspectorId/scheduledDate); restating the fields here is
+            // how F47's scheduledDate could have been added and silently dropped.
+            const created = await c.var.services.inspection.createReinspection(tenantId, id, body);
             return c.json({ success: true, data: { id: created.id, reinspectionRound: created.reinspectionRound } }, 200);
         } catch (err) {
             return c.json({ success: false, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to create re-inspection' } }, 400);

@@ -6,6 +6,23 @@ import { useAnchoredDropdown } from "~/hooks/useAnchoredDropdown";
 import { m } from "~/paraglide/messages";
 
 /**
+ * What the suggestion list is not allowed to cover (F1).
+ *
+ * The host page marks the element the list must not land on — on the
+ * new-inspection wizard that is the navigation footer carrying Next/Create. The
+ * hook walks UP from the field and budgets the list against that element's top
+ * edge, flipping above the field when nothing usable is left below. A host that
+ * marks nothing keeps the plain viewport behaviour, so every other place this
+ * input is mounted needs no change.
+ *
+ * A data attribute rather than a ref because the footer lives in `WizardLayout`,
+ * several components away from the field — threading a ref through
+ * PropertyStep would put the plumbing in files with no other reason to know.
+ */
+export const ADDRESS_DROPDOWN_OBSTACLE_ATTR = "data-address-dropdown-obstacle";
+const OBSTACLE_SELECTOR = `[${ADDRESS_DROPDOWN_OBSTACLE_ATTR}]`;
+
+/**
  * Address autocomplete input (Spec 5D B4, #198). Debounced suggestions from the
  * `/resources/places` BFF, keyboard-navigable listbox, and a per-typing-session
  * token so Google bills the whole autocomplete→details sequence once.
@@ -96,8 +113,17 @@ export function AddressAutocomplete({
   // the flip-when-cramped rule) is shared with the template and contact
   // typeaheads — this measurement used to be a local copy here, and the two later
   // typeaheads were written without it and clipped.
+  //
+  // Escaping the clip box stopped the list being truncated and let it land ON
+  // the controls underneath instead (F1): in the new-inspection wizard the list
+  // covered the footer, so the inspector reaching for Next picked a suggestion
+  // and silently replaced the address they had just chosen. The viewport had
+  // room to spare, so only the obstacle's own top edge can say otherwise.
   const dropdownOpen = open && suggestions.length > 0;
-  const { anchorRef: inputRef, style: dropdownStyle } = useAnchoredDropdown<HTMLInputElement>(dropdownOpen);
+  const { anchorRef: inputRef, style: dropdownStyle } = useAnchoredDropdown<HTMLInputElement>(
+    dropdownOpen,
+    { obstacleSelector: OBSTACLE_SELECTOR },
+  );
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (!open || suggestions.length === 0) return;

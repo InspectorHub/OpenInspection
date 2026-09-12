@@ -8,6 +8,7 @@
  */
 import { interpolate } from './shared';
 import { m } from '../../lib/i18n/messages';
+import { formatScheduledDate, type ScheduledDateDisplay } from '../../lib/inspection/scheduled-date-display';
 import type { NoticeWording } from './notice-headers';
 import type { TemplateStore } from './template-store';
 import type { ContactLocale } from '../../lib/i18n/contact-locale';
@@ -67,14 +68,30 @@ export function createNoticeWordingResolver(args: {
     companyName: string;
     inspection: typeof inspections.$inferSelect;
     rules: Array<typeof automations.$inferSelect>;
+    /** Workspace locale + timezone; see `readTenantDisplay`. */
+    display: ScheduledDateDisplay;
 }): (automationId: string | null, locale: ContactLocale) => Promise<NoticeWording> {
-    const { store, tenantId, triggerEvent, companyName, inspection, rules } = args;
+    const { store, tenantId, triggerEvent, companyName, inspection, rules, display } = args;
     const cache = new Map<string, NoticeWording>();
     const ruleById = new Map(rules.map((r) => [r.id, r]));
     const vars = {
         property_address: inspection.propertyAddress || 'inspection',
         company_name: companyName,
-        scheduled_date: inspection.date ?? '',
+        // WHY THE TOKEN IS FORMATTED HERE RATHER THAN JOINED BY A SECOND ONE.
+        // `{{scheduled_date}}` is resolved at three points — this one, the
+        // shared email/SMS map in `./template-vars.ts`, and the manual report
+        // send in `server/api/inspections/report-delivery.ts` — and each
+        // hands the result to `interpolate` to be dropped into a sentence a
+        // person reads. A grep over the seeded catalogue and both spec suites
+        // finds no consumer that parses it, compares it or sorts on it, so
+        // nothing depends on the raw column shape and formatting it breaks no
+        // one. The alternative — leaving this raw and adding, say,
+        // `{{scheduled_date_display}}` — would put two tokens in the template
+        // editor that a tenant cannot tell apart by name, differing only in
+        // which one is wrong, and the wrong one is the one that already appears
+        // in every template they have. One token, one meaning: the scheduled
+        // date as a reader reads it. All three resolution points now agree.
+        scheduled_date: formatScheduledDate(inspection.date, display),
     };
 
     return async (automationId, locale) => {

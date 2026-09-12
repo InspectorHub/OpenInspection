@@ -20,6 +20,16 @@ export function ServicesStep({
   return (
     <div className="space-y-2">
       <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_services_label()}</label>
+      {/* F4 — this list and the Report template list two steps back are nearly
+          the same names, so "these must correspond" is the reasonable reading,
+          and it is wrong. The template is snapshotted onto the inspection and
+          becomes the primary report's template (createInspection →
+          createPrimaryReport); the services become inspection_services price
+          snapshots, tier 2 of the money-authority chain (getEffectivePriceCents).
+          Neither constrains the other and nothing validates the pair — which is
+          the answer, not the absence of one. Same shape as the Schedule step's
+          timezone line: one sentence where the decision is made, no help panel. */}
+      <p className="mb-2 text-[11px] text-ih-fg-3">{m.newinsp_services_template_hint()}</p>
       <div className="space-y-1.5">
         {serviceCatalog.map((s) => {
           const selected = services.has(s.id);

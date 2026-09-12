@@ -4,7 +4,6 @@ import {
     isReportShipped,
     canPublish,
     latestPublishedAt,
-    publishNotified,
     invoiceFromParty,
     lifecycleState,
     type HubPayload,
@@ -61,10 +60,10 @@ describe('canPublish — report axis only', () => {
 /**
  * The Report card used to say "Report delivered to the client." whenever
  * `isReportShipped` was true — which is only `reportStatus === 'published'`.
- * Publishing takes `notifyClient` / `notifyAgent` checkboxes, so an inspector who
- * left both unticked published to nobody and was then told the client had it. The
- * card also offered a "Send report" button directly beneath that sentence, which
- * is the contradiction that gives the lie away.
+ * Publication is not delivery: whether the client was emailed is the workspace's
+ * `report.published` automation rules' business, and nothing in this payload
+ * records their outcome. The card also offered a "Send report" button directly
+ * beneath that sentence, which is the contradiction that gives the lie away.
  *
  * Publication time is a fact the hub does have — the report_versions rows carry
  * `publishedAt` — so the card can state that instead of inventing a delivery.
@@ -88,30 +87,15 @@ describe('latestPublishedAt', () => {
     });
 });
 
-/**
- * What publishing actually notified. Read off the submitted form, because that is
- * the only place the answer exists — the hub payload records publication, not
- * delivery.
+/*
+ * The `publishNotified` suite that sat here is gone with the helper (F79). It
+ * asserted that an unticked pair reads as 'none' — true of the form, and false of
+ * the world: the flags reached a service that never read them, so the automation
+ * rules mailed the client regardless. Its absence is covered by the publish
+ * modal's own spec (no notify switches) and by
+ * `tests/unit/inspections/publish-audit-notify-flags.spec.ts` (no notify flag in
+ * the audit row).
  */
-describe('publishNotified', () => {
-    it('names both recipients when both were ticked', () => {
-        expect(publishNotified({ notifyClient: true, notifyAgent: true })).toBe('both');
-    });
-
-    it('names whichever single recipient was ticked', () => {
-        expect(publishNotified({ notifyClient: true, notifyAgent: false })).toBe('client');
-        expect(publishNotified({ notifyClient: false, notifyAgent: true })).toBe('agent');
-    });
-
-    it('says nobody when neither was ticked — the case the old copy misreported', () => {
-        expect(publishNotified({ notifyClient: false, notifyAgent: false })).toBe('none');
-    });
-
-    it('treats an absent flag as unticked', () => {
-        expect(publishNotified({})).toBe('none');
-        expect(publishNotified({ notifyClient: undefined, notifyAgent: undefined })).toBe('none');
-    });
-});
 
 /**
  * The invoice's FROM field showed "Your inspector" when the invoice carried no

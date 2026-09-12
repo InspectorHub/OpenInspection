@@ -14,6 +14,7 @@ import { inspectorPaletteMiddleware } from './lib/middleware/inspector-palette';
 import { touchLastActiveMiddleware } from './lib/middleware/touch-last-active';
 import { tenantRouter } from './features/tenant-routing';
 import { diMiddleware } from './lib/middleware/di';
+import { checkRateLimit } from './lib/rate-limit';
 import { securityHeaders } from './lib/middleware/security-headers';
 import { AppError, ErrorCode } from './lib/errors';
 import { sendError } from './lib/response';
@@ -517,9 +518,19 @@ const OPENAPI_CONFIG = {
     },
 } as const;
 
+// The memoization does not bound the attack above: `??=` makes a WARM isolate
+// cheap and the lever is arranging for COLD ones. Hence two more, neither enough
+// alone — an IP-keyed limiter does nothing distributed, a cache header is walked
+// past by a cache-busting query, and only the header helps a cold isolate (by
+// never reaching it). Ordering and rationale: openapi-doc-cost.spec.ts.
+// ⚠️ Requiring auth, or dropping this outside standalone, is NOT done here —
+// both change WHO may read the API surface, which is a product call.
 let openApiDocument: ReturnType<typeof app.getOpenAPIDocument> | undefined;
-app.get('/doc', (c) => {
+app.get('/doc', async (c) => {
+    // Before the build. Refusing after it pays the CPU, then withholds it.
+    await checkRateLimit(c, 'openapi-doc');
     openApiDocument ??= app.getOpenAPIDocument(OPENAPI_CONFIG);
+    c.header('Cache-Control', 'public, max-age=3600');
     return c.json(openApiDocument);
 });
 

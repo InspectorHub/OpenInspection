@@ -24,13 +24,26 @@ import {
   type DispatchItem,
 } from "./dispatch-helpers";
 
-export function TimeGutter({ hours, axisPx }: { hours: number[]; axisPx: number }) {
+export function TimeGutter({
+  hours,
+  axisPx,
+  allDayPx,
+}: {
+  hours: number[];
+  axisPx: number;
+  allDayPx: number;
+}) {
   return (
     <div className="sticky left-0 z-10 w-16 shrink-0 border-r border-ih-border bg-ih-bg-card">
       {/* Two spacers, not one: the gutter has to line up with BOTH the column
-          heading and the all-day strip, or every card sits an all-day row off. */}
+          heading and the all-day strip, or every card sits an all-day row off.
+          The strip height is computed by the board and shared, for the same
+          reason — see `allDayStripPx`. */}
       <div className="h-10 border-b border-ih-border" />
-      <div className="h-10 border-b border-ih-border pr-2 pt-2 text-right text-[10px] font-bold text-ih-fg-3">
+      <div
+        className="border-b border-ih-border pr-2 pt-2 text-right text-[10px] font-bold text-ih-fg-3"
+        style={{ height: `${allDayPx}px` }}
+      >
         {m.calendar_all_day()}
       </div>
       <div className="relative" style={{ height: `${axisPx}px` }}>
@@ -59,6 +72,7 @@ export function InspectorColumn({
   items,
   hours,
   axisPx,
+  allDayPx,
   draggingId,
   hoverMinute,
   onDragStartItem,
@@ -72,6 +86,7 @@ export function InspectorColumn({
   items: DispatchItem[];
   hours: number[];
   axisPx: number;
+  allDayPx: number;
   draggingId: string | null;
   hoverMinute: number | null;
   onDragStartItem: (id: string) => void;
@@ -96,16 +111,22 @@ export function InspectorColumn({
         <span className="ml-auto shrink-0 text-[11px] text-ih-fg-3">{timed.length + untimed.length}</span>
       </div>
 
-      <div className="h-10 space-y-1 overflow-y-auto border-b border-ih-border p-1">
+      {/* Height comes from the board, shared with the gutter and every sibling
+          column — a strip that sized itself would offset this column's axis.
+          `overflow-y-auto` stays as the last resort past ALL_DAY_MAX_ENTRIES. */}
+      <div
+        className="space-y-1 overflow-y-auto border-b border-ih-border p-1"
+        style={{ height: `${allDayPx}px` }}
+        data-testid="dispatch-all-day-strip"
+      >
         {untimed.map((item) => (
-          <div
+          <AllDayEntry
             key={item.id}
-            data-item-id={item.id}
-            data-inspection-id={item.inspectionId ?? item.id}
-            className={`truncate rounded px-2 py-0.5 text-[11px] font-bold ${cardTone(item.kind)}`}
-          >
-            {item.title}
-          </div>
+            item={item}
+            dragging={draggingId === item.id}
+            onDragStartItem={onDragStartItem}
+            onDragEndItem={onDragEndItem}
+          />
         ))}
       </div>
 
@@ -161,6 +182,54 @@ export function InspectorColumn({
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * One untimed item in the all-day strip.
+ *
+ * It used to be a bare `<div>` with the title in it: no link, no drag handle, no
+ * handler anywhere up the tree. That is what made the board read as a read-only
+ * poster — and because the feed put EVERY timed inspection in this strip, it was
+ * the only kind of card most boards ever showed. The affordances are the same
+ * ones the axis card already had, wired to the same drop handlers: drag it onto
+ * an hour to give it a time and an owner in one gesture, or open it.
+ */
+function AllDayEntry({
+  item,
+  dragging,
+  onDragStartItem,
+  onDragEndItem,
+}: {
+  item: DispatchItem;
+  dragging: boolean;
+  onDragStartItem: (id: string) => void;
+  onDragEndItem: () => void;
+}) {
+  const draggable = isDraggableItem(item);
+  return (
+    <div
+      data-item-id={item.id}
+      data-inspection-id={item.inspectionId ?? item.id}
+      data-testid="dispatch-all-day-entry"
+      draggable={draggable}
+      title={draggable ? m.dispatch_card_grip() : item.title}
+      onDragStart={(event) => {
+        event.dataTransfer.setData("text/plain", item.id);
+        event.dataTransfer.effectAllowed = "move";
+        onDragStartItem(item.id);
+      }}
+      onDragEnd={onDragEndItem}
+      className={`truncate rounded px-2 py-0.5 text-[11px] font-bold ${cardTone(item.kind)}${dragging ? " opacity-40" : ""}${draggable ? " cursor-grab" : ""}`}
+    >
+      {item.inspectionId ? (
+        <Link to={`/inspections/${item.inspectionId}`} className="block truncate hover:underline">
+          {item.title}
+        </Link>
+      ) : (
+        item.title
+      )}
     </div>
   );
 }

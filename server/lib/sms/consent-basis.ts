@@ -21,9 +21,26 @@
  * for carrier filings — describe the layers in TFV/campaign answers instead
  * (see docs/operate/sms-compliance.md).
  */
-import type { RoleKind } from '../people/role-kinds';
+import { ROLE_KINDS, type RoleKind } from '../people/role-kinds';
 
-export type ConsentRecipientType = 'client' | 'agent' | 'other' | 'staff';
+/**
+ * The `sms_consent_log.recipient_type` vocabulary, and the reason it is one
+ * value longer than `ROLE_KINDS` rather than a separate list.
+ *
+ * Every contact-party kind must be stampable — that is what "mirror RoleKind"
+ * in the ledger's own comment means, and a kind with nowhere to be recorded is
+ * a kind whose messages go out unaudited. So the kinds are spread, not
+ * retyped: a fourth kind becomes stampable by existing.
+ *
+ * `staff` is appended because it is NOT a contact-party kind: it is an
+ * employee reachable under account/employment terms, never consumer consent.
+ * It is a separate value precisely so a staff STOP can be recorded without
+ * entering the consumer consent evidence a carrier filing rests on — see the
+ * column comment in `db/schema/compliance.ts`, which reads this array.
+ */
+export const CONSENT_RECIPIENT_TYPES = [...ROLE_KINDS, 'staff'] as const;
+
+export type ConsentRecipientType = (typeof CONSENT_RECIPIENT_TYPES)[number];
 export type ConsentBasis = 'express' | 'implied';
 
 export const CONSENT_BASIS_BY_KIND: Record<RoleKind, {

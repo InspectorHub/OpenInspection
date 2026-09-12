@@ -164,6 +164,7 @@ const listContactAccessRoute = createRoute(withMcpMetadata({
                     inspectionId:    z.string(),
                     propertyAddress: z.string().nullable(),
                     role:            z.string(),
+                    roleLabel:       z.string().nullable().describe("The tenant's display label for that role key; null when the profile was retired or deactivated — fall back to `role`."),
                     createdAt:       z.number().nullable(),
                 })),
             })) } },

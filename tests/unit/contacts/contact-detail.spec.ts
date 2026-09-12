@@ -128,10 +128,15 @@ describe('IA-18 — ContactService.getContactDetail', () => {
         ]);
         await people.addPerson(TENANT, 'insp-paid', 'client-rev', roleProfileId('client'));
         await people.addPerson(TENANT, 'insp-unpaid', 'client-rev', roleProfileId('client'));
+        // `contactId` is the BILLED PARTY and revenue is keyed on it (see
+        // contact-detail.ts). Production always sets it —
+        // InvoiceService.resolveContactId falls through to the inspection's
+        // primary client — and this fixture omitted a field the real write path
+        // supplies, which is the shape of fixture that agrees with nothing.
         await testDb.insert(schema.invoices).values([
-            { id: 'inv-paid', tenantId: TENANT, inspectionId: 'insp-paid', amountCents: 30000,
+            { id: 'inv-paid', tenantId: TENANT, inspectionId: 'insp-paid', contactId: 'client-rev', amountCents: 30000,
               lineItems: [], paidAt: new Date(5000), createdAt: new Date(1000) },
-            { id: 'inv-unpaid', tenantId: TENANT, inspectionId: 'insp-unpaid', amountCents: 25000,
+            { id: 'inv-unpaid', tenantId: TENANT, inspectionId: 'insp-unpaid', contactId: 'client-rev', amountCents: 25000,
               lineItems: [], paidAt: null, createdAt: new Date(1000) },
         ]);
 
@@ -166,9 +171,9 @@ describe('IA-18 — ContactService.getContactDetail', () => {
         await people.addPerson(TENANT, 'insp-drift-paid', 'client-drift', roleProfileId('client'));
         await people.addPerson(TENANT, 'insp-drift-unpaid', 'client-drift', roleProfileId('client'));
         await testDb.insert(schema.invoices).values([
-            { id: 'inv-drift-paid', tenantId: TENANT, inspectionId: 'insp-drift-paid',
+            { id: 'inv-drift-paid', tenantId: TENANT, inspectionId: 'insp-drift-paid', contactId: 'client-drift',
               amountCents: 45000, lineItems: [], paidAt: new Date(5000), createdAt: new Date(1000) },
-            { id: 'inv-drift-unpaid', tenantId: TENANT, inspectionId: 'insp-drift-unpaid',
+            { id: 'inv-drift-unpaid', tenantId: TENANT, inspectionId: 'insp-drift-unpaid', contactId: 'client-drift',
               amountCents: 38000, lineItems: [], paidAt: null, createdAt: new Date(1000) },
         ]);
 

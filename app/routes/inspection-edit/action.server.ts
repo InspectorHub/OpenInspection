@@ -5,6 +5,7 @@ import { sanitizeSettingsPatch } from "~/lib/settings-patch";
 import { unwrapResultsResponse } from "~/lib/results";
 import { mapPool } from "~/lib/map-pool";
 import { handleStatutoryIntent } from "./action-statutory.server";
+import { handleFollowupIntent } from "./action-followup.server";
 
 export async function action({ request, params, context }: Route.ActionArgs) {
  const token = await requireToken(context, request);
@@ -26,6 +27,10 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  const statutory = await handleStatutoryIntent(String(intent ?? ""), formData, api, params.id);
  if (statutory) return statutory;
 
+ // #119 — a re-inspection's follow-up verdict; see action-followup.server.ts.
+ const followup = await handleFollowupIntent(String(intent ?? ""), formData, api, params.id);
+ if (followup) return followup;
+
  if (intent === "complete") {
  // Advisory order-lifecycle move; decoupled from publishing, never a gate.
  const res = await completeEndpoint();
@@ -44,13 +49,12 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  // concluded they had mis-clicked. Ordering it here is what makes the
  // checkbox mean what it says on the publish it was ticked for.
  const autoSign = formData.get("autoSignOnPublish");
- if (autoSign !== null) {
-  await api.inspections[":id"].$patch({
-   param: { id: params.id },
-   json: { autoSignOnPublish: autoSign === "true" },
-  });
- }
- const res = await api.inspections[":id"].publish.$post({ param: { id: params.id }, json: {} });
+ if (autoSign !== null) await api.inspections[":id"].$patch({ param: { id: params.id }, json: { autoSignOnPublish: autoSign === "true" } });
+ // The revision reason, when the dialog collected one. Blank or absent sends
+ // nothing, so the stored reason stays NULL rather than becoming an empty
+ // string that the amendment trail would render as a reason someone wrote.
+ const summary = String(formData.get("summary") ?? "").trim();
+ const res = await api.inspections[":id"].publish.$post({ param: { id: params.id }, json: { ...(summary ? { summary } : {}) } });
  // Publish has meaningful precondition failures (e.g. "Inspection must be
  // completed before publishing the report.") that the inspector MUST see —
  // returning a bare { ok:false } here routed the publish through the generic

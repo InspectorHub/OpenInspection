@@ -226,3 +226,46 @@ describe('editor loader — the statutory details the panel switches on', () => 
         expect((await loadAll()).statutoryDetails).toBeNull();
     });
 });
+
+/**
+ * Whether the next publish is a REVISION, answered server-side.
+ *
+ * The editor's publish dialog asks what changed only when the report already has
+ * a published version — otherwise it would ask every inspector to describe a
+ * change to a document nobody has seen. The answer is a server fact, so the
+ * loader derives it and the dialog only renders it; deriving it in the component
+ * would mean guessing from the order status, which is a different axis entirely.
+ */
+describe('editor loader — nextPublishIsAmendment', () => {
+    const withReportStatus = (reportStatus: unknown) => {
+        inspectionGet.mockResolvedValue(json({
+            inspection: { id: 'insp-1', date: '2026-05-01', templateSnapshot: SNAPSHOT, reportStatus },
+        }));
+        return loadAll();
+    };
+
+    it('is true once the report is published', async () => {
+        const data = await withReportStatus('published');
+        expect(data.nextPublishIsAmendment).toBe(true);
+    });
+
+    // One load per test: the shared `beforeEach` stubs each endpoint with a single
+    // Response instance, and a second load in the same test would re-read a body
+    // that is already consumed.
+    it('is false while the report is still in progress', async () => {
+        // The discriminating half: hardcoding `true` would make every first
+        // publish ask what changed.
+        expect((await withReportStatus('in_progress')).nextPublishIsAmendment).toBe(false);
+    });
+
+    it('is false while the report is submitted but not published', async () => {
+        expect((await withReportStatus('submitted')).nextPublishIsAmendment).toBe(false);
+    });
+
+    it('is false when the payload carries no report status at all', async () => {
+        // A partial or older payload must not be read as "already published" —
+        // that would put a revision-reason box on a first publish.
+        const data = await loadAll();
+        expect(data.nextPublishIsAmendment).toBe(false);
+    });
+});

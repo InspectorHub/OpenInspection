@@ -9430,7 +9430,7 @@
       "body": null
     },
     "summary": "Effective SMS sender configuration (mode + source, no secrets)",
-    "description": "Returns the tenant SMS sender mode and the effective credential source (platform env, tenant own, or none) WITHOUT leaking any secret values. Drives the \"Using platform SMS\" / \"Using your Twilio\" line in Settings."
+    "description": "Returns the tenant SMS sender mode and the effective credential source (platform env, tenant own, the platform-managed pool, or none) WITHOUT leaking any secret values. Drives the \"Using platform SMS\" / \"Using your Twilio\" / managed-unavailable line in Settings; \"managed\" is resolved from the API-key triple + Messaging Service SID the managed send path uses, not from the account/token/from bag (see resolveTwilioSourceForTenant)."
   },
   {
     "operationId": "getSmsConsentStatus",
@@ -10665,8 +10665,8 @@
           "schema": {
             "type": "string",
             "enum": [
-              "agent",
               "client",
+              "agent",
               "other"
             ],
             "example": "agent",

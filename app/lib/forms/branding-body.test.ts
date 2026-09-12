@@ -9,7 +9,6 @@ describe("brandingUpdateBody", () => {
   it("sends every checkbox explicitly, even when the box was never rendered", () => {
     const body = brandingUpdateBody(values({ companyName: "Acme" }));
     expect(body).toMatchObject({
-      enableRepairList: false,
       enableCustomerRepairExport: false,
       pdfShowFooter: false,
       pdfShowPageNumbers: false,
@@ -18,8 +17,8 @@ describe("brandingUpdateBody", () => {
   });
 
   it("keeps a checked box true", () => {
-    const body = brandingUpdateBody(values({ companyName: "Acme", enableRepairList: true, pdfShowLicense: true }));
-    expect(body.enableRepairList).toBe(true);
+    const body = brandingUpdateBody(values({ companyName: "Acme", enableCustomerRepairExport: true, pdfShowLicense: true }));
+    expect(body.enableCustomerRepairExport).toBe(true);
     expect(body.pdfShowLicense).toBe(true);
   });
 

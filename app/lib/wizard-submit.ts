@@ -1,6 +1,15 @@
 import type { AddressSelection } from "~/routes/resources/places";
 
 /**
+ * Re-exported here because the property-type vocabulary is part of THIS
+ * contract: `propertyType` below is one of the fields the create endpoint
+ * validates, and the wizard needs the list to pick its default. Defined once in
+ * `server/lib/inspection-property-type.ts` — a literal retyped in the component
+ * is how the selection came to be posted in a shape no endpoint accepted.
+ */
+export { INSPECTION_PROPERTY_TYPES } from "../../server/lib/inspection-property-type";
+
+/**
  * The form body the New Inspection wizard posts.
  *
  * Pulled out of the component so the contract can be asserted directly rather

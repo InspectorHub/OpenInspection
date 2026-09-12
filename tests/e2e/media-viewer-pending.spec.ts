@@ -63,9 +63,14 @@ test.describe('media viewer — a photo still on another device', () => {
         // detail of the lightbox; asserting at least one, and looking at the
         // first, pins what the reader sees.
         const placeholders = page.getByTestId('media-pending-placeholder');
-        expect(await placeholders.count()).toBeGreaterThan(0);
+        // Wait for the lightbox to finish rendering before counting. `.count()`
+        // is a point-in-time snapshot — it returns 0 if called before the
+        // carousel mounts its slides. `toBeVisible()` retries and is the right
+        // gate; the count assertion that follows is then a post-condition, not a
+        // race.
         const placeholder = placeholders.first();
         await expect(placeholder).toBeVisible();
+        expect(await placeholders.count()).toBeGreaterThan(0);
         // Not just present: it has to SAY something, and say the right thing.
         // An empty box is the same dead end as the torn-page icon, one shade
         // quieter — and copy about a failed upload would be a different lie.

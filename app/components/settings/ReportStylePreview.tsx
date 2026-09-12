@@ -1,3 +1,7 @@
+// i18n-literals-ok-file: this component is a STYLE preview. Every string in it
+// is sample data standing in for a real inspection's own content, which is
+// tenant data and is never translated. Translating the sample would make the
+// preview lie about what a Spanish workspace's report actually renders.
 // Live, zero-round-trip preview of the resolved report appearance. Renders a
 // trimmed mini-report (cover, section heading, band, one defect card, a typed
 // signature) using the SAME var(--report-*) contract ReportView consumes, so the
@@ -36,6 +40,13 @@ export function ReportStylePreview({
       }}
     >
       {/* cover */}
+      {/* every string below is SAMPLE DATA in a style preview.
+          This component shows what the report's typography and palette look
+          like; the words are a stand-in for a real inspection's own content,
+          which is tenant data and is never translated. Translating the sample
+          would make the preview lie about what a Spanish workspace's report
+          actually renders — it renders that workspace's English or Spanish
+          text, whichever they typed. */}
       <div style={{ position: "relative", height: "var(--report-cover-height)", background: "linear-gradient(150deg,#c3ccd2,#9aa7af)" }}>
         <div style={{ position: "absolute", inset: 0, background: "var(--report-cover-overlay)" }} />
         <div style={{ position: "absolute", left: 14, bottom: 10, color: "var(--report-cover-ink)" }}>

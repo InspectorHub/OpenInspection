@@ -76,3 +76,51 @@ describe("PublishReportModal unresolved-items notice", () => {
         expect(screen.queryByText(/item\(s\)|items? still need attention/i)).toBeNull();
     });
 });
+
+/**
+ * F79 — the modal offers no "who gets notified" switches, because nothing honours
+ * them.
+ *
+ * It used to render `notifyClient` and `notifyAgent`. `publishInspection` declares
+ * both in its options type and reads neither: who receives the report is decided
+ * by the workspace's `report.published` automation rules. So the switches changed
+ * nothing, and the publish audit entry recorded the flag as given — a publish
+ * marked "notify nobody" was written down as one that notified nobody while every
+ * rule fired and the mail went out.
+ *
+ * Removing them without answering the question they asked would be a second
+ * defect, so the dialog now STATES who will be told and points at the surface
+ * that decides it. That sentence is asserted here alongside the absence: a modal
+ * that dropped the switches and said nothing would otherwise pass.
+ *
+ * The two remaining toggles are the positive control. They prove the harness
+ * renders toggle rows at all, so "no notify checkbox" means absent rather than
+ * unrendered.
+ */
+describe("PublishReportModal — no notify switches (F79)", () => {
+    it("renders no notify-client / notify-agent control", async () => {
+        renderModal(0);
+        // The wire names, which is what the action used to read off the form.
+        expect(await screen.findByRole("button", { name: /publish/i })).toBeTruthy();
+        expect(document.querySelector('input[name="notifyClient"]')).toBeNull();
+        expect(document.querySelector('input[name="notifyAgent"]')).toBeNull();
+        // And the user-visible promise, whatever it happened to be labelled.
+        expect(screen.queryByRole("checkbox", { name: /notify/i })).toBeNull();
+    });
+
+    it("states who will be notified, and points at what decides it", async () => {
+        renderModal(0);
+        expect(await screen.findByTestId("publish-notify-automation")).toBeTruthy();
+        const link = await screen.findByRole("link", { name: /automation/i });
+        expect(link.getAttribute("href")).toBe("/settings/automations");
+    });
+
+    // POSITIVE CONTROL: the gate toggles are still switches on this form, so the
+    // absence assertions above are about these two flags and not about a modal
+    // that renders no checkboxes at all.
+    it("still offers the two gates the server does honour", async () => {
+        renderModal(0);
+        expect(await screen.findByRole("checkbox", { name: /signature/i })).toBeTruthy();
+        expect(await screen.findByRole("checkbox", { name: /payment/i })).toBeTruthy();
+    });
+});

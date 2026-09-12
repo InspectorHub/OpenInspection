@@ -435,9 +435,9 @@ test.describe.serial('Agent unified link (Spec 3 Task 8)', () => {
     await page.goto(`${BASE_URL}/agent-login`, { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
     const linkForm = page
       .locator('form')
-      .filter({ has: page.getByRole('button', { name: 'Email me a sign-in link instead' }) });
-    await linkForm.getByLabel('Email address').fill(REGISTERED_AGENT.email);
-    await linkForm.getByRole('button', { name: 'Email me a sign-in link instead' }).click();
+      .filter({ has: page.getByRole('button', { name: 'Email me a sign-in link' }) });
+    await linkForm.getByLabel('Email address for your sign-in link').fill(REGISTERED_AGENT.email);
+    await linkForm.getByRole('button', { name: 'Email me a sign-in link' }).click();
 
     await expect(page.getByRole('heading', { name: 'Check your inbox' })).toBeVisible({ timeout: 10000 });
 

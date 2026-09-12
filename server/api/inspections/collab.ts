@@ -27,13 +27,16 @@
 import type { Context } from 'hono';
 import { createApiRouter } from '../../lib/openapi-router';
 import { logger } from '../../lib/logger';
-import { CollabRestoreRequestSchema, CollabSnapshotParamSchema } from '../../lib/validations/collab.schema';
+import { CollabFollowupRequestSchema, CollabRestoreRequestSchema, CollabSnapshotParamSchema } from '../../lib/validations/collab.schema';
 import type { HonoConfig } from '../../types/hono';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 import { getInspectionRoster } from '../../lib/inspection/roster';
 import { collabDocName } from '../../lib/collab/doc-name';
 import { resolvePrimaryReportId } from '../../lib/inspection/reports';
 import { getDrizzle } from '../../lib/route-helpers';
+import { eq } from 'drizzle-orm';
+import { tenantConfigs } from '../../lib/db/schema';
+import { parseReinspectionStatuses } from '../../lib/reinspection-status';
 
 /**
  * Result of the shared fail-closed auth: either an early `Response` (the caller
@@ -257,6 +260,65 @@ const collabRoutes = createApiRouter()
                 'x-report-id':     auth.reportId,
                 'x-user-id':       auth.userId,
             },
+        });
+        return stub.fetch(fwd);
+    })
+    // ── POST /:id/collab/followup — record a carried item's follow-up verdict ──
+    // #119. The one write this feature was missing: `createReinspection` seeds
+    // every carried item with `followupStatus: null`, the report renders it and
+    // the next round's pre-selection is computed from it, and until now no
+    // surface could set it. It travels through the DO rather than straight to D1
+    // because the Y.Doc is the only write path for a finding — see
+    // `server/lib/collab/followup-patch.ts`.
+    //
+    // Same fail-closed auth as /restore: whoever may edit the document may
+    // record the verdict, which is the same permission the rating buttons carry.
+    .post('/:id/collab/followup', async (c) => {
+        const auth = await authorizeCollab(c);
+        if (!auth.ok) return auth.response;
+
+        let parsedBody: unknown;
+        try {
+            parsedBody = await c.req.json();
+        } catch {
+            return c.json({ error: 'invalid JSON body' }, 400);
+        }
+        const parsed = CollabFollowupRequestSchema.safeParse(parsedBody);
+        if (!parsed.success) {
+            return c.json({ error: 'invalid follow-up request' }, 400);
+        }
+
+        // The VOCABULARY IS THE TENANT'S, and it is checked here rather than in
+        // the document: a key outside the workspace's set would be stored
+        // faithfully and then read as "still open" by `isOpenStatus`, which is a
+        // wrong answer that looks like a deliberate one. Refusing it names the
+        // keys, so a client whose list has drifted learns what the set is.
+        if (parsed.data.status !== null) {
+            const row = await getDrizzle(c)
+                .select({ s: tenantConfigs.reinspectionStatuses })
+                .from(tenantConfigs)
+                .where(eq(tenantConfigs.tenantId, auth.tenantId))
+                .get();
+            const allowed = parseReinspectionStatuses(row?.s ?? null);
+            if (!allowed.some((s) => s.key === parsed.data.status)) {
+                return c.json(
+                    { error: 'unknown follow-up status', allowed: allowed.map((s) => s.key) },
+                    400,
+                );
+            }
+        }
+
+        const stub = collabStub(c, auth.tenantId, auth.reportId);
+        const fwd = new Request('https://do.local/followup', {
+            method:  'POST',
+            headers: {
+                'Content-Type':    'application/json',
+                'x-tenant-id':     auth.tenantId,
+                'x-inspection-id': auth.inspectionId,
+                'x-report-id':     auth.reportId,
+                'x-user-id':       auth.userId,
+            },
+            body: JSON.stringify(parsed.data),
         });
         return stub.fetch(fwd);
     });

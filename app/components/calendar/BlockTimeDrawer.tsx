@@ -172,8 +172,11 @@ export function BlockTimeDrawer({
 
           <label className="block">
             <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">{m.calendar_block_field_date()}</span>
+            {/* IA-88 ⑥ — see FiltersDrawer: the native picker reads `lang` off
+                the control, not off `<html>`. */}
             <input
               type="date"
+              lang="en"
               required
               value={date}
               onChange={(event) => setDate(event.target.value)}

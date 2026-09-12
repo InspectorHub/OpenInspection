@@ -5,10 +5,29 @@ import type { action } from "~/routes/inspector-portal";
 import type { PersonRow } from "./PeopleEditor";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { m } from "~/paraglide/messages";
+// Grouped in vocabulary order — see the note in <PeopleEditor>.
+import { ROLE_KINDS } from "../../../server/lib/people/role-kinds";
 
 const FORM_ID = "ih-send-report-form";
 
-const GROUP_ORDER = ["client", "agent", "other"] as const;
+/**
+ * Whose box is ticked when the dialog opens.
+ *
+ * The client and the agents on the inspection ARE the report's addressees — they
+ * were entered on this job for that reason, and opening the dialog with nobody
+ * selected made the product ask a question it already had the answer to: the
+ * inspector had to re-nominate, by hand, the two people whose email addresses
+ * they had typed in themselves. Worse, the submit button is disabled until
+ * something is ticked, so the one-gesture case ("send it to the people on this
+ * job") was the one that needed the most clicks.
+ *
+ * `other` is deliberately NOT pre-ticked. It is the bucket for an attorney, a
+ * contractor, a transaction coordinator — people on the order who are not
+ * automatically addressees of the whole report. The two mistakes are not
+ * symmetrical: a missing tick costs one click, and a wrong one discloses a
+ * document to somebody and cannot be taken back.
+ */
+const PRECHECKED_KINDS: ReadonlySet<PersonRow["kind"]> = new Set(["client", "agent"]);
 
 function groupLabel(kind: PersonRow["kind"]): string {
   switch (kind) {
@@ -54,7 +73,16 @@ export function SendReportModal({
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
   onClose: () => void;
 }) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Computed in a lazy initializer, which holds only because this component is
+  // MOUNTED per open (`{sendReportOpen && <SendReportModal …>}`) — so every
+  // opening re-reads the current people. If it is ever kept mounted behind an
+  // `open` prop, this has to become an effect keyed on the dialog opening, or the
+  // ticks freeze at whoever was on the inspection the first time the page
+  // rendered. A person with no email is never pre-ticked: the endpoint would skip
+  // them and the row is rendered disabled.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    () => new Set(people.filter((p) => p.email && PRECHECKED_KINDS.has(p.kind)).map((p) => p.id)),
+  );
   const [oneOffEmail, setOneOffEmail] = useState("");
   const [oneOffRoleKey, setOneOffRoleKey] = useState("");
 
@@ -99,7 +127,7 @@ export function SendReportModal({
     if (succeeded) onClose();
   }, [succeeded, onClose]);
 
-  const groups = GROUP_ORDER.map((kind) => ({
+  const groups = ROLE_KINDS.map((kind) => ({
     kind,
     rows: people.filter((p) => p.kind === kind),
   })).filter((g) => g.rows.length > 0);
@@ -156,7 +184,7 @@ export function SendReportModal({
                           key={person.id}
                           htmlFor={inputId}
                           className={`flex items-start gap-2.5 text-[13px] ${
-                            hasEmail ? "text-ih-fg-1 cursor-pointer" : "text-ih-fg-4 cursor-not-allowed"
+                            hasEmail ? "text-ih-fg-1 cursor-pointer" : "text-ih-fg-3 cursor-not-allowed"
                           }`}
                         >
                           <Checkbox

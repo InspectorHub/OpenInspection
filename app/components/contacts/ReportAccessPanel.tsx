@@ -5,7 +5,14 @@ import { m } from "~/paraglide/messages";
 export interface AccessRow {
   inspectionId: string;
   propertyAddress: string | null;
+  /** The role-profile KEY, e.g. `buyer_agent`. Not for display. */
   role: string;
+  /**
+   * The tenant's own display label for that key, resolved server-side from
+   * `contact_role_profiles` (IA-119). Null when the profile was retired or
+   * deactivated — there is then no label to show and `role` is the fallback.
+   */
+  roleLabel: string | null;
   createdAt: number;
 }
 
@@ -102,13 +109,12 @@ export function ReportAccessPanel({
                   >
                     {a.propertyAddress || a.inspectionId.slice(0, 8)}
                   </Link>
-                  {/* TODO(IA-119): this prints the raw enum key (`buyer_agent`).
-                      The tenant's role vocabulary already has display labels —
-                      Settings -> Inspection roles renders "Buyer's Agent" from
-                      the same data — so this should read through it. Left as-is
-                      here because the fix belongs with IA-107's consolidation of
-                      the three competing role vocabularies, not ahead of it. */}
-                  <p className="text-[11px] text-ih-fg-3">{a.role}</p>
+                  {/* The tenant's own wording, with the key as the fallback —
+                      the same order the report-delivery list uses. No label map
+                      here on purpose: this vocabulary is tenant-editable
+                      (Settings -> Inspection roles), so any copy of it in the
+                      client would be a second, wrong answer. */}
+                  <p className="text-[11px] text-ih-fg-3">{a.roleLabel ?? a.role}</p>
                 </div>
                 <revokeFetcher.Form method="post">
                   <input type="hidden" name="intent" value="revoke-access" />

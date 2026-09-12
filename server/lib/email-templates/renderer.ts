@@ -8,6 +8,18 @@ export interface RendererConfig {
   tenantBrand: TemplateBrand;
   platformBrand: TemplateBrand;
   overrides?: Map<string, TemplateOverride>;
+  /**
+   * Whether THIS workspace counts report opens (`tenant_configs`, default off —
+   * read through `readReportViewCountingEnabled`).
+   *
+   * Required, with no default in this interface on purpose. The block it gates
+   * states as a fact that opens are recorded, and both ways of getting that
+   * wrong are real: a default of `true` puts the old false claim back in front
+   * of every workspace that never opted in, and a default of `false` would hide
+   * the Art. 13 notice from a workspace that DID. So the renderer does not
+   * guess — every construction site answers for the tenant it is rendering for.
+   */
+  viewCountingEnabled: boolean;
 }
 
 
@@ -75,6 +87,12 @@ export class EmailTemplateRenderer {
         if (!data.icsAttached) continue;
         parts.push(`<p style="margin:8px 0;font-size:13px;color:#64748b;">A calendar invite (<strong>inspection.ics</strong>) is attached — open it to add this to your calendar.</p>`);
       } else if (kind === 'viewDisclosure') {
+        // Only where the thing it describes actually happens. The notice states
+        // as fact that opens are recorded; in a workspace that has not turned
+        // counting on, nothing is, and the sentence described a measurement the
+        // recipient could neither verify nor find. The descriptor still DECLARES
+        // the block — what changed is whether this tenant's mail carries it.
+        if (!this.config.viewCountingEnabled) continue;
         parts.push(viewDisclosureHtml(data.reportUrl));
       }
     }
@@ -98,9 +116,12 @@ const ATTACHMENT_MANIFEST_HTML =
  * blocks means adding it HERE, not re-deriving the notice at the call site.
  */
 export function reportDeliverySystemBlocks(
-  args: { reportUrl: string; hasAttachment: boolean },
+  args: { reportUrl: string; hasAttachment: boolean; viewCountingEnabled: boolean },
 ): string {
-  const parts = [viewDisclosureHtml(args.reportUrl)];
+  // Same rule as the descriptor path above, and required for the same reason:
+  // the notice is owed where opens are counted and is a false statement where
+  // they are not, so the caller has to say which workspace this is.
+  const parts = args.viewCountingEnabled ? [viewDisclosureHtml(args.reportUrl)] : [];
   if (args.hasAttachment) parts.unshift(ATTACHMENT_MANIFEST_HTML);
   return parts.join('\n');
 }

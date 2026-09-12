@@ -192,6 +192,22 @@ export default function SetupPage() {
             {isSubmitting ? m.auth_setup_submit_pending() : m.auth_setup_submit()}
           </Button>
         </Form>
+
+        {/* F74 — publishing agent terms is a manual, deployment-level step in
+            BOTH modes: the gate does not branch on APP_MODE, no workspace
+            administrator can supply the document, and until it exists agents
+            reach "Agent sign-up is not available yet" with no way forward. It is
+            documented thoroughly in docs/operate/deploy.md and nowhere an
+            operator who only runs this wizard would see it. A note, not a step:
+            the terms are published from the command line, so nothing here waits
+            on it. */}
+        <p className="mt-6 pt-4 border-t border-ih-border text-[12px] text-ih-fg-3">
+          {m.auth_setup_agent_terms_note()}{" "}
+          {/* i18n-literal-ok: a shell command. Translating it would produce a
+              command that does not exist. */}
+          <code className="px-1 py-0.5 bg-ih-bg-muted rounded text-ih-fg-2 font-mono text-[10px]">npm run agent-terms:publish</code>{" "}
+          {m.auth_setup_agent_terms_docs()}
+        </p>
       </div>
     </div>
   );

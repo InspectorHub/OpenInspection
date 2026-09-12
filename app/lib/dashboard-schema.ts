@@ -37,6 +37,9 @@ export interface TemplateOption {
   retiredAt?: number | null;
   /** Why it stopped. Retired options stay listed; see `TemplateCombobox`. */
   retiredReason?: "superseded" | "uninstalled" | null;
+  /** The state or country this template is written to, or null for none. Decides
+   *  picker order, never availability — see `app/lib/template-order.ts`. */
+  jurisdiction?: string | null;
 }
 
 /** Service option for the New Inspection wizard Services step (B-8). */

@@ -21,6 +21,7 @@ import { tenantDisplayName } from '../../lib/tenant-display-name';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { resolveTurnstileSiteKey } from '../../lib/middleware/bot-protection';
 import { getDrizzle } from '../../lib/route-helpers';
+import { hasDeclaredTenantTimeZone } from '../../lib/tz';
 
 const bookingProfileRoutes = createApiRouter()
     /**
@@ -59,6 +60,7 @@ const bookingProfileRoutes = createApiRouter()
                 conciergeReviewRequired: tenantConfigs.conciergeReviewRequired,
                 currency: tenantConfigs.currency,
                 depositPolicy: tenantConfigs.depositPolicy,
+                defaultTimezone: tenantConfigs.defaultTimezone,
             })
                 .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantRow.id)).get(),
             booking.getQualifiedInspectorIds(tenantRow.id, []),
@@ -74,7 +76,25 @@ const bookingProfileRoutes = createApiRouter()
                 .all()
             : [];
         const hourIds = withHours.map(r => r.inspectorId);
-        const bookingOpen = hourIds.length > 0;
+        // OPENING HOURS ARE A WALL CLOCK. A wall clock with no declared zone is
+        // not a time, so a workspace that never set one is not open for online
+        // booking however many availability rows it has — offering "8:00 AM" we
+        // cannot anchor is how a client's invite ended up naming the wrong hour.
+        // Same predicate the submit path refuses on (see booking-admission), so
+        // the page and the POST can never disagree about whether booking is on.
+        const bookingOpen = hourIds.length > 0 && hasDeclaredTenantTimeZone(config?.defaultTimezone);
+        // WHICH half is missing, decided HERE, from the two locals the boolean
+        // above is already made of. The admin surface that configures this page
+        // (`/settings/booking`) has to name the blocker, and a second reader
+        // computing "is there an hour row" for itself is how two surfaces end up
+        // disagreeing about whether booking is on. Hours take precedence when
+        // both are missing: a wall clock with no hours to anchor is not yet the
+        // operator's next step.
+        const bookingClosedReason = bookingOpen
+            ? null
+            : hourIds.length === 0
+                ? 'no_inspector_hours' as const
+                : 'no_company_timezone' as const;
 
         let inspectors: Array<{ id: string; name: string | null; photoUrl: string | null }> = [];
         if (allowChoice && hourIds.length > 0) {
@@ -89,6 +109,9 @@ const bookingProfileRoutes = createApiRouter()
                 company: tenantRow.name,
                 turnstileSiteKey: resolveTurnstileSiteKey(c.env),
                 bookingOpen,
+                // Operator diagnostic, not visitor copy: the public page says
+                // only that booking is closed, and says it from `bookingOpen`.
+                bookingClosedReason,
                 allowInspectorChoice: allowChoice,
                 conciergeReviewRequired: !!config?.conciergeReviewRequired,
                 inspectors,
@@ -117,7 +140,10 @@ const bookingProfileRoutes = createApiRouter()
         const db = getDrizzle(c);
 
         // Resolve tenant by slug
-        const tenantRow = await db.select({ id: tenants.id, name: tenantDisplayName })
+        const tenantRow = await db.select({
+            id: tenants.id, name: tenantDisplayName,
+            defaultTimezone: tenantConfigs.defaultTimezone,
+        })
             .from(tenants)
             .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, tenants.id))
             .where(eq(tenants.slug, tenant)).get();
@@ -150,7 +176,10 @@ const bookingProfileRoutes = createApiRouter()
                 company: tenantRow.name,
                 avatar: inspector.photoUrl,
                 turnstileSiteKey: resolveTurnstileSiteKey(c.env),
-                bookingOpen: !!hasHours,
+                // Hours AND a declared company zone — the same two-part test the
+                // company page and the submit path apply. An hour nobody
+                // anchored is not an hour this page may offer.
+                bookingOpen: !!hasHours && hasDeclaredTenantTimeZone(tenantRow.defaultTimezone),
                 services: svcRows.map(s => ({
                     id: s.id, name: s.name, price: Number(s.price || 0), duration: Number(s.durationMinutes || 60),
                 })),

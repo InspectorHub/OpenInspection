@@ -49,7 +49,7 @@ function TemplateRowItem({ row }: { row: TemplateRow }) {
       {row.required ? (
         <span className="text-[10px] font-bold uppercase tracking-widest text-ih-ok-fg shrink-0">{m.email_list_active()}</span>
       ) : row.isCustomized ? (
-        <span className={`text-[10px] font-bold uppercase tracking-widest shrink-0 ${enabled ? "text-ih-ok-fg" : "text-ih-fg-4"}`}>{enabled ? m.email_list_active() : m.email_list_disabled()}</span>
+        <span className={`text-[10px] font-bold uppercase tracking-widest shrink-0 ${enabled ? "text-ih-ok-fg" : "text-ih-fg-3"}`}>{enabled ? m.email_list_active() : m.email_list_disabled()}</span>
       ) : (
         <fetcher.Form method="post" className="shrink-0">
           <input type="hidden" name="intent" value="toggle-template" />

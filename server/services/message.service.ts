@@ -2,6 +2,8 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 import { inspectionMessages, inspections, inspectionPeople, contactRoleProfiles, contacts } from '../lib/db/schema';
 import type { MessageAttachment } from '../lib/db/schema';
+import type { MessageFromRole } from '../lib/db/schema/message';
+import type { RoleKind } from '../lib/people/role-kinds';
 import { Errors } from '../lib/errors';
 import type { NotificationService } from './notification.service';
 import { PeopleService } from './people.service';
@@ -11,7 +13,7 @@ interface CreateMessageInput {
     inspectionId: string | null;
     /** The counterparty whose thread this message belongs to — never the staff author. */
     contactId: string;
-    fromRole: 'inspector' | 'client' | 'agent' | 'other';
+    fromRole: MessageFromRole;
     /** Staff author when fromRole === 'inspector'; null when the counterparty sent it. */
     fromUserId?: string | null;
     fromName?: string | null;
@@ -287,7 +289,7 @@ export class MessageService {
      * on counterparty-authored rows. 'other' when the seat's profile has no
      * recognisable kind.
      */
-    async roleKindOnInspection(tenantId: string, inspectionId: string, contactId: string): Promise<'client' | 'agent' | 'other'> {
+    async roleKindOnInspection(tenantId: string, inspectionId: string, contactId: string): Promise<RoleKind> {
         const seat = await this.db().select({ kind: contactRoleProfiles.kind })
             .from(inspectionPeople)
             .innerJoin(contactRoleProfiles, eq(inspectionPeople.roleProfileId, contactRoleProfiles.id))

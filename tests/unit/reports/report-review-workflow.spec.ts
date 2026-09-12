@@ -65,7 +65,7 @@ describe('Report review workflow (submit / publish / return / unpublish)', () =>
         ]);
 
         await svc.publishInspection('insp-pub-1', TENANT, {
-            theme: 'default', notifyClient: false, notifyAgent: false,
+            theme: 'default',
             requireSignature: false, requirePayment: false,
         });
 
@@ -94,7 +94,7 @@ describe('Report review workflow (submit / publish / return / unpublish)', () =>
             ]);
 
             await svc.publishInspection(id, TENANT, {
-                theme: 'default', notifyClient: false, notifyAgent: false,
+                theme: 'default',
                 requireSignature: false, requirePayment: false,
             });
 
@@ -111,7 +111,7 @@ describe('Report review workflow (submit / publish / return / unpublish)', () =>
 
         // Should NOT throw — re-publishing an already-published report is idempotent
         await svc.publishInspection('insp-pub-6', TENANT, {
-            theme: 'default', notifyClient: false, notifyAgent: false,
+            theme: 'default',
             requireSignature: false, requirePayment: false,
         });
 

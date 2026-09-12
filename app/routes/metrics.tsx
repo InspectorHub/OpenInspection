@@ -8,6 +8,7 @@ import { useDisplayLocale, useDisplayCurrency, useDisplayTimeZone } from "~/hook
 import { DateRangePicker } from "~/components/metrics/DateRangePicker";
 import { FindingsBySection, type FindingsData } from "~/components/metrics/FindingsBySection";
 import { civilToday, normaliseRange, type MetricsRange } from "~/lib/metrics-range";
+import { barHeightPx, monthLabel } from "~/lib/metrics-chart";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -110,6 +111,12 @@ export default function MetricsPage() {
   // this page was $0 and 100 × 0 is still 0. Fixing the source (IA-132) is what
   // finally made a wrong scale show up, as $83,000 for two jobs worth $830.
   const fmt = (n: number) => formatDollars(n, { locale, currency });
+  // "1 inspections" read off the page. The two nouns are separate keys rather
+  // than a `{plural}` suffix because Spanish changes the stem, not just the tail
+  // (inspección / inspecciones) — the same shape `/invoices` already uses.
+  const countLabel = data
+    ? `${data.totalInspections} ${data.totalInspections === 1 ? m.metrics_meta_singular() : m.metrics_meta_plural()}`
+    : "";
 
   const changeRange = (next: MetricsRange) => {
     navigate(`/metrics?from=${next.from}&to=${next.to}`, { replace: true });
@@ -133,7 +140,7 @@ export default function MetricsPage() {
     <div className="space-y-ih-list">
       <PageHeader
         title={m.metrics_heading()}
-        meta={data ? m.metrics_meta({ count: data.totalInspections }) : m.metrics_loading()}
+        meta={data ? countLabel : m.metrics_loading()}
         actions={
           <DateRangePicker range={range} today={today} locale={locale} onChange={changeRange} />
         }
@@ -155,7 +162,10 @@ export default function MetricsPage() {
         </Card>
       )}
 
-      {/* Inspections per month chart placeholder */}
+      {/* Inspections per month. Bar heights are px, not percentages — see
+          app/lib/metrics-chart.ts: a percentage height resolved against this
+          column (a flex item of an `items-end` row, so content-sized and
+          INDEFINITE) collapsed every bar to 0 and the chart drew nothing. */}
       {companyView && (
       <Card className="p-5">
         <p className="text-sm font-bold text-ih-fg-1 mb-4">{m.metrics_chart_inspections()}</p>
@@ -163,15 +173,15 @@ export default function MetricsPage() {
           <div className="flex items-end gap-2 h-40">
             {data.monthly.map((mo) => {
               const max = Math.max(...data.monthly.map((x) => x.count), 1);
-              const pct = (mo.count / max) * 100;
               return (
                 <div key={mo.month} className="flex-1 flex flex-col items-center gap-1">
                   <span className="text-[10px] font-bold text-ih-fg-3">{mo.count}</span>
                   <div
+                    data-testid="metrics-bar-inspections"
                     className="w-full bg-ih-primary rounded-t"
-                    style={{ height: `${Math.max(pct, 4)}%` }}
+                    style={{ height: `${barHeightPx(mo.count, max)}px` }}
                   />
-                  <span className="text-[10px] text-ih-fg-3">{mo.month.slice(5)}</span>
+                  <span className="text-[10px] text-ih-fg-3">{monthLabel(mo.month, locale)}</span>
                 </div>
               );
             })}
@@ -190,15 +200,15 @@ export default function MetricsPage() {
           <div className="flex items-end gap-2 h-40">
             {data.monthly.map((mo) => {
               const maxRev = Math.max(...data.monthly.map((x) => x.revenue), 1);
-              const pct = (mo.revenue / maxRev) * 100;
               return (
                 <div key={mo.month + "-rev"} className="flex-1 flex flex-col items-center gap-1">
                   <span className="text-[10px] font-bold text-ih-fg-3">{fmt(mo.revenue)}</span>
                   <div
+                    data-testid="metrics-bar-revenue"
                     className="w-full bg-ih-ok rounded-t"
-                    style={{ height: `${Math.max(pct, 4)}%` }}
+                    style={{ height: `${barHeightPx(mo.revenue, maxRev)}px` }}
                   />
-                  <span className="text-[10px] text-ih-fg-3">{mo.month.slice(5)}</span>
+                  <span className="text-[10px] text-ih-fg-3">{monthLabel(mo.month, locale)}</span>
                 </div>
               );
             })}

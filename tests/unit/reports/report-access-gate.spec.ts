@@ -4,15 +4,15 @@ import { publicReportAccessAllowed, shouldPinLatestPublished } from '../../../se
 
 describe('publicReportAccessAllowed', () => {
   it('client token: allowed only when published', () => {
-    expect(publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: 'published' })).toBe(true);
-    expect(publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: 'in_progress' })).toBe(false);
-    expect(publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: 'submitted' })).toBe(false);
+    expect(publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: 'published', releaseGate: null })).toBe(true);
+    expect(publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: 'in_progress', releaseGate: null })).toBe(false);
+    expect(publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: 'submitted', releaseGate: null })).toBe(false);
   });
   it('render mode bypasses (drafts must render headless)', () => {
-    expect(publicReportAccessAllowed({ renderMode: true, ownerPreview: false, reportStatus: 'in_progress' })).toBe(true);
+    expect(publicReportAccessAllowed({ renderMode: true, ownerPreview: false, reportStatus: 'in_progress', releaseGate: null })).toBe(true);
   });
   it('owner preview bypasses', () => {
-    expect(publicReportAccessAllowed({ renderMode: false, ownerPreview: true, reportStatus: 'in_progress' })).toBe(true);
+    expect(publicReportAccessAllowed({ renderMode: false, ownerPreview: true, reportStatus: 'in_progress', releaseGate: null })).toBe(true);
   });
 });
 
@@ -97,7 +97,7 @@ describe('GET /api/public/report/:tenant/:id — publish gate', () => {
             (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
             c.set('services', {
                 portalAccess: { resolveToken },
-                inspection: { getReportData, resolveAgentViewToken },
+                inspection: { getReportData, resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken },
                 // Option A resolves the latest published version on the recipient
                 // track. `null` = no version row, which keeps these cases about
                 // the PUBLISH GATE rather than about snapshot selection.
@@ -202,7 +202,7 @@ describe('GET /api/public/report/:tenant/:id/photo — publish gate', () => {
                     inspectionId: ID, tenantId: T, role: 'client',
                     recipientEmail: 'a@b.com', revokedAt: null, expiresAt: null,
                 }) },
-                inspection: { resolveAgentViewToken: vi.fn().mockResolvedValue(null) },
+                inspection: { resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken: vi.fn().mockResolvedValue(null) },
             } as any);
             await next();
         });
@@ -249,7 +249,7 @@ describe('GET /api/public/report/:tenant/:id/pdf — publish gate', () => {
             c.env = { DB: {}, BROWSER: {}, PHOTOS: {} } as any; // BROWSER+PHOTOS must be truthy to pass the 503 guard
             c.set('services', {
                 portalAccess: { resolveToken: vi.fn().mockResolvedValue({ inspectionId: ID, tenantId: T, role: 'client', recipientEmail: 'a@b.com', revokedAt: null, expiresAt: null }) },
-                inspection: { resolveAgentViewToken: vi.fn().mockResolvedValue(null) },
+                inspection: { resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken: vi.fn().mockResolvedValue(null) },
             } as any);
             await next();
         });

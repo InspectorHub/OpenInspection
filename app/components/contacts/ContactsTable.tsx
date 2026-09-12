@@ -43,10 +43,24 @@ export function ContactsTable({
             ),
           },
           { label: m.contacts_modal_type_label(), cell: (c) => <Pill tone="info">{c.type}</Pill> },
-          { label: m.contacts_field_email(), cell: (c) => <span className="text-ih-fg-3">{c.email || "—"}</span> },
-          { label: m.contacts_field_phone(), cell: (c) => <span className="text-ih-fg-3">{c.phone || "—"}</span> },
-          { label: m.contacts_field_agency(), cell: (c) => <span className="text-ih-fg-3">{c.agency || "—"}</span> },
-          { label: m.contacts_field_inspections(), cell: (c) => <span className="text-ih-fg-3">{c.inspectionCount ?? 0}</span> },
+          // F30/F35 — eight columns of contact data need ~1038px, and the
+          // content area beside the sidebar is ~928px at a 1232px viewport, so
+          // this table grew a scrollbar on an ordinary laptop and was roughly
+          // twice the viewport at 390px. Four columns are identity and verbs
+          // and always render; the other four are secondary and appear as the
+          // TABLE's own width allows (container queries, not viewport
+          // breakpoints — the viewport was never the box that ran out of room).
+          // Nothing becomes unreachable: every field is on the contact's own
+          // page, which the name in column one links to.
+          //
+          // `wrap-anywhere` on the email column is the other half. An address
+          // is a single unbroken word, so its min-content width — ~170px for a
+          // normal one — was a floor under the whole table that no amount of
+          // column-dropping could get below.
+          { label: m.contacts_field_email(), className: "wrap-anywhere", cell: (c) => <span className="text-ih-fg-3">{c.email || "—"}</span> },
+          { label: m.contacts_field_phone(), className: "hidden @2xl:table-cell", cell: (c) => <span className="text-ih-fg-3">{c.phone || "—"}</span> },
+          { label: m.contacts_field_agency(), className: "hidden @4xl:table-cell", cell: (c) => <span className="text-ih-fg-3">{c.agency || "—"}</span> },
+          { label: m.contacts_field_inspections(), className: "hidden @5xl:table-cell", cell: (c) => <span className="text-ih-fg-3">{c.inspectionCount ?? 0}</span> },
           {
             // IA-96 — this column is the one thing the retired Agents tab
             // showed that this table did not. Both counts are already
@@ -64,6 +78,7 @@ export function ContactsTable({
             // and it was being displayed as "not applicable". The distinction
             // has to come from the contact, not from the number.
             label: m.contacts_agents_col_referrals(),
+            className: "hidden @5xl:table-cell",
             cell: (c) => (
               <span className="text-ih-fg-3 tabular-nums">
                 {c.type === "agent" ? (c.referralCount ?? 0) : "—"}

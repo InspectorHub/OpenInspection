@@ -8,7 +8,6 @@
   "editor_route_photos_added": "+{count} foto{s}{toDefect}",
   "editor_route_photo_upload_failed": "Error al subir la foto — su foto NO llegó al servidor.",
   "editor_route_defect_library_copy_failed": "Se guardó el defecto, pero la copia en la biblioteca falló — inténtelo de nuevo desde Notas › Guardar como fragmento.",
-  "editor_route_select_item_hint": "Seleccione un elemento de la lista para empezar a editar",
   "editor_route_navigate_hint_press": "Presione",
   "editor_route_navigate_hint_navigate": "para navegar",
   "editor_route_select_an_item": "Seleccione un elemento",
@@ -17,7 +16,7 @@
   "editor_route_drawer_items": "Elementos",
   "editor_route_drawer_preview": "Vista previa",
   "editor_route_empty_template_title": "Esta inspección no tiene contenido de plantilla",
-  "editor_route_empty_template_desc": "Aplique una plantilla para obtener secciones, elementos y comentarios predefinidos — o importe su plantilla de Spectora.",
+  "editor_route_empty_template_desc": "Aplique una plantilla para obtener secciones, elementos y comentarios predefinidos — o importe una que ya tenga de otro producto.",
   "editor_route_choose_template": "Elegir una plantilla",
   "editor_route_crop_photo": "Recortar foto",
   "editor_route_save_crop": "Guardar el recorte",
@@ -168,5 +167,12 @@
   "editor_ai_assist_discard": "Descartar",
   "editor_ai_assist_use": "Usar el texto revisado",
   "editor_ai_assist_recording": "Registrando su revisión…",
-  "editor_ai_assist_note_unchanged": "Su nota no se modificó."
+  "editor_ai_assist_note_unchanged": "Su nota no se modificó.",
+  "editor_pane_start_title": "Comience con el primer elemento sin calificar",
+  "editor_pane_start_desc": "{unrated} elemento{s} sin calificar en esta sección.",
+  "editor_pane_open_item": "Abrir {label}",
+  "editor_pane_all_rated_title": "Todos los elementos de esta sección están calificados",
+  "editor_pane_all_rated_desc": "Abra un elemento para revisarlo o pase a la siguiente sección.",
+  "editor_pane_no_items_title": "Esta sección aún no tiene elementos",
+  "editor_pane_no_items_desc": "Agregue el primero con «+ Agregar elemento» en la lista de elementos."
 }

@@ -251,6 +251,46 @@ describe('gate registry', () => {
             // ~1030 entries. Measured beside `eol` on the same machine at the
             // same time, which came in at 511 ms.
             'lockreg',
+            // Added 2026-09-11 with the agent-terms compliance gate and its
+            // self-test, and the lock did its job an eighth time: both were
+            // registered at this rung without this entry, so the full run went
+            // red on a tree whose pre-commit hook and all 27 selected gates were
+            // green. The pattern is now so consistent it is worth stating as the
+            // rule rather than the exception — registering a gate and justifying
+            // its rung are two separate edits, and only the second one is
+            // remembered when they are not forced together.
+            //
+            // `agentterms` earns pre-commit on `gateregistry`'s argument,
+            // INVISIBLE BY CONSTRUCTION, across three of its four checks:
+            //   - delete a refusal from `publish-agent-terms.mjs` and nothing
+            //     goes red. The publisher simply publishes, which is the one
+            //     outcome the refusals exist to prevent
+            //   - add a second `insert(agentTermsAcceptances)` anywhere and the
+            //     row it writes is indistinguishable from a real acceptance,
+            //     with no evidence behind it
+            //   - broaden the middleware's exemptions from exact matching to a
+            //     prefix and every future path beneath one becomes exempt
+            // None of those three fails a test, a type-check or a build. What
+            // makes the rung pre-commit rather than push is not repair cost —
+            // it is that all three are one-line edits whose author is the only
+            // person who knows whether they were the point of the change.
+            //
+            // `agenttermsselftest` earns it on `chromerecord`'s argument
+            // exactly: a gate whose own fixtures no longer agree with it reports
+            // PASS on everything, so nothing downstream goes red and it reads as
+            // green on the day it stopped working. It asserts both directions of
+            // all four checks, which is the half that separates "correctly
+            // refused" from "found nothing to look at".
+            //
+            // Cost, measured three times each on this machine: 267-283 ms and
+            // 120-127 ms standalone. Both figures are dominated by node startup,
+            // which `run-gates` pays once for the whole rung — the marginal cost
+            // is the ~150 ms walk of 1,099 `server/**/*.ts` files for the
+            // single-writer check, and effectively nothing for the self-test.
+            // That puts it beside `rawnul` (272 ms over 3,940 files) and `eol`
+            // (310 ms over 4,002), both of which are on this rung.
+            'agentterms',
+            'agenttermsselftest',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);

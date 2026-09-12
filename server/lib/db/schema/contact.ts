@@ -1,6 +1,7 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import { tenants } from './tenant';
+import { ROLE_KINDS, ROLE_KIND } from '../../people/role-kinds';
 
 export const contacts = sqliteTable('contacts', {
     id: text('id').primaryKey(),
@@ -9,7 +10,11 @@ export const contacts = sqliteTable('contacts', {
     // contact already typed 'agent', and the booking path's auto-create only
     // reuses an existing 'client' — so retyping a row changes what it can be
     // matched to. (tenant, type) is indexed because that is the list query.
-    type: text('type', { enum: ['agent', 'client', 'other'] }).notNull().default('client'),
+    // Reads `ROLE_KINDS` rather than restating it: a contact created from an
+    // inspection role inherits that role's `kind` directly, so the two are one
+    // vocabulary and not two that must be kept equal. Type-layer only — the
+    // stored values and the DDL are unchanged by the import.
+    type: text('type', { enum: ROLE_KINDS }).notNull().default(ROLE_KIND.CLIENT),
     name: text('name').notNull(),
     email: text('email'),
     phone: text('phone'),
@@ -80,7 +85,8 @@ export const contacts = sqliteTable('contacts', {
  * compiling rather than by being remembered.
  *
  * The values mirror `contact_role_profiles.kind` on purpose: a contact created
- * from an inspection role inherits that role's kind directly, so the two
- * vocabularies must stay the same size.
+ * from an inspection role inherits that role's kind directly. That is no
+ * longer a rule to remember — both columns now read `ROLE_KINDS`, so they are
+ * the same list rather than two lists kept the same size.
  */
 export type ContactType = typeof contacts.$inferSelect['type'];

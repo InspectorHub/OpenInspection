@@ -207,6 +207,8 @@
   "portal_pay_processing": "Procesando…",
   "portal_pay_secured": "Protegido por Stripe",
   "report_view_cover_unavailable": "Foto de portada no disponible",
+  "report_view_held_title": "Su informe está listo y en espera",
+  "report_view_held_message": "Este informe está terminado. Su inspector lo retiene hasta completar la documentación de este trabajo: la pestaña Resumen indica qué falta y cómo resolverlo.",
   "report_view_not_published_title": "Este informe no está publicado",
   "report_view_not_published_message": "Este informe no está publicado. Comuníquese con su inspector si cree que esto es un error.",
   "report_view_unavailable_title": "Informe no disponible",
@@ -300,5 +302,11 @@
   "courtesy_translation_setting_off_note": "Las traducciones ya entregadas siguen disponibles para sus destinatarios.",
   "courtesy_translation_confirm_cancel": "Cancelar",
   "report_item_not_inspected": "No inspeccionado",
-  "report_item_not_present": "No presente"
+  "report_item_not_present": "No presente",
+  "report_publish_body_finalize": "Publicar finaliza este informe y registra una nueva versión.",
+  "report_publish_body_delivery": "No envía el informe por sí mismo. Los avisos del informe se ponen en cola según sus automatizaciones y salen en la próxima tanda de envíos — para que el informe llegue ahora a la bandeja de alguien, use Enviar informe en la página de la inspección.",
+  "report_publish_receipt_title": "Informe publicado",
+  "report_publish_receipt_nothing_sent": "El informe es definitivo y se registró una nueva versión. Este paso no envió ningún correo.",
+  "report_publish_receipt_goto": "Ir a la inspección",
+  "report_publish_checking": "Comprobando…"
 }

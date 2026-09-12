@@ -13,7 +13,7 @@
  */
 import type { ReactNode } from "react";
 import { m } from "~/paraglide/messages";
-import { itemDrivesSummary } from "~/lib/report-helpers";
+import { itemDrivesSummary, itemIsUnrated } from "~/lib/report-helpers";
 import { ReportDefectCard } from "./ReportDefectCard";
 import { ITEM_PHOTO_GRID_CLASS, PRINT_CARD_CLASS, type ReportItem, type ReportPhoto } from "./types";
 
@@ -86,6 +86,18 @@ export function ReportItemCard({
             while abbreviating it "NI". `naKind` is the value that always knows.
             The reason is the half that matters to a buyer: a limitation nobody
             states is a limitation nobody can act on. */}
+        {/* NO ANSWER IS ALSO AN ANSWER, and it has to be printed as one.
+            See `itemIsUnrated` for why this is not the `Not Inspected` rating
+            and why non-rich items are excluded. Rendered above the naKind line
+            because the two are mutually exclusive: naKind only exists on an item
+            that HAS a rating. */}
+        {itemIsUnrated(item) && (
+          <p className="mb-2 text-[12px] text-ih-fg-3">
+            <span className="font-semibold text-ih-fg-2">{m.report_item_unrated()}</span>
+            {` — ${m.report_item_unrated_body()}`}
+          </p>
+        )}
+
         {item.naKind && (
           <p className="mb-2 text-[12px] text-ih-fg-3">
             <span className="font-semibold text-ih-fg-2">

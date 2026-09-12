@@ -27,6 +27,12 @@ tests/e2e/.editor-seed.json
 #   wrangler.local.jsonc — your real standalone ids (scripts/setup-cloudflare.js writes it)
 #   wrangler.saas.jsonc  — InspectorHub private SaaS config
 wrangler.*.jsonc
+
+# Deployment-local agent terms body. The tracked `agent-terms.md` is a template
+# whose operator fields are placeholders; the filled-in text names a specific
+# operator and is deployment identity, not source. `publish-agent-terms.mjs`
+# prefers this file when it exists.
+app/content/legal/agent-terms.local.md
 wrangler.toml
 wrangler.*.toml
 

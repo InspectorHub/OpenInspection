@@ -262,13 +262,13 @@ export default function SettingsAutomations() {
             {recentLogs.map((l) => (
               <div key={l.id} className="flex items-center gap-3 px-5 py-2.5 text-[12px]">
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
-                  l.channel === "sms" ? "bg-ih-primary-tint text-ih-primary-text" : "bg-ih-bg-muted text-ih-fg-3"}`}>{l.channel ?? "email"}</span>
+                  l.channel === "sms" ? "bg-ih-primary-tint text-ih-primary-text" : "bg-ih-bg-muted text-ih-fg-2"}`}>{l.channel ?? "email"}</span>
                 <span className="text-ih-fg-2 flex-1 min-w-0 truncate">{l.recipient}</span>
                 <span className="text-ih-fg-3">{formatDateTime(l.sendAt, { locale, timeZone: displayTz })}</span>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
                   l.status === "sent" ? "bg-ih-ok-bg text-ih-ok-fg" :
                   l.status === "failed" ? "bg-ih-bad-bg text-ih-bad-fg" :
-                  l.status === "skipped" ? "bg-ih-watch-bg text-ih-watch-fg" : "bg-ih-bg-muted text-ih-fg-3"}`}>{l.status}</span>
+                  l.status === "skipped" ? "bg-ih-watch-bg text-ih-watch-fg" : "bg-ih-bg-muted text-ih-fg-2"}`}>{l.status}</span>
                 {l.error && <span className="text-ih-fg-3 truncate max-w-[180px]" title={l.error}>{l.error}</span>}
               </div>
             ))}

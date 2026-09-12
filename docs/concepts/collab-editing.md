@@ -43,6 +43,39 @@ D1 inspection_results
   blob via `loadResultsProjection`. Subsequent reconstructions (hibernation) restore
   from DO storage in the constructor (`blockConcurrencyWhile`).
 
+## One document per REPORT, not per inspection
+
+The Durable Object's name comes from `server/lib/collab/doc-name.ts` and is
+`${tenantId}:${reportId}`.
+
+It used to be `${tenantId}:${inspectionId}`, and that was a silent corruption
+path: an order can carry several reports, so two inspectors working the standard
+report and the sewer report of the same order landed in the **same** Durable
+Object and shared one Y.Doc. Nothing threw. The CRDT merged content belonging to
+two different documents, and it surfaced only when somebody opened a report
+containing another report's findings.
+
+⚠️ **Re-keying the address was not enough, and the second path is the instructive
+one.** The object also writes its projection back to D1, and that write was keyed
+on `inspection_id`. Since an inspection now has one `inspection_results` row *per
+report*, that predicate matched every one of them — so a correctly routed radon
+document would still have overwritten the standard report's row. The same
+corruption, one layer down, and just as silent. The object now carries an
+`x-report-id` header and writes by `report_id`, falling back to the inspection
+predicate only when it does not know one (an object woken before any client has
+connected).
+
+The derivation lives in its own function so a test can assert the thing that
+actually matters. Two report ids are trivially unequal, so a test that compared
+only the OUTPUTS would pass just as well against an implementation still keyed on
+the inspection. What has to be true is that the inspection id is not an input.
+
+`INSPECTION_PRESENCE` is deliberately still keyed per inspection. It persists no
+document, so it has no corruption path — the only question it raises is whether
+two people editing different reports of one order should see each other, and
+showing them as present on the same order is defensible. Treat that as a UX
+question, not a correctness one.
+
 ## The projection model
 
 `server/lib/collab/results-doc.ts` is pure Yjs (no React, no server deps) and owns

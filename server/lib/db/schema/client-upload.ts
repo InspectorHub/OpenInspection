@@ -9,6 +9,19 @@ export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
 export const DOCUMENT_VISIBILITIES = ['client_visible', 'internal'] as const;
 export type DocumentVisibility = (typeof DOCUMENT_VISIBILITIES)[number];
 
+/**
+ * Deliberately NOT `ROLE_KINDS`, and the difference is not an oversight.
+ *
+ * This axis is WHICH PORTAL SEAT the upload came from, which is a finer cut
+ * than the contact-party kind: `client` and `co_client` are two seats of the
+ * SAME kind, and the split is load-bearing because a client may delete only
+ * rows whose `uploaded_by_ref` is their own. `resolveClientActor` produces the
+ * two separately and nothing downstream folds them back together, so a column
+ * spelled in kinds could not record who to let delete what.
+ *
+ * `agent` and `other` are absent because no upload route resolves them; adding
+ * one is a route change, not a widening of this list.
+ */
 export const UPLOADER_KINDS = ['client', 'co_client', 'inspector'] as const;
 export type UploaderKind = (typeof UPLOADER_KINDS)[number];
 

@@ -3,6 +3,12 @@ import { useSessionContext } from "~/hooks/useSessionContext";
 import { isAdminRole, isOwnerRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
 
+// F68 — with no `meta` this page's browser tab reads only "OpenInspection".
+// Why it is a catalogue key and not a literal: settings-meta-titles.test.ts.
+export function meta() {
+  return [{ title: m.settings_hub_meta_title() }];
+}
+
 interface Tile {
   to: string;
   // Message-function references — called in the render (request ALS scope) so the

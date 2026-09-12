@@ -12,7 +12,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { and, desc, eq, isNull, like, sql } from 'drizzle-orm';
 import { escapeLikePattern } from '../../lib/db/like-escape';
 import { marketplaceLibraries, tenantLibraryImports } from '../../lib/db/schema/marketplace';
-import { countLibrarySchemaItems } from './library-pack';
+import { countLibrarySchemaItems, parseLibraryDescription } from './library-pack';
 
 /** The service's `drizzle(env.DB)` handle. Named so this signature does not
  *  silently narrow to the schema-less default and reject its only caller. */
@@ -104,6 +104,11 @@ export async function browseCatalogue(
         importedSemver: importMap.get(l.id) ?? null,
         hasUpdate: importMap.has(l.id) && importMap.get(l.id) !== l.semver,
         itemCount: countLibrarySchemaItems(packSchema as unknown),
+        // Lifted OUT of the blob before the blob is dropped. The card has always
+        // had a branch for it; the response never carried it, so the branch was
+        // dead and every entry rendered as a bare name. See
+        // `parseLibraryDescription` for why it is not a column.
+        description: parseLibraryDescription(packSchema as unknown),
     }));
 
     return { rows, total };

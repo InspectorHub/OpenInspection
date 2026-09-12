@@ -42,7 +42,7 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
             (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
             c.set('services', {
                 portalAccess: { resolveToken },
-                inspection: { getReportData, resolveAgentViewToken },
+                inspection: { getReportData, resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken },
                 reportVersion: { getLatestPublished },
             } as unknown as HonoConfig['Variables']['services']);
             await next();
@@ -380,7 +380,7 @@ describe('GET /api/public/report/:tenant/:id/photo — prefix guard (r2-key-conv
             };
             c.set('services', {
                 portalAccess: { resolveToken },
-                inspection: { resolveAgentViewToken: vi.fn().mockResolvedValue(null) },
+                inspection: { resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken: vi.fn().mockResolvedValue(null) },
             } as unknown as HonoConfig['Variables']['services']);
             await next();
         });

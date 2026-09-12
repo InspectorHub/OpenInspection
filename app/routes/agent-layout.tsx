@@ -3,8 +3,9 @@ import type { Route } from "./+types/agent-layout";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { throwIfAgentTermsRequired } from "~/lib/agent-terms.server";
-import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
+import { throwIfNotAgent } from "~/lib/agent-portal-access.server";
 import { AgentNoticeBell } from "~/components/agent/AgentNoticeBell";
+import { AgentUserMenu, type AgentPortalAccount } from "~/components/agent/AgentUserMenu";
 import type { NoticeRowData } from "~/lib/notice-view";
 import { m } from "~/paraglide/messages";
 
@@ -15,6 +16,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // timezone here so every agent page can resolve dates the same way. null =
   // no personal override (dates then follow each inspecting company's tz).
   let timezone: string | null = null;
+  // Who is signed in, for the header's user menu. No agent page showed this at
+  // all — not an email, not a name, not a role — so a session admitted by
+  // mistake had nothing on screen that could have told anyone.
+  let account: AgentPortalAccount | null = null;
   const api = createApi(context, { token });
 
   // Fetched OUTSIDE the try below, and this is load-bearing rather than a style
@@ -26,8 +31,18 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   try {
     profileRes = await api.agent.profile.$get();
   } catch {
-    // Leave it null: the caller treats absent as not-yet-accepted.
+    // Leave it null and let the guard below refuse: there is no answer to obey,
+    // and "carry on" is the reading that admits everybody exactly when nobody
+    // can be identified. (This comment used to say the caller treats absent as
+    // not-yet-accepted, which is what it did — and what F69 was.)
   }
+
+  // Authorization FIRST, ahead of everything else this loader does with the
+  // answer. `requireToken` above proves only that a session exists; this is the
+  // line that proves it belongs to an agent, by obeying the refusal the agent API
+  // already issues. See app/lib/agent-portal-access.server.ts for the three
+  // refusals and for why the role claim in the token is not consulted.
+  throwIfNotAgent(profileRes);
 
   // The agent-terms gate refuses every authenticated agent request with 428
   // until the terms in force are accepted
@@ -43,8 +58,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   try {
     if (profileRes?.ok) {
-      const body = (await profileRes.json()) as { data?: { timezone?: string | null } };
+      const body = (await profileRes.json()) as {
+        data?: { name?: string | null; email?: string; timezone?: string | null };
+      };
       timezone = body.data?.timezone ?? null;
+      if (body.data?.email) {
+        account = { name: body.data.name ?? null, email: body.data.email };
+      }
     }
   } catch {
     /* non-fatal: fall back to per-company / UTC resolution */
@@ -64,7 +84,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     /* non-fatal: an empty bell */
   }
 
-  return { agentTimezone: timezone, notices };
+  return { agentTimezone: timezone, notices, account };
 }
 
 /**
@@ -90,7 +110,7 @@ const NAV_ITEMS: { to: string; label: () => string }[] = [
 ];
 
 export default function AgentLayout({ loaderData }: Route.ComponentProps) {
-  const { notices } = loaderData;
+  const { notices, account } = loaderData;
   return (
     <div className="min-h-screen bg-ih-bg-app">
       {/* Top bar */}
@@ -121,24 +141,18 @@ export default function AgentLayout({ loaderData }: Route.ComponentProps) {
                 {item.label()}
               </NavLink>
             ))}
-            {/* Shared theme control — same 4-segment control as the tenant app,
-                so the auto/light/dark/field preference (a same-origin cookie) is
-                reachable and consistent here too. Hidden on the smallest widths
-                where the top bar has no room; the field variant + cookie still
-                apply. */}
             {/* Notices — a bell in the header is always "sent to me"
-                (design §3.15). Sits before the theme control so the two
-                header affordances read left-to-right as inbox then settings. */}
+                (design §3.15). Sits before the account menu so the two header
+                affordances read left-to-right as inbox then account. */}
             <span className="ml-2">
               <AgentNoticeBell notices={notices.notices} unread={notices.unread} />
             </span>
-            <ThemeSegmentControl className="hidden md:flex ml-2" />
-            <a
-              href="/agent-logout"
-              className="px-3 py-1.5 rounded-md text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bad-bg hover:text-ih-bad-fg transition-colors ml-2"
-            >
-              {m.agent_portal_layout_logout()}
-            </a>
+            {/* The account menu absorbs what used to be a bare `Log out` link and
+                a theme control that was `hidden md:flex` — so on a phone the
+                auto/light/dark/field preference had no control at all. Both now
+                live behind one trigger at every width, next to the identity that
+                was not shown anywhere in this portal. */}
+            <AgentUserMenu account={account} />
           </nav>
         </div>
       </header>

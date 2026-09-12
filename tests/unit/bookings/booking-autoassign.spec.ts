@@ -17,6 +17,7 @@ import {
     availability,
     inspections,
     inspectionInspectors,
+    tenantConfigs,
 } from '../../../server/lib/db/schema';
 import * as schema from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -36,10 +37,11 @@ vi.mock('../../../server/lib/rate-limit', () => ({
 // eslint-disable-next-line import/order
 import { bookingsRoutes } from '../../../server/api/bookings';
 import { makeExecutionContext } from '../helpers/exec-ctx';
+import { nextWeekday } from '../helpers/bookable-date';
 
 // 2026-06-08 is a Monday (dayOfWeek = 1) — mirrors booking-aggregation.spec.ts.
 // Must stay future-dated if a past-date guard ever lands in the booking handler.
-const MONDAY = '2026-06-08';
+const MONDAY = nextWeekday(1);
 
 // Stable UUIDs so test assertions are readable.
 const T1 = 'aaaaaaaa-0000-4000-8000-000000000001';   // tenant t1
@@ -130,6 +132,12 @@ async function seedBaseTenant(db: BetterSQLite3Database<typeof schema>) {
         { id: 'a1', tenantId: T1, inspectorId: U1, dayOfWeek: 1, startTime: '08:00', endTime: '10:00', createdAt: new Date() },
         { id: 'a2', tenantId: T1, inspectorId: U2, dayOfWeek: 1, startTime: '08:00', endTime: '10:00', createdAt: new Date() },
     ] as any);
+    // A DECLARED company timezone. Public booking refuses a workspace that never
+    // set one (the NOT NULL default 'UTC' is the unset sentinel), so a fixture
+    // that books has to say which clock "08:00" is on.
+    await db.insert(tenantConfigs).values({
+        tenantId: T1, updatedAt: new Date(), defaultTimezone: 'America/New_York',
+    } as any);
     // Existing inspection for U2 at 09:00 on MONDAY.
     await db.insert(inspections).values({
         id: 'i-existing', tenantId: T1, inspectorId: U2,

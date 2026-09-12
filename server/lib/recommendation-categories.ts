@@ -154,6 +154,20 @@ export const RECOMMENDATION_CATEGORIES: RecommendationCategory[] = [
 /** Set of all valid IDs — used by the Zod enum and by the report renderer. */
 export const RECOMMENDATION_CATEGORY_IDS = RECOMMENDATION_CATEGORIES.map(c => c.id) as [string, ...string[]];
 
+/**
+ * Slug → label, built once at module load.
+ *
+ * Lives here, beside the catalog, because two callers were each building their
+ * own copy of exactly this map — the report renderer's aggregated badges and
+ * the repair-list analytics pass. Two identical derivations of one list is the
+ * same duplication as two copies of the list, one step downstream: it survives
+ * a change to the catalog, and then diverges the first time one of them gets a
+ * fallback or a filter the other does not.
+ */
+export const RECOMMENDATION_CATEGORY_LABELS: ReadonlyMap<string, string> = new Map(
+    RECOMMENDATION_CATEGORIES.map(c => [c.id, c.label]),
+);
+
 /** Look up a single category by id. Returns undefined for unknown slugs. */
 export function getRecommendationCategory(id: string | null | undefined): RecommendationCategory | undefined {
     if (!id) return undefined;

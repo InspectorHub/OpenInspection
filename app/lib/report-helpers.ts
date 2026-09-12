@@ -52,6 +52,32 @@ export function itemDrivesSummary(item: {
   return (item.resolvedTabs?.defects ?? []).some((d) => d.drivesSummary !== false);
 }
 
+/**
+ * An item the inspector never answered.
+ *
+ * `inspection-report.service` sets `rating` to `res.rating ?? null` and
+ * `ratingLabel` to `level?.label ?? ratingId`, so an unanswered item arrives with
+ * BOTH null — no pill, no `naKind`, and on a report that was published part-done
+ * usually no notes, no defects and no photos either. The card then rendered a
+ * bordered box containing nothing but the item's own title, which a recipient
+ * cannot tell apart from "inspected, nothing to report". On an inspection report
+ * that difference is the whole liability question, and it lands on the commonest
+ * case there is: a report published before it was finished (19 of 36 production
+ * inspections have no content at all).
+ *
+ * ⚠️ UNRATED IS NOT THE `Not Inspected` RATING. That one is an answer — the
+ * component was there and the inspector says why they did not inspect it, and it
+ * renders through `naKind` with its reason. This is the absence of an answer.
+ *
+ * WHY `type` GATES IT. Only `rich` items carry `ratingOptions`; a `number` /
+ * `text` / `boolean` item ("Year built · 1995") is a data field and has no rating
+ * to miss. Marking those "Unrated" would invent a gap. `type` is optional on the
+ * wire and `rich` is the service's own default, so absent reads as rich.
+ */
+export function itemIsUnrated(item: { type?: string; rating: string | null }): boolean {
+  return (item.type ?? "rich") === "rich" && !item.rating;
+}
+
 /* ------------------------------------------------------------------ */
 /* Signature + verification pure helpers (exported for tests) */
 /* ------------------------------------------------------------------ */

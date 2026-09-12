@@ -187,6 +187,16 @@ const publicVerifyRoutes = createApiRouter()
 
         // Publish gate: the frozen archived PDF is a public client artifact — refuse
         // while the report is not currently published (re-publishing restores it).
+        //
+        // ⚠️ DELIBERATELY NOT the agreement/payment release gate, which the other
+        // public report paths do enforce (see publicReportAccessAllowed). This
+        // endpoint is reached with a per-version VERIFICATION token, and that
+        // token is carried by the document itself — so anyone holding one already
+        // holds the report, and refusing them protects nothing while breaking the
+        // thing the page exists for: a third party checking that a document they
+        // were handed is authentic. If a verification token ever starts being
+        // distributed to someone who has NOT been given the report, this becomes
+        // a hole and the gate belongs here too.
         const inspRow = await db.select({ reportStatus: inspections.reportStatus })
           .from(inspections)
           .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))

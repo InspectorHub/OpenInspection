@@ -66,7 +66,7 @@ All fields are on `OAuthProviderOptions<Env>`:
 | `refreshTokenTTL` | `number` | optional | Seconds; default 2,592,000 (30 days); `0` disables |
 | `clientRegistrationTTL` | `number` | optional | Seconds; default 7,776,000 (90 days) |
 | `allowImplicitFlow` | `boolean` | optional | Default false |
-| `allowPlainPKCE` | `boolean` | optional | Default true |
+| `allowPlainPKCE` | `boolean` | optional | Default true — ⚠️ **we set it to `false`, and the default is why.** See below. |
 | `allowTokenExchangeGrant` | `boolean` | optional | Default false |
 | `disallowPublicClientRegistration` | `boolean` | optional | Default false |
 | `resourceMetadata` | `{ resource?, authorization_servers?, scopes_supported?, bearer_methods_supported?, resource_name? }` | optional | Customises `/.well-known/oauth-protected-resource` |
@@ -77,6 +77,42 @@ All fields are on `OAuthProviderOptions<Env>`:
 | `onError` | `fn` | optional | Error hook; return `Response` to override |
 | `clientIdMetadataDocumentEnabled` | `boolean` | optional | Default false; requires `global_fetch_strictly_public` compat flag |
 | `enterpriseManagedAuthorization` | `EmaOptions` | optional | Experimental EMA/ID-JAG grant |
+
+### ⚠️ `allowPlainPKCE` must stay `false`, and an omission is not neutral
+
+`server/lib/mcp/oauth-provider.ts` passes `allowPlainPKCE: false`. Leaving it out
+is not "taking the safe default" — the library's default is `true`, and three
+things follow from it:
+
+1. `/.well-known/oauth-authorization-server` advertises
+   `code_challenge_methods_supported: ["plain", "S256"]`, so a client is told
+   `plain` is acceptable on this deployment.
+2. An authorize request that simply **omits** `code_challenge_method` is read as
+   `plain` rather than refused. The weaker method is what you get by saying
+   nothing, which is the opposite of how a security default should fail.
+3. The token endpoint's `plain` branch compares the submitted verifier to the
+   stored challenge **verbatim**. That is not a check. The challenge travelled to
+   the browser in the same redirect URL as the authorization code, so anyone who
+   intercepted the code already holds the value needed to redeem it.
+
+PKCE exists to make a stolen authorization code unusable. `plain` returns it to
+being usable, which makes advertising it **worse than offering no PKCE at all**:
+a client that negotiates down believes it is protected and is not.
+
+Setting the option to `false` does both halves — it narrows the advertisement to
+`["S256"]` **and** makes the authorize parse refuse `plain` instead of serving
+it. Narrowing the document alone would not be enough, because a client that
+ignores the document, or that omits the parameter, would still be served.
+
+Held by `tests/unit/mcp/oauth-pkce.spec.ts`, which deliberately asserts against
+the INSTALLED LIBRARY rather than only against our options object: the defect was
+an omission, so a test that checked only "we pass the flag" would stay green
+through a rename of the option and leave the deployment advertising `plain`
+again.
+
+Unrelated, and worth not confusing with the above: the **outbound** Google
+Calendar client in `server/lib/calendar/google.ts` also does PKCE, as a client
+rather than as a server, and has always sent `S256`.
 
 ### `env.OAUTH_PROVIDER` — the `OAuthHelpers` interface
 

@@ -8,7 +8,6 @@
   "editor_route_photos_added": "{count} photo{s} added{toDefect}",
   "editor_route_photo_upload_failed": "Photo upload failed — your photo did NOT reach the server.",
   "editor_route_defect_library_copy_failed": "Saved the defect, but the library copy failed — try again from Notes › Save as snippet.",
-  "editor_route_select_item_hint": "Select an item from the list to start editing",
   "editor_route_navigate_hint_press": "Press",
   "editor_route_navigate_hint_navigate": "to navigate",
   "editor_route_select_an_item": "Select an item",
@@ -17,7 +16,7 @@
   "editor_route_drawer_items": "Items",
   "editor_route_drawer_preview": "Preview",
   "editor_route_empty_template_title": "This inspection has no template content",
-  "editor_route_empty_template_desc": "Apply a template to get sections, items and canned comments — or import your Spectora template.",
+  "editor_route_empty_template_desc": "Apply a template to get sections, items and canned comments — or import one you already have from another product.",
   "editor_route_choose_template": "Choose a template",
   "editor_route_crop_photo": "Crop photo",
   "editor_route_save_crop": "Save crop",
@@ -168,5 +167,12 @@
   "editor_ai_assist_discard": "Discard",
   "editor_ai_assist_use": "Use reviewed text",
   "editor_ai_assist_recording": "Recording your review…",
-  "editor_ai_assist_note_unchanged": "Your note was not changed."
+  "editor_ai_assist_note_unchanged": "Your note was not changed.",
+  "editor_pane_start_title": "Start with the first unrated item",
+  "editor_pane_start_desc": "{unrated} item{s} still unrated in this section.",
+  "editor_pane_open_item": "Open {label}",
+  "editor_pane_all_rated_title": "Every item in this section is rated",
+  "editor_pane_all_rated_desc": "Open an item to review it, or move on to the next section.",
+  "editor_pane_no_items_title": "This section has no items yet",
+  "editor_pane_no_items_desc": "Add the first one with “+ Add item” in the item list."
 }

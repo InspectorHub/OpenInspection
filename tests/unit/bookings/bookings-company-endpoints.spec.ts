@@ -107,6 +107,9 @@ describe('GET /book/:tenant — company booking profile (IA-26)', () => {
         // a tenant with no config row books under its slug.
         await db.insert(tenantConfigs).values({
             tenantId: TENANT_ID, companyName: 'Acme Inspections', updatedAt: new Date(),
+            // bookingOpen is hours AND a declared company timezone: opening hours
+            // are a wall clock, and a wall clock with no zone is not a time.
+            defaultTimezone: 'America/New_York',
         } as any);
     });
 
@@ -170,6 +173,61 @@ describe('GET /book/:tenant — company booking profile (IA-26)', () => {
         expect(body.data.bookingOpen).toBe(false);
     });
 
+    /**
+     * OPENING HOURS ARE A WALL CLOCK, AND A WALL CLOCK WITH NO ZONE IS NOT A TIME.
+     *
+     * `default_timezone` is NOT NULL DEFAULT 'UTC', so a workspace that never
+     * opened Settings is indistinguishable from one that chose UTC. Reading that
+     * sentinel as a zone is what let /book offer "Morning, 8:00 AM" and then
+     * mail the client an invite for 08:00Z. The page's honest not-open state
+     * already existed for "nobody configured hours"; this is the same answer to
+     * the same kind of missing configuration.
+     */
+    it('returns bookingOpen=false when the company declared no timezone, hours and all', async () => {
+        // Hours ARE configured, so "not open" can only be about the zone.
+        await db.insert(users).values([
+            { id: 'u-tz', tenantId: TENANT_ID, email: 'tz@x.com', passwordHash: 'h', role: 'inspector', name: 'Tz', createdAt: new Date() },
+        ] as any);
+        await db.insert(availability).values([
+            { id: 'av-tz', tenantId: TENANT_ID, inspectorId: 'u-tz', dayOfWeek: 2, startTime: '09:00', endTime: '17:00', createdAt: new Date() },
+        ] as any);
+        const getQualifiedInspectorIds = vi.fn().mockResolvedValue(['u-tz']);
+
+        // Control first: with the seeded zone declared, this workspace IS open.
+        // Printing both answers is the point — "false" on its own could equally
+        // mean the fixture never had hours.
+        const openBody = await (await buildApp(db, { getQualifiedInspectorIds })
+            .request(`/book/${TENANT_SLUG}`, {}, FAKE_ENV)).json() as any;
+        expect(openBody.data.bookingOpen).toBe(true);
+
+        // Now put the column back to its NOT NULL default — the never-set state.
+        await db.update(tenantConfigs)
+            .set({ defaultTimezone: 'UTC', updatedAt: new Date() } as any)
+            .where(eq(tenantConfigs.tenantId, TENANT_ID));
+
+        const closedBody = await (await buildApp(db, { getQualifiedInspectorIds })
+            .request(`/book/${TENANT_SLUG}`, {}, FAKE_ENV)).json() as any;
+        expect(closedBody.data.bookingOpen).toBe(false);
+    });
+
+    it('keeps bookingOpen=true for a workspace that DECLARED UTC as Etc/UTC', async () => {
+        // The positive control for the sentinel rule, on the page side.
+        await db.insert(users).values([
+            { id: 'u-etc', tenantId: TENANT_ID, email: 'etc@x.com', passwordHash: 'h', role: 'inspector', name: 'Etc', createdAt: new Date() },
+        ] as any);
+        await db.insert(availability).values([
+            { id: 'av-etc', tenantId: TENANT_ID, inspectorId: 'u-etc', dayOfWeek: 2, startTime: '09:00', endTime: '17:00', createdAt: new Date() },
+        ] as any);
+        await db.update(tenantConfigs)
+            .set({ defaultTimezone: 'Etc/UTC', updatedAt: new Date() } as any)
+            .where(eq(tenantConfigs.tenantId, TENANT_ID));
+
+        const getQualifiedInspectorIds = vi.fn().mockResolvedValue(['u-etc']);
+        const body = await (await buildApp(db, { getQualifiedInspectorIds })
+            .request(`/book/${TENANT_SLUG}`, {}, FAKE_ENV)).json() as any;
+        expect(body.data.bookingOpen).toBe(true);
+    });
+
     it('returns inspectors sorted by name when allowInspectorChoice=true', async () => {
         // Enable allowInspectorChoice. An UPDATE, not an insert: the shared
         // setup now seeds this row for the company name, so a second insert
@@ -228,6 +286,9 @@ describe('GET /book/:tenant/:slug — route-order lock (IA-26)', () => {
         // a tenant with no config row books under its slug.
         await db.insert(tenantConfigs).values({
             tenantId: TENANT_ID, companyName: 'Acme Inspections', updatedAt: new Date(),
+            // bookingOpen is hours AND a declared company timezone: opening hours
+            // are a wall clock, and a wall clock with no zone is not a time.
+            defaultTimezone: 'America/New_York',
         } as any);
     });
 
@@ -280,6 +341,9 @@ describe('GET /slots — aggregated tenant slots (IA-26)', () => {
         // a tenant with no config row books under its slug.
         await db.insert(tenantConfigs).values({
             tenantId: TENANT_ID, companyName: 'Acme Inspections', updatedAt: new Date(),
+            // bookingOpen is hours AND a declared company timezone: opening hours
+            // are a wall clock, and a wall clock with no zone is not a time.
+            defaultTimezone: 'America/New_York',
         } as any);
     });
 

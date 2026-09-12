@@ -4,14 +4,30 @@ import { AddressAutocomplete } from "../address/AddressAutocomplete";
 import { GoogleMap } from "../address/GoogleMap";
 import type { AddressSelection } from "~/routes/resources/places";
 import { m } from "~/paraglide/messages";
+import {
+  INSPECTION_PROPERTY_TYPES,
+  type InspectionPropertyType,
+} from "../../../server/lib/inspection-property-type";
 
 // `label` is a thunk so each type name resolves at render inside the paraglide
 // request scope, not once at module import.
-const PROPERTY_TYPES = [
-  { value: "single_family", label: () => m.newinsp_property_type_single_family() },
-  { value: "multi_unit", label: () => m.newinsp_property_type_multi_unit() },
-  { value: "commercial", label: () => m.newinsp_property_type_commercial() },
-] as const;
+//
+// The VALUES come from the same constant the create API validates against, not
+// from literals retyped here. They were retyped here, and the list was the only
+// place they existed on the client: the selection reached the request body and
+// the API dropped it, because nothing joined this list to a field the server
+// would accept. A `Record` keyed on the type makes a value added to the tuple a
+// compile error here rather than an untranslated button.
+const PROPERTY_TYPE_LABELS: Record<InspectionPropertyType, () => string> = {
+  single_family: () => m.newinsp_property_type_single_family(),
+  multi_unit: () => m.newinsp_property_type_multi_unit(),
+  commercial: () => m.newinsp_property_type_commercial(),
+};
+
+const PROPERTY_TYPES = INSPECTION_PROPERTY_TYPES.map((value) => ({
+  value,
+  label: PROPERTY_TYPE_LABELS[value],
+}));
 
 export function PropertyStep({
   propertyType,

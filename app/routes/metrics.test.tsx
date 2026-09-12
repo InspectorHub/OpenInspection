@@ -16,6 +16,7 @@ import { render } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
 import MetricsPage from "~/routes/metrics";
+import { BAR_MAX_PX } from "~/lib/metrics-chart";
 
 const SERVER_MONTHLY = [
   { month: "2026-04", count: 3, revenue: 1500 },
@@ -73,12 +74,58 @@ describe("MetricsPage monthly charts", () => {
     // Each month's count is rendered above its bar — proves the series is read.
     await findByText("3");
     await findByText("7");
-    // The month label is the `YYYY-MM` sliced to `MM` — proves `month` (not
-    // the old `ym`) is the field being read. It appears in both month charts.
-    expect((await findAllByText("04")).length).toBeGreaterThan(0);
-    expect((await findAllByText("05")).length).toBeGreaterThan(0);
+    // The month label names the month — proves `month` (not the old `ym`) is
+    // the field being read, and that it reaches the axis as a name rather than
+    // the bare `04` a reader cannot parse. It appears in both month charts.
+    expect((await findAllByText("Apr")).length).toBeGreaterThan(0);
+    expect((await findAllByText("May")).length).toBeGreaterThan(0);
+    // DISCRIMINATING: the two-digit month must be gone from the axis entirely.
+    expect(queryByText("04")).toBeNull();
+    expect(queryByText("05")).toBeNull();
     // The empty-state copy must NOT appear when the series has data.
     expect(queryByText(/No data in this date range/i)).toBeNull();
+  });
+
+  it("draws bars with a real px height, never a percentage", async () => {
+    // F27 — the bars were there and measured 967 × 0. `height: 100%` resolved
+    // against a column that is a flex item of an `items-end` row, so the
+    // containing block's height is indefinite and the percentage fell back to
+    // `auto`: zero pixels, no svg, no canvas, an empty 237px card.
+    //
+    // ⚠️ This asserts the HEIGHT, not a class. happy-dom does no layout, so
+    // `getBoundingClientRect()` is 0 for everything here and cannot tell the
+    // two versions apart; the inline declaration is the value the browser
+    // would lay out, and it can. A `%` unit fails this test — which is the
+    // whole point, since the pre-fix markup carried `height: 100%` and would
+    // pass any assertion that only looked for a bar element or a bar class.
+    const { findByText, container } = renderMetrics({
+      totalInspections: 10,
+      totalRevenue: 5700,
+      avgOrderValue: 570,
+      monthly: SERVER_MONTHLY,
+      topAgents: [],
+      byInspector: [],
+    });
+    await findByText("3");
+
+    for (const testid of ["metrics-bar-inspections", "metrics-bar-revenue"]) {
+      const bars = Array.from(
+        container.querySelectorAll<HTMLElement>(`[data-testid="${testid}"]`),
+      );
+      expect(bars.length).toBe(SERVER_MONTHLY.length);
+      const heights = bars.map((bar) => bar.style.height);
+      // Unit first: a percentage is the defect, by name.
+      for (const h of heights) {
+        expect(h).toMatch(/^\d+px$/);
+        expect(h).not.toContain("%");
+        expect(Number.parseFloat(h)).toBeGreaterThan(0);
+      }
+      // And the scale is real, not a constant: the bigger month draws taller.
+      const px = heights.map((h) => Number.parseFloat(h));
+      expect(px[1]).toBeGreaterThan(px[0]);
+      // The tallest month takes the whole drawable track.
+      expect(px[1]).toBe(BAR_MAX_PX);
+    }
   });
 
   it("shows the empty state when the monthly series is absent", async () => {

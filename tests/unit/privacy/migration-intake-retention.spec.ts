@@ -13,10 +13,20 @@
  * knows the object's key, so clearing the key first leaves an object nothing
  * can ever reach.
  *
- * The batch row itself SURVIVES — it carries no third-party data, only ids,
- * timestamps, a vendor name and this workspace's own authorisations. Which
- * status a cleared run lands on, and why the answer differs per run, lives in
- * `tests/unit/migration-intake/batch-terminal-states.spec.ts`.
+ * The batch row itself SURVIVES: ids, timestamps, a vendor name, this
+ * workspace's own authorisations, and the bundle manifest. ⚠️ This said the row
+ * "carries no third-party data" and that was not accurate — a template adapter
+ * writes warnings quoting a canned comment's name and up to forty characters of
+ * its body, and those live in the manifest and are never cleared. The action
+ * stays `erase_in_place` on those facts — a canned-comment title is the
+ * operator's own template content — but a low assessed exposure never made the
+ * wrong description right.
+ *
+ * Which status a cleared run lands on, and why the answer differs per run,
+ * lives in `tests/unit/migration-intake/batch-terminal-states.spec.ts`.
+ *
+ * That the run cannot outlive its own upload past the declared window, on any
+ * path including a late apply, is held by `migration-intake-outer-bound.spec.ts`.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';

@@ -123,3 +123,75 @@ describe('in-app notice wording (B3)', () => {
         expect(rule.emailTemplateId).toBeNull();
     });
 });
+
+/**
+ * F44 residual — `{{scheduled_date}}` in an IN-APP notice.
+ *
+ * The seeded booking alert says "A new booking came in for {{scheduled_date}}."
+ * and `fulfill-booking` writes `inspections.date` as `${date}T${HH:MM}:00Z` (a
+ * busy-check key, not an instant), so the office read
+ * "A new booking came in for 2026-09-16T08:00:00Z."
+ *
+ * Both directions are asserted throughout: the raw column must be GONE and the
+ * readable string must be PRESENT. Asserting only the absence would pass for a
+ * notice whose body had stopped being interpolated at all.
+ */
+async function seedBookingAlert(storedDate: string, cfg: { timezone: string; locale: string }) {
+    await db.update(schema.inspections).set({ date: storedDate })
+        .where(eq(schema.inspections.id, INSP));
+    await db.insert(schema.tenantConfigs).values({
+        tenantId: T, defaultTimezone: cfg.timezone, defaultLocale: cfg.locale,
+        createdAt: new Date(), updatedAt: new Date(),
+    } as never);
+    await db.insert(schema.messageTemplates).values({
+        id: 'tpl-booking', tenantId: T, name: 'Office alert — new booking (in-app)',
+        channel: 'in_app',
+        subject: 'New booking — {{property_address}}',
+        body: 'A new booking came in for {{scheduled_date}}.',
+        variables: null, isSeeded: true,
+        createdAt: new Date(), updatedAt: new Date(),
+    } as never);
+    await db.insert(schema.automations).values({
+        id: 'auto-booking', tenantId: T, name: 'Office alert — new booking',
+        trigger: 'booking.received', recipientKind: 'staff', recipientRoleProfileId: null,
+        delayMinutes: 0, channels: '["in_app"]',
+        inAppTemplateId: 'tpl-booking',
+        active: true, isDefault: false, createdAt: new Date(),
+    } as never);
+    await new AutomationService({} as D1Database).trigger({
+        tenantId: T, inspectionId: INSP, triggerEvent: 'booking.received',
+        companyName: 'Acme',
+    });
+    const rows = await db.select().from(schema.notifications);
+    return rows.find((r) => (r.body ?? '').includes('A new booking came in'))?.body ?? null;
+}
+
+describe('in-app notice {{scheduled_date}} (F44 residual)', () => {
+    it('renders a booking\'s stored instant as a date a person reads', async () => {
+        const body = await seedBookingAlert('2026-09-16T08:00:00Z', {
+            timezone: 'America/New_York', locale: 'en-US',
+        });
+        // The wall clock stored on the column is the TENANT's, so 08:00 stays
+        // 08:00 — the zone label is what tells the reader which 08:00 it is.
+        expect(body).toBe('A new booking came in for Sep 16, 2026, 8:00 AM EDT.');
+        expect(body).not.toContain('2026-09-16T08:00:00Z');
+    });
+
+    it('renders a manually created inspection\'s bare civil day too', async () => {
+        // The other shape the column carries. A civil day has no clock, so it
+        // must not grow one — and must not shift zones on the way out.
+        const body = await seedBookingAlert('2026-06-01', {
+            timezone: 'America/Los_Angeles', locale: 'en-US',
+        });
+        expect(body).toBe('A new booking came in for Jun 1, 2026.');
+        expect(body).not.toContain('2026-06-01');
+    });
+
+    it('follows the workspace locale, not the server default', async () => {
+        const body = await seedBookingAlert('2026-09-16T08:00:00Z', {
+            timezone: 'America/New_York', locale: 'es-419',
+        });
+        expect(body).toBe('A new booking came in for 16 sept 2026, 8:00 a.m. GMT-4.');
+        expect(body).not.toContain('2026-09-16T08:00:00Z');
+    });
+});

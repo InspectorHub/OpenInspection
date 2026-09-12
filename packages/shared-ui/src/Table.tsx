@@ -11,6 +11,18 @@ export interface TableColumn<T> {
   cell?: (row: T, index: number) => React.ReactNode;
   /** Key into the row for the default cell renderer and as a stable column id. */
   key?: string;
+  /**
+   * Extra classes for this column's `<th>` AND every `<td>` in it — they have
+   * to move together or the header and its cells drift apart by one column.
+   *
+   * What it exists for: dropping a secondary column when the table is too
+   * narrow to hold every column at once. Express that with the CONTAINER
+   * variants (`hidden @5xl:table-cell`), never with a viewport breakpoint: the
+   * width that decides whether a column fits is the table's, and a table in a
+   * content area beside a 256px sidebar has nothing like the viewport's width.
+   * `Table` makes its scroll wrapper the query container for exactly this.
+   */
+  className?: string;
 }
 
 export interface TableProps<T> {
@@ -73,7 +85,15 @@ export function Table<T>({
     // horizontal scrollbar onto the whole page. The table scrolled correctly
     // the entire time; the page scrolled because of a screen-reader label.
     // `relative` makes the wrapper the containing block, so it stays inside.
-    <div className="relative overflow-x-auto">
+    //
+    // `@container` makes this wrapper the query container for the columns
+    // inside it. A table's columns fit or do not fit in the WRAPPER's width,
+    // which on a desktop page is the viewport minus a 256px sidebar and the
+    // page gutters — so `hidden lg:table-cell` on a column asks a question
+    // whose answer is about a different box. Contacts overflowed at 1232px
+    // (nine columns needing ~1038px in a ~928px content area) while every
+    // viewport breakpoint said there was plenty of room.
+    <div className="relative overflow-x-auto @container">
       <table
         className={`min-w-full text-left${className ? ` ${className}` : ""}`}
       >
@@ -82,7 +102,7 @@ export function Table<T>({
             {columns.map((col, ci) => (
               <th
                 key={col.key ?? ci}
-                className={`${HEADER_CLASS} ${alignClass[col.align ?? "left"]}`}
+                className={`${HEADER_CLASS} ${alignClass[col.align ?? "left"]}${col.className ? ` ${col.className}` : ""}`}
               >
                 {col.label}
               </th>
@@ -108,7 +128,7 @@ export function Table<T>({
                 {columns.map((col, ci) => (
                   <td
                     key={col.key ?? ci}
-                    className={`py-3 px-4 text-[13px] ${alignClass[col.align ?? "left"]}`}
+                    className={`py-3 px-4 text-[13px] ${alignClass[col.align ?? "left"]}${col.className ? ` ${col.className}` : ""}`}
                   >
                     {col.cell
                       ? col.cell(row, ri)

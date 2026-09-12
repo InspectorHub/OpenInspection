@@ -7,7 +7,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { deleteInspectionCascade } from '../../../server/services/inspection/inspection-cascade';
 import { inspectionScopedTables } from '../../../server/lib/db/scoped-tables';
-import { getTableName } from 'drizzle-orm';
+import { getTableColumns, getTableName, is } from 'drizzle-orm';
+import { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -89,5 +90,88 @@ describe('deleteInspectionCascade', () => {
             expect(names.has(t), `cascade must cover ${t}`).toBe(true);
         }
         expect(names.has('inspections')).toBe(false);
+    });
+
+    /**
+     * A published report's courtesy translation dies with the inspection.
+     *
+     * The retention catalogue excludes `report_translations` from the calendar
+     * sweep on the ground that a translation has no lifetime of its own and
+     * dies when its report does. For a time the code did not implement that:
+     * the cascade's child set is DERIVED from tables carrying `inspection_id`,
+     * this table is keyed by `report_id`, so the reports were deleted and the
+     * translated copy of their text stayed behind under an id nothing resolved.
+     * A retention answer whose whole ground is "it dies with its report" is
+     * worth nothing while the code lets it outlive the report.
+     *
+     * The DSAR half of the same guarantee is held by
+     * `tests/unit/privacy/report-translation-erasure.spec.ts`. Both paths are
+     * required; neither substitutes for the other, because a subject erasure is
+     * requested and an inspection deletion is routine.
+     */
+    it('deletes a report translation with the inspection that owns its report', async () => {
+        await testDb.insert(schema.reports).values({
+            id: 'rep-1', tenantId: TENANT, inspectionId: INSP, kind: 'primary',
+            title: 'Report', status: 'published', createdAt: new Date(), publishedAt: new Date(),
+        } as never);
+        // A second inspection with its own published report and translation.
+        // Without it, an executor that deleted the whole table would pass every
+        // assertion below.
+        await testDb.insert(schema.inspections).values({
+            id: 'i-2', tenantId: TENANT, propertyAddress: '2 St', date: '2026-06-02',
+            status: 'requested', paymentStatus: 'unpaid', price: 0,
+            agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        } as never);
+        await testDb.insert(schema.reports).values({
+            id: 'rep-2', tenantId: TENANT, inspectionId: 'i-2', kind: 'primary',
+            title: 'Other', status: 'published', createdAt: new Date(), publishedAt: new Date(),
+        } as never);
+        const translation = (id: string, reportId: string) => ({
+            id, tenantId: TENANT, reportId, locale: 'es-419',
+            content: '["texto"]', source: 'openai-compatible:byo',
+            englishHash: 'h-en', translatedHash: 'h-es', noticeVersion: 1,
+            aiCallId: `ai-${id}`, generatedAt: new Date(),
+        });
+        await testDb.insert(schema.reportTranslations).values([
+            translation('tr-1', 'rep-1'),
+            translation('tr-2', 'rep-2'),
+        ] as never);
+
+        const r2 = makeR2([]);
+        await deleteInspectionCascade(testDb as unknown as DrizzleD1Database, r2.bucket, TENANT, INSP);
+
+        const left = await testDb.select().from(schema.reportTranslations).all();
+        expect(left.map((t) => t.id)).toEqual(['tr-2']);
+        // And the report it belonged to really did go, so the assertion above
+        // is about a translation outliving its parent rather than about a
+        // deletion that never ran.
+        expect((await testDb.select().from(schema.reports).all()).map((r) => r.id)).toEqual(['rep-2']);
+    });
+
+    /**
+     * The hand-written hop above is only correct for the tables it knows about.
+     *
+     * `report_translations` is handled explicitly because a translation's owner
+     * is the DOCUMENT, and reshaping the domain model to suit a cascade is the
+     * wrong trade — give it an `inspection_id` and the derived set would cover
+     * it, at the cost of a key that lies about what owns the row. The price of that choice is that
+     * the next `report_id`-keyed table will NOT be picked up automatically.
+     *
+     * So this asserts the shape the choice depends on. A new table keyed by a
+     * report and not by an inspection turns this red, which is the moment
+     * somebody has to decide whether the cascade needs a second hop.
+     */
+    it('report_translations is the only report-keyed table the derived set cannot see', () => {
+        const inspectionScoped = new Set(inspectionScopedTables().map(getTableName));
+        // `as unknown[]` first, the same way `scoped-tables.ts` does it: the
+        // schema barrel exports constants as well as tables, so the narrowing
+        // predicate has to start from a type wide enough to hold both.
+        const reportKeyedOnly = (Object.values(schema) as unknown[])
+            .filter((t): t is SQLiteTable => is(t, SQLiteTable))
+            .filter((t) => 'reportId' in getTableColumns(t))
+            .map(getTableName)
+            .filter((name) => !inspectionScoped.has(name))
+            .sort();
+        expect(reportKeyedOnly).toEqual(['report_translations']);
     });
 });

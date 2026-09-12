@@ -375,6 +375,172 @@ basements and crawlspaces with no usable connection. That is a judgement about
 what this product needs, not about the tool. Until a native client exists,
 responsive web is the field surface.
 
+## Authoring surfaces
+
+Two pages author the same shape. `/templates/:id/edit` writes a template's
+schema; `/inspections/:id/edit` fills in results against a snapshot of that
+schema. The two route trees and their state hooks are deliberately **not**
+merged — one changes a schema, the other changes results, and that is a real
+difference. What they share is the component set and the data shapes.
+
+### One mode-aware component set, not two trees
+
+For a while there were two of everything. One `SectionRail` addressed sections
+by array index and could only reorder them; a second addressed them by id and
+had grown progress rings, structural editing and save-to-template. The
+inspection-side copy was by then a strict superset of the authoring-side one,
+which is the tell: the fork was not expressing a difference, it was losing
+fixes on whichever copy the next change did not touch.
+
+The structural components now exist once, under
+`app/components/editor-shared/`, and take `mode: 'author' | 'fill'`
+(`editor-shared/editor-mode.ts`):
+
+| Component | `author` renders | `fill` renders |
+|---|---|---|
+| `SectionRail` | item counts | progress donut, defect count, the Inspection Details overview entry |
+| `ItemList` | item-type badges | rating state, batch selection |
+| `SideRail` | Preview / Library | Preview / Library / Photos |
+
+`SideRail` is the exception to the directory: it still lives at
+`app/components/editor/SideRail.tsx` and imports `EditorMode` from
+`editor-shared/`. It is mode-aware but has not moved.
+
+**The item detail panel is the one thing that stays forked, and it says why.**
+Configuring an item's type and its canned entries
+(`components/template/ItemPropertiesPanel.tsx`, `ItemCommentsPanel.tsx`) and
+rating one in the field (`components/editor/ItemEditor.tsx`) are different jobs,
+not one job with a flag. They share the atoms instead of the panel —
+`ItemHeader`, `CannedCommentRow`, `DefectCategoryChip`, `InlineRename`,
+`RatingSegment`, all under `editor-shared/`.
+`components/template/preview-parity.test.ts` renders one canned entry through
+both the template preview and the editor's SideRail and compares what a reader
+sees, so the two cannot drift in silence.
+
+Five things were retired to get here, and none of them should come back:
+
+- **The duplicate `SectionRail` and `ItemList`.** One of each, addressed by id.
+- **A second inspection-filling route**, `/inspections/:id/form`, with its own
+  renderer. It was an orphan — registered in `routes.ts`, linked from nowhere —
+  and it was also the only place the eight non-`rich` item types and
+  `item.description` were ever rendered, so the live editor was the one missing
+  them. Both now render in `ItemEditor`; the route and its renderer are gone.
+  `FormField` (`app/components/form/FormField.tsx`) survives as the building
+  block `ItemEditor` reuses for non-`rich` input, which writes to
+  `result.value`. `item.description` is inspector-facing guidance: it shows in
+  the editor and is never emitted to the report or to the client.
+- **Per-section authored applicability.** A right-hand rail let a template
+  author declare which property types and commercial subtypes each section
+  applied to. It drove a preview and nothing else — the resolver never acquired
+  a production caller. Templates now identify by property type instead, which
+  picks the seed content and gates the commercial report block.
+  `server/lib/section-applicability.ts` is frozen dead code that says so at the
+  top: two unit specs still exercise it directly, and `applicableTo` stays in
+  the template JSON schema to avoid OpenAPI-snapshot churn, round-tripping
+  untouched through `app/lib/editor/template-meta.ts`. Do not re-wire it into
+  an editor.
+- **The second rating-system editor.** A modal in the template editor authored
+  one level shape while the library page authored another, bridged one way, and
+  `pausesAdvance` could not be edited from either. There is now one
+  `RatingSystemEditor` (`app/components/RatingSystemEditor.tsx`) and one
+  canonical level shape — `{ id, label, abbreviation, color, severity,
+  isDefect, pausesAdvance?, hotkey?, order }`.
+- **Three different reorder gestures** for the same operation (drag here, arrow
+  buttons there, a dropdown menu somewhere else). Dragging is the gesture, via
+  `editor-shared/useSortableReorder.ts`, with the arrow/menu path kept as the
+  keyboard-reachable fallback rather than as a second way of doing it.
+
+### A feature that touches the editor extends a dimension
+
+`mode` was the first dimension and is not the only one. The shared interfaces
+reserve two more, and a feature that touches the editor is expected to extend
+one of them rather than grow a parallel tree:
+
+- **Unit / scope.** `SectionRail` and `ItemList` take `activeUnitId`, which
+  chooses whose results are being read; the finding key is
+  `{unitId}:{sectionId}:{itemId}`. A per-unit inspection is this editor with a
+  scope selected, not a second editor. The unit tree (`inspection_units`,
+  building → floor → unit, at most three levels) is opt-in, and it is what makes
+  a site with several structures one inspection. Expressing the unit axis by
+  duplicating a section per unit was rejected: that puts it in the template,
+  where it has to be re-authored for every property.
+- **Location.** A tagged inspection walks the checklist once and labels each
+  finding with a location drawn from `inspections.location_options` — a flat
+  list, because what a tagged walk needs is a label and not a hierarchy.
+  Modelling it as a tree would make the lightest mode sit on the heaviest data
+  structure for no gain.
+
+`inspections.unit_inspection_mode` (`tagged | per_unit`) picks between them, and
+it is a **per-inspection setting rather than a live toggle**, because it decides
+the shape of the whole checklist: `tagged` is one pass with location labels,
+`per_unit` is a complete sub-inspection per unit.
+`server/services/unit-switch.service.ts` converts in both directions —
+promoting flat location labels into single-level unit nodes going up, merging
+unit labels back into the picklist coming down.
+
+Building a bespoke authoring surface for a new deliverable has been tried here
+and retired; the applicability rail above is that attempt. Commercial PCA work
+therefore rides these same two editors, with a commercial property type as the
+template's identity, and adds itself as a dimension.
+[`../concepts/commercial-pca-report.md`](../concepts/commercial-pca-report.md)
+states the same rule from the feature's side.
+
+⚠️ **No gate enforces this.** There is no `lint:*` entry for it, and no test
+asserts that a second `SectionRail` has not appeared. It is held by review and
+by this page.
+
+### Severity and defect category are two axes
+
+A finding carries two independent classifications, and collapsing them into one
+is the recurring mistake.
+
+**`severity` is how bad it is.** One vocabulary, four words —
+`good | marginal | significant | minor` — declared in `app/lib/severity.ts` and
+in `server/lib/validations/rating-system.schema.ts`. A rating level carries it;
+a canned comment carries it (`comments.severity`); the editor's library filter
+matches the two **structurally**, by reading the active level's own `severity`
+field (`severityForRatingId` in `app/hooks/useCannedComments.ts`).
+
+> Two details of that are worth keeping. The vocabulary used to be two
+> vocabularies for one axis — rating levels said `severity`, comments said a
+> locally coined `ratingBucket` (`satisfactory | monitor | defect | na`), and a
+> fixed table bridged them. And the matching used to GUESS the severity from
+> the level's name, so a workspace that named its levels unconventionally, or
+> named them in a language other than English, got no matches and was told
+> nothing. Reading the field works for any custom rating system in any
+> language. `ratingBucket` and the name-guessing helper are both gone.
+
+**A defect `category` is what kind of thing it is** — whether it belongs in the
+report Summary, and who gets dispatched. Categories are tenant rows in
+`defect_categories` (`server/lib/db/schema/inspection/defect-category.ts`)
+carrying only `name`, `color`, `drivesSummary`, `sortOrder` and `isSeed`, seeded
+with three and managed at `/library/defect-categories`. They were a hard-coded
+three-value enum, which was a guess about how every inspector files work.
+
+**The two axes deliberately do not map onto each other.** A category has no
+severity, and the comment library filters on `severity` alone. "Which severity
+is a Safety category?" is exactly the question this split exists to refuse.
+
+⚠️ Three traps here, each paid for once:
+
+- **`DefectCategory` is `string`, not an id type.** `defectDrivesSummary`
+  (`server/services/inspection/inspection-report.service.ts`) resolves it by id
+  **or** name, because seed template JSON stores a name (`"safety"`) while
+  anything authored after the tenant table stores a `defect_categories.id`. An
+  unknown or absent category resolves to `drivesSummary: true`: a finding
+  nobody classified still reaches the Summary rather than quietly falling out
+  of it.
+- **`mapRatingSystemLevels` (`server/lib/map-rating-levels.ts`) is the only
+  level shape the editor ever sees**, so a field dropped in that mapper does not
+  exist as far as the UI is concerned. `pausesAdvance` was dropped there once
+  and silently killed the seeds' "stop on a defect so notes actually get
+  written" behaviour, with nothing red anywhere. An unrecognised `severity`
+  falls back to `minor` rather than throwing, so one stale row cannot take a
+  report down.
+- **`activeUnitId` defaults to `null`, which resolves the `_default` common
+  scope.** Omitting it and passing `null` have to stay identical, or every
+  finding key shifts.
+
 ## Storage
 
 - **D1**: structured data (tenants, users, inspections, templates, comments, agreements, audit logs, ...)

@@ -136,11 +136,6 @@ export const REPORT_SPAN_REGISTER: readonly ReportSpanRegisterEntry[] = [
         reason: 'A boolean deciding whether cost estimates render in the report body.',
     },
     {
-        key: 'enableRepairList',
-        disposition: 'not_text',
-        reason: 'A boolean deciding whether the repair list section renders at all.',
-    },
-    {
         key: 'enableCustomerRepairExport',
         disposition: 'not_text',
         reason: 'A boolean deciding whether the customer repair export is offered.',

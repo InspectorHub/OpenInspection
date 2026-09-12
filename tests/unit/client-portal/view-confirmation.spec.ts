@@ -45,7 +45,7 @@ import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profil
 import { signPortalSession } from '../../../server/lib/portal-session';
 import { signRenderToken } from '../../../server/lib/render-token';
 import { buildKeyring, signJwt, type JwtKeyring } from '../../../server/lib/jwt-keyring';
-import { shouldCountReportView, getReportView } from '../../../server/lib/report-views';
+import { shouldCountReportView, getReportView, readReportViewCountingEnabled } from '../../../server/lib/report-views';
 import publicReportRoutes from '../../../server/api/public-report';
 
 const TENANT = '00000000-0000-0000-0000-0000000000c1';
@@ -117,7 +117,7 @@ describe('OI #271 — report view confirmation', () => {
                 portalAccess,
                 inspection: {
                     getReportData: vi.fn().mockResolvedValue({ inspectionId: INSP, sections: [] }),
-                    resolveAgentViewToken: vi.fn().mockResolvedValue(null),
+                    resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken: vi.fn().mockResolvedValue(null),
                 },
                 reportVersion: { getLatestPublished: vi.fn().mockResolvedValue(null) },
             } as unknown as HonoConfig['Variables']['services']);
@@ -464,6 +464,27 @@ describe('OI #271 — report view confirmation', () => {
             { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ objected: true }) },
         );
         expect(res.status).toBe(200);
+    });
+
+    /* ------- the ONE reader both the counter and the mail consult ------- */
+
+    it('readReportViewCountingEnabled answers from the row, and answers OFF when there is none', async () => {
+        // This reader is now also what decides whether a report-delivery email
+        // may state that opens are recorded. Two independent readings of one
+        // column is how the mail came to describe processing the counter was not
+        // doing, so the reader is pinned in all three states — including the
+        // missing row, which is the state every workspace starts in.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = testDb as any;
+        expect(await readReportViewCountingEnabled(db, TENANT)).toBe(true);
+
+        await testDb.update(schema.tenantConfigs)
+            .set({ reportViewCountingEnabled: false })
+            .where(eq(schema.tenantConfigs.tenantId, TENANT));
+        expect(await readReportViewCountingEnabled(db, TENANT)).toBe(false);
+
+        await testDb.delete(schema.tenantConfigs).where(eq(schema.tenantConfigs.tenantId, TENANT));
+        expect(await readReportViewCountingEnabled(db, TENANT)).toBe(false);
     });
 
     it('401 without any grant', async () => {

@@ -29,9 +29,37 @@
  * caller in `server/api/public-report.ts` stays one call wide.
  */
 import { and, eq, sql } from 'drizzle-orm';
-import { inspectionAccessTokens, reportViews } from './db/schema';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { inspectionAccessTokens, reportViews, tenantConfigs } from './db/schema';
 import type { AppDrizzle } from './route-helpers';
 import { logger } from './logger';
+
+/**
+ * Is this workspace counting report opens?
+ *
+ * ONE definition, because two things depend on the answer and they must not be
+ * able to disagree: the counter itself (`shouldCountReportView`, via the caller
+ * in `server/api/public-report.ts`) and the Art. 13 notice that the delivery
+ * email carries. A workspace where counting is off used to be told, in the mail
+ * handing over the report, that its recipient's opens were being recorded — a
+ * statement about processing that was not happening, in the one message the
+ * recipient cannot check. The notice is now rendered off this same column.
+ *
+ * A missing row reads as OFF, matching the column default: a workspace that has
+ * never opened the settings page has not opted in.
+ */
+export async function readReportViewCountingEnabled(
+    // Accepts any drizzle sqlite handle (D1 in production, better-sqlite3 in
+    // unit tests) — the query uses only portable core builders, the same
+    // narrowing `communicationCounts` takes for the same reason.
+    db: Pick<DrizzleD1Database, 'select'>, tenantId: string,
+): Promise<boolean> {
+    const row = await db.select({ enabled: tenantConfigs.reportViewCountingEnabled })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .get();
+    return row?.enabled ?? false;
+}
 
 /**
  * Everything that decides whether a request is a HUMAN READING THE REPORT.

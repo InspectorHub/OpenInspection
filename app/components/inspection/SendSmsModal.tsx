@@ -4,6 +4,8 @@ import { Modal, Button, Checkbox } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
 import type { PersonRow } from "./PeopleEditor";
 import { m } from "~/paraglide/messages";
+// Grouped in vocabulary order — see the note in <PeopleEditor>.
+import { ROLE_KINDS } from "../../../server/lib/people/role-kinds";
 
 const FORM_ID = "ih-send-sms-form";
 
@@ -54,7 +56,7 @@ export function SendSmsModal({
     }
   }, [fetcher.state, fetcher.data, onClose]);
 
-  const byKind = (["client", "agent", "other"] as const).map((kind) => ({
+  const byKind = ROLE_KINDS.map((kind) => ({
     kind,
     rows: people.filter((p) => p.kind === kind),
   })).filter((g) => g.rows.length > 0);
@@ -114,7 +116,7 @@ export function SendSmsModal({
                             onChange={() => toggle(person.id)}
                             className="mt-0.5"
                           />
-                    <label htmlFor={inputId} className={`text-[13px] ${disabled ? "text-ih-fg-4" : "text-ih-fg-1"}`}>
+                    <label htmlFor={inputId} className={`text-[13px] ${disabled ? "text-ih-fg-3" : "text-ih-fg-1"}`}>
                       <span className="font-medium">{person.name}</span>
                       <span className="text-ih-fg-4"> · {person.roleLabel}</span>
                       {disabled && (

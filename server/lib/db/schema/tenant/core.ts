@@ -146,9 +146,9 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // TIER (off residential, on `full_pca`, where ASTM E2018 makes the cost
     // opinion part of what a lender relies on) — one boolean was answering two
     // opposite obligations. Neither was ever per-tenant, so no column returns.
-    // Track E1 (ITB §11, UC-ITB-07) — when true, the published report sub-nav
-    // exposes a "Repair List" tab. Default OFF — opt-in for realtors who want
-    // a separate punch-list view rather than the full narrative report.
+    // DRAINED — no reader, no writer, awaiting a hand-written DROP COLUMN.
+    // NOT the repair gate: that is `enableCustomerRepairExport` below, pinned by
+    // tests/unit/repair/repair-gate-column-identity.spec.ts, which explains both.
     enableRepairList: integer('is_repair_list_enabled', { mode: 'boolean' }).notNull().default(false),
     // Sprint 3 S3-2 — when true, the public report viewer surfaces a
     // "Generate repair request" link that takes the customer to a print-

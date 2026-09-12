@@ -146,6 +146,10 @@ export default [
   route("resources/contact-access", "routes/resources/contact-access.tsx"),
   route("resources/template-search", "routes/resources/template-search.tsx"),
   route("resources/inspection-search", "routes/resources/inspection-search.tsx"),
+  // The command palette's `@` prefix. Server-side search, like the two above:
+  // the palette advertised the prefix while searching nothing but the recent
+  // inspections it had already loaded (F64).
+  route("resources/contact-search", "routes/resources/contact-search.tsx"),
   // OI #271 — the report RECIPIENT's Art. 21 control. The only resource route
   // with no staff-token gate, because its caller has no account: the API
   // authenticates the `?token=` link or the portal-session cookie. See the
@@ -199,7 +203,6 @@ export default [
     route("team", "routes/team.tsx"),
     route("metrics", "routes/metrics.tsx"),
     route("messages", "routes/messages.tsx"),
-    route("reports", "routes/reports-redirect.tsx"),
     layout("routes/settings-layout.tsx", [
       route("settings", "routes/settings-hub.tsx"),
       route("settings/profile", "routes/settings-profile.tsx"),
@@ -219,7 +222,6 @@ export default [
       // prerequisite shared by every workspace, not a workspace's own content —
       // the route module's header has the whole argument.
       route("settings/statutory-forms", "routes/settings-statutory-forms.tsx"),
-      route("settings/account", "routes/settings-account.tsx"),
       route("settings/advanced", "routes/settings-advanced.tsx"),
       route("settings/integrations", "routes/settings-integrations.tsx"),
       route("settings/integrations/qbo", "routes/settings-integrations-qbo.tsx"),
@@ -234,7 +236,6 @@ export default [
       route("settings/security", "routes/settings-security.tsx"),
       route("settings/connected-apps", "routes/settings-connected-apps.tsx"),
     ]),
-    route("recommendations", "routes/recommendations-redirect.tsx"),
     layout("routes/library-layout.tsx", [
       route("library", "routes/library-hub.tsx"),
       route("library/templates", "routes/templates.tsx"),

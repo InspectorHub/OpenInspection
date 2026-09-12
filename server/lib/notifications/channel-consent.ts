@@ -4,6 +4,7 @@ import { contacts, smsConsentLog, users } from '../db/schema';
 /** The BASIS a reader is reachable under — what the ledger's audit column means. */
 const basisFor = (a: Audience) => (a === 'client' ? 'client' as const : a === 'agent' ? 'agent' as const : 'staff' as const);
 import type { Audience } from './classes';
+import type { ConsentRecipientType } from '../sms/consent-basis';
 
 /**
  * The SMS consent block on the notifications screen (spec §4.2).
@@ -161,7 +162,7 @@ export interface ConsentRecorder {
         capturedVia: 'booking_form' | 'optin_link' | 'admin' | 'settings_page',
         meta: {
             ip?: string | undefined; userAgent?: string | undefined;
-            recipientType?: 'client' | 'agent' | 'other' | 'staff';
+            recipientType?: ConsentRecipientType;
             subjectKind?: 'contact' | 'user';
         },
     ): Promise<unknown>;

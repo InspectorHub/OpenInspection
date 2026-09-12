@@ -7,11 +7,13 @@ import { UnassignedLane } from "./UnassignedLane";
 import { ConflictModal } from "./ConflictModal";
 import { InspectorColumn, TimeGutter } from "./DispatchColumn";
 import {
+  allDayStripPx,
   axisHeightPx,
   boardHours,
   closureItems,
   currentStartMs,
   isDraggableItem,
+  maxUntimedCount,
   minuteFromOffsetY,
   minuteToEpochMs,
   type DispatchItem,
@@ -45,6 +47,12 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
   const hours = boardHours();
   const closures = closureItems(board.items);
   const axisPx = axisHeightPx();
+  // ONE strip height for the gutter and every column: they are separate vertical
+  // stacks, so a per-column height would offset the busier column's whole axis.
+  const allDayPx = useMemo(
+    () => allDayStripPx(maxUntimedCount(board.items, board.inspectors)),
+    [board.items, board.inspectors],
+  );
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [hover, setHover] = useState<{ inspectorId: string; minute: number } | null>(null);
@@ -134,7 +142,13 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
     setDraggingId(null);
     if (!dragged || !isDraggableItem(dragged)) return;
     const startMs = currentStartMs(dragged, board.dayStartMs);
-    if (startMs == null) return;
+    // An untimed job has no instant to carry, and the schedule write needs one.
+    // Say so: this used to return silently, so dropping an all-day card on the
+    // lane looked like a move that worked and left the card where it was.
+    if (startMs == null) {
+      pushToast({ message: m.dispatch_toast_failed(), variant: "error", durationMs: 6000 });
+      return;
+    }
     move(dragged, startMs, "");
   }
 
@@ -187,7 +201,7 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
                 {m.dispatch_scroll_hint()}
               </p>
               <div className="flex min-w-max">
-                <TimeGutter hours={hours} axisPx={axisPx} />
+                <TimeGutter hours={hours} axisPx={axisPx} allDayPx={allDayPx} />
                 {board.inspectors.map((inspector) => (
                   <InspectorColumn
                     key={inspector.id}
@@ -195,6 +209,7 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
                     items={board.items}
                     hours={hours}
                     axisPx={axisPx}
+                    allDayPx={allDayPx}
                     draggingId={draggingId}
                     hoverMinute={hover?.inspectorId === inspector.id ? hover.minute : null}
                     onDragStartItem={setDraggingId}

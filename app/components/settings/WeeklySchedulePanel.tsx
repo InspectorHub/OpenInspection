@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Banner } from "@core/shared-ui";
 import type { action } from "~/routes/settings-schedule";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
@@ -16,7 +17,19 @@ interface DayState {
   endTime: string;
 }
 
-/** Mon–Fri 08:00–17:00 draft when the inspector has never saved weekly hours. */
+/**
+ * Mon–Fri 08:00–17:00 draft when the inspector has never saved weekly hours.
+ *
+ * ⚠️ A DRAFT, AND THE PANEL HAS TO SAY SO. This shape is not in the database
+ * and nobody can be booked against it: `GET /api/availability` answers with
+ * zero rows while these five checkboxes are on screen. Rendered without a word
+ * of qualification it read as a finished week, which is why an operator with
+ * bookings CLOSED saw a schedule that looked complete and had no reason to
+ * press Save — the one action that creates the rows and opens booking. The
+ * remedy is the notice below, not a write: availability is a commitment to
+ * whoever reads the public booking page, so it may only ever be published by
+ * someone deciding to publish it.
+ */
 function defaultDraftDays(): DayState[] {
   return Array.from({ length: 7 }, (_, dayOfWeek) => ({
     enabled: dayOfWeek >= 1 && dayOfWeek <= 5,
@@ -74,6 +87,18 @@ export function WeeklySchedulePanel({
     fetcher.data.ok === false &&
     !dirty;
 
+  // Has a weekly schedule ever reached the database for this inspector?
+  //
+  // `initialSlots` is the loader's answer and becomes non-empty on the
+  // revalidation that follows a successful save — but only AFTER it lands, and
+  // this component is not remounted by it (its `key` does not change), so the
+  // second half covers the gap between the action returning ok and the fresh
+  // loader data arriving. Derived rather than held in state for that reason: a
+  // `useState` flag initialised from an empty `initialSlots` would never learn.
+  const persisted =
+    initialSlots.length > 0 ||
+    (fetcher.data?.intent === "schedule-save" && fetcher.data.ok === true);
+
 
   function updateDay(idx: number, patch: Partial<DayState>) {
     setDays((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
@@ -100,6 +125,15 @@ export function WeeklySchedulePanel({
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
       <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_weekly_heading()}</h3>
+      {!persisted && (
+        // Says BOTH halves on purpose: that these hours are not stored, and
+        // what the absence costs (no bookings). Either half alone is the state
+        // this panel used to be in — a form that looks answered, or a warning
+        // with no consequence attached.
+        <div data-testid="weekly-unsaved-notice">
+          <Banner tone="warn">{m.settings_weekly_unsaved_notice()}</Banner>
+        </div>
+      )}
       <div className="space-y-2">
         {displayOrder.map((dow) => (
           <div key={dow} className="flex items-center gap-3">

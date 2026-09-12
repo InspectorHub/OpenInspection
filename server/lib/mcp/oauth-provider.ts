@@ -93,6 +93,27 @@ export function buildOAuthHandler(
         authorizeEndpoint: '/oauth/authorize',
         tokenEndpoint: '/oauth/token',
         clientRegistrationEndpoint: '/oauth/register',
+        // S256 only, and NOT the library default.
+        //
+        // Left unset, `allowPlainPKCE` defaults to true, and three things follow
+        // that are all worse than they look:
+        //
+        //  - the metadata document advertises `["plain", "S256"]`, so a client
+        //    is told plain is acceptable here
+        //  - an authorize request that OMITS `code_challenge_method` is read as
+        //    `plain` rather than refused, so the weaker method is what you get
+        //    by saying nothing
+        //  - the token endpoint's plain branch compares the verifier to the
+        //    stored challenge verbatim, which is not a check: the challenge
+        //    travelled in the same redirect URL as the code, so whoever
+        //    intercepted one has the other
+        //
+        // PKCE exists to make a stolen authorization code unusable. `plain`
+        // returns it to being usable, which makes advertising it worse than not
+        // offering PKCE at all — a client that negotiates down believes it is
+        // protected. Setting this to false both narrows the advertisement to
+        // `["S256"]` and makes the parse REFUSE plain instead of accepting it.
+        allowPlainPKCE: false,
     });
 
     return { fetch: (req, e, ctx) => provider.fetch(req, e, ctx) };

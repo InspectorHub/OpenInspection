@@ -35,6 +35,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 // eslint-disable-next-line import/order
 import { bookingsRoutes } from '../../../server/api/bookings';
 import { makeExecutionContext } from '../helpers/exec-ctx';
+import { nextWeekday } from '../helpers/bookable-date';
 
 vi.mock('../../../server/lib/rate-limit', () => ({
     checkRateLimit: vi.fn().mockResolvedValue(undefined),
@@ -43,7 +44,7 @@ vi.mock('../../../server/lib/rate-limit', () => ({
 const TENANT_ID = 'aaaaaaaa-0000-0000-0000-00000000dep1';
 const TENANT_SLUG = 'deposit-co';
 /** A Friday, not a US federal holiday. */
-const FRIDAY = '2026-07-17';
+const FRIDAY = nextWeekday(5);
 const SVC_MAIN = 'svc-main';
 const SVC_RADON = 'svc-radon';
 
@@ -103,7 +104,10 @@ afterEach(() => sqlite.close());
 
 async function setTenantDeposit(policy: typeof schema.tenantConfigs.$inferInsert['depositPolicy'] | null) {
     await db.insert(tenantConfigs)
-        .values({ tenantId: TENANT_ID, updatedAt: new Date(), defaultTimezone: 'UTC', depositPolicy: policy })
+        // 'UTC' here was the NOT NULL default, which public booking now reads as
+        // "no zone declared" and refuses. Etc/UTC names the same clock deliberately,
+        // so every instant asserted in this file is unchanged.
+        .values({ tenantId: TENANT_ID, updatedAt: new Date(), defaultTimezone: 'Etc/UTC', depositPolicy: policy })
         .onConflictDoUpdate({ target: tenantConfigs.tenantId, set: { depositPolicy: policy } });
 }
 
@@ -241,10 +245,24 @@ describe('POST /book with no deposit configured', () => {
         expect(row!.depositRequiredCents).toBeNull();
     });
 
-    it('books normally when the workspace has no config row at all', async () => {
+    /**
+     * This used to assert a 200. It no longer can, and the reason is not about
+     * deposits: with no `tenant_configs` row a workspace has declared no
+     * timezone, and public booking refuses rather than reading the slot time in
+     * UTC and mailing the client an hour nobody chose.
+     *
+     * The deposit behaviour that case was reaching for — a workspace with no
+     * deposit policy asks for nothing — is the test directly above, which covers
+     * it with a config row present. Nothing is lost here except a state no real
+     * workspace is in: setup writes a config row for every tenant.
+     */
+    it('does not book at all with no config row - no declared timezone, no appointment', async () => {
         const res = await book(buildApp(['insp-a']), [SVC_MAIN]);
-        expect(res.status).toBe(200);
-        expect((await bodyOf(res)).data.depositRequiredCents).toBe(0);
+        expect(res.status).toBe(409);
+        // And nothing was snapshotted onto anything, because there is nothing to
+        // snapshot onto: the refusal lands before the first write.
+        expect(await db.select().from(inspections)
+            .where(eq(inspections.tenantId, TENANT_ID)).all()).toHaveLength(0);
     });
 });
 

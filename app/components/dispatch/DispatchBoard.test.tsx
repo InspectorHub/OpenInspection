@@ -237,6 +237,46 @@ describe("DispatchBoard drag-drop", () => {
     expect(posted[0].leadInspectorId).toBe("u-ada");
   });
 
+  it("makes an all-day strip entry a real control, not a poster", () => {
+    // The whole board read as read-only because EVERY card was in this strip and
+    // the strip's entries had no link, no draggable and no handler anywhere up
+    // six levels of ancestor. An untimed job is still a job someone opens.
+    const board: DispatchPayload = {
+      ...BOARD,
+      items: [item({ id: "u-1", title: "Untimed Job", allDay: true, inspectionId: "insp-u", userId: "u-ada" })],
+      unassigned: [],
+    };
+    renderBoard(board);
+    const entry = screen.getByTestId("dispatch-all-day-entry");
+    expect(entry.getAttribute("draggable")).toBe("true");
+    expect(within(entry).getByRole("link").getAttribute("href")).toBe("/inspections/insp-u");
+  });
+
+  it("schedules an all-day job by dragging it from the strip onto an hour", async () => {
+    const posted: Record<string, string>[] = [];
+    const board: DispatchPayload = {
+      ...BOARD,
+      items: [item({ id: "u-1", title: "Untimed Job", allDay: true, inspectionId: "insp-u", userId: "u-ada" })],
+      unassigned: [],
+    };
+    renderBoard(board, async ({ request }) => {
+      const form = await request.formData();
+      posted.push(Object.fromEntries(form) as Record<string, string>);
+      return { ok: true, conflicts: [] };
+    });
+
+    const bo = screen.getAllByTestId("dispatch-column")[1];
+    dragCardTo("Untimed Job", bo.querySelector("[data-dispatch-dropzone]")!, 112);
+
+    await waitFor(() => expect(posted).toHaveLength(1));
+    // One gesture, one write: the hour AND the new owner.
+    expect(posted[0]).toMatchObject({
+      inspectionId: "insp-u",
+      leadInspectorId: "u-bo",
+      scheduledStartMs: String(DAY_START_MS + 9 * 60 * 60_000),
+    });
+  });
+
   it("does not offer a company closure as a drag source", () => {
     renderBoard();
     const closure = screen.getByText(/Founders Day/);

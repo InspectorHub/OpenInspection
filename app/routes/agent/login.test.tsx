@@ -101,20 +101,30 @@ describe("agent login action — password intent", () => {
 });
 
 describe("agent login action — link intent", () => {
-  it("posts email to POST /api/agent/login-link and always shows the confirmation", async () => {
+  it("reads `linkEmail` and still posts the API's `{ email }` body", async () => {
+    // The field is named apart from the password form's because both render on
+    // this one page (F70); the API contract is unchanged, so the route maps it.
     const res = await action(
-      actionArgs({ intent: "link", email: "agent@example.com" }),
+      actionArgs({ intent: "link", linkEmail: "agent@example.com" }),
     );
 
     expect(agentLoginLinkPost).toHaveBeenCalledWith({ json: { email: "agent@example.com" } });
     expect(res).toMatchObject({ sent: true });
   });
 
+  it("does not accept the password form's `email` field for the link intent", async () => {
+    // The control for the rename: if both names were still honored, a form mix-up
+    // would go on silently working and the DOM ambiguity would come straight back.
+    const res = await action(actionArgs({ intent: "link", email: "agent@example.com" }));
+    expect(agentLoginLinkPost).not.toHaveBeenCalled();
+    expect(JSON.stringify(res)).toMatch(/email/i);
+  });
+
   it("shows the same confirmation even when the BFF call throws (anti-enumeration)", async () => {
     agentLoginLinkPost.mockRejectedValue(new Error("network down"));
 
     const res = await action(
-      actionArgs({ intent: "link", email: "agent@example.com" }),
+      actionArgs({ intent: "link", linkEmail: "agent@example.com" }),
     );
 
     expect(res).toMatchObject({ sent: true });
@@ -138,18 +148,52 @@ describe("AgentLoginPage rendering", () => {
     return render(<Stub initialEntries={["/agent-login"]} />);
   }
 
+  /**
+   * F70 — this page carries two email inputs, one per form, and they used to be
+   * indistinguishable: both named `email`, both labelled "Email address", stacked
+   * with a single `OR` rule between them. Filling one and pressing the other
+   * form's button is then the natural mistake, and a password manager sees one
+   * page with two identical fields.
+   */
+  it("gives each of its two email inputs a label of its own", () => {
+    const { getAllByLabelText, getByLabelText } = renderPage(async () => ({}));
+    // Exactly one input answers to the bare label now — the assertion that would
+    // have failed before, since there were two.
+    expect(getAllByLabelText("Email address")).toHaveLength(1);
+    const password = getByLabelText("Email address") as HTMLInputElement;
+    const link = getByLabelText("Email address for your sign-in link") as HTMLInputElement;
+    expect(password.name).toBe("email");
+    expect(link.name).toBe("linkEmail");
+    // Two inputs, two names: nothing on the page answers to the same one twice.
+    expect(password.name).not.toBe(link.name);
+  });
+
+  /**
+   * The other half of F70: there is no agent password-reset route anywhere in
+   * this app, so the sign-in link IS the recovery path — and it was labelled
+   * "Email me a sign-in link instead", which reads as a login PREFERENCE. A real
+   * session stalled here: the user did not remember the password and nothing on
+   * the page was addressed to that.
+   */
+  it("names the situation the magic link is the way out of", () => {
+    const { getByText, queryByText } = renderPage(async () => ({}));
+    expect(getByText("Forgot your password?")).toBeTruthy();
+    expect(getByText("Email me a sign-in link")).toBeTruthy();
+    // No reset link is offered, because no agent reset route exists — a link to
+    // one would be a promise this deployment cannot keep.
+    expect(queryByText(/reset your password/i)).toBeNull();
+  });
+
   it("renders email + password fields and the magic-link fallback CTA", () => {
-    const { getAllByLabelText, getByLabelText, getByText } = renderPage(async () => ({}));
-    // Two email inputs exist (primary password form + secondary link form) —
-    // both share the "Email address" label, so there are two matches.
-    expect(getAllByLabelText("Email address")).toHaveLength(2);
+    const { getByLabelText, getByText } = renderPage(async () => ({}));
+    expect(getByLabelText("Email address")).toBeTruthy();
     expect(getByLabelText("Password")).toBeTruthy();
-    expect(getByText("Email me a sign-in link instead")).toBeTruthy();
+    expect(getByText("Email me a sign-in link")).toBeTruthy();
   });
 
   it("clicking Log In submits the password intent with the typed credentials", async () => {
     const submitted: Record<string, FormDataEntryValue | null>[] = [];
-    const { getAllByLabelText, getByLabelText, getByText } = renderPage(async ({ request }) => {
+    const { getByLabelText, getByText } = renderPage(async ({ request }) => {
       const fd = await request.formData();
       submitted.push({
         intent: fd.get("intent"),
@@ -159,8 +203,7 @@ describe("AgentLoginPage rendering", () => {
       return {};
     });
 
-    // First email input belongs to the primary password form.
-    fireEvent.change(getAllByLabelText("Email address")[0], { target: { value: "agent@example.com" } });
+    fireEvent.change(getByLabelText("Email address"), { target: { value: "agent@example.com" } });
     fireEvent.change(getByLabelText("Password"), { target: { value: "hunter2hunter2" } });
     fireEvent.click(getByText("Log In"));
 
@@ -173,16 +216,21 @@ describe("AgentLoginPage rendering", () => {
   });
 
   it("clicking the magic-link CTA submits the link intent and shows the confirmation", async () => {
-    const { getAllByLabelText, getByText, findByText } = renderPage(async ({ request }) => {
+    const seen: Record<string, FormDataEntryValue | null>[] = [];
+    const { getByLabelText, getByText, findByText } = renderPage(async ({ request }) => {
       const fd = await request.formData();
-      expect(fd.get("intent")).toBe("link");
+      seen.push({ intent: fd.get("intent"), linkEmail: fd.get("linkEmail"), email: fd.get("email") });
       return { sent: true };
     });
 
-    // Second "Email address" input belongs to the secondary link form.
-    fireEvent.change(getAllByLabelText("Email address")[1], { target: { value: "agent@example.com" } });
-    fireEvent.click(getByText("Email me a sign-in link instead"));
+    fireEvent.change(getByLabelText("Email address for your sign-in link"), {
+      target: { value: "agent@example.com" },
+    });
+    fireEvent.click(getByText("Email me a sign-in link"));
 
     await findByText("Check your inbox");
+    // The link form carries only its OWN field — the password form's `email` is
+    // not swept along, which is what makes the two independently fillable.
+    expect(seen[0]).toEqual({ intent: "link", linkEmail: "agent@example.com", email: null });
   });
 });

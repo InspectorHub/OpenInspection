@@ -325,9 +325,9 @@
       "default_value": "false",
       "default_owner": "engine",
       "decision_type": "technical",
-      "basis": "Whether the repair-list feature appears at all. A product surface toggle; it changes what the tenant's staff can build, not who sees anybody's data.",
-      "controller_override": "available",
-      "override_surface": "app/routes/settings-workspace.tsx"
+      "basis": "DRAINED. This column gated nothing: it was plumbed from a settings toggle onto the report payload and read by no renderer, because the one control that consumed it pointed at a page route that does not exist and was removed. The Hub tab it was believed to gate is actually gated by is_customer_repair_export_enabled.",
+      "controller_override": "none",
+      "note": "The toggle was removed and the column is no longer writable by any request — the writable-column set is derived from the branding validation schema, which no longer declares it. Kept in the Drizzle schema pending a one-statement forward migration to drop it; the drift gate requires schema and migrations to agree, so it cannot leave the schema first."
     },
     {
       "column": "is_pdf_pipeline_enabled",

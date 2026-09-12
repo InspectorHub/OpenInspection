@@ -136,18 +136,60 @@ export interface RetentionPolicyHeader {
  *         by the operator, not the operator's own; and — new at `.5` — that the
  *         rule's action is `erase_in_place` rather than `delete`, so the RUN'S
  *         RECORD SURVIVES its own expiry indefinitely. The surviving row holds
- *         ids, timestamps, a vendor name and two authorisations given by the
- *         operator's own people; the reasoning for keeping it is that a cleared
- *         run must be distinguishable from one that never happened, and that
- *         the record itself carries no third-party data. It remains an OPEN
- *         QUESTION whether an indefinitely-retained record of a data subject's
- *         file having been uploaded is itself in scope. `.5` changed no window
- *         and no other rule.
+ *         ids, timestamps, a vendor name, two authorisations given by the
+ *         operator's own people, and — corrected at `.8`, this said "no
+ *         third-party data" and that was not accurate — the bundle manifest,
+ *         whose adapter warnings quote a canned comment's name and up to forty
+ *         characters of its body. The reasoning for keeping the row is that a
+ *         cleared run must be distinguishable from one that never happened.
+ *         ⚠️ AN IN-HOUSE REVIEW DOES NOT CLOSE THIS CONDITION, however
+ *         carefully it is conducted and whatever standard it holds itself to.
+ *         What this entry asks for is a review by someone outside, and only
+ *         that can discharge it. A later internal assessment may well settle
+ *         the engineering defects and still leave this open — when that
+ *         happens, do not read the settled defects as the review.
+ *   7. ❌ **the surviving `migration_batches` row has no period of its own.**
+ *         This is what `.5` recorded as an open question — "whether an
+ *         indefinitely-retained record of a data subject's file having been
+ *         uploaded is itself in scope" — and the answer taken at `.8` is YES
+ *         where the record can relate to identifiable individuals. Being an
+ *         audit record does not by itself put a row outside a retention
+ *         requirement, even when the row names no data subject, because the
+ *         workspace can relate it to a real run.
+ *         What that does NOT settle is the NUMBER. The facts available do not
+ *         support one, and it is not a figure engineering may pick: a period
+ *         here has to be chosen against accountability, contract and
+ *         limitation needs. So the SHAPE is settled and the period is not —
+ *         keep batch id, tenant, timestamp, vendor, action, authorisation
+ *         evidence and outcome, and nothing else, under a period somebody with
+ *         those facts decides.
+ *         ⚠️ This is the one open item nobody can close by writing code, and it
+ *         is NOT expressible as a RETENTION_OPEN entry: `migration_batches`
+ *         already carries a rule, and the manifest gate requires a table to
+ *         appear in exactly one array. So there is no dated deadline behind it
+ *         and no gate that will go red on its own. This list is the only thing
+ *         tracking it.
  *
- * That sixth entry is why the status did not move back to `interim`. Seventeen
- * of eighteen rules genuinely are approved-with-conditions and reverting would
+ * Entries 6 and 7 are why the status did not move back to `interim`. Seventeen
+ * of nineteen rules genuinely are approved-with-conditions and reverting would
  * destroy the provenance in `approvedBy`; but "approved with conditions" is only
  * honest here because one of the conditions now says which rule is not.
+ *
+ * ⚠️ WHAT `.8` CHANGED, AND WHY THE DIGEST DID NOT MOVE WITH IT.
+ * Two defects were found by reading the executors against the catalogue, and
+ * both are fixed at this version:
+ *   - apply reset `expires_at` with nothing above it, so an assisted run
+ *     applied late reached day 119 under a rule declaring 90. `appliedExpiry`
+ *     now clamps the reset to the run's own creation plus the declared window.
+ *   - `report_translations` survived the deletion of its own report, because
+ *     the inspection cascade derives its child set from `inspection_id` and
+ *     that table is keyed by `report_id`. The cascade now handles it.
+ * The first of those CHANGED WHAT PRODUCTION DELETES and moved nothing in the
+ * digest, because the clamp lives in a service and the digest covers the
+ * catalogue. That is the same hazard this header already records about constant
+ * references, one layer further out: the digest is a ratchet on the RULES, and
+ * it is not evidence that the behaviour they describe is unchanged. Both fixes
+ * are held by tests instead, which is the only place that guarantee can live.
  *
  * ⚠️ AND A METHOD RULE, which cost a wasted review cycle to learn:
  * do not classify retention behaviour from the manifest or the table name. The
@@ -169,7 +211,7 @@ export interface RetentionPolicyHeader {
  * every production store is covered.
  */
 export const RETENTION_POLICY: RetentionPolicyHeader = {
-    version: '2026-08-19.7',
+    version: '2026-09-11.8',
     status: 'approved_with_conditions',
     effectiveAt: '2026-08-08',
     // The document named below remains what approved the seventeen rules it
@@ -191,6 +233,19 @@ export const RETENTION_POLICY: RetentionPolicyHeader = {
     // not one of them. **A reviewer reading this header must be able to tell
     // which rules were approved from which were added afterwards, and the
     // version suffix is the only thing carrying that.**
-    supersedes: '2026-08-19.6',
+    //
+    // `.8` carries two executor fixes and the two conditions still open.
+    // `approvedBy`/`approvedAt` do not move here either, and for a sharper
+    // reason than the ones above: the assessment behind `.8` was conducted
+    // INTERNALLY and never went out. Moving the approver onto it would convert
+    // "we held ourselves to that standard" into "an outside reviewer signed
+    // this", which is the one thing this field must never be able to say.
+    //
+    // ⚠️ The value is deliberately an opaque identifier rather than a filename.
+    // What it names is held outside this repository, which is a PUBLIC one, and
+    // the mapping from the identifier to the document belongs wherever that
+    // document is kept. A reader here should be able to tell that a review
+    // happened and on what date, and no more than that.
+    supersedes: '2026-08-19.7',
     rulesDigest: '0d782dbd0e8afe1790a6d53b4d07819f5dfa83884e6ba1837c4b652bb737f892',
 };

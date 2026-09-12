@@ -49,6 +49,61 @@ export function expiryFor(isAssisted: boolean, now: Date): Date {
     return new Date(now.getTime() + days * DAY_MS);
 }
 
+/**
+ * The furthest into the future any batch's due date may ever be pushed.
+ *
+ * `MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS` is what the retention catalogue
+ * DECLARES for this table, and this function is what makes the declaration true
+ * of the data rather than only of the column. Read from the run's own creation
+ * instant, because what the declared period governs is how long an uploaded
+ * file survives its COLLECTION — not how long a timestamp survives its last
+ * write.
+ */
+export function outerExpiryBound(createdAt: Date): Date {
+    return new Date(createdAt.getTime() + MIGRATION_INTAKE_ASSISTED_RETENTION_DAYS * DAY_MS);
+}
+
+/**
+ * The due date an APPLIED run lands on: a fresh undo window, but never past the
+ * outer bound the run has carried since it was created.
+ *
+ * ── Why this exists ─────────────────────────────────────────────────────────
+ * Apply used to write `expiryFor(false, finishedAt)` outright, and a reset that
+ * cannot be exceeded is not a window, it is an extension. An assisted run holds
+ * a ninety-day clock from upload; the staff delivery moves it to `staged`
+ * without touching that clock; an apply on day eighty-nine then wrote a fresh
+ * thirty days, and the uploaded file — a third party's name, email address and
+ * phone number, which apply does not rewrite — lived to day one hundred and
+ * nineteen under a rule declaring ninety.
+ *
+ * That is not a documentation mismatch, and correcting the prose would not have
+ * addressed it: a retention control that does not enforce its own declared
+ * limit is not a control. The declared limit is what the catalogue publishes
+ * for this table, so the limit is what the code has to hold to.
+ *
+ * ── The invariant, and why the clamp is against the CREATION date ────────────
+ * What must hold is that APPLY CANNOT EXTEND THE ORIGINAL COLLECTION-TO-ERASURE
+ * OUTER BOUND BEYOND THE DECLARED MAXIMUM. Several implementations reach that.
+ *
+ * The obvious one — `min(30 days from apply, existing due date)` — reaches it by
+ * never moving the date at all, and in doing so reintroduces the exact defect
+ * the reset was written to fix: a run applied on day twenty-nine gets a one-day
+ * undo. It also over-delivers, holding an APPLIED staged run to thirty days when
+ * the period declared for this table is ninety and nothing ever promised the
+ * shorter one would survive the apply.
+ *
+ * Clamping to creation-plus-the-declared-window satisfies the invariant exactly
+ * — no run outlives its own upload by more than the declared period, on any
+ * path — while leaving a full undo window everywhere it fits. Recorded here
+ * rather than in a plan, because a later reader who reaches for the obvious
+ * formula must be able to see that the difference was decided, not missed.
+ */
+export function appliedExpiry(createdAt: Date, finishedAt: Date): Date {
+    const undoWindow = expiryFor(false, finishedAt);
+    const bound = outerExpiryBound(createdAt);
+    return undoWindow.getTime() < bound.getTime() ? undoWindow : bound;
+}
+
 /** Statuses a run can still be usefully reminded about. A finished run has nothing at stake. */
 const REMINDABLE = [
     MIGRATION_BATCH_STATUS.STAGED,

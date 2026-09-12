@@ -6,6 +6,7 @@
  * once rather than being spelled twice and drifting.
  */
 import { ROLE, ROLES, type Role } from '../auth/roles';
+import { ROLE_KINDS } from '../people/role-kinds';
 import type { PermissionOverrides } from '../auth/capabilities';
 import type { TemplateSchemaV2 } from '../../types/template-schema';
 
@@ -23,10 +24,14 @@ export type VendorId = typeof VENDOR_IDS[number];
 /**
  * The contact-type vocabulary, declared here rather than imported from the
  * database layer so that an adapter's import graph stays free of the ORM.
- * `bundle-vocabulary.spec.ts` asserts at runtime that this list and the
- * column's own enum are the same list, so the duplication cannot drift.
+ *
+ * It is no longer a RESTATEMENT: `people/role-kinds` is a leaf with no ORM in
+ * its graph (the same reason `auth/roles` is already imported above), so the
+ * bundle format can read the vocabulary itself. `bundle-vocabulary.spec.ts`
+ * still asserts the agreement with the column, which is now a fact rather than
+ * a coincidence two lists have to keep achieving.
  */
-export const BUNDLE_CONTACT_TYPES = ['agent', 'client', 'other'] as const;
+export const BUNDLE_CONTACT_TYPES = ROLE_KINDS;
 export type BundleContactType = typeof BUNDLE_CONTACT_TYPES[number];
 
 /**

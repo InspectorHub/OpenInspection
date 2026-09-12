@@ -132,8 +132,52 @@ describe("RatingSegment", () => {
     const fullSpan = Array.from(tile.querySelectorAll("span")).find(
       (el) => el.textContent === "Serviceable"
     );
-    expect(shortSpan?.className).toContain("sm:hidden");
+    // F56 — the swap must be decided by the TILE's width, not the window's.
+    // `sm:` here is what let a 44px tile inside a squeezed editor column paint
+    // a 93px label across its neighbour while the viewport reported 1055px.
+    expect(shortSpan?.className).toContain("@min-[6.5rem]:hidden");
     expect(fullSpan?.className).toContain("hidden");
-    expect(fullSpan?.className).toContain("sm:inline");
+    expect(fullSpan?.className).toContain("@min-[6.5rem]:inline");
+    for (const el of [shortSpan, fullSpan]) {
+      expect(el?.className).not.toMatch(/(^|\s)(sm|md|lg|xl|2xl):/);
+    }
+
+    // …and the tile has to BE a query container, or neither rule ever applies.
+    expect(tile.className).toContain("@container");
+  });
+
+  it("size=md lets the label clip instead of running over the next tile", () => {
+    render(
+      <RatingSegment
+        ratings={[{ value: "ni", label: "Not Inspected", shortLabel: "NI", tone: "neutral" as const }]}
+        value="ni"
+        onChange={() => {}}
+        size="md"
+      />,
+    );
+    const tile = screen.getByRole("radio", { name: "Not Inspected" });
+    const label = tile.querySelector("span") as HTMLElement;
+    // `truncate` is overflow-hidden + ellipsis + nowrap, and overflow does
+    // nothing at all on a non-replaced inline box. Without `block` the span
+    // carried the intent and clipped nothing — which is why the text overlapped
+    // rather than ending in an ellipsis.
+    expect(label.className).toContain("truncate");
+    expect(label.className).toContain("block");
+  });
+
+  it("size=sm tiles are NOT query containers — their width comes from content", () => {
+    render(
+      <RatingSegment
+        ratings={[{ value: "ok", label: "Serviceable", shortLabel: "OK", tone: "ok" as const }]}
+        value="ok"
+        onChange={() => {}}
+        size="sm"
+      />,
+    );
+    const tile = screen.getByRole("radio", { name: "Serviceable" });
+    // `min-w-8 px-2` + content sizes these. `container-type: inline-size` tells
+    // a box to stop taking its inline size from its contents, which would
+    // collapse exactly these tiles.
+    expect(tile.className).not.toContain("@container");
   });
 });

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { brandTokens, type TenantBrand } from "~/lib/brand";
 import { useTurnstileWidget } from "~/lib/turnstile";
 import { LanguageChoice } from "~/components/booking/LanguageChoice";
+import { BOOKING_HORIZON_DAYS, addDaysCivil, todayCivil } from "~/components/booking/booking-date-rules";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -300,6 +301,12 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
             type="date"
             name="date"
             required
+            // F42 — the widget posts to the same endpoint as the full page, and
+            // that endpoint now refuses a date in the past. Giving the picker the
+            // same range means the visitor is stopped by the calendar rather than
+            // by a server error on a one-screen form.
+            min={todayCivil()}
+            max={addDaysCivil(todayCivil(), BOOKING_HORIZON_DAYS)}
             className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
           />
         </div>

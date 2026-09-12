@@ -44,7 +44,7 @@ const A_TEMPLATE: TemplateFixture = {
     updatedAt: "2026-08-01T10:00:00.000Z",
 };
 
-function renderPage(opts: { templates?: TemplateFixture[] } = {}) {
+function renderPage(opts: { templates?: TemplateFixture[]; url?: string } = {}) {
     const templates = opts.templates ?? [];
     const context = {
         branding: { defaultLocale: "en-US", defaultTimezone: "UTC" },
@@ -83,7 +83,7 @@ function renderPage(opts: { templates?: TemplateFixture[] } = {}) {
             ],
         },
     ]);
-    return render(<Stub initialEntries={["/templates"]} />);
+    return render(<Stub initialEntries={[opts.url ?? "/templates"]} />);
 }
 
 /** Every import control on the page, whatever view it is rendered from. */
@@ -157,6 +157,25 @@ describe("/templates — one front door", () => {
         // looking for.
         expect(document.querySelectorAll("textarea")).toHaveLength(0);
         expect(screen.queryByText(/Paste your/i)).toBeNull();
+    });
+
+    /**
+     * F65 — the command palette's "New Template" action has always pointed at
+     * `/library/templates?new=1`, and nothing read that parameter
+     * (`searchParams.get("new")` → 0 hits repo-wide), so the action landed on
+     * this list and stopped: no dialog, and nothing to explain the silence.
+     */
+    it("opens the create dialog on ?new=1", async () => {
+        renderPage({ templates: [A_TEMPLATE], url: "/templates?new=1" });
+
+        expect(await screen.findByRole("dialog")).toBeTruthy();
+    });
+
+    it("does not open the create dialog without the parameter", async () => {
+        renderPage({ templates: [A_TEMPLATE] });
+        await screen.findByRole("heading", { name: /Inspection Templates/i });
+
+        expect(screen.queryByRole("dialog")).toBeNull();
     });
 
     it("still opens CREATE as a button — the control that must NOT have become a link", async () => {

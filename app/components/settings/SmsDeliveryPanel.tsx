@@ -72,7 +72,12 @@ export function SmsDeliveryPanel({
   isSaas: boolean;
   smsMode: SmsModeValue;
   setSmsMode: (m: SmsModeValue) => void;
-  smsConfig: { mode: "platform" | "own" | "managed_shared" | "managed_dedicated"; effectiveSource: "platform" | "own" | "none" };
+  // `effectiveSource` includes `managed` (F58): the managed tiers resolve from a
+  // platform API-key triple + Messaging Service SID, which is a different
+  // credential set from the one `own`/`platform` describe. A deployment that
+  // never configured that pool resolves to `none` WHILE the tenant sits on a
+  // managed mode — the one case where the missing credentials are not theirs.
+  smsConfig: { mode: "platform" | "own" | "managed_shared" | "managed_dedicated"; effectiveSource: "platform" | "own" | "managed" | "none" };
   companyPhone: string;
   savingSmsConfig: boolean;
   secrets: {
@@ -143,13 +148,43 @@ export function SmsDeliveryPanel({
               {m.settings_smsdelivery_selfhost_note()}
             </p>
           )}
-          <p className="text-[11px] font-bold text-ih-ok-fg">
-            {smsConfig.effectiveSource === "own"
-              ? m.settings_smsdelivery_using_your({ provider: smsProviderLabel })
-              : smsConfig.effectiveSource === "platform"
-                ? m.settings_smsdelivery_using_platform()
-                : m.settings_smsdelivery_not_configured()}
-          </p>
+          {/* F59 — all three states used to share one class, `text-ih-ok-fg`.
+              "SMS not configured" was drawn in the same success green as "using
+              your provider": a blocking configuration gap rendered as a healthy
+              one. Configured states stay ok; the two unconfigured ones take the
+              `watch` semantic, which is what the token set has for "needs
+              attention" (never a raw hex — `lint:ds` and `lint:contrast` both
+              read this line).
+
+              F58 — and there are TWO unconfigured states, not one. A tenant on a
+              managed tier is missing nothing of their own: the deployment has no
+              managed pool, the credential panel below is not even rendered in
+              that mode, and "set your provider credentials below" was therefore
+              pointing at the wrong party AND at nothing. */}
+          {(() => {
+            const configured =
+              smsConfig.effectiveSource === "own" ||
+              smsConfig.effectiveSource === "platform" ||
+              smsConfig.effectiveSource === "managed";
+            const managedMode =
+              smsConfig.mode === "managed_shared" || smsConfig.mode === "managed_dedicated";
+            return (
+              <p
+                data-testid="sms-effective-source"
+                className={`text-[11px] font-bold ${configured ? "text-ih-ok-fg" : "text-ih-watch-fg"}`}
+              >
+                {smsConfig.effectiveSource === "own"
+                  ? m.settings_smsdelivery_using_your({ provider: smsProviderLabel })
+                  : smsConfig.effectiveSource === "platform"
+                    ? m.settings_smsdelivery_using_platform()
+                    : smsConfig.effectiveSource === "managed"
+                      ? m.settings_smsdelivery_using_managed()
+                      : managedMode
+                        ? m.settings_smsdelivery_managed_unavailable()
+                        : m.settings_smsdelivery_not_configured()}
+              </p>
+            );
+          })()}
 
           {/* BYO compliance status — toll-free verification is Twilio-specific,
               so this is gated to own-mode tenants on Twilio. */}

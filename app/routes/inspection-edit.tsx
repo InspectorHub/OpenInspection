@@ -14,7 +14,7 @@ import { useInspectionPrefs } from "~/hooks/useInspectionPrefs";
 import { pushToast } from "~/hooks/useToast";
 import { useKeyboard } from "~/hooks/useKeyboard";
 import { useCannedComments } from "~/hooks/useCannedComments";
-import { useUnsavedChanges } from "~/hooks/useUnsavedChanges";
+import { useUnsavedChanges, unsavedChangesAtRisk } from "~/hooks/useUnsavedChanges";
 import { usePresence } from "~/hooks/usePresence";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { useResultsDoc } from "~/lib/collab/use-results-doc";
@@ -32,6 +32,7 @@ import { useCompletedRevalidation } from "~/hooks/useCompletedRevalidation";
 import { AddGroupInstanceHost } from "~/components/statutory/AddGroupInstanceHost";
 import { RevisionBanner } from "~/components/statutory/RevisionBanner";
 import { ItemEditor } from "~/components/editor/ItemEditor";
+import { ItemPaneEmptyState } from "~/components/editor/ItemPaneEmptyState";
 import { TagChipRow, type TagPin } from "~/components/editor/TagChipRow";
 import type { DefectFieldsValue } from "~/components/editor/DefectFieldsRow";
 import { SideRail } from "~/components/editor/SideRail";
@@ -62,7 +63,7 @@ import { AddItemTypeModal } from "~/components/editor/AddItemTypeModal";
 import { SaveTemplateModal } from "~/components/editor/SaveTemplateModal";
 import { useStructureEdit } from "~/hooks/useStructureEdit";
 import { UnsavedChangesBlocker } from "~/components/editor/UnsavedChangesBlocker";
-import { PublishModal } from "~/components/editor/PublishModal";
+import { PublishModal, type PublishExtras } from "~/components/editor/PublishModal";
 import { SignModal } from "~/components/editor/SignModal";
 import { CommentLibraryDrawer } from "~/components/editor/CommentLibraryDrawer";
 import { SectionPickerModal } from "~/components/editor/SectionPickerModal";
@@ -605,7 +606,10 @@ export default function InspectionEditPage() {
  /* Unsaved changes guard */
  /* ---------------------------------------------------------------- */
 
- const { blocker, confirmLeave, cancelLeave } = useUnsavedChanges(state.dirty);
+ // `state.dirty` alone armed this forever — see `unsavedChangesAtRisk` for why.
+ const { blocker, confirmLeave, cancelLeave } = useUnsavedChanges(unsavedChangesAtRisk({
+  hasLocalEdits: state.dirty, collabSynced, uploadInFlight: uploadFetcher.state !== "idle",
+ }));
 
  /* ---------------------------------------------------------------- */
  /* Presence roster (multi-inspector collaboration) */
@@ -1681,16 +1685,13 @@ export default function InspectionEditPage() {
  pendingPhotoUrl={pendingPhotoUrl}
  />
  ) : (
- <div className="flex items-center justify-center h-full text-ih-fg-4">
- <div className="text-center">
- <p className="text-[13px]">
- {m.editor_route_select_item_hint()}
- </p>
- <p className="text-[11px] mt-2 text-ih-fg-3">
- {m.editor_route_navigate_hint_press()} <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">J</kbd> / <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">K</kbd> {m.editor_route_navigate_hint_navigate()}
- </p>
- </div>
- </div>
+ /* F12 — the pane offers the next item instead of naming two keys. Items come from the
+  * SECTION, not `visibleItems`: a filter emptying the list is not an empty section. */
+ <ItemPaneEmptyState
+ items={state.currentSectionItems.map((it) => ({ id: it.id, label: it.label || it.name || "" }))}
+ isRated={(itemId) => state.getResult(itemId, state.currentSection?.id).rating != null}
+ onOpenItem={(itemId) => { state.setActiveItemId(itemId); if (isMobile) setMobileDrawer(null); }}
+ />
  );
 
  const sideRailEl = (
@@ -1871,10 +1872,10 @@ export default function InspectionEditPage() {
  open={state.showPublishModal}
  progress={{ rated: state.progress.rated, total: state.progress.total, pct: state.progress.pct }}
  status={state.inspection.status as string}
- publishError={publishError}
- isSubmitting={publishBusy}
+ publishError={publishError} isSubmitting={publishBusy}
+ isAmendment={loaderData.nextPublishIsAmendment}
  onClose={() => { setPublishError(null); state.setShowPublishModal(false); }}
- onPublish={(markComplete: boolean) => {
+ onPublish={(markComplete: boolean, extras: PublishExtras) => {
  // Keep the modal open: the publish-result effect closes it on success
  // and shows the real server reason inline on failure. `markComplete`
  // also closes the order axis first (advisory — never blocks publish);
@@ -1894,7 +1895,7 @@ export default function InspectionEditPage() {
  submitPublish(
  {
  intent: "publish",
- autoSignOnPublish: String(autoSign),
+ autoSignOnPublish: String(autoSign), ...extras,
  ...(markComplete ? { markComplete: "true" } : {}),
  },
  { method: "post" },

@@ -15,8 +15,6 @@ const SAVED_SIG = 'data:image/png;base64,SAVEDSIG';
 
 const PUBLISH_OPTS = {
     theme: 'default',
-    notifyClient: false,
-    notifyAgent: false,
     requireSignature: false,
     requirePayment: false,
 };

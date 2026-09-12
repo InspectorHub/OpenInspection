@@ -64,7 +64,7 @@ export function QboConnectionPanel({
           </div>
           <span
             className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${
-              status.syncEnabled ? "bg-ih-ok-bg text-ih-ok-fg" : "bg-ih-bg-muted text-ih-fg-3"
+              status.syncEnabled ? "bg-ih-ok-bg text-ih-ok-fg" : "bg-ih-bg-muted text-ih-fg-2"
             }`}
           >
             <span

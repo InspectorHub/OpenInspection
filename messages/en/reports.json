@@ -207,6 +207,8 @@
   "portal_pay_processing": "Processing…",
   "portal_pay_secured": "Secured by Stripe",
   "report_view_cover_unavailable": "Cover photo unavailable",
+  "report_view_held_title": "Your report is ready, and on hold",
+  "report_view_held_message": "This report is finished. Your inspector is holding it until the paperwork on this job is complete — the Overview tab shows what is outstanding and how to clear it.",
   "report_view_not_published_title": "This report is not published",
   "report_view_not_published_message": "This report is not published. Please contact your inspector if you believe this is a mistake.",
   "report_view_unavailable_title": "Report unavailable",
@@ -300,5 +302,11 @@
   "courtesy_translation_setting_off_note": "Translations already delivered stay available to their recipients.",
   "courtesy_translation_confirm_cancel": "Cancel",
   "report_item_not_inspected": "Not inspected",
-  "report_item_not_present": "Not present"
+  "report_item_not_present": "Not present",
+  "report_publish_body_finalize": "Publishing finalizes this report and records a new version.",
+  "report_publish_body_delivery": "It does not send the report itself. Report notices are queued to your automations and go out on the next delivery pass — to put the report in someone's inbox now, use Send report on the inspection page.",
+  "report_publish_receipt_title": "Report published",
+  "report_publish_receipt_nothing_sent": "The report is final and a new version is recorded. Nothing has been emailed by this step.",
+  "report_publish_receipt_goto": "Go to the inspection",
+  "report_publish_checking": "Checking…"
 }

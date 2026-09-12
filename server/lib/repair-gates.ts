@@ -53,6 +53,20 @@ export async function runBuilderGate(
         );
     }
 
+    // THE RELEASE GATE APPLIES HERE TOO, and for the same reason it applies to
+    // the report itself: what this route serves IS report content. The builder
+    // hands a client every defect in the inspection, so a workspace holding the
+    // report for a signed agreement or an outstanding payment would have the
+    // whole substance of it walk out through this door while the report page
+    // beside it correctly refused. One rule, every door that opens onto it.
+    const releaseGate = await c.var.services.inspection.resolveReleaseGate(id, tenantId);
+    if (releaseGate) {
+        return c.json(
+            { success: false as const, error: { code: 'REPORT_GATED', message: 'This report has not been released yet.' } },
+            403,
+        );
+    }
+
     return null;
 }
 
@@ -183,6 +197,30 @@ export async function runShareGate(
     if (!insp || !isReportPublished(insp.reportStatus)) {
         return c.json(
             { success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } },
+            403,
+        );
+    }
+
+    // THE RELEASE GATE APPLIES TO THE SHARE TRACK TOO, and this door is the one
+    // most easily missed: its credential is a share token minted when the list
+    // was built, so a link created BEFORE a company switched on "require
+    // payment" keeps working forever unless the hold is checked on every read.
+    // The hold is per-inspection and can be switched on at any time, so a link
+    // that was legitimate yesterday is not evidence that it is legitimate now.
+    //
+    // What it serves is the same report-derived defect content `runBuilderGate`
+    // above is gated for — the item list, its PDF, and the email that carries
+    // them — 130 lines apart in this same file. It was left out of the first
+    // pass by oversight, not by an argument; the one door that IS deliberately
+    // exempt (the per-version verify endpoint) carries its reasoning at its own
+    // check, which is the standard any future exemption has to meet.
+    const releaseGate = await c.var.services.inspection.resolveReleaseGate(
+        request.inspectionId,
+        request.tenantId,
+    );
+    if (releaseGate) {
+        return c.json(
+            { success: false as const, error: { code: 'REPORT_GATED', message: 'This report has not been released yet.' } },
             403,
         );
     }

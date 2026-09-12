@@ -10,7 +10,7 @@ import { MIGRATION_BATCH_STATUS, type MigrationBatchStatus } from '../../lib/sta
 import { MIGRATION_ROW_STATUS } from '../../lib/status/migration-row-status';
 import { applyMemberRow, type InviteDispatch } from './member-rows';
 import { applyContactRow, applyTemplateRow, type RowOutcome } from './row-writers';
-import { expiryFor } from './assistance.service';
+import { appliedExpiry } from './assistance.service';
 import { getSeatUsage } from '../../features/seat-quota/usage';
 import { assertBatchSeatsAvailable, computeSeatsNeeded } from '../../features/seat-quota/batch';
 import { Errors } from '../../lib/errors';
@@ -166,11 +166,17 @@ export class MigrationApplyService {
                 // undo possible are kept. Leaving it where it was would give a
                 // run applied on day twenty-nine a one-day undo.
                 //
+                // CLAMPED, though. A reset with nothing above it is an
+                // extension: an assisted run applied late reached day 119 under
+                // a rule declaring 90, because apply does not rewrite the
+                // uploaded file it is re-dating. `appliedExpiry` is where the
+                // bound and the reasoning for it live.
+                //
                 // ONE instant for both columns: `applied_at` and the new due
                 // date describe the same event, and two `new Date()` calls
                 // would leave them milliseconds apart, reading like two things
                 // that happened rather than one.
-                expiresAt: expiryFor(false, finishedAt),
+                expiresAt: appliedExpiry(batch.createdAt, finishedAt),
             })
             .where(and(
                 eq(migrationBatches.id, params.batchId),

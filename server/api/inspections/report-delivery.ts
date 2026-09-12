@@ -3,8 +3,9 @@
 // agent view tokens, and the agent share-link email. The report review state
 // machine + publish + PDF render pipeline live in ./publish.ts; the agreement
 // signing envelope lives in ./agreements.ts.
-// Behavior-preserving extraction from inspections.ts — handler bodies + route
-// definitions are byte-identical to the original (only their location changed).
+// Originally a behavior-preserving extraction from inspections.ts. The handler
+// bodies have been fixed in place since, so do not read this file as a copy of
+// anything — it is the only definition of these routes.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
@@ -25,6 +26,8 @@ import {
 import { SendReportSchema, SendReportResponseDataSchema } from '../../lib/validations/send-report.schema';
 import { inspections as inspectionTable, contacts, tenants } from '../../lib/db/schema';
 import { makeManualSendLogger } from '../../services/automation/manual-log';
+import { resolveAutomationCompanyName } from '../../services/automation/company-name';
+import { formatScheduledDate, readTenantDisplay } from '../../lib/inspection/scheduled-date-display';
 import { eq, and } from 'drizzle-orm';
 import { resolveSignatureInspector } from '../../lib/signature-helpers';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
@@ -327,6 +330,17 @@ const reportDeliveryRoutes = createApiRouter()
         const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
         const address = inspection.propertyAddress as string;
 
+        // What `{{company_name}}` renders as, and the locale + timezone `{{scheduled_date}}` renders in.
+        // Both are properties of the WORKSPACE rather than of a recipient, so both are resolved ONCE per
+        // request (two small reads, next to a PDF render) rather than inside the loop below. companyName
+        // is deliberately NOT `tenantSlug`: a slug is a URL identifier — lowercase, hyphenated, often an
+        // abbreviation — and the recipients of this email are outside the tenant, so a slug gives them no
+        // way to recognise the company that inspected their property. Shares the resolver with every other
+        // `{{company_name}}` reader so one email can never carry two company names, including its empty
+        // fallback: a blank reads as a template gap the operator will report, whereas any substitute (slug
+        // or platform name) reads as a confident claim about who wrote the email that is simply wrong.
+        const [companyName, display] = await Promise.all([resolveAutomationCompanyName(db, tenantId), readTenantDisplay(db, tenantId)]);
+
         // Sprint B-4a — append rebooking signature for the assigned inspector.
         const sigInspector = await resolveSignatureInspector(c, inspection.inspectorId, tenantId);
         const sigHost = getBookingHost(c);
@@ -402,9 +416,9 @@ const reportDeliveryRoutes = createApiRouter()
                     const vars: Record<string, string> = {
                         client_name:      (inspection.clientName as string | null) ?? '',
                         property_address: address,
-                        scheduled_date:   (inspection.date as string | null) ?? '',
+                        scheduled_date:   formatScheduledDate(inspection.date as string | null, display),
                         report_url:       linkUrl,
-                        company_name:     tenantSlug,
+                        company_name:     companyName,
                         role_label:       roleTemplate.roleLabel,
                     };
                     // The PDF rides along, exactly as it does on the default

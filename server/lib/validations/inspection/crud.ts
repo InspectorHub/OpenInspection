@@ -2,6 +2,7 @@ import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema, SuccessResponseSchema } from '../shared.schema';
 import { INSPECTION_STATUSES } from '../../status/inspection-status';
 import { CANCELLATION_REASONS } from '../../cancellation-reason';
+import { INSPECTION_PROPERTY_TYPES } from '../../inspection-property-type';
 
 /**
  * Core Inspection Schema (Output)
@@ -74,6 +75,15 @@ export const CreateInspectionSchema = z.object({
     addressCounty:  z.string().max(100).optional().nullable().describe('TODO describe addressCounty field for the OpenInspection MCP integration'),
     addressLat:     z.number().min(-90).max(90).optional().nullable().describe('TODO describe addressLat field for the OpenInspection MCP integration'),
     addressLng:     z.number().min(-180).max(180).optional().nullable().describe('TODO describe addressLng field for the OpenInspection MCP integration'),
+    // The wizard's step-1 property type. Intake is the only moment the engine
+    // learns whether this job is a house, a multi-unit building or a commercial
+    // property, and the answer decides what the report becomes: resolveReportTier,
+    // buildPcaReportBlock, the Building Profile preset and the editor's units
+    // surface all branch on it. Omitted leaves the column NULL (unclassified),
+    // which is what every pre-existing row holds — see lib/inspection-property-type.ts.
+    propertyType:   z.enum(INSPECTION_PROPERTY_TYPES).optional().nullable()
+        .openapi({ example: 'commercial' })
+        .describe('What kind of property is being inspected. Decides report tier, PCA block, Building Profile preset and the per-unit editor surface. Omit for unclassified.'),
     serviceIds:     z.array(z.string()).optional().describe('Legacy flat service-id list. Kept for backward compat. When serviceSelections is also present, serviceSelections takes precedence for per-row price overrides; any serviceId listed here but absent from serviceSelections is linked without a priceOverride.'),
     // IA-1 People step: richer service selection with optional per-line price overrides.
     // Relationship to serviceIds: serviceSelections is the superset. Old callers that
@@ -146,6 +156,21 @@ export const UpdateInspectionSchema = z.object({
     status: z.enum(INSPECTION_STATUSES).optional().openapi({ example: 'completed' }).describe('TODO describe status field for the OpenInspection MCP integration'),
     paymentRequired:   z.boolean().optional().openapi({ example: false }).describe('TODO describe paymentRequired field for the OpenInspection MCP integration'),
     agreementRequired: z.boolean().optional().openapi({ example: false }).describe('TODO describe agreementRequired field for the OpenInspection MCP integration'),
+    // Reclassification. The create path sets this at intake; this is the only
+    // way to correct it afterwards, and the only way an inspection that predates
+    // intake capture can reach the commercial surface at all.
+    //
+    // NOT a neutral edit, and deliberately NOT guarded server-side: leaving
+    // 'commercial' closes the units / cost-items / PCA / compliance surfaces, so
+    // cost rows, narrative and deviations stop reaching the report while staying
+    // in the database, and per-unit findings keep printing (the report gates those
+    // on `unit_inspection_mode`) but lose their editor. Nothing cascades and
+    // nothing is deleted, so the move is reversible by setting it back — which is
+    // why the warning belongs in the UI (PropertyTypeControl) rather than as a
+    // refusal here. `null` clears the classification.
+    propertyType:   z.enum(INSPECTION_PROPERTY_TYPES).nullable().optional()
+        .openapi({ example: 'commercial' })
+        .describe('Reclassify the property. Decides report tier, PCA block, Building Profile preset and the per-unit editor surface. Moving off commercial hides commercial data without deleting it; null clears the classification.'),
     yearBuilt:      z.number().int().min(1800).max(2100).nullable().optional().openapi({ example: 1990 }).describe('TODO describe yearBuilt field for the OpenInspection MCP integration'),
     sqft:           z.number().int().min(0).nullable().optional().openapi({ example: 1800 }).describe('TODO describe sqft field for the OpenInspection MCP integration'),
     foundationType: z.enum(['basement', 'slab', 'crawlspace', 'other']).nullable().optional().describe('TODO describe foundationType field for the OpenInspection MCP integration'),
@@ -243,16 +268,21 @@ const PublishRecipientSchema = z.object({
   channels:  z.array(z.enum(['email', 'text'])).default([]).describe('TODO describe channels field for the OpenInspection MCP integration'),
 }).openapi('PublishRecipient');
 
+// F79 — there are deliberately NO `notifyClient` / `notifyAgent` fields here.
+// They were accepted, defaulted to true, passed down, and read by nothing: who
+// receives a published report is decided by the workspace's `report.published`
+// automation rules. Having them on the wire is what let the publish audit row
+// state a notification decision the rules had already made differently. Zod
+// strips unknown keys, so a client still posting them is accepted and the flags
+// ignored — no 400, no contract break. Do not re-add them to give the UI
+// something to bind to; the UI now names the automation rules instead.
 export const PublishInspectionSchema = z.object({
   theme: z.enum(['modern', 'classic', 'minimal']).default('modern').describe('TODO describe theme field for the OpenInspection MCP integration'),
-  notifyClient: z.boolean().default(true).describe('TODO describe notifyClient field for the OpenInspection MCP integration'),
-  notifyAgent: z.boolean().default(true).describe('TODO describe notifyAgent field for the OpenInspection MCP integration'),
   requireSignature: z.boolean().default(false).describe('TODO describe requireSignature field for the OpenInspection MCP integration'),
   requirePayment: z.boolean().default(false).describe('TODO describe requirePayment field for the OpenInspection MCP integration'),
   // Round-2 F1 — multi-recipient publish modal payload. Optional because
   // legacy clients still post the flat shape above. When present, the
-  // server uses this list to drive per-recipient delivery (email + text)
-  // instead of the broad notifyClient/notifyAgent flags.
+  // server uses this list to drive per-recipient delivery (email + text).
   recipients: z.array(PublishRecipientSchema).optional().describe('TODO describe recipients field for the OpenInspection MCP integration'),
   // Whether the modal sent a copy of the agreement alongside the report.
   // Stored only for audit/notification fan-out — does not change how the
@@ -288,6 +318,17 @@ export const PublishInspectionSchema = z.object({
 export const CreateReinspectionSchema = z.object({
   selectedItemIds: z.array(z.string().min(1)).min(1).describe('Item ids carried forward into the re-inspection (the still-open flagged items the inspector chose).'),
   inspectorId: z.string().optional().describe('Inspector assigned to the re-inspection; defaults to the baseline inspector.'),
+  // F47 — the day the round is filed on. A CIVIL DAY and deliberately not an
+  // instant: `inspections.date` carries the date and `scheduled_start_ms` stays
+  // NULL, so the calendar and the ICS feed fall back to business-hours start
+  // rather than publishing an hour nobody chose.
+  //
+  // Optional, because the dialog prefills today and the one-click path must keep
+  // working. Absent means "today for this company" — which the service can only
+  // answer for a workspace that has DECLARED a timezone, and refuses to guess at
+  // otherwise (see InspectionReinspectionService.companyToday).
+  scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'scheduledDate must be YYYY-MM-DD').optional()
+    .describe('Civil day (YYYY-MM-DD) the re-inspection is scheduled for. Absent means today in the company timezone, which requires one to have been declared.'),
 }).openapi('CreateReinspection');
 
 /**

@@ -5,15 +5,36 @@ import type { Route } from "./+types/settings-billing";
 import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
+import { useSessionContext } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
+
+// F68 — with no `meta` this page's browser tab reads only "OpenInspection".
+// Why it is a catalogue key and not a literal: settings-meta-titles.test.ts.
+export function meta() {
+  return [{ title: m.settings_billing_meta_title() }];
+}
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
+/**
+ * What `GET /api/billing/summary` actually returns: seat numbers, the tier, and
+ * the portal URL when one is configured.
+ *
+ * ⚠️ `hasBilling` and `hasSeatQuota` are deliberately NOT here (F26). This
+ * interface used to declare them, the page destructured them with `= false`
+ * defaults, and `summariseSeats` has never returned either one — so the answer
+ * was `false` on every deployment in existence, and a hosted SaaS workspace was
+ * shown the self-hosted page: "no subscription required", "no per-seat charge",
+ * "no quotas in standalone mode", and an invitation to try the hosted version it
+ * was already running, beside a Team page reading `2 of 3 seats used`.
+ *
+ * Whether a deployment bills is a property of the DEPLOYMENT, not of one
+ * tenant's seat count, so it is read from the deployment profile below. Putting
+ * the fields back on this interface would restore the defect exactly.
+ */
 interface BillingSummary {
-  hasBilling?: boolean;
-  hasSeatQuota?: boolean;
   tier?: string | null;
   portalUrl?: string | null;
   seatsUsed?: number;
@@ -52,11 +73,27 @@ function fmtMoney(n: number): string {
 
 export default function SettingsBillingPage() {
   const data = useLoaderData<typeof loader>();
+  // F26 — the two questions this page branches on come from the deployment
+  // profile (`server/lib/deployment-profile.ts`, shipped to the client through
+  // `deploymentPayload`), which is where `APP_MODE` is turned into capabilities
+  // and the only place that knows whether this deployment bills at all. They are
+  // NOT in the billing summary and never were; read from there they defaulted to
+  // `false` on every deployment, which is why a hosted SaaS workspace was shown
+  // the self-hosted page.
+  //
+  // `=== true` for the same reason `useCapability` does it: no context (a failed
+  // chrome load, or a render outside the auth layout) must not read as "this
+  // deployment bills" and show a plan card built from nothing.
+  //
+  // Above the `forbidden` return because it is a HOOK: React requires the same
+  // hooks in the same order on every render of this component.
+  const session = useSessionContext();
+  const hasBilling = session?.deployment?.hasBilling === true;
+  const hasSeatQuota = session?.deployment?.hasSeatQuota === true;
+
   if ("forbidden" in data) return <AccessDenied />;
   const { billing } = data;
   const {
-    hasBilling = false,
-    hasSeatQuota = false,
     tier = "free",
     portalUrl,
     seatsUsed = 0,

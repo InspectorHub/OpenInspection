@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { isValidTimeZone, resolveTenantTimeZone, epochMsToRfc3339, wallClockToEpochMs } from '../../../server/lib/tz';
+import {
+  isValidTimeZone,
+  resolveTenantTimeZone,
+  epochMsToRfc3339,
+  wallClockToEpochMs,
+  hasDeclaredTenantTimeZone,
+  requireDeclaredTenantTimeZone,
+  UNDECLARED_TENANT_TIMEZONE,
+} from '../../../server/lib/tz';
 
 describe('tz helper', () => {
   it('validates IANA names', () => {
@@ -36,5 +44,40 @@ describe('tz helper', () => {
     // 09:00 local on 2026-01-15 in New York (EST -05:00) == 14:00Z
     expect(wallClockToEpochMs('2026-01-15', '09:00', 'America/New_York'))
       .toBe(Date.parse('2026-01-15T14:00:00Z'));
+  });
+});
+
+/**
+ * THE SENTINEL, AND WHY IT NEEDS ITS OWN PREDICATE.
+ *
+ * `resolveTenantTimeZone` answers "which zone do we render in" and can never
+ * answer "did anybody choose one" — the column is NOT NULL DEFAULT 'UTC', so the
+ * never-configured workspace and the deliberately-UTC one are the same string.
+ * Anything that mints an instant a client is told has to ask the second question,
+ * and the pair below is the only place it can be asked.
+ */
+describe('declared-vs-default tenant timezone', () => {
+  it('treats the NOT NULL default as "nobody declared a zone"', () => {
+    expect(UNDECLARED_TENANT_TIMEZONE).toBe('UTC');
+    expect(hasDeclaredTenantTimeZone('UTC')).toBe(false);
+    expect(requireDeclaredTenantTimeZone('UTC')).toBeNull();
+    // ...while the display resolver still answers the same thing it always did,
+    // because a report still has to be rendered in some zone.
+    expect(resolveTenantTimeZone('UTC')).toBe('UTC');
+  });
+
+  it('accepts Etc/UTC as a DELIBERATE UTC declaration', () => {
+    // The escape hatch that keeps the rule from meaning "UTC is unsupported".
+    expect(hasDeclaredTenantTimeZone('Etc/UTC')).toBe(true);
+    expect(requireDeclaredTenantTimeZone('Etc/UTC')).toBe('Etc/UTC');
+  });
+
+  it('accepts a real region zone and rejects everything that is not one', () => {
+    expect(hasDeclaredTenantTimeZone('America/Chicago')).toBe(true);
+    expect(requireDeclaredTenantTimeZone('America/Chicago')).toBe('America/Chicago');
+    for (const bad of [null, undefined, '', 'garbage', 'EST', 'PST8PDT']) {
+      expect(hasDeclaredTenantTimeZone(bad)).toBe(false);
+      expect(requireDeclaredTenantTimeZone(bad)).toBeNull();
+    }
   });
 });

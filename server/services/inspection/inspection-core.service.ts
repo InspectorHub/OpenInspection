@@ -289,6 +289,9 @@ export class InspectionCoreService extends InspectionSubService {
             addressLat:        (data.addressLat as number | null) ?? null,
             addressLng:        (data.addressLng as number | null) ?? null,
             addressGeocodedAt: data.addressPlaceId ? new Date() : null,
+            // Wizard step 1; decides what the report becomes (report-tier.ts,
+            // pca-report-block.ts, the units surface). null = unclassified.
+            propertyType:      data.propertyType ?? null,
             // #180 — discount columns set after atomic redemption above.
             // null/0 when no code was supplied or the cap blocked redemption.
             discountCodeId:    persistedDiscountCodeId,
@@ -416,7 +419,7 @@ export class InspectionCoreService extends InspectionSubService {
     async createReinspection(
         tenantId: string,
         baselineId: string,
-        opts: { selectedItemIds: string[]; inspectorId?: string | undefined },
+        opts: Parameters<InspectionReinspectionService['createReinspection']>[2],
     ): Promise<CreatedReinspection> {
         return this.reinspection.createReinspection(tenantId, baselineId, opts);
     }

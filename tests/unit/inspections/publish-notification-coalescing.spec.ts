@@ -42,7 +42,7 @@ let db: BetterSQLite3Database<typeof schema>;
 let inspections: InspectionService;
 
 const publishOptions = (reportId: string) => ({
-    theme: 'modern', notifyClient: true, notifyAgent: true,
+    theme: 'modern',
     requireSignature: false, requirePayment: false, reportId,
 });
 
@@ -146,7 +146,7 @@ describe('publish — one notification per delivery, not per document', () => {
 
     it('publishing the primary with no reportId still stamps the primary', async () => {
         await inspections.publishInspection(INSPECTION, TENANT, {
-            theme: 'modern', notifyClient: true, notifyAgent: true,
+            theme: 'modern',
             requireSignature: false, requirePayment: false,
         });
 

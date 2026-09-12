@@ -47,6 +47,7 @@ import {
     removeFindingKeys,
 } from '../lib/collab/results-doc';
 import type { ResultsProjection } from '../lib/collab/results-doc.types';
+import { applyFollowupPatch, resolveCarriedFindingKey } from '../lib/collab/followup-patch';
 import { findingKeysFromTemplateSnapshot } from '../lib/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
@@ -96,6 +97,24 @@ const SNAPSHOT_EVERY = 20;
  * doc-internal emit fire during a doc swap, onDocUpdate still skips counting it.
  */
 const RESTORE_ORIGIN: unique symbol = Symbol('collab-restore-origin');
+
+/**
+ * Origin for the DO-storage read-back in `hydrate()`. Reading state out of
+ * storage is not a change to it, and this is what lets `onDocUpdate` tell the
+ * two apart.
+ *
+ * Without it the read-back looked like an edit, and `hydrate()` runs in the
+ * CONSTRUCTOR — so every reconstruction persisted state straight back to the
+ * storage it came from (and to D1), armed a 1s alarm that WOKE THE DO into
+ * hydrating again, and counted toward `SNAPSHOT_EVERY`. Measured over 24h on an
+ * idle deployment: 7,015 alarms against 1,284 fetches, ten documents, all day.
+ *
+ * ⚠️ NOT for `doHydrateFromD1`: that runs once per DO lifetime and genuinely
+ * introduces state DO storage lacks (the template seed; the results blob when
+ * there was no prior collab state), which SHOULD persist. Only the storage
+ * read-back is a no-op by construction.
+ */
+const HYDRATE_ORIGIN: unique symbol = Symbol('collab-hydrate-origin');
 
 /**
  * One persisted projection snapshot — a point-in-time copy of the doc projected
@@ -267,6 +286,11 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
      * counting it would cause a snapshot storm.
      */
     private onDocUpdate = (update: Uint8Array, origin: unknown): void => {
+        // Before the broadcast as well as before the persist: a socket that
+        // survived hibernation already applied these updates, and one
+        // reconnecting gets them through sync — there is nobody to tell.
+        if (origin === HYDRATE_ORIGIN) return;
+
         this.broadcastDocUpdate(update, origin);
         this.schedulePersist();
 
@@ -414,6 +438,46 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
             await this.restructure();
             return Response.json({ ok: true });
+        }
+
+        // #119 — record a carried item's follow-up disposition. Same identity
+        // headers and same trust boundary as /restructure above. The D1 hydration
+        // is NOT optional: this is the one mutating path that can reach a DO with
+        // no prior state, and patching an empty document and persisting it would
+        // write an empty projection over the round's carried items.
+        if (url.pathname.endsWith('/followup') && req.method === 'POST') {
+            const headerTenantId     = req.headers.get('x-tenant-id');
+            const headerInspectionId = req.headers.get('x-inspection-id');
+            const headerReportId     = req.headers.get('x-report-id');
+            if (headerTenantId)     this.tenantId     = headerTenantId;
+            if (headerInspectionId) this.inspectionId = headerInspectionId;
+            if (headerReportId)     this.reportId     = headerReportId;
+            if (!this.tenantId || !this.inspectionId) {
+                return new Response('missing tenant/inspection identity', { status: 400 });
+            }
+
+            let body: { itemId?: unknown; status?: unknown; notes?: unknown };
+            try {
+                body = (await req.json()) as typeof body;
+            } catch {
+                return new Response('invalid body', { status: 400 });
+            }
+            const itemId = typeof body.itemId === 'string' ? body.itemId : '';
+            if (!itemId) return new Response('invalid itemId', { status: 400 });
+            const status = typeof body.status === 'string' && body.status.length > 0 ? body.status : null;
+            const notes  = typeof body.notes === 'string' ? body.notes : undefined;
+
+            await this.hydrateFromD1Once();
+            const resolved = resolveCarriedFindingKey(this.doc, itemId);
+            if (!resolved.ok) {
+                return Response.json(
+                    { ok: false, reason: resolved.reason },
+                    { status: resolved.reason === 'ambiguous' ? 409 : 404 },
+                );
+            }
+            applyFollowupPatch(this.doc, resolved.findingKey, notes === undefined ? { status } : { status, notes });
+            await this.persist();
+            return Response.json({ ok: true, findingKey: resolved.findingKey });
         }
 
         // Destruction. Called by TenantPurgeService for every report the tenant
@@ -788,7 +852,8 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         ]);
 
         if (stored instanceof Uint8Array && stored.length > 0) {
-            Y.applyUpdate(this.doc, stored);
+            // HYDRATE_ORIGIN, not a bare apply — see the symbol.
+            Y.applyUpdate(this.doc, stored, HYDRATE_ORIGIN);
             // NO-WIPE guard: prior collab state existed. The D1 blob must never be
             // imported on top of it (see hadStoredState + doHydrateFromD1).
             this.hadStoredState = true;

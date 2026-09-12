@@ -13,6 +13,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { describeRowProblem } from '../../../server/lib/migration-intake/row-problems';
+import { BUNDLE_CONTACT_TYPES } from '../../../server/lib/migration-intake/bundle';
 
 describe('describeRowProblem — contacts', () => {
     it('passes a complete contact', () => {
@@ -44,7 +45,12 @@ describe('describeRowProblem — contacts', () => {
     it('lists the accepted contact types when the type is not one of them', () => {
         const problem = describeRowProblem('contact', { name: 'A', type: 'vendor' });
         expect(problem?.field).toBe('type');
-        expect(problem?.reason).toMatch(/agent, client, other/);
+        // Built from the vocabulary, not retyped: a literal here would agree
+        // with whatever it was copied from and stop agreeing with the list the
+        // message is actually rendered from.
+        expect(problem?.reason).toContain(BUNDLE_CONTACT_TYPES.join(', '));
+        // Negative control, so the line above cannot pass on an empty join.
+        expect(BUNDLE_CONTACT_TYPES.length).toBeGreaterThan(1);
         expect(problem?.suggestion).toBe('client');
     });
 });

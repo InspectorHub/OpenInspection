@@ -13,8 +13,8 @@
  *   - null      → at cap, no billingPortalUrl configured (CTA hidden).
  *   - string    → at cap, billingPortalUrl for the "Subscribe" CTA.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 
 const fetcherMocks = {
@@ -59,7 +59,10 @@ vi.mock('react-router', async () => {
     };
 });
 
+import { useFetcher } from 'react-router';
 import { NewInspectionWizard } from '~/components/NewInspectionWizard';
+import { ADDRESS_DROPDOWN_OBSTACLE_ATTR } from '~/components/address/AddressAutocomplete';
+import { anchoredDropdownPlacement } from '~/lib/dropdown-position';
 
 describe('NewInspectionWizard — at-open quota gate', () => {
     beforeEach(() => {
@@ -142,7 +145,7 @@ describe('NewInspectionWizard — client + buyer-agent payload', () => {
         });
         // One combobox, not a filter box + a select + an echo line. Typing
         // filters; only picking selects.
-        fireEvent.change(getByLabelText('Template'), { target: { value: 'Standard' } });
+        fireEvent.change(getByLabelText('Report template'), { target: { value: 'Standard' } });
         fireEvent.mouseDown(getByText('Standard Inspection'));
 
         const clickNext = () => {
@@ -238,5 +241,149 @@ describe('NewInspectionWizard — client + buyer-agent payload', () => {
         const createCalls = fetcherMocks.submit.mock.calls
             .filter((c) => (c[0] as { intent?: string })?.intent === 'create');
         expect(createCalls.length).toBe(1);
+    });
+});
+
+/**
+ * F1 — the Places suggestion list must not cover the wizard's footer.
+ *
+ * Walkthrough finding, on `/inspections/new` at 1280x720: the address field
+ * ended at y=457 and the navigation footer carrying Next/Create began at y=520,
+ * so a 224px list starting at 461 ran to 685 and buried the control the
+ * inspector needs next. There is 255px of room before the viewport floor, so no
+ * viewport-only measurement would ever move it — the footer's own top edge is
+ * the only number that says the space is not free. Same shape as the public
+ * booking page's Continue button (F41), one wizard further in.
+ *
+ * WHAT DISCRIMINATES HERE. happy-dom does no layout and no hit-testing, so
+ * `getBoundingClientRect()` reads zero everywhere and clicking a covered button
+ * still dispatches on the button — "Next still works" would pass with the fix
+ * reverted. The page is therefore laid out by a rect spy at the measured
+ * coordinates, and the assertion is geometric: the list's own box, read off the
+ * inline style the hook writes, must not intersect the footer's. The second test
+ * pins the same numbers against the pure placement function with no obstacle
+ * named, which is what the component did before this wiring — so the pair shows
+ * both that the list moves and that it had somewhere wrong to be.
+ */
+const F1_FIELD_RECT = { top: 421, bottom: 457, left: 232, right: 823, width: 591, height: 36 };
+const F1_FOOTER_RECT = { top: 520, bottom: 566, left: 232, right: 823, width: 591, height: 46 };
+
+/** `/resources/places` suggestions, in the shape `PlaceSuggestion` declares. */
+const F1_PLACES = [
+    {
+        placeId: 'place-nw',
+        description: '1600 Pennsylvania Avenue NW, Washington, DC 20500',
+        mainText: '1600 Pennsylvania Avenue NW',
+        secondaryText: 'Washington, DC 20500',
+    },
+    {
+        placeId: 'place-south',
+        description: '1600 Pennsylvania Avenue South, Washington, DC 20003',
+        mainText: '1600 Pennsylvania Avenue South',
+        secondaryText: 'Washington, DC 20003',
+    },
+];
+
+describe('NewInspectionWizard — address suggestions vs the wizard footer (F1)', () => {
+    const mockedUseFetcher = vi.mocked(useFetcher);
+    let restoreFetcher: (() => void) | null = null;
+    let rectSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+        window.innerHeight = 720;
+        window.innerWidth = 1280;
+
+        // Every fetcher in the wizard answers with the Places payload, because
+        // the file's module mock deliberately stopped keying fetchers by call
+        // order. Only the address input reads `suggestions`; the create effect
+        // keys on `intent === 'create'` and the conflict/holiday consumers treat
+        // an unrecognised body as nothing to report, so this stays local to the
+        // address list. The previous implementation is put back in afterEach.
+        const previous = mockedUseFetcher.getMockImplementation();
+        mockedUseFetcher.mockImplementation((() => ({
+            state: 'idle',
+            data: { suggestions: F1_PLACES },
+            submit: fetcherMocks.submit,
+            load: vi.fn(),
+            Form: ({ children, ...props }: { children: React.ReactNode; [k: string]: unknown }) =>
+                createElement('form', props, children),
+        })) as never);
+        restoreFetcher = () => {
+            if (previous) mockedUseFetcher.mockImplementation(previous);
+        };
+
+        // Lay the page out where the walkthrough measured it. Everything else
+        // reads zero, which is what an unlaid-out element reports anyway — and
+        // a zero-height obstacle is ignored by the hook by design.
+        rectSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+            function (this: Element) {
+                if ((this as HTMLElement).id === 'property-address') return F1_FIELD_RECT as DOMRect;
+                if (this.hasAttribute(ADDRESS_DROPDOWN_OBSTACLE_ATTR)) return F1_FOOTER_RECT as DOMRect;
+                return { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 } as DOMRect;
+            },
+        );
+    });
+
+    afterEach(() => {
+        rectSpy.mockRestore();
+        restoreFetcher?.();
+        restoreFetcher = null;
+    });
+
+    /**
+     * Types an address and waits for the list the 250ms debounce opens.
+     *
+     * REAL timers, deliberately. React 19 flushes asynchronously, so the list
+     * has to be awaited rather than read straight after the keystroke — and
+     * under an installed fake clock `findBy*`/`waitFor` never return at all
+     * (their polling loop flushes through React's act, which schedules work on
+     * timers nobody is advancing once the loop owns the turn). Waiting 250ms for
+     * real is the cheaper of the two, and it is the assertion that matters.
+     */
+    async function openAddressSuggestions() {
+        render(<NewInspectionWizard open onClose={() => {}} templates={[]} />);
+        const input = screen.getByPlaceholderText('123 Main St, City, State') as HTMLInputElement;
+        fireEvent.change(input, { target: { value: '1600 Pennsylvania' } });
+        return { input, list: await screen.findByRole('listbox') };
+    }
+
+    /** The list's own viewport box, read off the inline style the hook writes. */
+    function listBox(list: HTMLElement) {
+        const top = parseFloat(list.style.top);
+        return { top, bottom: top + parseFloat(list.style.maxHeight) };
+    }
+
+    it('leaves the Next/Create footer uncovered', async () => {
+        const { list } = await openAddressSuggestions();
+        expect(list.style.position).toBe('fixed');
+        const { top, bottom } = listBox(list);
+        const overlap = Math.min(bottom, F1_FOOTER_RECT.bottom) - Math.max(top, F1_FOOTER_RECT.top);
+        expect(overlap).toBeLessThanOrEqual(0);
+        expect(bottom).toBeLessThanOrEqual(F1_FOOTER_RECT.top);
+        // And the control underneath is still there, reachable by its name.
+        expect(screen.getByRole('button', { name: /next/i })).toBeTruthy();
+    });
+
+    it('would have covered the footer had the obstacle not been named', async () => {
+        const { list } = await openAddressSuggestions();
+        const placed = listBox(list);
+        // The same geometry with no obstacle — what this component asked for
+        // before the wiring. It runs to 685, straight over a footer at 520.
+        const blind = anchoredDropdownPlacement(
+            { top: F1_FIELD_RECT.top, bottom: F1_FIELD_RECT.bottom, left: F1_FIELD_RECT.left, width: F1_FIELD_RECT.width },
+            720,
+            { viewportWidth: 1280 },
+        );
+        expect(blind.top + blind.maxHeight).toBeGreaterThan(F1_FOOTER_RECT.top);
+        // So the list the wizard actually renders is NOT the blind placement.
+        expect(placed.bottom).not.toBe(blind.top + blind.maxHeight);
+    });
+
+    it('still lets the inspector pick a suggestion', async () => {
+        const { input } = await openAddressSuggestions();
+        fireEvent.mouseDown(screen.getAllByRole('option')[1]);
+        await waitFor(() => {
+            expect(input.value).toBe(F1_PLACES[1].description);
+        });
     });
 });

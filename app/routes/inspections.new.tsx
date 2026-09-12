@@ -55,6 +55,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         itemCount: t.itemCount,
         retiredAt: t.retiredAt ?? null,
         retiredReason: t.retiredReason ?? null,
+        // Rides along for picker ORDER, not for availability: the wizard leads
+        // with a general template unless this workspace's own state is known.
+        // See `app/lib/template-order.ts`.
+        jurisdiction: t.jurisdiction ?? null,
       }));
     }
 

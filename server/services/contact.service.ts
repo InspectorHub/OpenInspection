@@ -207,6 +207,7 @@ export class ContactService {
         inspectionId: string;
         propertyAddress: string | null;
         role: string;
+        roleLabel: string | null;
         createdAt: number | null;
     }> | null> {
         const db = this.getDrizzle();
@@ -214,7 +215,32 @@ export class ContactService {
             .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
         if (!row) return null;
         if (!row.email || !this.portalAccess) return [];
-        return this.portalAccess.listLiveAccessByRecipient(tenantId, row.email);
+        const live = await this.portalAccess.listLiveAccessByRecipient(tenantId, row.email);
+        const labelByKey = await this.roleLabels(tenantId);
+        // IA-119 — `role` is a role-profile KEY. This panel is read by an
+        // operator deciding what a live link grants, so it shows the tenant's
+        // own wording. `null` when the profile was retired or deactivated: the
+        // panel falls back to the key, which is ugly and true, rather than to a
+        // label this layer invented for a role the tenant no longer defines.
+        return live.map((a) => ({ ...a, roleLabel: labelByKey.get(a.role) ?? null }));
+    }
+
+    /**
+     * The tenant's active role vocabulary, key → display label. The same lookup
+     * `report-view-status.ts` does for the delivery list, and the only place
+     * these labels live — they are tenant-editable, so no map in code can stand
+     * in for them.
+     */
+    private async roleLabels(tenantId: string): Promise<Map<string, string>> {
+        const rows = await this.getDrizzle()
+            .select({ key: contactRoleProfiles.key, label: contactRoleProfiles.label })
+            .from(contactRoleProfiles)
+            .where(and(
+                eq(contactRoleProfiles.tenantId, tenantId),
+                eq(contactRoleProfiles.active, true),
+            ))
+            .all();
+        return new Map(rows.map((r) => [r.key, r.label]));
     }
 
     /**

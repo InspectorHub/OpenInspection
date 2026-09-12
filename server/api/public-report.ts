@@ -2,14 +2,14 @@ import type { Context } from 'hono';
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq, and } from 'drizzle-orm';
 import type { HonoConfig } from '../types/hono';
-import { inspections, tenants, tenantConfigs } from '../lib/db/schema';
+import { inspections, tenants } from '../lib/db/schema';
 import { resolveRenderAccess } from '../lib/render-token';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { resolvePortalAccess, resolveOwnerPreview, classifyPortalAccess } from '../lib/public-access';
 import { resolveClientActor } from '../lib/portal-client-actor';
-import { recordReportView } from '../lib/report-views';
+import { recordReportView, readReportViewCountingEnabled } from '../lib/report-views';
 import publicViewTrackingRoutes from './public/view-tracking';
 // Re-exported for existing importers (tests); both now live in lib/.
 export { resolveOwnerPreviewToken } from '../lib/public-access';
@@ -26,6 +26,28 @@ import { PublicInvoiceBodySchema } from '../lib/validations/invoice.schema';
 import { getDrizzle } from '../lib/route-helpers';
 import { readCourtesyTranslationForReport } from '../lib/translation/read-for-report';
 import { COURTESY_TRANSLATION_LOCALE, PublicReportResponseSchema } from '../lib/validations/courtesy-translation.schema';
+
+/**
+ * The outstanding release gate for a public request, or null when nothing holds
+ * the report back.
+ *
+ * Skipped entirely on the bypass paths rather than computed and discarded: the
+ * predicate ignores it there, and asking anyway would put two database reads on
+ * every page the headless PDF renderer loads.
+ *
+ * Takes the service structurally so this module needs no new import, and so a
+ * test can hand it a stub without constructing the whole service graph.
+ */
+async function releaseGateFor(
+    services: { inspection: { resolveReleaseGate(inspectionId: string, tenantId: string): Promise<{ reason: 'payment' | 'agreement' } | null> } },
+    id: string,
+    tenantId: string,
+    bypass: boolean,
+): Promise<'payment' | 'agreement' | null> {
+    if (bypass) return null;
+    const gate = await services.inspection.resolveReleaseGate(id, tenantId);
+    return gate?.reason ?? null;
+}
 
 /**
  * Shared client-facing tenant resolution for the public report endpoints:
@@ -332,8 +354,15 @@ const publicReportRoutes = createApiRouter()
             .from(inspections)
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
             .get();
-        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: gateRow?.reportStatus })) {
-            return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+        // TWO gates, not one. `releaseGate` is the agreement/payment hold the
+        // client Hub already reports; this endpoint used to check only whether
+        // the report was published, so a workspace that required payment got a
+        // Hub saying the report was held back and this endpoint handing it over.
+        const releaseGate = await releaseGateFor(c.var.services, id, tenantId, renderMode || ownerPreview);
+        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: gateRow?.reportStatus, releaseGate })) {
+            return c.json(releaseGate
+                ? { success: false as const, error: { code: 'REPORT_GATED', message: 'This report has not been released yet.' } }
+                : { success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
         }
         // OI #271 — delivery confirmation, after the publish gate (a blocked
         // request is not an open). Grant/renderMode/ownerPreview are resolved
@@ -344,13 +373,13 @@ const publicReportRoutes = createApiRouter()
         // its supposed beneficiary cannot decline). A missing config row reads
         // as OFF, which is the same direction as the column default: a tenant
         // who has never opened the settings page has not opted in.
-        const viewCfg = await getDrizzle(c)
-            .select({ enabled: tenantConfigs.reportViewCountingEnabled })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
+        // Read through the shared reader, which is also what decides whether the
+        // delivery email may state that opens are recorded. Two readings of one
+        // column is how the email came to describe processing this branch was
+        // not doing.
+        const countingEnabled = await readReportViewCountingEnabled(getDrizzle(c), tenantId);
         await recordReportView(getDrizzle(c), { tenantId, inspectionId: id }, {
-            countingEnabled: viewCfg?.enabled ?? false,
+            countingEnabled,
             accessTokenId: clientGrant?.accessTokenId ?? null, renderMode, ownerPreview,
             method: c.req.header('x-oi-client-method') ?? c.req.method,
             purpose: c.req.header('purpose'), secPurpose: c.req.header('sec-purpose'),
@@ -415,7 +444,9 @@ const publicReportRoutes = createApiRouter()
             .from(inspections)
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
             .get();
-        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: photoGate?.reportStatus })) {
+        // A gate that holds the report but serves its photographs is not a gate.
+        const photoReleaseGate = await releaseGateFor(c.var.services, id, tenantId, renderMode || ownerPreview);
+        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: photoGate?.reportStatus, releaseGate: photoReleaseGate })) {
             return c.notFound();
         }
         // Ownership: keys are `${tenantId}/inspections/${inspectionId}/...` — reject
@@ -452,8 +483,19 @@ const publicReportRoutes = createApiRouter()
         if (!insp) return c.notFound();
         // Publish gate: this is a pure client-facing endpoint (no owner-preview, no
         // render token), so block whenever the report is not currently published.
-        if (!publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: insp.reportStatus })) {
-            return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+        // Same two gates. This is the pure client-facing download; the headless
+        // renderer reaches the report through its own render token above, so
+        // gating here does not block the PDF from being BUILT, only from being
+        // handed to a client who has not cleared the hold.
+        const pdfReleaseGate = await releaseGateFor(c.var.services, id, tenantId, false);
+        if (!publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: insp.reportStatus, releaseGate: pdfReleaseGate })) {
+            // Same two meanings as the payload door above. Answering NOT_PUBLISHED
+            // for a held report tells a client who owes money that their inspector
+            // has not finished — the wrong fact, and it points them at the wrong
+            // person to fix it.
+            return c.json(pdfReleaseGate
+                ? { success: false as const, error: { code: 'REPORT_GATED', message: 'This report has not been released yet.' } }
+                : { success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
         }
         // Everyday download always tracks current content (versionNumber: null →
         // content-hash cache, renders live data). Frozen per-version PDFs are only

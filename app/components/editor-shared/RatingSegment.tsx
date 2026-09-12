@@ -63,9 +63,43 @@ const TONE_IDLE: Record<RatingTone, string> = {
 
 const SIZE_CLASSES: Record<NonNullable<RatingSegmentProps["size"]>, string> = {
   sm: "h-8 min-w-8 px-2 rounded text-[11px] font-bold",
-  md: "h-11 min-w-0 flex-1 px-3 rounded-lg text-[13px] font-bold",
-  lg: "h-20 w-20 rounded-xl text-sm font-bold",
+  md: "h-11 min-w-0 flex-1 px-3 rounded-lg text-[13px] font-bold @container",
+  lg: "h-20 w-20 rounded-xl text-sm font-bold @container",
 };
+
+/**
+ * F56 — where the abbreviation/full-label swap gets its width from.
+ *
+ * It used to be `sm:` — a VIEWPORT media query. Opening the editor's photo
+ * drawer squeezed the rating row from ~456px to ~213px while the viewport
+ * stayed at 1055px, so every tile kept rendering its full label inside a 44px
+ * box: "Not Inspected" painted 93px wide in a 45px tile and ran 51px into the
+ * next one. The viewport was never the box that ran out of room.
+ *
+ * The query container is each TILE, not the row, because what decides whether
+ * a label fits is the tile's own width — and that depends on how many ratings
+ * the system has (four for TREC, five for the default), which no row-level
+ * threshold can know. `md` tiles are `flex-1 min-w-0` and `lg` tiles are
+ * `w-20`, so neither takes its width from its content and `inline-size`
+ * containment costs them nothing.
+ *
+ * ⚠️ `sm` tiles are deliberately NOT containers: their width comes from
+ * `min-w-8 px-2` plus their content, and inline-size containment would tell the
+ * box to ignore the content it is sized by. They always render the short form
+ * anyway, so they have nothing to query for.
+ *
+ * 6.5rem = 104px is measured, not picked: the longest TREC label renders 93px
+ * at 13px bold, and `px-3` adds 24px around it. Below that the tile shows the
+ * abbreviation; a tile in the narrow window where the full label ALMOST fits
+ * gets an ellipsis rather than an overlap, because the label span can finally
+ * clip (see `block truncate`).
+ *
+ * ⚠️ Both class names are written out in full below rather than built from a
+ * shared `@min-[6.5rem]` constant. Tailwind finds utilities by scanning source
+ * TEXT for candidates, so a class assembled at runtime from two fragments is a
+ * class it never generates — the markup would carry it and no rule would
+ * exist, which is the silent failure this whole finding is made of.
+ */
 
 /**
  * Domain rating-tile row. Consolidates the three hand-rolled rating-tile
@@ -140,17 +174,18 @@ export function RatingSegment({
         // regardless of selection — see the RatingOption.color doc above.
         const style = r.color ? { background: r.color, color: "#fff" } : undefined;
         // At `size="sm"` (compact tiles, e.g. BatchActionBar) always show the
-        // short form. At md/lg, responsively swap: shortLabel below the `sm`
-        // breakpoint, full label at `sm` and up — mirrors the pre-migration
-        // RatingButtonRow behavior of abbreviating on narrow screens. When no
-        // `shortLabel` is provided, just render the full label everywhere.
+        // short form. At md/lg, swap on the TILE's own width: the abbreviation
+        // while the tile is narrow, the full label once there is room for it —
+        // see LABEL_FULL_AT for why this is a container query and not a
+        // viewport breakpoint. When no `shortLabel` is provided, just render
+        // the full label everywhere.
         const text =
           size === "sm" ? (
             (r.shortLabel ?? r.label)
           ) : r.shortLabel ? (
             <>
-              <span className="sm:hidden">{r.shortLabel}</span>
-              <span className="hidden sm:inline">{r.label}</span>
+              <span className="@min-[6.5rem]:hidden">{r.shortLabel}</span>
+              <span className="hidden @min-[6.5rem]:inline">{r.label}</span>
             </>
           ) : (
             r.label
@@ -175,7 +210,13 @@ export function RatingSegment({
             }`}
             style={style}
           >
-            <span className="truncate px-0.5">{text}</span>
+            {/* `block`, and that is the whole point: `truncate` is
+                overflow-hidden + ellipsis + nowrap, and overflow does nothing
+                on a non-replaced INLINE box. This span carried `truncate`
+                throughout the defect and clipped nothing — the label simply
+                painted past the tile and over its neighbour. As a block it
+                fills the tile's content box and can finally cut the text off. */}
+            <span className="block truncate px-0.5">{text}</span>
             {r.hint != null && (
               <span className="block text-[9px] font-mono opacity-60 mt-0.5">{r.hint}</span>
             )}

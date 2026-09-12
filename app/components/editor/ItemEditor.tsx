@@ -27,6 +27,7 @@ import { findRatingContradictions } from "../../lib/contradiction-lint";
 import { filterCannedEntries, deriveDefectTitle, type CustomDefect, type CustomDefectCategory } from "../../lib/custom-defects";
 import type { DefectTrade } from "../../lib/defect-fields";
 import { ItemHeading } from "./ItemHeading";
+import { FollowupPanel, hasCarriedBaseline } from "./FollowupPanel";
 import { FormField, type ItemOptions, type TemplateItem } from "../form/FormField";
 import { m } from "~/paraglide/messages";
 
@@ -379,6 +380,9 @@ export function ItemEditor({
  return (
  <div className="max-w-2xl space-y-6">
  <ItemHeading sectionTitle={sectionTitle} label={item.label} description={item.description} />
+
+ {/* #119 — carried items only. Gated here, not inside: see hasCarriedBaseline. */}
+ {hasCarriedBaseline(result) && <FollowupPanel itemId={item.id} result={result} />}
 
  {/* Item attributes (equipment fields: brand, year, model, etc.) */}
  {item.attributes && item.attributes.length > 0 && (

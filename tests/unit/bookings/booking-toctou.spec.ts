@@ -9,6 +9,7 @@ import {
     inspections,
     inspectionInspectors,
     inspectionRequests,
+    tenantConfigs,
 } from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
@@ -40,6 +41,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { bookingsRoutes } from '../../../server/api/bookings';
 
 import { makeExecutionContext } from '../helpers/exec-ctx';
+import { nextWeekday } from '../helpers/bookable-date';
 
 vi.mock('../../../server/lib/rate-limit', () => ({
     checkRateLimit: vi.fn().mockResolvedValue(undefined),
@@ -48,7 +50,7 @@ vi.mock('../../../server/lib/rate-limit', () => ({
 const TENANT_ID = 'aaaaaaaa-0000-0000-0000-0000000000b1';
 const TENANT_SLUG = 'toctou-test';
 // 2026-07-07 is a Tuesday (dayOfWeek = 2). Keep future-dated.
-const TEST_DATE = '2026-07-07';
+const TEST_DATE = nextWeekday(2);
 const SLOT_ISO = `${TEST_DATE}T08:00:00Z`;
 
 const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
@@ -95,6 +97,12 @@ describe('B-28 booking TOCTOU', () => {
             id: 'av-1', tenantId: TENANT_ID, inspectorId: 'insp-1',
             dayOfWeek: 2, startTime: '08:00', endTime: '10:00', createdAt: new Date(),
         });
+        // A DECLARED company timezone. Public booking refuses a workspace that
+        // never set one (the NOT NULL default 'UTC' is the unset sentinel).
+        await db.insert(tenantConfigs).values({
+            tenantId: TENANT_ID, updatedAt: new Date(), defaultTimezone: 'America/New_York',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
     });
     afterEach(() => sqlite.close());
 

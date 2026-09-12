@@ -18,7 +18,7 @@ export type HubSection =
   | "messages"
   | "repair"
   | "documents"
-  // Reached from the BELL, never from navItems() below: the eight tabs are
+  // Reached from the BELL, never from hubNavItems() below: the tabs are
   // facts about this inspection and this is a fact about the reader.
   | "notifications";
 
@@ -51,9 +51,23 @@ export function hubSectionNavHref(section: HubSection, ctx: HubLinkCtx): string 
 /* Component */
 /* ------------------------------------------------------------------ */
 
-// Factory (not a module const) so the labels resolve inside the request's
-// paraglide scope on each render rather than being frozen at import time.
-function navItems(): Array<{ section: HubSection; label: string }> {
+/**
+ * The Hub tabs. A factory (not a module const) so the labels resolve inside the
+ * request's paraglide scope on each render rather than being frozen at import
+ * time — and exported so the rule below is testable without a render.
+ *
+ * THE REPAIR TAB IS CONDITIONAL, and that is the whole of it. Every
+ * repair-builder endpoint runs `runBuilderGate`, which refuses with 403 unless
+ * `tenant_configs.is_customer_repair_export_enabled` is on — so on a company
+ * without it, this tab rendered in the client's navigation, in the same row as
+ * seven tabs that work, and answered "Feature Not Available — the repair
+ * request builder is not enabled for this inspection company". That is this
+ * repo's own dead-control category "the label promises a capability that does
+ * not exist", whose fix is to stop printing the label, not to apologise after
+ * the click. The flag is resolved server-side (where it is ENFORCED) and
+ * arrives on the overview.
+ */
+export function hubNavItems(opts: { repairRequestEnabled: boolean }): Array<{ section: HubSection; label: string }> {
   return [
     { section: "overview", label: m.portal_hub_nav_overview() },
     { section: "report", label: m.portal_hub_nav_report() },
@@ -61,7 +75,9 @@ function navItems(): Array<{ section: HubSection; label: string }> {
     { section: "payment", label: m.portal_hub_nav_payment() },
     { section: "progress", label: m.portal_hub_nav_progress() },
     { section: "messages", label: m.portal_hub_nav_messages() },
-    { section: "repair", label: m.portal_hub_nav_repair() },
+    ...(opts.repairRequestEnabled
+      ? [{ section: "repair" as HubSection, label: m.portal_hub_nav_repair() }]
+      : []),
     { section: "documents", label: m.portal_hub_nav_documents() },
   ];
 }
@@ -151,7 +167,7 @@ export default function ClientPortalHub({
           agent mode: an agent report link has only the report section. */}
       {!agentMode && (
       <nav className="mb-6 flex flex-wrap gap-2 border-b border-ih-border pb-3">
-        {navItems().map((n) => {
+        {hubNavItems({ repairRequestEnabled: overview.repairRequestEnabled }).map((n) => {
           const active = n.section === activeSection;
           const base =
             "px-3 py-1.5 text-xs font-semibold rounded-full transition-colors";

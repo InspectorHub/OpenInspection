@@ -1,8 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { automationLogs, tenantConfigs } from '../../lib/db/schema';
-import { resolveTenantTimeZone } from '../../lib/tz';
-import { resolveLocale } from '../../lib/locale';
 import { formatDateTime } from '../../lib/format';
+import { readTenantDisplay } from '../../lib/inspection/scheduled-date-display';
 import { logger } from '../../lib/logger';
 import { deliverAction } from '../../lib/automation-core';
 import { buildBaseTemplateVars } from './template-vars';
@@ -84,8 +83,14 @@ export async function deliverTemplatedEmail(
     const subjectSource = tpl.subject ?? '';
     const bodySource = tpl.body;
 
+    // The WORKSPACE's locale + timezone, which is what every date a second
+    // party also reads is rendered in (see readTenantDisplay). Read once here
+    // rather than inside the event branch below, which used to own the only
+    // copy of this read while `scheduled_date` a few lines up went out raw.
+    const display = await readTenantDisplay(db, inspection.tenantId);
+
     const vars: Record<string, string> = {
-        ...buildBaseTemplateVars(inspection, tenant, appName, appHost, {
+        ...buildBaseTemplateVars(inspection, tenant, appName, appHost, display, {
             summary: automation?.trigger === 'report.amended'
                 ? await deps.latestSummary(inspection.id, inspection.tenantId)
                 : '',
@@ -116,13 +121,9 @@ export async function deliverTemplatedEmail(
                 // Format the client-facing scheduled time in the RECIPIENT
                 // tenant's locale + timezone (external client -> tenant defaults),
                 // not the server default (which anchored UTC with no locale).
-                const cfg = await db.select({ defaultLocale: tenantConfigs.defaultLocale, defaultTimezone: tenantConfigs.defaultTimezone })
-                    .from(tenantConfigs).where(eq(tenantConfigs.tenantId, inspection.tenantId)).get();
+                // `display` is that same pair, resolved once above.
                 vars.event_scheduled_at = ev.scheduledAt
-                    ? formatDateTime(ev.scheduledAt as Date, {
-                          locale: resolveLocale(cfg?.defaultLocale),
-                          timeZone: resolveTenantTimeZone(cfg?.defaultTimezone),
-                      })
+                    ? formatDateTime(ev.scheduledAt as Date, display)
                     : '';
             }
         } catch (err) {

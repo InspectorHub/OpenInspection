@@ -103,9 +103,11 @@ worker upload: 17977 KiB raw / 2775 KiB gzip (90.3% of the 3 MiB Workers Free li
   is pre-existing, not caused by this spike, but it means Task 2–6's actual
   production builder code (plus any further growth elsewhere in the worker)
   has materially less than 297 KiB of margin left before the gate goes red.
-  Flagging for Task 2+ implementers and for the broader bundle-diet backlog
-  (`2026-07-06-oi-knip-verified-cleanup-backlog.md`, another superproject
-  plan outside this submodule / the pre-push WARNING).
+  Flagging for Task 2+ implementers and for the pre-push bundle WARNING. (The
+  dead-code side of this is closed: the knip baseline converged from 602 to 5
+  in #256, and `npm run lint:deadcode` is the live check. This used to cite a
+  planning file in the private superproject, which no reader of this repository
+  could open and which no longer exists.)
 - `docx`'s own dependencies (`jszip`, `nanoid`, `xml`, `xml-js`, `hash.js` —
   npm package names, each its own `node_modules/<name>/` entry, not tracked
   in this repo) are pre-bundled into `docx`'s own `dist/index.mjs` (a

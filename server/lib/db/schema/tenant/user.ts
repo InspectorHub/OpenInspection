@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
-import { ROLES } from '../../../auth/roles';
+import { ROLES, ROLE } from '../../../auth/roles';
 import { tenants } from './core';
 
 export const users = sqliteTable('users', {
@@ -38,7 +38,7 @@ export const users = sqliteTable('users', {
     // DDL default is FROZEN (D1 cannot alter column defaults without a
     // table rebuild and users is FK-referenced). Every insert path MUST pass an
     // explicit role — audited 2026-06-05; enforced by review, not DDL.
-    role: text('role', { enum: ROLES }).notNull().default('manager'),
+    role: text('role', { enum: ROLES }).notNull().default(ROLE.MANAGER),
     // Sparse map of one-time UI flags — an ABSENT key means "not done yet", so
     // a NULL column is simply a fresh account and nothing has to backfill it.
     // Written only by the three /auth profile endpoints (skip-setup → `skipped`,
@@ -177,7 +177,7 @@ export const tenantInvites = sqliteTable('tenant_invites', {
     // emits it on the `user.invited` outbox event that drives portal seat sync.
     // It is the invite, not the accept form, that decides — nothing downstream
     // re-derives it. Kept identical to `users.role` by the role-enum-drift spec.
-    role: text('role', { enum: ROLES }).notNull().default('inspector'),
+    role: text('role', { enum: ROLES }).notNull().default(ROLE.INSPECTOR),
     // Schema Rules: state-machine column declares its enum (type-layer only).
     status: text('status', { enum: ['pending', 'accepted'] }).notNull().default('pending'),
     expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),

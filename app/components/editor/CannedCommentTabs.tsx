@@ -234,7 +234,7 @@ export function CannedCommentTabs({
                   />
                 }
                 bodySlot={
-                  <p className={`text-[11px] mt-0.5 leading-relaxed ${isIncluded ? "text-ih-fg-3" : "text-ih-fg-4"}`}>
+                  <p className={`text-[11px] mt-0.5 leading-relaxed ${isIncluded ? "text-ih-fg-3" : "text-ih-fg-3"}`}>
                     {vars ? renderTemplate(entry.comment, vars) : entry.comment}
                   </p>
                 }

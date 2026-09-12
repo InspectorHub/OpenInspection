@@ -127,6 +127,11 @@ const sessionContextRoutes = createApiRouter()
         let tenantTimezone = 'UTC';
         let tenantLocale = 'en-US';
         let tenantCurrency = 'USD';
+        // Null until the tenant_configs read below answers. The platform default
+        // is applied once, at the payload, so "unset" and "unreadable" stay
+        // distinguishable up to that point.
+        let tenantCompanyName: string | null = null;
+        let holidayRegion: string | null = null;
         let archiveRevokesAccess = false;
         // Resolved inside the tenant_configs read below. Fail mode: a DB error
         // leaves this `false` (fail-CLOSED to the legacy editor). Deliberately
@@ -172,6 +177,24 @@ const sessionContextRoutes = createApiRouter()
                         customPrivacyUrl: tenantConfigs.customPrivacyUrl,
                         customTermsUrl: tenantConfigs.customTermsUrl,
                         collabEditing: tenantConfigs.collabEditing,
+                        // ⚠️ READ HERE RATHER THAN OFF `c.get('branding')`, and
+                        // the reason is the early return at the top of
+                        // `middleware/branding.ts`: that middleware is mounted
+                        // BEFORE jwtAuthMiddleware, so on a saas authenticated
+                        // request it has no `tenantId` and hands back platform
+                        // defaults. Every saas workspace was therefore told its
+                        // own company name was 'OpenInspection' — which is why
+                        // the Getting started checklist's first step could never
+                        // be completed on saas, however many times the name was
+                        // saved. This query has the JWT's tenantId and is the
+                        // same row the name lives on.
+                        companyName: tenantConfigs.companyName,
+                        // The only structured statement a workspace makes about
+                        // where it works ('US' or 'US-TX'). Set for the holiday
+                        // catalogue; read by the New Inspection template picker
+                        // so a workspace is not offered another state's
+                        // statutory form first (app/lib/template-order.ts).
+                        holidayRegion: tenantConfigs.holidayRegion,
                     })
                         .from(tenantConfigs)
                         .where(eq(tenantConfigs.tenantId, tenantId))
@@ -191,6 +214,11 @@ const sessionContextRoutes = createApiRouter()
                     userTimeFormat = isTimeFormat(row.timeFormat) ? row.timeFormat : null;
                 }
                 if (cfg?.defaultTimezone) tenantTimezone = cfg.defaultTimezone;
+                // Blank and whitespace are both "never set" to a reader, and
+                // only one of them is null.
+                const storedCompanyName = cfg?.companyName?.trim();
+                if (storedCompanyName) tenantCompanyName = storedCompanyName;
+                holidayRegion = cfg?.holidayRegion ?? null;
                 tenantLocale = resolveLocale(cfg?.defaultLocale);
                 if (cfg?.currency) tenantCurrency = cfg.currency;
                 if (isDateFormat(cfg?.dateFormat)) tenantDateFormat = cfg.dateFormat;
@@ -302,7 +330,9 @@ const sessionContextRoutes = createApiRouter()
             success: true,
             data: {
                 branding: {
-                    companyName: branding?.companyName || 'OpenInspection',
+                    // The stored name first — see the query above for why
+                    // `branding` cannot answer this on saas.
+                    companyName: tenantCompanyName || branding?.companyName || 'OpenInspection',
                     primaryColor: branding?.primaryColor || '#6366f1',
                     logoUrl: branding?.logoUrl || null,
                     defaultProfileId: branding?.defaultProfileId || 'signature',
@@ -315,6 +345,7 @@ const sessionContextRoutes = createApiRouter()
                     privacyUrl,
                     termsUrl,
                     defaultTimezone: tenantTimezone,
+                    holidayRegion,
                     defaultLocale: tenantLocale,
                     currency: tenantCurrency,
                     archiveRevokesAccess,

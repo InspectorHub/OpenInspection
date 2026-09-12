@@ -21,6 +21,7 @@ import { createRoutesStub } from "react-router";
 
 import ContactsPage from "~/routes/contacts";
 import { asSelect } from "../../tests/helpers/dom";
+import { ROLE_KINDS } from "../../server/lib/people/role-kinds";
 
 const AGENT = {
   id: "c1",
@@ -35,12 +36,34 @@ const AGENT = {
 const CLIENT = { ...AGENT, id: "c2", name: "Tomas Beck", type: "client", agency: null, inspectionCount: 1, referralCount: 0 };
 const OTHER = { ...AGENT, id: "c3", name: "Priya Anand", type: "other", agency: null, inspectionCount: 2, referralCount: 0 };
 
-function renderContacts(contacts: unknown[], filterType = "") {
+function renderContacts(contacts: unknown[], filterType = "", url = "/contacts") {
   const Stub = createRoutesStub([
     { path: "/contacts", Component: ContactsPage, loader: () => ({ contacts, filterType }) },
   ]);
-  return render(<Stub initialEntries={["/contacts"]} />);
+  return render(<Stub initialEntries={[url]} />);
 }
+
+/**
+ * F65 — the command palette's "New Contact" action has always navigated to
+ * `/contacts?new=1`, and nothing in the repository read that parameter
+ * (`searchParams.get("new")` → 0 hits), so the action landed on the list and
+ * stopped: no dialog, and nothing to say why.
+ */
+describe("/contacts — ?new=1", () => {
+  it("opens the add-contact dialog", async () => {
+    renderContacts([AGENT], "", "/contacts?new=1");
+
+    // Queried off the document: the modal renders through a portal.
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+  });
+
+  it("does not open it without the parameter", async () => {
+    renderContacts([AGENT]);
+    await screen.findByText("Rosa Lindqvist");
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
 
 describe("/contacts — IA-96", () => {
   it("has no tab strip: one list, not three", async () => {
@@ -68,7 +91,10 @@ describe("/contacts — IA-96", () => {
     const select = asSelect(await findByLabelText(/type/i), "the contact-type picker");
 
     const values = [...select.options].map((o) => o.value);
-    expect(values).toEqual(["", "agent", "client", "other"]);
+    // Derived, not retyped: the picker offers the blank "all" entry followed by
+    // the vocabulary in its own order. A literal list here would keep agreeing
+    // with whatever it was copied from after the vocabulary moved on.
+    expect(values).toEqual(["", ...ROLE_KINDS]);
   });
 
   it("does not repeat the same count in the title and the meta line", async () => {

@@ -257,3 +257,19 @@ export async function handleSearchContacts(
   }
   return { intent: "search-contacts", contacts: [] };
 }
+
+/**
+ * F47 — the day the operator chose for a re-inspection, as a spreadable
+ * fragment of the `reinspect` request body.
+ *
+ * Returns `{}` rather than `{ scheduledDate: "" }` when the field is absent or
+ * cleared, because ABSENT AND EMPTY MEAN DIFFERENT THINGS to the endpoint:
+ * absent asks the server to date the round itself (today in the company
+ * timezone, which it refuses to guess at when none was declared), while ""
+ * fails the YYYY-MM-DD check and 400s. A cleared field is a request for the
+ * default, not a malformed date.
+ */
+export function reinspectionDay(formData: FormData): { scheduledDate?: string } {
+  const day = String(formData.get("scheduledDate") ?? "").trim();
+  return day ? { scheduledDate: day } : {};
+}

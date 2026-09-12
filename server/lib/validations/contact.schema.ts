@@ -1,8 +1,12 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from './shared.schema';
+// One vocabulary for the contact-party axis: the `contacts.type` column, the
+// role-profile `kind` column and every schema below read this same array, so a
+// widened select can never meet a narrower validator.
+import { ROLE_KINDS } from '../people/role-kinds';
 
 export const CreateContactSchema = z.object({
-    type: z.enum(['agent', 'client', 'other']).default('client').openapi({ example: 'agent' }).describe('TODO describe type field for the OpenInspection MCP integration'),
+    type: z.enum(ROLE_KINDS).default('client').openapi({ example: 'agent' }).describe('TODO describe type field for the OpenInspection MCP integration'),
     name: z.string().min(1).max(100).openapi({ example: 'Jane Smith' }).describe('TODO describe name field for the OpenInspection MCP integration'),
     email: z.string().email().optional().nullable().openapi({ example: 'jane@realty.com' }).describe('TODO describe email field for the OpenInspection MCP integration'),
     phone: z.string().max(30).optional().nullable().openapi({ example: '(555) 987-6543' }).describe('TODO describe phone field for the OpenInspection MCP integration'),
@@ -28,7 +32,7 @@ export const UpdateContactSchema = CreateContactSchema.partial().openapi('Update
 export const ContactResponseSchema = z.object({
     id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
     tenantId: z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    type: z.enum(['agent', 'client', 'other']).describe('TODO describe type field for the OpenInspection MCP integration'),
+    type: z.enum(ROLE_KINDS).describe('TODO describe type field for the OpenInspection MCP integration'),
     name: z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
     email: z.string().nullable().describe('TODO describe email field for the OpenInspection MCP integration'),
     phone: z.string().nullable().describe('TODO describe phone field for the OpenInspection MCP integration'),
@@ -41,7 +45,7 @@ export const ContactResponseSchema = z.object({
 }).openapi('Contact');
 
 export const ContactListQuerySchema = z.object({
-    type: z.enum(['agent', 'client', 'other']).optional().openapi({ example: 'agent' }).describe('TODO describe type field for the OpenInspection MCP integration'),
+    type: z.enum(ROLE_KINDS).optional().openapi({ example: 'agent' }).describe('TODO describe type field for the OpenInspection MCP integration'),
     search: z.string().max(100).optional().describe('TODO describe search field for the OpenInspection MCP integration'),
     // IA-120 — archive had a writer and no reader. `archivedAt` was set by the
     // Archive button and then filtered out of every query, with no way to list,
@@ -57,7 +61,7 @@ export const ContactListQuerySchema = z.object({
 const ContactDetailSchema = z.object({
     contact: z.object({
         id:         z.string().describe('Contact id'),
-        type:       z.enum(['agent', 'client', 'other']).describe('Contact type'),
+        type:       z.enum(ROLE_KINDS).describe('Contact type'),
         name:       z.string().describe('Contact name'),
         email:      z.string().nullable().describe('Contact email'),
         phone:      z.string().nullable().describe('Contact phone'),
@@ -76,7 +80,8 @@ const ContactDetailSchema = z.object({
     })).describe('Inspection history for this contact, newest first'),
     stats: z.object({
         inspectionCount:   z.number().describe('Total linked inspections'),
-        totalRevenueCents: z.number().describe('Sum of PAID invoice amounts in cents'),
+        totalRevenueCents: z.number().describe('Sum of PAID invoice amounts in cents that were BILLED TO THIS CONTACT (invoices.contact_id). One invoice has one billed party, so this is safe to sum across contacts — it previously counted every paid invoice on every inspection the contact appeared on, which reported one payment as revenue on the client AND on the agent.'),
+        billedToOthersCents: z.number().describe("Sum of PAID invoice amounts in cents on this contact's inspections that were billed to a DIFFERENT contact (or to none). Money this contact is associated with but was not charged — an agent's referred volume, not their revenue."),
     }).describe('Aggregate stats'),
 }).openapi('ContactDetail');
 
@@ -104,7 +109,7 @@ export const ContactImportSchema = z.object({
         email: z.string().optional().describe('CSV column header mapped to email address'),
         phone: z.string().optional().describe('CSV column header mapped to phone number'),
         agency: z.string().optional().describe('CSV column header mapped to agency name'),
-        type: z.enum(['agent', 'client', 'other']).optional().describe('Default contact type for imported rows'),
+        type: z.enum(ROLE_KINDS).optional().describe('Default contact type for imported rows'),
     }).describe('Column-to-field mapping confirmed by the user'),
 }).openapi('ContactImport');
 

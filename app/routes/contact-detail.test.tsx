@@ -38,8 +38,8 @@ const DETAIL = {
 };
 
 const ACCESS = [
-  { inspectionId: "i1", propertyAddress: "742 Evergreen Terrace", role: "buyer_agent", createdAt: 1 },
-  { inspectionId: "i2", propertyAddress: "1 Lifecycle Publish Street", role: "buyer_agent", createdAt: 2 },
+  { inspectionId: "i1", propertyAddress: "742 Evergreen Terrace", role: "buyer_agent", roleLabel: "Buyer's Agent", createdAt: 1 },
+  { inspectionId: "i2", propertyAddress: "1 Lifecycle Publish Street", role: "buyer_agent", roleLabel: "Buyer's Agent", createdAt: 2 },
 ];
 
 function renderDetail(loaderData: Record<string, unknown>) {
@@ -59,6 +59,33 @@ describe("contact detail — report access", () => {
 
     expect(await findByText("742 Evergreen Terrace")).toBeTruthy();
     expect(await findByText("1 Lifecycle Publish Street")).toBeTruthy();
+  });
+
+  it("names the role the way the tenant does, not the way the database does", async () => {
+    // IA-119 — this is an operator-facing permissions list; `buyer_agent` made
+    // "what does this link grant" a thing to translate in your head. The label
+    // is the tenant's own from `contact_role_profiles`, resolved server-side,
+    // because the vocabulary is tenant-editable and there is no map to hold here.
+    const { findAllByText, queryByText } = renderDetail({
+      detail: DETAIL,
+      access: ACCESS,
+      accessFailed: false,
+    });
+
+    expect((await findAllByText("Buyer's Agent")).length).toBe(2);
+    expect(queryByText("buyer_agent")).toBeNull();
+  });
+
+  it("falls back to the raw key when the role has no label left", async () => {
+    // A retired profile has no label. Showing the key is honest; showing
+    // nothing would make the row claim the link grants no role at all.
+    const { findByText } = renderDetail({
+      detail: DETAIL,
+      access: [{ inspectionId: "i1", propertyAddress: "742 Evergreen Terrace", role: "attorney", roleLabel: null, createdAt: 1 }],
+      accessFailed: false,
+    });
+
+    expect(await findByText("attorney")).toBeTruthy();
   });
 
   it("says the answer is NONE only when it actually knows that", async () => {

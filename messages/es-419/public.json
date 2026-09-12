@@ -173,6 +173,8 @@
   "agent_portal_nav_inspectors": "Inspectores",
   "agent_portal_layout_badge": "Portal del agente",
   "agent_portal_layout_logout": "Cerrar sesión",
+  "agent_portal_user_menu_aria": "Menú de la cuenta",
+  "agent_portal_user_menu_role": "Agente",
   "oauth_authorize_meta_title": "Autorizar el acceso - OpenInspection",
   "oauth_authorize_client_fallback": "Una aplicación",
   "oauth_authorize_heading": "Autorizar el acceso",
@@ -206,5 +208,10 @@
   "public_unsubscribe_back_heading": "Su suscripción está activa de nuevo",
   "public_unsubscribe_back_body": "Recibirá",
   "public_unsubscribe_error": "No se guardó. Inténtelo de nuevo en un momento.",
-  "public_unsubscribe_already_heading": "Su suscripción ya está cancelada"
+  "public_unsubscribe_already_heading": "Su suscripción ya está cancelada",
+  "report_item_unrated": "Sin calificar",
+  "report_item_unrated_body": "No se registró ningún hallazgo para este elemento. Eso no es lo mismo que un elemento inspeccionado y en buen estado, ni lo mismo que un elemento marcado como no inspeccionado.",
+  "portal_report_selection_title": "Mis elementos seleccionados",
+  "portal_report_selection_print_only": "Esta lista es para que usted la imprima o la guarde. Nada de lo que contiene se envía a su inspector.",
+  "contacts_detail_billed_to_others_label": "Facturado a terceros"
 }

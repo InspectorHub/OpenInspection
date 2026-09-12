@@ -3,6 +3,8 @@ import { useNavigate, useFetcher } from "react-router";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 import { getPages, getSettings, RECENTS_CAP, type PaletteItem } from "./command-palette-items";
+import { importEntryHref } from "~/lib/import-entry-points";
+import type { ContactSearchItem } from "~/routes/resources/contact-search";
 
 /**
  * Lets any workspace surface (the sidebar search button, MobileHeader) open the
@@ -25,10 +27,36 @@ export const CommandPaletteProvider = CommandPaletteContext.Provider;
 function getQuickActions(): PaletteItem[] {
   return [
     { id: "qa-new-inspection", label: m.command_palette_action_new_inspection(), group: m.command_palette_group_quick_actions(), icon: "plus", hint: m.command_palette_action_hint_create() },
+    // F65 — `?new=1` on these two is now READ by the page it lands on
+    // (`routes/templates.tsx`, `routes/contacts.tsx`), which opens its own
+    // create dialog. Until then nothing anywhere read the parameter: all three
+    // of these actions navigated to a list page and stopped, with no overlay
+    // and nothing to say why.
     { id: "qa-new-template", label: m.command_palette_action_new_template(), group: m.command_palette_group_quick_actions(), icon: "plus", hint: m.command_palette_action_hint_create(), to: "/library/templates?new=1" },
     { id: "qa-new-contact", label: m.command_palette_action_new_contact(), group: m.command_palette_group_quick_actions(), icon: "plus", hint: m.command_palette_action_hint_create(), to: "/contacts?new=1" },
-    { id: "qa-import", label: m.command_palette_action_import(), group: m.command_palette_group_quick_actions(), icon: "plus", to: "/library/templates?import=1" },
+    // F65 — this was `Import Spectora` pointing at `/library/templates?import=1`.
+    // Both halves of that were stale. The paste-a-JSON-document importer and its
+    // endpoint are gone; importing now runs through the staged wizard, whose
+    // address `importEntryHref` owns so this entry cannot drift from the two
+    // others that open it. The VENDOR NAME goes with it: the wizard's first
+    // question is which product the file came from — Spectora is one of several
+    // — so naming one here promised a shortcut that does not exist.
+    { id: "qa-import", label: m.command_palette_action_import(), group: m.command_palette_group_quick_actions(), icon: "plus", to: importEntryHref("templates.create") },
   ];
+}
+
+/** A contact as a palette row. The server has already searched and ordered, so
+ *  these are NOT re-scored client-side: `score()` only looks at the label, and
+ *  re-filtering on it would throw away a row matched by email or agency. */
+function toPeopleItems(contacts: ContactSearchItem[]): PaletteItem[] {
+  return contacts.map((c) => ({
+    id: `person-${c.id}`,
+    label: c.name,
+    group: m.command_palette_group_people(),
+    icon: "person",
+    hint: c.email ?? c.type,
+    to: `/contacts/${c.id}`,
+  }));
 }
 
 /* ------------------------------------------------------------------ */
@@ -115,6 +143,11 @@ export function CommandPalette({
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const recentsFetcher = useFetcher<{ inspections: Array<Record<string, unknown>> }>();
+  // F64 — the `@` prefix searches contacts on the SERVER. It cannot filter the
+  // recents list client-side the way the other prefixes do: the palette holds
+  // ten inspections and no contacts at all, which is why `@Marge` answered "No
+  // results found" for a contact the product had.
+  const peopleFetcher = useFetcher<{ contacts: ContactSearchItem[] }>();
   const sessionCtx = useSessionContext();
 
   // F6 — Build booking link action dynamically from session context
@@ -167,6 +200,22 @@ export function CommandPalette({
     }
   }, [open, recentsFetcher]);
 
+  const isPeopleQuery = query.startsWith("@");
+  const peopleTerm = isPeopleQuery ? query.replace(/^@\s*/, "") : "";
+
+  // F64 — ask the server while the operator types. Debounced, because this is a
+  // query per keystroke otherwise; `@` on its own is still a question ("show me
+  // my contacts") and is sent as an empty term rather than withheld.
+  useEffect(() => {
+    if (!open || !isPeopleQuery) return;
+    const t = setTimeout(() => {
+      peopleFetcher.load(`/resources/contact-search?q=${encodeURIComponent(peopleTerm)}`);
+    }, 180);
+    return () => clearTimeout(t);
+    // peopleFetcher is stable per instance; including it would re-arm the timer
+    // on every state change it makes.
+  }, [open, isPeopleQuery, peopleTerm]);
+
   // Build all actions
   const allItems = useMemo(() => {
     const isActions = query.startsWith(">");
@@ -175,11 +224,15 @@ export function CommandPalette({
 
     const dynamicQuickActions = [...getQuickActions(), ...bookingActions];
 
+    // People are returned already searched and ordered by the contacts API, so
+    // this branch leaves before the client-side scoring below: `score()` reads
+    // the label only, and re-filtering on it would discard a contact the server
+    // matched on email or agency.
+    if (isPeople) return toPeopleItems(peopleFetcher.data?.contacts ?? []);
+
     let sources: PaletteItem[];
     if (isActions) {
       sources = dynamicQuickActions;
-    } else if (isPeople) {
-      sources = []; // contacts would need a search endpoint
     } else {
       const recents: PaletteItem[] = (recentsFetcher.data?.inspections ?? []).slice(0, RECENTS_CAP).map((insp, i) => {
         // `propertyAddress` — the field the list endpoint actually publishes.
@@ -207,7 +260,7 @@ export function CommandPalette({
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
       .map((x) => x.item);
-  }, [query, recentsFetcher.data]);
+  }, [query, recentsFetcher.data, peopleFetcher.data, bookingActions]);
 
   // Group the filtered results. No per-group truncation: every source group is
   // already bounded (Pages/Settings are fixed lists; Recents is sliced to

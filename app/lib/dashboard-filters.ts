@@ -217,3 +217,46 @@ export function emptyListReason(
     // rendered count is zero. Named anyway so the argument is not decoration.
     return totalAll > 0 ? "no-matches" : "no-inspections";
 }
+
+/**
+ * How many inspections a workspace needs before the dashboard's list controls
+ * are worth showing at all — the stat cards, the focus bar, the workflow tabs,
+ * the time/tag chips, the search box, Filters, Columns and Export.
+ *
+ * WHY A THRESHOLD AND NOT "IS IT EMPTY". Every one of those controls exists to
+ * NARROW a list, and their cost does not scale with the list: seventeen filter
+ * chips are seventeen chips whether they are sifting four rows or four hundred.
+ * So the benefit has to clear a fixed cost, and below some row count it cannot.
+ * Gating on `length === 0` measured the wrong population — the workspace the
+ * density complaint was raised on held ONE inspection and was shown the whole
+ * apparatus, four stat cards reading 0 or 1 included.
+ *
+ * WHY FIVE. It is the first count at which a reader can stop holding the whole
+ * list in their head. Up to four rows every row is on screen together on any
+ * viewport this product supports, phone included, so reading the list is
+ * strictly cheaper than choosing a control to shorten it — picking a chip costs
+ * a decision and a click to reach an answer the eye already had. At five the
+ * list starts to run past the fold on a phone and a filter begins to pay for
+ * itself. A judgement about reading, not a measurement, and a constant rather
+ * than a setting on purpose: a workspace-tunable number would make an
+ * onboarding surface answer support questions forever.
+ */
+export const LIST_CONTROLS_MIN_ROWS = 5;
+
+/**
+ * Should the dashboard render the controls that narrow the list?
+ *
+ * The row count is the main question, but not the only one. Unlike the
+ * `=== 0` gate this replaced, a threshold has a state where a filter is applied
+ * to a list that has since shrunk below it — filter a list of six, delete two —
+ * and hiding the controls there would take the filter's own off-switch away
+ * while the filter kept hiding rows. Whatever can hide a row keeps its off
+ * switch on screen.
+ *
+ * Deliberately NOT gated by this: the getting-started checklist, which a
+ * separate finding made dismissible-but-not-permanently. It is the one thing a
+ * new workspace comes to this page for.
+ */
+export function shouldShowListControls(totalAll: number, f: ListFilterState): boolean {
+    return totalAll >= LIST_CONTROLS_MIN_ROWS || activeListFilters(f).length > 0;
+}

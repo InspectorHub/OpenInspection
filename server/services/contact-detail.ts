@@ -17,6 +17,26 @@ import { safeISODate } from '../lib/date';
  * of the P-4 authority chain, a denormalized cache, and reading it directly is
  * what made this card show "TOTAL REVENUE $450.00" above the very inspection it
  * had just listed at "$0.00 / Unpaid". One invoice pass feeds both readers.
+ *
+ * ⚠️ REVENUE IS ATTRIBUTED TO ONE CONTACT, BECAUSE IT WAS BILLED TO ONE CONTACT.
+ * `totalRevenueCents` used to be "paid invoices on any inspection this contact is
+ * attached to", and a contact is attached through `inspection_people` — which
+ * names the client, the co-client, the buyer's agent, the listing agent and
+ * anyone else on the job. One $450 paid invoice therefore printed as
+ * "TOTAL REVENUE $450.00" on the client's record AND on the buyer's agent's, so
+ * the only database-wide total was $900 of revenue that a single $450 payment had
+ * produced. Summing a per-contact figure is exactly what an operator does with
+ * it, so the figure has to be summable.
+ *
+ * `invoices.contact_id` is the billed party and is set at creation
+ * (InvoiceService.resolveContactId: explicit id, else the inspection's primary
+ * client, else an email match). One invoice, one billed contact — so revenue
+ * keyed on it cannot be counted twice, whoever else stood on the job.
+ *
+ * The agent's $450 does not disappear. It is reported beside the revenue as
+ * `billedToOthersCents` under its own name, because "money paid on a job you
+ * referred" is a real and different fact from "money you paid us" — and the
+ * defect was never the number, it was two different facts sharing one word.
  */
 export async function buildContactDetail(
     db: DrizzleD1Database,
@@ -55,17 +75,21 @@ export async function buildContactDetail(
 
         const inspectionIds = inspectionRows.map(r => r.id);
 
-        // One pass over the invoices on these inspections, serving two readers.
+        // One pass over the invoices on these inspections, serving three readers.
         //
-        // Revenue counts PAID ones only. The per-row price needs EVERY live one,
-        // because an invoice is tier 1 of the P-4 authority chain whether or not
-        // it has been paid — `inspections.price` is a denormalized cache and its
-        // own schema comment says to read through getEffectivePriceCents().
-        // Reading the cache directly is how this card came to state
-        // "TOTAL REVENUE $450.00" beside that same inspection listed at "$0.00".
+        // The per-row price needs EVERY live one, because an invoice is tier 1 of
+        // the P-4 authority chain whether or not it has been paid —
+        // `inspections.price` is a denormalized cache and its own schema comment
+        // says to read through getEffectivePriceCents(). Reading the cache
+        // directly is how this card came to state "TOTAL REVENUE $450.00" beside
+        // that same inspection listed at "$0.00".
+        //
+        // The two money totals split on `invoices.contact_id` — the billed party.
+        // Paid only, for both: an unpaid invoice is a hope, not revenue.
         //
         // Chunk the inArray to stay under D1's 100-bind-param ceiling.
         let totalRevenueCents = 0;
+        let billedToOthersCents = 0;
         const invoiceByInspection = new Map<string, number>();
         const paidInspectionIds = new Set<string>();
         const CHUNK = 90;
@@ -73,6 +97,7 @@ export async function buildContactDetail(
             const chunk = inspectionIds.slice(i, i + CHUNK);
             const rows = await db.select({
                 inspectionId: invoices.inspectionId,
+                contactId:    invoices.contactId,
                 amountCents:  invoices.amountCents,
                 paidAt:       invoices.paidAt,
             })
@@ -86,7 +111,13 @@ export async function buildContactDetail(
             for (const inv of rows) {
                 if (!inv.inspectionId) continue;
                 if (inv.paidAt) {
-                    totalRevenueCents += inv.amountCents ?? 0;
+                    // An invoice with no billed contact at all (legacy rows —
+                    // resolveContactId has three rungs and still returns null when
+                    // none of them hit) is nobody's revenue. It counts toward the
+                    // other total instead of being silently dropped: the money is
+                    // on a job this contact is on, and it was not billed to them.
+                    if (inv.contactId === id) totalRevenueCents += inv.amountCents ?? 0;
+                    else billedToOthersCents += inv.amountCents ?? 0;
                     paidInspectionIds.add(inv.inspectionId);
                 }
                 if (!invoiceByInspection.has(inv.inspectionId)) {
@@ -128,7 +159,11 @@ export async function buildContactDetail(
             })),
             stats: {
                 inspectionCount:   inspectionRows.length,
+                /** Paid invoices BILLED TO THIS CONTACT. Summable across contacts. */
                 totalRevenueCents,
+                /** Paid invoices on this contact's inspections that were billed to
+                 *  someone else (or to nobody). Not this contact's revenue. */
+                billedToOthersCents,
             },
         };
 }

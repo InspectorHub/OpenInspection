@@ -3,6 +3,7 @@ import type { useFetcher } from "react-router";
 import { Modal, Button, Input, Select, Banner } from "@core/shared-ui";
 import type { GuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { formatCurrency, formatDate } from "~/lib/format";
+import { civilToInstantISO, todayInZone } from "~/lib/civil-time";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -59,6 +60,13 @@ interface Props {
   /** The guard's own in-flight flag — the pending affordance on both buttons. */
   busy: boolean;
   locale: string;
+  /**
+   * The COMPANY's IANA timezone — the authority for the date on this surface.
+   * A prop rather than a hook call inside, so the one thing this component must
+   * not guess is supplied by its owner and is visible in every test that renders
+   * it. See `useCompanyTimeZone` for why it is not the viewer's zone.
+   */
+  companyTimeZone: string;
   onClose: () => void;
 }
 
@@ -82,27 +90,32 @@ function payMethodOptions() {
   ];
 }
 
-/** Today as the browser's own calendar day — the value a date input expects. */
-function todayLocal(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
-
 /**
  * The picker gives a calendar DAY; the ledger stores an INSTANT. The conversion
- * has to happen in the browser, because only the browser knows which zone that
- * day belongs to. Local midnight of a day that has already begun is always in
- * the past, so "today" can never trip the endpoint's no-future rule.
+ * happens in the browser because that is where the picker is — but the zone it
+ * converts in is the COMPANY's, never the browser's.
+ *
+ * THE ZONE IS NOT A DISPLAY CHOICE HERE. This instant is a financial record: it
+ * decides which day, month and accounting period the money landed in, and it is
+ * what the QuickBooks push and every ledger roll-up read back. Converting in the
+ * recorder's own zone made the answer depend on where the person was sitting —
+ * a payment entered as today by a member of staff one zone east of the office
+ * was stored as the office's YESTERDAY, and two people recording the same cash
+ * the same afternoon from different cities disagreed about the date.
+ *
+ * Midnight of a day that has already begun IN THAT ZONE is always in the past,
+ * so "today" still cannot trip the endpoint's no-future rule — that property is
+ * a fact about midnight, not about which zone was picked, and it holds for any
+ * company zone, ahead of the recorder or behind.
  */
-function civilDayToInstant(day: string): string {
-  return new Date(`${day}T00:00:00`).toISOString();
+function civilDayToInstant(day: string, companyTz: string): string {
+  return civilToInstantISO(day, "00:00", companyTz);
 }
 
-export function PaymentsModal({ invoice, payments, loading, fetcher, submit, busy, locale, onClose }: Props) {
+export function PaymentsModal({ invoice, payments, loading, fetcher, submit, busy, locale, companyTimeZone, onClose }: Props) {
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("cash");
-  const [occurredOn, setOccurredOn] = useState(todayLocal());
+  const [occurredOn, setOccurredOn] = useState(() => todayInZone(companyTimeZone));
   const [note, setNote] = useState("");
   const [correcting, setCorrecting] = useState<string | null>(null);
   const [correctedAmount, setCorrectedAmount] = useState("");
@@ -134,7 +147,7 @@ export function PaymentsModal({ invoice, payments, loading, fetcher, submit, bus
         id: invoice!.id,
         amount,
         method,
-        occurredAt: occurredOn ? civilDayToInstant(occurredOn) : "",
+        occurredAt: occurredOn ? civilDayToInstant(occurredOn, companyTimeZone) : "",
         note,
         allowOverpayment: allowOverpayment ? "1" : "",
       },
@@ -295,7 +308,7 @@ export function PaymentsModal({ invoice, payments, loading, fetcher, submit, bus
             <Input
               label={m.invoices_payments_date_label()}
               type="date"
-              max={todayLocal()}
+              max={todayInZone(companyTimeZone)}
               value={occurredOn}
               onChange={(e) => setOccurredOn(e.target.value)}
             />

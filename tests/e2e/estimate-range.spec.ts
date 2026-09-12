@@ -67,7 +67,10 @@ test.describe.serial('Sprint 2 S2-4 — Repair estimate range', () => {
         expect(res.status()).toBe(200);
         const html = await res.text();
         expect(html).toContain('Report Features');
-        expect(html).toContain('Show repair list tab');
+        // The section's one remaining toggle. It used to assert "Show repair list
+        // tab" as well; that switch promised a Repair List tab the product never
+        // rendered and was removed with the flag behind it.
+        expect(html).toContain('Allow clients to build repair requests');
     });
 
     test('E-05: the results write path folds a defect-estimate patch (no 400)', async ({ request }) => {

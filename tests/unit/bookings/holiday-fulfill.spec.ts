@@ -65,6 +65,9 @@ describe('fulfillBooking holiday block', () => {
         await db.insert(tenantConfigs).values({
             tenantId: TENANT_ID,
             updatedAt: new Date(),
+            // A DECLARED company timezone. Public booking refuses a workspace that
+            // never set one (the NOT NULL default 'UTC' is the unset sentinel).
+            defaultTimezone: 'America/New_York',
             holidayRegion: 'US',
             holidayPublicPolicy: 'block',
             holidayInternalPolicy: 'advisory',

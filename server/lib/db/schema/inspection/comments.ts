@@ -28,10 +28,22 @@ export const comments = sqliteTable('comments', {
     // JSON array of template section ids the snippet is offered for. Narrowed
     // by the drawer's `sectionId` filter through a LIKE on the QUOTED id, so a
     // section id that is a prefix of another cannot cross-match.
+    //
+    // ⚠️ `text`, NOT `{ mode: 'json' }`, on purpose — this has been proposed
+    // twice as a free type-layer tidy-up (DB-12 residual) and it is not one.
+    // The only query that reads it is a SQL LIKE against the raw stored
+    // characters (`admin-comments.ts`), which is what makes the quoted-id trick
+    // work at all; a json-mode column hands drizzle a parsed value, so the
+    // filter stops type-checking and the substring semantics it depends on
+    // stop existing. Nothing in this repo ever JSON.parses either column, and
+    // nothing writes them (see the note above), so the annotation would buy no
+    // safety while changing `$inferSelect` for every reader of a comment row.
     sectionIds: text('section_ids'),
     // Plural and inert: SELECTed into the list response, but nothing filters,
     // sorts or renders it. The singular `itemLabel` below is the one the
-    // drawer actually filters on.
+    // drawer actually filters on. Same `text`-not-json reasoning as
+    // `sectionIds` above: it travels through the row spread in
+    // `commentRowToResponse` untouched, and nobody parses it at either end.
     itemLabels: text('item_labels'),
     // Short code (e.g. 'NI') matched EXACTLY. Like `sectionId`, it is a
     // user-typed filter and applies in both filter modes — unlike `section`

@@ -1,37 +1,30 @@
 /**
- * <PublishNotice> — what publishing actually did, shown after the publish modal
- * closes.
+ * <PublishNotice> — confirmation that publishing happened, shown after the
+ * publish modal closes.
  *
  * Publishing gave no feedback at all: the modal closed and the only sign it had
  * worked was the Report card flipping to a sentence claiming the client had the
- * report — regardless of whether anyone was emailed. Publishing takes
- * notifyClient / notifyAgent checkboxes, so "nobody" is a legitimate outcome (an
- * inspector publishes to get the link and sends it later), which is why that case
- * reads as information rather than as a warning.
+ * report — regardless of whether anyone was emailed.
  *
- * The discriminant is computed server-side by the publish action from the form it
- * submitted (`publishNotified` in ~/lib/hub-blocks) — the only place the answer
- * exists, since the hub payload records publication and not delivery.
+ * F79 — it no longer names WHO was emailed. It used to, computed from the
+ * `notifyClient` / `notifyAgent` checkboxes the modal submitted, and those flags
+ * reached a service that never read them: delivery is decided by the workspace's
+ * `report.published` automation rules. So "Nobody has been emailed yet" was
+ * printed over a publish that had just mailed the client. The banner states what
+ * this surface can actually know — the report is published — and names the
+ * authority that decides the rest, which is the same thing the publish dialog
+ * says before the act.
  */
 import { useState } from "react";
 import { Banner } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
-export type PublishNotified = "both" | "client" | "agent" | "none";
-
-const COPY: Record<PublishNotified, () => string> = {
-    both: () => m.inspections_hub_publish_ok_both(),
-    client: () => m.inspections_hub_publish_ok_client(),
-    agent: () => m.inspections_hub_publish_ok_agent(),
-    none: () => m.inspections_hub_publish_ok_none(),
-};
-
-export function PublishNotice({ notified }: { notified: PublishNotified | null }) {
+export function PublishNotice({ show }: { show: boolean }) {
     const [dismissed, setDismissed] = useState(false);
-    if (!notified || dismissed) return null;
+    if (!show || dismissed) return null;
     return (
-        <Banner tone={notified === "none" ? "info" : "success"} dismissible onDismiss={() => setDismissed(true)}>
-            {COPY[notified]()}
+        <Banner tone="success" dismissible onDismiss={() => setDismissed(true)}>
+            {m.inspections_hub_publish_ok()}
         </Banner>
     );
 }

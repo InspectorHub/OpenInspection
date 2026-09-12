@@ -216,6 +216,38 @@ describe("buildCreateInspectionJson", () => {
         expect("addressLat" in json).toBe(false);
         expect("addressLng" in json).toBe(false);
     });
+
+    /**
+     * This whitelist is where the wizard's property type was lost. PropertyStep
+     * set it, buildWizardCreatePayload posted it, and this function never read
+     * the field — so `inspections.property_type` was NULL on every inspection the
+     * product could create, and the commercial / multi-unit editor surface was
+     * gated on a value that could not occur.
+     */
+    it.each(["single_family", "multi_unit", "commercial"])(
+        "forwards the wizard's propertyType %j instead of dropping it",
+        (propertyType) => {
+            const json = buildCreateInspectionJson(fd({ address: "1 A St", templateId: "t", propertyType }));
+            expect(json.propertyType).toBe(propertyType);
+        },
+    );
+
+    it("omits propertyType when the field is absent or blank", () => {
+        expect("propertyType" in buildCreateInspectionJson(fd({ address: "1 A St", templateId: "t" }))).toBe(false);
+        expect("propertyType" in buildCreateInspectionJson(fd({
+            address: "1 A St", templateId: "t", propertyType: "   ",
+        }))).toBe(false);
+    });
+
+    /**
+     * Deliberately NOT validated here. The API owns the vocabulary, and a value
+     * this layer refused to forward would be indistinguishable from the original
+     * defect: the inspector's choice vanishing with no error anywhere.
+     */
+    it("forwards an unrecognised value so the API can refuse it out loud", () => {
+        const json = buildCreateInspectionJson(fd({ address: "1 A St", templateId: "t", propertyType: "duplex" }));
+        expect(json.propertyType).toBe("duplex");
+    });
 });
 
 describe("dollarsToCents", () => {

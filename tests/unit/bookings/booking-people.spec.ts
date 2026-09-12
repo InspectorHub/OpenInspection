@@ -22,6 +22,7 @@ import {
     users,
     availability,
     inspections,
+    tenantConfigs,
 } from '../../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
@@ -46,9 +47,10 @@ vi.mock('../../../server/lib/rate-limit', () => ({
 // eslint-disable-next-line import/order
 import { bookingsRoutes } from '../../../server/api/bookings';
 import { makeExecutionContext } from '../helpers/exec-ctx';
+import { nextWeekday } from '../helpers/bookable-date';
 
 // 2026-06-08 is a Monday (dayOfWeek = 1) — mirrors booking-autoassign.spec.ts.
-const MONDAY = '2026-06-08';
+const MONDAY = nextWeekday(1);
 
 const T1 = 'aaaaaaaa-0000-4000-8000-000000000001';
 const U1 = 'bbbbbbbb-0000-4000-8000-000000000001';
@@ -131,6 +133,12 @@ async function seedBaseTenant(db: BetterSQLite3Database<typeof schema>) {
         { id: 'a1', tenantId: T1, inspectorId: U1, dayOfWeek: 1, startTime: '08:00', endTime: '12:00', createdAt: new Date() },
         { id: 'a2', tenantId: T1, inspectorId: U2, dayOfWeek: 1, startTime: '08:00', endTime: '12:00', createdAt: new Date() },
     ] as any);
+    // A DECLARED company timezone. Public booking refuses a workspace that never
+    // set one (the NOT NULL default 'UTC' is the unset sentinel), so a fixture
+    // that books has to say which clock "08:00" is on.
+    await db.insert(tenantConfigs).values({
+        tenantId: T1, updatedAt: new Date(), defaultTimezone: 'America/New_York',
+    } as any);
     await seedRoleProfiles(db as any, T1, new Date(1));
 }
 

@@ -14,6 +14,8 @@ import { EmailTemplateRenderer } from '../lib/email-templates/renderer';
 import { sampleDataFor } from '../lib/email-templates/sample-data';
 import { BrandingService } from '../services/branding.service';
 import { SaveEmailTemplateSchema, PreviewEmailTemplateSchema } from '../lib/validations/email-template.schema';
+import { readReportViewCountingEnabled } from '../lib/report-views';
+import { getDrizzle } from '../lib/route-helpers';
 
 // ─── Response schemas ──────────────────────────────────────────────────────
 
@@ -330,6 +332,11 @@ const emailTemplateRoutes = createApiRouter()
             tenantBrand,
             platformBrand,
             overrides: new Map([[trigger, override]]),
+            // The preview has to agree with what this workspace would actually
+            // send: the delivery-confirmation notice rides a report-link email
+            // only where opens are counted, so previewing it unconditionally
+            // would show the author a paragraph their recipients never get.
+            viewCountingEnabled: await readReportViewCountingEnabled(getDrizzle(c), tenantId),
         });
 
         const { subject, html } = renderer.render(trigger, sampleDataFor(d));

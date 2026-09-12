@@ -6,6 +6,7 @@ import type { IcsEvent } from '../../../server/lib/ics';
 const renderer = new EmailTemplateRenderer({
   tenantBrand: { name: 'Acme', logoUrl: null, primaryColor: '#F55A1A' },
   platformBrand: { name: 'OpenInspection', logoUrl: null, primaryColor: '#4f46e5' },
+  viewCountingEnabled: false,
 });
 
 describe('EmailService rendered path', () => {

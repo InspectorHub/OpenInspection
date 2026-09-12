@@ -12,7 +12,24 @@ import { ContactModal } from "~/components/contacts/ContactModal";
 import { ContactsTable } from "~/components/contacts/ContactsTable";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { ROLE_KINDS, type RoleKind } from "../../server/lib/people/role-kinds";
 import { m } from "~/paraglide/messages";
+
+/**
+ * The filter dropdown's label per contact type.
+ *
+ * A `Record<RoleKind, …>`, so a fourth kind is a COMPILE error here rather than
+ * an option quietly missing from the filter — which is the shape of the bug
+ * IA-96 fixed the last time this list and `contact_role_profiles.kind`
+ * disagreed: a person filed under a contractor/other role showed up as a
+ * Client because the type had only two values. Labels cannot be derived (each
+ * is its own translated string), but completeness can be enforced.
+ */
+const TYPE_FILTER_LABEL: Record<RoleKind, () => string> = {
+  client: () => m.contacts_label_clients(),
+  agent: () => m.contacts_label_agents(),
+  other: () => m.contacts_label_other(),
+};
 
 export function meta() {
   return [{ title: m.contacts_meta_title() }];
@@ -126,11 +143,16 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function ContactsPage() {
   const { contacts, filterType, archivedView } = useLoaderData<typeof loader>();
   const contactList = contacts as Contact[];
-  const [modalOpen, setModalOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // F65 — `?new=1` opens the add-contact dialog. The command palette's "New
+  // Contact" action has addressed this page that way all along and nothing read
+  // the parameter, so the action landed on the list and stopped. Read at mount
+  // rather than in an effect, so the dialog is there in the first paint instead
+  // of appearing a frame later.
+  const [modalOpen, setModalOpen] = useState(searchParams.get("new") === "1");
   const [editContact, setEditContact] = useState<Contact | null>(null);
   const [typeFilter, setTypeFilter] = useState(filterType || "");
   const [pendingArchive, setPendingArchive] = useState<Contact | null>(null);
-  const [searchParams, setSearchParams] = useSearchParams();
   // #106 - archiving a contact can revoke every report they can still open,
   // and restore puts it back. One guard: both fire from row controls that
   // are disabled while it is busy.
@@ -165,7 +187,12 @@ export default function ContactsPage() {
   // What is left is one list and one filter. The count follows the filter, so
   // the meta line says what is being shown AND out of how many — otherwise a
   // filtered page just looks like a small address book.
-  const totalLabel = m.contacts_list_meta_count({ count: contactList.length });
+  // "1 contacts" read off the page. Two keys rather than a `{plural}` suffix:
+  // Spanish changes the stem on some of these nouns, not just the tail, and the
+  // /invoices header already settled on this shape.
+  const totalLabel = `${contactList.length} ${
+    contactList.length === 1 ? m.contacts_list_meta_count_singular() : m.contacts_list_meta_count_plural()
+  }`;
   const metaLine = typeFilter
     ? `${m.contacts_list_meta_showing({ count: filtered.length })} · ${totalLabel}`
     : totalLabel;
@@ -207,13 +234,10 @@ export default function ContactsPage() {
                 onChange={(e) => setTypeFilter(e.target.value)}
                 options={[
                   { value: "", label: m.contacts_filter_all_types() },
-                  { value: "agent", label: m.contacts_label_agents() },
-                  { value: "client", label: m.contacts_label_clients() },
-                  // IA-96 — `contact_role_profiles.kind` has always had three
-                  // values; `contacts.type` had two, so a person added under a
-                  // contractor/other role was filed as a Client. The type now
-                  // matches the roles that produce it.
-                  { value: "other", label: m.contacts_label_other() },
+                  // Offered in vocabulary order, from the vocabulary itself —
+                  // see TYPE_FILTER_LABEL above for why the labels sit in a
+                  // Record rather than being listed here.
+                  ...ROLE_KINDS.map((kind) => ({ value: kind, label: TYPE_FILTER_LABEL[kind]() })),
                 ]}
               />
             </div>
@@ -243,7 +267,21 @@ export default function ContactsPage() {
         archivedView={archivedView}
       />
 
-      <ContactModal open={modalOpen} onClose={() => setModalOpen(false)} contact={editContact} />
+      {/* Closing drops `?new=1` with it: the parameter is an instruction that
+          has been carried out, and leaving it in the address reopens the dialog
+          on every reload and on Back. */}
+      <ContactModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          if (searchParams.get("new")) {
+            const next = new URLSearchParams(searchParams);
+            next.delete("new");
+            setSearchParams(next, { replace: true, preventScrollReset: true });
+          }
+        }}
+        contact={editContact}
+      />
 
       {/* IA-100 — say what archiving does and does not withdraw. A report link
           is a per-inspection token that works with no account, so archiving
