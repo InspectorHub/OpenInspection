@@ -38,6 +38,7 @@ interface DOInternals {
     tenantId: string | null;
     inspectionId: string | null;
     identityPersisted: boolean;
+    alarm(): Promise<void>;
     persist(): Promise<void>;
     webSocketMessage(ws: WebSocket, data: ArrayBuffer): Promise<void>;
 }
@@ -133,5 +134,21 @@ describe('collab persistence with no pre-existing inspection_results row', () =>
         const row = await readRow(inspectionId);
         const data = JSON.parse(row!.data) as Record<string, { rating?: string }>;
         expect(data[FINDING_KEY]?.rating).toBe('Satisfactory');
+    });
+
+    it('does not let a legacy identity alarm write without a report id', async () => {
+        const inspectionId = 'insp-legacy-identity-' + crypto.randomUUID().slice(0, 8);
+        const stub = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:${inspectionId}`));
+
+        await runInDurableObject(stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            io.tenantId = TENANT;
+            io.inspectionId = inspectionId;
+            io.identityPersisted = true;
+
+            await io.alarm();
+        });
+
+        expect(await readRow(inspectionId)).toBeNull();
     });
 });
