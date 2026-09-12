@@ -39,33 +39,11 @@ const VIEWPORTS = [
     { name: 'small-laptop', w: 1024, h: 768 },
     { name: 'tablet-mid', w: 1100, h: 768 },
     { name: 'desktop', w: 1440, h: 900 },
+    // 375 was promoted out of UNCOVERED_NARROW_WIDTHS once PageHeader was made
+    // to wrap its action row on phone widths. Measured: all six workspace pages
+    // now fit at 375px without horizontal scroll.
+    { name: 'phone', w: 375, h: 812 },
 ];
-
-// Phone (375) is NOT covered yet, and that is a statement of fact rather than
-// an oversight — at that width several workspace pages genuinely scroll
-// sideways today. (768 WAS in this list; see the note at the end.) The cause is not the tables
-// (shared-ui Table scrolls within its own container, verified: at 375px its
-// wrapper measures 301px wide around a 789px table). It is `PageHeader`, whose
-// action row is `flex-shrink-0`: a 130px filter plus two buttons cannot shrink
-// or wrap, so it pushes the page out on every screen narrower than the actions.
-//
-// Fixing that is a design decision about what header actions should DO on a
-// phone — wrap, scroll, or collapse behind a menu — not a CSS tweak, and it
-// belongs to whoever owns that call. Adding the widths here before then would
-// just add a permanently red test.
-//
-// That diagnosis was INCOMPLETE, and the ratchet below is what said so. A
-// second, unrelated cause was hiding behind it: shared-ui's Table wrapper had
-// `overflow-x-auto` without `relative`, so the `sr-only` label on the actions
-// column — `position: absolute` — resolved against the initial containing
-// block and kept contributing to the DOCUMENT's scroll width. The table was
-// clipped correctly the whole time; a 1px screen-reader label was pushing the
-// page out. With that fixed, contacts@768 fits, which is precisely the
-// improvement this ratchet exists to notice. 768 has been promoted into
-// VIEWPORTS above on measured evidence: with the ratchet widened to check all
-// six pages, none of them scrolls at that width any more. 375 still does, and
-// there the original PageHeader diagnosis stands.
-const UNCOVERED_NARROW_WIDTHS = [375];
 
 const PAGES = [
     { url: '/contacts', key: 'contacts' },
@@ -266,29 +244,4 @@ test.describe('Workspace pages — responsive smoke', () => {
         }
     }
 
-    // Kept as a live reminder rather than a comment that rots: if someone makes
-    // the header actions responsive, this starts failing and tells them to move
-    // the widths into VIEWPORTS above.
-    test('narrow widths are still unsupported (remove this when they are not)', async ({ page }) => {
-        // Measures EVERY page, because that is what promoting a width into
-        // VIEWPORTS would enforce. It used to check /contacts alone, so a fix
-        // that helped only that page read as "768 is supported now" and would
-        // have licensed six pages on the evidence of one.
-        const stillBroken: number[] = [];
-        for (const w of UNCOVERED_NARROW_WIDTHS) {
-            let anyBroken = false;
-            for (const p of PAGES) {
-                await page.setViewportSize({ width: w, height: 800 });
-                const res = await page.goto(`${BASE_URL}${p.url}`, { waitUntil: 'domcontentloaded' });
-                if (!res || res.status() >= 500) continue;
-                await page.waitForTimeout(150);
-                if (await hasHorizontalScroll(page)) { anyBroken = true; break; }
-            }
-            if (anyBroken) stillBroken.push(w);
-        }
-        expect(
-            stillBroken,
-            'Workspace pages now fit at these widths — add them to VIEWPORTS and delete this test',
-        ).toEqual(UNCOVERED_NARROW_WIDTHS);
-    });
 });
