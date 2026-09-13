@@ -1,34 +1,21 @@
 {
   "name": "OpenInspection",
   "short_name": "OpenInspection",
-  "description": "Mobile-first property inspection field data collection",
-  "start_url": "/inspections",
-  "scope": "/",
+  "description": "Property inspection management",
+  "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "theme_color": "#4f46e5",
-  "background_color": "#f8fafc",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
   "icons": [
     {
-      "src": "/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "src": "/icons/android/mipmap-192dpi/ic_launcher_foreground.png",
+      "sizes": "192x192",
+      "type": "image/png"
     },
     {
-      "src": "/logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "/icons/android/mipmap-512dpi/ic_launcher_foreground.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
-  ],
-  "shortcuts": [
-    {
-      "name": "Inspections",
-      "short_name": "Inspections",
-      "url": "/inspections",
-      "description": "Open the inspections workspace"
-    }
-  ],
-  "categories": ["business", "productivity", "utilities"]
+  ]
 }

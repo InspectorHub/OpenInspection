@@ -206,9 +206,14 @@ app.get("/inspector/:tenant/:slug/calendar.ics", toApi); // ICS feed (API-only)
  */
 const SCANNER_PROBE =
   /(?:^|\/)\.(?:env|git|svn|hg|aws|ssh)(?:$|[./])|(?:^|\/)(?:wp-admin|wp-login|wp-content|wp-includes|wordpress|phpmyadmin|cgi-bin|vendor\/phpunit)(?:$|\/)|\.(?:php[3457]?|asp|aspx|jsp|cgi|sql|bak|old|swp)$/i;
+const ADDITIONAL_SCANNER_PROBE = new RegExp(
+  '^/(?:graphql|v1/graphql|rds-data/ExecuteStatement)$',
+  'i',
+);
 
 app.all("*", (c, next) => {
-  if (!SCANNER_PROBE.test(new URL(c.req.url).pathname)) return next();
+  const pathname = new URL(c.req.url).pathname;
+  if (!SCANNER_PROBE.test(pathname) && !ADDITIONAL_SCANNER_PROBE.test(pathname)) return next();
   // Plain text, no body worth parsing, and `noindex` so a crawler that stumbles
   // onto one does not keep asking.
   return c.text("Not Found", 404, {
