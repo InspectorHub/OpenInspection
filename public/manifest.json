@@ -3,19 +3,38 @@
   "short_name": "OpenInspection",
   "description": "Property inspection management",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#ffffff",
   "theme_color": "#0f172a",
   "icons": [
     {
       "src": "/icons/android/mipmap-192dpi/ic_launcher_foreground.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icons/android/mipmap-512dpi/ic_launcher_foreground.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/android/mipmap-512dpi/ic_launcher_background.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "Inspections",
+      "short_name": "Inspections",
+      "url": "/inspections",
+      "description": "Open the inspections workspace"
+    }
+  ],
+  "categories": ["business", "productivity", "utilities"]
 }
