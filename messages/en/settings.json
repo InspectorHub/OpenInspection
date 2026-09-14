@@ -177,6 +177,7 @@
   "settings_workspace_pdf_license_desc": "Includes the inspector license number on the report PDF.",
   "settings_workspace_save_button": "Save Company",
   "settings_workspace_error_no_logo": "No valid logo provided",
+  "settings_workspace_error_logo_upload": "The logo could not be uploaded. Please try again.",
   "settings_data_meta_title": "Data - Settings - OpenInspection",
   "settings_data_crumb": "Data import / export",
   "settings_data_subtitle": "Download your data or import contacts from other platforms.",

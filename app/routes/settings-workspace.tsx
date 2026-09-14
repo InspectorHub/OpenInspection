@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Form, useLoaderData, useActionData, useFetcher, useSearchParams } from "react-router";
+import { Form, useLoaderData, useActionData, useSearchParams } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { BrowserTimezoneHint } from "~/components/settings/BrowserTimezoneHint";
 import { useForm } from "@conform-to/react";
@@ -7,7 +7,7 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-workspace";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { LogoUploader } from "~/components/media-studio/LogoUploader";
+import { LogoField } from "~/components/settings/LogoField";
 import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
 import { SectionNav } from "~/components/settings/SectionNav";
 import { ProfilePicker } from "~/components/settings/ProfilePicker";
@@ -94,8 +94,21 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
     const api = createApi(context, { token });
     const res = await api.adminBranding.branding.logo.$post({ form: { logo } });
-    const body = (await res.json().catch(() => null)) as { data?: { logoUrl?: string } } | null;
-    return { success: res.ok, intent, logoUrl: body?.data?.logoUrl ?? null };
+    const body = (await res.json().catch(() => null)) as
+      | { data?: { logoUrl?: string }; error?: { message?: string } }
+      | null;
+    // A failed upload used to return `{ success: false }` and nothing else, and
+    // nothing on the page read it: the button dropped back to "Upload" and the
+    // preview stayed empty whether the file was the wrong type, over 2MB, or the
+    // R2 bucket was missing entirely. The server always says which; carry it.
+    if (!res.ok) {
+      return {
+        success: false,
+        intent,
+        error: body?.error?.message || m.settings_workspace_error_logo_upload(),
+      };
+    }
+    return { success: true, intent, logoUrl: body?.data?.logoUrl ?? null };
   }
 
   const submission = parseWithZod(fd, { schema: makeWorkspaceSchema() });
@@ -130,13 +143,6 @@ export default function SettingsWorkspacePage() {
   const [color, setColor] = useState(branding.primaryColor ?? "#6366f1");
   const [profile, setProfile] = useState(branding.defaultProfileId ?? "signature");
   const displayLocale = useDisplayLocale();
-
-  const logoFetcher = useFetcher<{ success: boolean; intent?: string; logoUrl?: string | null }>();
-  const [logoUrl, setLogoUrl] = useState<string | null>(branding.logoUrl ?? null);
-  useEffect(() => {
-    const d = logoFetcher.data;
-    if (logoFetcher.state === "idle" && d?.intent === "logo-upload" && d.success && d.logoUrl) setLogoUrl(d.logoUrl);
-  }, [logoFetcher.state, logoFetcher.data]);
 
   const [form, fields] = useForm({
     lastResult: actionData && "status" in actionData ? actionData : undefined,
@@ -271,20 +277,8 @@ export default function SettingsWorkspacePage() {
             </div>
           </div>
 
-          {/* Logo upload */}
-          <div className="space-y-3">
-            <label className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_logo_label()}</label>
-            <LogoUploader
-              currentUrl={logoUrl}
-              uploading={logoFetcher.state !== "idle"}
-              onSelect={(file) => {
-                const fd = new FormData();
-                fd.append("intent", "logo-upload");
-                fd.append("logo", file);
-                logoFetcher.submit(fd, { method: "POST", encType: "multipart/form-data" });
-              }}
-            />
-          </div>
+          {/* Logo upload — owns its own fetcher, preview and error message. */}
+          <LogoField initialUrl={branding.logoUrl ?? null} />
         </section>
 
         {/* Timezone */}
