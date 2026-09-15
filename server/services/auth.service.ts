@@ -194,9 +194,11 @@ export class AuthService {
      * Value format: "{userId}:{issuedAtUnixSec}" so we can detect tokens that predate
      * a password change and reject them even though they haven't expired yet.
      */
-    async createPasswordResetToken(email: string): Promise<string | null> {
-        const db = this.getDrizzle();
-        const user = await db.select().from(users).where(eq(users.email, email)).get();
+    async createPasswordResetToken(email: string, tenantId: string): Promise<string | null> {
+        // The same lookup as login: this tenant's own, undeleted row, refusing an
+        // ambiguous email rather than minting a token for whichever row D1
+        // returns first. `users.email` is unique per (tenant, email), not globally.
+        const user = await this.findLoginUser(email, tenantId);
         if (!user || !this.kv) return null;
 
         const resetToken = crypto.randomUUID();
