@@ -26,7 +26,7 @@
   "app/components/editor/ItemEditor.tsx": 651,
   "app/components/inspection-edit/CompliancePanel.tsx": 638,
   "server/api/public-report.ts": 628,
-  "server/api/auth.ts": 611,
+  "server/api/auth.ts": 614,
   "app/hooks/useInspection.ts": 600,
   "server/services/concierge.service.ts": 596,
   "server/api/bookings/agreement.ts": 583,
