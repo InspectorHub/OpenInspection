@@ -262,6 +262,27 @@ describe('AuthService', () => {
         expect(await authService.isSetUp()).toBe(true);
     });
 
+    it('scopes a reset token to the tenant and skips deleted rows, exactly as login does', async () => {
+        // users.email is unique per (tenant, email), not globally. The old
+        // lookup took whichever row D1 returned first — another tenant's, or a
+        // soft-deleted one — and minted a reset token for it.
+        const email = 'shared@example.com';
+        await testDb.insert(tenants).values({ id: 't2', slug: 'other', createdAt: new Date() });
+        await testDb.insert(users).values([
+            { id: 'u-other-tenant', tenantId: 't2', email, passwordHash: 'x', role: 'owner', createdAt: new Date() },
+            { id: 'u-deleted', tenantId: 't1', email, passwordHash: 'x', role: 'owner', createdAt: new Date(), deletedAt: new Date() },
+            { id: 'u-mine', tenantId: 't1', email, passwordHash: 'x', role: 'owner', createdAt: new Date() },
+        ]);
+
+        const token = await authService.createPasswordResetToken(email, 't1');
+        expect(token).toBeDefined();
+        expect(mockKV.put).toHaveBeenCalledWith(
+            `pw_reset:${token}`,
+            expect.stringMatching(/^u-mine:/),
+            expect.anything(),
+        );
+    });
+
     it('should handle password reset flow via KV', async () => {
         const email = 'reset@example.com';
         await testDb.insert(users).values({
@@ -273,7 +294,7 @@ describe('AuthService', () => {
             createdAt: new Date(),
         });
 
-        const token = await authService.createPasswordResetToken(email);
+        const token = await authService.createPasswordResetToken(email, 't1');
         expect(token).toBeDefined();
         
         (mockKV.get as any).mockResolvedValue('u-reset');

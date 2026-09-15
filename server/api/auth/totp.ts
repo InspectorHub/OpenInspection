@@ -121,6 +121,13 @@ const login2faRoute = createRoute(withMcpMetadata({
 const totpRoutes = createApiRouter()
     .openapi(totpSetupRoute, async (c) => {
         const me = await loadCurrentUser(c);
+        // Setup overwrites the secret and clears totpEnabled until /2fa/verify
+        // proves the new one. On an account that already has a second factor
+        // that is a disable — and /2fa/disable demands password + code for it.
+        // A session alone must not be able to strip the second factor.
+        if (me.totpEnabled) {
+            throw Errors.Conflict('Two-factor authentication is already enabled. Disable it first.');
+        }
         const totpSvc = c.var.services.totp;
 
         const secret = totpSvc.generateSecret();
@@ -146,6 +153,9 @@ const totpRoutes = createApiRouter()
         }, 200);
     })
     .openapi(totpVerifyRoute, async (c) => {
+        await checkRateLimit(c, 'totp');
+        // A 6-digit code is a 1e6 space; without this an attacker holding a
+        // session and password brute-forces the second factor at full speed.
         const me = await loadCurrentUser(c);
         if (!me.totpSecret) throw Errors.BadRequest('No pending 2FA setup. Call /2fa/setup first.');
 
@@ -162,6 +172,9 @@ const totpRoutes = createApiRouter()
         return c.json({ success: true }, 200);
     })
     .openapi(totpDisableRoute, async (c) => {
+        await checkRateLimit(c, 'totp');
+        // A 6-digit code is a 1e6 space; without this an attacker holding a
+        // session and password brute-forces the second factor at full speed.
         const me = await loadCurrentUser(c);
         const { password, code } = c.req.valid('json');
 
@@ -194,6 +207,9 @@ const totpRoutes = createApiRouter()
         return c.json({ success: true }, 200);
     })
     .openapi(totpRegenRoute, async (c) => {
+        await checkRateLimit(c, 'totp');
+        // A 6-digit code is a 1e6 space; without this an attacker holding a
+        // session and password brute-forces the second factor at full speed.
         const me = await loadCurrentUser(c);
         const { password, code } = c.req.valid('json');
 

@@ -498,7 +498,10 @@ const coreAuthRoutes = createApiRouter()
         await checkRateLimit(c, 'forgot');
 
         const body = c.req.valid('json');
-        const resetToken = await c.var.services.auth.createPasswordResetToken(body.email);
+        const resetToken = await c.var.services.auth.createPasswordResetToken(
+            body.email,
+            getDeploymentProfile(c.env).fixedTenantId!,
+        );
 
         if (!resetToken) return c.json({ success: true }, 200);
 
