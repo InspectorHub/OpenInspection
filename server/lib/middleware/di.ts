@@ -221,7 +221,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.booking = new BookingService(c.env.DB, buildPlanQuota());
                     break;
                 case 'branding':
-                    target.branding = new BrandingService(c.env.DB, c.env.TENANT_CACHE);
+                    target.branding = new BrandingService(c.env.DB, c.env.TENANT_CACHE, c.env.PHOTOS);
                     // Request scope, so the tenant_configs reads memoise per request.
                     target.branding.requestEnv = c.env;
                     break;
