@@ -3,9 +3,8 @@ import { useLoaderData, useRevalidator } from "react-router";
 import type { Route } from "./+types/agreements";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { PageHeader, Card, Button, EmptyState, Banner } from "@core/shared-ui";
+import { PageHeader, Card, Button, EmptyState, Banner, Pill, Table } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { TemplateRow } from "~/components/agreements/AgreementRows";
 import { AgreementTemplateModal } from "~/components/agreements/AgreementTemplateModal";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import type { AgreementTemplateSaveResult } from "~/routes/resources/agreement-templates";
@@ -13,6 +12,8 @@ import { AGREEMENT_TEMPLATES_ACTION } from "~/routes/resources/agreement-templat
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
+import { formatDate } from "~/lib/format";
+import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 
 /**
  * Library → Agreements. Reusable agreement TEMPLATES, and nothing else.
@@ -92,6 +93,8 @@ type TemplateSummary = { id: string; name?: string; updatedAt?: string; createdA
 export default function AgreementsPage() {
   const { templates, attestedAgreementId, loadFailed } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
+  const locale = useDisplayLocale();
+  const timeZone = useDisplayTimeZone();
   // #106 - deleting an agreement template is irreversible and can revoke the
   // cancellation-fee attestation with it.
   const { fetcher: deleteFetcher, submit: submitDelete, busy: deleteBusy } =
@@ -166,22 +169,57 @@ export default function AgreementsPage() {
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          {/* TODO(ds-table): not migrated to the shared <Table> primitive. */}
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-ih-border">
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-ih-fg-3">{m.library_agreements_col_title()}</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-ih-fg-3">{m.library_agreements_col_last_updated()}</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-ih-fg-3">{m.library_agreements_col_status()}</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-ih-fg-3 text-right">{m.library_agreements_col_actions()}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ih-border">
-              {templates.map((t) => (
-                <TemplateRow key={t.id} t={t} onEdit={setEditorFor} onDelete={setDeleting} />
-              ))}
-            </tbody>
-          </table>
+          <Table<TemplateSummary>
+            rows={templates}
+            getRowKey={(template) => template.id}
+            columns={[
+              {
+                label: m.library_agreements_col_title(),
+                cell: (template) => (
+                  <span className="font-semibold text-ih-fg-1">
+                    {template.name || m.agreement_row_untitled()}
+                  </span>
+                ),
+              },
+              {
+                label: m.library_agreements_col_last_updated(),
+                cell: (template) => {
+                  const updatedOrCreated = template.updatedAt || template.createdAt;
+                  return (
+                    <span className="text-ih-fg-3">
+                      {updatedOrCreated ? formatDate(updatedOrCreated, { locale, timeZone }) : "--"}
+                    </span>
+                  );
+                },
+              },
+              {
+                label: m.library_agreements_col_status(),
+                cell: () => <Pill tone="sat">{m.agreement_template_status_active()}</Pill>,
+              },
+              {
+                label: m.library_agreements_col_actions(),
+                align: "right",
+                cell: (template) => (
+                  <div className="flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setEditorFor(template.id)}
+                      className="text-[13px] text-ih-primary-text hover:opacity-80 font-semibold"
+                    >
+                      {m.common_edit()}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleting(template)}
+                      className="text-[13px] text-ih-fg-3 hover:text-ih-bad-fg hover:underline font-semibold"
+                    >
+                      {m.common_delete()}
+                    </button>
+                  </div>
+                ),
+              },
+            ]}
+          />
         </Card>
       )}
 
