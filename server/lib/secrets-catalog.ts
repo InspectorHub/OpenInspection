@@ -60,6 +60,14 @@ export const INTEGRATION_SECRET_KEYS = [
     'POSTMARK_WEBHOOK_TOKEN',
     'MAILGUN_SIGNING_KEY',
     'APP_BASE_URL',
+    // ISN (Inspection Support Network) — the company's own REST access keys
+    // (ISN: Settings → My Access Keys) plus where that company's ISN lives.
+    // ISN_DOMAIN is not a credential; it travels with them for the reason
+    // QBO_ENV does, and ISN is white-labelled so it has no safe default.
+    'ISN_DOMAIN',
+    'ISN_COMPANY_KEY',
+    'ISN_ACCESS_KEY',
+    'ISN_SECRET_KEY',
 ] as const;
 
 export type IntegrationSecretKey = (typeof INTEGRATION_SECRET_KEYS)[number];
@@ -86,6 +94,9 @@ const KEY_FORMATS: Array<{ key: IntegrationSecretKey; re: RegExp; hint: string }
     // typed "Sandbox" would otherwise learn about it from a failed OAuth round
     // trip. Must stay in step with QBO_API_HOSTS in services/qbo/api-base.ts.
     { key: 'QBO_ENV', re: /^(sandbox|production)$/, hint: 'must be exactly "sandbox" or "production"' },
+    // Scheme + host only — the company key is its own field.
+    { key: 'ISN_DOMAIN', re: /^https:\/\/[a-z0-9.-]+\.[a-z]{2,}\/?$/i, hint: 'must be https:// and the host only, e.g. https://inspectionsupport.com' },
+    { key: 'ISN_COMPANY_KEY', re: /^[a-z0-9_-]+$/i, hint: 'must be the company key alone (letters, digits, - or _), as shown on ISN’s My Access Keys page' },
     { key: 'TWILIO_ACCOUNT_SID', re: /^AC[0-9a-fA-F]{32}$/, hint: 'must be an Account SID (starts with AC, 34 chars)' },
     { key: 'TWILIO_FROM_NUMBER', re: /^\+[1-9]\d{6,14}$/, hint: 'must be an E.164 number (e.g. +15551234567)' },
     // TWILIO_AUTH_TOKEN has no stable public prefix — not format-gated.

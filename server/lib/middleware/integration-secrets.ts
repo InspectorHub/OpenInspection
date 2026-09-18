@@ -33,6 +33,12 @@ const TENANT_OWNED_KEYS = new Set<string>([
     'STRIPE_SECRET_KEY',
     'STRIPE_WEBHOOK_SECRET',
     'STRIPE_PUBLISHABLE_KEY',
+    // ISN keys open one company's orders. A platform key winning here would put
+    // every tenant's reports on that one company's ISN account.
+    'ISN_DOMAIN',
+    'ISN_COMPANY_KEY',
+    'ISN_ACCESS_KEY',
+    'ISN_SECRET_KEY',
 ]);
 
 /**

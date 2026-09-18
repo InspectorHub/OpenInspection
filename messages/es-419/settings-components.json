@@ -687,5 +687,14 @@
   "settings_discount_active_label": "Activo — los clientes pueden aplicar este código",
   "settings_discount_save": "Guardar",
   "settings_discount_saving": "Guardando…",
-  "settings_discount_cancel": "Cancelar"
+  "settings_discount_cancel": "Cancelar",
+  "settings_isn_heading": "ISN (Inspection Support Network)",
+  "settings_isn_desc": "Envía cada informe publicado a su orden de ISN como enlace de informe. Escribe el número de orden de ISN en el Número de referencia de la inspección; las inspecciones sin él no se envían.",
+  "settings_isn_domain_label": "Dirección de ISN",
+  "settings_isn_domain_hint": "La dirección donde inicias sesión en ISN, sin la clave de empresa, p. ej. https://inspectionsupport.com",
+  "settings_isn_company_key_label": "Clave de empresa",
+  "settings_isn_keys_hint": "En ISN: Settings → My Access Keys. Las claves tienen todos los permisos del usuario de ISN al que pertenecen.",
+  "settings_isn_access_key_label": "Clave de acceso",
+  "settings_isn_secret_key_label": "Clave de acceso secreta",
+  "settings_isn_save_error": "No se pudo guardar la configuración de ISN."
 }

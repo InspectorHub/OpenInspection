@@ -23,6 +23,7 @@ once per service and then forget until it breaks.
 | [AI](ai.md) | Translation and drafting assistance | `AI_MODEL`, plus a tenant key or `AI_MANAGED_API_KEY` | yes |
 | [Turnstile](turnstile.md) | Bot protection on the public booking form | `TURNSTILE_SECRET_KEY` | yes |
 | [Google Places](google-places.md) | Address autocomplete on the booking form and the new-inspection wizard | `GOOGLE_PLACES_API_KEY` | yes |
+| [ISN](isn.md) | Add a published report's link to its ISN order; optionally let ISN's payment/signature hold govern it | `ISN_DOMAIN`, `ISN_COMPANY_KEY`, `ISN_ACCESS_KEY`, `ISN_SECRET_KEY` | yes |
 | [Estated](estated.md) | Property facts (year built, sqft, foundation) by address | `ESTATED_API_KEY` | yes |
 | [MCP](mcp.md) | **Inbound.** Lets Claude or another MCP client drive this deployment over OAuth 2.1 | `MCP_ENABLED` | n/a |
 

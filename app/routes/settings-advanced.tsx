@@ -12,6 +12,8 @@ import { AccessDenied } from "~/components/AccessDenied";
 import { StripeConnectPanel } from "~/components/settings/advanced/StripeConnectPanel";
 import { AiFeaturesPanel } from "~/components/settings/advanced/AiFeaturesPanel";
 import { IntegrationKeysPanel } from "~/components/settings/advanced/IntegrationKeysPanel";
+import { IsnPanel } from "~/components/settings/advanced/IsnPanel";
+import { loadIsnSettings, saveIsnSettings } from "~/lib/isn-settings.server";
 import { SectionNav } from "~/components/settings/SectionNav";
 import { parseTestResults } from "~/lib/connection-test";
 import { m } from "~/paraglide/messages";
@@ -85,6 +87,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       APP_BASE_URL: secrets.APP_BASE_URL || "",
     },
     testResults,
+    isn: loadIsnSettings(secrets),
   };
 }
 
@@ -202,6 +205,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { intent, success: true, error: null, field: null, test: { ok: true as const } };
   }
 
+  if (intent === "save-isn") return saveIsnSettings(api, fd);
+
   if (intent === "save-advanced-secrets") {
     const body: Record<string, string> = {};
     for (const key of ["GOOGLE_PLACES_API_KEY", "ESTATED_API_KEY", "APP_BASE_URL"] as const) {
@@ -265,7 +270,7 @@ export default function SettingsAdvancedPage() {
   );
 
   if ("forbidden" in loaderResult) return <AccessDenied />;
-  const { config, secrets, testResults, ai } = loaderResult;
+  const { config, secrets, testResults, ai, isn } = loaderResult;
 
   // Map a server `field` error back onto the matching SecretField.
   const secretFieldError = (name: string): string | undefined => {
@@ -285,6 +290,7 @@ export default function SettingsAdvancedPage() {
     { id: "stripe-connect", label: m.settings_stripeconnect_heading() },
     { id: "ai-features", label: m.settings_ai_heading() },
     { id: "integration-keys", label: m.settings_intkeys_heading() },
+    { id: "isn", label: m.settings_isn_heading() },
     { id: "data", label: m.settings_advanced_data_heading() },
   ];
 
@@ -349,6 +355,10 @@ export default function SettingsAdvancedPage() {
           fieldError={secretFieldError}
           saving={savingAdvanced}
         />
+      </div>
+
+      <div id="isn" className="scroll-mt-12">
+        <IsnPanel secrets={isn} fieldError={secretFieldError} saving={nav.state !== "idle" && nav.formData?.get("intent") === "save-isn"} />
       </div>
 
       {/* Data import/export */}

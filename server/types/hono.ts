@@ -125,6 +125,12 @@ export interface AppEnv {
     PRIMARY_COLOR: string;
     APP_BASE_URL?: string;
 
+    // ISN report-link sync (services/isn). Tenant-owned; all four set = on.
+    ISN_DOMAIN?: string;
+    ISN_COMPANY_KEY?: string;
+    ISN_ACCESS_KEY?: string;
+    ISN_SECRET_KEY?: string;
+
     // Optional Configuration
     SINGLE_TENANT_ID?: string;
     APP_MODE?: 'standalone' | 'saas';
