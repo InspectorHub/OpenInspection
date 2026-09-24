@@ -7,6 +7,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.2.0...openinspection-v2.3.0) (2026-09-24)
+
+
+### Features
+
+* **isn:** add a published report's link to its ISN order ([acc1eb3](https://github.com/InspectorHub/OpenInspection/commit/acc1eb31b629234d13d8ae73d150ebe551010c93))
+
+
+### Bug Fixes
+
+* **cron:** ack on self-continuation send failure instead of retrying ([8384c14](https://github.com/InspectorHub/OpenInspection/commit/8384c149b7419497b98fbeeaf753fb1012a22e80))
+* **cron:** ack on self-continuation send failure instead of retrying (CF 10250) ([97aabf6](https://github.com/InspectorHub/OpenInspection/commit/97aabf6dfec2967cd80155e0415e4ccd1b668482))
+* **isn:** tenant-scope the report lookup, fix the settings save fan-out ([1d0b351](https://github.com/InspectorHub/OpenInspection/commit/1d0b351391c6d1b0a5cda968c6e99491d6b44ce7))
+
 ## [2.2.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.1.0...openinspection-v2.2.0) (2026-09-15)
 
 
