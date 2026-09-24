@@ -687,5 +687,14 @@
   "settings_discount_active_label": "Active — clients can apply this code",
   "settings_discount_save": "Save",
   "settings_discount_saving": "Saving…",
-  "settings_discount_cancel": "Cancel"
+  "settings_discount_cancel": "Cancel",
+  "settings_isn_heading": "ISN (Inspection Support Network)",
+  "settings_isn_desc": "Sends each published report to its ISN order as a report link. Put the ISN order number in the inspection's Reference Number; inspections without one are not sent.",
+  "settings_isn_domain_label": "ISN address",
+  "settings_isn_domain_hint": "The address you sign in to ISN at, without your company key, e.g. https://inspectionsupport.com",
+  "settings_isn_company_key_label": "Company key",
+  "settings_isn_keys_hint": "In ISN: Settings → My Access Keys. The keys carry the full permissions of the ISN user who owns them.",
+  "settings_isn_access_key_label": "Access key",
+  "settings_isn_secret_key_label": "Secret access key",
+  "settings_isn_save_error": "Could not save the ISN settings."
 }

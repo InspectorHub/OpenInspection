@@ -203,7 +203,7 @@ const publishRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ reportUrl: z.string().describe('TODO describe reportUrl field for the OpenInspection MCP integration'), reportStatus: z.string().describe('TODO describe reportStatus field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ reportUrl: z.string().describe('TODO describe reportUrl field for the OpenInspection MCP integration'), reportStatus: z.string().describe('TODO describe reportStatus field for the OpenInspection MCP integration'), isnSync: z.object({ ok: z.boolean(), isnReportId: z.string().optional(), error: z.string().optional() }).nullable().describe('Outcome of adding the report link to the ISN order named in Reference Number; null when ISN is not configured or the inspection has no Reference Number.') })),
                 },
             },
             description: 'Published',
@@ -478,7 +478,7 @@ const publishRoutes = createApiRouter()
             c.executionCtx.waitUntil(renderBoth());
         }
 
-        return c.json({ success: true, data: result }, 200);
+        return c.json({ success: true, data: { ...result, isnSync: await (await import('../../services/isn/report-link-sync')).syncPublishedReportToIsn(c, tenantId, id, body.reportId) } }, 200);
     })
     .openapi(reinspectRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;

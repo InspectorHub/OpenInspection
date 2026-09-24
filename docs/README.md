@@ -63,6 +63,7 @@ conventions common to all of them: [`integrations/README.md`](integrations/READM
 | [`integrations/ai.md`](integrations/ai.md) | Tenant key vs managed key, and why `AI_MODEL` has no default |
 | [`integrations/turnstile.md`](integrations/turnstile.md) | Bot protection on booking and agent signup |
 | [`integrations/google-places.md`](integrations/google-places.md) | Address autocomplete; the key never reaches the browser |
+| [`integrations/isn.md`](integrations/isn.md) | Report links on ISN orders, and which system holds the report |
 | [`integrations/estated.md`](integrations/estated.md) | Property facts by address, on an explicit button |
 | [`integrations/mcp.md`](integrations/mcp.md) | **Inbound** — connecting Claude or another MCP client over OAuth 2.1 |
 
