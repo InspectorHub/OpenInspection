@@ -177,6 +177,7 @@
   "settings_workspace_pdf_license_desc": "Incluye el número de licencia del inspector en el PDF del informe.",
   "settings_workspace_save_button": "Guardar empresa",
   "settings_workspace_error_no_logo": "No se proporcionó un logotipo válido",
+  "settings_workspace_error_logo_upload": "No se pudo subir el logotipo. Vuelve a intentarlo.",
   "settings_data_meta_title": "Datos - Configuración - OpenInspection",
   "settings_data_crumb": "Importación / exportación de datos",
   "settings_data_subtitle": "Descargue sus datos o importe contactos desde otras plataformas.",
