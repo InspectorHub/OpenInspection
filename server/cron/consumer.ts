@@ -56,7 +56,24 @@ export async function handleCronBatch(
             // again.
             await writeCursor(env, jobKey, nextCursor);
             if (nextCursor !== null && hop < MAX_HOPS) {
-                await env.CRON_QUEUE?.send({ job: jobKey, cursor: nextCursor, hop: hop + 1 });
+                try {
+                    await env.CRON_QUEUE?.send({ job: jobKey, cursor: nextCursor, hop: hop + 1 });
+                } catch (sendErr) {
+                    // The queue can return 10250 ("Queue is overloaded. Please
+                    // back off.") when many sweep hops land in a short window.
+                    // Retrying the message would immediately hammer the same
+                    // overloaded queue up to max_retries times and then drop it.
+                    // The cursor is already written above, so the next */5 tick
+                    // will re-probe, find the stored cursor, and resume the
+                    // sweep from exactly this point — acking here is safe and
+                    // is the correct back-pressure response.
+                    logger.warn('[cron:queue] self-continuation send failed — sweep will resume next tick', {
+                        job: jobKey,
+                        hop,
+                        processed,
+                        error: sendErr instanceof Error ? sendErr.message : String(sendErr),
+                    });
+                }
             } else if (nextCursor !== null) {
                 logger.warn('[cron:queue] hop ceiling reached — sweep will resume next tick', { job: jobKey, hop, processed });
             }
