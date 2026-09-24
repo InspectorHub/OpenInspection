@@ -67,7 +67,7 @@
       // One message per invocation, deliberately: batching would hand several
       // jobs a single shared CPU budget, which is precisely what this queue
       // exists to avoid.
-      { "queue": "openinspection-cron", "max_batch_size": 1, "max_retries": 3 }
+      { "queue": "openinspection-cron", "max_batch_size": 1, "max_retries": 3, "retry_delay": 30 }
     ]
   },
   "browser": { "binding": "BROWSER" },
