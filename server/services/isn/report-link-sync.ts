@@ -68,7 +68,10 @@ export async function syncPublishedReportToIsn(
         const token = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId, recipientEmail: client.email, role: 'client' });
         const url = `${reportUrl(getBookingHost(c), await resolveTenantSlug(c, tenantId), inspectionId)}?token=${encodeURIComponent(token)}`;
         const targetId = await resolvePublishTargetReport(db, tenantId, inspectionId, reportId);
-        const report = targetId ? await db.select({ title: reports.title }).from(reports).where(eq(reports.id, targetId)).get() : undefined;
+        const report = targetId
+            ? await db.select({ title: reports.title }).from(reports)
+                  .where(and(eq(reports.id, targetId), eq(reports.tenantId, tenantId))).get()
+            : undefined;
 
         const isnReportId = await addReportLinkToIsnOrder(cfg, orderRef, url, report?.title || 'Inspection Report');
         logger.info('report link added to ISN order', { inspectionId, orderRef, isnReportId });

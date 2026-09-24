@@ -12,8 +12,8 @@ import { AccessDenied } from "~/components/AccessDenied";
 import { StripeConnectPanel } from "~/components/settings/advanced/StripeConnectPanel";
 import { AiFeaturesPanel } from "~/components/settings/advanced/AiFeaturesPanel";
 import { IntegrationKeysPanel } from "~/components/settings/advanced/IntegrationKeysPanel";
-import { IsnPanel } from "~/components/settings/advanced/IsnPanel";
-import { loadIsnSettings, saveIsnSettings } from "~/lib/isn-settings.server";
+import { IsnPanel, ISN_SECRET_KEYS } from "~/components/settings/advanced/IsnPanel";
+import { loadIsnSettings } from "~/lib/isn-settings.server";
 import { SectionNav } from "~/components/settings/SectionNav";
 import { parseTestResults } from "~/lib/connection-test";
 import { m } from "~/paraglide/messages";
@@ -100,6 +100,21 @@ export async function action({ request, context }: Route.ActionArgs) {
   const fd = await request.formData();
   const intent = fd.get("intent");
   const api = createApi(context, { token });
+
+  // Shared subset -> secrets-store PUT: ISN and Integration Keys share this one
+  // call site instead of each writing their own (see check-middleware-budget.mjs).
+  const putSecrets = async (keys: readonly string[], fallbackError: string) => {
+    const body: Record<string, string> = {};
+    for (const key of keys) {
+      const val = fd.get(key);
+      if (val && typeof val === "string" && val.trim()) body[key] = val;
+    }
+    if (Object.keys(body).length === 0) return { intent, success: true, error: null, field: null, test: null };
+    const res = await api.secrets.secrets.$put({ json: body });
+    if (res.ok) return { intent, success: true, error: null, field: null, test: null };
+    const errBody = (await res.json().catch(() => null)) as { error?: { message?: string; field?: string } } | null;
+    return { intent, success: false, error: errBody?.error?.message ?? fallbackError, field: errBody?.error?.field ?? null, test: null };
+  };
 
   if (intent === "connect-stripe") {
     const submission = parseWithZod(fd, { schema: makeStripeConnectSchema() });
@@ -205,30 +220,10 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { intent, success: true, error: null, field: null, test: { ok: true as const } };
   }
 
-  if (intent === "save-isn") return saveIsnSettings(api, fd);
+  if (intent === "save-isn") return putSecrets(ISN_SECRET_KEYS, m.settings_isn_save_error());
 
   if (intent === "save-advanced-secrets") {
-    const body: Record<string, string> = {};
-    for (const key of ["GOOGLE_PLACES_API_KEY", "ESTATED_API_KEY", "APP_BASE_URL"] as const) {
-      const val = fd.get(key);
-      if (val && typeof val === "string" && val.trim()) body[key] = val;
-    }
-    if (Object.keys(body).length > 0) {
-      const res = await api.secrets.secrets.$put({ json: body });
-      if (!res.ok) {
-        const errBody = (await res.json().catch(() => null)) as
-          | { error?: { message?: string; field?: string } }
-          | null;
-        return {
-          intent,
-          success: false,
-          error: errBody?.error?.message ?? m.settings_advanced_integration_keys_save_error(),
-          field: errBody?.error?.field ?? null,
-          test: null,
-        };
-      }
-    }
-    return { intent, success: true, error: null, field: null, test: null };
+    return putSecrets(["GOOGLE_PLACES_API_KEY", "ESTATED_API_KEY", "APP_BASE_URL"], m.settings_advanced_integration_keys_save_error());
   }
 
   return { intent: null, success: false, error: m.settings_unknown_action(), field: null, test: null };
