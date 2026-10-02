@@ -66,6 +66,14 @@
     ".react-router/types/**/*",
     "app/**/*.ts",
     "app/**/*.tsx",
+    // Paraglide-compiled declaration files. The compiler (v2.7+) generates
+    // .d.ts alongside .js when --emit-ts-declarations is set, but tsc won't
+    // pick them up from app/**/*.ts alone because .d.ts files need an explicit
+    // include or a matching .js with allowJs:true. Listing them here gives
+    // TypeScript the type signatures for every m.*() call without touching
+    // allowJs or the .gitignore (paraglide's own .gitignore excludes the whole
+    // outdir, so these are gitignored but still present after i18n:compile).
+    "app/paraglide/**/*.d.ts",
     "workers/**/*.ts",
     "vite.config.ts",
     // The worker entry's `typeof import("../server/index")` pulls the server
