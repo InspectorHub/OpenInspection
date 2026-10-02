@@ -15,7 +15,7 @@ import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, getBaseUrl, resolveTenantSlug } from '../../lib/url';
 import { reportUrl as buildReportUrl, buildRenderReportUrl, paymentUrl } from '../../lib/public-urls';
 import { buildPortalUrl } from '../../lib/portal-urls';
-import { Errors, AppError, ErrorCode } from '../../lib/errors';
+import { Errors, AppError } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import {
@@ -450,10 +450,12 @@ const reportDeliveryRoutes = createApiRouter()
                 sentTo.push(recipientEmail);
                 await logManualSend({ recipient: recipientEmail, contactId: recipient.contactId ?? null, roleKey: recipient.roleKey, status: 'sent' });
             } catch (err) {
-                // Only workspace-wide email refusals abort; recipient failures stay isolated.
-                if (err instanceof AppError && [
-                    ErrorCode.QUOTA_EXHAUSTED, ErrorCode.OUTBOUND_COOLING_WINDOW, ErrorCode.EMAIL_SENDER_DOMAIN,
-                ].includes(err.code)) throw err;
+                // Platform-level refusals (cooling window, quota exhausted, domain
+                // unverified, address suppressed) apply to ALL recipients — abort
+                // the batch and let the route return a 4xx so the caller knows why
+                // nothing was sent, rather than silently counting every recipient
+                // as a per-recipient skip.
+                if (err instanceof AppError) throw err;
                 logger.error('[send-report-pdf] recipient send failed', { inspectionId: id, recipient: recipientLabel }, err instanceof Error ? err : undefined);
                 const reason = err instanceof Error ? err.message : 'Send failed';
                 skipped.push({ recipient: recipientLabel, reason });
