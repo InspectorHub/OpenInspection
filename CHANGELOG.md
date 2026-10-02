@@ -7,6 +7,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.2.0...openinspection-v2.3.0) (2026-10-02)
+
+
+### Features
+
+* **isn:** add a published report's link to its ISN order ([acc1eb3](https://github.com/InspectorHub/OpenInspection/commit/acc1eb31b629234d13d8ae73d150ebe551010c93))
+
+
+### Bug Fixes
+
+* **cron:** ack on self-continuation send failure instead of retrying ([8384c14](https://github.com/InspectorHub/OpenInspection/commit/8384c149b7419497b98fbeeaf753fb1012a22e80))
+* **cron:** ack on self-continuation send failure instead of retrying (CF 10250) ([97aabf6](https://github.com/InspectorHub/OpenInspection/commit/97aabf6dfec2967cd80155e0415e4ccd1b668482))
+* **deps:** patch dompurify and fast-uri advisories ([cf53eb7](https://github.com/InspectorHub/OpenInspection/commit/cf53eb76660553f598ac1c8861d91663207fc739))
+* **deps:** patch ip-address SSRF advisory ([cfe07c2](https://github.com/InspectorHub/OpenInspection/commit/cfe07c22873875f3c8ec2c46e1a90dc050833cb0))
+* **deps:** update dompurify and fast-uri ([d1a88a4](https://github.com/InspectorHub/OpenInspection/commit/d1a88a487a2b2cf32a46f39fb05b87cf7b597777))
+* **email:** address PR 364 CI failures ([425f7cd](https://github.com/InspectorHub/OpenInspection/commit/425f7cdb0417d5df8558af776963963cd15f5b64))
+* **email:** structured error handling and delivery_failed signer status ([049731c](https://github.com/InspectorHub/OpenInspection/commit/049731cf7385ca24040d18a8db6142f02dd741cb))
+* **email:** structured error handling, delivery_failed status, and type fixes ([b84a42e](https://github.com/InspectorHub/OpenInspection/commit/b84a42e3092b4ab9af3638386c6ff6d6d5362b0d))
+* **isn:** tenant-scope the report lookup, fix the settings save fan-out ([1d0b351](https://github.com/InspectorHub/OpenInspection/commit/1d0b351391c6d1b0a5cda968c6e99491d6b44ce7))
+* **types:** resolve all type-check errors from email provider refactor ([59fc28e](https://github.com/InspectorHub/OpenInspection/commit/59fc28e73471831915b0baa7d24b81a5e2c610bd))
+* **types:** resolve paraglide TS7016 by including generated .d.ts in tsconfig ([aba24b8](https://github.com/InspectorHub/OpenInspection/commit/aba24b844ac675f1d55765aab761bb85f0b72721))
+
 ## [2.2.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.1.0...openinspection-v2.2.0) (2026-09-15)
 
 
