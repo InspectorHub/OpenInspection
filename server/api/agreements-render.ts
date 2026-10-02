@@ -10,6 +10,7 @@ import {
   signaturesRecordCurrentDisclosure,
 } from '../lib/legal/agreement-language-disclosure';
 import { safeISODate } from '../lib/date';
+import { logger } from '../lib/logger';
 
 /**
  * Human-readable UTC string from a Drizzle-hydrated date value (Date object, or
@@ -52,7 +53,7 @@ function verifyQrHtml(
     `</div>`;
   } catch (e) {
     // QR generation failure is non-fatal; render without it.
-    console.warn(`${logPrefix} QR generation failed`, { error: (e as Error).message });
+    logger.warn(`${logPrefix} QR generation failed`, { error: (e as Error).message });
     return '';
   }
 }

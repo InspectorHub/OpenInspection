@@ -3,7 +3,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { users } from '../lib/db/schema';
 import { setCookie } from 'hono/cookie';
-import { Errors } from '../lib/errors';
+import { Errors, AppError } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { getDeploymentProfile } from '../lib/deployment-profile';
 import { getBaseUrl } from '../lib/url';
@@ -509,7 +509,14 @@ const coreAuthRoutes = createApiRouter()
         const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
 
         await c.var.services.email.sendPasswordReset(body.email, resetLink)
-            .catch(() => { /* email delivery is best-effort */ });
+            .catch((e: unknown) => {
+                // Platform-level refusals (suppressed address, domain unverified,
+                // quota exhausted) are actionable: surface them so the user knows
+                // the reset email was refused rather than waiting forever.
+                if (e instanceof AppError) throw e;
+                // Transient failures are best-effort — the user can retry.
+                logger.warn('[auth] password-reset email delivery failed (transient)', {}, e instanceof Error ? e : undefined);
+            });
 
         return c.json({ success: true }, 200);
     })

@@ -26,8 +26,7 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     agreementId: text('agreement_id').notNull().references(() => agreements.id),
     clientEmail: text('client_email').notNull(),
     clientName: text('client_name'),
-    status: text('status', { enum: ['pending', 'sent', 'viewed', 'signed', 'declined', 'expired'] }).notNull().default('pending'),
-    // Envelope completion time — THAT it completed and WHEN, which is the
+    status: text('status', { enum: ['pending', 'sent', 'viewed', 'signed', 'declined', 'expired', 'delivery_failed'] }).notNull().default('pending'),
     // envelope's own fact. The signature is not: it belongs to the person who
     // made it and lives on their `agreement_signers` row. Read by the GDPR
     // retention sweep (its window is computed from this), publish-readiness,
@@ -110,7 +109,10 @@ export const agreementSigners = sqliteTable('agreement_signers', {
     contactId:          text('contact_id'),               // → contacts.id (app-layer, optional)
     tokenHash:          text('token_hash'),               // SHA-256 hex; NULL on backfilled rows until first link build
     tokenEnc:           text('token_enc'),                // 't1:iv:cipher' sealed plaintext (config-crypto sealToken)
-    status:             text('status', { enum: ['pending', 'sent', 'viewed', 'signed', 'declined', 'expired'] }).notNull().default('pending'),
+    // `delivery_failed` marks a signer whose email was rejected at the provider
+    // level (transient failure or unclassified error). The signer can be
+    // re-emailed via the Remind action; the envelope itself is not expired.
+    status:             text('status', { enum: ['pending', 'sent', 'viewed', 'signed', 'declined', 'expired', 'delivery_failed'] }).notNull().default('pending'),
     // The drawn signature image. Bare base64 OR a full `data:` URL — both are
     // accepted, and agreements-render prefixes the bare form when composing the
     // signed PDF. Written only by markSignedBySigner. A DSAR erase KEEPS it (it

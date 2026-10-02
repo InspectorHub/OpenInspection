@@ -27,6 +27,8 @@ import { InspectorAuditLogSchema } from '../../lib/validations/audit-log-write.s
 import { erasureLog } from '../../lib/db/schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { getDrizzle } from '../../lib/route-helpers';
+import { AppError } from '../../lib/errors';
+import { logger } from '../../lib/logger';
 
 
 /**
@@ -281,7 +283,18 @@ const adminDataRoutes = createApiRouter()
         const inviteLink = inviteAcceptUrl(c, inviteId);
 
         const emailPromise = c.var.services.email.sendInvitation(body.email, inviteLink)
-            .catch(() => { /* email delivery is best-effort */ });
+            .catch((e: unknown) => {
+                // The invite row and link are already created; the admin has the
+                // inviteLink in the response and can share it manually. But we
+                // want to distinguish a platform-level refusal (domain unverified,
+                // quota exhausted, address suppressed) from a transient failure so
+                // ops can act on it rather than assuming everything is fine.
+                if (e instanceof AppError) {
+                    logger.warn('admin.invite.email.refused', { code: e.code });
+                } else {
+                    logger.error('admin.invite.email.failed', {}, e instanceof Error ? e : undefined);
+                }
+            });
         c.executionCtx.waitUntil(emailPromise);
 
         return c.json({ success: true, data: { inviteLink, expiresAt: expiresAt.toISOString() } }, 201);

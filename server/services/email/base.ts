@@ -1,4 +1,4 @@
-import { AppError, ErrorCode } from '../../lib/errors';
+import { AppError, Errors, ErrorCode } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { buildIcs, type IcsEvent } from '../../lib/ics';
 import { inspectorSignature, type SignatureUser } from '../../lib/inspector-signature';
@@ -368,8 +368,40 @@ export class EmailBaseService {
         }, to, html, this.unsubscribeLinks, opts?.classId);
 
         if (!result.ok) {
-            logger.error('[email] Delivery failed', { error: result.error });
-            throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Email delivery failed');
+            const { error: providerError, kind } = result;
+
+            if (kind === 'suppressed') {
+                // Write back to the local suppression table so the send-path gate
+                // skips this address on the next attempt without hitting the
+                // provider again. Best-effort: recordSuppression never throws.
+                for (const addr of to) {
+                    await this.suppression?.recordSuppression(addr, 'provider_rejected');
+                }
+                // Throw a specific, actionable error the UI can branch on:
+                // "update the address and try again" rather than a generic 502.
+                throw Errors.EmailRecipientSuppressed({ recipient: to.join(', ') });
+            }
+
+            if (kind === 'quota_exceeded') {
+                // Re-use the existing QuotaExhausted shape. Provider-level quota
+                // (no cap/used numbers available), but the code lets the UI
+                // surface the upgrade path.
+                logger.error('[email] Provider quota exceeded', { error: providerError });
+                throw new AppError(402, ErrorCode.QUOTA_EXHAUSTED,
+                    'Your email sending quota is exhausted. Upgrade your plan or wait for the quota to reset.',
+                    { metric: 'email', used: 0, cap: 0, billingPortalUrl: null },
+                );
+            }
+
+            if (kind === 'sender_domain') {
+                // Operator configuration problem — the from-domain is not verified.
+                logger.error('[email] Sender domain error', { error: providerError });
+                throw Errors.EmailSenderDomain({ hint: providerError });
+            }
+
+            // Transient / unclassified: generic delivery failure.
+            logger.error('[email] Delivery failed', { kind, error: providerError });
+            throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Email delivery failed. Please try again.');
         }
 
         // success — meter the send (best-effort; never blocks or breaks delivery).

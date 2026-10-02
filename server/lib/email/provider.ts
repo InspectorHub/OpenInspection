@@ -65,13 +65,32 @@ export type NormalizedEmailEvent = {
   at: number;
 };
 
+/**
+ * Structured failure kinds returned by `sendEmail`.
+ *
+ * `transient`      — provider-side fault (5xx, rate-limit, lock). Safe to
+ *                    retry after a delay; no operator action required now.
+ * `suppressed`     — Resend (or another provider) rejected the address because
+ *                    it is on their suppression list. The send will keep failing
+ *                    until the block clears; write it to `email_suppressions`
+ *                    so we stop trying before the provider rejects it again.
+ * `quota_exceeded` — daily or monthly send quota exhausted. Operator must
+ *                    upgrade their plan or wait for the quota to reset.
+ * `sender_domain`  — the `from` domain is unverified or the key is limited to
+ *                    test sends. Operator must verify the domain in Resend.
+ */
+export type EmailFailureKind = 'transient' | 'suppressed' | 'quota_exceeded' | 'sender_domain';
+
 export interface EmailProvider {
   /**
    * Send a transactional email.
-   * Returns `{ ok: true; id? }` on success; `{ ok: false; error }` on failure.
-   * Implementations MUST NOT throw — errors are surfaced via the result shape.
+   *
+   * Returns `{ ok: true; id? }` on success.
+   * Returns `{ ok: false; error; kind }` on failure — implementations MUST NOT
+   * throw. `kind` lets callers branch on WHY delivery failed rather than
+   * treating all failures identically.
    */
-  sendEmail(args: EmailSendArgs): Promise<{ ok: true; id?: string } | { ok: false; error: string }>;
+  sendEmail(args: EmailSendArgs): Promise<{ ok: true; id?: string } | { ok: false; error: string; kind: EmailFailureKind }>;
 
   /**
    * Optional lightweight credential check (e.g. a GET /domains call).

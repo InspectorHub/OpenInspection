@@ -12,7 +12,7 @@ import { m } from "~/paraglide/messages";
  * via data-color-scheme (no hardcoded colors).
  */
 
-type SignerStatus = "pending" | "sent" | "viewed" | "signed" | "declined" | "expired";
+type SignerStatus = "pending" | "sent" | "viewed" | "signed" | "declined" | "expired" | "delivery_failed";
 
 export interface SignerRow {
     id: string;
@@ -37,15 +37,20 @@ export function isTerminal(status: string): boolean {
 type ChipTone = "sat" | "monitor" | "defect" | "info" | "neutral";
 
 /** Status → (tone, label) for the per-signer status chip. */
-export function statusChip(status: string): { tone: ChipTone; label: string } {
+export function statusChip(status: string): { tone: ChipTone; label: string; tooltip?: string } {
     switch (status) {
-        case "signed":   return { tone: "sat", label: "Signed" };
-        case "viewed":   return { tone: "info", label: "Viewed" };
-        case "sent":     return { tone: "monitor", label: "Sent" };
-        case "declined": return { tone: "defect", label: "Declined" };
-        case "expired":  return { tone: "neutral", label: "Expired" };
-        case "pending":  return { tone: "neutral", label: "Pending" };
-        default:         return { tone: "neutral", label: status.charAt(0).toUpperCase() + status.slice(1) };
+        case "signed":          return { tone: "sat",     label: "Signed" };
+        case "viewed":          return { tone: "info",    label: "Viewed" };
+        case "sent":            return { tone: "monitor", label: "Sent" };
+        case "declined":        return { tone: "defect",  label: "Declined" };
+        case "expired":         return { tone: "neutral", label: "Expired" };
+        case "pending":         return { tone: "neutral", label: "Pending" };
+        case "delivery_failed": return {
+            tone: "defect",
+            label: m.agreement_signers_status_delivery_failed(),
+            tooltip: m.agreement_signers_status_delivery_failed_tooltip(),
+        };
+        default: return { tone: "neutral", label: status.charAt(0).toUpperCase() + status.slice(1) };
     }
 }
 
@@ -145,7 +150,9 @@ export function SignerList({ signers, onRemind, onCopyLink, busy, nowMs }: Signe
                             <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-[13px] font-semibold text-ih-fg-1 truncate">{s.name}</span>
                                 <Pill tone="neutral">{roleLabel(s.role)}</Pill>
-                                <Pill tone={chip.tone}>{chip.label}</Pill>
+                                <span title={chip.tooltip}>
+                                    <Pill tone={chip.tone}>{chip.label}</Pill>
+                                </span>
                                 {s.channel === "in_person" && <Pill tone="info">{m.agreement_signers_in_person()}</Pill>}
                             </div>
                             <div className="text-[12px] text-ih-fg-3 mt-0.5 truncate">{s.email}</div>

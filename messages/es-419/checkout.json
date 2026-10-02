@@ -191,5 +191,7 @@
   "agreement_send_add": "+ Agregar firmante",
   "agreement_send_completion_legend": "Avance",
   "agreement_send_policy_all": "Todos deben firmar",
-  "agreement_send_policy_one": "Basta con una sola firma para completarlo"
+  "agreement_send_policy_one": "Basta con una sola firma para completarlo",
+  "agreement_signers_status_delivery_failed": "No entregado",
+  "agreement_signers_status_delivery_failed_tooltip": "No se pudo entregar el correo a esta dirección. Use Recordar para intentarlo de nuevo, o actualice la dirección."
 }
