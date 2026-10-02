@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EmailService } from '../../../server/services/email.service';
 import { logger } from '../../../server/lib/logger';
 import type { EmailProvider } from '../../../server/lib/email/provider';
+import type { EmailSuppressionPort } from '../../../server/lib/email/suppression';
 
 /**
  * WH-3 — send-path suppression gate. The gate is injected the same way `meter`
@@ -28,7 +29,7 @@ function stubProvider(): EmailProvider & { calls: Array<{ to: string | string[] 
 
 /** Build an EmailService with the injected provider + suppression stub. */
 function buildService(
-  suppression: { isSuppressed(email: string): Promise<boolean> } | undefined,
+  suppression: EmailSuppressionPort | undefined,
   provider = stubProvider(),
 ) {
   // ctor: (apiKey, senderEmail, appName, identity?, renderer?, meter?, provider?, suppression?)
@@ -45,7 +46,10 @@ describe('EmailService send-path suppression gate (WH-3)', () => {
 
   it('suppressed sole recipient → provider NOT called, benign skip, logged', async () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
-    const suppression = { isSuppressed: vi.fn(async () => true) };
+    const suppression = {
+      isSuppressed: vi.fn(async () => true),
+      recordSuppression: vi.fn(async () => {}),
+    };
     const { svc, provider } = buildService(suppression);
 
     const result = await svc.sendEmail(['blocked@x.io'], 'Subj', '<p>hi</p>');
@@ -61,7 +65,10 @@ describe('EmailService send-path suppression gate (WH-3)', () => {
   });
 
   it('clean recipient → provider called normally (unchanged)', async () => {
-    const suppression = { isSuppressed: vi.fn(async () => false) };
+    const suppression = {
+      isSuppressed: vi.fn(async () => false),
+      recordSuppression: vi.fn(async () => {}),
+    };
     const { svc, provider } = buildService(suppression);
 
     const result = await svc.sendEmail(['ok@x.io'], 'Subj', '<p>hi</p>');
@@ -72,17 +79,21 @@ describe('EmailService send-path suppression gate (WH-3)', () => {
   });
 
   it('normalizes the recipient before lookup (trim + lowercase)', async () => {
-    const isSuppressed = vi.fn(async () => false);
-    const { svc } = buildService({ isSuppressed });
+    const suppression = {
+      isSuppressed: vi.fn(async () => false),
+      recordSuppression: vi.fn(async () => {}),
+    };
+    const { svc } = buildService(suppression);
 
     await svc.sendEmail(['  Mixed.Case@X.IO  '], 'Subj', '<p>hi</p>');
 
-    expect(isSuppressed).toHaveBeenCalledWith('mixed.case@x.io');
+    expect(suppression.isSuppressed).toHaveBeenCalledWith('mixed.case@x.io');
   });
 
   it('multi-recipient with one suppressed → provider gets only the clean ones', async () => {
     const suppression = {
       isSuppressed: vi.fn(async (email: string) => email === 'blocked@x.io'),
+      recordSuppression: vi.fn(async () => {}),
     };
     const { svc, provider } = buildService(suppression);
 
@@ -105,7 +116,10 @@ describe('EmailService send-path suppression gate (WH-3)', () => {
 
   it('fail-OPEN: a lookup error never blocks the send', async () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
-    const suppression = { isSuppressed: vi.fn(async () => { throw new Error('db down'); }) };
+    const suppression = {
+      isSuppressed: vi.fn(async () => { throw new Error('db down'); }),
+      recordSuppression: vi.fn(async () => {}),
+    };
     const { svc, provider } = buildService(suppression);
 
     const result = await svc.sendEmail(['ok@x.io'], 'Subj', '<p>hi</p>');

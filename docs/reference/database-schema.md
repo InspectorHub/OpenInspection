@@ -13,7 +13,7 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | Columns | 1263 |
 | Indexes (excluding primary keys) | 183 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 609 (48%) |
+| Columns carrying a source comment | 610 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -105,8 +105,8 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `agreement_id` | text | NN FK→`agreements.id` |  |  | *App-layer reference to another row — no database foreign key.* |
 | `client_email` | text | NN |  |  | *An email address.* |
 | `client_name` | text |  |  |  | *A name.* |
-| `status` | text | NN | `'pending'` | `pending, sent, viewed, signed, declined, expired` | *State-machine column — see the Values column for the vocabulary.* |
-| `signed_at` | integer |  |  |  | Envelope completion time — THAT it completed and WHEN, which is the envelope's own fact. The signature is not: it belongs to the person who made it and lives on their `agreement_signers` row. |
+| `status` | text | NN | `'pending'` | `pending, sent, viewed, signed, declined, expired, delivery_failed` | *State-machine column — see the Values column for the vocabulary.* |
+| `signed_at` | integer |  |  |  | envelope's own fact. The signature is not: it belongs to the person who made it and lives on their `agreement_signers` row. |
 | `viewed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `sent_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `last_error` | text |  |  |  | The decline REASON, truncated to 500 chars. Written only by markDeclinedBySigner, and only when the signer's decline actually drags the envelope aggregate to 'declined' — a decline that leaves a 'one'-policy envelope live records nothing here. **[more]** |
@@ -149,7 +149,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `contact_id` | text |  |  |  | → contacts.id (app-layer, optional) |
 | `token_hash` | text | UQ |  |  | SHA-256 hex; NULL on backfilled rows until first link build |
 | `token_enc` | text |  |  |  | 't1:iv:cipher' sealed plaintext (config-crypto sealToken) |
-| `status` | text | NN | `'pending'` | `pending, sent, viewed, signed, declined, expired` | *State-machine column — see the Values column for the vocabulary.* |
+| `status` | text | NN | `'pending'` | `pending, sent, viewed, signed, declined, expired, delivery_failed` | `delivery_failed` marks a signer whose email was rejected at the provider level (transient failure or unclassified error). |
 | `signature_base64` | text |  |  |  | The drawn signature image. Bare base64 OR a full `data:` URL — both are accepted, and agreements-render prefixes the bare form when composing the signed PDF. |
 | `signed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `viewed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
