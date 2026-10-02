@@ -90,7 +90,7 @@ const ssr = (c: Ctx) => {
   // language instead of English-then-Spanish. It returns the SAME request
   // object once the cookie already agrees, which is every request after the
   // first — the steady-state cost here is one header read.
-  return paraglideMiddleware(withResolvedUiLocale(c.req.raw), ({ request }) =>
+  return paraglideMiddleware(withResolvedUiLocale(c.req.raw), ({ request }: { request: Request }) =>
     requestHandler(request, context),
   );
 };

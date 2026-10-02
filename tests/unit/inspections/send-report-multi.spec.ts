@@ -168,7 +168,7 @@ describe('POST /api/inspections/:id/send-report-pdf — multi-recipient, role-ke
         expect(sendInspectionReportPdf).toHaveBeenCalledTimes(1);
     });
 
-    it('an unknown roleKey fails gracefully for that recipient only — batch still 200', async () => {
+    it('an unknown roleKey returns 400 and aborts the batch before sending', async () => {
         const app = buildApp({ propertyAddress: '1 Main St', inspectorId: null, id: INSP_ID });
         const res = await app.fetch(post({
             recipients: [
@@ -177,11 +177,9 @@ describe('POST /api/inspections/:id/send-report-pdf — multi-recipient, role-ke
             ],
         }), ENV, CTX);
 
-        expect(res.status).toBe(200);
-        const body = (await res.json()) as { data: { sentTo: string[]; skipped?: Array<{ recipient: string; reason: string }> } };
-        expect(body.data.sentTo).toEqual(['jane@example.com']);
-        expect(body.data.skipped).toHaveLength(1);
-        expect(body.data.skipped?.[0].recipient).toBe('weird@example.com');
+        expect(res.status).toBe(400);
+        expect(sendInspectionReportPdf).not.toHaveBeenCalled();
+        expect(sendReportReady).not.toHaveBeenCalled();
     });
 
     it('empty recipients array — 400 (Zod validation), no emails sent', async () => {

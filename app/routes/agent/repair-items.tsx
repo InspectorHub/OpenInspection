@@ -243,7 +243,7 @@ export function groupByProperty(items: RepairItemRow[]): PropertySection[] {
       key,
       label: row.propertyAddress?.trim() || m.agent_portal_no_address(),
       recency: -Infinity,
-      blocks: [],
+      blocks: [] as InspectionBlock[],
     };
     let block = section.blocks.find((b) => b.inspectionId === row.inspectionId);
     if (!block) {

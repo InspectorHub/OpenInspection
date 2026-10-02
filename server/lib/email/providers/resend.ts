@@ -1,5 +1,5 @@
 import { logger } from '../../logger';
-import type { EmailProvider, EmailSendArgs, EmailWebhookContext, NormalizedEmailEvent } from '../provider';
+import type { EmailFailureKind, EmailProvider, EmailSendArgs, EmailWebhookContext, NormalizedEmailEvent } from '../provider';
 import {
   base64ToBytes,
   bytesToBase64,
@@ -8,6 +8,47 @@ import {
   normalizeEmail,
   withinReplayWindow,
 } from '../webhook-crypto';
+
+/**
+ * Classify a Resend non-2xx response into one of the four `EmailFailureKind`
+ * buckets. The mapping is derived from Resend's published error reference
+ * (resend.com/docs/api-reference/errors).
+ *
+ * Classification priority:
+ *  1. Suppressed — 403 validation_error whose message mentions "suppressed".
+ *     Resend uses the same (name=validation_error, status=403) shape for domain
+ *     errors too, so the message must be checked.
+ *  2. Sender-domain — any other 403 validation_error (unverified domain, test
+ *     key restricted to own address, domain already registered on another team).
+ *  3. Quota — 429 daily_quota_exceeded | monthly_quota_exceeded.
+ *  4. Transient — everything else: rate-limit, 5xx, lock/conflict, network.
+ *
+ * Any Resend error not covered by (1)–(3) is treated as transient because
+ * retrying is the safest default — the operator can always check the logs.
+ */
+export function classifyResendError(
+    status: number,
+    name: string | undefined,
+    message: string,
+): EmailFailureKind {
+    if (status === 403 && name === 'validation_error') {
+        // Suppression messages always contain the word "suppressed".
+        if (/suppressed/i.test(message)) return 'suppressed';
+        // Remaining 403 validation_errors are domain / key scope problems.
+        return 'sender_domain';
+    }
+    if (status === 429) {
+        if (name === 'daily_quota_exceeded' || name === 'monthly_quota_exceeded') {
+            return 'quota_exceeded';
+        }
+        // rate_limit_exceeded → transient (retry after backing off)
+        return 'transient';
+    }
+    // 4xx config errors (suspended key, missing key, etc.) are not recoverable
+    // by the recipient changing anything — treat as transient so the operator
+    // sees a delivery failure log, not a user-facing actionable error.
+    return 'transient';
+}
 
 /**
  * ResendProvider — thin fetch-based adapter over the Resend REST API.
@@ -19,7 +60,7 @@ export class ResendProvider implements EmailProvider {
 
   async sendEmail(
     args: EmailSendArgs,
-  ): Promise<{ ok: true; id?: string } | { ok: false; error: string }> {
+  ): Promise<{ ok: true; id?: string } | { ok: false; error: string; kind: EmailFailureKind }> {
     const payload: Record<string, unknown> = {
       from: args.from,
       to: args.to,
@@ -43,7 +84,7 @@ export class ResendProvider implements EmailProvider {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'network error';
       logger.error('[email] ResendProvider fetch error', { message });
-      return { ok: false, error: message };
+      return { ok: false, error: message, kind: 'transient' };
     }
 
     if (res.ok) {
@@ -52,16 +93,20 @@ export class ResendProvider implements EmailProvider {
       return { ok: true, ...(json?.id ? { id: json.id } : {}) };
     }
 
-    // Non-2xx: try to extract the provider's error message.
+    // Non-2xx — parse the body once, then classify.
+    let errName: string | undefined;
     let errMsg: string;
     try {
       const body = (await res.json()) as { message?: string; name?: string } | null;
-      errMsg = body?.message ?? body?.name ?? `Resend ${res.status}`;
+      errName = body?.name;
+      errMsg  = body?.message ?? body?.name ?? `Resend ${res.status}`;
     } catch {
       errMsg = `Resend ${res.status}`;
     }
-    logger.error('[email] ResendProvider delivery failed', { status: res.status, error: errMsg });
-    return { ok: false, error: errMsg };
+
+    const kind = classifyResendError(res.status, errName, errMsg);
+    logger.error('[email] ResendProvider delivery failed', { status: res.status, kind, error: errMsg });
+    return { ok: false, error: errMsg, kind };
   }
 
   async validateCredentials(): Promise<{ ok: true } | { ok: false; error: string }> {

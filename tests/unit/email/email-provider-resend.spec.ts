@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { ResendProvider } from '../../../server/lib/email/providers/resend';
+import { ResendProvider, classifyResendError } from '../../../server/lib/email/providers/resend';
 import { recordingFetch } from '../helpers/fetch-mock';
 
 describe('ResendProvider.sendEmail', () => {
@@ -22,7 +22,7 @@ describe('ResendProvider.sendEmail', () => {
   it('returns ok:false with the API error message on non-2xx', async () => {
     vi.stubGlobal('fetch', recordingFetch(async () => new Response(JSON.stringify({ message: 'bad key' }), { status: 401 })));
     const res = await new ResendProvider({ apiKey: 're_bad' }).sendEmail({ from: 'a@x.com', to: 'b@y.com', subject: 's', html: 'h' });
-    expect(res).toEqual({ ok: false, error: 'bad key' });
+    expect(res).toEqual({ ok: false, error: 'bad key', kind: 'transient' });
   });
 
   it('includes reply_to in body when replyTo is set', async () => {
@@ -60,6 +60,41 @@ describe('ResendProvider.sendEmail', () => {
     const res = await new ResendProvider({ apiKey: 're_bad' }).sendEmail({ from: 'a@x.com', to: 'b@y.com', subject: 's', html: 'h' });
     expect(res).toMatchObject({ ok: false });
     expect((res as { ok: false; error: string }).error).toContain('500');
+  });
+});
+
+describe('classifyResendError', () => {
+  it('classifies 403 validation_error with "suppressed" in message as suppressed', () => {
+    expect(classifyResendError(403, 'validation_error', 'The recipient address foo@bar.com is suppressed')).toBe('suppressed');
+  });
+
+  it('classifies 403 validation_error without "suppressed" as sender_domain', () => {
+    expect(classifyResendError(403, 'validation_error', 'The domain.com domain is not verified.')).toBe('sender_domain');
+    expect(classifyResendError(403, 'validation_error', 'You can only send testing emails to your own email address')).toBe('sender_domain');
+  });
+
+  it('classifies 429 daily_quota_exceeded as quota_exceeded', () => {
+    expect(classifyResendError(429, 'daily_quota_exceeded', 'You have exceeded your daily email sending quota.')).toBe('quota_exceeded');
+  });
+
+  it('classifies 429 monthly_quota_exceeded as quota_exceeded', () => {
+    expect(classifyResendError(429, 'monthly_quota_exceeded', 'You have exceeded your monthly email sending quota.')).toBe('quota_exceeded');
+  });
+
+  it('classifies 429 rate_limit_exceeded as transient', () => {
+    expect(classifyResendError(429, 'rate_limit_exceeded', 'Too many requests.')).toBe('transient');
+  });
+
+  it('classifies 500 application_error as transient', () => {
+    expect(classifyResendError(500, 'application_error', 'An unexpected error occurred.')).toBe('transient');
+  });
+
+  it('classifies 503 service_unavailable as transient', () => {
+    expect(classifyResendError(503, 'service_unavailable', 'API is temporarily unavailable')).toBe('transient');
+  });
+
+  it('classifies 401 missing_api_key as transient', () => {
+    expect(classifyResendError(401, 'missing_api_key', 'Missing API key in the authorization header.')).toBe('transient');
   });
 });
 

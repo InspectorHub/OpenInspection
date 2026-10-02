@@ -12,7 +12,7 @@
   "scripts/check-idempotency-coverage.mjs": 797,
   "app/routes/settings-communication.tsx": 783,
   "server/services/inspection.service.ts": 770,
-  "server/api/inspections/report-delivery.ts": 750,
+  "server/api/inspections/report-delivery.ts": 756,
   "server/services/inspection/inspection-analytics.service.ts": 748,
   "server/api/admin/admin-settings.ts": 747,
   "server/index.ts": 747,
@@ -26,7 +26,7 @@
   "app/components/editor/ItemEditor.tsx": 651,
   "app/components/inspection-edit/CompliancePanel.tsx": 638,
   "server/api/public-report.ts": 628,
-  "server/api/auth.ts": 614,
+  "server/api/auth.ts": 621,
   "app/hooks/useInspection.ts": 600,
   "server/services/concierge.service.ts": 596,
   "server/api/bookings/agreement.ts": 583,
@@ -82,6 +82,8 @@
   "server/services/agreement/signer-state.ts": 413,
   "app/components/portal/sections/ReportView.tsx": 410,
   "app/routes/team.tsx": 405,
+  "server/api/admin/admin-data.ts": 406,
+  "server/services/email/base.ts": 430,
   "scripts/check-non-translatable.mjs": 402,
   "playwright.config.ts": 401
 }

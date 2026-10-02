@@ -14,6 +14,7 @@ import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
 import { r2Keys } from '../lib/r2-keys';
+import { logger } from '../lib/logger';
 
 /**
  * The machine-readable half of the evidence pack — extracted from the workflow
@@ -156,7 +157,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                     r2Key: r2Keys.agreementFile(tenantId, inspectionId, requestId, 'signed.pdf'),
                 });
             } catch (e) {
-                console.warn('[sign-workflow] render-canonical-pdf failed (BR may not be provisioned)', { error: (e as Error).message });
+                logger.warn('[sign-workflow] render-canonical-pdf failed (BR may not be provisioned)', { error: (e as Error).message });
                 return null;
             }
         });
@@ -180,7 +181,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                     r2Key: r2Keys.agreementFile(tenantId, inspectionId, requestId, 'certificate.pdf'),
                 });
             } catch (e) {
-                console.warn('[sign-workflow] render-certificate-pdf failed (BR may not be provisioned)', { error: (e as Error).message });
+                logger.warn('[sign-workflow] render-certificate-pdf failed (BR may not be provisioned)', { error: (e as Error).message });
                 return null;
             }
         });
@@ -212,7 +213,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                 });
                 return { r2Key, sha256, sizeBytes: bytes.byteLength };
             } catch (e) {
-                console.warn('[sign-workflow] build-evidence-pack failed', { error: (e as Error).message });
+                logger.warn('[sign-workflow] build-evidence-pack failed', { error: (e as Error).message });
                 return null;
             }
         });
@@ -283,7 +284,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                     evidenceZipBytes: evidenceBytes,
                 });
             } catch (e) {
-                console.warn('[sign-workflow] email-parties failed', { error: (e as Error).message });
+                logger.error('[sign-workflow] email-parties failed', {}, e instanceof Error ? e : undefined);
             }
         });
 
@@ -315,11 +316,11 @@ export async function renderPdfToR2(env: AppEnv, opts: { renderUrl: string; r2Ke
         throw new Error(`render target returned HTTP ${probe.status}: ${opts.renderUrl}`);
     }
 
-    console.info('[sign-workflow] BR quickAction("pdf")', { renderUrl: opts.renderUrl });
+    logger.info('[sign-workflow] BR quickAction("pdf")', { renderUrl: opts.renderUrl });
     const res = await env.BROWSER.quickAction('pdf', { url: opts.renderUrl });
     if (!res.ok) {
         const body = await res.text().catch(() => '<unreadable>');
-        console.error('[sign-workflow] BR error', { status: res.status, headers: Object.fromEntries(res.headers.entries()), body: body.slice(0, 1000) });
+        logger.error('[sign-workflow] BR error', { status: res.status, body: body.slice(0, 1000) });
         throw new Error(`BR ${res.status}: ${body.slice(0, 500)}`);
     }
     const pdfBuffer = await res.arrayBuffer();

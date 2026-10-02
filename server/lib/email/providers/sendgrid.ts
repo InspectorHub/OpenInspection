@@ -1,5 +1,5 @@
 import { logger } from '../../logger';
-import type { EmailProvider, EmailSendArgs, EmailWebhookContext, NormalizedEmailEvent } from '../provider';
+import type { EmailFailureKind, EmailProvider, EmailSendArgs, EmailWebhookContext, NormalizedEmailEvent } from '../provider';
 import { base64ToBytes, normalizeEmail, withinReplayWindow } from '../webhook-crypto';
 
 /**
@@ -12,7 +12,7 @@ export class SendgridProvider implements EmailProvider {
 
   async sendEmail(
     args: EmailSendArgs,
-  ): Promise<{ ok: true; id?: string } | { ok: false; error: string }> {
+  ): Promise<{ ok: true; id?: string } | { ok: false; error: string; kind: EmailFailureKind }> {
     // Normalize to: string | string[] → array of { email } objects required by SendGrid.
     const toAddresses = (Array.isArray(args.to) ? args.to : [args.to]).map(
       (email) => ({ email }),
@@ -47,7 +47,7 @@ export class SendgridProvider implements EmailProvider {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'network error';
       logger.error('[email] SendgridProvider fetch error', { message });
-      return { ok: false, error: message };
+      return { ok: false, error: message, kind: 'transient' as const };
     }
 
     // SendGrid returns 202 with an empty body on success — no id.
@@ -64,7 +64,7 @@ export class SendgridProvider implements EmailProvider {
       errMsg = `SendGrid ${res.status}`;
     }
     logger.error('[email] SendgridProvider delivery failed', { status: res.status, error: errMsg });
-    return { ok: false, error: errMsg };
+    return { ok: false, error: errMsg, kind: 'transient' as const };
   }
 
   async validateCredentials(): Promise<{ ok: true } | { ok: false; error: string }> {

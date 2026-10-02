@@ -84,7 +84,7 @@ describe('SendgridProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    expect(res).toEqual({ ok: false, error: 'Invalid API key' });
+    expect(res).toEqual({ ok: false, error: 'Invalid API key', kind: 'transient' });
   });
 
   it('falls back to SendGrid <status> when error body is unparseable', async () => {
@@ -96,7 +96,7 @@ describe('SendgridProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    expect(res).toEqual({ ok: false, error: 'SendGrid 500' });
+    expect(res).toEqual({ ok: false, error: 'SendGrid 500', kind: 'transient' });
   });
 
   it('returns ok:false on network error', async () => {
@@ -107,7 +107,7 @@ describe('SendgridProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    expect(res).toEqual({ ok: false, error: 'network failure' });
+    expect(res).toEqual({ ok: false, error: 'network failure', kind: 'transient' });
   });
 
   it('validateCredentials GETs /v3/scopes and returns ok:true on 200', async () => {
@@ -239,7 +239,7 @@ describe('PostmarkProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    expect(res).toEqual({ ok: false, error: 'Bad token' });
+    expect(res).toEqual({ ok: false, error: 'Bad token', kind: 'transient' });
   });
 
   it('falls back to Postmark <status> when error body is unparseable', async () => {
@@ -251,7 +251,7 @@ describe('PostmarkProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    expect(res).toEqual({ ok: false, error: 'Postmark 500' });
+    expect(res).toEqual({ ok: false, error: 'Postmark 500', kind: 'transient' });
   });
 
   it('returns ok:false on network error', async () => {
@@ -262,7 +262,7 @@ describe('PostmarkProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    expect(res).toEqual({ ok: false, error: 'connection refused' });
+    expect(res).toEqual({ ok: false, error: 'connection refused', kind: 'transient' });
   });
 
   it('validateCredentials GETs /server and returns ok:true on 200', async () => {
@@ -397,7 +397,7 @@ describe('MailgunProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    expect(res).toEqual({ ok: false, error: 'Forbidden. Provide valid API credentials.' });
+    expect(res).toEqual({ ok: false, error: 'Forbidden. Provide valid API credentials.', kind: 'transient' });
   });
 
   it('falls back to Mailgun <status> when error body is unparseable', async () => {
@@ -409,7 +409,7 @@ describe('MailgunProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    expect(res).toEqual({ ok: false, error: 'Mailgun 500' });
+    expect(res).toEqual({ ok: false, error: 'Mailgun 500', kind: 'transient' });
   });
 
   it('returns ok:false on network error', async () => {
@@ -420,7 +420,7 @@ describe('MailgunProvider', () => {
       subject: 'Hi',
       html: '<p>h</p>',
     });
-    expect(res).toEqual({ ok: false, error: 'timeout' });
+    expect(res).toEqual({ ok: false, error: 'timeout', kind: 'transient' });
   });
 
   it('validateCredentials GETs /v3/<domain> with Basic auth and returns ok:true', async () => {

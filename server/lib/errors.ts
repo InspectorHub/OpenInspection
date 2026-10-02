@@ -43,6 +43,23 @@ export enum ErrorCode {
     // it into either of the others would send the agent back to a login page
     // they just came from, or to a dead end with no action available.
     AGENT_TERMS_REQUIRED = 'AGENT_TERMS_REQUIRED',
+    // Email delivery failed at the provider level for a transient or
+    // unclassified reason (provider 5xx, rate-limit, network error). Distinct
+    // from SERVICE_UNAVAILABLE (which means OUR infrastructure is down) — this
+    // code means a specific outbound send attempt was rejected by the email
+    // provider. Surfaces to the caller so the UI can say "delivery failed, try
+    // resending" rather than a generic error.
+    EMAIL_DELIVERY_FAILED = 'EMAIL_DELIVERY_FAILED',
+    // The recipient's address is on the provider's suppression list (hard bounce
+    // or complaint history). 422 rather than 403: the request itself is valid,
+    // but this specific recipient cannot be reached right now. The client should
+    // offer "update the email address" as the resolution path rather than
+    // retrying to the same address.
+    EMAIL_RECIPIENT_SUPPRESSED = 'EMAIL_RECIPIENT_SUPPRESSED',
+    // The sender domain used in the `from` field is not verified with the email
+    // provider, or the API key is scoped to test sends only. Operator action
+    // required: verify the domain in email provider settings.
+    EMAIL_SENDER_DOMAIN = 'EMAIL_SENDER_DOMAIN',
 }
 
 /**
@@ -149,6 +166,52 @@ export const Errors = {
             428,
             ErrorCode.AGENT_TERMS_REQUIRED,
             'The agent terms in force have not been accepted on this account.',
+            details,
+        ),
+    /**
+     * 502 — a specific outbound email send failed at the provider level for a
+     * transient or unclassified reason. The caller may retry; the user should
+     * see "delivery failed, try resending" rather than a generic server error.
+     *
+     * `recipient` is the email address that failed. It is included in `details`
+     * (not the message) so log sinks that strip PII from the message field can
+     * do so without losing the machine-readable fact.
+     */
+    EmailDeliveryFailed: (details: { recipient: string; providerError: string }) =>
+        new AppError(
+            502,
+            ErrorCode.EMAIL_DELIVERY_FAILED,
+            'Email delivery failed. Please check the address and try again.',
+            details,
+        ),
+    /**
+     * 422 — the recipient's address is on the provider's suppression list.
+     * 422 rather than 403: the request is structurally valid, but this specific
+     * address cannot be reached until the block clears (up to 14 days for an
+     * automatic Resend block). The UI should offer "update the email address"
+     * as the primary resolution path.
+     *
+     * Writing the address to `email_suppressions` happens in `performSend`
+     * before this error is thrown, so the send-path gate will skip it on the
+     * next attempt without hitting the provider again.
+     */
+    EmailRecipientSuppressed: (details: { recipient: string }) =>
+        new AppError(
+            422,
+            ErrorCode.EMAIL_RECIPIENT_SUPPRESSED,
+            'This email address cannot receive mail right now. Update the address and try again.',
+            details,
+        ),
+    /**
+     * 422 — the sender domain in the `from` field is not verified with the
+     * email provider, or the API key is scoped to test sends only. Operator
+     * action required: verify the domain in Settings → Email.
+     */
+    EmailSenderDomain: (details?: { hint?: string }) =>
+        new AppError(
+            422,
+            ErrorCode.EMAIL_SENDER_DOMAIN,
+            'Email could not be sent: the sender domain is not verified. Go to Settings → Email to fix this.',
             details,
         ),
 };

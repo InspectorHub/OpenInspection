@@ -15,7 +15,7 @@ import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, resolveTenantSlug } from '../../lib/url';
 import { lookupSenderSignature, buildSignUrl } from '../../lib/signature-helpers';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
-import { Errors } from '../../lib/errors';
+import { Errors, AppError } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { agreements as agreementsTable, agreementRequests as agreementRequestsTable } from '../../lib/db/schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
@@ -357,8 +357,15 @@ const adminEsignRoutes = createApiRouter()
         const token = await svc.getSignerLink(tenantId, requestId, signerId);
         const signUrl = await buildSignUrl(c, tenantId, row.inspectionId, tenantSlug, token);
         const sigInspector = await lookupSenderSignature(c, tenantId);
-        await c.var.services.email.sendAgreementRequest(row.email, row.name, 'Agreement', signUrl, sigInspector, getBookingHost(c))
-            .catch((e: unknown) => logger.error('Failed to send agreement reminder', {}, e instanceof Error ? e : undefined));
+        try {
+            await c.var.services.email.sendAgreementRequest(row.email, row.name, 'Agreement', signUrl, sigInspector, getBookingHost(c));
+        } catch (e: unknown) {
+            // Platform-level refusals (cooling window, suppressed address, domain
+            // unverified, quota exhausted) must surface to the caller so the admin
+            // sees why the reminder wasn't sent rather than getting a silent 200.
+            if (e instanceof AppError) throw e;
+            logger.error('Failed to send agreement reminder', {}, e instanceof Error ? e : undefined);
+        }
 
         await db.update(schema.agreementSigners).set({ lastRemindedAt: new Date(now) })
             .where(eqDz(schema.agreementSigners.id, signerId));

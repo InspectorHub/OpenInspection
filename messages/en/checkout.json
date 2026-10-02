@@ -191,5 +191,7 @@
   "agreement_send_add": "+ Add signer",
   "agreement_send_completion_legend": "Completion",
   "agreement_send_policy_all": "Everyone must sign",
-  "agreement_send_policy_one": "Any one signature completes it"
+  "agreement_send_policy_one": "Any one signature completes it",
+  "agreement_signers_status_delivery_failed": "Not delivered",
+  "agreement_signers_status_delivery_failed_tooltip": "Email could not be delivered to this address. Use Remind to try again, or update the address."
 }

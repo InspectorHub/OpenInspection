@@ -1,5 +1,5 @@
 import { logger } from '../../logger';
-import type { EmailProvider, EmailSendArgs, EmailWebhookContext, NormalizedEmailEvent } from '../provider';
+import type { EmailFailureKind, EmailProvider, EmailSendArgs, EmailWebhookContext, NormalizedEmailEvent } from '../provider';
 import {
   base64ToBytes,
   bytesToHex,
@@ -26,7 +26,7 @@ export class MailgunProvider implements EmailProvider {
 
   async sendEmail(
     args: EmailSendArgs,
-  ): Promise<{ ok: true; id?: string } | { ok: false; error: string }> {
+  ): Promise<{ ok: true; id?: string } | { ok: false; error: string; kind: EmailFailureKind }> {
     const hasAttachments = !!(args.attachments && args.attachments.length > 0);
     // Binary attachments can't ride urlencoded — switch to multipart only when present,
     // keeping the urlencoded path (and its assertions) intact for the common no-attachment case.
@@ -81,7 +81,7 @@ export class MailgunProvider implements EmailProvider {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'network error';
       logger.error('[email] MailgunProvider fetch error', { message });
-      return { ok: false, error: message };
+      return { ok: false, error: message, kind: 'transient' as const };
     }
 
     if (res.ok) {
@@ -99,7 +99,7 @@ export class MailgunProvider implements EmailProvider {
       errMsg = `Mailgun ${res.status}`;
     }
     logger.error('[email] MailgunProvider delivery failed', { status: res.status, error: errMsg });
-    return { ok: false, error: errMsg };
+    return { ok: false, error: errMsg, kind: 'transient' as const };
   }
 
   async validateCredentials(): Promise<{ ok: true } | { ok: false; error: string }> {

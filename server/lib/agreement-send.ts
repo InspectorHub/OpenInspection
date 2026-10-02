@@ -1,9 +1,13 @@
 import type { Context } from 'hono';
+import { eq } from 'drizzle-orm';
+import { getDrizzle } from './route-helpers';
+import { agreementSigners } from './db/schema';
 import type { HonoConfig } from '../types/hono';
 import type { SignatureUser } from './inspector-signature';
 import { getBookingHost } from './url';
 import { buildSignUrl } from './signature-helpers';
 import { logger } from './logger';
+import { AppError } from './errors';
 
 /**
  * IA-65 — email every signer on an envelope their own signing link.
@@ -23,6 +27,18 @@ import { logger } from './logger';
  * A signer whose link cannot be minted is logged and skipped rather than
  * aborting the batch — one broken token must not stop the other parties from
  * being asked to sign.
+ *
+ * Error handling on sendAgreementRequest:
+ *
+ *   • AppErrors with actionable codes (OutboundCoolingWindow, EmailRecipientSuppressed,
+ *     EmailSenderDomain, QUOTA_EXHAUSTED) are re-thrown so the route handler
+ *     returns a 4xx the client can act on. These are platform-level refusals,
+ *     not per-signer delivery failures.
+ *
+ *   • Transient delivery failures (SERVICE_UNAVAILABLE / generic errors) are
+ *     caught, logged, and recorded on the signer row as `delivery_failed` so
+ *     the inspector can see which addresses did not receive the email and use
+ *     the Remind button to retry.
  */
 export async function emailSignersTheirLinks(
     c: Context<HonoConfig>,
@@ -44,8 +60,11 @@ export async function emailSignersTheirLinks(
     },
 ): Promise<void> {
     const host = getBookingHost(c);
+    const db = getDrizzle(c);
+
     for (const s of opts.signers) {
         if (['signed', 'declined', 'expired'].includes(s.status)) continue;
+
         let signUrl: string;
         try {
             const token = await c.var.services.agreement.getSignerLink(opts.tenantId, opts.requestId, s.id);
@@ -54,8 +73,32 @@ export async function emailSignersTheirLinks(
             logger.warn('agreement.signer.link.failed', { signerId: s.id, error: e instanceof Error ? e.message : String(e) });
             continue;
         }
-        await c.var.services.email
-            .sendAgreementRequest(s.email, s.name, opts.agreementName, signUrl, opts.senderSignature, host)
-            .catch((e: unknown) => logger.error('Failed to send agreement email', {}, e instanceof Error ? e : undefined));
+
+        try {
+            await c.var.services.email.sendAgreementRequest(
+                s.email, s.name, opts.agreementName, signUrl, opts.senderSignature, host,
+            );
+        } catch (e: unknown) {
+            // Platform-level refusals: cooling window, recipient suppressed, sender
+            // domain not verified, quota exhausted. These apply to ALL signers on
+            // this tenant — re-throw so the route returns a 4xx the UI can act on.
+            if (e instanceof AppError) {
+                throw e;
+            }
+
+            // Transient / unclassified delivery failure for this specific signer.
+            // Log it and mark the signer row so the inspector can see which
+            // addresses failed and use the Remind button to retry.
+            logger.error('agreement.signer.email.failed', { signerId: s.id }, e instanceof Error ? e : undefined);
+            await db
+                .update(agreementSigners)
+                .set({ status: 'delivery_failed' })
+                .where(eq(agreementSigners.id, s.id))
+                .catch((dbErr: unknown) => logger.error(
+                    'agreement.signer.status.update.failed',
+                    { signerId: s.id },
+                    dbErr instanceof Error ? dbErr : undefined,
+                ));
+        }
     }
 }
