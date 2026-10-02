@@ -515,7 +515,7 @@ const coreAuthRoutes = createApiRouter()
                 // the reset email was refused rather than waiting forever.
                 if (e instanceof AppError) throw e;
                 // Transient failures are best-effort — the user can retry.
-                logger.warn('[auth] password-reset email delivery failed (transient)', {}, e instanceof Error ? e : undefined);
+                logger.warn('[auth] password-reset email delivery failed (transient)', { error: e instanceof Error ? e.message : String(e) });
             });
 
         return c.json({ success: true }, 200);

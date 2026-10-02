@@ -45,7 +45,7 @@ export class EmailBaseService {
          * (standalone/legacy callers) ⇒ no gate, behavior unchanged. Wired in
          * `assembleTenantEmailService` the same way `meter` is.
          */
-        public suppression?: { isSuppressed(email: string): Promise<boolean> },
+        public suppression?: import('../../lib/email/suppression').EmailSuppressionPort,
         /**
          * Free-tier usage-quota pre-flight (2026-07 spec). When injected,
          * `sendEmail` awaits `quota.preflight()` BEFORE building or sending any

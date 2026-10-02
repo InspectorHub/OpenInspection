@@ -126,7 +126,7 @@ export default function AgentDashboardPage() {
  const groups = new Map<string, { label: string; rows: Referral[]; recency: number }>();
  for (const r of visible) {
  const key = propertyGroupKey(r.propertyAddress, r.id);
- const g = groups.get(key) || { label: r.propertyAddress?.trim() || m.agent_portal_no_address(), rows: [], recency: -Infinity };
+ const g = groups.get(key) || { label: r.propertyAddress?.trim() || m.agent_portal_no_address(), rows: [] as Referral[], recency: -Infinity };
  if (welcomeReferral && r.id === welcomeReferral.id) g.rows.unshift(r);
  else g.rows.push(r);
  g.recency = Math.max(g.recency, inspectionDateValue(r.date));
