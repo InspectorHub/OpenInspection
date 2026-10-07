@@ -194,17 +194,11 @@ export const SCRIPT_GATES = [
     // plan that builds a primitive before its caller, and a gate that is red
     // for a legitimate reason all week is a gate people learn to pass with
     // --no-verify. ~10s: one knip pass over the production entry graph.
-    // PUSH, not PRECOMMIT: it reads node_modules, which is environment state
-    // rather than anything a commit stages. What it guards is the one kind of
-    // dependency change that leaves NO trace where anyone looks -- `npm ls`,
-    // package.json and the lockfile all read 4.129.0 whether the patch applied
-    // or not. Without it, a lost postinstall silently restores the bug that
-    // failed this repository's e2e job three times out of four.
-    // ⚠️ `fix` is the DIAGNOSTIC, not the remedy: the remedy is `npm install`,
-    // which re-runs patch-package. The registry requires a real npm script here
-    // and the lock is right to -- a fix line naming a command nobody can run is
-    // worse than none. The script itself prints what to do.
-    { key: 'wranglerpatch', label: 'wrangler patch present (workers-sdk#15317)', script: 'check-wrangler-patch.mjs', fix: 'npm run lint:wrangler-patch', rung: PUSH },
+    // PUSH, not PRECOMMIT: this checks the installed Wrangler bundle, which is
+    // environment state rather than anything a commit stages. The postinstall
+    // script applies the narrowly scoped compatibility patch and fails closed
+    // if Wrangler's bundle no longer matches the expected shape.
+    { key: 'wranglerpatch', label: 'Wrangler compatibility patch present', script: 'check-wrangler-patch.mjs', fix: 'npm run lint:wrangler-patch', rung: PUSH },
     { key: 'unwired', label: 'lint:unwired', script: 'check-unwired.mjs', fix: 'npm run lint:unwired', rung: PUSH },
     // `unwired` one level down: a field, not a module. See that script's header.
     { key: 'unreadfields', label: 'lint:unread-fields', script: 'check-unread-fields.mjs', fix: 'npm run lint:unread-fields', rung: PUSH },
