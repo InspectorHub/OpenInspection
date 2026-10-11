@@ -426,7 +426,6 @@
   "settings_emailsecrets_deliverability_desc": "Configure {provider} para que envíe aquí los eventos de rebote y de queja por spam, de modo que nunca se vuelva a escribir a las direcciones suprimidas.",
   "settings_emailsecrets_webhook_url_label": "URL del webhook",
   "settings_emailsecrets_save": "Guardar la(s) clave(s) de {provider}",
-  "settings_emailsecrets_resend_connected": "Conectado — {count} dominio(s) verificado(s)",
   "settings_emailsecrets_validate_idle": "Validar las credenciales",
   "settings_emailsecrets_validate_busy": "Validando…",
   "settings_emailsecrets_creds_verified": "Credenciales verificadas.",
@@ -696,5 +695,18 @@
   "settings_isn_keys_hint": "En ISN: Settings → My Access Keys. Las claves tienen todos los permisos del usuario de ISN al que pertenecen.",
   "settings_isn_access_key_label": "Clave de acceso",
   "settings_isn_secret_key_label": "Clave de acceso secreta",
-  "settings_isn_save_error": "No se pudo guardar la configuración de ISN."
+  "settings_isn_save_error": "No se pudo guardar la configuración de ISN.",
+  "settings_emailsteps_notice": "Envía un correo de prueba a tu propia dirección.",
+  "settings_emailsteps_recheck": "Volver a comprobar la entrega",
+  "settings_emailsteps_error": "No se pudo ejecutar la prueba. Inténtalo de nuevo en un minuto.",
+  "settings_emailsteps_key_valid": "Clave de API aceptada",
+  "settings_emailsteps_key_scope": "Permisos de la clave",
+  "settings_emailsteps_sender_domain_verified": "Dominio del remitente verificado",
+  "settings_emailsteps_send_test": "Correo de prueba enviado a ti",
+  "settings_emailsteps_quota": "Cuota de envío",
+  "settings_emailsteps_delivery": "Entrega confirmada",
+  "settings_emailsteps_status_pass": "Correcto",
+  "settings_emailsteps_status_fail": "Falló",
+  "settings_emailsteps_status_skipped": "Omitido",
+  "settings_emailsteps_status_pending": "En espera"
 }

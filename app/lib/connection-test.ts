@@ -13,6 +13,8 @@ export interface ConnectionTestResult {
   detail: string | null;
   testedByUserId: string | null;
   testedAt: number; // epoch ms
+  /** Step id of a stepwise test row; null for single-shot probes. */
+  step: string | null;
 }
 
 const TARGETS = new Set(["sms", "email", "stripe", "gemini"]);
@@ -38,5 +40,6 @@ export async function parseTestResults(
       detail: typeof r.detail === "string" ? r.detail : null,
       testedByUserId: typeof r.testedByUserId === "string" ? r.testedByUserId : null,
       testedAt: typeof r.testedAt === "number" ? r.testedAt : 0,
+      step: typeof r.step === "string" ? r.step : null,
     }));
 }

@@ -426,7 +426,6 @@
   "settings_emailsecrets_deliverability_desc": "Configure {provider} to send bounce & spam-complaint events here so suppressed addresses are never emailed again.",
   "settings_emailsecrets_webhook_url_label": "Webhook URL",
   "settings_emailsecrets_save": "Save {provider} key(s)",
-  "settings_emailsecrets_resend_connected": "Connected — {count} verified domain(s)",
   "settings_emailsecrets_validate_idle": "Validate credentials",
   "settings_emailsecrets_validate_busy": "Validating…",
   "settings_emailsecrets_creds_verified": "Credentials verified.",
@@ -696,5 +695,18 @@
   "settings_isn_keys_hint": "In ISN: Settings → My Access Keys. The keys carry the full permissions of the ISN user who owns them.",
   "settings_isn_access_key_label": "Access key",
   "settings_isn_secret_key_label": "Secret access key",
-  "settings_isn_save_error": "Could not save the ISN settings."
+  "settings_isn_save_error": "Could not save the ISN settings.",
+  "settings_emailsteps_notice": "Sends one test email to your own address.",
+  "settings_emailsteps_recheck": "Check delivery again",
+  "settings_emailsteps_error": "The test could not be run. Try again in a minute.",
+  "settings_emailsteps_key_valid": "API key accepted",
+  "settings_emailsteps_key_scope": "Key permissions",
+  "settings_emailsteps_sender_domain_verified": "Sender domain verified",
+  "settings_emailsteps_send_test": "Test email sent to you",
+  "settings_emailsteps_quota": "Sending quota",
+  "settings_emailsteps_delivery": "Delivery confirmed",
+  "settings_emailsteps_status_pass": "Passed",
+  "settings_emailsteps_status_fail": "Failed",
+  "settings_emailsteps_status_skipped": "Skipped",
+  "settings_emailsteps_status_pending": "Waiting"
 }

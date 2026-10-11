@@ -50,7 +50,7 @@ afterEach(() => {
 function row(over: Partial<ConnectionTestResult>): ConnectionTestResult {
   return {
     target: 'sms', provider: null, ok: true, detail: null,
-    testedByUserId: null, testedAt: NOW - MIN, ...over,
+    testedByUserId: null, testedAt: NOW - MIN, step: null, ...over,
   };
 }
 

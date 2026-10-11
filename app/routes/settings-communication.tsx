@@ -16,6 +16,7 @@ import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { EmailDeliveryPanel } from "~/components/settings/EmailDeliveryPanel";
 import { EmailSecretsPanel } from "~/components/settings/EmailSecretsPanel";
+import { runEmailTestStepIntent } from "~/lib/email-test-step.server";
 import { SmsDeliveryPanel, type SmsModeValue } from "~/components/settings/SmsDeliveryPanel";
 import { GoogleCalendarPanel } from "~/components/settings/GoogleCalendarPanel";
 import { ManagedComplianceWizard, type ManagedComplianceData } from "~/components/settings/ManagedComplianceWizard";
@@ -254,22 +255,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     return saveSecrets(api, intent, body, m.settings_comms_email_secrets_save_error());
   }
 
-  if (intent === "test-resend") {
-    const res = await api.integrations.resend.test.$post();
-    const body = (await res.json().catch(() => null)) as
-      | { data?: { domains: number }; error?: { message?: string } }
-      | null;
-    if (!res.ok || !body?.data) {
-      return {
-        intent,
-        ok: false,
-        error: body?.error?.message ?? m.settings_connection_test_failed(),
-        field: null,
-        test: null,
-      };
-    }
-    return { intent, ok: true, error: null, field: null, test: body.data };
-  }
+  if (intent === "test-email-step") return runEmailTestStepIntent(api, intent, form.get("step"));
 
   if (intent === "validate-email-provider") {
     const VALID_PROVIDERS = ["resend", "sendgrid", "postmark", "mailgun"] as const;
@@ -498,7 +484,6 @@ export default function SettingsCommunication() {
     : loaderResult.compliance;
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
-  const resendTestFetcher = useFetcher<typeof action>();
   const emailValidateFetcher = useFetcher<typeof action>();
   const smsTestFetcher = useFetcher<typeof action>();
   const session = useSessionContext();
@@ -604,7 +589,6 @@ export default function SettingsCommunication() {
     return null;
   };
 
-  const resendTest = resendTestFetcher.data;
 
   // Whether the tenant's OWN selected email provider has its credentials saved
   // (drives the Email delivery panel's provider-aware guardrail + status copy).
@@ -669,8 +653,6 @@ export default function SettingsCommunication() {
             secretFieldError={secretFieldError}
             secretFormError={secretFormError}
             savingEmailSecrets={savingEmailSecrets}
-            resendTestFetcher={resendTestFetcher}
-            resendTest={resendTest}
             emailValidateFetcher={emailValidateFetcher}
             initialProvider={emailByoProvider}
             webhookBaseUrl={typeof window !== "undefined" ? window.location.origin : ""}
