@@ -33,6 +33,7 @@
   "server/services/automation/deliver-email.ts::deliverTemplatedEmail::}).where(eq(automationLogs.id, log.id));",
   "server/services/automation/delivery.ts::emailSvcCache::.where(eq(automationLogs.id, log.id));",
   "server/services/automation/delivery.ts::emailSvcCache::}).where(eq(automationLogs.id, log.id));",
+  "server/services/automation/provider-deferral.ts::applyProviderOutcome::.where(eq(automationLogs.id, logId));",
   "server/services/automation/report-email.ts::deliverReportEmail::.where(eq(automationLogs.id, log.id));",
   "server/services/concierge.service.ts::approveByInspector::.where(eq(inspections.id, row.inspectionId))",
   "server/services/concierge.service.ts::resolveToken::.where(eq(inspections.id, row.inspectionId))",

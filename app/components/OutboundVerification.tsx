@@ -44,6 +44,11 @@ export function useHumanGatedSubmit() {
       busy.current = true;
       try {
         if (!(await ensureHuman())) return;
+        // Let the submit event that started this finish dispatching first. When no
+        // challenge is needed the promise above is already resolved, so the code
+        // below would otherwise run INSIDE that dispatch, where the browser
+        // ignores a nested requestSubmit() and the form silently never posts.
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
         pass.current = true;
         form.requestSubmit();
       } finally {

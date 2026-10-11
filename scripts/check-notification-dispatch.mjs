@@ -106,6 +106,11 @@ const HTML_IN_ROUTE_ALLOW = [
 // jane@x.com" cannot be compared to "Jane muted review requests".
 const SEND_EMAIL_RE = /\.sendEmail\s*\(/g;
 const SEND_EMAIL_ALLOW = [
+  // The stepwise "Test connection" send: calls the provider adapter directly, and
+  // only ever to the signed-in user's own address (the request carries no
+  // recipient). It is a diagnostic of the workspace's own account, not a
+  // notification, so there is no class to name.
+  /^server\/lib\/integration\/email-test-steps\.ts$/,
   // The email service layer itself — `sendRendered` supplies the class from
   // the RenderResult, and `sendEmail` is the boundary being annotated.
   /^server\/services\/email\//,

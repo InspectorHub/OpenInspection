@@ -4,7 +4,7 @@ import type { EmailProvider } from './provider';
  * Longest provider-requested pause the request path will sit through. A person
  * is waiting on the response, so anything longer is reported back instead.
  */
-export const MAX_INLINE_RETRY_SECONDS = 2;
+const MAX_INLINE_RETRY_SECONDS = 2;
 
 export interface RateLimitRetryOptions {
     /** Injected so tests do not wait; defaults to a timer. */

@@ -21,10 +21,9 @@
  */
 import type { StepResult, StepStatus } from './email-test-steps';
 
-export const STRIPE_STEP_IDS = ['key_valid', 'account_capabilities', 'webhook'] as const;
-export type StripeStepId = (typeof STRIPE_STEP_IDS)[number];
+export type StripeStepId = 'key_valid' | 'account_capabilities' | 'webhook';
 
-export interface StripeAccountStatus {
+interface StripeAccountStatus {
     accountName: string;
     chargesEnabled: boolean;
     payoutsEnabled: boolean;
@@ -33,7 +32,7 @@ export interface StripeAccountStatus {
     livemode?: boolean;
 }
 
-export interface StripeWebhookDelivery {
+interface StripeWebhookDelivery {
     ts: string;
     eventType: string;
     result: 'processed' | 'received' | 'signature_failed' | 'tenant_mismatch';

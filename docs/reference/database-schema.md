@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 109 |
-| Columns | 1263 |
+| Columns | 1264 |
 | Indexes (excluding primary keys) | 183 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 610 (48%) |
+| Columns carrying a source comment | 611 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -1426,7 +1426,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `integration_test_results`
 
-<sub>server/lib/db/schema/tenant/integration.ts · 8 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/tenant/integration.ts · 9 columns · primary key `id`</sub>
 
 > Settings "Test connection" history. Each on-demand provider probe (SMS, email, Stripe, Gemini) appends one row so the settings panels can show the LAST tested time + outcome without re-probing on every page load — and a short recent history (the helper prunes to the newest N per (tenant, target)).
 
@@ -1440,6 +1440,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `detail` | text |  |  |  | Non-sensitive outcome summary (success blurb or provider error message). |
 | `tested_by_user_id` | text |  |  |  | User who ran the probe (JWT sub); NULL if unknown. |
 | `tested_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `step` | text |  |  |  | Which step of a stepwise test this row records (e.g. 'key_valid', 'send_test'); NULL for the single-shot probes. |
 
 **Indexes**
 

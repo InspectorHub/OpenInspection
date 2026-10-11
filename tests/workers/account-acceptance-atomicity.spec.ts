@@ -73,6 +73,7 @@ describe('account_acceptances — real-D1 batch atomicity', () => {
     beforeEach(async () => {
         await b.DB.exec('DELETE FROM account_acceptances;');
         await b.DB.exec('DELETE FROM users;');
+        await b.DB.exec('DELETE FROM tenant_configs;');
         await b.DB.exec('DELETE FROM tenants;');
         await b.DB.prepare(
             'INSERT INTO tenants (id, slug, status, tier, deployment_mode, created_at) VALUES (?, ?, ?, ?, ?, ?)',

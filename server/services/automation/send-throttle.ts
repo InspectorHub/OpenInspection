@@ -20,7 +20,7 @@ export interface SendThrottleOptions {
 }
 
 /** Sends per second a flush batch may start. Half of a typical provider limit, to leave room for other senders. */
-export const FLUSH_MAX_SENDS_PER_SECOND = 5;
+const FLUSH_MAX_SENDS_PER_SECOND = 5;
 
 const timerSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 

@@ -7,7 +7,7 @@
  * API verifies it lazily, only when a send inside a new company's cooling
  * window needs it (`diMiddleware`).
  */
-export const HUMAN_TOKEN_COOKIE = "oi-human-token";
+const HUMAN_TOKEN_COOKIE = "oi-human-token";
 export const HUMAN_TOKEN_HEADER = "x-turnstile-token";
 
 /** Turnstile tokens are URL-safe; anything else is not ours and is dropped. */

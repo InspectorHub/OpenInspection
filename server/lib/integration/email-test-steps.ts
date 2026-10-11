@@ -28,10 +28,8 @@
 import { ResendProvider } from '../email/providers/resend';
 import type { EmailSendUsage } from '../email/provider';
 
-export const EMAIL_STEP_IDS = [
-    'key_valid', 'key_scope', 'sender_domain_verified', 'send_test', 'delivery', 'quota',
-] as const;
-export type EmailStepId = (typeof EMAIL_STEP_IDS)[number];
+export type EmailStepId =
+    'key_valid' | 'key_scope' | 'sender_domain_verified' | 'send_test' | 'delivery' | 'quota';
 
 export type StepStatus = 'pass' | 'fail' | 'skipped' | 'pending';
 
