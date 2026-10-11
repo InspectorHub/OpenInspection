@@ -17,7 +17,7 @@ import {
     JoinTeamSchema,
     ForgotPasswordSchema,
     ResetPasswordSchema,
-    AuthResponseSchema,
+    AuthResponseSchema, LoginResponseSchema,
     SetupSchema,
 } from '../lib/validations/auth.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
@@ -50,7 +50,7 @@ const loginRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: {
-                'application/json': { schema: AuthResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: LoginResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             },
             description: 'Login successful'
         },

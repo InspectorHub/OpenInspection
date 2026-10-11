@@ -73,7 +73,13 @@ async function completeTwoFactor(
 
   try {
     const api = createApi(context);
-    const res = await api.auth.login["2fa"].$post({ json: { challengeToken, code } });
+    // Same BFF signal as the password step below: this client does not forward
+    // the API's Set-Cookie, so without the header the session token never
+    // reaches this action and a correct code reads as a failure.
+    const res = await api.auth.login["2fa"].$post(
+      { json: { challengeToken, code } },
+      { headers: { "x-token-relay": "1" } },
+    );
     if (!res.ok) {
       // 401 covers both a wrong code and an expired challenge, and the two need
       // different advice: retyping helps with one and cannot help with the other.
