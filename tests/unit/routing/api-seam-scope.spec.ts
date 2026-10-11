@@ -19,7 +19,7 @@ describe('API seam request scope', () => {
         expect(SRC).toMatch(/createRequestScope\(\)/);
         expect(SRC).toMatch(/\[REQUEST_SCOPE\]\s*:\s*scope/);
         // The inner fetch must pass the augmented env, not the raw c.env.
-        expect(SRC).toMatch(/app\.fetch\(req,\s*innerEnv,\s*c\.executionCtx\)/);
+        expect(SRC).toMatch(/app\.fetch\(withHumanToken\(req,[^)]*\)[^)]*\),\s*innerEnv,\s*c\.executionCtx\)/);
     });
 
     it('leaves the external route dispatcher on the raw env', () => {

@@ -254,7 +254,7 @@
   "load_failed_generic": "Esto no se pudo cargar, así que puede estar incompleto. Vuelva a cargar antes de darlo por vacío.",
   "media_gallery_unavailable": "No se pudieron cargar las fotos.",
   "load_failed_named": "No se pudo cargar {what}, así que esto puede estar incompleto. Vuelva a cargar antes de darlo por vacío.",
-  "outbound_cooling_notice": "Su empresa tiene menos de un día, así que antes de enviar correo a clientes desde nuestro remitente compartido — informes, acuerdos, facturas y automatizaciones — le pedimos confirmar que es una persona. Esto aplica hasta el {unlockAt}. Todo lo demás ya funciona, y conectar su propio proveedor de correo elimina la verificación.",
+  "outbound_cooling_notice": "Su empresa tiene menos de un día, así que antes de enviar correo a clientes desde nuestro remitente compartido — informes, acuerdos, facturas y automatizaciones — le pedimos confirmar que es una persona. Esto aplica hasta el {unlockAt}. Todo lo demás ya funciona: inspecciones, informes, agenda, correo de inicio de sesión e invitaciones de equipo. Conectar su propio proveedor de correo elimina la verificación.",
   "outbound_cooling_notice_action": "Use su propio proveedor de correo",
   "outbound_verify_title": "Confirme que es una persona",
   "outbound_verify_body": "Su empresa es nueva, así que verificamos una vez antes de cada correo a clientes desde nuestro remitente compartido. Solo toma un momento.",

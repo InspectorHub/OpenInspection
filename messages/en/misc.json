@@ -254,7 +254,7 @@
   "load_failed_generic": "This could not be loaded, so it may be incomplete. Reload before treating it as empty.",
   "media_gallery_unavailable": "Photos could not be loaded.",
   "load_failed_named": "{what} could not be loaded, so this may be incomplete. Reload before treating it as empty.",
-  "outbound_cooling_notice": "Your company is less than a day old, so before client email goes out on our shared sender — reports, agreements, invoices and automations — we ask you to confirm you are a person. This applies until {unlockAt}. Everything else works now, and connecting your own email provider removes the check.",
+  "outbound_cooling_notice": "Your company is less than a day old, so before client email goes out on our shared sender — reports, agreements, invoices and automations — we ask you to confirm you are a person. This applies until {unlockAt}. Everything else works now: inspections, reports, scheduling, sign-in email and team invitations. Connecting your own email provider removes the check.",
   "outbound_cooling_notice_action": "Use your own email provider",
   "outbound_verify_title": "Confirm you are a person",
   "outbound_verify_body": "Your company is new, so we check once before each client email goes out on our shared sender. It only takes a moment.",
