@@ -128,7 +128,11 @@ export async function runEnvelopeCompletionPipeline(
         c.executionCtx.waitUntil((async () => {
             try {
                 const built = await buildSignedConfirmation(c, requestId, inspectionId);
-                await c.var.services.email.sendAgreementSignedConfirmation(
+                // The envelope's tenant, by id: a public signing link resolves
+                // its tenant in the handler, after the DI middleware ran. The signer
+                // has just signed, so the confirmation answers their own action.
+                const email = await c.var.services.emailFor(tenantId, { recipientInitiated: true });
+                await email.sendAgreementSignedConfirmation(
                     clientEmail,
                     built.inspectorEmail ? [built.inspectorEmail] : [],
                     clientName || 'Client',
@@ -215,15 +219,16 @@ async function buildSignedConfirmation(
  */
 export async function runSignerReceiptEffects(
     c: Context<HonoConfig>,
-    args: { signerEmail: string; signerName: string; inspectionId: string | null; requestId: string },
+    args: { signerEmail: string; signerName: string; inspectionId: string | null; requestId: string; tenantId: string },
 ): Promise<void> {
-    const { signerEmail, signerName, inspectionId, requestId } = args;
+    const { signerEmail, signerName, inspectionId, requestId, tenantId } = args;
     if (!signerEmail) return;
     const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
     c.executionCtx.waitUntil((async () => {
         try {
             const built = await buildSignedConfirmation(c, requestId, inspectionId);
-            await c.var.services.email.sendAgreementSignedConfirmation(
+            const email = await c.var.services.emailFor(tenantId, { recipientInitiated: true });
+            await email.sendAgreementSignedConfirmation(
                 signerEmail,
                 built.inspectorEmail ? [built.inspectorEmail] : [],
                 signerName || 'Signer',

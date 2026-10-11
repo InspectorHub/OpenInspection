@@ -217,13 +217,28 @@ const integrationsRoutes = createApiRouter()
         const { ResendProvider } = await import('../lib/email/providers/resend');
         const provider = new ResendProvider({ apiKey: key });
         const probe = await provider.probeApiKey();
+        // No HTTP response at all: the key was never checked, so never report it valid.
+        if (!probe.reachable) {
+            await logTest(c.env, tenantId, uid, 'email', false, 'Could not reach Resend.', 'resend');
+            return c.json({ success: false as const, error: { code: 'RESEND_UNREACHABLE', message: 'Could not reach Resend.' } }, 503);
+        }
         if (!probe.valid) {
             await logTest(c.env, tenantId, uid, 'email', false, 'Resend rejected the stored API key.', 'resend');
             return c.json({ success: false as const, error: { code: 'RESEND_KEY_INVALID', message: 'Resend rejected the stored API key.' } }, 502);
         }
-        const domains = await provider.countVerifiedDomains();
-        await logTest(c.env, tenantId, uid, 'email', true, `Resend key valid${domains > 0 ? ` · ${domains} verified domain${domains === 1 ? '' : 's'}` : ''}.`, 'resend');
-        return c.json({ success: true as const, data: { domains } }, 200);
+        const listing = await provider.listDomains();
+        if (!listing.ok && listing.reason === 'restricted') {
+            await logTest(c.env, tenantId, uid, 'email', true, 'Resend key valid (send-only key; sender domains cannot be checked).', 'resend');
+            return c.json({ success: true as const, data: { domains: 0 } }, 200);
+        }
+        const verified = listing.ok ? listing.verified : 0;
+        const unverified = listing.ok ? listing.total - listing.verified : 0;
+        const verifiedPart = verified > 0
+            ? ` · ${verified} verified domain${verified === 1 ? '' : 's'}`
+            : unverified > 0 ? ' · no verified domains' : '';
+        const unverifiedPart = unverified > 0 ? ` (${unverified} not yet verified)` : '';
+        await logTest(c.env, tenantId, uid, 'email', true, `Resend key valid${verifiedPart}${unverifiedPart}.`, 'resend');
+        return c.json({ success: true as const, data: { domains: verified } }, 200);
     })
     .openapi(emailValidateRoute, async (c) => {
         const { provider } = c.req.valid('json');

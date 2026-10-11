@@ -66,6 +66,7 @@ function makeServiceStubs(bookingSvc: BookingService) {
         email: {
             sendBookingConfirmation: vi.fn().mockResolvedValue(undefined),
         },
+        emailFor: async () => ({ sendBookingConfirmation: vi.fn().mockResolvedValue(undefined) }),
         notification: {
             createForAllAdmins: vi.fn().mockResolvedValue(undefined),
         },

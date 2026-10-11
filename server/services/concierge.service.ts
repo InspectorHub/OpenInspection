@@ -104,14 +104,14 @@ function toMs(value: Date | number | null | undefined): number {
 
 export class ConciergeService {
     /**
-     * Free-tier usage-quota guard (optional). Present only in SaaS deploys
-     * with `hasUsageQuota` (see deployment-profile.ts); undefined in
-     * standalone, where concierge booking stays unlimited. See the
-     * `consumeInspection` call site in createBooking.
+     * `emailFor`: each send uses the email service of the tenant it is for (an
+     * agent session carries none). `planQuota`: free-tier usage guard, present
+     * only where `hasUsageQuota` (see deployment-profile.ts); undefined in
+     * standalone, where booking stays unlimited. See `consumeInspection`.
      */
     constructor(
         private db: D1Database,
-        private email: EmailService,
+        private emailFor: (tenantId: string) => Promise<EmailService>,
         private appBaseUrl: string,
         private planQuota?: PlanQuotaGuard,
     ) {}
@@ -275,7 +275,7 @@ export class ConciergeService {
             throw Errors.BadRequest('Choose an inspector — this company reviews agent bookings.');
         }
         try {
-            await this.email.sendConciergeInspectorReview(reviewer.email, {
+            await (await this.emailFor(params.tenantId)).sendConciergeInspectorReview(reviewer.email, {
                 inspectionId,
                 clientName: params.clientName,
                 propertyAddress: params.propertyAddress,
@@ -422,7 +422,7 @@ export class ConciergeService {
                     )
                     .get();
                 if (agentContact?.email) {
-                    await this.email.sendConciergeConfirmedToAgent(agentContact.email, {
+                    await (await this.emailFor(row.tenantId)).sendConciergeConfirmedToAgent(agentContact.email, {
                         propertyAddress: insp.propertyAddress,
                         date: insp.date,
                         clientName: row.clientEmail,
@@ -574,7 +574,7 @@ export class ConciergeService {
         });
         const confirmUrl = `${this.appBaseUrl.replace(/\/$/, '')}/confirm/${encodeURIComponent(token)}`;
         try {
-            await this.email.sendConciergeClientConfirm(clientEmail, {
+            await (await this.emailFor(tenantId)).sendConciergeClientConfirm(clientEmail, {
                 token,
                 confirmUrl,
                 propertyAddress: emailPayload.propertyAddress,

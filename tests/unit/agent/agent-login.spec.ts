@@ -98,8 +98,10 @@ describe('Agent password + magic-link login (core /agent-login front door)', () 
         app.use('*', async (c, next) => {
             c.env = { DB: {}, TENANT_CACHE: kv } as unknown as HonoConfig['Bindings'];
             c.set('keyringPromise', Promise.resolve({}) as unknown as HonoConfig['Variables']['keyringPromise']);
+            // The sign-in link speaks for the deployment (agents belong to no
+            // company), so it goes through `platformEmail()`, never `email`.
             c.set('services', {
-                email: { sendAgentLoginLink },
+                platformEmail: () => ({ sendAgentLoginLink }),
             } as unknown as HonoConfig['Variables']['services']);
             await next();
         });

@@ -22,6 +22,7 @@ import type { AvailabilityService } from '../services/availability.service';
 import type { BrandingService } from '../services/branding.service';
 import type { LegalVersionService } from '../services/legal-version.service';
 import type { EmailService } from '../services/email.service';
+import type { EmailForOptions } from '../lib/email/tenant-email-resolver';
 import type { InspectionService } from '../services/inspection.service';
 import type { TeamService } from '../services/team.service';
 import type { TemplateService } from '../services/template.service';
@@ -69,7 +70,17 @@ export interface AppServices {
     branding: BrandingService;
     /** Immutable version rows for the tenant's own Privacy / Terms (design 6A.3). */
     legalVersion: LegalVersionService;
+    /**
+     * The email service DI built for the tenant it already knew. Only routes
+     * whose tenant is resolved BEFORE the DI middleware (tenant JWT, path slug,
+     * fixed tenant) may use it — `scripts/check-tenant-email-resolution.mjs`
+     * holds that list. Everything else uses one of the two below.
+     */
     email: EmailService;
+    /** The email service for `tenantId` — for routes that learn their tenant in the handler. */
+    emailFor: (tenantId: string, options?: EmailForOptions) => Promise<EmailService>;
+    /** The deployment's own identity, for sends that belong to no company. */
+    platformEmail: () => EmailService;
     inspection: InspectionService;
     team: TeamService;
     template: TemplateService;

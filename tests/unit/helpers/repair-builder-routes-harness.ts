@@ -217,7 +217,14 @@ export function makeShareServices(overrides: {
     creditTotal?: ReturnType<typeof vi.fn>;
     sendRepairRequestShare?: ReturnType<typeof vi.fn>;
 } = {}) {
+    // The share email resolves its service by the share token's tenant
+    // (`emailFor`), so the same stub is what `emailFor` hands back.
+    const email = {
+        sendRepairRequestShare: overrides.sendRepairRequestShare ?? vi.fn().mockResolvedValue(undefined),
+    };
     return {
+        email,
+        emailFor: vi.fn(async (_tenantId: string) => email),
         portalAccess: { resolveToken: vi.fn().mockResolvedValue(null) },
         inspection:   { resolveAgentViewToken: vi.fn().mockResolvedValue(null), resolveReleaseGate: vi.fn().mockResolvedValue(null) },
         repairRequest: {
@@ -232,9 +239,6 @@ export function makeShareServices(overrides: {
             removeItem:    vi.fn().mockResolvedValue(undefined),
             setIntro:      vi.fn().mockResolvedValue(undefined),
             assertCanEdit: vi.fn().mockResolvedValue(undefined),
-        },
-        email: {
-            sendRepairRequestShare: overrides.sendRepairRequestShare ?? vi.fn().mockResolvedValue(undefined),
         },
     };
 }

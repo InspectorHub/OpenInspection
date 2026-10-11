@@ -235,6 +235,7 @@ agreementSignRoutes.post('/:id/sign', async (c) => {
                 signerName: signer.name,
                 inspectionId: result.inspectionId,
                 requestId: result.requestId,
+                tenantId: result.tenantId,
             });
         }
 

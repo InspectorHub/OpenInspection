@@ -291,6 +291,12 @@ describe('gate registry', () => {
             // (310 ms over 4,002), both of which are on this rung.
             'agentterms',
             'agenttermsselftest',
+            // A send resolved for the wrong tenant fails no test, type-check or
+            // build: the mail simply goes out in the platform's voice. Only the
+            // author of the new send site knows whether its route resolves the
+            // tenant in the handler, so the question is asked at the keystroke.
+            // One regex walk of server/**/*.ts, beside `rawnul` in cost.
+            'tenantemail',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);

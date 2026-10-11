@@ -90,6 +90,7 @@
     "lint:capability-readers": "node scripts/check-capability-readers.mjs",
     "lint:mode-disguises": "node scripts/check-mode-disguises.mjs",
     "lint:provider-helpers": "node scripts/check-provider-helpers.mjs",
+    "lint:tenant-email": "node scripts/check-tenant-email-resolution.mjs",
     "lint:notification-dispatch": "node scripts/check-notification-dispatch.mjs",
     "lint:tests": "node scripts/check-test-layout.mjs",
     "lint:e2e-coverage": "node scripts/check-e2e-spec-coverage.mjs",

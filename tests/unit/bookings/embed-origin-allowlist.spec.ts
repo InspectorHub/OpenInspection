@@ -72,6 +72,7 @@ function buildApp(db: BetterSQLite3Database<typeof schema>, bookingSvc: BookingS
         booking: bookingSvc,
         widget,
         email: { sendBookingConfirmation: vi.fn().mockResolvedValue(undefined) },
+        emailFor: async () => ({ sendBookingConfirmation: vi.fn().mockResolvedValue(undefined) }),
         notification: { createForAllAdmins: vi.fn().mockResolvedValue(undefined) },
         automation: { trigger: vi.fn().mockResolvedValue(undefined) },
         inspectionRequest: {

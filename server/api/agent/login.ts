@@ -162,7 +162,8 @@ export const agentLoginRoutes = createApiRouter()
             // waitUntil so the response returns immediately in all cases.
             const sendPromise = (async () => {
                 try {
-                    await c.var.services.email.sendAgentLoginLink(email, loginUrl);
+                    // Agent accounts belong to no company: the deployment speaks.
+                    await c.var.services.platformEmail().sendAgentLoginLink(email, loginUrl);
                 } catch (err) {
                     logger.error('agent.login.link_send_failed', {}, err instanceof Error ? err : undefined);
                 }

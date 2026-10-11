@@ -61,7 +61,7 @@ describe('ConciergeService.approveByInspector — primary-client resolution (Tas
         await people.addPerson(TENANT, INSP_ID, CLIENT, roleProfileId('client'));
 
         stubEmail = { sendConciergeClientConfirm: vi.fn().mockResolvedValue(undefined) };
-        svc = new ConciergeService({} as D1Database, stubEmail as unknown as EmailService, 'https://acme.example.com');
+        svc = new ConciergeService({} as D1Database, async () => stubEmail as unknown as EmailService, 'https://acme.example.com');
     });
 
     it('mints the client-confirm token and emails the primary client resolved via PeopleService', async () => {

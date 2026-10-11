@@ -130,6 +130,7 @@ describe('public booking refuses a workspace with no declared timezone', () => {
                     recordEvent: vi.fn().mockResolvedValue(undefined),
                 },
                 email: { sendBookingConfirmation: vi.fn().mockResolvedValue(undefined) },
+                emailFor: async () => ({ sendBookingConfirmation: vi.fn().mockResolvedValue(undefined) }),
                 notification: { createForAllAdmins: vi.fn().mockResolvedValue(undefined) },
                 automation: { trigger: vi.fn().mockResolvedValue(undefined) },
                 inspectionRequest: {

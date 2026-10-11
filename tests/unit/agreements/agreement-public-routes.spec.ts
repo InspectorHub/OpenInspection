@@ -118,7 +118,8 @@ function buildApp(db: BetterSQLite3Database<typeof schema>, stubs: Stubs = {}) {
             auditLog: { append: auditAppend },
             automation: { trigger: automationTrigger },
             notification: { createForAllAdmins: notificationCreate },
-            email: { sendAgreementSignedConfirmation: emailConfirm },
+            // By the envelope's tenant: the route learns it from the token.
+            emailFor: async () => ({ sendAgreementSignedConfirmation: emailConfirm }),
         } as unknown as HonoConfig['Variables']['services']);
         // Wire the workflow binding onto env so the completion pipeline can fire.
         Object.assign(c.env, { SIGN_COMPLETION_WORKFLOW: { create: workflowCreate } });

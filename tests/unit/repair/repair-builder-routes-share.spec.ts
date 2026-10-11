@@ -20,7 +20,7 @@ vi.mock('../../../server/lib/public-access', async (importOriginal) => {
 });
 
 // eslint-disable-next-line import/order
-import { buildShareApp, SHARE_INSP_UNPUBLISHED } from '../helpers/repair-builder-routes-harness';
+import { buildShareApp, SHARE_INSP_UNPUBLISHED, SHARE_RR } from '../helpers/repair-builder-routes-harness';
 
 describe('GET /api/public/repair-request/share/:shareToken', () => {
     it('200 with propertyAddress + customIntro + items + creditTotal for published report', async () => {
@@ -173,6 +173,8 @@ describe('POST /api/public/repair-request/share/:shareToken/email', () => {
         const body = await res.json() as { success: boolean };
         expect(body.success).toBe(true);
 
+        // The service is the share token's tenant's, asked for by id.
+        expect(svc.emailFor).toHaveBeenCalledWith(SHARE_RR.tenantId);
         expect(svc.email.sendRepairRequestShare).toHaveBeenCalledWith(
             'contractor@example.com',
             expect.objectContaining({

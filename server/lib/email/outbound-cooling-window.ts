@@ -112,8 +112,20 @@ export function isAccountEmailClass(classId: string | undefined): boolean {
 export function coolingWindowApplies(input: {
     profile: Pick<DeploymentProfile, 'mode'>;
     platformFunded: boolean;
+    /**
+     * The send answers something its recipient just did: a booking made on a
+     * public page that is already behind bot verification and a rate limit, or
+     * a signature the recipient has just given. Holding it would leave the very
+     * person who acted with no confirmation, and a new company's first customer
+     * would see nothing at all.
+     *
+     * This is decided per CALL SITE, never per notification class. The same
+     * class (a booking confirmation) is also produced by automation rules for
+     * people who did nothing, and the recipient of that one did not ask for it.
+     */
+    recipientInitiated?: boolean | undefined;
 }): boolean {
-    return input.profile.mode === 'saas' && input.platformFunded;
+    return input.profile.mode === 'saas' && input.platformFunded && input.recipientInitiated !== true;
 }
 
 /** The instant the window closes, from the CORE `tenants.created_at` anchor. */

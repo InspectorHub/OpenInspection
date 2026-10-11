@@ -79,7 +79,11 @@ export async function dispatchBookingConfirmation(
     // for every tenant not actually in UTC.
     pushInspectionAfterResponse(c, tenantId, inspectionId);
 
-    const emailService = c.var.services.email;
+    // By tenant id: a public booking names its company in the body, so the
+    // DI middleware ran before anyone knew which company this mail speaks for.
+    // The booker asked for this message on a page behind bot verification, so
+    // it is not held by the new-company window (see coolingWindowApplies).
+    const emailService = await c.var.services.emailFor(tenantId, { recipientInitiated: true });
 
     // Sprint 1 C-10 — the ICS invite the customer imports into Apple Calendar
     // or Google Calendar.
