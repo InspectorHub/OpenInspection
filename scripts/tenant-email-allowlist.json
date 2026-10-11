@@ -1,0 +1,14 @@
+{
+  "server/api/admin/admin-data-import.ts": "Mounted under /api/admin: tenant-JWT authenticated, tenant resolved by the JWT middleware before DI.",
+  "server/api/admin/admin-data.ts": "Mounted under /api/admin: tenant-JWT authenticated, tenant resolved by the JWT middleware before DI.",
+  "server/api/admin/admin-esign.ts": "Mounted under /api/admin: tenant-JWT authenticated, tenant resolved by the JWT middleware before DI.",
+  "server/api/auth.ts": "Password reset only: refused with 410 in multi-tenant mode, so it only sends where the fixed tenant is resolved before DI.",
+  "server/api/inspections/report-delivery.ts": "Mounted under /api/inspections: tenant-JWT authenticated, tenant resolved by the JWT middleware before DI.",
+  "server/api/invoices.ts": "Mounted under /api/invoices: tenant-JWT authenticated, tenant resolved by the JWT middleware before DI.",
+  "server/api/messages-threads.ts": "Mounted under /api/messages: tenant-JWT authenticated, tenant resolved by the JWT middleware before DI.",
+  "server/api/messages.ts": "Inspector routes are tenant-JWT authenticated; the client route is /api/public/inspections/:id/..., whose tenant the inspection-id resolver sets before DI.",
+  "server/api/migration-intake.ts": "Mounted under /api/imports: tenant-JWT authenticated, tenant resolved by the JWT middleware before DI.",
+  "server/api/portal.ts": "Mounted under /api/portal/:tenant: the tenant slug in the path is resolved before DI.",
+  "server/api/team.ts": "Mounted under /api/team: tenant-JWT authenticated, tenant resolved by the JWT middleware before DI.",
+  "server/lib/agreement-send.ts": "Called only from tenant-JWT routes (admin agreements, inspection agreements), whose tenant is resolved before DI."
+}

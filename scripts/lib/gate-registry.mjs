@@ -118,6 +118,9 @@ export const SCRIPT_GATES = [
     // already true of, are in check-line-endings.mjs's header. Cost measured
     // against `rawnul` beside it: 310 ms vs 272 ms over 4002 files.
     { key: 'eol', label: 'LF line endings (no CRLF, no lone CR)', script: 'check-line-endings.mjs', fix: 'npm run lint:eol', rung: PRECOMMIT },
+    // A send in the wrong tenant's voice fails nothing and reads fine — only its
+    // author knows the route resolves its tenant in the handler. One regex walk.
+    { key: 'tenantemail', label: 'Tenant email resolution', script: 'check-tenant-email-resolution.mjs', fix: 'npm run lint:tenant-email', rung: PRECOMMIT },
     // Belongs at pre-commit rather than CI: what it catches is a CAPABILITY
     // being added -- a money column, a money field on the inspection record, a
     // money input on a new screen. By the time CI sees one it is written and
