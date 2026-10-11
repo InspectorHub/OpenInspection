@@ -229,7 +229,7 @@ export class ResendProvider implements EmailProvider {
    * `restricted_api_key` and reports `reason: 'restricted'`.
    */
   async listDomains(): Promise<
-    | { ok: true; total: number; verified: number }
+    | { ok: true; total: number; verified: number; domains: Array<{ name: string; status: string }> }
     | { ok: false; reason: 'restricted' | 'unreachable' | 'error'; status: number | null }
   > {
     let res: Response;
@@ -252,7 +252,13 @@ export class ResendProvider implements EmailProvider {
       const status = (d as { status?: unknown } | null)?.status;
       return typeof status === 'string' && status.toLowerCase() === 'verified';
     }).length;
-    return { ok: true, total: data.length, verified };
+    const domains = data.flatMap((d) => {
+      const row = d as { name?: unknown; status?: unknown } | null;
+      return typeof row?.name === 'string'
+        ? [{ name: row.name.toLowerCase(), status: typeof row.status === 'string' ? row.status.toLowerCase() : 'unknown' }]
+        : [];
+    });
+    return { ok: true, total: data.length, verified, domains };
   }
 
   /** Count of verified domains visible to this key (0 when the key cannot list). */

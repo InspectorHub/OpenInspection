@@ -130,13 +130,13 @@ describe('ResendProvider.listDomains', () => {
       { name: 'd.com', status: 'failed' },
     ] }, 200));
     vi.stubGlobal('fetch', fetchMock);
-    expect(await list()).toEqual({ ok: true, total: 4, verified: 2 });
+    expect(await list()).toMatchObject({ ok: true, total: 4, verified: 2 });
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.resend.com/domains');
   });
 
   it('returns zero totals for an empty account', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => json({ data: [] }, 200)));
-    expect(await list()).toEqual({ ok: true, total: 0, verified: 0 });
+    expect(await list()).toEqual({ ok: true, total: 0, verified: 0, domains: [] });
   });
 
   it('reports a send-only key as restricted', async () => {

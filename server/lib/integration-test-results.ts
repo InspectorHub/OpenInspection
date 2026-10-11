@@ -11,7 +11,7 @@
  * message) — never a key, token, or raw response body.
  */
 import type { drizzle } from 'drizzle-orm/d1';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { integrationTestResults } from './db/schema';
 
 type Db = ReturnType<typeof drizzle>;
@@ -28,6 +28,8 @@ export interface IntegrationTestResult {
     detail: string | null;
     testedByUserId: string | null;
     testedAt: number; // epoch ms
+    /** Step id for a stepwise test row; null for single-shot probes. */
+    step: string | null;
 }
 
 export interface RecordTestArgs {
@@ -37,6 +39,8 @@ export interface RecordTestArgs {
     provider?: string | null;
     detail?: string | null;
     testedByUserId?: string | null;
+    /** Step id when this row records one step of a stepwise test. */
+    step?: string | null;
     /** Injectable for tests; defaults to wall-clock. */
     nowMs?: number;
 }
@@ -74,15 +78,19 @@ export async function recordIntegrationTest(db: Db, args: RecordTestArgs): Promi
         detail: clampDetail(args.detail),
         testedByUserId: args.testedByUserId ?? null,
         testedAt: new Date(testedAt),
+        step: args.step ?? null,
     });
 
-    // Prune to the newest KEEP_PER_TARGET for this (tenant, target).
+    // Prune to the newest KEEP_PER_TARGET for this (tenant, target, step): a stepwise
+    // run writes one row per step, and pruning the whole target would let a six-step
+    // run evict every earlier result, including the single-shot (step-less) ones.
     const rows = await db
         .select({ id: integrationTestResults.id })
         .from(integrationTestResults)
         .where(and(
             eq(integrationTestResults.tenantId, args.tenantId),
             eq(integrationTestResults.target, args.target),
+            args.step ? eq(integrationTestResults.step, args.step) : isNull(integrationTestResults.step),
         ))
         .orderBy(desc(integrationTestResults.testedAt))
         .all();
@@ -112,5 +120,6 @@ export async function listIntegrationTestResults(db: Db, tenantId: string): Prom
         detail: r.detail,
         testedByUserId: r.testedByUserId,
         testedAt: r.testedAt instanceof Date ? r.testedAt.getTime() : Number(r.testedAt),
+        step: r.step,
     }));
 }

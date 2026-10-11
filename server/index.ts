@@ -37,6 +37,7 @@ import testHooksRoutes from './api/test-hooks';
 import identityRoutes from './api/identity';
 import integrationsApiRoutes from './api/integrations';
 import integrationsAiRoutes from './api/integrations-ai';
+import integrationsTestStepsRoutes from './api/integrations-test-steps';
 import analyticsRoutes from './api/analytics';
 import billingRoutes from './api/billing';
 import usageRoutes from './api/usage';
@@ -330,6 +331,7 @@ const routes = app
   // under one path collapse to the first in the typed client, so the second's
   // routes would exist at runtime and be uncallable from a loader.
   .route('/api/integrations/ai', integrationsAiRoutes)
+  .route('/api/integrations/test-steps', integrationsTestStepsRoutes)
   .route('/api/analytics', analyticsRoutes)
   .route('/api/inspections', inspectionsRoutes)
   .route('/api/credentials', credentialsRoutes)

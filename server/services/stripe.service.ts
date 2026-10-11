@@ -117,4 +117,15 @@ export class StripeService {
             accountName: acct.settings?.dashboard?.display_name || acct.email || acct.id,
         };
     }
+
+    /** The own-account capability flags the "Test connection" steps report on. */
+    async getAccountStatus(): Promise<{ accountName: string; chargesEnabled: boolean; payoutsEnabled: boolean; detailsSubmitted: boolean }> {
+        const acct = await this.stripe.accounts.retrieve(null);
+        return {
+            accountName: acct.settings?.dashboard?.display_name || acct.email || acct.id,
+            chargesEnabled: acct.charges_enabled === true,
+            payoutsEnabled: acct.payouts_enabled === true,
+            detailsSubmitted: acct.details_submitted === true,
+        };
+    }
 }

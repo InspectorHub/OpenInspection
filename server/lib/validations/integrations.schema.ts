@@ -80,3 +80,31 @@ export const AiConnectionTestResultSchema = z
         message: z.string().optional().describe('What to show. Never contains the provider response body.'),
     })
     .openapi('AiConnectionTestResult');
+
+/**
+ * Request body for POST /test-steps/email and /test-steps/stripe: which ONE step
+ * to run. Deliberately nothing else — in particular no recipient. Unknown keys
+ * are stripped by the default object behaviour, never read.
+ */
+export const EmailTestStepBodySchema = z
+    .object({
+        step: z.enum(['key_valid', 'key_scope', 'sender_domain_verified', 'send_test', 'delivery', 'quota'])
+            .describe('Which step to run. Earlier steps are re-checked server-side, not trusted from the client.'),
+    })
+    .openapi('EmailTestStepBody');
+
+export const StripeTestStepBodySchema = z
+    .object({
+        step: z.enum(['key_valid', 'account_capabilities', 'webhook']).describe('Which step to run.'),
+    })
+    .openapi('StripeTestStepBody');
+
+/** One step outcome. `detail` is short, fixed and non-sensitive. */
+export const TestStepResultSchema = z
+    .object({
+        step: z.string().describe('Step id.'),
+        status: z.enum(['pass', 'fail', 'skipped', 'pending']),
+        detail: z.string().describe('Short non-sensitive explanation; on a failure, the reason.'),
+        provider: z.string().nullable().describe('Email provider the test ran against; null for Stripe.'),
+    })
+    .openapi('TestStepResult');
