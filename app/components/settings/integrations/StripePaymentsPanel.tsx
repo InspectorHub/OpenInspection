@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Form, type useFetcher, type useRevalidator } from "react-router";
+import { Form, type useRevalidator } from "react-router";
 import { SecretField } from "~/components/SecretField";
-import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
+import { StripeStepTest } from "~/components/settings/StripeStepTest";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import { WebhookStatusBadge } from "./WebhookStatusBadge";
 import { useChromeDateTimeFormat, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { formatShapedDateTime } from "~/lib/format-date";
-import type { action } from "~/routes/settings-integrations";
 import { m } from "~/paraglide/messages";
 
 type WebhookLogEntry = { ts: string; eventType: string; result: string };
@@ -43,7 +42,6 @@ interface StripePaymentsPanelProps {
   saving: boolean;
   serverField: string | null;
   serverError: string | null | undefined;
-  testFetcher: ReturnType<typeof useFetcher<typeof action>>;
   revalidator: ReturnType<typeof useRevalidator>;
   /** Persisted "Test connection" history (shared loader list, filtered to stripe). */
   testResults?: ConnectionTestResult[];
@@ -56,7 +54,6 @@ export function StripePaymentsPanel({
   saving,
   serverField,
   serverError,
-  testFetcher,
   revalidator,
   testResults = [],
 }: StripePaymentsPanelProps) {
@@ -144,24 +141,8 @@ export function StripePaymentsPanel({
         </div>
       </Form>
 
-      {/* Test connection — probes the STORED secret key, no re-entry needed */}
-      <TestConnectionButton fetcher={testFetcher} intent="test-stripe">
-        {testFetcher.data?.intent === "test-stripe" && testFetcher.data.test && (
-          <span className="text-[12px] text-ih-fg-2">
-            {m.settings_stripe_test_connected_prefix()} <span className="font-semibold">{testFetcher.data.test.accountName}</span>
-            <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${
-              testFetcher.data.test.livemode
-                ? "bg-ih-bad-bg text-ih-bad-fg"
-                : "bg-ih-ok-bg text-ih-ok-fg"
-            }`}>
-              {testFetcher.data.test.livemode ? m.settings_stripe_livemode_live() : m.settings_stripe_livemode_test()}
-            </span>
-          </span>
-        )}
-        {testFetcher.data?.intent === "test-stripe" && !testFetcher.data.success && (
-          <span className="text-[12px] text-ih-bad-fg">{testFetcher.data.error}</span>
-        )}
-      </TestConnectionButton>
+      {/* Test connection — three read-only checks against the STORED secret key */}
+      <StripeStepTest results={testResults} />
 
       {/* Persisted last-tested status + recent history (survives reloads). */}
       <ConnectionTestStatus results={testResults} target="stripe" />

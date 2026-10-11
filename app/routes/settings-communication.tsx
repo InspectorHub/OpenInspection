@@ -16,7 +16,7 @@ import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { EmailDeliveryPanel } from "~/components/settings/EmailDeliveryPanel";
 import { EmailSecretsPanel } from "~/components/settings/EmailSecretsPanel";
-import { runEmailTestStepIntent } from "~/lib/email-test-step.server";
+import { runEmailTestStepIntent } from "~/lib/test-step.server";
 import { SmsDeliveryPanel, type SmsModeValue } from "~/components/settings/SmsDeliveryPanel";
 import { GoogleCalendarPanel } from "~/components/settings/GoogleCalendarPanel";
 import { ManagedComplianceWizard, type ManagedComplianceData } from "~/components/settings/ManagedComplianceWizard";

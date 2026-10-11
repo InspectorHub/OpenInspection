@@ -128,7 +128,10 @@ const integrationsTestStepsRoutes = createApiRouter()
         const secretKey = c.env.STRIPE_SECRET_KEY;
         const result = await runStripeStep(step, {
             fetchAccount: secretKey
-                ? async () => new (await import('../services/stripe.service')).StripeService(secretKey).getAccountStatus()
+                ? async () => ({
+                    ...(await new (await import('../services/stripe.service')).StripeService(secretKey).getAccountStatus()),
+                    livemode: secretKey.startsWith('sk_live_') || secretKey.startsWith('rk_live_'),
+                })
                 : null,
             webhookSecretConfigured: !!c.env.STRIPE_WEBHOOK_SECRET,
             readDeliveries: () => readWebhookLog(c.env.TENANT_CACHE, tenantId),

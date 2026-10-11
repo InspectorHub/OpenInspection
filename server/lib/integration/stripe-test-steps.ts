@@ -29,6 +29,8 @@ export interface StripeAccountStatus {
     chargesEnabled: boolean;
     payoutsEnabled: boolean;
     detailsSubmitted: boolean;
+    /** From the key's prefix (the Account API does not expose it); absent when unknown. */
+    livemode?: boolean;
 }
 
 export interface StripeWebhookDelivery {
@@ -55,7 +57,7 @@ async function loadAccount(deps: StripeStepDeps): Promise<StripeAccountStatus | 
 function keyValid(account: StripeAccountStatus | null, deps: StripeStepDeps): StepResult {
     if (!deps.fetchAccount) return result('key_valid', 'fail', 'No Stripe secret key is saved.');
     if (!account) return result('key_valid', 'fail', 'Stripe rejected the saved secret key, or could not be reached.');
-    return result('key_valid', 'pass', `Connected to ${account.accountName}.`);
+    return result('key_valid', 'pass', `Connected to ${account.accountName}${account.livemode === undefined ? '' : account.livemode ? ' (live mode)' : ' (test mode)'}.`);
 }
 
 function capabilities(account: StripeAccountStatus): StepResult {

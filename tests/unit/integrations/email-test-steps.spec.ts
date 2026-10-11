@@ -198,6 +198,10 @@ describe('stripe steps', () => {
         expect((await runStripeStep('key_valid', sd({ fetchAccount: async () => { throw new Error('401'); } }))).status).toBe('fail');
         expect(await runStripeStep('key_valid', sd())).toMatchObject({ status: 'pass', detail: 'Connected to Acme.' });
     });
+    it('key_valid: says which mode the key is in when known', async () => {
+        expect((await runStripeStep('key_valid', sd({ fetchAccount: async () => ({ ...acct, livemode: false }) }))).detail).toBe('Connected to Acme (test mode).');
+        expect((await runStripeStep('key_valid', sd({ fetchAccount: async () => ({ ...acct, livemode: true }) }))).detail).toBe('Connected to Acme (live mode).');
+    });
     it('account_capabilities: names what is missing', async () => {
         const r = await runStripeStep('account_capabilities', sd({ fetchAccount: async () => ({ ...acct, payoutsEnabled: false }) }));
         expect(r.status).toBe('fail');
