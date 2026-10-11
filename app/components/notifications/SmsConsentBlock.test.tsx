@@ -12,8 +12,10 @@ import { render } from "@testing-library/react";
 import { SmsConsentBlock, type SmsConsent } from "./SmsConsentBlock";
 
 const DISCLOSURE = { version: 3, text: "Message and data rates may apply." };
+// Noon UTC, not midnight: midnight is still the 11th for every viewer west of Greenwich, so the
+// assertion below passed only on UTC and east of it. Noon is the 12th from UTC-11 to UTC+11.
 const base: SmsConsent = {
-  phone: "+1 555 000 1111", state: "granted", at: "2026-06-12T00:00:00.000Z",
+  phone: "+1 555 000 1111", state: "granted", at: "2026-06-12T12:00:00.000Z",
   capturedVia: "booking_form", disclosure: DISCLOSURE, mode: "express",
 };
 
