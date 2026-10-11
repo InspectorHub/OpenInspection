@@ -73,7 +73,7 @@ export const FLUSH_SELECTION = {
 export function AutomationDelivery<TBase extends Constructor<AutomationBase & HasEvaluateConditions & HasDeliverSms>>(Base: TBase) {
     return class extends Base {
         async flush(
-            emailFor: (tenantId: string) => Promise<EmailService>,
+            emailFor: (tenantId: string, options?: { humanVerified?: boolean }) => Promise<EmailService>,
             appName: string, appBaseUrl: string,
             sms?: SmsRuntime,
             batchSize = 50,
@@ -251,9 +251,14 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             const emailSvcCache = (() => {
                 const cache = new Map<string, EmailService>();
                 return {
-                    async getOrBuild(tenantId: string, factory: (tid: string) => Promise<EmailService>): Promise<EmailService> {
-                        let svc = cache.get(tenantId);
-                        if (!svc) { svc = await factory(tenantId); cache.set(tenantId, svc); }
+                    async getOrBuild(
+                        tenantId: string,
+                        factory: (tid: string, options?: { humanVerified?: boolean }) => Promise<EmailService>,
+                        humanVerified = false,
+                    ): Promise<EmailService> {
+                        const key = humanVerified ? `${tenantId}#verified` : tenantId;
+                        let svc = cache.get(key);
+                        if (!svc) { svc = await factory(tenantId, humanVerified ? { humanVerified } : undefined); cache.set(key, svc); }
                         return svc;
                     },
                 };
@@ -353,7 +358,7 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // this branch's — see deliverReportEmail's "whose words go out".
                     if (log.channel === 'email' && automation?.trigger === 'report.published' && reportDelivery) {
                         await throttle.beforeSend();
-                        const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
+                        const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor, !!log.humanVerifiedAt);
                         await deliverReportEmail(db, { log, automation, inspection, tenant },
                             emailSvc, appBaseUrl, reportDelivery, pdfMemo,
                             { rawDb: this.db, appName, appHost });
@@ -364,7 +369,7 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // (file-size ratchet); it owns every outcome write on that
                     // branch, so there is nothing to interpret here.
                     await throttle.beforeSend();
-                    const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
+                    const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor, !!log.humanVerifiedAt);
                     await deliverTemplatedEmail(db, { log, automation, inspection, tenant }, {
                         rawDb: this.db,
                         agreementService: this.agreementService,

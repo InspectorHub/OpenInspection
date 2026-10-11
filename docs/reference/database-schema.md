@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 109 |
-| Columns | 1264 |
+| Columns | 1265 |
 | Indexes (excluding primary keys) | 183 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 611 (48%) |
+| Columns carrying a source comment | 612 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -24,7 +24,7 @@ a tenant, which is the only reason to be missing it:
 That is 13 of 109. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 205 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 206 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -269,7 +269,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `automation_logs`
 
-<sub>server/lib/db/schema/inspection/automation.ts · 17 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/inspection/automation.ts · 18 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -290,6 +290,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `attempts` | integer | NN | `0` |  | How many times flush() has PICKED THIS ROW UP. Stamped when the batch is claimed — before anything is dispatched — and that ordering is the entire point. **[more]** |
 | `last_attempt_at` | integer |  |  |  | When the last claim happened — `attempts` says how many, this says how stale. A row stuck at attempts=6 tells you nothing without it. |
 | `sender_identity` | text |  |  |  | WHO SENT IT, and ON WHOSE BEHALF — recorded, not inferred. The owner of the number is not automatically the legal sender. **[more]** |
+| `human_verified_at` | integer |  |  |  | When a person passed the human check on the request that queued this row (publishing a report in a new company's first 24 hours). |
 
 **Indexes**
 

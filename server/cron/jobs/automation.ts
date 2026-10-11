@@ -139,9 +139,11 @@ export const automationFlushJob: CronJob = {
             renderSecret: env.JWT_SECRET,
         } : undefined;
         await svc.flush(
-            async (tid) => {
+            async (tid, opts) => {
                 const tier = quotaGuard ? await readTenantTier(env.DB, tid) : undefined;
-                return buildTenantEmailService(env as EmailServiceEnv, tid, quotaGuard, tier);
+                // A row whose publisher passed the human check keeps that proof.
+                return buildTenantEmailService(env as EmailServiceEnv, tid, quotaGuard, tier,
+                    opts?.humanVerified ? { humanVerified: async () => true } : {});
             },
             env.APP_NAME || 'OpenInspection',
             appBaseUrl,

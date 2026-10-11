@@ -185,6 +185,13 @@ export const automationLogs = sqliteTable('automation_logs', {
      */
     senderIdentity: text('sender_identity', { mode: 'json' })
         .$type<SmsSenderIdentity>(),
+    /**
+     * When a person passed the human check on the request that queued this row
+     * (publishing a report in a new company's first 24 hours). Set, the delivery
+     * path sends at the due time instead of deferring to the end of the cooling
+     * window; null for every other row. Appended at table end for D1 rebuild safety.
+     */
+    humanVerifiedAt: integer('human_verified_at', { mode: 'timestamp_ms' }),
 }, (t) => [
     index('idx_automation_logs_pending').on(t.tenantId, t.status, t.sendAt),
     index('idx_automation_logs_insp').on(t.inspectionId),

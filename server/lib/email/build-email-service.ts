@@ -391,9 +391,8 @@ export async function buildTenantEmailService(
     tenantId: string | undefined,
     quotaGuard?: PlanQuotaGuard,
     tenantTier?: string,
+    options: { humanVerified?: HumanVerifier } = {},
 ): Promise<EmailService> {
-    if (!tenantId) {
-        return assembleTenantEmailService(env, { dbSecrets: {} });
-    }
-    return assembleTenantEmailService(env, await loadTenantEmailConfig(env, tenantId), tenantId, quotaGuard, tenantTier);
+    if (!tenantId) return assembleTenantEmailService(env, { dbSecrets: {} });
+    return assembleTenantEmailService(env, await loadTenantEmailConfig(env, tenantId), tenantId, quotaGuard, tenantTier, options);
 }

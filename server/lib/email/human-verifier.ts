@@ -14,9 +14,13 @@ export function buildHumanVerifier(c: Context): HumanVerifier | undefined {
     const token = c.req.header('x-turnstile-token')?.trim();
     if (!token) return undefined;
     let once: Promise<boolean> | undefined;
-    return () => (once ??= (async () => {
+    const verifier: HumanVerifier = () => (once ??= (async () => {
         const policy = resolveTurnstile(c.env);
         if (!policy.enforced) return false;
         try { return await verifyTurnstile(token, policy.secret); } catch { return false; }
     })());
+    // Also exposed on the context, so a route that learns the person is verified
+    // (publish) can vouch for work it queued.
+    c.set('humanVerified', verifier);
+    return verifier;
 }

@@ -15,6 +15,7 @@ import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, resolveTenantSlug } from '../../lib/url';
 import { buildRenderReportUrl } from '../../lib/public-urls';
 import { logger } from '../../lib/logger';
+import { stampIfHumanVerified } from '../../services/automation/human-verified';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { PublishInspectionSchema, CreateReinspectionSchema } from '../../lib/validations/inspection.schema';
 import { inspections as inspectionTable } from '../../lib/db/schema';
@@ -374,6 +375,9 @@ const publishRoutes = createApiRouter()
             ...(body.reportId ? { reportId: body.reportId } : {}),
         };
         const result = await service.publishInspection(id, tenantId, publishOptions);
+
+        // A verified person vouches for the report emails this publish queued, delayed ones included.
+        await stampIfHumanVerified(c.get('humanVerified'), getDrizzle(c), tenantId, id);
 
         // The only record that a PERSON published this, and the only one that
         // survives a later unpublish. Written HERE rather than beside the
