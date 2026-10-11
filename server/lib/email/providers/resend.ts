@@ -153,7 +153,13 @@ export class ResendProvider implements EmailProvider {
     }
 
     const kind = classifyResendError(res.status, errName, errMsg);
-    logger.error('[email] ResendProvider delivery failed', { status: res.status, kind, error: errMsg });
+    const failure = { status: res.status, kind, error: errMsg };
+    // The kind goes in the message too: log alert rules can match message text but
+    // not the data object. A used-up quota needs a human; a suppressed recipient is
+    // expected and must not read as an error.
+    if (kind === 'quota_exceeded') logger.alert('email-quota-exceeded', '[email] ResendProvider delivery failed (quota_exceeded)', failure);
+    else if (kind === 'suppressed') logger.warn('[email] ResendProvider delivery failed (suppressed)', failure);
+    else logger.error(`[email] ResendProvider delivery failed (${kind})`, failure);
     const retryAfterSeconds = kind === 'rate_limited' ? readRetryAfterSeconds(res.headers) : undefined;
     return {
       ok: false, error: errMsg, kind,
