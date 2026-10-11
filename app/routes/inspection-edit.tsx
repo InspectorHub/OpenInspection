@@ -7,6 +7,7 @@ import { useInspectionState, type InspectionSchema, type ItemFilter } from "~/ho
 import { findingKey } from "~/hooks/findings/shared";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { useEnsureHuman } from "~/components/OutboundVerification";
 import { useFindings, type AttachedRepairItem } from "~/hooks/useFindings";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
 import { useScopeLoader } from "~/hooks/useScopeLoader";
@@ -163,6 +164,7 @@ export default function InspectionEditPage() {
  // message is surfaced inline in the publish modal instead.
  // #106 — publishing is the tier-1 surface: it mints a report version, signs
  // it and notifies the client, and a double click would do all three twice.
+ const ensureHuman = useEnsureHuman();
  const { fetcher: publishFetcher, submit: submitPublish, busy: publishBusy } =
   useGuardedSubmit<{ ok: boolean; intent?: string; error?: string }>();
  const [publishError, setPublishError] = useState<string | null>(null);
@@ -1875,7 +1877,8 @@ export default function InspectionEditPage() {
  publishError={publishError} isSubmitting={publishBusy}
  isAmendment={loaderData.nextPublishIsAmendment}
  onClose={() => { setPublishError(null); state.setShowPublishModal(false); }}
- onPublish={(markComplete: boolean, extras: PublishExtras) => {
+ onPublish={async (markComplete: boolean, extras: PublishExtras) => {
+ if (!(await ensureHuman())) return;
  // Keep the modal open: the publish-result effect closes it on success
  // and shows the real server reason inline on failure. `markComplete`
  // also closes the order axis first (advisory — never blocks publish);

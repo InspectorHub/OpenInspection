@@ -1,4 +1,5 @@
 import { Link, type useFetcher } from "react-router";
+import { useHumanGatedSubmit } from "~/components/OutboundVerification";
 import { Modal } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
 import { m } from "~/paraglide/messages";
@@ -71,6 +72,7 @@ export function PublishReportModal({
   error: string | undefined;
   onClose: () => void;
 }) {
+  const gatedSubmit = useHumanGatedSubmit();
   return (
     <Modal
       open={open}
@@ -96,7 +98,12 @@ export function PublishReportModal({
         </>
       }
     >
-      <fetcher.Form id={FORM_ID} method="post" className="space-y-3">
+      <fetcher.Form
+        id={FORM_ID}
+        method="post"
+        className="space-y-3"
+        onSubmit={gatedSubmit}
+      >
         <input type="hidden" name="intent" value="publish" />
         {blockingCount > 0 && (
           <p className="rounded-md border border-ih-watch bg-ih-watch-bg px-3 py-2 text-[12px] text-ih-watch-fg">

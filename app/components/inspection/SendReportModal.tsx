@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useHumanGatedSubmit } from "~/components/OutboundVerification";
 import type { useFetcher } from "react-router";
 import { Modal, Button, Checkbox, Input, Select } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
@@ -73,6 +74,7 @@ export function SendReportModal({
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
   onClose: () => void;
 }) {
+  const gatedSubmit = useHumanGatedSubmit();
   // Computed in a lazy initializer, which holds only because this component is
   // MOUNTED per open (`{sendReportOpen && <SendReportModal …>}`) — so every
   // opening re-reads the current people. If it is ever kept mounted behind an
@@ -154,7 +156,12 @@ export function SendReportModal({
         </>
       }
     >
-      <fetcher.Form id={FORM_ID} method="post" className="space-y-4">
+      <fetcher.Form
+        id={FORM_ID}
+        method="post"
+        className="space-y-4"
+        onSubmit={gatedSubmit}
+      >
         <input type="hidden" name="intent" value="send-report" />
         <input type="hidden" name="recipients" value={JSON.stringify(recipients)} readOnly />
         <input type="hidden" name="channels" value={JSON.stringify(["email"])} readOnly />

@@ -58,6 +58,7 @@ import { getBaseUrl } from '../lib/url';
 import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
 import { resolveVideoProvider, videoStreamServiceable } from '../services/video/resolve';
 import { unlockAtMs } from '../lib/email/outbound-cooling-window';
+import { resolveTurnstileSiteKey } from '../lib/middleware/bot-protection';
 
 /**
  * Portal #98 item 3 — is the outbound cooling window OPEN for this viewer, and
@@ -287,7 +288,7 @@ const sessionContextRoutes = createApiRouter()
         // Fail-open, matching the send gate: an unreadable anchor leaves this
         // null, so a D1 blip never puts a banner in front of someone whose sends
         // work fine.
-        let outboundCoolingWindow: { unlockAtMs: number } | null = null;
+        let outboundCoolingWindow: { unlockAtMs: number; turnstileSiteKey: string | null } | null = null;
         if (tenantId && profile.mode === 'saas') {
             try {
                 const tenantRow = await getDrizzle(c)
@@ -295,9 +296,12 @@ const sessionContextRoutes = createApiRouter()
                     .from(tenants)
                     .where(eq(tenants.id, tenantId))
                     .get();
-                outboundCoolingWindow = resolveCoolingWindowForSession({
+                const open = resolveCoolingWindowForSession({
                     mode: profile.mode, createdAt: tenantRow?.createdAt, nowMs: Date.now(),
                 });
+                // The site key rides along so the web app can ask for the
+                // challenge before a send, matched to the secret the API verifies with.
+                outboundCoolingWindow = open ? { ...open, turnstileSiteKey: resolveTurnstileSiteKey(c.env) } : null;
             } catch (e) {
                 logger.warn('[session-context] cooling-window anchor read failed', { error: (e as Error).message });
             }

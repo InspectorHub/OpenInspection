@@ -61,8 +61,7 @@ describe('PublishModal — outbound cooling window', () => {
     unlockAtMs = Date.now() + 3_600_000;
     render(<PublishModal {...props} />);
     const notice = screen.getByText(/less than a day old/i);
-    expect(notice.textContent).toMatch(/sends itself/i);
-    expect(notice.textContent).toMatch(/nothing to redo/i);
+    expect(notice.textContent).toMatch(/confirm you are a person/i);
     expect(notice.textContent).toMatch(/goes live now/i);
   });
 

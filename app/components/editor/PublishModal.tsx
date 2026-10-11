@@ -66,8 +66,8 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  // first 24 hours. Said HERE, on the button that sets the expectation, because
  // the account-wide banner answers a different question: it says the window
  // exists, not that THIS publish is about to land in it. Publishing itself is
- // unaffected — the report goes live and the client's email is re-scheduled to
- // the unlock instant, so the wording promises a delay, never a loss.
+ // unaffected — the report goes live, and the person is asked to confirm they are
+ // a person before the client email goes out; the wording never promises a loss.
  //
  // Same `unlockAtMs` the banner reads, so the two cannot name different times;
  // it is non-null only while the window is open, and the server decides that

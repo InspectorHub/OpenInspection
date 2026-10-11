@@ -12,7 +12,7 @@ import { buildEmailSuppression } from './suppression';
 import { buildEmailDedupe } from './dedupe';
 import { buildNotificationPreferences } from '../notifications/preference-port';
 import { buildUnsubscribeLinks } from '../notifications/unsubscribe-footer';
-import { buildOutboundCoolingWindow, coolingWindowApplies } from './outbound-cooling-window';
+import { buildOutboundCoolingWindow, coolingWindowApplies, type HumanVerifier } from './outbound-cooling-window';
 import { getDeploymentProfile } from '../deployment-profile';
 import { logger } from '../logger';
 import { memoOnce } from '../request-scope';
@@ -116,7 +116,7 @@ export function assembleTenantEmailService(
     cfg: LoadedEmailConfig,
     meterTenantId?: string,
     quotaGuard?: PlanQuotaGuard, tenantTier?: string,
-    options: { recipientInitiated?: boolean } = {},
+    options: { recipientInitiated?: boolean; humanVerified?: HumanVerifier } = {},
 ): EmailService {
     const { emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider } = cfg;
     // The ONE place an absent answer becomes `false` (a platform-default
@@ -264,7 +264,7 @@ export function assembleTenantEmailService(
     // here with no cast, which is the whole point of that narrowing.
     const profile = getDeploymentProfile(env);
     const cooling = meterTenantId && coolingWindowApplies({ profile, platformFunded: !isByo, recipientInitiated: options.recipientInitiated })
-        ? buildOutboundCoolingWindow(env.DB, meterTenantId)
+        ? buildOutboundCoolingWindow(env.DB, meterTenantId, Date.now, options.humanVerified)
         : undefined;
 
     // TEST-ONLY email sink (E2E). Capture every message to KV instead of

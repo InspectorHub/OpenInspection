@@ -137,7 +137,7 @@ export const Errors = {
         new AppError(
             403,
             ErrorCode.OUTBOUND_COOLING_WINDOW,
-            `New companies cannot send client email on the shared sender for the first ${details.windowHours} hours. Everything else works, and connecting your own email provider removes the wait entirely.`,
+            `New companies must confirm they are a person before sending client email on the shared sender during the first ${details.windowHours} hours. Do it in the web app, or connect your own email provider to remove the check entirely.`,
             details,
         ),
     /**

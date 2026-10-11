@@ -2,6 +2,7 @@ import type { EmailService } from '../../services/email.service';
 import { readTenantPlan, type PlanQuotaGuard } from '../../features/plan-quota/guard';
 import { memoOnce } from '../request-scope';
 import { assembleTenantEmailService, loadTenantEmailConfig, type EmailServiceEnv } from './build-email-service';
+import type { HumanVerifier } from './outbound-cooling-window';
 
 /**
  * Explicit per-tenant email resolution for one request.
@@ -53,6 +54,8 @@ export interface TenantEmailResolverDeps {
     /** Whether this deployment meters tenants against a usage allowance. */
     hasUsageQuota: boolean;
     buildPlanQuota: () => PlanQuotaGuard | undefined;
+    /** Present when the request carries a Turnstile token; lets a new company send inside its cooling window. */
+    humanVerified?: HumanVerifier;
 }
 
 export function createTenantEmailResolver(deps: TenantEmailResolverDeps): TenantEmailResolver {
@@ -72,7 +75,7 @@ export function createTenantEmailResolver(deps: TenantEmailResolverDeps): Tenant
         const plan = deps.hasUsageQuota
             ? await memoOnce(deps.env, `plan:${tenantId}`, () => readTenantPlan(deps.env.DB, tenantId)).catch(() => null)
             : null;
-        return assembleTenantEmailService(deps.env, cfg, tenantId, deps.buildPlanQuota(), plan?.tier, { recipientInitiated });
+        return assembleTenantEmailService(deps.env, cfg, tenantId, deps.buildPlanQuota(), plan?.tier, { recipientInitiated, ...(deps.humanVerified ? { humanVerified: deps.humanVerified } : {}) });
     };
 
     return {

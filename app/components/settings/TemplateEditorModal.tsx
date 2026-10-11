@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import { Button, Pill, Modal } from "@core/shared-ui";
+import { useHumanGatedSubmit } from "~/components/OutboundVerification";
 import { m } from "~/paraglide/messages";
 import { SUPPORTED_CONTACT_LOCALES } from "../../../server/lib/i18n/contact-locale";
 import { localeLabel } from "~/lib/locales";
@@ -79,6 +80,7 @@ export function TemplateEditorModal({
   const [subject, setSubject] = useState(template?.subject ?? prefill?.subject ?? "");
   const [body, setBody] = useState(template?.body ?? prefill?.body ?? "");
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const gatedSubmit = useHumanGatedSubmit();
   const [testTo, setTestTo] = useState("");
   const [testSent, setTestSent] = useState(false);
 
@@ -349,7 +351,10 @@ export function TemplateEditorModal({
                 className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
               />
             </div>
-            <fetcher.Form method="post">
+            <fetcher.Form
+              method="post"
+              onSubmit={isEmail ? gatedSubmit : undefined}
+            >
               <input type="hidden" name="intent" value="test-send" />
               <input type="hidden" name="channel" value={channel} />
               {isEmail && <input type="hidden" name="subject" value={subject} />}

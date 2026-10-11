@@ -1,4 +1,5 @@
 import type { useFetcher } from "react-router";
+import { useHumanGatedSubmit } from "~/components/OutboundVerification";
 import { Modal } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
 import { m } from "~/paraglide/messages";
@@ -28,6 +29,7 @@ export function RequestPaymentModal({
   error: string | undefined;
   onClose: () => void;
 }) {
+  const gatedSubmit = useHumanGatedSubmit();
   const title = resend ? m.hub_payment_title_resend() : m.hub_payment_title();
   const submitLabel = resend ? m.hub_payment_submit_resend() : m.hub_payment_submit();
   return (
@@ -55,7 +57,12 @@ export function RequestPaymentModal({
         </>
       }
     >
-      <fetcher.Form id={FORM_ID} method="post" className="space-y-4">
+      <fetcher.Form
+        id={FORM_ID}
+        method="post"
+        className="space-y-4"
+        onSubmit={gatedSubmit}
+      >
         <input type="hidden" name="intent" value="request-payment" />
         <div>
           <p className="text-[12px] font-bold text-ih-fg-2 mb-1">{m.hub_payment_recipient_label()}</p>

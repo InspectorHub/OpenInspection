@@ -16,6 +16,7 @@ import { LegalVersionService } from '../../services/legal-version.service';
 import { drizzle } from 'drizzle-orm/d1';
 import { assembleTenantEmailService, loadTenantEmailConfig, type LoadedEmailConfig } from '../email/build-email-service';
 import { createTenantEmailResolver } from '../email/tenant-email-resolver';
+import { buildHumanVerifier } from '../email/human-verifier';
 import { InspectionService } from '../../services/inspection.service';
 import type { ImagesBinding } from '../media/strip-exif';
 import { PortalService } from '../../services/portal.service';
@@ -114,7 +115,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
 
     // One place decides own-vs-platform Resend + branded renderer, shared with
     // non-request contexts (workflows/scheduled) via assembleTenantEmailService.
-    const buildEmailService = () => assembleTenantEmailService(c.env, emailCfg, c.get('tenantId'), buildPlanQuota(), tenantTierForQuota);
+    const humanVerified = buildHumanVerifier(c);
+    const emailOptions = humanVerified ? { humanVerified } : {};
+    const buildEmailService = () => assembleTenantEmailService(c.env, emailCfg, c.get('tenantId'), buildPlanQuota(), tenantTierForQuota, emailOptions);
 
     // Build the core->portal outbox sink, gated on the SYNC_QUEUE producer
     // binding — the transport itself. No queue → no sink → append() no-ops:
@@ -238,6 +241,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     Object.assign(target, createTenantEmailResolver({
                         env: c.env, loadedTenantId: emailCfgFor, loadedService: () => (target.email ??= buildEmailService()),
                         fixedTenantId: c.var.profile.fixedTenantId, hasUsageQuota: c.var.profile.hasUsageQuota, buildPlanQuota,
+                        ...(humanVerified ? { humanVerified } : {}),
                     }));
                     break;
                 case 'inspection':

@@ -75,6 +75,7 @@ import { isAdminRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { useModalFetcher } from "~/hooks/useModalFetcher";
+import { useEnsureHuman } from "~/components/OutboundVerification";
 
 export function meta() {
   return [{ title: m.inspections_hub_meta_title() }];
@@ -723,7 +724,9 @@ export default function InspectionHubPage() {
   // IA-65 — signer management on the inspection. The send modal serializes its
   // signer rows into the action; the pre-sign modal is keyed by envelope id
   // (which row's "Sign now" was pressed) and closes itself on success.
-  const submitSendAgreement = (payload: SendAgreementPayload) => {
+  const ensureHuman = useEnsureHuman();
+  const submitSendAgreement = async (payload: SendAgreementPayload) => {
+    if (!(await ensureHuman())) return;
     agreementModal.fetcher.submit(
       {
         intent: "send-agreement",

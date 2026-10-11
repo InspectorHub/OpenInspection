@@ -8,6 +8,7 @@ import { CommandPalette, CommandPaletteProvider } from "~/components/CommandPale
 import { Sidebar, MobileHeader } from "~/components/Sidebar";
 import { RouteSkeleton } from "~/components/RouteSkeleton";
 import { OutboundCoolingBanner } from "~/components/OutboundCoolingBanner";
+import { OutboundVerificationProvider } from "~/components/OutboundVerification";
 import type { SessionContext } from "~/hooks/useSessionContext";
 
 /**
@@ -131,6 +132,10 @@ export default function AuthLayout() {
 
   return (
     <CommandPaletteProvider value={paletteCtx}>
+      <OutboundVerificationProvider
+        windowOpen={context?.outboundCoolingWindow != null}
+        siteKey={context?.outboundCoolingWindow?.turnstileSiteKey ?? null}
+      >
       {/* F4 — Suspension banner */}
       {context?.branding?.tenantStatus === "suspended" && (
         <div className="bg-ih-watch-bg border-b border-ih-watch px-4 py-3 flex items-center justify-center gap-3 z-50">
@@ -177,6 +182,7 @@ export default function AuthLayout() {
         onOpenChange={setPaletteOpen}
         onNewInspection={() => navigate("/inspections/new")}
       />
+      </OutboundVerificationProvider>
     </CommandPaletteProvider>
   );
 }
