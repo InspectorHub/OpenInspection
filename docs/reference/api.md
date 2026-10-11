@@ -204,7 +204,9 @@ The browser never sends that header.
 with **no** `Set-Cookie` — challenge tokens travel JSON-only, so a stolen session
 cookie alone can never bypass the second factor. The challenge is valid for five
 minutes; post it back with the TOTP code to `POST /api/auth/login/2fa` to get a
-session.
+session. That response follows the same delivery rule as this one: the session
+arrives as the cookie, and only a caller sending `x-token-relay: 1` also gets
+`token` in `data`.
 
 Returns `401` if credentials are invalid.
 

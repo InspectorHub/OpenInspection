@@ -45,6 +45,7 @@ vi.mock("../../server/lib/deployment-profile", () => ({
 
 import { action } from "./login";
 import { routeArgs } from "../../tests/helpers/route-args";
+import { Login2faResponseSchema } from "../../server/lib/validations/auth.schema";
 
 const CONTEXT = {} as Parameters<typeof action>[0]["context"];
 const json = (body: unknown, status = 200) =>
@@ -57,6 +58,26 @@ function post(fields: Record<string, string>) {
         new Request("https://x/login", { method: "POST", body: form }),
         { params: {}, context: CONTEXT },
     ));
+}
+
+/**
+ * What `POST /api/auth/login/2fa` answers a successful code with, built through
+ * the REAL response schema rather than typed out here. A hand-written
+ * `{ data: { token } }` is how this file used to pass while the page could not
+ * sign anyone in: the server never sent a token, and nothing here could notice.
+ * Parsing strips any field the schema does not declare, and the token is only
+ * present when the caller identified itself as the BFF — the same rule the
+ * handler applies (see tests/unit/auth/login-2fa-token-relay.spec.ts, which
+ * holds the handler to it).
+ */
+function twoFaSuccess(token: string) {
+    return (_args: unknown, options?: { headers?: Record<string, string> }) => {
+        const relay = options?.headers?.["x-token-relay"] === "1";
+        return Promise.resolve(json(Login2faResponseSchema.parse({
+            success: true,
+            data: { redirect: "/inspections", ...(relay ? { token } : {}) },
+        })));
+    };
 }
 
 const CHALLENGE = "challenge.jwt.value";
@@ -95,7 +116,7 @@ describe("login — a 2FA account is handed a challenge, not a refusal", () => {
 
 describe("login — answering the challenge", () => {
     it("posts the code to /login/2fa and never re-posts credentials", async () => {
-        twoFaPost.mockResolvedValue(json({ data: { token: "session.jwt" } }));
+        twoFaPost.mockImplementation(twoFaSuccess("session.jwt"));
         await post({ challengeToken: CHALLENGE, code: "123456" });
 
         expect(loginPost).not.toHaveBeenCalled();
@@ -104,8 +125,18 @@ describe("login — answering the challenge", () => {
             .toEqual({ challengeToken: CHALLENGE, code: "123456" });
     });
 
+    it("identifies itself as the BFF, so the API hands back the session token", async () => {
+        // The BFF client does not forward the API's Set-Cookie. Without this
+        // header the API keeps the JWT out of the body, the action has nothing
+        // to open a session with, and a correct code reads as a failure.
+        twoFaPost.mockImplementation(twoFaSuccess("session.jwt"));
+        await post({ challengeToken: CHALLENGE, code: "123456" });
+        const options = twoFaPost.mock.calls[0][1] as { headers?: Record<string, string> } | undefined;
+        expect(options?.headers?.["x-token-relay"]).toBe("1");
+    });
+
     it("creates the session at the requested destination on success", async () => {
-        twoFaPost.mockResolvedValue(json({ data: { token: "session.jwt" } }));
+        twoFaPost.mockImplementation(twoFaSuccess("session.jwt"));
         await post({ challengeToken: CHALLENGE, code: "123456", returnTo: "/oauth/authorize?x=1" });
         expect(createSession).toHaveBeenCalledWith(CONTEXT, "session.jwt", "/oauth/authorize?x=1");
     });
@@ -132,7 +163,7 @@ describe("login — answering the challenge", () => {
         // A 2FA submission carries no email or password. Parsed as a login it
         // would answer "email is required" to somebody who has already proved
         // their password — the branch order in the action is what prevents it.
-        twoFaPost.mockResolvedValue(json({ data: { token: "session.jwt" } }));
+        twoFaPost.mockImplementation(twoFaSuccess("session.jwt"));
         const out = await post({ challengeToken: CHALLENGE, code: "123456" });
         expect(out).toBeInstanceOf(Response);
     });

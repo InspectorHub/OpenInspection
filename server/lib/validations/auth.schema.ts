@@ -120,7 +120,10 @@ export const TotpSetupResponseSchema = createApiResponseSchema(z.object({
 }));
 
 export const Login2faResponseSchema = createApiResponseSchema(z.union([
-    z.object({ redirect: z.string().describe('TODO describe redirect field for the OpenInspection MCP integration') }),
+    z.object({
+        redirect: z.string().describe('TODO describe redirect field for the OpenInspection MCP integration'),
+        token: z.string().optional().describe('Session JWT. Present ONLY for the in-process BFF caller that sends `x-token-relay: 1`; browsers receive the session as the HttpOnly cookie and never in the body.'),
+    }),
     z.object({ requires2fa: z.literal(true).describe('TODO describe requires2fa field for the OpenInspection MCP integration'), challengeToken: z.string().describe('TODO describe challengeToken field for the OpenInspection MCP integration') }),
 ]));
 
