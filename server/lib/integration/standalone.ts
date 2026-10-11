@@ -10,6 +10,7 @@ import { SQL_UUID_V4 } from './standalone-uuid';
 import { seedDefaultAutomations } from './standalone-seed-automations';
 import { SmsConsentService } from '../../services/sms-consent.service';
 import { SMS_DISCLOSURE_V1 } from '../../services/automation/shared';
+import { initReplyToFromOwner } from './owner-reply-to';
 
 // Default Comment Library entries seeded into every new tenant. The same set
 // is also backfilled into existing tenants by the default-comments seed
@@ -304,6 +305,10 @@ export class StandaloneProvider implements IntegrationProvider {
                     ...acceptanceStatements,
                 ];
                 await db.batch(statements as unknown as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+
+                // First owner exists: default the tenant's Reply-To to their
+                // email (initialize-only; a value set earlier is kept).
+                await initReplyToFromOwner(db, tenantId, adminEmail);
 
                 // Default Template — empty starter. Renamed from "Standard
                 // Home Inspection" (R7-23) because it collided semantically
