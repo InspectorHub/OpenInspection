@@ -13,6 +13,9 @@ import {
     COOLING_WINDOW_SENTINEL, COOLING_WINDOW_DEFER_REASON, coolingWindowSentinelFor,
     coolingWindowUnlockAtMs, deferUntilCoolingWindowOpens,
 } from './cooling-window';
+import {
+    PROVIDER_DEFERRAL_SENTINEL, providerOutcomeFor, applyProviderOutcome, type ProviderOutcome,
+} from './provider-deferral';
 import type { FlushInspection } from './shared';
 import type { EmailService } from '../email.service';
 import type { automations, automationLogs as automationLogsTable, tenants } from '../../lib/db/schema';
@@ -188,6 +191,9 @@ export async function deliverTemplatedEmail(
     // which is what the log row is re-scheduled to. Scoped to this one
     // delivery, written on exactly one branch, read on exactly one.
     let coolingUnlockAtMs: number | null = null;
+    // Same idea for a provider refusal that undoes itself (rate limit, daily
+    // quota) or is final for the month: see ./provider-deferral.
+    let providerOutcome: ProviderOutcome | null = null;
     const transport = {
         sendEmail: async (a: { to: string; subject: string; html: string }) => {
             // The rules layer names what it is sending, like every other
@@ -207,7 +213,11 @@ export async function deliverTemplatedEmail(
                 // The cooling window DECLINED; it did not break. Anything else
                 // is a real fault and must keep propagating as one.
                 const sentinel = coolingWindowSentinelFor(err);
-                if (!sentinel) throw err;
+                if (!sentinel) {
+                    providerOutcome = providerOutcomeFor(err, Date.now());
+                    if (!providerOutcome) throw err;
+                    return { ok: false as const, error: PROVIDER_DEFERRAL_SENTINEL };
+                }
                 coolingUnlockAtMs = coolingWindowUnlockAtMs(err);
                 return { ok: false as const, error: sentinel };
             }
@@ -246,6 +256,10 @@ export async function deliverTemplatedEmail(
                         .set({ status: 'skipped', error: COOLING_WINDOW_DEFER_REASON })
                         .where(eq(automationLogs.id, log.id));
                 }
+                return;
+            }
+            if (row.status === 'failed' && row.error === PROVIDER_DEFERRAL_SENTINEL && providerOutcome) {
+                await applyProviderOutcome(db, log.id, providerOutcome);
                 return;
             }
             if (row.status === 'sent') {

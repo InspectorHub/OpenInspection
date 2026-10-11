@@ -11,6 +11,7 @@ import type { ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 import { deliverReportEmail, type ReportDeliveryDeps } from './report-email';
 import { deliverTemplatedEmail } from './deliver-email';
+import { createSendThrottle, type SendThrottle } from './send-throttle';
 
 /**
  * The flush query's SELECT projection. `inspection` is narrowed to the
@@ -86,6 +87,9 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
              *  on every existing caller/test (backward-compatible) and on deploys
              *  missing JWT_SECRET (see scheduled.ts wiring). */
             reportDelivery?: ReportDeliveryDeps,
+            /** Test seam: the throttle that keeps the batch's email sends under the
+             *  provider's request-rate limit. Absent ⇒ a real one (5 per second). */
+            flushDeps?: { throttle?: SendThrottle },
         ): Promise<void> {
             const db = this.getDrizzle();
             const now = new Date();
@@ -261,6 +265,9 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             // Declared once per flush() call; see report-email.ts:deliverReportEmail.
             const pdfMemo = new Map<string, Promise<ArrayBuffer | null>>();
 
+            // Email sends in this batch start at most N per second (wall time only).
+            const throttle = flushDeps?.throttle ?? createSendThrottle();
+
             // report.amended templates carry the re-publish change note
             // ({{summary}}) from the latest report_versions row. Fetch once per
             // inspection per flush; only amended emails need it, so the query is
@@ -345,6 +352,7 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // `automation` rides along because the WORDS are the rule's, not
                     // this branch's — see deliverReportEmail's "whose words go out".
                     if (log.channel === 'email' && automation?.trigger === 'report.published' && reportDelivery) {
+                        await throttle.beforeSend();
                         const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
                         await deliverReportEmail(db, { log, automation, inspection, tenant },
                             emailSvc, appBaseUrl, reportDelivery, pdfMemo,
@@ -355,6 +363,7 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // The generic templated-email path lives in deliver-email.ts
                     // (file-size ratchet); it owns every outcome write on that
                     // branch, so there is nothing to interpret here.
+                    await throttle.beforeSend();
                     const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
                     await deliverTemplatedEmail(db, { log, automation, inspection, tenant }, {
                         rawDb: this.db,

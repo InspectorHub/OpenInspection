@@ -79,6 +79,10 @@ export type NormalizedEmailEvent = {
  *                    so we stop trying before the provider rejects it again.
  * `quota_exceeded` — daily or monthly send quota exhausted. Operator must
  *                    upgrade their plan or wait for the quota to reset.
+ *                    `quotaWindow` says which one when the provider told us:
+ *                    a daily quota resets at the next UTC midnight, a monthly
+ *                    one only with the next billing period. Absent means the
+ *                    adapter could not tell (treat as unknown, not as either).
  * `sender_domain`  — the `from` domain is unverified or the key is limited to
  *                    test sends. Operator must verify the domain in Resend.
  */
@@ -94,6 +98,8 @@ export type EmailFailureKind =
  * emails USED so far in the window (not remaining). Each field is present only
  * when the provider sent a valid reading for it.
  */
+export type EmailQuotaWindow = 'daily' | 'monthly';
+
 export interface EmailSendUsage {
   dailyUsed?: number;
   monthlyUsed?: number;
@@ -104,13 +110,13 @@ export interface EmailProvider {
    * Send a transactional email.
    *
    * Returns `{ ok: true; id?; usage? }` on success.
-   * Returns `{ ok: false; error; kind; retryAfterSeconds?; usage? }` on failure — implementations MUST NOT
+   * Returns `{ ok: false; error; kind; retryAfterSeconds?; quotaWindow?; usage? }` on failure — implementations MUST NOT
    * throw. `kind` lets callers branch on WHY delivery failed rather than
    * treating all failures identically.
    */
   sendEmail(args: EmailSendArgs): Promise<
     | { ok: true; id?: string; usage?: EmailSendUsage }
-    | { ok: false; error: string; kind: EmailFailureKind; retryAfterSeconds?: number; usage?: EmailSendUsage }
+    | { ok: false; error: string; kind: EmailFailureKind; retryAfterSeconds?: number; quotaWindow?: EmailQuotaWindow; usage?: EmailSendUsage }
   >;
 
   /**

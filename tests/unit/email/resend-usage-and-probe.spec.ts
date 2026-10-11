@@ -62,7 +62,7 @@ describe('ResendProvider.sendEmail usage headers', () => {
       { 'x-resend-daily-quota': '100', 'x-resend-monthly-quota': '2900' },
     )));
     expect(await send()).toEqual({
-      ok: false, error: 'Daily quota exceeded.', kind: 'quota_exceeded',
+      ok: false, error: 'Daily quota exceeded.', kind: 'quota_exceeded', quotaWindow: 'daily',
       usage: { dailyUsed: 100, monthlyUsed: 2900 },
     });
   });
