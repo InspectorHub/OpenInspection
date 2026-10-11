@@ -45,7 +45,7 @@ vi.mock("../../server/lib/deployment-profile", () => ({
 
 import { action } from "./login";
 import { routeArgs } from "../../tests/helpers/route-args";
-import { Login2faResponseSchema } from "../../server/lib/validations/auth.schema";
+import { Login2faResponseSchema, LoginResponseSchema } from "../../server/lib/validations/auth.schema";
 
 const CONTEXT = {} as Parameters<typeof action>[0]["context"];
 const json = (body: unknown, status = 200) =>
@@ -80,6 +80,27 @@ function twoFaSuccess(token: string) {
     };
 }
 
+/**
+ * What `POST /api/auth/login` answers a correct password with, built the same
+ * way: through `LoginResponseSchema`, carrying the session token only when the
+ * call identified itself as the BFF (the handler's rule, held to it by
+ * tests/unit/auth/login-2fa-token-relay.spec.ts). A page that stopped sending the
+ * header would get no token here, exactly as it would get none from the API.
+ */
+function loginSuccess(token: string) {
+    return (_args: unknown, options?: { headers?: Record<string, string> }) => {
+        const relay = options?.headers?.["x-token-relay"] === "1";
+        return Promise.resolve(json(LoginResponseSchema.parse({
+            success: true,
+            data: { redirect: "/inspections", ...(relay ? { token } : {}) },
+        })));
+    };
+}
+
+/** The password step's answer for a 2FA account, through the same schema. */
+const challengeReply = (challengeToken: string) =>
+    json(LoginResponseSchema.parse({ success: true, data: { requires2fa: true, challengeToken } }));
+
 const CHALLENGE = "challenge.jwt.value";
 const GOOD = { email: "a@b.test", password: "hunter2hunter2" };
 
@@ -90,14 +111,15 @@ beforeEach(() => {
 
 describe("login — a 2FA account is handed a challenge, not a refusal", () => {
     it("CONTROL — a non-2FA login still mints a session, so the branch below is the only change", async () => {
-        loginPost.mockResolvedValue(json({ data: { token: "session.jwt" } }));
+        loginPost.mockImplementation(loginSuccess("session.jwt"));
         await post(GOOD);
         expect(createSession).toHaveBeenCalledTimes(1);
+        expect(createSession).toHaveBeenCalledWith(CONTEXT, "session.jwt", "/inspections");
         expect(twoFaPost).not.toHaveBeenCalled();
     });
 
     it("returns the challenge token instead of an error", async () => {
-        loginPost.mockResolvedValue(json({ data: { requires2fa: true, challengeToken: CHALLENGE } }));
+        loginPost.mockResolvedValue(challengeReply(CHALLENGE));
         const out = await post(GOOD);
         // Not a session: the second factor has not been supplied yet.
         expect(createSession).not.toHaveBeenCalled();
@@ -108,7 +130,7 @@ describe("login — a 2FA account is handed a challenge, not a refusal", () => {
         // The OAuth consent bounce resumes on the far side of the code form. A
         // version that dropped it would send 2FA users somewhere else than
         // everyone else, only on the flow that has a destination.
-        loginPost.mockResolvedValue(json({ data: { requires2fa: true, challengeToken: CHALLENGE } }));
+        loginPost.mockResolvedValue(challengeReply(CHALLENGE));
         const out = await post({ ...GOOD, returnTo: "/oauth/authorize?x=1" });
         expect(out).toMatchObject({ returnTo: "/oauth/authorize?x=1" });
     });

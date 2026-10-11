@@ -16,7 +16,29 @@ export const LoginSchema = z.object({
 });
 
 /**
- * Validation schema for the login response.
+ * Response of `POST /api/auth/login` — the password step only.
+ *
+ * Two shapes: a session (`redirect`, plus `token` for the in-process BFF that
+ * sends `x-token-relay: 1`), or a second-factor challenge when the account has
+ * TOTP enabled. Join and setup keep `AuthResponseSchema`: they never put the
+ * JWT in the body, so declaring `token` there would document a field nothing
+ * sends.
+ */
+export const LoginResponseSchema = createApiResponseSchema(z.union([
+    z.object({
+        redirect: z.string().openapi({ example: '/inspections' }).describe('Path the client navigates to once the session cookie is set.'),
+        token: z.string().optional().describe('Session JWT. Present ONLY for the in-process BFF caller that sends `x-token-relay: 1`; browsers receive the session as the HttpOnly cookie and never in the body.'),
+    }),
+    z.object({
+        requires2fa: z.literal(true).describe('The password was correct and the account has TOTP enabled; no session has been granted yet.'),
+        challengeToken: z.string().describe('Five-minute challenge to post back with the TOTP code to `POST /api/auth/login/2fa`.'),
+    }),
+]));
+
+/**
+ * Response of `POST /api/auth/join` and `POST /api/auth/setup`. The session is
+ * delivered only as the HttpOnly cookie; neither route returns the JWT in the
+ * body, whatever headers the caller sends.
  */
 export const AuthResponseSchema = createApiResponseSchema(
     z.object({

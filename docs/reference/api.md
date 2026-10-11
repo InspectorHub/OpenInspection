@@ -195,9 +195,11 @@ The JWT is delivered **only** as the `__Host-inspector_token` HttpOnly cookie.
 It is not in the body, and browser JavaScript must never store a token —
 `CLAUDE.md` § JWT & Auth Security Rules makes both of those rules. The one
 exception is the server-side BFF: a caller sending `x-token-relay: 1` also gets
-`token` in `data`, because Workers `fetch()` may strip `Set-Cookie` on a
-server-to-server hop and the BFF has to put the token in its own session cookie.
-The browser never sends that header.
+`token` in `data`, because the in-process BFF client does not forward the API's
+`Set-Cookie` to the browser, and the login page has to put the token in its own
+session cookie. The browser never sends that header. Only login (this step and
+`POST /api/auth/login/2fa`) honours it; join and setup never return the token in
+the body (see below).
 
 **If the user has 2FA enabled, no session is granted here.** The response is
 `{ "success": true, "data": { "requires2fa": true, "challengeToken": "…" } }`
@@ -231,8 +233,11 @@ Accept a team invite token, create the user account, and set the `__Host-inspect
 { "success": true, "data": { "redirect": "/inspections" } }
 ```
 
-Sets the `__Host-inspector_token` HttpOnly cookie. As with login, the JWT is not
-returned to a browser and must not be stored in `localStorage`.
+Sets the `__Host-inspector_token` HttpOnly cookie. The JWT is never in the
+body — unlike login, this route ignores `x-token-relay`, and so does
+`POST /api/auth/setup`. Their pages open a session by reading the JWT out of the
+`Set-Cookie` header on the in-process API response. It must not be stored in
+`localStorage`.
 
 Returns `400` if the token is expired or already used.
 
