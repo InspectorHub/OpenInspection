@@ -81,8 +81,8 @@ describe('classifyResendError', () => {
     expect(classifyResendError(429, 'monthly_quota_exceeded', 'You have exceeded your monthly email sending quota.')).toBe('quota_exceeded');
   });
 
-  it('classifies 429 rate_limit_exceeded as transient', () => {
-    expect(classifyResendError(429, 'rate_limit_exceeded', 'Too many requests.')).toBe('transient');
+  it('classifies 429 rate_limit_exceeded as rate_limited', () => {
+    expect(classifyResendError(429, 'rate_limit_exceeded', 'Too many requests.')).toBe('rate_limited');
   });
 
   it('classifies 500 application_error as transient', () => {

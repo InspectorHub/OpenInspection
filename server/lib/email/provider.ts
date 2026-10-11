@@ -68,8 +68,11 @@ export type NormalizedEmailEvent = {
 /**
  * Structured failure kinds returned by `sendEmail`.
  *
- * `transient`      — provider-side fault (5xx, rate-limit, lock). Safe to
- *                    retry after a delay; no operator action required now.
+ * `transient`      — provider-side fault (5xx, lock, network). Safe to retry
+ *                    after a delay; no operator action required now.
+ * `rate_limited`   — the provider's request-rate limit was hit (HTTP 429, not a
+ *                    quota). Retry after backing off; `retryAfterSeconds` carries
+ *                    the provider's `retry-after` hint when it sent one.
  * `suppressed`     — Resend (or another provider) rejected the address because
  *                    it is on their suppression list. The send will keep failing
  *                    until the block clears; write it to `email_suppressions`
@@ -79,24 +82,44 @@ export type NormalizedEmailEvent = {
  * `sender_domain`  — the `from` domain is unverified or the key is limited to
  *                    test sends. Operator must verify the domain in Resend.
  */
-export type EmailFailureKind = 'transient' | 'suppressed' | 'quota_exceeded' | 'sender_domain';
+export type EmailFailureKind =
+  | 'transient'
+  | 'rate_limited'
+  | 'suppressed'
+  | 'quota_exceeded'
+  | 'sender_domain';
+
+/**
+ * Sending-quota counters a provider reported alongside a response. Values are
+ * emails USED so far in the window (not remaining). Each field is present only
+ * when the provider sent a valid reading for it.
+ */
+export interface EmailSendUsage {
+  dailyUsed?: number;
+  monthlyUsed?: number;
+}
 
 export interface EmailProvider {
   /**
    * Send a transactional email.
    *
-   * Returns `{ ok: true; id? }` on success.
-   * Returns `{ ok: false; error; kind }` on failure — implementations MUST NOT
+   * Returns `{ ok: true; id?; usage? }` on success.
+   * Returns `{ ok: false; error; kind; retryAfterSeconds?; usage? }` on failure — implementations MUST NOT
    * throw. `kind` lets callers branch on WHY delivery failed rather than
    * treating all failures identically.
    */
-  sendEmail(args: EmailSendArgs): Promise<{ ok: true; id?: string } | { ok: false; error: string; kind: EmailFailureKind }>;
+  sendEmail(args: EmailSendArgs): Promise<
+    | { ok: true; id?: string; usage?: EmailSendUsage }
+    | { ok: false; error: string; kind: EmailFailureKind; retryAfterSeconds?: number; usage?: EmailSendUsage }
+  >;
 
   /**
    * Optional lightweight credential check (e.g. a GET /domains call).
-   * Used by Settings "validate on save" flows — Task 6.
+   * Used by Settings "validate on save" flows — Task 6. `restricted: true`
+   * means the key is valid but scoped to sending only, so account-level
+   * endpoints (e.g. domain listing) are not available to it.
    */
-  validateCredentials?(): Promise<{ ok: true } | { ok: false; error: string }>;
+  validateCredentials?(): Promise<{ ok: true; restricted?: true } | { ok: false; error: string }>;
 
   /**
    * Verify an inbound webhook signature using the provider's scheme. Reads only
