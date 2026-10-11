@@ -92,6 +92,8 @@ export function buildApp(db: TestDb, stubs: Stubs = {}) {
                 sendAgreementSignedConfirmation: emailConfirm,
                 sendAgreementRequest: emailAgreementRequest,
             },
+            // The signed-confirmation sends resolve by the envelope's tenant.
+            emailFor: async () => ({ sendAgreementSignedConfirmation: emailConfirm }),
         } as unknown as HonoConfig['Variables']['services']);
         // `SIGN_COMPLETION_WORKFLOW` is a declared optional binding on AppEnv
         // (server/types/hono.ts), so this is a plain assignment — only the

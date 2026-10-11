@@ -75,7 +75,7 @@ describe('ConciergeService.resolveToken — primary-client sourcing (Task 9c)', 
             createdAt: new Date(),
         });
 
-        svc = new ConciergeService({} as D1Database, {} as unknown as EmailService, 'https://acme.example.com');
+        svc = new ConciergeService({} as D1Database, async () => ({} as unknown as EmailService), 'https://acme.example.com');
     });
 
     it('resolves inspection.clientName/.clientEmail from the inspection_people primary-client join', async () => {

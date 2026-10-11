@@ -76,7 +76,7 @@ describe('ConciergeService.confirmByClient — buyer_agent notify sourcing (Task
         stubEmail = { sendConciergeConfirmedToAgent: vi.fn().mockResolvedValue(undefined) };
         svc = new ConciergeService(
             {} as D1Database,
-            stubEmail as unknown as EmailService,
+            async () => stubEmail as unknown as EmailService,
             'https://acme.example.com',
         );
     });

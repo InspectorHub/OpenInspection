@@ -88,7 +88,8 @@ export const agentMagicLoginRequestRoutes = createApiRouter()
             // loginLink and portal.ts's requestLink.
             const sendPromise = (async () => {
                 try {
-                    await c.var.services.email.sendAgentLoginLink(result.email, result.loginUrl);
+                    // Agent accounts belong to no company: the deployment speaks.
+                    await c.var.services.platformEmail().sendAgentLoginLink(result.email, result.loginUrl);
                 } catch (err) {
                     logger.error('agent.magic_login.link_send_failed', {}, err instanceof Error ? err : undefined);
                 }

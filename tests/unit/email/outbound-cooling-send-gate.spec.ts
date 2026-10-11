@@ -127,6 +127,22 @@ describe('24-hour outbound cooling window', () => {
         ).resolves.toEqual({ delivered: true });
     });
 
+    it('lets a recipient-initiated send through from the same new company, and still holds the class otherwise', async () => {
+        await seedTenant('tenant-initiated', 60 * 60 * 1000);
+        const initiated = assembleTenantEmailService(saasEnv, platformCfg, 'tenant-initiated', undefined, undefined, { recipientInitiated: true });
+        await expect(
+            initiated.sendEmail(['client@example.com'], 'Booked', '<p>x</p>', undefined, { classId: 'booking-confirmation' }),
+        ).resolves.toEqual({ delivered: true });
+
+        // The notification class is not what earns the exemption: the same class,
+        // sent by a service that was not built for a recipient-initiated send
+        // (an automation rule firing it for someone who did nothing), is held.
+        const ordinary = assembleTenantEmailService(saasEnv, platformCfg, 'tenant-initiated');
+        await expect(
+            ordinary.sendEmail(['client@example.com'], 'Booked', '<p>x</p>', undefined, { classId: 'booking-confirmation' }),
+        ).rejects.toMatchObject({ status: 403, code: 'OUTBOUND_COOLING_WINDOW' });
+    });
+
     it('allows the same send once the window has elapsed', async () => {
         await seedTenant('tenant-old', COOLING_WINDOW_MS + 60_000);
         const svc = assembleTenantEmailService(saasEnv, platformCfg, 'tenant-old');

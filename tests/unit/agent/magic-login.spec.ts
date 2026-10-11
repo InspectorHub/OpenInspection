@@ -104,7 +104,8 @@ describe('Agent magic-login primitive', () => {
         const app = withErrorHandler(new OpenAPIHono<HonoConfig>());
         app.use('*', async (c, next) => {
             c.env = { DB: {}, TENANT_CACHE: kv } as unknown as HonoConfig['Bindings'];
-            c.set('services', { portalAccess: { resolveToken }, email: { sendAgentLoginLink } } as unknown as HonoConfig['Variables']['services']);
+            // Deployment voice: agents belong to no company (see agent-login.spec.ts).
+            c.set('services', { portalAccess: { resolveToken }, platformEmail: () => ({ sendAgentLoginLink }) } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
         app.route('/api/agent', agentMagicLoginRequestRoutes);

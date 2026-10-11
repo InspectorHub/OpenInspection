@@ -527,7 +527,7 @@ const agreementRoutes = createApiRouter()
                 signerEmail: signer.email,
                 signerName: signer.name,
                 inspectionId: result.inspectionId,
-                requestId: result.requestId,
+                requestId: result.requestId, tenantId: result.tenantId,
             });
         }
 

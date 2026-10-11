@@ -113,7 +113,7 @@ describe('ConciergeService.createBooking — writes inspection_people (Task 7b)'
             sendConciergeConfirmedToAgent: vi.fn().mockResolvedValue(undefined),
             sendConciergeCancelledToAgent: vi.fn().mockResolvedValue(undefined),
         };
-        svc = new ConciergeService({} as D1Database, stubEmail as unknown as EmailService, 'https://acme.example.com');
+        svc = new ConciergeService({} as D1Database, async () => stubEmail as unknown as EmailService, 'https://acme.example.com');
         people = new PeopleService({ DB: {} as D1Database });
     });
 

@@ -222,6 +222,7 @@ describe('B-28 booking TOCTOU', () => {
             c.set('services', {
                 booking: svc,
                 email: { sendBookingConfirmation: vi.fn().mockResolvedValue(undefined) },
+                emailFor: async () => ({ sendBookingConfirmation: vi.fn().mockResolvedValue(undefined) }),
                 notification: { createForAllAdmins: vi.fn().mockResolvedValue(undefined) },
             } as unknown as HonoConfig['Variables']['services']);
             await next();

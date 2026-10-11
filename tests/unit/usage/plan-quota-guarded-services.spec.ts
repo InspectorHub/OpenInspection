@@ -109,7 +109,7 @@ describe('ConciergeService.createBooking consumes the free-tier quota', () => {
 
     it('blocks the 6th create for a free tenant with 402/QUOTA_EXHAUSTED', async () => {
         const guard = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
-        const svc = new ConciergeService(testD1, stubEmail as unknown as EmailService, 'https://acme.example.com', guard);
+        const svc = new ConciergeService(testD1, async () => stubEmail as unknown as EmailService, 'https://acme.example.com', guard);
 
         for (let i = 0; i < 5; i++) await svc.createBooking(baseParams());
         await expect(svc.createBooking(baseParams())).rejects.toMatchObject({
@@ -120,7 +120,7 @@ describe('ConciergeService.createBooking consumes the free-tier quota', () => {
 
     it('a rejected validation (unknown inspector contact) does not consume quota', async () => {
         const guard = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
-        const svc = new ConciergeService(testD1, stubEmail as unknown as EmailService, 'https://acme.example.com', guard);
+        const svc = new ConciergeService(testD1, async () => stubEmail as unknown as EmailService, 'https://acme.example.com', guard);
 
         await expect(svc.createBooking({ ...baseParams(), inspectorContactId: 'no-such-contact' }))
             .rejects.toThrow(/not found/i);

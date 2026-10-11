@@ -103,6 +103,15 @@ describe('coolingWindowApplies', () => {
     it("does not apply to a tenant's own provider even on SaaS", () => {
         expect(coolingWindowApplies({ profile: SAAS_PROFILE, platformFunded: false })).toBe(false);
     });
+
+    it('does not apply to a send that answers something the recipient just did', () => {
+        expect(coolingWindowApplies({ profile: SAAS_PROFILE, platformFunded: true, recipientInitiated: true })).toBe(false);
+    });
+
+    it('is unchanged when the send is not recipient-initiated', () => {
+        expect(coolingWindowApplies({ profile: SAAS_PROFILE, platformFunded: true, recipientInitiated: false })).toBe(true);
+        expect(coolingWindowApplies({ profile: SAAS_PROFILE, platformFunded: true, recipientInitiated: undefined })).toBe(true);
+    });
 });
 
 describe('unlockAtMs', () => {

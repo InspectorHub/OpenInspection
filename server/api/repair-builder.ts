@@ -345,7 +345,7 @@ const repairBuilderRoutes = createApiRouter()
         const gateResult = await runShareGate(c, shareToken);
         if (gateResult instanceof Response) return gateResult;
 
-        const { propertyAddress } = gateResult;
+        const { propertyAddress, tenantId } = gateResult;
 
         await checkRateLimit(c, 'book');
 
@@ -354,7 +354,9 @@ const repairBuilderRoutes = createApiRouter()
         // The route owns the LINK; the email service owns the email. Building
         // the HTML here is what left this send unbranded, uneditable and
         // unclassified while every registry-backed send was none of those.
-        await c.var.services.email.sendRepairRequestShare(body.to, {
+        // The share token names the tenant, so its service is asked for by id.
+        const email = await c.var.services.emailFor(tenantId);
+        await email.sendRepairRequestShare(body.to, {
             propertyAddress: propertyAddress || '',
             shareUrl: `${baseUrl}/repair-request/${shareToken}`,
             message: body.message,

@@ -115,8 +115,8 @@ export function assembleTenantEmailService(
     env: EmailServiceEnv,
     cfg: LoadedEmailConfig,
     meterTenantId?: string,
-    quotaGuard?: PlanQuotaGuard,
-    tenantTier?: string,
+    quotaGuard?: PlanQuotaGuard, tenantTier?: string,
+    options: { recipientInitiated?: boolean } = {},
 ): EmailService {
     const { emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider } = cfg;
     // The ONE place an absent answer becomes `false` (a platform-default
@@ -263,7 +263,7 @@ export function assembleTenantEmailService(
     // satisfies structurally — so a Cloudflare Workflow env reaches the seam
     // here with no cast, which is the whole point of that narrowing.
     const profile = getDeploymentProfile(env);
-    const cooling = meterTenantId && coolingWindowApplies({ profile, platformFunded: !isByo })
+    const cooling = meterTenantId && coolingWindowApplies({ profile, platformFunded: !isByo, recipientInitiated: options.recipientInitiated })
         ? buildOutboundCoolingWindow(env.DB, meterTenantId)
         : undefined;
 

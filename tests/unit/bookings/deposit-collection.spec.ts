@@ -129,6 +129,7 @@ function buildApp(createdInspectionIds: string[]) {
             booking: svc,
             widget: { isOriginAllowed: vi.fn().mockResolvedValue(true), recordEvent: vi.fn().mockResolvedValue(undefined) },
             email: { sendBookingConfirmation: vi.fn().mockResolvedValue(undefined) },
+            emailFor: async () => ({ sendBookingConfirmation: vi.fn().mockResolvedValue(undefined) }),
             notification: { createForAllAdmins: vi.fn().mockResolvedValue(undefined) },
             automation: { trigger: vi.fn().mockResolvedValue(undefined) },
             contact: { upsertClientContact: vi.fn().mockResolvedValue({ id: 'c1' }) },

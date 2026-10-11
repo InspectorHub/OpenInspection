@@ -15,6 +15,7 @@ import { BrandingService } from '../../services/branding.service';
 import { LegalVersionService } from '../../services/legal-version.service';
 import { drizzle } from 'drizzle-orm/d1';
 import { assembleTenantEmailService, loadTenantEmailConfig, type LoadedEmailConfig } from '../email/build-email-service';
+import { createTenantEmailResolver } from '../email/tenant-email-resolver';
 import { InspectionService } from '../../services/inspection.service';
 import type { ImagesBinding } from '../media/strip-exif';
 import { PortalService } from '../../services/portal.service';
@@ -84,9 +85,10 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
 
     // A-16 — one parallel batch (identity / brand / secrets / overrides)
     // replacing four serial awaits. Only API requests consume these (email
-    // sends + AI), so page/asset requests skip the D1 reads entirely. The
-    // root-mounted auth duplicates (/forgot-password) send platform-branded
-    // mail by design, so the /api/ gate loses nothing there.
+    // sends + AI), so page/asset requests skip the D1 reads entirely. A route
+    // that learns its tenant inside the handler resolves its own email service
+    // with `services.emailFor(tenantId)` instead (see tenant-email-resolver.ts).
+    const emailCfgFor = tenantId && c.req.path.startsWith('/api/') ? tenantId : undefined;
     let emailCfg: LoadedEmailConfig = { dbSecrets: {} };
     // The email free-tier pre-flight (below) needs the tenant's plan tier.
     // `tenantTier` is only populated in session-context by the public/
@@ -99,13 +101,13 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
     // status, not just the tier). Null wherever it was not read — a session
     // tier carries no status, and null is deliberately NOT an entitlement.
     let tenantPlan: TenantPlan | null = null;
-    if (tenantId && c.req.path.startsWith('/api/')) {
+    if (emailCfgFor) {
         // Its own key, NOT the `secrets:` one — the shapes differ, so they
         // cannot share an entry; see loadEmailSecrets for where the shared
         // decrypt actually happens.
-        emailCfg = await memoOnce(c.env, `email-cfg:${tenantId}`, () => loadTenantEmailConfig(c.env, tenantId));
+        emailCfg = await memoOnce(c.env, `email-cfg:${emailCfgFor}`, () => loadTenantEmailConfig(c.env, emailCfgFor));
         if (!tenantTierForQuota && c.var.profile.hasUsageQuota) {
-            tenantPlan = await memoOnce(c.env, `plan:${tenantId}`, () => readTenantPlan(c.env.DB, tenantId)).catch(() => null);
+            tenantPlan = await memoOnce(c.env, `plan:${emailCfgFor}`, () => readTenantPlan(c.env.DB, emailCfgFor)).catch(() => null);
             tenantTierForQuota = tenantPlan?.tier;
         }
     }
@@ -230,6 +232,13 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'email':
                     target.email = buildEmailService();
+                    break;
+                case 'emailFor':
+                case 'platformEmail':
+                    Object.assign(target, createTenantEmailResolver({
+                        env: c.env, loadedTenantId: emailCfgFor, loadedService: () => (target.email ??= buildEmailService()),
+                        fixedTenantId: c.var.profile.fixedTenantId, hasUsageQuota: c.var.profile.hasUsageQuota, buildPlanQuota,
+                    }));
                     break;
                 case 'inspection':
                     target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota(), c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
@@ -399,20 +408,11 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.agent = new AgentService(c.env.DB);
                     break;
                 case 'concierge':
-                    {
-                        // Agent Accounts A3 — concierge state-machine service.
-                        // Depends on EmailService (for client/inspector/agent
-                        // notifications) + APP_BASE_URL for the magic-link target.
-                        if (!target.email) {
-                            target.email = buildEmailService();
-                        }
-                        target.concierge = new ConciergeService(
-                            c.env.DB,
-                            target.email,
-                            c.env.APP_BASE_URL || '',
-                            buildPlanQuota(),
-                        );
-                    }
+                    // Agent Accounts A3 — concierge state machine. Agent sessions carry
+                    // no tenant, so it asks for each operation's tenant's email service.
+                    target.concierge = new ConciergeService(
+                        c.env.DB, (id) => c.var.services.emailFor(id), c.env.APP_BASE_URL || '', buildPlanQuota(),
+                    );
                     break;
                 case 'qbo':
                     target.qbo = new QBOService(
