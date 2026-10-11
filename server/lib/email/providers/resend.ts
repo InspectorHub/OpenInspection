@@ -1,5 +1,5 @@
 import { logger } from '../../logger';
-import type { EmailFailureKind, EmailProvider, EmailSendArgs, EmailWebhookContext, NormalizedEmailEvent } from '../provider';
+import type { EmailFailureKind, EmailProvider, EmailSendArgs, EmailSendUsage, EmailWebhookContext, NormalizedEmailEvent } from '../provider';
 import {
   base64ToBytes,
   bytesToBase64,
@@ -10,7 +10,49 @@ import {
 } from '../webhook-crypto';
 
 /**
- * Classify a Resend non-2xx response into one of the four `EmailFailureKind`
+ * A real `Response` always has headers; hand-rolled fetch doubles often do not.
+ * Reading a header must never turn such a response into a thrown TypeError.
+ */
+function headerValue(headers: Headers | undefined, name: string): string | null {
+    return typeof headers?.get === 'function' ? headers.get(name) : null;
+}
+
+/** Strict non-negative integer parse; anything else (absent, garbage, negative, fractional) is undefined. */
+function parseCount(raw: string | null): number | undefined {
+    if (raw === null || !/^[0-9]+$/.test(raw.trim())) return undefined;
+    const n = Number(raw.trim());
+    return Number.isSafeInteger(n) ? n : undefined;
+}
+
+/**
+ * Read Resend's quota headers: `x-resend-daily-quota` (emails used today; only
+ * sent for accounts with a daily cap) and `x-resend-monthly-quota` (emails used
+ * this month). Returns undefined when neither carries a valid reading.
+ */
+function readUsage(headers: Headers | undefined): EmailSendUsage | undefined {
+    const dailyUsed = parseCount(headerValue(headers, 'x-resend-daily-quota'));
+    const monthlyUsed = parseCount(headerValue(headers, 'x-resend-monthly-quota'));
+    if (dailyUsed === undefined && monthlyUsed === undefined) return undefined;
+    return {
+        ...(dailyUsed !== undefined ? { dailyUsed } : {}),
+        ...(monthlyUsed !== undefined ? { monthlyUsed } : {}),
+    };
+}
+
+/** Parse `retry-after` as integer seconds in [0, 86400]; anything else is undefined. */
+function readRetryAfterSeconds(headers: Headers | undefined): number | undefined {
+    const n = parseCount(headerValue(headers, 'retry-after'));
+    return n !== undefined && n <= 86400 ? n : undefined;
+}
+
+/** Name field of a Resend JSON error body, or undefined when the body is absent/unparseable. */
+async function readErrorName(res: Response): Promise<string | undefined> {
+    const body = (await res.json().catch(() => null)) as { name?: unknown } | null;
+    return typeof body?.name === 'string' ? body.name : undefined;
+}
+
+/**
+ * Classify a Resend non-2xx response into one of the `EmailFailureKind`
  * buckets. The mapping is derived from Resend's published error reference
  * (resend.com/docs/api-reference/errors).
  *
@@ -21,9 +63,10 @@ import {
  *  2. Sender-domain — any other 403 validation_error (unverified domain, test
  *     key restricted to own address, domain already registered on another team).
  *  3. Quota — 429 daily_quota_exceeded | monthly_quota_exceeded.
- *  4. Transient — everything else: rate-limit, 5xx, lock/conflict, network.
+ *  4. Rate-limited — 429 rate_limit_exceeded (request rate, not a quota).
+ *  5. Transient — everything else: 5xx, lock/conflict, network.
  *
- * Any Resend error not covered by (1)–(3) is treated as transient because
+ * Any Resend error not covered by (1)–(4) is treated as transient because
  * retrying is the safest default — the operator can always check the logs.
  */
 export function classifyResendError(
@@ -41,8 +84,8 @@ export function classifyResendError(
         if (name === 'daily_quota_exceeded' || name === 'monthly_quota_exceeded') {
             return 'quota_exceeded';
         }
-        // rate_limit_exceeded → transient (retry after backing off)
-        return 'transient';
+        // rate_limit_exceeded → back off and retry; any other 429 stays transient
+        return name === 'rate_limit_exceeded' ? 'rate_limited' : 'transient';
     }
     // 4xx config errors (suspended key, missing key, etc.) are not recoverable
     // by the recipient changing anything — treat as transient so the operator
@@ -60,7 +103,10 @@ export class ResendProvider implements EmailProvider {
 
   async sendEmail(
     args: EmailSendArgs,
-  ): Promise<{ ok: true; id?: string } | { ok: false; error: string; kind: EmailFailureKind }> {
+  ): Promise<
+    | { ok: true; id?: string; usage?: EmailSendUsage }
+    | { ok: false; error: string; kind: EmailFailureKind; retryAfterSeconds?: number; usage?: EmailSendUsage }
+  > {
     const payload: Record<string, unknown> = {
       from: args.from,
       to: args.to,
@@ -87,10 +133,12 @@ export class ResendProvider implements EmailProvider {
       return { ok: false, error: message, kind: 'transient' };
     }
 
+    const usage = readUsage(res.headers);
+
     if (res.ok) {
       let json: { id?: string } | null = null;
       try { json = (await res.json()) as { id?: string }; } catch { /* empty body */ }
-      return { ok: true, ...(json?.id ? { id: json.id } : {}) };
+      return { ok: true, ...(json?.id ? { id: json.id } : {}), ...(usage ? { usage } : {}) };
     }
 
     // Non-2xx — parse the body once, then classify.
@@ -106,10 +154,15 @@ export class ResendProvider implements EmailProvider {
 
     const kind = classifyResendError(res.status, errName, errMsg);
     logger.error('[email] ResendProvider delivery failed', { status: res.status, kind, error: errMsg });
-    return { ok: false, error: errMsg, kind };
+    const retryAfterSeconds = kind === 'rate_limited' ? readRetryAfterSeconds(res.headers) : undefined;
+    return {
+      ok: false, error: errMsg, kind,
+      ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+      ...(usage ? { usage } : {}),
+    };
   }
 
-  async validateCredentials(): Promise<{ ok: true } | { ok: false; error: string }> {
+  async validateCredentials(): Promise<{ ok: true; restricted?: true } | { ok: false; error: string }> {
     let res: Response;
     try {
       res = await fetch('https://api.resend.com/domains', {
@@ -120,6 +173,10 @@ export class ResendProvider implements EmailProvider {
       return { ok: false, error: message };
     }
     if (res.ok) return { ok: true };
+    // A send-only key is valid, but Resend refuses it on non-send endpoints.
+    if (res.status === 401 && (await readErrorName(res)) === 'restricted_api_key') {
+      return { ok: true, restricted: true };
+    }
     return { ok: false, error: `Resend ${res.status}` };
   }
 
@@ -129,8 +186,12 @@ export class ResendProvider implements EmailProvider {
    * restricted keys that 401 on GET /domains) → 422. No email is ever sent.
    * Lives on the provider so route handlers never hand-roll Resend URLs
    * (`lint:provider-helpers`).
+   *
+   * `reachable` is true when an HTTP response was received. On a network
+   * failure `valid` stays true (a save is never blocked on provider uptime)
+   * and `reachable` is false; callers that report a verdict must check it.
    */
-  async probeApiKey(): Promise<{ valid: boolean; status: number | null }> {
+  async probeApiKey(): Promise<{ valid: boolean; status: number | null; reachable: boolean }> {
     let res: Response | null;
     try {
       res = await fetch('https://api.resend.com/emails', {
@@ -142,25 +203,48 @@ export class ResendProvider implements EmailProvider {
         body: '{}',
       });
     } catch {
-      return { valid: true, status: null }; // network/5xx → don't block save on Resend uptime
+      return { valid: true, status: null, reachable: false }; // network failure → don't block save on Resend uptime
     }
-    if (res.status === 401 || res.status === 403) return { valid: false, status: res.status };
-    return { valid: true, status: res.status };
+    if (res.status === 401 || res.status === 403) return { valid: false, status: res.status, reachable: true };
+    return { valid: true, status: res.status, reachable: true };
   }
 
-  /** Count of verified domains visible to this key (0 when the key cannot list). */
-  async countVerifiedDomains(): Promise<number> {
+  /**
+   * List the sending domains visible to this key (GET /domains) and count the
+   * verified ones. A send-only key is rejected by Resend with 401
+   * `restricted_api_key` and reports `reason: 'restricted'`.
+   */
+  async listDomains(): Promise<
+    | { ok: true; total: number; verified: number }
+    | { ok: false; reason: 'restricted' | 'unreachable' | 'error'; status: number | null }
+  > {
     let res: Response;
     try {
       res = await fetch('https://api.resend.com/domains', {
         headers: { 'Authorization': `Bearer ${this.creds.apiKey}` },
       });
     } catch {
-      return 0;
+      return { ok: false, reason: 'unreachable', status: null };
     }
-    if (!res.ok) return 0;
-    const body = (await res.json().catch(() => null)) as { data?: unknown[] } | null;
-    return Array.isArray(body?.data) ? body.data.length : 0;
+    if (!res.ok) {
+      if (res.status === 401 && (await readErrorName(res)) === 'restricted_api_key') {
+        return { ok: false, reason: 'restricted', status: res.status };
+      }
+      return { ok: false, reason: 'error', status: res.status };
+    }
+    const body = (await res.json().catch(() => null)) as { data?: unknown } | null;
+    const data: unknown[] = Array.isArray(body?.data) ? body.data : [];
+    const verified = data.filter((d) => {
+      const status = (d as { status?: unknown } | null)?.status;
+      return typeof status === 'string' && status.toLowerCase() === 'verified';
+    }).length;
+    return { ok: true, total: data.length, verified };
+  }
+
+  /** Count of verified domains visible to this key (0 when the key cannot list). */
+  async countVerifiedDomains(): Promise<number> {
+    const result = await this.listDomains();
+    return result.ok ? result.verified : 0;
   }
 
   /**
