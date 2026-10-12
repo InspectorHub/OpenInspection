@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayer } from "./layers";
 
 /**
  * Measurement must happen before the browser paints, or the panel is visible
@@ -28,14 +29,12 @@ const PANEL_GAP_PX = 8;
  * no full-screen scrim, no body scroll-lock, no hard Tab focus-trap. The rest of
  * the page must stay visible and interactive while a Popover is open.
  *
- * This deliberately does NOT reuse useDialogBehavior. That hook's scroll-lock
- * and focus-trap are correct for Modal/Drawer but wrong here, and threading
- * boolean flags through it to opt a third, semantically different consumer out
- * of half its behavior would make it harder to reason about for its two real
- * callers. Esc-close + focus capture/restore are still shared *in spirit*
- * (same lifecycle shape), just reimplemented at popover scope: no scroll lock,
- * no trap, plus click-outside-to-close (which Modal/Drawer get for free from
- * their full-screen scrim, which this component doesn't have).
+ * This deliberately does NOT reuse useDialogBehavior: its scroll-lock and focus-trap
+ * are right for Modal/Drawer but wrong here. It does join the shared layer stack
+ * (layers.ts), so Escape closes the popover and NOT a modal underneath it; the next
+ * Escape then reaches the modal. No scroll lock, no trap; plus click-outside-to-close
+ * (which Modal/Drawer get for free from their full-screen scrim, which this
+ * component doesn't have).
  */
 export function Popover({ open, onClose, anchorRef, children, align = "right" }: PopoverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -112,28 +111,25 @@ export function Popover({ open, onClose, anchorRef, children, align = "right" }:
     };
   }, [open, reposition]);
 
-  // Esc-to-close, click-outside-to-close, focus capture on open / restore to
+  useLayer(open, { onEscape: onClose });
+
+  // Click-outside-to-close, focus capture on open / restore to
   // the anchor on close. Intentionally keyed on [open] only (see onCloseRef
   // above) so the lifecycle runs on open-toggle only, not on every render.
   useEffect(() => {
     if (!open) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCloseRef.current();
-    };
     // mousedown (not click) so this fires before any click-through to the
     // newly-focused element outside the panel — the standard dropdown/menu
     // dismiss pattern.
     const handlePointerDown = (e: MouseEvent) => {
       if (!panelRef.current?.contains(e.target as Node)) onCloseRef.current();
     };
-    document.addEventListener("keydown", handleKeyDown);
     document.addEventListener("mousedown", handlePointerDown);
 
     panelRef.current?.focus();
 
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("mousedown", handlePointerDown);
       anchorRef.current?.focus();
     };

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
-import { Icon } from "@core/shared-ui";
+import { Icon, useLayer } from "@core/shared-ui";
 import { Stage, Layer, Image as KonvaImage, Circle, Arrow, Line, Label, Tag, Text } from "react-konva";
 import type Konva from "konva";
 import {
@@ -136,21 +136,16 @@ export function PhotoAnnotator({
   /* -------------------------------------------------------------- */
   /* Escape to close (label input swallows it first)                 */
   /* -------------------------------------------------------------- */
-  useEffect(() => {
-    if (!open) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
+  useLayer(open, {
+    onEscape: () => {
       if (labelInput) {
         setLabelInput(null);
         setLabelText("");
         return;
       }
-      e.preventDefault();
       onClose();
-    }
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [open, onClose, labelInput]);
+    },
+  });
 
   /* -------------------------------------------------------------- */
   /* Pointer -> natural px                                           */

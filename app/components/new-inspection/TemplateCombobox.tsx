@@ -95,6 +95,7 @@ export function TemplateCombobox({
             return;
         }
         if (e.key === "Escape" && open) {
+            e.preventDefault();
             setOpen(false);
             setQuery("");
         }

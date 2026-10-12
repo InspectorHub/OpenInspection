@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayer } from '@core/shared-ui';
 
 export interface MobileBottomDrawerProps {
     open:    boolean;
@@ -15,19 +15,7 @@ export interface MobileBottomDrawerProps {
  * editor drawers (Sections / Items / Preview) share this primitive.
  */
 export function MobileBottomDrawer({ open, onClose, title, children, heightFraction = 0.7 }: MobileBottomDrawerProps) {
-    useEffect(() => {
-        if (!open) return;
-        const prev = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = prev; };
-    }, [open]);
-
-    useEffect(() => {
-        if (!open) return;
-        const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-        document.addEventListener('keydown', fn);
-        return () => document.removeEventListener('keydown', fn);
-    }, [open, onClose]);
+    useLayer(open, { onEscape: onClose, lockScroll: true });
 
     return (
         <>

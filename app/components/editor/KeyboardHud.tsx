@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { IconButton } from "@core/shared-ui";
+import { IconButton, useLayer } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 interface ShortcutColumn {
@@ -47,13 +46,7 @@ export function KeyboardHud({ onClose }: { onClose: () => void }) {
   // click, or another `?`). It previously kept a private `open` state that
   // started false, so it mounted but rendered nothing: the `?` HUD never
   // appeared after the Alpine→RR migration.
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  useLayer(true, { onEscape: onClose });
 
   return (
     <div className="hidden md:flex fixed inset-0 z-[9999] items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={m.editor_shortcuts_heading()}>

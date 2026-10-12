@@ -5,6 +5,7 @@ import { m } from "~/paraglide/messages";
 import { getPages, getSettings, RECENTS_CAP, type PaletteItem } from "./command-palette-items";
 import { importEntryHref } from "~/lib/import-entry-points";
 import type { ContactSearchItem } from "~/routes/resources/contact-search";
+import { useLayer } from "@core/shared-ui";
 
 /**
  * Lets any workspace surface (the sidebar search button, MobileHeader) open the
@@ -184,11 +185,12 @@ export function CommandPalette({
         setQuery("");
         setActiveIdx(0);
       }
-      if (e.key === "Escape") setOpen(false);
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [setOpen]);
+
+  useLayer(open, { onEscape: () => setOpen(false) });
 
   // Focus input when opened; lazy-load recent inspections via BFF resource route
   useEffect(() => {

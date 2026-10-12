@@ -123,7 +123,14 @@ export function TemplateCombobox({
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === "Escape") { setOpen(false); setQuery(""); return; }
+        if (e.key === "Escape") {
+            // Only consume the key when there was a list or a query to dismiss; otherwise a
+            // dialog around the combobox should still see it.
+            if (open || query) e.preventDefault();
+            setOpen(false);
+            setQuery("");
+            return;
+        }
         if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, results.length - 1)); return; }
         if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)); return; }
         if (e.key === "Enter" && activeIdx >= 0 && results[activeIdx]) {

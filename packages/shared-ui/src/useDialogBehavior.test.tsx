@@ -60,4 +60,36 @@ describe("stacked dialogs", () => {
     unmount();
     expect(document.body.style.overflow).toBe("");
   });
+
+  it("does not pull focus out of the top dialog when the one underneath closes", () => {
+    const { rerender } = render(<Stack onCloseBottom={() => {}} onCloseTop={() => {}} />);
+    screen.getByText("top-b").focus();
+    // The bottom dialog goes away while the top stays open.
+    rerender(
+      <Modal open title="Top" onClose={() => {}}>
+        <button type="button">top-a</button>
+        <button type="button">top-b</button>
+      </Modal>,
+    );
+    expect(screen.getByText("Top").closest('[role="dialog"]')!.contains(document.activeElement)).toBe(true);
+  });
+
+  it("removes a dialog that unmounts while open, so the one underneath answers Escape again", () => {
+    const bottom = vi.fn();
+    const { rerender } = render(<Stack onCloseBottom={bottom} onCloseTop={() => {}} />);
+    rerender(<Stack onCloseBottom={bottom} onCloseTop={() => {}} top={false} />);
+    rerender(<Stack onCloseBottom={bottom} onCloseTop={() => {}} top />);
+    rerender(<Stack onCloseBottom={bottom} onCloseTop={() => {}} top={false} />);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(bottom).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the dialog open when something inside it already used Escape", () => {
+    const top = vi.fn();
+    render(<Stack onCloseBottom={() => {}} onCloseTop={top} />);
+    const event = new KeyboardEvent("keydown", { key: "Escape", cancelable: true, bubbles: true });
+    event.preventDefault();
+    document.dispatchEvent(event);
+    expect(top).not.toHaveBeenCalled();
+  });
 });

@@ -1,6 +1,6 @@
-import { useEffect } from "react";
 import type { FindingDiff } from "~/lib/collab/snapshot-diff";
 import { m } from "~/paraglide/messages";
+import { useLayer } from "@core/shared-ui";
 
 /**
  * #181 PR-H (Task H2) — version compare + field recovery modal.
@@ -61,14 +61,7 @@ export function VersionCompare({
     busy = false,
 }: VersionCompareProps) {
     // Escape closes (unless busy) — mirrors the editor's other custom modals.
-    useEffect(() => {
-        if (!open) return;
-        function onKey(e: KeyboardEvent) {
-            if (e.key === "Escape" && !busy) onClose();
-        }
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [open, busy, onClose]);
+    useLayer(open, { onEscape: () => { if (!busy) onClose(); } });
 
     if (!open) return null;
 
