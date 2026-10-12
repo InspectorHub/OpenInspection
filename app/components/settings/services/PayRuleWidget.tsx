@@ -2,6 +2,7 @@ import { useState } from "react";
 import { PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import type { action } from "~/routes/settings-services";
 import { toHundredths, fromHundredths } from "~/lib/settings-services";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
@@ -70,6 +71,7 @@ function RuleRow({
     const { fetcher, submit, busy } = useGuardedSubmit<typeof action>({
         key: `pay-rule-${rule?.id ?? "new"}-${serviceId}`,
     });
+    const latch = useSubmitLatch(fetcher.state);
     const [type, setType] = useState<PayRule["type"]>(rule?.type ?? "percent");
     const [rate, setRate] = useState(rule ? rateOf(rule) : "");
     const [deduction, setDeduction] = useState(fromHundredths(rule?.deductionCents));
@@ -175,11 +177,11 @@ function RuleRow({
                 </button>
 
                 {rule ? (
-                    <fetcher.Form method="post" className="inline">
+                    <fetcher.Form method="post" className="inline" onSubmit={latch()}>
                         <input type="hidden" name="intent" value="pay-rule-delete" />
                         <input type="hidden" name="serviceId" value={serviceId} />
                         <input type="hidden" name="ruleId" value={rule.id} />
-                        <button type="submit" className="h-7 px-2 text-[12px] font-semibold text-ih-bad-fg hover:underline">
+                        <button type="submit" {...pendingProps(busy)} className={`h-7 px-2 text-[12px] font-semibold text-ih-bad-fg hover:underline ${PENDING_CLASS}`}>
                             {m.settings_pay_rule_remove()}
                         </button>
                     </fetcher.Form>

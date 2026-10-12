@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { m } from "~/paraglide/messages";
 import type { ModuleGroup } from "../../../server/lib/mcp/tag-catalog";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
@@ -58,6 +58,7 @@ export function ConsentForm({
 }: ConsentFormProps) {
 
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const decided = useRef(false);
 
 
 
@@ -137,7 +138,14 @@ export function ConsentForm({
 
 
 
-        <form method="post" className="space-y-5">
+        <form
+          method="post"
+          className="space-y-5"
+          onSubmit={(e) => {
+            if (decided.current) e.preventDefault();
+            else decided.current = true;
+          }}
+        >
 
           <input type="hidden" name="oauthReq" value={oauthReqJson} />
 

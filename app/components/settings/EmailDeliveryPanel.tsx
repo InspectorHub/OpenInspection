@@ -1,5 +1,6 @@
-import { Link, Form } from "react-router";
-import { SegmentedControl, RadioCardGroup } from "@core/shared-ui";
+import { Link, Form, useNavigation } from "react-router";
+import { SegmentedControl, RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import type { useForm } from "@conform-to/react";
 import { m } from "~/paraglide/messages";
 
@@ -74,13 +75,15 @@ export function EmailDeliveryPanel({
     mailgun: m.settings_email_provider_mailgun(),
   };
   const providerLabel = EMAIL_PROVIDER_LABELS[emailByoProvider];
+  const latch = useSubmitLatch();
+  const busy = useNavigation().state !== "idle";
   return (
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
         <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_emaildelivery_heading()}</h3>
         <Form
           method="post"
           id={emailForm.id}
-          onSubmit={emailForm.onSubmit}
+          onSubmit={latch(emailForm.onSubmit)}
           noValidate
           className="space-y-4"
         >
@@ -264,7 +267,7 @@ export function EmailDeliveryPanel({
                 </span>
               );
             })()}
-            <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
+            <button type="submit" {...pendingProps(busy)} className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}>
               {m.common_save()}
             </button>
           </div>

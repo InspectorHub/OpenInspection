@@ -1,9 +1,10 @@
-import { Form } from "react-router";
-import { Table } from "@core/shared-ui";
+import { Form, useNavigation } from "react-router";
+import { Table, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { QualificationWidget } from "./QualificationWidget";
 import { PayRuleWidget } from "./PayRuleWidget";
 import type { PayRule } from "./PayRuleWidget";
 import { DepositWidget } from "./DepositWidget";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { splitDurationMinutes, serviceIsBookable } from "~/lib/settings-services";
 import type { DepositPolicy } from "../../../../server/lib/billing/deposit-policy";
 import { m } from "~/paraglide/messages";
@@ -50,6 +51,21 @@ function durationLabel(minutes: number | null): string {
   if (split.hours && split.minutes) return m.settings_services_duration_hm(split);
   if (split.hours) return m.settings_services_duration_h({ hours: split.hours });
   return m.settings_services_duration_m({ minutes: split.minutes });
+}
+
+export function ToggleServiceForm({ svc }: { svc: Pick<Service, "id" | "active"> }) {
+  const latch = useSubmitLatch();
+  const busy = useNavigation().state !== "idle";
+  return (
+    <Form method="post" className="inline" onSubmit={latch()}>
+      <input type="hidden" name="intent" value="toggle-service" />
+      <input type="hidden" name="id" value={svc.id} />
+      <input type="hidden" name="active" value={String(svc.active)} />
+      <button type="submit" {...pendingProps(busy)} className={`text-[12px] font-semibold text-ih-primary-text hover:underline ${PENDING_CLASS}`}>
+        {svc.active ? m.settings_services_deactivate() : m.settings_services_activate()}
+      </button>
+    </Form>
+  );
 }
 
 export function ServicesCatalogPanel({
@@ -161,14 +177,7 @@ export function ServicesCatalogPanel({
                     {editingId === svc.id ? m.common_cancel() : m.settings_services_edit()}
                   </button>
                 )}
-                <Form method="post" className="inline">
-                  <input type="hidden" name="intent" value="toggle-service" />
-                  <input type="hidden" name="id" value={svc.id} />
-                  <input type="hidden" name="active" value={String(svc.active)} />
-                  <button type="submit" className="text-[12px] font-semibold text-ih-primary-text hover:underline">
-                    {svc.active ? m.settings_services_deactivate() : m.settings_services_activate()}
-                  </button>
-                </Form>
+                <ToggleServiceForm svc={svc} />
               </div>
             ),
           },

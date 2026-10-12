@@ -152,10 +152,10 @@ export default function SettingsContractorTypes() {
       <p className="text-[13px] text-ih-fg-3">{m.settings_contractor_types_intro()}</p>
 
       <div className="bg-ih-bg-card border border-ih-border rounded-lg p-4">
-        <createFetcher.Form method="POST" className="flex gap-2" onSubmit={() => setNewName("")}>
+        <createFetcher.Form method="POST" className="flex gap-2" onSubmit={(e) => { if (!newName.trim()) { e.preventDefault(); return; } setNewName(""); }}>
           <input type="hidden" name="intent" value="create" />
           <input name="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={m.settings_contractor_types_name_placeholder()} className={`flex-1 ${INPUT}`} />
-          <button type="submit" disabled={!newName.trim()} className="px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold disabled:opacity-50">{m.common_add()}</button>
+          <button type="submit" {...pendingProps(!newName.trim())} className={`px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold ${PENDING_CLASS}`}>{m.common_add()}</button>
         </createFetcher.Form>
       </div>
 

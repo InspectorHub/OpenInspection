@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
-import { Form, createRoutesStub } from "react-router";
+import { Form, createRoutesStub, useFetcher } from "react-router";
 import { useSubmitLatch } from "./useSubmitLatch";
 
 afterEach(cleanup);
@@ -81,5 +81,57 @@ describe("useSubmitLatch", () => {
             fireEvent.submit(form());
         });
         expect(calls).toBe(0);
+    });
+});
+
+function FetcherHarness() {
+    const fetcher = useFetcher();
+    const latch = useSubmitLatch(fetcher.state);
+    return (
+        <fetcher.Form method="post" data-testid="fform" onSubmit={latch()}>
+            <button type="submit">go</button>
+        </fetcher.Form>
+    );
+}
+
+function renderFetcherHarness() {
+    const Stub = createRoutesStub([
+        {
+            path: "/",
+            Component: FetcherHarness,
+            action: async () => {
+                calls += 1;
+                await new Promise<void>((resolve) => { release = resolve; });
+                return null;
+            },
+        },
+    ]);
+    render(<Stub initialEntries={["/"]} />);
+}
+
+describe("useSubmitLatch with a fetcher", () => {
+    it("follows the fetcher: two same-frame submits post once", async () => {
+        renderFetcherHarness();
+        const f = () => screen.getByTestId("fform");
+        act(() => {
+            fireEvent.submit(f());
+            fireEvent.submit(f());
+        });
+        await waitFor(() => expect(calls).toBe(1));
+        expect(calls).toBe(1);
+        await act(async () => { release(); });
+    });
+
+    it("CONTROL - releases when the fetcher returns to idle, since navigation never leaves idle", async () => {
+        renderFetcherHarness();
+        const f = () => screen.getByTestId("fform");
+        act(() => { fireEvent.submit(f()); });
+        await waitFor(() => expect(calls).toBe(1));
+        await act(async () => { release(); });
+        await waitFor(() => {
+            fireEvent.submit(f());
+            expect(calls).toBe(2);
+        });
+        await act(async () => { release(); });
     });
 });

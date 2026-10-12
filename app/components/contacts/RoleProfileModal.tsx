@@ -8,6 +8,7 @@ import { capabilitiesForProfile, type RoleCapabilities } from "../../../server/l
 // The picker offers the vocabulary itself: an option it rendered that the
 // form schema refuses would save nothing and say nothing.
 import { ROLE_KINDS } from "../../../server/lib/people/role-kinds";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 import { KIND_LABEL, type MessageTemplateOption, type RoleProfile } from "./contacts-helpers";
 
@@ -67,6 +68,7 @@ export function RoleProfileModal({
       ? undefined
       : (fetcher.data as SubmissionResult<string[]> | undefined);
 
+  const latch = useSubmitLatch(fetcher.state);
   const [form, fields] = useForm({
     lastResult,
     onValidate({ formData }) {
@@ -125,14 +127,14 @@ export function RoleProfileModal({
       footer={
         <>
           <Button variant="secondary" type="button" onClick={onClose}>{m.common_cancel()}</Button>
-          <Button variant="primary" type="submit" form={form.id}>{m.common_save()}</Button>
+          <Button variant="primary" type="submit" form={form.id} pending={fetcher.state !== "idle"}>{m.common_save()}</Button>
         </>
       }
     >
       <fetcher.Form
         method="post"
         id={form.id}
-        onSubmit={form.onSubmit}
+        onSubmit={latch(form.onSubmit)}
         noValidate
         className="space-y-4"
       >

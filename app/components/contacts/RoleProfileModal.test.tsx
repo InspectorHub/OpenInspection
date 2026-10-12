@@ -26,6 +26,7 @@ vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof import("react-router")>("react-router");
   return {
     ...actual,
+    useNavigation: () => ({ state: "idle" }),
     useFetcher: vi.fn(() => ({
       get state() {
         return fetcherState;
@@ -128,5 +129,18 @@ describe("RoleProfileModal — auto-close on save", () => {
     rerender(<RoleProfileModal open onClose={onClose} profile={null} templates={[]} />);
 
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("RoleProfileModal - Save while pending", () => {
+  it("keeps Save focusable but inert while the fetcher is busy", () => {
+    const { getByText, rerender } = renderModal(true, vi.fn());
+    const save = getByText("Save").closest("button") as HTMLButtonElement;
+    expect(save.getAttribute("aria-disabled")).toBeNull();
+
+    fetcherState = "submitting";
+    rerender(<RoleProfileModal open onClose={vi.fn()} profile={null} templates={[]} />);
+    expect(save.getAttribute("aria-disabled")).toBe("true");
+    expect(save.disabled).toBe(false);
   });
 });

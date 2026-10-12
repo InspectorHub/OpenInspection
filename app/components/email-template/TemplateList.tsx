@@ -1,4 +1,6 @@
 import { Link, useFetcher } from "react-router";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
 export interface TemplateRow {
@@ -35,6 +37,7 @@ export function TemplateList({ rows }: { rows: TemplateRow[] }) {
 
 function TemplateRowItem({ row }: { row: TemplateRow }) {
   const fetcher = useFetcher();
+  const latch = useSubmitLatch(fetcher.state);
   const enabled = fetcher.formData ? fetcher.formData.get("enabled") === "true" : row.enabled;
   return (
     <div className="group flex items-center gap-4 px-5 py-3.5 hover:bg-ih-bg-muted/60 transition-colors">
@@ -51,11 +54,11 @@ function TemplateRowItem({ row }: { row: TemplateRow }) {
       ) : row.isCustomized ? (
         <span className={`text-[10px] font-bold uppercase tracking-widest shrink-0 ${enabled ? "text-ih-ok-fg" : "text-ih-fg-3"}`}>{enabled ? m.email_list_active() : m.email_list_disabled()}</span>
       ) : (
-        <fetcher.Form method="post" className="shrink-0">
+        <fetcher.Form method="post" className="shrink-0" onSubmit={latch()}>
           <input type="hidden" name="intent" value="toggle-template" />
           <input type="hidden" name="trigger" value={row.trigger} />
           <input type="hidden" name="enabled" value={(!enabled).toString()} />
-          <button type="submit" aria-pressed={enabled} aria-label={enabled ? m.email_list_disable_aria({ name: row.name }) : m.email_list_enable_aria({ name: row.name })} className={`relative h-5 w-9 rounded-full transition-colors ${enabled ? "bg-ih-primary" : "bg-ih-border"}`}>
+          <button type="submit" {...pendingProps(fetcher.state !== "idle")} aria-pressed={enabled} aria-label={enabled ? m.email_list_disable_aria({ name: row.name }) : m.email_list_enable_aria({ name: row.name })} className={`relative h-5 w-9 rounded-full transition-colors ${PENDING_CLASS} ${enabled ? "bg-ih-primary" : "bg-ih-border"}`}>
             <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-ih-bg-card shadow-ih-card transition-all ${enabled ? "left-[18px]" : "left-0.5"}`} />
           </button>
         </fetcher.Form>

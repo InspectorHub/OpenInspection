@@ -21,6 +21,7 @@ import { EmailSignatureCard, SavedSignatureCard } from "~/components/settings/Si
 import { InspectorIdentityFields } from "~/components/settings/InspectorIdentityFields";
 import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { bulkNotificationChoice, grantNotificationSms, loadNotificationScreen, saveNotificationChoice } from "~/lib/settings-notifications.server";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
 // F68 — with no `meta` this page's browser tab reads only "OpenInspection".
@@ -292,6 +293,7 @@ export default function SettingsProfilePage() {
   // Conform owns the main profile form (default intent). The save-signature
   // intent is handled by a separate useFetcher below, so guard against feeding
   // a non-Conform actionData into useForm.
+  const latch = useSubmitLatch();
   const [form, fields] = useForm({
     lastResult: actionData && "status" in actionData ? actionData : undefined,
     onValidate({ formData }) {
@@ -411,7 +413,7 @@ export default function SettingsProfilePage() {
       <Form
         method="post"
         id={form.id}
-        onSubmit={form.onSubmit}
+        onSubmit={latch(form.onSubmit)}
         noValidate
         className="space-y-5"
       >

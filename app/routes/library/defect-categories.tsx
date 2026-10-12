@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useLoaderData, useFetcher } from "react-router";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import type { Route } from "./+types/defect-categories";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { PageHeader, Card, Button, EmptyState } from "@core/shared-ui";
+import { PageHeader, Card, Button, EmptyState, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { DefectCategoryEditor, type EditorDefectCategory } from "~/components/DefectCategoryEditor";
 import { m } from "~/paraglide/messages";
@@ -48,6 +49,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function DefectCategoriesPage() {
   const { categories, loadFailed } = useLoaderData<typeof loader>();
   const deleteFetcher = useFetcher();
+  const latch = useSubmitLatch(deleteFetcher.state);
+  const deleting = deleteFetcher.state !== "idle";
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<EditorDefectCategory | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -110,10 +113,10 @@ export default function DefectCategoriesPage() {
                     </button>
                     {!cat.isSeed && (
                       confirming ? (
-                        <deleteFetcher.Form method="post" onSubmit={() => setConfirmId(null)}>
+                        <deleteFetcher.Form method="post" onSubmit={latch(() => setConfirmId(null))}>
                           <input type="hidden" name="intent" value="delete" />
                           <input type="hidden" name="id" value={cat.id} />
-                          <button type="submit" className="text-[12px] font-bold text-ih-bad-fg hover:opacity-80 px-1">{m.library_action_confirm()}</button>
+                          <button type="submit" {...pendingProps(deleting)} className={`text-[12px] font-bold text-ih-bad-fg hover:opacity-80 px-1 ${PENDING_CLASS}`}>{m.library_action_confirm()}</button>
                         </deleteFetcher.Form>
                       ) : (
                         <button onClick={() => setConfirmId(cat.id)} className="text-[13px] text-ih-fg-3 hover:text-ih-bad-fg font-semibold px-1" title={m.common_delete()}>{m.common_delete()}</button>

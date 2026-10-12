@@ -29,6 +29,9 @@ export function MobileBottomDrawer({ open, onClose, title, children, heightFract
                 role="dialog"
                 aria-modal="true"
                 aria-label={title}
+                // Closed, the sheet is only parked below the viewport: keep it out of the tab order and the accessibility tree.
+                inert={!open}
+                aria-hidden={open ? undefined : true}
                 className={`fixed left-0 right-0 bottom-0 z-50 bg-ih-bg-card rounded-t-2xl shadow-ih-popover flex flex-col transition-transform ${
                     open ? 'translate-y-0' : 'translate-y-full'
                 }`}

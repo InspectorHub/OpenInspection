@@ -256,7 +256,7 @@ function AddUnitForm({ busy, onSubmit }: { busy: boolean; onSubmit: (fields: Rec
         aria-label={m.editor_unitsmanager_new_unit_name()}
         className="flex-1 h-8 px-2.5 rounded-ih-input border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
       />
-      <Button variant="secondary" size="sm" pending={busy} disabled={!trimmed} onClick={add}>
+      <Button variant="secondary" size="sm" pending={busy || !trimmed} onClick={add}>
         {m.common_add()}
       </Button>
     </div>
