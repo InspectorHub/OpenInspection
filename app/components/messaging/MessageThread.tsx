@@ -22,11 +22,11 @@
  *   client portal fetches the public track directly; the inspector goes
  *   through a BFF resource route. This component cannot tell, and must not.
  */
-import { VerificationCancelledError } from "~/components/OutboundVerification";
 import { useEffect, useRef, useState } from "react";
 import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { bucketMessages, dayKeyInZone, dayLabel, type MessageRow } from "~/lib/communication-view";
+import { VerificationCancelledError } from "~/lib/verification-cancelled";
 
 export interface ThreadMessage extends MessageRow {
   /** Local-only: an optimistic send not yet confirmed, or one that failed. */

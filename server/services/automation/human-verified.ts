@@ -1,6 +1,6 @@
-import { and, eq, isNull, like } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { automationLogs } from '../../lib/db/schema';
+import { automationLogs, automations } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
 import type { HumanVerifier } from '../../lib/email/outbound-cooling-window';
 
@@ -28,9 +28,13 @@ async function stampHumanVerifiedLogs(
             eq(automationLogs.inspectionId, inspectionId),
             eq(automationLogs.channel, 'email'),
             eq(automationLogs.status, 'pending'),
-            // Only what THIS publish queued: the report.published rules' rows. Delayed
-            // reminders or follow-ups queued by anything else are not vouched for.
-            like(automationLogs.eventId, 'auto:report.published:%'),
+            // Only what a publish queues: rows of this tenant's report.published and
+            // report.amended rules. Reminders or follow-ups from other rules are not
+            // vouched for. Matched on the RULE, not on a dedup-key string.
+            inArray(automationLogs.automationId, db.select({ id: automations.id }).from(automations).where(and(
+                eq(automations.tenantId, tenantId),
+                inArray(automations.trigger, ['report.published', 'report.amended']),
+            ))),
             isNull(automationLogs.humanVerifiedAt),
         ));
 }

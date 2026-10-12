@@ -18,14 +18,6 @@ type EnsureHuman = () => Promise<boolean>;
 
 const EnsureHumanContext = createContext<EnsureHuman>(async () => true);
 
-/** Thrown by a caller that gave up because the person closed the challenge. */
-export class VerificationCancelledError extends Error {
-  constructor() {
-    super("verification cancelled");
-    this.name = "VerificationCancelledError";
-  }
-}
-
 export function useEnsureHuman(): EnsureHuman {
   return useContext(EnsureHumanContext);
 }
@@ -85,9 +77,21 @@ export function useChallengeOnRefusal(
   const [open, setOpen] = useState<{ id: number; siteKey: string } | null>(null);
   const handled = useRef<unknown>(null);
   const counter = useRef(0);
+  // True between "sent again after a passed check" and the answer to that send.
+  const retried = useRef(false);
   useEffect(() => {
-    if (state !== "idle" || !data?.verifySiteKey || data === handled.current) return;
+    if (state !== "idle" || !data || data === handled.current) return;
     handled.current = data;
+    if (!data.verifySiteKey) {
+      retried.current = false;
+      return;
+    }
+    // Refused again straight after a passed check: asking again would loop forever
+    // (the server cannot accept this token). Stop and let the page show its error.
+    if (retried.current) {
+      retried.current = false;
+      return;
+    }
     counter.current += 1;
     setOpen({ id: counter.current, siteKey: data.verifySiteKey });
   }, [data, state]);
@@ -99,7 +103,10 @@ export function useChallengeOnRefusal(
       siteKey={open.siteKey}
       onDone={(ok) => {
         setOpen(null);
-        if (ok) resubmit();
+        if (ok) {
+          retried.current = true;
+          resubmit();
+        }
       }}
     />
   );
@@ -121,6 +128,9 @@ export function OutboundVerificationProvider({
   children: ReactNode;
 }) {
   const [pending, setPending] = useState<Pending | null>(null);
+  // The request on screen, held outside React state so settling it is never a side
+  // effect of a state updater (which React may run more than once).
+  const pendingRef = useRef<Pending | null>(null);
   const counter = useRef(0);
 
   const ensureHuman = useCallback<EnsureHuman>(() => {
@@ -132,18 +142,18 @@ export function OutboundVerificationProvider({
       const id = counter.current;
       // A second request while a dialog is open replaces it; the first caller is
       // told "not verified" instead of waiting forever.
-      setPending((prev) => {
-        prev?.resolve(false);
-        return { id, resolve };
-      });
+      pendingRef.current?.resolve(false);
+      const next = { id, resolve };
+      pendingRef.current = next;
+      setPending(next);
     });
   }, [windowOpen, siteKey]);
 
   const finish = useCallback((ok: boolean) => {
-    setPending((p) => {
-      p?.resolve(ok);
-      return null;
-    });
+    const current = pendingRef.current;
+    pendingRef.current = null;
+    setPending(null);
+    current?.resolve(ok);
   }, []);
 
   return (

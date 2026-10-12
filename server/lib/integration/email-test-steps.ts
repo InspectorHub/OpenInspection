@@ -70,6 +70,8 @@ const pause = () => new Promise<void>((resolve) => setTimeout(resolve, RATE_LIMI
 async function keyValid(provider: ResendProvider): Promise<StepResult> {
     let probe = await provider.probeApiKey();
     if (probe.status === 429) { await pause(); probe = await provider.probeApiKey(); }
+    // Still rate limited: the key was never checked, which is not the same as accepted.
+    if (probe.status === 429) return result('key_valid', 'fail', 'Resend is rate limiting this account, so the key could not be checked. Wait a moment and retry.');
     if (!probe.reachable) return result('key_valid', 'fail', 'Could not reach Resend. Try again in a moment.');
     if (!probe.valid) return result('key_valid', 'fail', 'Resend rejected the saved API key.');
     return result('key_valid', 'pass', 'Resend accepted the API key.');

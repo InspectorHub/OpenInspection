@@ -158,6 +158,12 @@ describe('send_test', () => {
         expect(r.status).toBe('pass');
         expect(n).toBe(2);
     });
+    it('does not call the key accepted when Resend is still rate limiting on the retry', async () => {
+        stubNet({ probe: () => json({}, 429, { 'retry-after': '1' }) });
+        const r = await runEmailStep('key_valid', deps());
+        expect(r.status).toBe('fail');
+        expect(r.detail).toMatch(/rate limiting/i);
+    });
     it('does not send when the domain step failed', async () => {
         const calls = stubNet({ domains: () => json({ data: [] }, 200) });
         const r = await runEmailStep('send_test', deps());

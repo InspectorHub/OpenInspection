@@ -117,4 +117,17 @@ describe("useChallengeOnRefusal", () => {
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Cancel" })); });
     expect(resubmit).not.toHaveBeenCalled();
   });
+
+  it("does not loop: a refusal straight after a passed check is left to the page's error", async () => {
+    const resubmit = vi.fn();
+    const { rerender } = render(<Page data={{ verifySiteKey: "k" }} resubmit={resubmit} />);
+    await act(async () => emitToken!("0.token-value-1234567890"));
+    expect(resubmit).toHaveBeenCalledOnce();
+    // The same refusal comes back for the re-send: no second dialog.
+    rerender(<Page data={{ verifySiteKey: "k" }} resubmit={resubmit} />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // A later, separate refusal is a new attempt and asks again.
+    rerender(<Page data={{ verifySiteKey: "k" }} resubmit={resubmit} />);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
 });

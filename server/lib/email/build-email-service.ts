@@ -32,7 +32,8 @@ import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
  */
 export interface EmailServiceEnv {
     DB: D1Database;
-    APP_MODE?: string; TURNSTILE_SITE_KEY?: string; TURNSTILE_SECRET_KEY?: string;
+    APP_MODE?: string;
+    TURNSTILE_SITE_KEY?: string;
     TENANT_CACHE: KVNamespace;
     /** Test-only email sink flag (see AppEnv.E2E_EMAIL_SINK). '1' ⇒ capture, don't send. */
     E2E_EMAIL_SINK?: string;
@@ -394,6 +395,8 @@ export async function buildTenantEmailService(
     tenantTier?: string,
     options: { humanVerified?: HumanVerifier } = {},
 ): Promise<EmailService> {
-    if (!tenantId) return assembleTenantEmailService(env, { dbSecrets: {} });
+    if (!tenantId) {
+        return assembleTenantEmailService(env, { dbSecrets: {} });
+    }
     return assembleTenantEmailService(env, await loadTenantEmailConfig(env, tenantId), tenantId, quotaGuard, tenantTier, options);
 }

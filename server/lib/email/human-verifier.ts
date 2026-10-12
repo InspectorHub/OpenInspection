@@ -21,11 +21,17 @@ export function buildHumanVerifier(c: Context): HumanVerifier | undefined {
     // Keyed by the token on the OUTER request's scope: a token redeems once, so every
     // in-process call of one page action must share a single answer, or the second
     // send of the same action would be refused for a token the first one spent.
-    const verifier: HumanVerifier = () => memoOnce(c.env, `human-verified:${token}`, async () => {
+    const attempt = async (): Promise<'yes' | 'no' | 'error'> => {
         const policy = resolveTurnstile(c.env);
-        if (!policy.enforced) return false;
-        try { return await verifyTurnstile(token, policy.secret); } catch { return false; }
-    });
+        if (!policy.enforced) return 'no';
+        try { return (await verifyTurnstile(token, policy.secret)) ? 'yes' : 'no'; } catch { return 'error'; }
+    };
+    // A definite answer is shared across the page action's calls; a transient failure
+    // is not cached as "not a person" and gets one fresh attempt.
+    const verifier: HumanVerifier = async () => {
+        const first = await memoOnce(c.env, `human-verified:${token}`, attempt);
+        return (first === 'error' ? await attempt() : first) === 'yes';
+    };
     // Also exposed on the context, so a route that learns the person is verified
     // (publish) can vouch for work it queued.
     c.set('humanVerified', verifier);

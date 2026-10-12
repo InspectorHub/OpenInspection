@@ -15,7 +15,7 @@ const T2 = '00000000-0000-0000-0000-0000000aa002';
 let db: BetterSQLite3Database<typeof schema>;
 
 const row = (id: string, over: Record<string, unknown> = {}) => ({
-    id, tenantId: T1, inspectionId: 'insp-1', recipient: 'c@example.com', channel: 'email' as const, eventId: 'auto:report.published:insp-1',
+    id, tenantId: T1, inspectionId: 'insp-1', recipient: 'c@example.com', channel: 'email' as const, automationId: 'rule-pub',
     sendAt: new Date(), status: 'pending' as const, ...over,
 });
 
@@ -23,9 +23,15 @@ beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db;
     await setupSchema(fx.sqlite);
+    const rule = (id: string, trigger: string, tenantId = T1) => ({
+        id, tenantId, name: id, trigger, recipientKind: 'all', createdAt: new Date(),
+    });
     for (const [id, slug] of [[T1, 'a1'], [T2, 'a2']] as const) {
         await db.insert(schema.tenants).values({ id, slug, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() } as never);
     }
+    await db.insert(schema.automations).values([
+        rule('rule-pub', 'report.published'), rule('rule-amended', 'report.amended'), rule('rule-other', 'inspection.reminder'),
+    ] as never);
 });
 
 const stamped = async () =>
@@ -40,11 +46,12 @@ describe('stampHumanVerifiedLogs', () => {
             row('other-tenant', { tenantId: T2 }),
             row('sms', { channel: 'sms' }),
             row('already-sent', { status: 'sent' }),
-            row('other-trigger', { eventId: 'auto:reminder:insp-1' }),
-            row('no-event', { eventId: null }),
+            row('other-trigger', { automationId: 'rule-other' }),
+            row('manual-send', { automationId: null }),
+            row('amended', { automationId: 'rule-amended' }),
         ] as never);
         await stampIfHumanVerified(async () => true, db as never, T1, 'insp-1');
-        expect(await stamped()).toEqual(['mine']);
+        expect(await stamped()).toEqual(['amended', 'mine']);
     });
 
     it('never overwrites an earlier stamp', async () => {

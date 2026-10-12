@@ -84,6 +84,7 @@
   "app/routes/team.tsx": 405,
   "server/api/admin/admin-data.ts": 406,
   "server/services/email/base.ts": 430,
+  "server/lib/email/build-email-service.ts": 403,
   "scripts/check-non-translatable.mjs": 402,
   "playwright.config.ts": 401
 }

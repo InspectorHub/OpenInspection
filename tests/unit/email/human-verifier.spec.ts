@@ -65,4 +65,15 @@ describe('buildHumanVerifier across the in-process calls of one page action', ()
         expect(await second()).toBe(true);
         expect(f).toHaveBeenCalledTimes(1);
     });
+
+    it('does not cache a transient siteverify failure as "not a person"', async () => {
+        let n = 0;
+        vi.stubGlobal('fetch', vi.fn(async () => {
+            if (++n === 1) throw new Error('network blip');
+            return new Response(JSON.stringify({ success: true }), { status: 200 });
+        }));
+        const v = buildHumanVerifier(ctx({ 'x-turnstile-token': 'a'.repeat(20) }, inProcess()) as never)!;
+        expect(await v()).toBe(true);
+        expect(n).toBe(2);
+    });
 });

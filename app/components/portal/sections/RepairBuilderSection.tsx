@@ -19,10 +19,10 @@
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
-import { useChallengeOnRefusal } from "~/components/OutboundVerification";
 import { useState, useCallback, useEffect } from "react";
 import { useFetcher } from "react-router";
 import { m } from "~/paraglide/messages";
+import { useChallengeOnRefusal } from "~/components/OutboundVerification";
 import { RepairDefectRow } from "./repair/RepairDefectRow";
 import { useRepairOpQueue } from "./repair/useRepairOpQueue";
 import { useRepairItemDrafts } from "./repair/useRepairItemDrafts";

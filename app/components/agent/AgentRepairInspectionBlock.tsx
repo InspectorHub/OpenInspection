@@ -13,11 +13,11 @@
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
-import { useChallengeOnRefusal } from "~/components/OutboundVerification";
 import { useState } from "react";
 import { useFetcher } from "react-router";
 import { RepairDefectRowView, type RepairDefectPhoto } from "~/components/portal/sections/repair/RepairDefectRowView";
 import { RepairSharePanel } from "~/components/portal/sections/repair/RepairSharePanel";
+import { useChallengeOnRefusal } from "~/components/OutboundVerification";
 import { agentMayWriteRepairList, type AgentRepairAccess } from "~/lib/agent-repair-access";
 import { m } from "~/paraglide/messages";
 
