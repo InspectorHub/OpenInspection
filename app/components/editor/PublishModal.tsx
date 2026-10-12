@@ -22,6 +22,12 @@ export interface PublishModalProps {
  isSubmitting: boolean;
  onClose: () => void;
  /**
+  * The instant a new company's cooling window closes, when the host route has it.
+  * The full-screen editor sits outside the workspace layout, so the session
+  * context this modal otherwise reads is absent there; it passes its own.
+  */
+ coolingUnlockAtMs?: number | null;
+ /**
   * Publish the report. `markComplete` also closes the order axis first, and
   * `extras` carries the fields collected below — the owning route must send them
   * with the publish, not beside it.
@@ -57,7 +63,7 @@ export interface PublishModalProps {
  onAutoSignToggle: (checked: boolean) => void;
 }
 
-export function PublishModal({ open, progress, status, publishError, isSubmitting, onClose, onPublish, autoSign, onAutoSignToggle, isAmendment }: PublishModalProps) {
+export function PublishModal({ open, progress, status, publishError, isSubmitting, onClose, onPublish, autoSign, onAutoSignToggle, isAmendment, coolingUnlockAtMs }: PublishModalProps) {
  // The order lifecycle does not gate publishing (report and order axes are
  // independent). When the on-site work is not yet marked complete, offer an
  // advisory choice — do both, or just publish — but never block.
@@ -72,7 +78,8 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  // Same `unlockAtMs` the banner reads, so the two cannot name different times;
  // it is non-null only while the window is open, and the server decides that
  // (see resolveCoolingWindowForSession) — no clock arithmetic here.
- const unlockAtMs = useSessionContext()?.outboundCoolingWindow?.unlockAtMs ?? null;
+ const sessionUnlockAtMs = useSessionContext()?.outboundCoolingWindow?.unlockAtMs ?? null;
+ const unlockAtMs = coolingUnlockAtMs ?? sessionUnlockAtMs;
  const timeZone = useDisplayTimeZone();
  const dtFormat = useChromeDateTimeFormat();
 

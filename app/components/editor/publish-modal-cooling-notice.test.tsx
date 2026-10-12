@@ -39,6 +39,12 @@ const props = {
 };
 
 describe('PublishModal — outbound cooling window', () => {
+  it('shows the notice from its own prop when the host route has no session context (the full-screen editor)', () => {
+    unlockAtMs = null;
+    render(<PublishModal {...props} coolingUnlockAtMs={Date.now() + 3_600_000} />);
+    expect(screen.getByText(/less than a day old/i)).toBeTruthy();
+  });
+
   it('says nothing when the company is not in a window', () => {
     unlockAtMs = null;
     render(<PublishModal {...props} />);

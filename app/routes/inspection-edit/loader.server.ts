@@ -207,14 +207,19 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  let tenantSlug: string | null = null;
  let videoProvider: "r2" | "stream" = "r2";
  let collabEditing = false;
+ // The full-screen editor is declared outside the workspace layout, so it has no
+ // session context of its own; this is what lets it ask for the human check.
+ let outboundCoolingWindow: { unlockAtMs: number; turnstileSiteKey: string | null } | null = null;
  if (sessRes?.ok) {
  const sb = await sessRes.json() as {
   data?: {
    branding?: { tenantSlug?: string | null };
    videoProvider?: "r2" | "stream";
    collabEditing?: boolean;
+   outboundCoolingWindow?: { unlockAtMs: number; turnstileSiteKey: string | null } | null;
   };
  };
+ outboundCoolingWindow = sb.data?.outboundCoolingWindow ?? null;
  tenantSlug = sb.data?.branding?.tenantSlug ?? null;
  // Plan 7 — resolved video backend provider for this tenant (default 'r2').
  // Drives VideoCapture/VideoPlayer branch selection in the editor.
@@ -371,5 +376,5 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // `report_versions.length`; both mean "a version already exists".
  const nextPublishIsAmendment = isReportPublished(inspection.reportStatus);
 
- return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage, nextPublishIsAmendment };
+ return { inspection, schema, results, resultId, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, outboundCoolingWindow, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage, nextPublishIsAmendment };
 }

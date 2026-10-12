@@ -30,6 +30,7 @@ const reportDataGet = vi.fn();
  * — so it is the default, and the tests that care set it.
  */
 let statutoryDetailsResponse: Response | null = null;
+let sessionContextBody: unknown = null;   // a Response body is single-use, so the stub builds one per call
 
 vi.mock('~/lib/session.server', () => ({
     requireToken: vi.fn().mockResolvedValue('tok'),
@@ -64,7 +65,7 @@ vi.mock('~/lib/api-client.server', () => ({
             },
         },
         tags: { index: { $get: async () => null } },
-        sessionContext: { context: { $get: async () => null } },
+        sessionContext: { context: { $get: async () => (sessionContextBody === null ? null : json(sessionContextBody)) } },
         defectCategories: { 'defect-categories': { $get: async () => null } },
     })),
 }));
@@ -137,6 +138,7 @@ beforeEach(() => {
         ratingLevels: [],
     }));
     statutoryDetailsResponse = null;   // the ordinary inspection: no statutory form
+    sessionContextBody = null;
 });
 
 describe('editor loader — item attributes survive the report-data overlay', () => {
@@ -267,5 +269,23 @@ describe('editor loader — nextPublishIsAmendment', () => {
         // that would put a revision-reason box on a first publish.
         const data = await loadAll();
         expect(data.nextPublishIsAmendment).toBe(false);
+    });
+});
+
+describe('loader — the human check for a new company', () => {
+    it('passes the open cooling window and the site key through, so the editor can ask for the check', async () => {
+        sessionContextBody = { outboundCoolingWindow: { unlockAtMs: 1_800_000_000_000, turnstileSiteKey: 'site-key-1' } };
+        const data = await loadAll();
+        expect(data.outboundCoolingWindow).toEqual({ unlockAtMs: 1_800_000_000_000, turnstileSiteKey: 'site-key-1' });
+    });
+
+    // One load per test: the other stubs hand out single-use Response bodies.
+    it.each([
+        ['the window has closed', { outboundCoolingWindow: null }],
+        ['the field is absent', {}],
+        ['the session context could not be read', null],
+    ])('is null when %s', async (_name, body) => {
+        sessionContextBody = body;
+        expect((await loadAll()).outboundCoolingWindow).toBeNull();
     });
 });
