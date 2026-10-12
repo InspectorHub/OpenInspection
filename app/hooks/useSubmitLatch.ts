@@ -23,12 +23,25 @@ import { useNavigation } from "react-router";
 export function useSubmitLatch(fetcherState?: string) {
     const navigation = useNavigation();
     const latched = useRef(false);
+    const sawBusy = useRef(false);
+    const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const state = fetcherState ?? navigation.state;
 
     useEffect(() => {
-        if (state === "idle") latched.current = false;
+        if (state === "idle") {
+            latched.current = false;
+            sawBusy.current = false;
+            clearTimeout(timer.current);
+        } else {
+            sawBusy.current = true;
+        }
     }, [state]);
 
+    useEffect(() => () => clearTimeout(timer.current), []);
+
+    // The latch also opens one macrotask after it closes when the state was never seen non-idle: an
+    // idle -> submitting -> idle round trip that React batched into one render would otherwise leave
+    // it closed for good. Two submits in one task are still blocked.
     return useCallback(
         <E extends FormEvent<HTMLFormElement>>(next?: (event: E) => void) =>
             (event: E): void => {
@@ -37,7 +50,13 @@ export function useSubmitLatch(fetcherState?: string) {
                     return;
                 }
                 next?.(event);
-                if (!event.defaultPrevented) latched.current = true;
+                if (event.defaultPrevented) return;
+                latched.current = true;
+                sawBusy.current = false;
+                clearTimeout(timer.current);
+                timer.current = setTimeout(() => {
+                    if (!sawBusy.current) latched.current = false;
+                }, 0);
             },
         [],
     );

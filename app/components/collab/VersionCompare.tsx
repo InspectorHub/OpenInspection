@@ -1,7 +1,6 @@
-import { useEffect, useRef } from "react";
 import type { FindingDiff } from "~/lib/collab/snapshot-diff";
 import { m } from "~/paraglide/messages";
-import { PENDING_CLASS, pendingProps, useLayer } from "@core/shared-ui";
+import { PENDING_CLASS, pendingProps, useActionLatch, useLayer } from "@core/shared-ui";
 
 /**
  * #181 PR-H (Task H2) — version compare + field recovery modal.
@@ -64,16 +63,10 @@ export function VersionCompare({
     // Escape closes (unless busy) — mirrors the editor's other custom modals.
     useLayer(open, { onEscape: () => { if (!busy) onClose(); } });
 
-    // Two clicks inside one frame both run before `busy` renders.
-    const inFlight = useRef(false);
-    useEffect(() => {
-        if (!busy) inFlight.current = false;
-    }, [busy]);
-    const once = (run: () => void) => () => {
-        if (inFlight.current) return;
-        inFlight.current = true;
-        run();
-    };
+    // Two clicks inside one frame both run before `busy` renders. Recovering a field is synchronous
+    // and never raises `busy`, so the latch also reopens one macrotask later.
+    const latch = useActionLatch(busy);
+    const once = (run: () => void) => () => latch(run);
 
     if (!open) return null;
 

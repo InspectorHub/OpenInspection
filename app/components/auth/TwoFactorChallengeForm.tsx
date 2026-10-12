@@ -26,7 +26,9 @@ export function TwoFactorChallengeForm({
   error?: string;
 }) {
   const navigation = useNavigation();
-  const submitting = navigation.state === "submitting";
+  // "loading" is the redirect target loading after the action answered: still busy, or a second
+  // click would post the same single-use code again.
+  const submitting = navigation.state !== "idle";
   const inFlight = useRef(false);
 
   // Two clicks inside one frame both submit before `submitting` renders.

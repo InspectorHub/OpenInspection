@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { m } from "~/paraglide/messages";
 import type { ModuleGroup } from "../../../server/lib/mcp/tag-catalog";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
@@ -59,6 +59,13 @@ export function ConsentForm({
 
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const decided = useRef(false);
+  // A restore from the back/forward cache brings this page back with its JS state, `decided` included,
+  // while the POST has already been answered elsewhere: Allow and Cancel would stay dead. Start over.
+  useEffect(() => {
+    const reopen = (e: PageTransitionEvent) => { if (e.persisted) decided.current = false; };
+    window.addEventListener("pageshow", reopen);
+    return () => window.removeEventListener("pageshow", reopen);
+  }, []);
 
 
 

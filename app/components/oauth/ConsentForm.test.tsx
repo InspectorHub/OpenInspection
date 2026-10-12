@@ -44,4 +44,24 @@ describe("ConsentForm", () => {
       stop();
     }
   });
+
+  it("accepts a decision again after the page is restored from the back/forward cache", () => {
+    const { state, stop } = countPosts();
+    try {
+      render(<ConsentForm clientName="Acme" role="admin" modules={[]} canWrite oauthReqJson="{}" />);
+      const allow = screen.getByTestId("oauth-authorize-submit");
+      act(() => { allow.click(); });
+      act(() => { allow.click(); });
+      expect(state.posted).toBe(1);
+      act(() => {
+        const e = new Event("pageshow") as Event & { persisted: boolean };
+        e.persisted = true;
+        window.dispatchEvent(e);
+      });
+      act(() => { allow.click(); });
+      expect(state.posted).toBe(2);
+    } finally {
+      stop();
+    }
+  });
 });

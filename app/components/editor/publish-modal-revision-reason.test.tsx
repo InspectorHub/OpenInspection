@@ -177,7 +177,7 @@ describe("PublishModal — the in-flight latch", () => {
     expect(onPublish).toHaveBeenCalledTimes(2);
   });
 
-  it("releases when an async handler finishes without ever setting isSubmitting (human check dismissed)", async () => {
+  it("reopens one macrotask later when the handler declines without ever raising isSubmitting (human check dismissed)", async () => {
     const onPublish = vi.fn().mockResolvedValue(undefined);
     render(<PublishModal {...props({ onPublish })} />);
     const btn = publishBtn();
@@ -187,9 +187,23 @@ describe("PublishModal — the in-flight latch", () => {
     });
     expect(onPublish).toHaveBeenCalledTimes(1);
     await act(async () => {
-      await Promise.resolve();
+      await new Promise((r) => setTimeout(r, 5));
     });
     fireEvent.click(publishBtn());
     expect(onPublish).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not reopen at a microtask: a handler that settled but whose isSubmitting has not rendered yet stays latched", async () => {
+    const onPublish = vi.fn().mockResolvedValue(undefined);
+    render(<PublishModal {...props({ onPublish })} />);
+    act(() => {
+      publishBtn().click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    fireEvent.click(publishBtn());
+    expect(onPublish).toHaveBeenCalledTimes(1);
   });
 });

@@ -30,3 +30,4 @@ export { Avatar, avatarInitials, type AvatarSize, type AvatarVariant, type Avata
 export { MenuItem } from "./MenuItem";
 export { useLayer, hasOpenLayer, escapeWillBeHandled } from "./layers";
 export { useDialogBehavior } from "./useDialogBehavior";
+export { useActionLatch } from "./useActionLatch";

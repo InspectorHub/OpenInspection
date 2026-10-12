@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { Modal, Button, PENDING_CLASS, pendingProps } from "@core/shared-ui";
+import { useState, useEffect } from "react";
+import { Modal, Button, PENDING_CLASS, pendingProps, useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -123,13 +123,10 @@ export function SendAgreementModal({
     const [agreementId, setAgreementId] = useState(templates?.[0]?.id ?? "");
     const [error, setError] = useState<string | null>(null);
     const noTemplates = templates !== undefined && templates.length === 0;
-    const inFlight = useRef(false);
-
-    // Two clicks inside one frame both run before `busy` renders; release the
-    // latch only once the parent reports the send settled.
-    useEffect(() => {
-        if (!busy) inFlight.current = false;
-    }, [busy]);
+    // Two clicks inside one frame both run before `busy` renders. The caller can also decline
+    // before it submits (the human check is dismissed), which never raises `busy`, so the latch
+    // reopens one macrotask later instead of waiting for a `busy` change.
+    const latch = useActionLatch(Boolean(busy));
 
     // The modal stays mounted (Modal renders null when closed), so reseed the
     // draft each time it opens — a reopened modal must start fresh, not resume
@@ -150,10 +147,10 @@ export function SendAgreementModal({
     const submit = () => {
         const problem = validateSigners(signers);
         if (problem) { setError(problem); return; }
-        if (inFlight.current) return;
-        inFlight.current = true;
-        setError(null);
-        onSend(buildSendPayload(signers, completionPolicy, agreementId));
+        latch(() => {
+            setError(null);
+            onSend(buildSendPayload(signers, completionPolicy, agreementId));
+        });
     };
 
     return (

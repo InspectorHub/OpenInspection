@@ -32,4 +32,16 @@ describe("SendAgreementModal in-flight latch", () => {
         act(() => { sendButton().click(); });
         expect(onSend).toHaveBeenCalledTimes(2);
     });
+
+    it("reopens when the caller declines before submitting, so Send is not dead after a dismissed human check", async () => {
+        // The caller awaits a human check before it submits; when that is dismissed nothing is submitted
+        // and `busy` never rises. A latch that only waits for a busy change would swallow every later click.
+        const onSend = vi.fn();
+        render(ui(onSend, false));
+        act(() => { sendButton().click(); });
+        expect(onSend).toHaveBeenCalledTimes(1);
+        await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
+        act(() => { sendButton().click(); });
+        expect(onSend).toHaveBeenCalledTimes(2);
+    });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Modal, Button, Banner, buttonClasses } from "@core/shared-ui";
+import { Modal, Button, Banner, buttonClasses, useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { formatShapedDateTime } from "~/lib/format-date";
 import { useSessionContext, useChromeDateTimeFormat, useDisplayTimeZone } from "~/hooks/useSessionContext";
@@ -32,7 +32,7 @@ export interface PublishModalProps {
   * `extras` carries the fields collected below — the owning route must send them
   * with the publish, not beside it.
   */
- onPublish: (markComplete: boolean, extras: PublishExtras) => void | Promise<void>; // i18n-literal-ok: a TypeScript type, not UI text
+ onPublish: (markComplete: boolean, extras: PublishExtras) => void;
  /**
   * Whether the next publish creates version > 1 — i.e. this is a REVISION.
   *
@@ -107,19 +107,11 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  const extras = (): PublishExtras =>
   isAmendment && summary.trim() ? { summary: summary.trim() } : {};
  const [receiptOpen, setReceiptOpen] = useState(false);
- // Synchronous latch: two clicks in one frame both run before `isSubmitting` has rendered.
- const inFlight = useRef(false);
- useEffect(() => {
-  if (!isSubmitting) inFlight.current = false;
- }, [isSubmitting]);
- // An async handler can finish without submitting (the human check was dismissed), so isSubmitting
- // never rises; release the latch when it settles so the next click is not swallowed.
- const publish = (markComplete: boolean) => {
-  if (inFlight.current) return;
-  inFlight.current = true;
-  const result = onPublish(markComplete, extras());
-  if (result) void result.finally(() => { inFlight.current = false; });
- };
+ // Two clicks in one frame both run before `isSubmitting` has rendered. The caller can also decline
+ // before it submits (the human check is dismissed), which never raises `isSubmitting`, so the latch
+ // reopens one macrotask later instead of waiting for a `isSubmitting` change.
+ const latch = useActionLatch(isSubmitting);
+ const publish = (markComplete: boolean) => latch(() => onPublish(markComplete, extras()));
  /** Set while a publish is in flight, so a plain Cancel shows no receipt. */
  const submitSeen = useRef(false);
  /**
