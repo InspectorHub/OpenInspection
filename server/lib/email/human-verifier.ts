@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import type { HumanVerifier } from './outbound-cooling-window';
 import { isInProcessRequest, memoOnce } from '../request-scope';
-import { resolveTurnstile, verifyTurnstile } from '../middleware/bot-protection';
+import { resolveTurnstile, verifyTurnstileOutcome } from '../middleware/bot-protection';
 
 /**
  * The request's Turnstile proof, if the web app attached one (`x-turnstile-token`,
@@ -24,13 +24,18 @@ export function buildHumanVerifier(c: Context): HumanVerifier | undefined {
     const attempt = async (): Promise<'yes' | 'no' | 'error'> => {
         const policy = resolveTurnstile(c.env);
         if (!policy.enforced) return 'no';
-        try { return (await verifyTurnstile(token, policy.secret)) ? 'yes' : 'no'; } catch { return 'error'; }
+        try { return await verifyTurnstileOutcome(token, policy.secret); } catch { return 'error'; }
     };
-    // A definite answer is shared across the page action's calls; a transient failure
-    // is not cached as "not a person" and gets one fresh attempt.
+    // One answer per token per page action, shared by every in-process call and by
+    // concurrent callers. A could-not-tell answer gets one fresh attempt INSIDE the
+    // shared computation, so the outcome that is kept is the second one; only if that
+    // also fails is the person treated as unverified.
     const verifier: HumanVerifier = async () => {
-        const first = await memoOnce(c.env, `human-verified:${token}`, attempt);
-        return (first === 'error' ? await attempt() : first) === 'yes';
+        const outcome = await memoOnce(c.env, `human-verified:${token}`, async () => {
+            const first = await attempt();
+            return first === 'error' ? attempt() : first;
+        });
+        return outcome === 'yes';
     };
     // Also exposed on the context, so a route that learns the person is verified
     // (publish) can vouch for work it queued.

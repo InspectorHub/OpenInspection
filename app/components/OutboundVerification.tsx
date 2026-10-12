@@ -77,19 +77,20 @@ export function useChallengeOnRefusal(
   const [open, setOpen] = useState<{ id: number; siteKey: string } | null>(null);
   const handled = useRef<unknown>(null);
   const counter = useRef(0);
-  // True between "sent again after a passed check" and the answer to that send.
-  const retried = useRef(false);
+  // When the page last sent again after a passed check. A refusal right after that is
+  // the same refusal; one long after it is a new attempt (the re-send may never have run).
+  const retriedAt = useRef(0);
   useEffect(() => {
     if (state !== "idle" || !data || data === handled.current) return;
     handled.current = data;
     if (!data.verifySiteKey) {
-      retried.current = false;
+      retriedAt.current = 0;
       return;
     }
     // Refused again straight after a passed check: asking again would loop forever
     // (the server cannot accept this token). Stop and let the page show its error.
-    if (retried.current) {
-      retried.current = false;
+    if (Date.now() - retriedAt.current < RETRY_WINDOW_MS) {
+      retriedAt.current = 0;
       return;
     }
     counter.current += 1;
@@ -104,13 +105,16 @@ export function useChallengeOnRefusal(
       onDone={(ok) => {
         setOpen(null);
         if (ok) {
-          retried.current = true;
+          retriedAt.current = Date.now();
           resubmit();
         }
       }}
     />
   );
 }
+
+/** How long a refusal after a re-send counts as the answer to that re-send. */
+const RETRY_WINDOW_MS = 30_000;
 
 interface Pending {
   id: number;
@@ -149,8 +153,10 @@ export function OutboundVerificationProvider({
     });
   }, [windowOpen, siteKey]);
 
-  const finish = useCallback((ok: boolean) => {
+  const finish = useCallback((ok: boolean, id: number) => {
     const current = pendingRef.current;
+    // A late callback from a dialog that has since been replaced must not settle its successor.
+    if (!current || current.id !== id) return;
     pendingRef.current = null;
     setPending(null);
     current?.resolve(ok);
@@ -160,7 +166,7 @@ export function OutboundVerificationProvider({
     <EnsureHumanContext.Provider value={ensureHuman}>
       {children}
       {pending && (
-        <VerifyDialog key={pending.id} step={pending.id} siteKey={siteKey} onDone={finish} />
+        <VerifyDialog key={pending.id} step={pending.id} siteKey={siteKey} onDone={(ok) => finish(ok, pending.id)} />
       )}
     </EnsureHumanContext.Provider>
   );

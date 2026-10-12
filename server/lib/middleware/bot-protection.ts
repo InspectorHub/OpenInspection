@@ -103,3 +103,23 @@ export async function verifyTurnstile(token: string, secretKey: string): Promise
     const data = await res.json() as { success: boolean };
     return data.success;
 }
+
+/**
+ * Like `verifyTurnstile`, but tells a definite "no" from "could not tell": a
+ * throttled or failing siteverify (429, 5xx) or a network error is `'error'`, so
+ * a caller can retry instead of treating a Cloudflare hiccup as a bot.
+ */
+export async function verifyTurnstileOutcome(token: string, secretKey: string): Promise<'yes' | 'no' | 'error'> {
+    if (!secretKey) throw new Error('TURNSTILE_SECRET_KEY is not configured');
+    try {
+        const body = new FormData();
+        body.append('secret', secretKey);
+        body.append('response', token);
+        const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body });
+        if (res.status === 429 || res.status >= 500) return 'error';
+        if (!res.ok) return 'no';
+        return ((await res.json()) as { success: boolean }).success ? 'yes' : 'no';
+    } catch {
+        return 'error';
+    }
+}

@@ -227,8 +227,10 @@ export async function action({
       });
       if (!res.ok) {
         const verifySiteKey = await humanCheckSiteKey(res);
-        if (verifySiteKey) return { ok: false as const, verifySiteKey };
-        return { ok: false as const, error: m.repair_builder_error_send_email() };
+        const error = m.repair_builder_error_send_email();
+        // `error` rides along so that, if the check cannot be completed, the page says so.
+        if (verifySiteKey) return { ok: false as const, error, verifySiteKey };
+        return { ok: false as const, error };
       }
       return { ok: true as const };
     }

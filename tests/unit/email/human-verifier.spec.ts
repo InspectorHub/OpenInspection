@@ -76,4 +76,27 @@ describe('buildHumanVerifier across the in-process calls of one page action', ()
         expect(await v()).toBe(true);
         expect(n).toBe(2);
     });
+
+    it('treats a throttled or failing siteverify (429 / 5xx) as could-not-tell and tries again', async () => {
+        let n = 0;
+        vi.stubGlobal('fetch', vi.fn(async () => (++n === 1
+            ? new Response('busy', { status: 503 })
+            : new Response(JSON.stringify({ success: true }), { status: 200 }))));
+        const v = buildHumanVerifier(ctx({ 'x-turnstile-token': 'a'.repeat(20) }, inProcess()) as never)!;
+        expect(await v()).toBe(true);
+        expect(n).toBe(2);
+    });
+
+    it('keeps the retried answer for later and concurrent callers instead of redeeming the token again', async () => {
+        let n = 0;
+        vi.stubGlobal('fetch', vi.fn(async () => {
+            n += 1;
+            if (n === 1) throw new Error('blip');
+            return new Response(JSON.stringify({ success: n === 2 }), { status: 200 });
+        }));
+        const v = buildHumanVerifier(ctx({ 'x-turnstile-token': 'a'.repeat(20) }, inProcess()) as never)!;
+        const [a, b] = await Promise.all([v(), v()]);
+        expect([a, b, await v()]).toEqual([true, true, true]);
+        expect(n).toBe(2);
+    });
 });
