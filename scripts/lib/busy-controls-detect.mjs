@@ -1,8 +1,8 @@
 /**
  * Detector for lint:busy-controls. Two rules over <button> / <Button> opening tags:
  *
- *  submit-unprotected   type="submit" with none of pending, pendingProps, disabled,
- *                       aria-disabled, aria-busy: a double-click sends twice.
+ *  submit-unprotected   type="submit" with none of pending, pendingProps or disabled
+ *                       (a bare aria-disabled / aria-busy does not block a click or Enter).
  *  native-disable-busy  disabled={...} that names a busy-ish identifier: the browser drops
  *                       focus to <body> the moment the control disables. The convention is
  *                       <Button pending> or {...pendingProps(busy, onClick)} + PENDING_CLASS
@@ -12,7 +12,9 @@
  */
 import { analyze, findOpeningTags, hasAllowMarker } from './jsx-scan.mjs';
 
-const PROTECTION = new Set(['pending', 'disabled', 'aria-disabled', 'aria-busy']);
+// A bare aria-disabled / aria-busy does not stop a submit: only pendingProps' inert click cancels
+// the click that Enter in a field synthesizes on the default button. Anything else needs a marker.
+const PROTECTION = new Set(['pending', 'disabled']);
 const BUSY_RE = /(?:submitting|saving|busy|loading|pending|sending|uploading|deleting|working)|state\s*[!=]==?\s*["']idle["']/i;
 const SUBMIT_RE = /^\{?\s*["']submit["']\s*\}?$/;
 
@@ -34,7 +36,7 @@ export function detectBusyControls(src) {
                 violations.push({
                     line: tag.line,
                     rule: 'submit-unprotected',
-                    message: `<${tag.name} type="submit"> has no pending / pendingProps / disabled / aria-disabled / aria-busy`,
+                    message: `<${tag.name} type="submit"> has no pending / pendingProps / disabled (aria-disabled alone neither blocks a click nor Enter)`,
                 });
             }
         }

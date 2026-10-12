@@ -29,9 +29,17 @@ describe('busy-controls detector', () => {
             ['pending', '<Button type="submit" pending={busy}>Save</Button>'],
             ['pendingProps spread', '<button type="submit" {...pendingProps(busy)} className={PENDING_CLASS}>Save</button>'],
             ['disabled', '<button type="submit" disabled={!valid}>Save</button>'],
+        ])('does not flag a submit protected by %s', (_n, src) => {
+            expect(rules(src)).toEqual([]);
+        });
+        it.each([
             ['aria-disabled', '<button type="submit" aria-disabled={!valid}>Save</button>'],
             ['aria-busy', '<button type="submit" aria-busy={busy || undefined}>Save</button>'],
-        ])('does not flag a submit protected by %s', (_n, src) => {
+        ])('flags a submit that only has %s: it blocks neither a click nor Enter in a field', (_n, src) => {
+            expect(rules(src)).toEqual(['submit-unprotected']);
+        });
+        it('allows such a submit when a marker states why the form handler guards it', () => {
+            const src = ['{/* busy-controls-allow: onSubmit drops a submit while busy */}', '<button type="submit" aria-disabled={busy}>Save</button>'].join(String.fromCharCode(10));
             expect(rules(src)).toEqual([]);
         });
         it('does not flag a non-submit button, nor type="button"', () => {

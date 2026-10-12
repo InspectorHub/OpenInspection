@@ -65,6 +65,8 @@ export const PENDING_CLASS = "aria-disabled:opacity-50 aria-disabled:cursor-not-
  * The same pending semantics as `<Button pending>` for a raw `<button>` that cannot be the
  * shared Button: aria-disabled instead of native `disabled` (a focused button that becomes
  * disabled drops focus to <body>) and a click that reaches neither the caller nor a form.
+ * The inert click also stops Enter in a field: the browser submits by clicking the default
+ * button, and that click is cancelled here (checked in Chrome; a bare aria-disabled does not).
  */
 export function pendingProps<T extends HTMLElement>(
   pending: boolean | undefined,
