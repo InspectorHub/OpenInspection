@@ -22,6 +22,7 @@
  *   client portal fetches the public track directly; the inspector goes
  *   through a BFF resource route. This component cannot tell, and must not.
  */
+import { VerificationCancelledError } from "~/components/OutboundVerification";
 import { useEffect, useRef, useState } from "react";
 import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
@@ -98,8 +99,9 @@ export function MessageThread({
     try {
       await onSend(body);
       setComposeBody("");
-    } catch {
-      setSendFailed(true);
+    } catch (err) {
+      // Closing the human check is not a failed send: keep the draft, say nothing.
+      if (!(err instanceof VerificationCancelledError)) setSendFailed(true);
     } finally {
       setSending(false);
     }

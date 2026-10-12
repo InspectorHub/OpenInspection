@@ -31,6 +31,11 @@ export async function writeLastSend(kv: KVNamespace | undefined, tenantId: strin
     } catch { /* diagnostics only — a missing record just skips the later steps */ }
 }
 
+export async function clearLastSend(kv: KVNamespace | undefined, tenantId: string, userId: string): Promise<void> {
+    if (!kv) return;
+    try { await kv.delete(lastSendKey(tenantId, userId)); } catch { /* best effort */ }
+}
+
 /**
  * The signed-in user's own address. Looked up by the verified JWT subject within
  * the verified tenant; no request field participates.

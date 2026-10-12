@@ -18,6 +18,14 @@ type EnsureHuman = () => Promise<boolean>;
 
 const EnsureHumanContext = createContext<EnsureHuman>(async () => true);
 
+/** Thrown by a caller that gave up because the person closed the challenge. */
+export class VerificationCancelledError extends Error {
+  constructor() {
+    super("verification cancelled");
+    this.name = "VerificationCancelledError";
+  }
+}
+
 export function useEnsureHuman(): EnsureHuman {
   return useContext(EnsureHumanContext);
 }
@@ -51,6 +59,9 @@ export function useHumanGatedSubmit() {
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
         pass.current = true;
         form.requestSubmit();
+        // The flag only bridges the re-fired event, which dispatches synchronously.
+        // If no event fired (validation now fails, form gone) it must not outlive this call.
+        pass.current = false;
       } finally {
         busy.current = false;
       }
@@ -83,7 +94,13 @@ export function OutboundVerificationProvider({
     if (!windowOpen || !siteKey) return Promise.resolve(true);
     return new Promise<boolean>((resolve) => {
       counter.current += 1;
-      setPending({ id: counter.current, resolve });
+      const id = counter.current;
+      // A second request while a dialog is open replaces it; the first caller is
+      // told "not verified" instead of waiting forever.
+      setPending((prev) => {
+        prev?.resolve(false);
+        return { id, resolve };
+      });
     });
   }, [windowOpen, siteKey]);
 

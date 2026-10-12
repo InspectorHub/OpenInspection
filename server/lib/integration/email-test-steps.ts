@@ -56,13 +56,20 @@ export interface EmailStepDeps {
     sessionEmail: string | null;
     lastSend: LastSend | null;
     saveLastSend(send: LastSend): Promise<void>;
+    /** Forget the previous test send, so a failed new one cannot leave an old message to be reported on. */
+    clearLastSend(): Promise<void>;
     lookupDelivery(messageId: string): Promise<DeliveryOutcome>;
 }
 
 const result = (step: EmailStepId, status: StepStatus, detail: string): StepResult => ({ step, status, detail });
 
+/** Resend allows only a couple of requests per second per team, and a step makes several. */
+const RATE_LIMIT_PAUSE_MS = 1100;
+const pause = () => new Promise<void>((resolve) => setTimeout(resolve, RATE_LIMIT_PAUSE_MS));
+
 async function keyValid(provider: ResendProvider): Promise<StepResult> {
-    const probe = await provider.probeApiKey();
+    let probe = await provider.probeApiKey();
+    if (probe.status === 429) { await pause(); probe = await provider.probeApiKey(); }
     if (!probe.reachable) return result('key_valid', 'fail', 'Could not reach Resend. Try again in a moment.');
     if (!probe.valid) return result('key_valid', 'fail', 'Resend rejected the saved API key.');
     return result('key_valid', 'pass', 'Resend accepted the API key.');
@@ -103,17 +110,21 @@ function displayName(name: string | null): string {
 async function sendTest(provider: ResendProvider, deps: EmailStepDeps): Promise<StepResult> {
     if (!deps.senderEmail) return result('send_test', 'fail', 'No sender email is saved. Save one under Communication settings first.');
     if (!deps.sessionEmail) return result('send_test', 'fail', 'Your account has no email address to send the test to.');
+    if (/[\r\n]/.test(deps.senderEmail)) return result('send_test', 'fail', 'The saved sender email is not valid. Correct it under Communication settings.');
     const name = displayName(deps.senderDisplayName);
+    await deps.clearLastSend();
     // Straight to the provider adapter: a workspace testing its OWN account is not
     // subject to the platform-funded send cooling window or the suppression list.
-    const sent = await provider.sendEmail({
+    const message = {
         from: name ? `${name} <${deps.senderEmail}>` : deps.senderEmail,
         to: deps.sessionEmail,
         subject: 'Test email from your inspection software',
         html: '<p>This is a test message confirming that your email provider settings can send.</p>',
         text: 'This is a test message confirming that your email provider settings can send.',
         ...(deps.replyTo ? { replyTo: deps.replyTo } : {}),
-    });
+    };
+    let sent = await provider.sendEmail(message);
+    if (!sent.ok && sent.kind === 'rate_limited') { await pause(); sent = await provider.sendEmail(message); }
     if (sent.ok) {
         if (sent.id) await deps.saveLastSend({ messageId: sent.id, ...(sent.usage ? { usage: sent.usage } : {}) });
         return result('send_test', 'pass', 'Test email accepted by Resend and sent to your own address.');
@@ -160,7 +171,8 @@ export async function runEmailStep(target: EmailStepId, deps: EmailStepDeps): Pr
     if (target === 'key_valid') return valid;
     if (valid.status === 'fail') return blockedBy(target, valid);
 
-    const listing = await provider.listDomains();
+    let listing = await provider.listDomains();
+    if (!listing.ok && listing.status === 429) { await pause(); listing = await provider.listDomains(); }
     const scope = keyScope(listing);
     if (target === 'key_scope') return scope;
     if (scope.status === 'fail') return blockedBy(target, scope);

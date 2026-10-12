@@ -7,7 +7,7 @@
  * Each step goes through the route action (`intent`), never a client fetch. A
  * failed step ends the run: what follows would only repeat the same cause.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { persistedOutcomes, type StepOutcome, type StepStatus } from "~/lib/test-steps";
 import type { ConnectionTestResult } from "~/lib/connection-test";
@@ -60,6 +60,9 @@ export function StepChecklist({
   const [queue, setQueue] = useState<string[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  // The last response already applied. A re-run starts with the previous run's
+  // data still on the fetcher; it must not be mistaken for the new answer.
+  const handled = useRef<unknown>(null);
 
   const start = (run: string[]) => {
     const [first, ...rest] = run;
@@ -77,7 +80,8 @@ export function StepChecklist({
   useEffect(() => {
     if (fetcher.state !== "idle" || !active) return;
     const d = fetcher.data;
-    if (!d || d.intent !== intent || d.step !== active) return;
+    if (!d || d.intent !== intent || d.step !== active || d === handled.current) return;
+    handled.current = d;
     const outcome = d.outcome;
     if (!outcome) {
       setFailed(true);

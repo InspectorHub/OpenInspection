@@ -66,4 +66,28 @@ describe("OutboundVerificationProvider", () => {
     expect(onResult).toHaveBeenCalledWith(true);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it("tells the first caller 'not verified' when a second request replaces its dialog", async () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    function Two() {
+      const ensureHuman = useEnsureHuman();
+      return (
+        <>
+          <button type="button" onClick={async () => first(await ensureHuman())}>one</button>
+          <button type="button" onClick={async () => second(await ensureHuman())}>two</button>
+        </>
+      );
+    }
+    render(
+      <OutboundVerificationProvider windowOpen siteKey="site-key">
+        <Two />
+      </OutboundVerificationProvider>,
+    );
+    await act(async () => { fireEvent.click(screen.getByText("one")); });
+    await act(async () => { fireEvent.click(screen.getByText("two")); });
+    expect(first).toHaveBeenCalledWith(false);
+    await act(async () => emitToken!("0.token-value-1234567890"));
+    expect(second).toHaveBeenCalledWith(true);
+  });
 });

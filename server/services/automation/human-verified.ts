@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, like } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { automationLogs } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
@@ -28,6 +28,9 @@ async function stampHumanVerifiedLogs(
             eq(automationLogs.inspectionId, inspectionId),
             eq(automationLogs.channel, 'email'),
             eq(automationLogs.status, 'pending'),
+            // Only what THIS publish queued: the report.published rules' rows. Delayed
+            // reminders or follow-ups queued by anything else are not vouched for.
+            like(automationLogs.eventId, 'auto:report.published:%'),
             isNull(automationLogs.humanVerifiedAt),
         ));
 }

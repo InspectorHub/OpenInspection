@@ -92,7 +92,7 @@ const tenants = query(
     'SELECT t.id AS tenantId, c.reply_to AS replyTo FROM tenants t LEFT JOIN tenant_configs c ON c.tenant_id = t.id',
 );
 const owners = query(
-    "SELECT tenant_id AS tenantId, email, created_at AS createdAt FROM users WHERE role = 'owner'",
+    "SELECT tenant_id AS tenantId, email, created_at AS createdAt FROM users WHERE role = 'owner' AND deleted_at IS NULL AND tenant_id IS NOT NULL",
 );
 const { fills, skipped } = planReplyToBackfill(tenants, owners);
 

@@ -32,8 +32,9 @@ function stubNet(net: Net) {
 }
 const down = () => { throw new TypeError('fetch failed'); };
 
-function deps(over: Partial<EmailStepDeps> = {}): EmailStepDeps & { saved: LastSend[] } {
+function deps(over: Partial<EmailStepDeps> = {}): EmailStepDeps & { saved: LastSend[]; cleared: { count: number } } {
     const saved: LastSend[] = [];
+    const cleared = { count: 0 };
     return {
         apiKey: 're_fake',
         senderEmail: 'hello@mail.example.com',
@@ -42,9 +43,11 @@ function deps(over: Partial<EmailStepDeps> = {}): EmailStepDeps & { saved: LastS
         sessionEmail: 'me@example.com',
         lastSend: null,
         saveLastSend: async (s) => { saved.push(s); },
+        clearLastSend: async () => { cleared.count += 1; },
         lookupDelivery: async () => 'none',
         ...over,
         saved,
+        cleared,
     };
 }
 const verifiedDomain = () => json({ data: [{ name: 'mail.example.com', status: 'verified' }] }, 200);
@@ -133,6 +136,27 @@ describe('send_test', () => {
     it('proceeds with a send-only key (the domain step was merely skipped)', async () => {
         stubNet({ domains: () => json({ name: 'restricted_api_key' }, 401) });
         expect((await runEmailStep('send_test', deps())).status).toBe('pass');
+    });
+    it('forgets the previous test send before sending, so a failed new send leaves nothing to report on', async () => {
+        stubNet({ domains: verifiedDomain, send: () => json({ name: 'validation_error', message: 'x' }, 403) });
+        const d = deps({ lastSend: { messageId: 'old' } });
+        const r = await runEmailStep('send_test', d);
+        expect(r.status).toBe('fail');
+        expect(d.cleared.count).toBe(1);
+        expect(d.saved).toEqual([]);
+    });
+    it('refuses a saved sender address containing a line break', async () => {
+        const calls = stubNet({ domains: verifiedDomain });
+        const r = await runEmailStep('send_test', deps({ senderEmail: 'a@mail.example.com\r\nBcc: x@y.z' }));
+        expect(r.status).not.toBe('pass');
+        expect(calls.some((c) => (c.body as object | null) && Object.keys(c.body as object).length > 0)).toBe(false);
+    });
+    it('retries once when Resend answers 429 to the key probe', async () => {
+        let n = 0;
+        stubNet({ probe: () => (++n === 1 ? json({}, 429, { 'retry-after': '1' }) : json({}, 422)) });
+        const r = await runEmailStep('key_valid', deps());
+        expect(r.status).toBe('pass');
+        expect(n).toBe(2);
     });
     it('does not send when the domain step failed', async () => {
         const calls = stubNet({ domains: () => json({ data: [] }, 200) });

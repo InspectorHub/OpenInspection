@@ -23,6 +23,7 @@ vi.mock('../../../server/lib/integration/email-test-store', () => ({
     readSessionEmail: async (...a: unknown[]) => { h.sessionEmailArgs.push(a); return 'session-user@example.com'; },
     readLastSend: async () => null,
     writeLastSend: async () => undefined,
+    clearLastSend: async () => undefined,
     lookupResendDelivery: async () => 'none',
 }));
 

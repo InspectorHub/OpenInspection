@@ -12,7 +12,7 @@ import { recordIntegrationTest, type IntegrationTarget } from '../lib/integratio
 import { EmailTestStepBodySchema, StripeTestStepBodySchema, TestStepResultSchema } from '../lib/validations/integrations.schema';
 import { runEmailStep, type StepResult } from '../lib/integration/email-test-steps';
 import { runStripeStep } from '../lib/integration/stripe-test-steps';
-import { lookupResendDelivery, readLastSend, readSessionEmail, writeLastSend } from '../lib/integration/email-test-store';
+import { clearLastSend, lookupResendDelivery, readLastSend, readSessionEmail, writeLastSend } from '../lib/integration/email-test-store';
 import { readWebhookLog } from '../lib/stripe-webhook-log';
 
 /**
@@ -95,6 +95,7 @@ const integrationsTestStepsRoutes = createApiRouter()
                     sessionEmail: await readSessionEmail(db, tenantId, user.sub),
                     lastSend: await readLastSend(c.env.TENANT_CACHE, tenantId, user.sub),
                     saveLastSend: (s) => writeLastSend(c.env.TENANT_CACHE, tenantId, user.sub, s),
+                    clearLastSend: () => clearLastSend(c.env.TENANT_CACHE, tenantId, user.sub),
                     lookupDelivery: (id) => lookupResendDelivery(db, tenantId, id),
                 });
             }

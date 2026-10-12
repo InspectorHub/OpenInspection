@@ -21,7 +21,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Avatar } from "@core/shared-ui";
 import { MessageThread, type ThreadMessage } from "~/components/messaging/MessageThread";
-import { useEnsureHuman } from "~/components/OutboundVerification";
+import { useEnsureHuman, VerificationCancelledError } from "~/components/OutboundVerification";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
@@ -179,7 +179,7 @@ export default function MessagesPage() {
 
   async function handleSend(body: string) {
     // Throw (not return) on cancel so MessageThread keeps the draft text.
-    if (!(await ensureHuman())) throw new Error("verification cancelled");
+    if (!(await ensureHuman())) throw new VerificationCancelledError();
     if (!selected) throw new Error("no thread");
     submitSend(
       { contactId: selected, body, inspectionId: mentionId },

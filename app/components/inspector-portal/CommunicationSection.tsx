@@ -33,7 +33,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useFetcher } from "react-router";
 import { Card } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
-import { useEnsureHuman } from "~/components/OutboundVerification";
+import { useEnsureHuman, VerificationCancelledError } from "~/components/OutboundVerification";
 import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { BlockHeading } from "./BlockHeading";
@@ -178,7 +178,7 @@ export function CommunicationSection({
 
     async function handleSend(body: string) {
         // Throw (not return) on cancel so MessageThread keeps the draft text.
-        if (!(await ensureHuman())) throw new Error("verification cancelled");
+        if (!(await ensureHuman())) throw new VerificationCancelledError();
         if (!effectiveRecipient) throw new Error("no recipient");
         // The optimistic bubble goes up only for a call the guard accepted -
         // otherwise the thread would show a message nothing had been sent for.

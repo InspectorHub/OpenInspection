@@ -15,7 +15,7 @@ const T2 = '00000000-0000-0000-0000-0000000aa002';
 let db: BetterSQLite3Database<typeof schema>;
 
 const row = (id: string, over: Record<string, unknown> = {}) => ({
-    id, tenantId: T1, inspectionId: 'insp-1', recipient: 'c@example.com', channel: 'email' as const,
+    id, tenantId: T1, inspectionId: 'insp-1', recipient: 'c@example.com', channel: 'email' as const, eventId: 'auto:report.published:insp-1',
     sendAt: new Date(), status: 'pending' as const, ...over,
 });
 
@@ -40,6 +40,8 @@ describe('stampHumanVerifiedLogs', () => {
             row('other-tenant', { tenantId: T2 }),
             row('sms', { channel: 'sms' }),
             row('already-sent', { status: 'sent' }),
+            row('other-trigger', { eventId: 'auto:reminder:insp-1' }),
+            row('no-event', { eventId: null }),
         ] as never);
         await stampIfHumanVerified(async () => true, db as never, T1, 'insp-1');
         expect(await stamped()).toEqual(['mine']);
