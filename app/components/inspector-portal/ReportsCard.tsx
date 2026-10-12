@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Pill } from "@core/shared-ui";
+import { Card, Pill, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
@@ -156,15 +156,17 @@ export function ReportsCard({
                                 {canManage && (
                                     <button
                                         type="button"
-                                        onClick={() => setDeleting(report)}
-                                        disabled={!report.canDelete || busy}
+                                        // Only the in-flight part is aria-disabled: the confirm dialog
+                                        // closes in the batch that sets busy and returns focus here.
+                                        {...pendingProps(busy, () => setDeleting(report))}
+                                        disabled={!report.canDelete}
                                         // Disabled controls give no title on hover in every
                                         // browser, so the reason also rides `aria-label` —
                                         // a greyed-out button that will not say why is the
                                         // silent no-op this card exists to avoid.
                                         title={blockedReason(report) ?? undefined}
                                         aria-label={blockedReason(report) ?? undefined}
-                                        className="shrink-0 text-[12px] font-bold text-ih-fg-3 enabled:hover:text-ih-bad-fg enabled:hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className={`shrink-0 text-[12px] font-bold text-ih-fg-3 enabled:hover:text-ih-bad-fg enabled:hover:underline disabled:opacity-40 disabled:cursor-not-allowed ${PENDING_CLASS}`}
                                     >
                                         {m.inspections_hub_reports_delete()}
                                     </button>
@@ -297,9 +299,8 @@ function TranslationState({
             {canManage && translationEnabled && (
                 <button
                     type="button"
-                    onClick={onRegenerate}
-                    disabled={busy}
-                    className="text-[12px] font-bold text-ih-fg-3 enabled:hover:text-ih-fg-1 enabled:hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                    {...pendingProps(busy, onRegenerate)}
+                    className={`text-[12px] font-bold text-ih-fg-3 enabled:hover:text-ih-fg-1 enabled:hover:underline disabled:opacity-40 disabled:cursor-not-allowed ${PENDING_CLASS}`}
                 >
                     {m.courtesy_translation_regenerate()}
                 </button>
@@ -308,9 +309,8 @@ function TranslationState({
             {canManage && state !== "none" && (
                 <button
                     type="button"
-                    onClick={onRemove}
-                    disabled={busy}
-                    className="text-[12px] font-bold text-ih-fg-3 enabled:hover:text-ih-bad-fg enabled:hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                    {...pendingProps(busy, onRemove)}
+                    className={`text-[12px] font-bold text-ih-fg-3 enabled:hover:text-ih-bad-fg enabled:hover:underline disabled:opacity-40 disabled:cursor-not-allowed ${PENDING_CLASS}`}
                 >
                     {m.courtesy_translation_remove()}
                 </button>

@@ -1,3 +1,4 @@
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { QboBooksHealth, type QboDiscrepancy } from "~/components/settings/QboBooksHealth";
 import type { QBOConnectionStatus } from "../../../server/services/qbo/api-base";
@@ -91,10 +92,10 @@ export function QboConnectionPanel({
             {status.syncEnabled ? m.settings_qbo_pause_sync() : m.settings_qbo_resume_sync()}
           </button>
           <button
-            onClick={onRequestDisconnect}
-            disabled={busy}
+            // Pending, not native disabled: the confirm closes in the batch busy flips and focus must return here.
+            {...pendingProps(busy, onRequestDisconnect)}
             aria-busy={busy || undefined}
-            className="px-4 py-2 text-[12px] font-bold text-ih-bad-fg hover:bg-ih-bad-bg rounded-md transition-colors disabled:opacity-50"
+            className={`px-4 py-2 text-[12px] font-bold text-ih-bad-fg hover:bg-ih-bad-bg rounded-md transition-colors ${PENDING_CLASS}`}
           >
             {m.settings_qbo_disconnect()}
           </button>

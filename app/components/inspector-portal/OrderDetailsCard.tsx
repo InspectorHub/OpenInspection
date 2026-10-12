@@ -105,7 +105,7 @@ export function OrderDetailsCard({
                 <Row label={m.inspections_hub_details_closing()} value={closingDate} />
             </dl>
             {error && <p className="text-[12px] text-ih-bad-fg mb-2">{error}</p>}
-            <Button variant="secondary" size="sm" onClick={() => setOpen(true)} disabled={saving}>
+            <Button variant="secondary" size="sm" onClick={() => setOpen(true)} pending={saving}>
                 {m.inspections_hub_details_edit()}
             </Button>
 

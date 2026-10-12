@@ -145,7 +145,7 @@ export function ServicesCard({
                         variant="secondary"
                         size="sm"
                         onClick={() => setAddOpen(true)}
-                        disabled={adding}
+                        pending={adding}
                     >
                         {m.inspections_hub_services_add()}
                     </Button>

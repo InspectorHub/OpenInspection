@@ -325,7 +325,7 @@ export default function MarketplacePage() {
                         variant="danger-link"
                         size="sm"
                         onClick={() => setUninstalling({ id: t.id, name: t.name, kind: t.kind ?? null })}
-                        disabled={removing}
+                        pending={removing}
                       >
                         {m.marketplace_uninstall()}
                       </Button>

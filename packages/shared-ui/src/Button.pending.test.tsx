@@ -2,7 +2,7 @@
 import React from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup, fireEvent, screen } from "@testing-library/react";
-import { Button } from "@core/shared-ui";
+import { Button, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 afterEach(cleanup);
 
@@ -52,5 +52,41 @@ describe("Button pending", () => {
     expect(btn.hasAttribute("disabled")).toBe(true);
     fireEvent.click(btn);
     expect(onClick).not.toHaveBeenCalled();
+  });
+});
+
+describe("pendingProps (raw <button>)", () => {
+  it("pending: aria-disabled, no native disabled, click reaches neither the caller nor a form", () => {
+    const onClick = vi.fn();
+    const onSubmit = vi.fn((e: React.FormEvent) => e.preventDefault());
+    render(
+      <form onSubmit={onSubmit}>
+        <button type="submit" className={PENDING_CLASS} {...pendingProps(true, onClick)}>Go</button>
+      </form>,
+    );
+    const btn = screen.getByRole("button");
+    btn.focus();
+    expect(btn.getAttribute("aria-disabled")).toBe("true");
+    expect(btn.hasAttribute("disabled")).toBe(false);
+    expect(btn.className).toContain("aria-disabled:opacity-50");
+    fireEvent.click(btn);
+    expect(onClick).not.toHaveBeenCalled();
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(btn);
+  });
+
+  it("positive control: not pending, the click and the submit go through", () => {
+    const onClick = vi.fn();
+    const onSubmit = vi.fn((e: React.FormEvent) => e.preventDefault());
+    render(
+      <form onSubmit={onSubmit}>
+        <button type="submit" {...pendingProps(false, onClick)}>Go</button>
+      </form>,
+    );
+    const btn = screen.getByRole("button");
+    expect(btn.hasAttribute("aria-disabled")).toBe(false);
+    fireEvent.click(btn);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 });

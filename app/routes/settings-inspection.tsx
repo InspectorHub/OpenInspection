@@ -309,7 +309,10 @@ export function BulkLinkExpiry({ ttl, liveLinks }: { ttl: ReportLinkTtl; liveLin
                 // Nothing live to act on. Kept visible and disabled rather than
                 // hidden, so the absence reads as "none right now" instead of
                 // "this product cannot do that".
-                disabled={liveLinks === 0 || busy}
+                disabled={liveLinks === 0}
+                // Pending, not native disabled: the confirm Modal closes in the same batch busy flips,
+                // and focus must be able to return to this button.
+                pending={busy}
                 onClick={() => setConfirming(true)}
             >
                 {label}

@@ -134,15 +134,15 @@ export function TwoFactorPanel({ totpEnabled, recoveryCodesRemaining }: TwoFacto
         </div>
         <div className="flex gap-2 flex-wrap">
           {!totpEnabled ? (
-            <Button variant="primary" onClick={beginEnroll} disabled={busy}>
+            <Button variant="primary" onClick={beginEnroll} pending={busy}>
               {m.settings_2fa_enable()}
             </Button>
           ) : (
             <>
-              <Button variant="secondary" onClick={() => { setPayload(null); setStep("regenerate"); }} disabled={busy}>
+              <Button variant="secondary" onClick={() => { setPayload(null); setStep("regenerate"); }} pending={busy}>
                 {m.settings_2fa_regenerate()}
               </Button>
-              <Button variant="danger" onClick={() => setStep("disable")} disabled={busy}>
+              <Button variant="danger" onClick={() => setStep("disable")} pending={busy}>
                 {m.settings_2fa_disable()}
               </Button>
             </>
@@ -168,7 +168,7 @@ export function TwoFactorPanel({ totpEnabled, recoveryCodesRemaining }: TwoFacto
           <Input name="code" autoComplete="one-time-code" inputMode="numeric" label={m.settings_2fa_setup_code_label()} error={error} reserveErrorSpace />
           <div className="flex justify-end gap-3">
             <Button type="button" variant="secondary" onClick={() => setStep(null)}>{m.settings_2fa_cancel()}</Button>
-            <Button type="submit" variant="primary" disabled={busy || !payload}>
+            <Button type="submit" variant="primary" disabled={!payload} pending={busy}>
               {busy ? m.settings_2fa_working() : m.settings_2fa_setup_confirm()}
             </Button>
           </div>
@@ -183,7 +183,7 @@ export function TwoFactorPanel({ totpEnabled, recoveryCodesRemaining }: TwoFacto
           <Input name="code" autoComplete="one-time-code" label={m.settings_2fa_code_label()} error={error} reserveErrorSpace />
           <div className="flex justify-end gap-3">
             <Button type="button" variant="secondary" onClick={() => setStep(null)}>{m.settings_2fa_cancel()}</Button>
-            <Button type="submit" variant="danger" disabled={busy}>
+            <Button type="submit" variant="danger" pending={busy}>
               {busy ? m.settings_2fa_working() : m.settings_2fa_confirm_disable()}
             </Button>
           </div>
@@ -198,7 +198,7 @@ export function TwoFactorPanel({ totpEnabled, recoveryCodesRemaining }: TwoFacto
           <Input name="code" autoComplete="one-time-code" label={m.settings_2fa_code_label()} error={error} reserveErrorSpace />
           <div className="flex justify-end gap-3">
             <Button type="button" variant="secondary" onClick={() => setStep(null)}>{m.settings_2fa_cancel()}</Button>
-            <Button type="submit" variant="primary" disabled={busy}>
+            <Button type="submit" variant="primary" pending={busy}>
               {busy ? m.settings_2fa_working() : m.settings_2fa_confirm_regenerate()}
             </Button>
           </div>

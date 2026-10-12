@@ -3,7 +3,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/repair-items";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
+import { PageHeader, Card, Pill, Button, EmptyState, Modal } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
@@ -160,38 +160,49 @@ export default function RepairItemsPage() {
         </div>
       )}
 
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-ih-backdrop" onClick={() => setModalOpen(false)} />
-          <div className="relative bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover w-full max-w-md mx-4 p-6 space-y-4">
-            <h3 className="text-[16px] font-bold text-ih-fg-1">{form.id ? m.repair_items_modal_edit_title() : m.repair_items_modal_new_title()}</h3>
-            <div className="space-y-3">
-              <Field label={m.repair_items_field_name()}><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={m.repair_items_placeholder_name()} className={INPUT} /></Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label={m.repair_items_field_category()}><input value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} placeholder={m.repair_items_placeholder_category()} className={INPUT} /></Field>
-                <Field label={m.repair_items_field_severity()}>
-                  <select value={form.severity} onChange={(e) => setForm((f) => ({ ...f, severity: e.target.value as RepairItem["severity"] }))} className={INPUT}>
-                    <option value="good">{m.repair_items_severity_good()}</option>
-                    <option value="marginal">{m.repair_items_severity_marginal()}</option>
-                    <option value="significant">{m.repair_items_severity_significant()}</option>
-                  </select>
-                </Field>
-              </div>
-              <Field label={m.repair_items_field_summary()}><textarea value={form.defaultRepairSummary} onChange={(e) => setForm((f) => ({ ...f, defaultRepairSummary: e.target.value }))} rows={3} className={INPUT} /></Field>
-              <Field label={m.repair_items_field_contractor()}>
-                <select value={form.recommendedContractorTypeId} onChange={(e) => setForm((f) => ({ ...f, recommendedContractorTypeId: e.target.value }))} className={INPUT}>
-                  <option value="">{m.repair_items_contractor_none()}</option>
-                  {contractorTypes.map((ct) => <option key={ct.id} value={ct.id}>{ct.name}</option>)}
-                </select>
-              </Field>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">{m.common_cancel()}</button>
-              <button onClick={() => submit(form.id ? "update" : "create")} disabled={saving || !form.name.trim() || !form.defaultRepairSummary.trim()} aria-busy={saving || undefined} className="px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50">{m.common_save()}</button>
-            </div>
+      {/* Shared Modal: Escape, Tab trap, scroll lock and focus return. It closes the moment a save
+          is accepted (see submit()), so Save is aria-disabled while in flight, never natively disabled. */}
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={form.id ? m.repair_items_modal_edit_title() : m.repair_items_modal_new_title()}
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setModalOpen(false)}>{m.common_cancel()}</Button>
+            <Button
+              variant="primary"
+              onClick={() => submit(form.id ? "update" : "create")}
+              disabled={!form.name.trim() || !form.defaultRepairSummary.trim()}
+              pending={saving}
+              aria-busy={saving || undefined}
+            >
+              {m.common_save()}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Field label={m.repair_items_field_name()}><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={m.repair_items_placeholder_name()} className={INPUT} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={m.repair_items_field_category()}><input value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} placeholder={m.repair_items_placeholder_category()} className={INPUT} /></Field>
+            <Field label={m.repair_items_field_severity()}>
+              <select value={form.severity} onChange={(e) => setForm((f) => ({ ...f, severity: e.target.value as RepairItem["severity"] }))} className={INPUT}>
+                <option value="good">{m.repair_items_severity_good()}</option>
+                <option value="marginal">{m.repair_items_severity_marginal()}</option>
+                <option value="significant">{m.repair_items_severity_significant()}</option>
+              </select>
+            </Field>
           </div>
+          <Field label={m.repair_items_field_summary()}><textarea value={form.defaultRepairSummary} onChange={(e) => setForm((f) => ({ ...f, defaultRepairSummary: e.target.value }))} rows={3} className={INPUT} /></Field>
+          <Field label={m.repair_items_field_contractor()}>
+            <select value={form.recommendedContractorTypeId} onChange={(e) => setForm((f) => ({ ...f, recommendedContractorTypeId: e.target.value }))} className={INPUT}>
+              <option value="">{m.repair_items_contractor_none()}</option>
+              {contractorTypes.map((ct) => <option key={ct.id} value={ct.id}>{ct.name}</option>)}
+            </select>
+          </Field>
         </div>
-      )}
+      </Modal>
 
       <ConfirmDialog
         open={!!pendingDelete}

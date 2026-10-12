@@ -58,6 +58,24 @@ function swallowClick(e: React.MouseEvent<HTMLButtonElement>) {
   e.preventDefault();
 }
 
+/** Look of a pending control; pair it with `pendingProps` on a raw element. */
+export const PENDING_CLASS = "aria-disabled:opacity-50 aria-disabled:cursor-not-allowed";
+
+/**
+ * The same pending semantics as `<Button pending>` for a raw `<button>` that cannot be the
+ * shared Button: aria-disabled instead of native `disabled` (a focused button that becomes
+ * disabled drops focus to <body>) and a click that reaches neither the caller nor a form.
+ */
+export function pendingProps<T extends HTMLElement>(
+  pending: boolean | undefined,
+  onClick?: React.MouseEventHandler<T>,
+): { "aria-disabled": true | undefined; onClick: React.MouseEventHandler<T> | undefined } {
+  return {
+    "aria-disabled": pending ? true : undefined,
+    onClick: pending ? (e: React.MouseEvent<T>) => e.preventDefault() : onClick,
+  };
+}
+
 // React 19: `ref` is a plain prop, so no forwardRef wrapper.
 export function Button({
   variant = "secondary", size = "md", icon, children, className = "", selected, pending, onClick, ref, ...props

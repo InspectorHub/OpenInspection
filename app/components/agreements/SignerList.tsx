@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pill } from "@core/shared-ui";
+import { Pill, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -171,10 +171,12 @@ export function SignerList({ signers, onRemind, onCopyLink, busy, nowMs }: Signe
                                 {onRemind && (
                                     <button
                                         type="button"
-                                        onClick={() => handleRemind(s.id)}
-                                        disabled={!!busy || !canRemind || remindingId === s.id}
+                                        // In-flight reminder is aria-disabled, not native: the VerifyDialog it opens
+                                        // must not record <body> as its focus-return target.
+                                        {...pendingProps(remindingId === s.id, () => handleRemind(s.id))}
+                                        disabled={!!busy || !canRemind}
                                         title={reason ?? undefined}
-                                        className="text-[13px] font-semibold text-ih-primary-text hover:opacity-80 disabled:text-ih-fg-4 disabled:cursor-not-allowed disabled:hover:opacity-100"
+                                        className={`text-[13px] font-semibold text-ih-primary-text hover:opacity-80 disabled:text-ih-fg-4 disabled:cursor-not-allowed disabled:hover:opacity-100 ${PENDING_CLASS}`}
                                     >
                                         {remindingId === s.id ? m.agreement_signers_remind_pending() : m.agreement_signers_remind()}
                                     </button>

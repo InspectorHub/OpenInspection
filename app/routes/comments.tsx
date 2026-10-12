@@ -198,7 +198,8 @@ export default function CommentsPage() {
           </div>
           {selectedComments.length > 0 && (
             <>
-              <Button variant="danger" onClick={() => setBulkConfirm(true)} disabled={busy}>
+              {/* pending, not native disabled: the confirm closes in the batch busy flips, focus must return here */}
+              <Button variant="danger" onClick={() => setBulkConfirm(true)} pending={busy}>
                 {m.comments_delete_selected({ count: selectedComments.length })}
               </Button>
               <button

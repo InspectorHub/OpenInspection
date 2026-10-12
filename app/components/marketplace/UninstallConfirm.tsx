@@ -46,7 +46,7 @@ export function UninstallConfirm({
                     <Button type="button" variant="ghost" onClick={onCancel}>
                         {m.marketplace_uninstall_confirm_cancel()}
                     </Button>
-                    <Button type="button" variant="danger" disabled={submitting} onClick={onConfirm}>
+                    <Button type="button" variant="danger" pending={submitting} onClick={onConfirm}>
                         {submitting ? m.marketplace_uninstalling() : m.marketplace_uninstall_confirm_submit()}
                     </Button>
                 </>

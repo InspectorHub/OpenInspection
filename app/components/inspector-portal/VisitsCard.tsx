@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Button, Pill } from "@core/shared-ui";
+import { Card, Button, Pill, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { isAdminRole } from "~/lib/access";
@@ -150,9 +150,10 @@ export function VisitRow({
                     {actions.includes("cancel") && (
                         <button
                             type="button"
-                            disabled={busy}
-                            onClick={() => onAction("cancel", visit)}
-                            className="text-[12px] font-bold text-ih-fg-3 enabled:hover:text-ih-bad-fg enabled:hover:underline disabled:opacity-40"
+                            // aria-disabled, not native: the ConfirmDialog closes in the same batch that
+                            // sets busy, and its focus-return target is this button.
+                            {...pendingProps(busy, () => onAction("cancel", visit))}
+                            className={`text-[12px] font-bold text-ih-fg-3 enabled:hover:text-ih-bad-fg enabled:hover:underline disabled:opacity-40 ${PENDING_CLASS}`}
                         >
                             {m.inspections_hub_visits_action_cancel()}
                         </button>
@@ -249,7 +250,7 @@ export function VisitsCard({
 
             {canManage && (
                 <div className="mt-4">
-                    <Button variant="secondary" size="sm" onClick={() => setAddOpen(true)} disabled={busy}>
+                    <Button variant="secondary" size="sm" onClick={() => setAddOpen(true)} pending={busy}>
                         {m.inspections_hub_visits_add()}
                     </Button>
                 </div>
