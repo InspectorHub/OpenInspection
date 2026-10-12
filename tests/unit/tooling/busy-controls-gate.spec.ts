@@ -76,6 +76,58 @@ describe('busy-controls detector', () => {
         });
     });
 
+    describe('submit written other than as a literal', () => {
+        it('flags a conditional type and a template-literal type', () => {
+            expect(rules('<button type={ok ? "submit" : "button"}>Save</button>')).toEqual(['submit-unprotected']);
+            expect(rules('<button type={`submit`}>Save</button>')).toEqual(['submit-unprotected']);
+        });
+        it('does not flag a type expression that never says submit, and honours protection on the dynamic one', () => {
+            expect(rules('<button type={kind}>Save</button>')).toEqual([]);
+            expect(rules('<button type={ok ? "submit" : "button"} pending={busy}>Save</button>')).toEqual([]);
+        });
+    });
+
+    describe('a bare <button> inside a form defaults to submit', () => {
+        it('flags a <button> with no type inside <form>, <Form> and fetcher.Form', () => {
+            expect(rules('<form><button>Save</button></form>')).toEqual(['submit-unprotected']);
+            expect(rules('<Form method="post"><div><button>Save</button></div></Form>')).toEqual(['submit-unprotected']);
+            expect(rules('<fetcher.Form method="post"><button>Save</button></fetcher.Form>')).toEqual(['submit-unprotected']);
+        });
+        it('does not flag it when protected, typed as button, outside the form, or a shared-ui <Button>', () => {
+            expect(rules('<form><button disabled={!ok}>Save</button></form>')).toEqual([]);
+            expect(rules('<form><button type="button">Cancel</button></form>')).toEqual([]);
+            expect(rules('<form></form><button>Save</button>')).toEqual([]);
+            expect(rules('<form><Button>Save</Button></form>')).toEqual([]);
+        });
+        it('does not flag a button after a self-closing form or one that sits in a sibling element', () => {
+            expect(rules('<Form action="/x" /><button>Go</button>')).toEqual([]);
+            expect(rules('<div><form><input /></form><button>Go</button></div>')).toEqual([]);
+        });
+        it('counts such a button as a submit candidate', () => {
+            expect(run('<form><button disabled={!ok}>Save</button></form>').submits).toBe(1);
+        });
+    });
+
+    describe('busy words are matched as whole identifiers', () => {
+        it('does not flag a comparison against a string literal', () => {
+            expect(rules('<button disabled={inv.status !== "pending"}>x</button>')).toEqual([]);
+            expect(rules("<button disabled={status === 'loading'}>x</button>")).toEqual([]);
+        });
+        it('does not flag a longer word that merely contains a busy word', () => {
+            expect(rules('<button disabled={unbusyness}>x</button>')).toEqual([]);
+            expect(rules('<button disabled={loadingzone}>x</button>')).toEqual([]);
+        });
+        it.each([
+            'creating', 'syncing', 'processing', 'connecting', 'starting', 'updating', 'removing', 'revoking',
+            'isBusy', 'inFlight', 'isRevoking', 'revoking_id', 'state.isSyncing',
+        ])('flags disabled={%s}', (id) => {
+            expect(rules(`<button disabled={${id}}>x</button>`)).toEqual(['native-disable-busy']);
+        });
+        it('still flags a busy identifier next to a string comparison on another operand', () => {
+            expect(rules('<button disabled={busy || kind === "pending"}>x</button>')).toEqual(['native-disable-busy']);
+        });
+    });
+
     describe('what is not JSX', () => {
         it('ignores a commented-out button', () => {
             expect(rules('// <button type="submit">x</button>\n/* <Button disabled={busy}>y</Button> */')).toEqual([]);
@@ -99,6 +151,14 @@ describe('busy-controls detector', () => {
         });
         it('does not let a marker far above exempt a later tag', () => {
             expect(rules('// busy-controls-allow: ok\n\n\n\n<button type="submit">Go</button>')).toEqual(['submit-unprotected']);
+        });
+        it('ignores a marker whose reason is only the comment terminator, or that sits in a string', () => {
+            expect(rules('{/* busy-controls-allow: */}\n<button type="submit">Go</button>')).toEqual(['submit-unprotected']);
+            expect(rules('<button title="busy-controls-allow: x" type="submit">Go</button>')).toEqual(['submit-unprotected']);
+        });
+        it('exempts only the next tag, not the ones after it', () => {
+            const src = '{/* busy-controls-allow: ok */}\n<button type="submit">A</button>\n<button type="submit">B</button>';
+            expect(run(src).violations.map((v) => v.line)).toEqual([3]);
         });
     });
 });

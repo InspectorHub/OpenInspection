@@ -50,6 +50,20 @@ describe('inviteAcceptUrl resolves to a registered route', () => {
     const declared = [...table.matchAll(/\broute\(\s*"([^"]*)"/g)].map((m) => m[1] ?? '');
     const matches = (pattern: string, pathname: string) =>
         new RegExp(`^/${pattern.replace(/:[A-Za-z0-9_]+/g, '[^/]+')}/?$`).test(pathname);
+    // Bound: the flat first-argument regex above is only sound while no route() takes a children
+    // array and prefix() is unused. layout() is pathless, so it adds no segment. If either nesting form
+    // appears, the joined path would differ from the declared one and this spec must be rewritten.
+    const NESTING = /\bprefix\(|\broute\(\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*\[/;
+
+    it('the flat parse is sound: app/routes.ts nests no route() children and uses no prefix()', () => {
+        expect(NESTING.test(table)).toBe(false);
+    });
+
+    it('CONTROL - the nesting guard recognises a nested route and a prefix()', () => {
+        expect(NESTING.test('route("team", "routes/team.tsx", [ route("join", "routes/join.tsx") ])')).toBe(true);
+        expect(NESTING.test('...prefix("team", [ route("join", "routes/join.tsx") ])')).toBe(true);
+        expect(NESTING.test('layout("routes/l.tsx", [ route("join", "routes/join.tsx") ])')).toBe(false);
+    });
 
     it('the pathname of a generated link matches a declared route', () => {
         expect(declared.length, 'parsed zero routes from app/routes.ts').toBeGreaterThan(50);

@@ -18,11 +18,42 @@ describe('hidden-focusable detector', () => {
         });
         it.each([
             'focus-within:opacity-100',
-            'focus-visible:opacity-100',
-            'focus:opacity-100',
             'group-focus-within:opacity-100',
+            'group-focus-within/row:opacity-100',
         ])('does not flag the reveal when %s is present', (v) => {
             expect(rules(`<span className="opacity-0 group-hover:opacity-100 ${v}">x</span>`)).toEqual([]);
+        });
+        it.each(['focus:opacity-100', 'focus-visible:opacity-100'])('%s satisfies the focus rule on a focusable element', (v) => {
+            expect(rules(`<input className="opacity-0 group-hover:opacity-100 ${v} [@media(hover:none)]:opacity-100" />`)).toEqual([]);
+            expect(rules(`<span tabIndex={0} className="opacity-0 hover:opacity-100 ${v}">x</span>`)).toEqual([]);
+        });
+        it.each(['focus:opacity-100', 'focus-visible:opacity-100'])('%s on a non-focusable wrapper does not satisfy the focus rule', (v) => {
+            expect(rules(`<div className="opacity-0 group-hover:opacity-100 ${v}">x</div>`)).toEqual(['hover-only-reveal']);
+        });
+        it.each([
+            'lg:opacity-0 lg:group-hover:opacity-100',
+            'opacity-0 md:group-hover:opacity-100',
+            'opacity-0 [@media(hover:hover)]:group-hover:opacity-100',
+            'opacity-0 group-hover/row:opacity-100',
+            'opacity-0 group-hover:opacity-90',
+            'opacity-0 hover:opacity-50',
+        ])('sees the reveal through variants and partial opacity: %s', (cls) => {
+            expect(rules(`<div className="${cls}">x</div>`)).toEqual(['hover-only-reveal']);
+        });
+        it('a variant-prefixed focus reveal still satisfies the rule', () => {
+            expect(rules('<div className="opacity-0 group-hover:opacity-100 md:group-focus-within:opacity-100">x</div>')).toEqual([]);
+        });
+        it('reads a className that wraps onto a second line', () => {
+            expect(rules('<div className="opacity-0\n group-hover:opacity-100">x</div>')).toEqual(['hover-only-reveal']);
+        });
+        it('resolves a same-file const used directly or inside cn()', () => {
+            expect(rules('const REVEAL = "opacity-0 group-hover:opacity-100";\n<div className={REVEAL}>x</div>')).toEqual(['hover-only-reveal']);
+            expect(rules('const REVEAL = `opacity-0 group-hover:opacity-100`;\n<div className={cn(REVEAL, "p-2")}>x</div>')).toEqual(['hover-only-reveal']);
+            expect(rules('const REVEAL: string = "opacity-0 group-hover:opacity-100 focus-within:opacity-100";\n<div className={REVEAL}>x</div>')).toEqual([]);
+        });
+        it('BOUND - a const from another file or an object map is not resolved', () => {
+            expect(rules('import { REVEAL } from "./x";\n<div className={REVEAL}>x</div>')).toEqual([]);
+            expect(rules('const V = { a: "opacity-0 group-hover:opacity-100" };\n<div className={V.a}>x</div>')).toEqual([]);
         });
         it('finds the class in a cn() call and a template with a conditional', () => {
             expect(rules('<div className={cn("opacity-0", "group-hover:opacity-100")}>x</div>')).toEqual(['hover-only-reveal']);
@@ -73,6 +104,21 @@ describe('hidden-focusable detector', () => {
         it('does not accept inert that sits on a DIFFERENT element', () => {
             expect(rules('<div inert={!open}><div className="translate-y-full">x</div></div>')).toEqual(['parked-not-inert']);
         });
+        it.each([
+            'max-md:translate-y-full',
+            'data-[state=closed]:translate-y-full',
+            'md:-translate-x-full',
+            'translate-y-[100%]',
+            '-translate-x-[100%]',
+        ])('flags the parked form %s', (cls) => {
+            expect(rules(`<div className="${cls}">x</div>`)).toEqual(['parked-not-inert']);
+        });
+        it('inert={false} / inert={undefined} do not count as inert, a real expression does', () => {
+            expect(rules('<div inert={false} className="translate-y-full">x</div>')).toEqual(['parked-not-inert']);
+            expect(rules('<div inert={undefined} className="translate-y-full">x</div>')).toEqual(['parked-not-inert']);
+            expect(rules('<div inert={!open} className="translate-y-full">x</div>')).toEqual([]);
+            expect(rules('<div inert={true} className="translate-y-full">x</div>')).toEqual([]);
+        });
         it('does not flag partial translates', () => {
             expect(rules('<div className="translate-y-1/2 -translate-x-1/2">x</div>')).toEqual([]);
         });
@@ -94,7 +140,7 @@ describe('hidden-focusable detector', () => {
     });
 
     it('counts clean candidate sites so an empty result is not read as green', () => {
-        const r = run('<div inert className="translate-y-full">x</div><span className="opacity-0 hover:opacity-100 focus:opacity-100">y</span>');
+        const r = run('<div inert className="translate-y-full">x</div><span className="opacity-0 hover:opacity-100 focus-within:opacity-100">y</span>');
         expect(r.sites).toBe(2);
         expect(r.violations).toEqual([]);
     });

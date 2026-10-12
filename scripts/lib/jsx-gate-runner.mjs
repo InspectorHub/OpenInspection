@@ -1,11 +1,14 @@
 /**
  * Shared runner for the JSX ratchet gates (busy-controls, hidden-focusable).
  *
- * Walks app/**\/*.tsx (tests excluded), runs a detector per file, and compares violation
+ * Walks the ROOTS below (app/ and, where it exists, packages/shared-ui/src; *.tsx, tests excluded),
+ * runs a detector per file, and compares violation
  * counts per file with a { path: count } baseline. It prints BOTH numbers -- sites looked
  * at and violations found -- so an empty result cannot read as green, and it fails when it
- * scanned nothing, when its file listing disagrees with an independent count, or when its
- * built-in positive control no longer fires.
+ * scanned nothing, when its file listing disagrees with an independent count, or when ANY of its
+ * rules misses that rule's own planted control (one control per rule: a total count could be met by
+ * the other rules while one stays broken). Baselines are expected to stay {}; the spec
+ * tests/unit/tooling/jsx-gate-baselines.spec.ts fails if one gains a key.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -13,6 +16,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/** Source roots, as directories. A root that does not exist in this repo simply lists nothing. */
+const ROOTS = ['app', 'packages/shared-ui/src'];
 
 const isTest = (p) => /\.(?:test|spec)\.tsx$/.test(p) || p.includes('/__tests__/') || p.includes('/node_modules/');
 const lsFiles = (...specs) => execFileSync('git', ['ls-files', '-z', '--', ...specs], {
@@ -22,13 +28,23 @@ const lsFiles = (...specs) => execFileSync('git', ['ls-files', '-z', '--', ...sp
 }).toString('utf8').split('\0').filter((p) => p !== '');
 
 /**
+ * Rules whose planted control did not fire. Each control must make ITS rule report at least one violation.
+ * @param {(src: string) => { violations: Array<{ rule: string }> }} detect
+ * @param {Array<{ rule: string, src: string }>} controls
+ * @returns {string[]} the rule ids that missed their control (empty when every rule fires)
+ */
+export function missedControls(detect, controls) {
+    return controls.filter((c) => !detect(c.src).violations.some((v) => v.rule === c.rule)).map((c) => c.rule);
+}
+
+/**
  * @param {{ name: string, baselineFile: string, detect: (src: string) => { sites: number, violations: Array<{line:number, rule:string, message:string}> },
- *           control: string, controlMin: number, fixHint: string[] }} cfg
+ *           controls: Array<{ rule: string, src: string }>, fixHint: string[] }} cfg
  */
 export function runJsxGate(cfg) {
     const tag = `[${cfg.name}]`;
-    const files = [...new Set(lsFiles(':(glob)app/**/*.tsx'))].filter((p) => !isTest(p)).sort();
-    const counted = lsFiles('app').filter((p) => p.endsWith('.tsx') && !isTest(p));
+    const files = [...new Set(lsFiles(...ROOTS.map((r) => `:(glob)${r}/**/*.tsx`)))].filter((p) => !isTest(p)).sort();
+    const counted = lsFiles(...ROOTS).filter((p) => p.endsWith('.tsx') && !isTest(p));
     const baselinePath = join(ROOT, cfg.baselineFile);
     const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf8')) : {};
 
@@ -56,9 +72,9 @@ export function runJsxGate(cfg) {
         failed = true;
     }
     if (unreadable > 0) { console.error(`${tag} ${unreadable} file(s) could not be read.`); failed = true; }
-    const control = cfg.detect(cfg.control);
-    if (control.violations.length < cfg.controlMin) {
-        console.error(`${tag} BROKEN: the detector missed its own planted violation (${control.violations.length} < ${cfg.controlMin}). A clean scan means nothing.`);
+    const missed = missedControls(cfg.detect, cfg.controls);
+    if (cfg.controls.length === 0 || missed.length > 0) {
+        console.error(`${tag} BROKEN: the detector missed its own planted violation for rule(s): ${missed.join(', ') || '(no controls configured)'}. A clean scan means nothing.`);
         failed = true;
     }
     if (fresh.length) {
