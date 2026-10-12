@@ -297,6 +297,11 @@ describe('gate registry', () => {
             // tenant in the handler, so the question is asked at the keystroke.
             // One regex walk of server/**/*.ts, beside `rawnul` in cost.
             'tenantemail',
+            // A hand-drawn `fixed inset-0` dialog has none of the shared Escape, Tab trap,
+            // scroll lock or focus return. One tokenising walk of app/ and packages/*/src,
+            // beside `filesize` in cost; it carries a counted baseline for the files that
+            // predate it.
+            'overlays',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);

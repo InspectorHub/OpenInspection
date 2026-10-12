@@ -29,3 +29,4 @@ export { SegmentedControl, type SegmentedControlOption } from "./SegmentedContro
 export { Avatar, avatarInitials, type AvatarSize, type AvatarVariant, type AvatarStatus } from "./Avatar";
 export { MenuItem } from "./MenuItem";
 export { useLayer, hasOpenLayer, escapeWillBeHandled } from "./layers";
+export { useDialogBehavior } from "./useDialogBehavior";

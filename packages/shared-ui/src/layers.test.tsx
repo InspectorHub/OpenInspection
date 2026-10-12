@@ -3,6 +3,7 @@ import React, { useRef } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup, fireEvent, screen } from "@testing-library/react";
 import { Modal, Drawer, Popover, useLayer, hasOpenLayer, escapeWillBeHandled } from "@core/shared-ui";
+import { hasTrappingLayer } from "./layers";
 
 /** Module state is shared across tests: unmounting everything must leave it empty. */
 afterEach(() => {
@@ -218,6 +219,25 @@ describe("layer stack", () => {
     expect(hasOpenLayer()).toBe(true);
     rerender(<Probe open={false} />);
     expect(hasOpenLayer()).toBe(false);
+  });
+
+  it("hasTrappingLayer ignores a non-trapping layer; hasOpenLayer does not", () => {
+    function Trap({ open }: { open: boolean }) {
+      useLayer(open, { traps: true });
+      return null;
+    }
+    const { rerender } = render(<Probe open />);
+    expect(hasOpenLayer()).toBe(true);
+    expect(hasTrappingLayer()).toBe(false);
+    rerender(
+      <>
+        <Probe open />
+        <Trap open />
+      </>,
+    );
+    expect(hasTrappingLayer()).toBe(true);
+    rerender(<Probe open={false} />);
+    expect(hasTrappingLayer()).toBe(false);
   });
 });
 

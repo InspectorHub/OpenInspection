@@ -90,3 +90,17 @@ describe("pendingProps (raw <button>)", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("Button pending hover", () => {
+  // happy-dom has no hover, so assert the neutralising classes exist per variant.
+  it.each([
+    ["primary", "aria-disabled:hover:bg-ih-primary"],
+    ["secondary", "aria-disabled:hover:bg-ih-bg-card"],
+    ["ghost", "aria-disabled:hover:bg-transparent"],
+    ["danger", "aria-disabled:hover:opacity-50"],
+    ["link", "aria-disabled:hover:no-underline"],
+  ] as const)("%s neutralises its hover look while aria-disabled", (variant, cls) => {
+    render(<Button variant={variant} pending>Go</Button>);
+    expect(screen.getByRole("button").className).toContain(cls);
+  });
+});

@@ -1,9 +1,10 @@
+import { useRef } from "react";
 import { NavLink } from "react-router";
 import { useCapabilities, useSessionContext } from "~/hooks/useSessionContext";
 import { IC, WORKSPACE_ITEMS, visibleNavItems } from "~/components/sidebar/nav-items";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { LocaleSwitcher } from "~/components/LocaleSwitcher";
-import { Avatar, Icon } from "@core/shared-ui";
+import { Avatar, Icon, useDialogBehavior } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 // ─── Mobile drawer ─────────────────────────────────────────────────────────────
@@ -20,11 +21,22 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
   const showSwitchWorkspace = ctx?.branding?.isSaas && ctx?.branding?.portalBaseUrl;
   const privacyUrl = ctx?.branding?.privacyUrl ?? null;
 
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Hook runs before the early return: Escape, Tab trap, scroll lock and focus return.
+  useDialogBehavior(open, onClose, panelRef);
+
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 lg:hidden">
       <div className="absolute inset-0 bg-ih-backdrop" onClick={onClose} />
-      <div className="relative w-80 max-w-[85vw] h-full bg-ih-bg-card shadow-ih-popover flex flex-col">
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label={m.nav_user_menu_aria()}
+        className="relative w-80 max-w-[85vw] h-full bg-ih-bg-card shadow-ih-popover flex flex-col outline-none"
+      >
         <div className="p-4 flex items-center justify-between border-b border-ih-border">
           <div className="flex items-center gap-3">
             <img src={logoUrl} alt="" className="w-7 h-7 shrink-0" width={28} height={28} />

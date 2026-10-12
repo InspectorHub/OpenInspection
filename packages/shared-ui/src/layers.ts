@@ -70,6 +70,14 @@ export function hasOpenLayer(): boolean {
 }
 
 /**
+ * True while a layer that traps focus (a dialog or drawer) is open. A popover or menu is a
+ * layer too, but it must not cancel a pending focus restore; only a dialog owns focus.
+ */
+export function hasTrappingLayer(): boolean {
+  return layers.some((l) => l.traps);
+}
+
+/**
  * True when the next Escape will be taken by an overlay. For window-level hotkeys that are
  * not layers: they must skip Escape exactly when a layer will answer it, and not when a
  * layer is open that does not answer Escape.

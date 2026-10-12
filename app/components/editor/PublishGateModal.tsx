@@ -1,4 +1,4 @@
-import { Icon, Button, IconButton } from '@core/shared-ui';
+import { Icon, Button, Modal } from '@core/shared-ui';
 import type { PublishReadiness, PublishBlockingDefect } from '../../lib/types';
 import { m } from '~/paraglide/messages';
 
@@ -58,35 +58,19 @@ export function PublishGateModal({ open, readiness, onClose, onJump, onProceed }
     // !ready = hard gate, warnings (if any) listed beneath the blockers.
     const warningOnly = readiness.ready && warnings.length > 0;
     if (readiness.ready && warnings.length === 0) return null;
+    const title = warningOnly
+        ? (warnings.length === 1 ? m.editor_gate_warn_title_one({ count: warnings.length }) : m.editor_gate_warn_title_other({ count: warnings.length }))
+        : (blocking.length === 1 ? m.editor_gate_block_title_one({ count: blocking.length }) : m.editor_gate_block_title_other({ count: blocking.length }));
+    // Shared Modal owns Escape, Tab trap, scroll lock and focus return; the close
+    // button and the footer both route to the same onClose.
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ih-backdrop">
-            <div className="bg-ih-bg-card text-ih-fg-1 rounded-lg shadow-ih-popover w-full max-w-2xl max-h-[80vh] flex flex-col">
-                <div className="px-5 py-3 border-b border-ih-border flex items-center justify-between">
-                    <h2 className="text-[14px] font-bold">
-                        {warningOnly
-                            ? (warnings.length === 1 ? m.editor_gate_warn_title_one({ count: warnings.length }) : m.editor_gate_warn_title_other({ count: warnings.length }))
-                            : (blocking.length === 1 ? m.editor_gate_block_title_one({ count: blocking.length }) : m.editor_gate_block_title_other({ count: blocking.length }))}
-                    </h2>
-                    <IconButton
-                        onClick={onClose}
-                        aria-label={m.common_close()}
-                        size="sm"
-                    >
-                        &#x2715;
-                    </IconButton>
-                </div>
-                <div className="flex-1 overflow-y-auto">
-                    {blocking.length > 0 && <DefectList entries={blocking} onJump={onJump} tone="blocking" />}
-                    {warnings.length > 0 && (
-                        <>
-                            <div className="px-5 py-2 bg-ih-watch-bg text-ih-watch-fg text-[11px] font-bold uppercase tracking-[0.1em] border-y border-ih-border">
-                                {m.editor_gate_warnings_banner()}
-                            </div>
-                            <DefectList entries={warnings} onJump={onJump} tone="warning" />
-                        </>
-                    )}
-                </div>
-                <div className="px-5 py-3 border-t border-ih-border flex items-center justify-end gap-2">
+        <Modal
+            open
+            onClose={onClose}
+            title={title}
+            size="xl"
+            footer={(
+                <>
                     <Button variant="ghost" size="sm" onClick={onClose}>
                         {warningOnly ? m.common_cancel() : m.common_close()}
                     </Button>
@@ -100,8 +84,20 @@ export function PublishGateModal({ open, readiness, onClose, onJump, onProceed }
                             {m.editor_gate_publish_anyway()}
                         </Button>
                     )}
-                </div>
+                </>
+            )}
+        >
+            <div className="-m-4">
+                {blocking.length > 0 && <DefectList entries={blocking} onJump={onJump} tone="blocking" />}
+                {warnings.length > 0 && (
+                    <>
+                        <div className="px-5 py-2 bg-ih-watch-bg text-ih-watch-fg text-[11px] font-bold uppercase tracking-[0.1em] border-y border-ih-border">
+                            {m.editor_gate_warnings_banner()}
+                        </div>
+                        <DefectList entries={warnings} onJump={onJump} tone="warning" />
+                    </>
+                )}
             </div>
-        </div>
+        </Modal>
     );
 }

@@ -57,7 +57,7 @@
   "server/services/inspection/inspection-core.service.ts": 481,
   "server/portal/integration.routes.ts": 476,
   "server/api/admin/admin-config.ts": 472,
-  "scripts/lib/gate-registry.mjs": 465,
+  "scripts/lib/gate-registry.mjs": 467,
   "app/components/inspection/PeopleEditor.tsx": 465,
   "scripts/check-retention-manifest.mjs": 462,
   "server/lib/middleware/di.ts": 464,

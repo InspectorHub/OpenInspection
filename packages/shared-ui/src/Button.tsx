@@ -19,12 +19,12 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: "bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600 shadow-[var(--shadow-ih-focus)] shadow-transparent hover:shadow-ih-card",
-  secondary: "bg-ih-bg-card border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted",
-  ghost: "text-ih-fg-2 hover:bg-ih-bg-muted",
-  danger: "bg-ih-bad text-ih-fg-inverse hover:opacity-90",
-  link: "text-ih-primary-text hover:underline bg-transparent",
-  "danger-link": "text-ih-bad-fg hover:underline bg-transparent",
+  primary: "bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600 shadow-[var(--shadow-ih-focus)] shadow-transparent hover:shadow-ih-card aria-disabled:hover:bg-ih-primary aria-disabled:hover:shadow-[var(--shadow-ih-focus)] aria-disabled:hover:shadow-transparent",
+  secondary: "bg-ih-bg-card border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted aria-disabled:hover:bg-ih-bg-card",
+  ghost: "text-ih-fg-2 hover:bg-ih-bg-muted aria-disabled:hover:bg-transparent",
+  danger: "bg-ih-bad text-ih-fg-inverse hover:opacity-90 aria-disabled:hover:opacity-50",
+  link: "text-ih-primary-text hover:underline bg-transparent aria-disabled:hover:no-underline",
+  "danger-link": "text-ih-bad-fg hover:underline bg-transparent aria-disabled:hover:no-underline",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
