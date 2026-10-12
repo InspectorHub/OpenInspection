@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
-import { Icon } from "@core/shared-ui";
+import { Icon, useLayer } from "@core/shared-ui";
 import { Stage, Layer, Image as KonvaImage, Circle, Arrow, Line, Label, Tag, Text } from "react-konva";
 import type Konva from "konva";
 import {
@@ -134,23 +134,13 @@ export function PhotoAnnotator({
   }, [labelInput]);
 
   /* -------------------------------------------------------------- */
-  /* Escape to close (label input swallows it first)                 */
+  /* Escape to close (the label input cancels its own Escape first)                 */
   /* -------------------------------------------------------------- */
-  useEffect(() => {
-    if (!open) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
-      if (labelInput) {
-        setLabelInput(null);
-        setLabelText("");
-        return;
-      }
-      e.preventDefault();
-      onClose();
-    }
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [open, onClose, labelInput]);
+  useLayer(open && mounted, {
+    // The label input cancels itself on Escape (and calls preventDefault), so by the time the
+    // stack hears one the label box is already gone: this is always "close the annotator".
+    onEscape: onClose,
+  });
 
   /* -------------------------------------------------------------- */
   /* Pointer -> natural px                                           */

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { escapeWillBeHandled } from "@core/shared-ui";
 import { singleKeyShortcutsAllowed } from "../lib/shortcut-scope";
 
 /* ------------------------------------------------------------------ */
@@ -81,6 +82,10 @@ export function useKeyboard(
 
     function handle(e: KeyboardEvent) {
       if (e.defaultPrevented || e.isComposing) return;
+      // An open overlay (dialog, drawer, popover) owns Escape. This listener may run
+      // before the layer stack's own window listener, so a defaultPrevented check alone
+      // is not enough: ask the stack directly.
+      if (e.key === "Escape" && escapeWillBeHandled()) return;
       const h = handlersRef.current;
       const inField = isInField();
       const meta = e.metaKey || e.ctrlKey;

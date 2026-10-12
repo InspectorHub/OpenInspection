@@ -63,3 +63,9 @@ test("Enter then blur commits only once", () => {
   fireEvent.blur(input);
   expect(onCommit).toHaveBeenCalledTimes(1);
 });
+
+test("Escape is marked consumed so a dialog around the field does not also close", () => {
+  const { input } = setup("Roof");
+  // fireEvent returns false when the event was default-prevented.
+  expect(fireEvent.keyDown(input, { key: "Escape" })).toBe(false);
+});

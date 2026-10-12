@@ -188,7 +188,11 @@ function UnitRow({
         onBlur={commitRename}
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-          if (e.key === "Escape") setName(unit.name);
+          if (e.key === "Escape" && name !== unit.name) {
+            // Reverting an edit consumes the key; an untouched field lets Escape reach the dialog.
+            e.preventDefault();
+            setName(unit.name);
+          }
         }}
         aria-label={m.editor_unitsmanager_rename_aria({ name: unit.name })}
         maxLength={80}

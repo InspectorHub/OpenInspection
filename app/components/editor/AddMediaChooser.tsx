@@ -1,3 +1,4 @@
+import { useLayer } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export interface AddMediaChooserProps {
@@ -10,6 +11,8 @@ export interface AddMediaChooserProps {
 }
 
 export function AddMediaChooser({ onClose, onTakePhoto, onAddFromLibrary, onPickVideo }: AddMediaChooserProps) {
+ // Full-screen overlay: it takes Escape (and the scroll lock) so a dialog under it stays put.
+ useLayer(true, { onEscape: onClose, lockScroll: true });
  return (
  <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={m.editor_addmedia_title()}>
   <button

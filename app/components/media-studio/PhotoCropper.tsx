@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import Cropper from "react-easy-crop";
+import { useLayer } from "@core/shared-ui";
 import { bakeCrop, normalizeRotation, type BakeFormat, type PixelCrop } from "./cropImage";
 import { m } from "~/paraglide/messages";
 
@@ -124,6 +125,9 @@ export function PhotoCropper({
       setBakeError(m.media_cropper_bake_failed());
     } finally { setBusy(false); }
   }
+
+  // Full-screen overlay: it takes Escape (and the scroll lock) so a dialog under it stays put.
+  useLayer(true, { onEscape: onCancel, lockScroll: true });
 
   return (
     // ds-allow: full-bleed media studio chrome, intentional fixed-dark backdrop

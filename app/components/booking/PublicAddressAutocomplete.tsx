@@ -125,6 +125,8 @@ export function PublicAddressAutocomplete({
       e.preventDefault();
       choose(suggestions[active]);
     } else if (e.key === "Escape") {
+      // Consumed: the list is open here, so this Escape must not also close a dialog around it.
+      e.preventDefault();
       setOpen(false);
       setActive(-1);
     }

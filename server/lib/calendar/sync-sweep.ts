@@ -16,8 +16,8 @@
  *    difference, and the inspector is the only one who can fix a revoked token.
  */
 import { drizzle } from 'drizzle-orm/d1';
-import { asc, isNull, lt, or } from 'drizzle-orm';
-import { calendarConnections } from '../db/schema';
+import { and, asc, eq, isNull, lt, notInArray, or } from 'drizzle-orm';
+import { calendarConnections, tenants } from '../db/schema';
 import { logger } from '../logger';
 import { importBusyForConnection } from './sync-engine';
 import { loadOpenCalendarConnection, markCalendarSynced, markCalendarSyncFailed } from './connection';
@@ -59,12 +59,15 @@ export async function sweepCalendarSyncs(
     // here would mean a non-Google connection is never attempted at all — and a
     // row that is never attempted also never fails, so nothing would report it.
     const due = await db.select().from(calendarConnections)
-        .where(
+        .where(and(
             or(
                 isNull(calendarConnections.lastSyncAt),
                 lt(calendarConnections.lastSyncAt, dueBefore),
             ),
-        )
+            // A suspended company (including one scheduled for deletion) is not synced. The sweep
+            // pulls a window of busy time, so a reactivated company catches up on the next tick.
+            notInArray(calendarConnections.tenantId, db.select({ id: tenants.id }).from(tenants).where(eq(tenants.status, 'suspended'))),
+        ))
         .orderBy(asc(calendarConnections.lastSyncAt))
         .limit(MAX_CONNECTIONS_PER_TICK)
         .all();

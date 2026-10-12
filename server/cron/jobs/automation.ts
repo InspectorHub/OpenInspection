@@ -6,8 +6,9 @@
  * rules and inspections, the other talks to mail and SMS providers - and a
  * delivery outage must not also stop reminders being scheduled.
  */
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { automationLogs, automations } from '../../lib/db/schema/inspection/automation';
+import { tenants } from '../../lib/db/schema/tenant/core';
 import { AutomationService } from '../../services/automation.service';
 import { maybeMetering } from '../../services/metering.service';
 import { buildTenantEmailService } from '../../lib/email/build-email-service';
@@ -74,7 +75,10 @@ export const automationFlushJob: CronJob = {
     probe: (env) => exists(
         db(env).select({ id: automationLogs.id })
             .from(automationLogs)
-            .where(eq(automationLogs.status, 'pending'))
+            // Rows of a suspended company wait and are not delivered, so they must not
+            // keep waking the flush every tick.
+            .innerJoin(tenants, eq(tenants.id, automationLogs.tenantId))
+            .where(and(eq(automationLogs.status, 'pending'), ne(tenants.status, 'suspended')))
             .limit(1).get(),
     ),
     run: async (env, _cursor) => {

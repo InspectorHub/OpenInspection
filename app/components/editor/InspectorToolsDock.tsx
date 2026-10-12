@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { MenuItem } from "@core/shared-ui";
+import { useState } from "react";
+import { MenuItem, useLayer } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 interface DockTile {
@@ -39,14 +39,8 @@ export function InspectorToolsDock({
   // Escape via useDialogBehavior). Without this the menu could only be dismissed
   // by clicking its click-outside backdrop — and that full-screen backdrop
   // intercepts pointer events over the rest of the editor until it closes.
-  useEffect(() => {
-    if (!dockOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setDockOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [dockOpen]);
+  // Not while the dock is hidden (speed mode renders nothing): an invisible layer would eat Escape.
+  useLayer(dockOpen && !hidden, { onEscape: () => setDockOpen(false) });
 
   if (hidden) return null;
 

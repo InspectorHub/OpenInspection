@@ -102,6 +102,15 @@ describe('sweepCalendarSyncs', () => {
         expect(importBusy).toHaveBeenCalledTimes(1);
     });
 
+    it('skips a suspended company and syncs it again once reactivated', async () => {
+        await addConnection('c1', 'u1', null);
+        await db.update(schema.tenants).set({ status: 'suspended' });
+        expect(await sweepCalendarSyncs(env, NOW)).toMatchObject({ attempted: 0 });
+        expect(importBusy).not.toHaveBeenCalled();
+        await db.update(schema.tenants).set({ status: 'active' });
+        expect(await sweepCalendarSyncs(env, NOW)).toMatchObject({ attempted: 1, succeeded: 1 });
+    });
+
     /**
      * The sweep is the only thing that keeps a connection fresh without anyone
      * pressing a button. A `provider = 'google'` filter on the due query means a

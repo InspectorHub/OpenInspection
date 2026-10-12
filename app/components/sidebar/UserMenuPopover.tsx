@@ -4,6 +4,7 @@ import { IC } from "~/components/sidebar/nav-items";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { LocaleSwitcher } from "~/components/LocaleSwitcher";
 import { m } from "~/paraglide/messages";
+import { useLayer } from "@core/shared-ui";
 
 // ─── User Menu popover (desktop sidebar) ─────────────────────────────────────
 interface UserMenuPopoverProps {
@@ -29,6 +30,8 @@ export function UserMenuPopover({
 }: UserMenuPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
+  useLayer(open, { onEscape: onClose });
+
   useEffect(() => {
     if (!open) return;
     function handleMouseDown(e: MouseEvent) {
@@ -36,14 +39,9 @@ export function UserMenuPopover({
         onClose();
       }
     }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
     document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [open, onClose]);
 

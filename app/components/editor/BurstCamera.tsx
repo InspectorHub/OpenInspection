@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Icon, IconButton, Button } from "@core/shared-ui";
+import { Icon, IconButton, Button, useLayer } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 interface Capture {
@@ -50,6 +50,9 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
     }
     return () => stopCamera();
   }, [open, facing, startCamera, stopCamera]);
+
+  // Full-screen overlay: it takes Escape (and the scroll lock) so a dialog under it stays put.
+  useLayer(open, { onEscape: onClose, lockScroll: true });
 
   if (!open) return null;
 
