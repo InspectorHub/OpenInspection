@@ -15,7 +15,7 @@
  * the defect this fixes, not a fix for it.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup, fireEvent, screen } from "@testing-library/react";
+import { render, cleanup, fireEvent, screen, act } from "@testing-library/react";
 import { PublishModal, type PublishModalProps } from "./PublishModal";
 
 vi.mock("~/hooks/useSessionContext", () => ({
@@ -40,6 +40,14 @@ function props(over: Partial<PublishModalProps> = {}): PublishModalProps {
     isAmendment: true,
     ...over,
   };
+}
+
+type View = ReturnType<typeof render>;
+
+/** One attempt finishing the way the owning route reports it: busy goes up, then back down with the dialog still open. */
+function attemptFinishes(view: View, over: Partial<PublishModalProps>) {
+  view.rerender(<PublishModal {...props({ ...over, isSubmitting: true })} />);
+  view.rerender(<PublishModal {...props({ ...over, isSubmitting: false })} />);
 }
 
 const reasonBox = () => screen.getByPlaceholderText(/Corrected the roof rating/i);
@@ -73,10 +81,11 @@ describe("PublishModal — the revision reason", () => {
     // render it as a reason someone wrote. Absent means the endpoint's own
     // default (NULL) stands.
     const onPublish = vi.fn();
-    render(<PublishModal {...props({ onPublish })} />);
+    const view = render(<PublishModal {...props({ onPublish })} />);
     fireEvent.change(reasonBox(), { target: { value: "   spaces   " } });
     fireEvent.click(publishBtn());
     expect(onPublish).toHaveBeenLastCalledWith(false, { summary: "spaces" });
+    attemptFinishes(view, { onPublish });
 
     fireEvent.change(reasonBox(), { target: { value: "   " } });
     fireEvent.click(publishBtn());
@@ -88,11 +97,12 @@ describe("PublishModal — the revision reason", () => {
     // reason has to ride whichever one is pressed — a field wired to one of two
     // publish buttons is a field that vanishes depending on the order axis.
     const onPublish = vi.fn();
-    render(<PublishModal {...props({ onPublish, status: "scheduled" })} />);
+    const view = render(<PublishModal {...props({ onPublish, status: "scheduled" })} />);
     fireEvent.change(reasonBox(), { target: { value: "Reworded the summary." } });
 
     fireEvent.click(screen.getByText("Just publish").closest("button") as HTMLButtonElement);
     expect(onPublish).toHaveBeenLastCalledWith(false, { summary: "Reworded the summary." });
+    attemptFinishes(view, { onPublish, status: "scheduled" });
 
     fireEvent.click(screen.getByText("Mark complete and publish").closest("button") as HTMLButtonElement);
     expect(onPublish).toHaveBeenLastCalledWith(true, { summary: "Reworded the summary." });
@@ -138,5 +148,48 @@ describe("PublishModal — the revision reason", () => {
     const boxes = container.querySelectorAll('input[type="checkbox"]');
     expect(boxes).toHaveLength(1);
     expect(container.textContent).toContain("Auto-sign");
+  });
+});
+
+describe("PublishModal — the in-flight latch", () => {
+  it("submits once when two clicks land in the same frame", () => {
+    const onPublish = vi.fn();
+    render(<PublishModal {...props({ onPublish })} />);
+    const btn = publishBtn();
+    act(() => {
+      btn.click();
+      btn.click();
+    });
+    expect(onPublish).toHaveBeenCalledTimes(1);
+  });
+
+  it("submits again once the attempt has finished", () => {
+    const onPublish = vi.fn();
+    const view = render(<PublishModal {...props({ onPublish })} />);
+    const btn = publishBtn();
+    act(() => {
+      btn.click();
+      btn.click();
+    });
+    expect(onPublish).toHaveBeenCalledTimes(1);
+    attemptFinishes(view, { onPublish });
+    fireEvent.click(publishBtn());
+    expect(onPublish).toHaveBeenCalledTimes(2);
+  });
+
+  it("releases when an async handler finishes without ever setting isSubmitting (human check dismissed)", async () => {
+    const onPublish = vi.fn().mockResolvedValue(undefined);
+    render(<PublishModal {...props({ onPublish })} />);
+    const btn = publishBtn();
+    act(() => {
+      btn.click();
+      btn.click();
+    });
+    expect(onPublish).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.click(publishBtn());
+    expect(onPublish).toHaveBeenCalledTimes(2);
   });
 });

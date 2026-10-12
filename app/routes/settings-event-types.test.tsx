@@ -10,7 +10,7 @@
  * unset, and a write that treats "untouched" as 0.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
 import SettingsEventTypes from "~/routes/settings-event-types";
@@ -99,5 +99,31 @@ describe("settings → event types: follow-up delay", () => {
         fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
         await waitFor(() => expect(fetchMock).toHaveBeenCalled());
         expect(lastPatchBody(fetchMock)).not.toHaveProperty("followUpDelayHours");
+    });
+});
+
+describe("settings → event types: save latch", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("sends one request for two same-frame Save clicks, and releases after a failure", async () => {
+        let resolveFirst: (v: { ok: boolean }) => void = () => {};
+        const fetchMock = vi
+            .fn()
+            .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+            .mockResolvedValue({ ok: false });
+        vi.stubGlobal("fetch", fetchMock);
+
+        renderPage([TYPE]);
+        fireEvent.click(await screen.findByRole("button", { name: /edit/i }));
+        const save = await screen.findByRole("button", { name: /^save$/i });
+
+        act(() => { save.click(); save.click(); });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        // Failure path: the modal stays open and the latch must be released so the user can retry.
+        await act(async () => { resolveFirst({ ok: false }); });
+        const retry = await screen.findByRole("button", { name: /^save$/i });
+        act(() => { retry.click(); });
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     });
 });

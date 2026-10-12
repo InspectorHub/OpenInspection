@@ -32,7 +32,7 @@ export interface PublishModalProps {
   * `extras` carries the fields collected below — the owning route must send them
   * with the publish, not beside it.
   */
- onPublish: (markComplete: boolean, extras: PublishExtras) => void;
+ onPublish: (markComplete: boolean, extras: PublishExtras) => void | Promise<void>;
  /**
   * Whether the next publish creates version > 1 — i.e. this is a REVISION.
   *
@@ -107,6 +107,19 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  const extras = (): PublishExtras =>
   isAmendment && summary.trim() ? { summary: summary.trim() } : {};
  const [receiptOpen, setReceiptOpen] = useState(false);
+ // Synchronous latch: two clicks in one frame both run before `isSubmitting` has rendered.
+ const inFlight = useRef(false);
+ useEffect(() => {
+  if (!isSubmitting) inFlight.current = false;
+ }, [isSubmitting]);
+ // An async handler can finish without submitting (the human check was dismissed), so isSubmitting
+ // never rises; release the latch when it settles so the next click is not swallowed.
+ const publish = (markComplete: boolean) => {
+  if (inFlight.current) return;
+  inFlight.current = true;
+  const result = onPublish(markComplete, extras());
+  if (result) void result.finally(() => { inFlight.current = false; });
+ };
  /** Set while a publish is in flight, so a plain Cancel shows no receipt. */
  const submitSeen = useRef(false);
  /**
@@ -148,12 +161,12 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  <Button
  variant="secondary"
  pending={isSubmitting}
- onClick={() => onPublish(false, extras())}
+ onClick={() => publish(false)}
  >{isSubmitting ? m.editor_publish_publishing() : m.editor_publish_just_publish()}</Button>
  <Button
  variant="primary"
  pending={isSubmitting}
- onClick={() => onPublish(true, extras())}
+ onClick={() => publish(true)}
  >{isSubmitting ? m.editor_publish_publishing() : m.editor_publish_mark_complete_and_publish()}</Button>
  </>
  ) : (
@@ -162,7 +175,7 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  <Button
  variant="primary"
  pending={isSubmitting}
- onClick={() => onPublish(false, extras())}
+ onClick={() => publish(false)}
  >{isSubmitting ? m.editor_publish_publishing() : m.editor_publish_now()}</Button>
  </>
  )

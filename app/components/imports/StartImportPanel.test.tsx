@@ -18,7 +18,7 @@
  * real library from bytes the real library wrote. The conversion under test is
  * therefore the production one.
  */
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 import ExcelJS from "exceljs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -76,6 +76,7 @@ async function realWorkbook(fileName: string, sheets: SheetSpec[]): Promise<{ fi
 function renderPanel(props: {
     entry: ImportEntryPoint;
     hasAssistedMigration?: boolean;
+    action?: () => null;
 }): HTMLFormElement {
     // A router context, because the panel submits through `<Form>`. The panel
     // is still rendered DIRECTLY: no route module, no loader, no middleware —
@@ -84,6 +85,7 @@ function renderPanel(props: {
     const Stub = createRoutesStub([
         {
             path: "/",
+            action: props.action,
             Component: () => (
                 <StartImportPanel
                     entry={props.entry}
@@ -337,5 +339,29 @@ describe("the PDF route, for a source nothing here can read", () => {
             expect((await uploadedFile(form)).name).toBe("blank-template.pdf");
         });
         expect((await uploadedFile(form)).type).toBe("application/pdf");
+    });
+});
+
+describe("StartImportPanel — the in-flight latch", () => {
+    const submitEvent = () => new Event("submit", { bubbles: true, cancelable: true });
+
+    it("starts one run when two submits land in the same frame, and again once the navigation settles", async () => {
+        const action = vi.fn((): null => null);
+        const form = renderPanel({ entry: CONTACTS, action });
+
+        act(() => {
+            form.dispatchEvent(submitEvent());
+            form.dispatchEvent(submitEvent());
+        });
+        await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 50));
+        });
+        expect(action).toHaveBeenCalledTimes(1);
+
+        act(() => {
+            form.dispatchEvent(submitEvent());
+        });
+        await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
     });
 });

@@ -2,6 +2,7 @@ import { useId, useRef, useState } from "react";
 import { Form } from "react-router";
 import { Banner, Button, Checkbox } from "@core/shared-ui";
 
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 import { PdfInferenceUpload } from "./PdfInferenceUpload";
 import { importStartBlockedReason, type ImportEntryPoint } from "~/lib/import-entry-points";
@@ -100,6 +101,7 @@ export function StartImportPanel({
      *  about why this is not called an attestation. */
     const [statementAccepted, setStatementAccepted] = useState(false);
     const fileInputId = useId();
+    const latch = useSubmitLatch();
 
     const inputRef = useRef<HTMLInputElement>(null);
     /** The parsed workbook and the name it arrived under — see (1) above. */
@@ -205,7 +207,7 @@ export function StartImportPanel({
     );
 
     return (
-        <Form method="post" encType="multipart/form-data" className="space-y-4">
+        <Form method="post" encType="multipart/form-data" onSubmit={latch()} className="space-y-4">
             <input type="hidden" name="intent" value={entry.intent} />
 
             {/* The panel is titled by what it imports: the entry point is the
@@ -392,7 +394,6 @@ export function StartImportPanel({
     );
 }
 
-/** The label that stands in for the file input's own chrome. Same rank as a
- *  secondary button, because that is what it is. */
+/** Stands in for the file input's own chrome, at the rank of a secondary button. */
 const fileChooserClass =
     "h-9 px-4 rounded-ih-button border border-ih-border bg-ih-bg-card text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors inline-flex items-center cursor-pointer";
