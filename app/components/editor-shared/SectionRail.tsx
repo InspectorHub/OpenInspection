@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Button, IconButton, MenuItem } from '@core/shared-ui';
+import { useRef, useState } from 'react';
+import { Button, IconButton, MenuItem, Popover } from '@core/shared-ui';
 import { SectionDonut } from '../editor/SectionDonut';
 import { sectionIconFor } from '../editor/section-icons';
 import type { EditorMode } from './editor-mode';
@@ -100,16 +99,16 @@ export function SectionRail({
 }: SharedSectionRailProps) {
  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
  const [editingId, setEditingId] = useState<string | null>(null);
- // The ⋯ menu is portaled to a viewport anchor so the section rail's
- // overflow-y-auto never clips the last section's menu.
- const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
+ // The ⋯ menu is a shared Popover (position: fixed, so the rail's overflow-y-auto
+ // never clips it). The open row's ⋯ button is kept so Popover focuses it on close:
+ // a confirm dialog opened by a menu action then records a mounted anchor, not <body>.
+ const menuAnchorRef = useRef<HTMLElement | null>(null);
  const openSectionMenu = (sectionId: string, el: HTMLElement) => {
-  if (openMenuId === sectionId) { setOpenMenuId(null); setMenuAnchor(null); return; }
-  const r = el.getBoundingClientRect();
+  if (openMenuId === sectionId) { setOpenMenuId(null); return; }
+  menuAnchorRef.current = el;
   setOpenMenuId(sectionId);
-  setMenuAnchor({ x: r.right, y: r.bottom });
  };
- const closeSectionMenu = () => { setOpenMenuId(null); setMenuAnchor(null); };
+ const closeSectionMenu = () => { setOpenMenuId(null); };
  const hasStructuralOps = Boolean(onAddSection || onDuplicateSection || onDeleteSection || onMoveSection || onRenameSection);
  // Drag-to-reorder via SortableJS (desktop: grab the handle; touch: 500ms
  // long-press). Disabled mid-rename so the input isn't torn out from under you.
@@ -240,14 +239,8 @@ export function SectionRail({
    >
    <DotsIcon />
    </IconButton>
-   {menuOpen && menuAnchor && createPortal(
-   <>
-   <div className="fixed inset-0 z-[60]" onClick={closeSectionMenu} />
-   <div
-    style={{ top: menuAnchor.y + 4, left: menuAnchor.x }}
-    className="fixed -translate-x-full z-[61] w-36 rounded-md shadow-ih-popover bg-ih-bg-card border border-ih-border py-0.5 text-[12px]"
-    role="menu"
-   >
+   <Popover open={menuOpen} onClose={closeSectionMenu} anchorRef={menuAnchorRef} align="right" anchorToggles>
+   <div className="w-36 py-0.5 text-[12px]" role="menu">
     {onRenameSection && (
     <MenuItem
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); setEditingId(section.id); }}
@@ -288,9 +281,7 @@ export function SectionRail({
     </>
     )}
    </div>
-   </>,
-   document.body,
-   )}
+   </Popover>
   </div>
   )}
  </div>

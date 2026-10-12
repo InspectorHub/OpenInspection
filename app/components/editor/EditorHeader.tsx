@@ -362,11 +362,8 @@ export function EditorHeader({
  <Button
   variant="primary"
   onClick={onPublishClick}
-  // aria-disabled, not disabled: a disabled button that holds focus drops it to <body>,
-  // and the Publish dialog opens only after the readiness check, so it would record
-  // <body> as the element to hand focus back to. onPublishClick already refuses clicks.
-  aria-disabled={openingPublish}
-  className="aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
+  // pending (not disabled) keeps focus on the button; see Button. onPublishClick also refuses re-entry.
+  pending={openingPublish}
   data-testid="editor-publish-btn"
   icon={
    <svg

@@ -72,7 +72,7 @@ describe('the editor header consumes it on the Publish button', () => {
         expect(SRC).toContain('runWithPending(handlePublishClick, setOpeningPublish)');
     });
 
-    it('marks the Publish button aria-disabled, not disabled, and changes its label while the flag is set', () => {
+    it('marks the Publish button pending, not natively disabled, and changes its label while the flag is set', () => {
         // From the Publish button's own comment to the end of the file: the two
         // attributes sit either side of its `data-testid`, so slicing at that
         // would read only half the element.
@@ -82,8 +82,8 @@ describe('the editor header consumes it on the Publish button', () => {
         expect(publishBlock).toContain('data-testid="editor-publish-btn"');
         // A native `disabled` on the focused button drops focus to <body> while the check
         // runs, and the dialog then records <body> as the element to return focus to.
-        expect(publishBlock).toContain('aria-disabled={openingPublish}');
-        expect(publishBlock).not.toMatch(/(?<!aria-)disabled=\{openingPublish\}/);
+        expect(publishBlock).toContain('pending={openingPublish}');
+        expect(publishBlock).not.toMatch(/(?<![-\w])disabled=\{openingPublish\}/);
         expect(publishBlock).toContain('openingPublish ? m.report_publish_checking()');
     });
 });

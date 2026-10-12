@@ -49,7 +49,7 @@
   "app/routes/inspection-edit/action.server.ts": 511,
   "server/services/inspection/shared.ts": 500,
   "server/services/portal-access.service.ts": 500,
-  "app/components/collab/VersionHistoryPanel.tsx": 497,
+  "app/components/collab/VersionHistoryPanel.tsx": 501,
   "server/api/portal.ts": 488,
   "server/lib/compliance/erasure-orchestrator.ts": 486,
   "scripts/check-processing-stores.mjs": 483,

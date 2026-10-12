@@ -19,6 +19,10 @@ interface PopoverProps {
   /** Horizontal alignment to the anchor's edge. Default 'right': the panel's right
    *  edge lines up with the anchor's right edge (standard dropdown placement). */
   align?: "left" | "right";
+  /** When true, a mousedown on the anchor does not dismiss the panel, so the
+   *  anchor's own click handler can toggle it (otherwise mousedown closes and
+   *  the click reopens). Default false: existing callers are unchanged. */
+  anchorToggles?: boolean;
 }
 
 const PANEL_GAP_PX = 8;
@@ -36,8 +40,12 @@ const PANEL_GAP_PX = 8;
  * (which Modal/Drawer get for free from their full-screen scrim, which this
  * component doesn't have).
  */
-export function Popover({ open, onClose, anchorRef, children, align = "right" }: PopoverProps) {
+export function Popover({ open, onClose, anchorRef, children, align = "right", anchorToggles = false }: PopoverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const anchorTogglesRef = useRef(anchorToggles);
+  useEffect(() => {
+    anchorTogglesRef.current = anchorToggles;
+  });
   /**
    * `position: fixed` from the very first render, before anything is measured.
    *
@@ -123,7 +131,10 @@ export function Popover({ open, onClose, anchorRef, children, align = "right" }:
     // newly-focused element outside the panel — the standard dropdown/menu
     // dismiss pattern.
     const handlePointerDown = (e: MouseEvent) => {
-      if (!panelRef.current?.contains(e.target as Node)) onCloseRef.current();
+      const target = e.target as Node;
+      if (panelRef.current?.contains(target)) return;
+      if (anchorTogglesRef.current && anchorRef.current?.contains(target)) return;
+      onCloseRef.current();
     };
     document.addEventListener("mousedown", handlePointerDown);
 

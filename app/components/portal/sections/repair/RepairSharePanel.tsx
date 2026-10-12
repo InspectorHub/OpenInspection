@@ -7,6 +7,7 @@
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import { usePdfExport, pdfActionLabel, pdfBusyHint } from "~/hooks/usePdfExport";
+import { Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 interface RepairSharePanelProps {
@@ -90,14 +91,10 @@ export function RepairSharePanel({
             onChange={(e) => onEmailMsgChange(e.target.value)}
             className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 resize-none focus:outline-none focus:border-ih-primary"
           />
-          <button
-            type="button"
-            disabled={!emailTo || emailSubmitting}
-            onClick={onSendEmail}
-            className="h-9 px-4 rounded-lg bg-ih-primary text-ih-primary-fg text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
-          >
+          {/* pending, not disabled: a focused button that goes disabled drops focus to <body>. */}
+          <Button variant="primary" disabled={!emailTo} pending={emailSubmitting} onClick={onSendEmail}>
             {emailSubmitting ? m.portal_landing_submit_pending() : m.repair_share_email_submit()}
-          </button>
+          </Button>
           {emailError && (
             <p className="text-[12px] text-ih-bad-fg">{emailError}</p>
           )}

@@ -5,6 +5,7 @@ import { applyItemPatch } from "../../../server/lib/collab/results-doc";
 import type { ResultsProjection } from "../../../server/lib/collab/results-doc.types";
 import { diffProjections, type FindingDiff, type ScalarField } from "~/lib/collab/snapshot-diff";
 import { VersionCompare } from "~/components/collab/VersionCompare";
+import { useReturnFocusAfterCompare } from "~/components/collab/useReturnFocusAfterCompare";
 import { useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import { formatShapedDate, type InspectionDateTimeFormat } from "~/lib/format-date";
 import { m } from "~/paraglide/messages";
@@ -174,6 +175,8 @@ export function VersionHistoryPanel({
     const [compareBusy, setCompareBusy] = useState(false);
 
     const canCompare = !!currentResults;
+
+    const returnFocus = useReturnFocusAfterCompare(confirmSeq !== null);
 
     // Tenant-anchored (#270): every collaborator on this document must read the
     // same date off this list.
@@ -399,7 +402,7 @@ export function VersionHistoryPanel({
                                         {canCompare && (
                                             <button
                                                 type="button"
-                                                onClick={() => void handleCompare(snap.seq)}
+                                                onClick={(e) => { returnFocus.rememberOpener(e.currentTarget); void handleCompare(snap.seq); }}
                                                 className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-semibold text-ih-fg-2 hover:bg-ih-bg-muted"
                                             >
                                                 {m.editor_collab_compare()}
@@ -484,6 +487,7 @@ export function VersionHistoryPanel({
                         ? undefined
                         : () => {
                               const seq = compareSeq;
+                              returnFocus.markFromCompare();
                               setCompareOpen(false);
                               setCompareSeq(null);
                               setRestoreError(null);

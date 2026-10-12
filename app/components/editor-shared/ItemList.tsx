@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
-import { createPortal } from "react-dom";
-import { Button, IconButton, MenuItem } from "@core/shared-ui";
+import { Button, IconButton, MenuItem, Popover } from "@core/shared-ui";
 import type { EditorMode } from "./editor-mode";
 import { useSortableReorder } from "./useSortableReorder";
 import { InlineRename } from "./InlineRename";
@@ -160,7 +159,10 @@ export function ItemList({
   };
   const lastClickedRef = useRef<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const { menuItemId, menuAnchor, openItemMenu, closeItemMenu } = useItemRowMenu();
+  const { menuItemId, openItemMenu, closeItemMenu } = useItemRowMenu();
+  // The open row's ⋯ button. Popover focuses it on close, so a confirm dialog
+  // opened by a menu action records a still-mounted anchor, not <body>.
+  const menuAnchorRef = useRef<HTMLElement | null>(null);
   const structuralEditing = Boolean(onDuplicateItem || onDeleteItem || onMoveItem || onRenameItem);
   const resultsMap = results ?? {};
   // Phase U (Batch C1) — resolve a result in the active unit scope. The bare
@@ -298,7 +300,7 @@ export function ItemList({
               {structuralEditing && !batchMode && (
                 <div className={`shrink-0 w-6 flex items-center justify-center ${REVEAL}`}>
                   <IconButton
-                    onClick={(e) => { e.stopPropagation(); openItemMenu(item.id, e.currentTarget); }}
+                    onClick={(e) => { e.stopPropagation(); menuAnchorRef.current = e.currentTarget; openItemMenu(item.id, e.currentTarget); }}
                     size="sm"
                     className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2"
                     aria-label={m.editor_shared_edit_label({ label: item.label })}
@@ -307,14 +309,8 @@ export function ItemList({
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
                   </IconButton>
-                  {menuItemId === item.id && menuAnchor && createPortal(
-                    <>
-                      <div className="fixed inset-0 z-[60]" onClick={closeItemMenu} />
-                      <div
-                        role="menu"
-                        style={{ top: menuAnchor.y + 4, left: menuAnchor.x }}
-                        className="fixed -translate-x-full z-[61] w-36 py-1 bg-ih-bg-card border border-ih-border rounded-md shadow-ih-popover text-[12px]"
-                      >
+                  <Popover open={menuItemId === item.id} onClose={closeItemMenu} anchorRef={menuAnchorRef} align="right" anchorToggles>
+                      <div role="menu" className="w-36 py-1 text-[12px]">
                         {onRenameItem && (
                           <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); setEditingId(item.id); }}>{m.editor_shared_menu_rename()}</MenuItem>
                         )}
@@ -346,9 +342,7 @@ export function ItemList({
                           <MenuItem tone="danger" onClick={(e) => { e.stopPropagation(); closeItemMenu(); requestDelete(item.id, item.label); }}>{m.common_delete()}</MenuItem>
                         )}
                       </div>
-                    </>,
-                    document.body,
-                  )}
+                  </Popover>
                 </div>
               )}
             </div>

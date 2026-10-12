@@ -23,6 +23,7 @@
  *   through a BFF resource route. This component cannot tell, and must not.
  */
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { bucketMessages, dayKeyInZone, dayLabel, type MessageRow } from "~/lib/communication-view";
@@ -231,14 +232,10 @@ export function MessageThread({
               </>
             )}
           </div>
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!composeBody.trim() || sending}
-            className="px-4 py-2 rounded-xl bg-ih-primary text-ih-primary-fg text-sm font-semibold disabled:opacity-50 transition-opacity"
-          >
+          {/* pending, not disabled: the human check opened by onSend must not record <body> as its focus-return target. */}
+          <Button variant="primary" onClick={handleSend} disabled={!composeBody.trim()} pending={sending}>
             {sending ? m.portal_messages_send_pending() : m.portal_messages_send()}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

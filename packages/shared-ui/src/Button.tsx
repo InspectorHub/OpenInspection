@@ -9,6 +9,13 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   icon?: React.ReactNode;
   selected?: boolean;
+  /**
+   * Async work in flight. Renders `aria-disabled` rather than native `disabled`, so a focused
+   * button keeps focus (a natively disabled one drops it to <body>, and a dialog opened by the
+   * work would then record <body> as its focus-return target). Clicks are swallowed.
+   * Native `disabled` still wins when both are given.
+   */
+  pending?: boolean;
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -46,9 +53,14 @@ export function buttonClasses({
   );
 }
 
+// Pending clicks must neither reach the caller nor submit an enclosing form.
+function swallowClick(e: React.MouseEvent<HTMLButtonElement>) {
+  e.preventDefault();
+}
+
 // React 19: `ref` is a plain prop, so no forwardRef wrapper.
 export function Button({
-  variant = "secondary", size = "md", icon, children, className = "", selected, ref, ...props
+  variant = "secondary", size = "md", icon, children, className = "", selected, pending, onClick, ref, ...props
 }: ButtonProps & { ref?: React.Ref<HTMLButtonElement> }) {
   const selectedClass = selected ? "ring-2 ring-ih-primary ring-inset" : "";
   return (
@@ -56,14 +68,16 @@ export function Button({
       type="button"
       ref={ref}
       aria-pressed={selected === undefined ? undefined : selected}
+      aria-disabled={pending ? true : undefined}
       className={cn(
-        "inline-flex items-center justify-center font-bold rounded-ih-button transition-all focus:outline-none focus:shadow-ih-focus disabled:opacity-50 disabled:cursor-not-allowed",
+        "inline-flex items-center justify-center font-bold rounded-ih-button transition-all focus:outline-none focus:shadow-ih-focus disabled:opacity-50 disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:cursor-not-allowed",
         variantClasses[variant],
         sizeClasses[size],
         selectedClass,
         className,
       )}
       {...props}
+      onClick={pending ? swallowClick : onClick}
     >
       {icon}
       {children}
