@@ -147,6 +147,7 @@ const TestResultSchema = z.object({
     detail: z.string().nullable().describe('Non-sensitive outcome summary or provider error message.'),
     testedByUserId: z.string().nullable().describe('JWT sub of the user who ran the probe.'),
     testedAt: z.number().describe('Epoch milliseconds when the probe ran.'),
+    step: z.string().nullable().describe('Step id when the row records one step of a stepwise test; null for single-shot probes.'),
 }).openapi('IntegrationTestResult');
 
 const testResultsRoute = createRoute(withMcpMetadata({

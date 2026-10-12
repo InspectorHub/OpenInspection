@@ -3,6 +3,7 @@ import { eq, and, lt } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { users, tenants } from '../lib/db/schema';
 import { deriveAuthorityBasis } from '../lib/auth/authority-basis';
+import { initReplyToFromOwner } from '../lib/integration/owner-reply-to';
 import { buildAcceptanceStatement, type CapturedAcceptance } from '../services/legal/account-acceptance';
 
 /**
@@ -110,6 +111,11 @@ export async function applyAdminCredential(
         // buildAcceptanceStatement threw above rather than return zero
         // statements), which the compiler cannot see through the spread.
         await db.batch(statements as unknown as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+        // Only here, on the branch that CREATES the owner: the Reply-To default
+        // is a provisioning-time fact, not something to re-assert on every
+        // credential rotation. Placed after the batch so the atomic
+        // account+acceptance write is untouched by a config failure.
+        await initReplyToFromOwner(db, p.tenantId, p.adminEmail);
     } else {
         await db.update(users)
             .set({

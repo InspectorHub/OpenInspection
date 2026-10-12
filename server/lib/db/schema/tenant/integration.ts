@@ -303,6 +303,9 @@ export const integrationTestResults = sqliteTable('integration_test_results', {
     // User who ran the probe (JWT sub); NULL if unknown.
     testedByUserId: text('tested_by_user_id'),
     testedAt:       integer('tested_at', { mode: 'timestamp_ms' }).notNull(),
+    // Which step of a stepwise test this row records (e.g. 'key_valid',
+    // 'send_test'); NULL for the single-shot probes. Appended last (forward-only).
+    step:           text('step'),
 }, (t) => [
     index('idx_integration_test_tenant_target').on(t.tenantId, t.target, t.testedAt),
 ]);

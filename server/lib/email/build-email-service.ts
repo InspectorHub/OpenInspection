@@ -12,7 +12,8 @@ import { buildEmailSuppression } from './suppression';
 import { buildEmailDedupe } from './dedupe';
 import { buildNotificationPreferences } from '../notifications/preference-port';
 import { buildUnsubscribeLinks } from '../notifications/unsubscribe-footer';
-import { buildOutboundCoolingWindow, coolingWindowApplies } from './outbound-cooling-window';
+import { resolveTurnstileSiteKey } from '../middleware/bot-protection';
+import { buildOutboundCoolingWindow, coolingWindowApplies, type HumanVerifier } from './outbound-cooling-window';
 import { getDeploymentProfile } from '../deployment-profile';
 import { logger } from '../logger';
 import { memoOnce } from '../request-scope';
@@ -32,6 +33,7 @@ import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 export interface EmailServiceEnv {
     DB: D1Database;
     APP_MODE?: string;
+    TURNSTILE_SITE_KEY?: string;
     TENANT_CACHE: KVNamespace;
     /** Test-only email sink flag (see AppEnv.E2E_EMAIL_SINK). '1' ⇒ capture, don't send. */
     E2E_EMAIL_SINK?: string;
@@ -116,7 +118,7 @@ export function assembleTenantEmailService(
     cfg: LoadedEmailConfig,
     meterTenantId?: string,
     quotaGuard?: PlanQuotaGuard, tenantTier?: string,
-    options: { recipientInitiated?: boolean } = {},
+    options: { recipientInitiated?: boolean; humanVerified?: HumanVerifier } = {},
 ): EmailService {
     const { emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider } = cfg;
     // The ONE place an absent answer becomes `false` (a platform-default
@@ -264,7 +266,7 @@ export function assembleTenantEmailService(
     // here with no cast, which is the whole point of that narrowing.
     const profile = getDeploymentProfile(env);
     const cooling = meterTenantId && coolingWindowApplies({ profile, platformFunded: !isByo, recipientInitiated: options.recipientInitiated })
-        ? buildOutboundCoolingWindow(env.DB, meterTenantId)
+        ? buildOutboundCoolingWindow(env.DB, meterTenantId, Date.now, options.humanVerified, resolveTurnstileSiteKey(env))
         : undefined;
 
     // TEST-ONLY email sink (E2E). Capture every message to KV instead of
@@ -391,9 +393,10 @@ export async function buildTenantEmailService(
     tenantId: string | undefined,
     quotaGuard?: PlanQuotaGuard,
     tenantTier?: string,
+    options: { humanVerified?: HumanVerifier } = {},
 ): Promise<EmailService> {
     if (!tenantId) {
         return assembleTenantEmailService(env, { dbSecrets: {} });
     }
-    return assembleTenantEmailService(env, await loadTenantEmailConfig(env, tenantId), tenantId, quotaGuard, tenantTier);
+    return assembleTenantEmailService(env, await loadTenantEmailConfig(env, tenantId), tenantId, quotaGuard, tenantTier, options);
 }

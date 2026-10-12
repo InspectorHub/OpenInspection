@@ -11,6 +11,7 @@ import {
   type AgentRepairRow,
 } from "~/components/agent/AgentRepairInspectionBlock";
 import { m } from "~/paraglide/messages";
+import { humanCheckSiteKey } from "~/lib/outbound-refusal.server";
 
 export function meta() {
   return [{ title: m.agent_portal_recommendations_meta_title() }];
@@ -135,7 +136,13 @@ export async function action({ request, context }: Route.ActionArgs) {
         param: { shareToken },
         json: { to, message },
       });
-      if (!res.ok) return { ok: false as const, error: m.repair_builder_error_send_email() };
+      if (!res.ok) {
+        const verifySiteKey = await humanCheckSiteKey(res);
+        const error = m.repair_builder_error_send_email();
+        // `error` rides along so that, if the check cannot be completed, the page says so.
+        if (verifySiteKey) return { ok: false as const, error, verifySiteKey };
+        return { ok: false as const, error };
+      }
       return { ok: true as const };
     }
 

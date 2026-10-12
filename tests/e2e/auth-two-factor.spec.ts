@@ -22,7 +22,7 @@
  * out of the same account.
  */
 import { test, expect } from '@playwright/test';
-import type { APIRequestContext } from '@playwright/test';
+import type { APIRequestContext, Page } from '@playwright/test';
 import { TOTP, Secret } from 'otpauth';
 import { csrfHeaders } from './helpers/csrf';
 
@@ -109,12 +109,44 @@ async function post(request: APIRequestContext, path: string, data: unknown, tok
 const sessionFrom = (res: { headers(): Record<string, string> }) =>
     (res.headers()['set-cookie'] ?? '').match(/__Host-inspector_token=([^;]+)/)?.[1] ?? '';
 
+/**
+ * Sign in through the /login PAGE, as a person does, up to the point where the
+ * page either lands on /inspections or asks for a code.
+ *
+ * The API-level tests below cannot see the BFF hop: the page calls the API
+ * in-process and has to receive the JWT in the body to open a session, which a
+ * Playwright `request` never exercises. A correct code that the API accepted
+ * still failed on this page for exactly that reason.
+ */
+async function submitPassword(page: Page): Promise<void> {
+    await page.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
+    await page.fill('input[name=email]', EMAIL);
+    await page.fill('input[name=password]', PASSWORD);
+    await page.click('button[type=submit]');
+}
+
+/** Landed AND authenticated: a reload of /inspections must not bounce to /login. */
+async function expectSignedIn(page: Page): Promise<void> {
+    await page.waitForURL('**/inspections', { timeout: 15_000 });
+    const names = (await page.context().cookies()).map((c) => c.name);
+    expect(names, 'the BFF opened a session').toContain('__session');
+    await page.reload({ waitUntil: 'networkidle' });
+    expect(new URL(page.url()).pathname, 'still signed in after a reload').toBe('/inspections');
+}
+
 test.describe.configure({ mode: 'serial' });
 
 test.describe('two-factor sign-in', () => {
     let secret = '';
     let recoveryCodes: string[] = [];
     let session = '';
+
+    test('CONTROL — the login page signs in a password-only account', async ({ page }) => {
+        // Same page, same account, same run, before 2FA is on: proves the
+        // page-level step below CAN pass, so a red there is the second factor.
+        await submitPassword(page);
+        await expectSignedIn(page);
+    });
 
     test('enrolling issues a secret, a QR and eight recovery codes', async ({ request }) => {
         const login = await post(request, '/api/auth/login', { email: EMAIL, password: PASSWORD });
@@ -160,6 +192,15 @@ test.describe('two-factor sign-in', () => {
         const done = await post(request, '/api/auth/login/2fa', { challengeToken, code: codeFor(secret) });
         expect(done.status()).toBe(200);
         expect(sessionFrom(done), 'a real session cookie').not.toBe('');
+    });
+
+    test('the login page completes a sign-in with a TOTP code', async ({ page }) => {
+        await submitPassword(page);
+        const code = page.locator('input[name=code]');
+        await expect(code, 'the page asks for the second factor').toBeVisible({ timeout: 15_000 });
+        await code.fill(codeFor(secret));
+        await page.click('button[type=submit]');
+        await expectSignedIn(page);
     });
 
     test('a wrong code is refused WITHOUT spending the challenge', async ({ request }) => {

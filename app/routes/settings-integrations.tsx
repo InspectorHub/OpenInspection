@@ -3,12 +3,12 @@ import {
   useActionData,
   useNavigation,
   useRevalidator,
-  useFetcher,
 } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-integrations";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { runStripeTestStepIntent } from "~/lib/test-step.server";
 import { useFlash } from "~/hooks/useFlash";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { requireAdminLoader } from "~/lib/access.server";
@@ -109,22 +109,10 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { intent, success: true, error: null, field: null, test: null };
   }
 
-  if (intent === "test-stripe") {
-    const api = createApi(context, { token });
-    const res = await api.integrations.stripe.test.$post();
-    const body = (await res.json().catch(() => null)) as
-      | { data?: { accountName: string; livemode: boolean }; error?: { message?: string } }
-      | null;
-    if (!res.ok || !body?.data) {
-      return {
-        intent,
-        success: false,
-        error: body?.error?.message ?? m.settings_connection_test_failed(),
-        field: null,
-        test: null,
-      };
-    }
-    return { intent, success: true, error: null, field: null, test: body.data };
+  if (intent === "test-stripe-step") {
+    // This route's other results carry `success` and `field`; keep the union uniform.
+    const r = await runStripeTestStepIntent(createApi(context, { token }), "test-stripe-step", fd.get("step"));
+    return { ...r, success: r.ok, field: null };
   }
 
   if (intent === "save-video") {
@@ -233,7 +221,6 @@ export default function SettingsIntegrations() {
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const revalidator = useRevalidator();
-  const testFetcher = useFetcher<typeof action>();
   const ctx = useSessionContext();
 
   const { flashVisible } = useFlash(
@@ -300,7 +287,6 @@ export default function SettingsIntegrations() {
         saving={saving}
         serverField={serverField}
         serverError={actionData?.error}
-        testFetcher={testFetcher}
         revalidator={revalidator}
         testResults={testResults}
       />

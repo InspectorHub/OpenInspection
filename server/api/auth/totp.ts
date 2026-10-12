@@ -296,7 +296,17 @@ const totpRoutes = createApiRouter()
         }, keyring);
 
         setCookie(c, AUTH_COOKIE_NAME, sessionToken, authCookieOptions());
-        return c.json({ success: true, data: { redirect: '/inspections' } }, 200);
+
+        // Token Relay BFF, exactly as the password step in server/api/auth.ts:
+        // the login page calls this in-process and its client does not forward
+        // Set-Cookie, so the only way it can open a session is to receive the
+        // JWT in the body. Only the BFF sends this header; a browser caller
+        // gets the cookie and never the token.
+        const isBff = c.req.header('x-token-relay') === '1';
+        return c.json({
+            success: true,
+            data: { redirect: '/inspections', ...(isBff ? { token: sessionToken } : {}) },
+        }, 200);
     });
 
 export default totpRoutes;

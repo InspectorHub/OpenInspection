@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from "react";
 import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { bucketMessages, dayKeyInZone, dayLabel, type MessageRow } from "~/lib/communication-view";
+import { VerificationCancelledError } from "~/lib/verification-cancelled";
 
 export interface ThreadMessage extends MessageRow {
   /** Local-only: an optimistic send not yet confirmed, or one that failed. */
@@ -98,8 +99,9 @@ export function MessageThread({
     try {
       await onSend(body);
       setComposeBody("");
-    } catch {
-      setSendFailed(true);
+    } catch (err) {
+      // Closing the human check is not a failed send: keep the draft, say nothing.
+      if (!(err instanceof VerificationCancelledError)) setSendFailed(true);
     } finally {
       setSending(false);
     }

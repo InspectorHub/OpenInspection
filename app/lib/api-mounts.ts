@@ -50,6 +50,7 @@ export const MOUNT: Record<keyof Api, string> = {
     inspectionTag:      "/api/inspections",
     integrations:       "/api/integrations",
     integrationsAi:     "/api/integrations/ai",
+    integrationsTestSteps: "/api/integrations/test-steps",
     imports:            "/api/imports",
     invoices:           "/api/invoices",
     marketplace:        "/api/templates/marketplace",

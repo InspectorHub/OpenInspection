@@ -60,6 +60,10 @@ export enum ErrorCode {
     // provider, or the API key is scoped to test sends only. Operator action
     // required: verify the domain in email provider settings.
     EMAIL_SENDER_DOMAIN = 'EMAIL_SENDER_DOMAIN',
+    // The email provider's request-rate limit was hit and did not clear within
+    // the short inline retry. Nothing is wrong with the message or the account;
+    // trying again in a few seconds is the right response.
+    EMAIL_RATE_LIMITED = 'EMAIL_RATE_LIMITED',
 }
 
 /**
@@ -129,11 +133,11 @@ export const Errors = {
     // 403 rather than 402/429 deliberately: this is not a quota and not a rate
     // limit, it is a permission that has not vested yet. The CODE, not the
     // status, is what distinguishes it.
-    OutboundCoolingWindow: (details: { unlockAtMs: number; windowHours: number }) =>
+    OutboundCoolingWindow: (details: { unlockAtMs: number; windowHours: number; turnstileSiteKey?: string | null }) =>
         new AppError(
             403,
             ErrorCode.OUTBOUND_COOLING_WINDOW,
-            `New companies cannot send client email on the shared sender for the first ${details.windowHours} hours. Everything else works, and connecting your own email provider removes the wait entirely.`,
+            `New companies must confirm they are a person before sending client email on the shared sender during the first ${details.windowHours} hours. Do it in the web app, or connect your own email provider to remove the check entirely.`,
             details,
         ),
     /**
@@ -213,5 +217,13 @@ export const Errors = {
             ErrorCode.EMAIL_SENDER_DOMAIN,
             'Email could not be sent: the sender domain is not verified. Go to Settings → Email to fix this.',
             details,
+        ),
+    /** 429: the provider is rate limiting sends right now. `retryAfterSeconds` is its hint, when it gave one. */
+    EmailRateLimited: (retryAfterSeconds?: number) =>
+        new AppError(
+            429,
+            ErrorCode.EMAIL_RATE_LIMITED,
+            'Email delivery is busy right now. Please try again shortly.',
+            retryAfterSeconds !== undefined ? { retryAfterSeconds } : undefined,
         ),
 };

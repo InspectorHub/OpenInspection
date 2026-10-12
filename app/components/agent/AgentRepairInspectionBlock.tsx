@@ -17,6 +17,7 @@ import { useState } from "react";
 import { useFetcher } from "react-router";
 import { RepairDefectRowView, type RepairDefectPhoto } from "~/components/portal/sections/repair/RepairDefectRowView";
 import { RepairSharePanel } from "~/components/portal/sections/repair/RepairSharePanel";
+import { useChallengeOnRefusal } from "~/components/OutboundVerification";
 import { agentMayWriteRepairList, type AgentRepairAccess } from "~/lib/agent-repair-access";
 import { m } from "~/paraglide/messages";
 
@@ -59,7 +60,7 @@ export function AgentRepairInspectionBlock({
   photosFor,
 }: AgentRepairInspectionBlockProps) {
   const shareFetcher = useFetcher<ShareResult>();
-  const emailFetcher = useFetcher<{ ok?: boolean; error?: string }>();
+  const emailFetcher = useFetcher<{ ok?: boolean; error?: string; verifySiteKey?: string }>();
   const [copyLabel, setCopyLabel] = useState(m.portal_repair_copy_share());
   const [emailTo, setEmailTo] = useState("");
   const [emailMsg, setEmailMsg] = useState("");
@@ -97,9 +98,12 @@ export function AgentRepairInspectionBlock({
     if (emailMsg) fd.append("message", emailMsg);
     emailFetcher.submit(fd, { method: "post" });
   };
+  // A company in its first 24 hours is asked for the human check; send again once passed.
+  const challenge = useChallengeOnRefusal(emailFetcher.data, emailFetcher.state, sendEmail);
 
   return (
     <div data-testid={`repair-inspection-${inspectionId}`} className="p-5 space-y-3">
+      {challenge.dialog}
       <div className="flex items-center justify-between gap-3">
         <p className="text-[11px] font-bold text-ih-fg-3 uppercase tracking-widest">{tenantName}</p>
         {/* Sharing creates a repair_requests row, which the API refuses under
@@ -151,7 +155,7 @@ export function AgentRepairInspectionBlock({
           emailMsg={emailMsg}
           emailSent={emailFetcher.data?.ok === true}
           emailSubmitting={emailFetcher.state === "submitting"}
-          emailError={emailFetcher.data?.error}
+          emailError={emailFetcher.data?.verifySiteKey && !challenge.blocked ? undefined : emailFetcher.data?.error}
           onCopyShareLink={copyShareLink}
           onEmailToChange={setEmailTo}
           onEmailMsgChange={setEmailMsg}

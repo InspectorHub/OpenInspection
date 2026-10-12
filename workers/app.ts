@@ -29,6 +29,7 @@ import { paraglideMiddleware } from "../app/paraglide/server.js";
 import { withResolvedUiLocale } from "../server/lib/i18n/ui-locale";
 import type { WorkerEnv } from "./env";
 import { cloudflareContext } from "../app/lib/load-context";
+import { withHumanToken } from "./human-token";
 
 /** Hono context for this worker, so handlers need no `any`. */
 type Ctx = Context<{ Bindings: WorkerEnv }>;
@@ -70,7 +71,7 @@ const ssr = (c: Ctx) => {
     ...c.env,
     API_WORKER: {
       fetch: async (req: Request) =>
-        (await getApi()).app.fetch(req, innerEnv, c.executionCtx),
+        (await getApi()).app.fetch(withHumanToken(req, c.req.header("cookie")), innerEnv, c.executionCtx),
     },
   };
   const context = new RouterContextProvider();

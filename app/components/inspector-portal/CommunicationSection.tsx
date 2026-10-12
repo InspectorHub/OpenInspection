@@ -33,6 +33,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useFetcher } from "react-router";
 import { Card } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { useEnsureHuman } from "~/components/OutboundVerification";
+import { VerificationCancelledError } from "~/lib/verification-cancelled";
 import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { BlockHeading } from "./BlockHeading";
@@ -83,6 +85,7 @@ export function CommunicationSection({
     // MessageThread owns the pending affordance here: it holds its own `sending`
     // state, disables Send while `onSend` is awaited, and refuses a second press
     // before that resolves.
+    const ensureHuman = useEnsureHuman();
     // submit-guard-allow-no-busy: the composer disables its own Send button.
     const { fetcher: send, submit: submitSend } = useGuardedSubmit<{ ok: boolean }>();
     // Resend posts to the PAGE action's send-report intent (BFF — the browser
@@ -138,7 +141,7 @@ export function CommunicationSection({
         if (resendState === "idle" && resend.data) load();
     }, [resendState, resend.data, load]);
 
-    function handleResend(row: DeliveryRow) {
+    async function handleResend(row: DeliveryRow) {
         // Channel-faithful: the resend rides the row's OWN channel so it reaches
         // the same provider that failed. Email → send-report; SMS → send-sms.
         // An email endpoint must never be the fallback for an SMS failure.
@@ -155,6 +158,7 @@ export function CommunicationSection({
             return;
         }
         if (row.channel !== "email") return;
+        if (!(await ensureHuman())) return;
         const recipient = row.recipientContactId
             ? { contactId: row.recipientContactId, roleKey: row.roleKey }
             : { email: row.recipient, roleKey: row.roleKey };
@@ -174,6 +178,8 @@ export function CommunicationSection({
     const effectiveRecipient = recipientId || lastInbound?.contactId || threadOptions[0]?.contactId || "";
 
     async function handleSend(body: string) {
+        // Throw (not return) on cancel so MessageThread keeps the draft text.
+        if (!(await ensureHuman())) throw new VerificationCancelledError();
         if (!effectiveRecipient) throw new Error("no recipient");
         // The optimistic bubble goes up only for a call the guard accepted -
         // otherwise the thread would show a message nothing had been sent for.

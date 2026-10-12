@@ -49,3 +49,13 @@ export function memoOnce<T>(env: unknown, key: string, fn: () => Promise<T>): Pr
     const scope = (env as Record<string, unknown> | undefined)?.[REQUEST_SCOPE] as RequestScope | undefined;
     return scope ? scope.once(key, fn) : fn();
 }
+
+/**
+ * True when this request reached the API through the worker's in-process
+ * self-binding (the web app's own loaders and actions), false for external HTTP.
+ * Unforgeable for the same reason the scope is: only `workers/app.ts` puts the
+ * key on the env, and external traffic is handed the plain env.
+ */
+export function isInProcessRequest(env: unknown): boolean {
+    return !!(env as Record<string, unknown> | undefined)?.[REQUEST_SCOPE];
+}

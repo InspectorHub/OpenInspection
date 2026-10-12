@@ -11,6 +11,7 @@ import type { ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 import { deliverReportEmail, type ReportDeliveryDeps } from './report-email';
 import { deliverTemplatedEmail } from './deliver-email';
+import { createSendThrottle, type SendThrottle } from './send-throttle';
 
 /**
  * The flush query's SELECT projection. `inspection` is narrowed to the
@@ -72,7 +73,7 @@ export const FLUSH_SELECTION = {
 export function AutomationDelivery<TBase extends Constructor<AutomationBase & HasEvaluateConditions & HasDeliverSms>>(Base: TBase) {
     return class extends Base {
         async flush(
-            emailFor: (tenantId: string) => Promise<EmailService>,
+            emailFor: (tenantId: string, options?: { humanVerified?: boolean }) => Promise<EmailService>,
             appName: string, appBaseUrl: string,
             sms?: SmsRuntime,
             batchSize = 50,
@@ -86,6 +87,9 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
              *  on every existing caller/test (backward-compatible) and on deploys
              *  missing JWT_SECRET (see scheduled.ts wiring). */
             reportDelivery?: ReportDeliveryDeps,
+            /** Test seam: the throttle that keeps the batch's email sends under the
+             *  provider's request-rate limit. Absent ⇒ a real one (5 per second). */
+            flushDeps?: { throttle?: SendThrottle },
         ): Promise<void> {
             const db = this.getDrizzle();
             const now = new Date();
@@ -247,9 +251,14 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             const emailSvcCache = (() => {
                 const cache = new Map<string, EmailService>();
                 return {
-                    async getOrBuild(tenantId: string, factory: (tid: string) => Promise<EmailService>): Promise<EmailService> {
-                        let svc = cache.get(tenantId);
-                        if (!svc) { svc = await factory(tenantId); cache.set(tenantId, svc); }
+                    async getOrBuild(
+                        tenantId: string,
+                        factory: (tid: string, options?: { humanVerified?: boolean }) => Promise<EmailService>,
+                        humanVerified = false,
+                    ): Promise<EmailService> {
+                        const key = humanVerified ? `${tenantId}#verified` : tenantId;
+                        let svc = cache.get(key);
+                        if (!svc) { svc = await factory(tenantId, humanVerified ? { humanVerified } : undefined); cache.set(key, svc); }
                         return svc;
                     },
                 };
@@ -260,6 +269,9 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             // report.published rule fans out to N logs for the same inspection).
             // Declared once per flush() call; see report-email.ts:deliverReportEmail.
             const pdfMemo = new Map<string, Promise<ArrayBuffer | null>>();
+
+            // Email sends in this batch start at most N per second (wall time only).
+            const throttle = flushDeps?.throttle ?? createSendThrottle();
 
             // report.amended templates carry the re-publish change note
             // ({{summary}}) from the latest report_versions row. Fetch once per
@@ -345,7 +357,8 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // `automation` rides along because the WORDS are the rule's, not
                     // this branch's — see deliverReportEmail's "whose words go out".
                     if (log.channel === 'email' && automation?.trigger === 'report.published' && reportDelivery) {
-                        const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
+                        await throttle.beforeSend();
+                        const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor, !!log.humanVerifiedAt);
                         await deliverReportEmail(db, { log, automation, inspection, tenant },
                             emailSvc, appBaseUrl, reportDelivery, pdfMemo,
                             { rawDb: this.db, appName, appHost });
@@ -355,7 +368,8 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // The generic templated-email path lives in deliver-email.ts
                     // (file-size ratchet); it owns every outcome write on that
                     // branch, so there is nothing to interpret here.
-                    const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
+                    await throttle.beforeSend();
+                    const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor, !!log.humanVerifiedAt);
                     await deliverTemplatedEmail(db, { log, automation, inspection, tenant }, {
                         rawDb: this.db,
                         agreementService: this.agreementService,

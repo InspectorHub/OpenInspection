@@ -91,15 +91,48 @@ export function resolveTurnstileSiteKey(
  * reaching that state means the caller ignored it.
  */
 export async function verifyTurnstile(token: string, secretKey: string): Promise<boolean> {
+    const res = await postSiteverify(token, secretKey);
+    if (!res.ok) return false;
+    const data = await res.json() as { success: boolean };
+    return data.success;
+}
+
+const SITEVERIFY_TIMEOUT_MS = 5000;
+
+/** The one siteverify request. `idempotencyKey` makes a retry of the same check return the same answer. */
+function postSiteverify(token: string, secretKey: string, idempotencyKey?: string, timeoutMs?: number): Promise<Response> {
     if (!secretKey) throw new Error('TURNSTILE_SECRET_KEY is not configured');
     const body = new FormData();
     body.append('secret', secretKey);
     body.append('response', token);
-    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    if (idempotencyKey) body.append('idempotency_key', idempotencyKey);
+    return fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
         method: 'POST',
         body,
+        ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
     });
-    if (!res.ok) return false;
-    const data = await res.json() as { success: boolean };
-    return data.success;
+}
+
+/**
+ * Like `verifyTurnstile`, but tells a definite "no" from "could not tell": a
+ * throttled or failing siteverify (429, 5xx), a timeout or a network error is
+ * `'error'`, so a caller can retry instead of treating a Cloudflare hiccup as a
+ * bot. Pass the same `idempotencyKey` on the retry: if the first request reached
+ * Cloudflare and only its answer was lost, the retry returns that same answer
+ * instead of "already redeemed". An empty secret still throws.
+ */
+export async function verifyTurnstileOutcome(
+    token: string,
+    secretKey: string,
+    idempotencyKey?: string,
+): Promise<'yes' | 'no' | 'error'> {
+    try {
+        const res = await postSiteverify(token, secretKey, idempotencyKey, SITEVERIFY_TIMEOUT_MS);
+        if (res.status === 429 || res.status >= 500) return 'error';
+        if (!res.ok) return 'no';
+        return ((await res.json()) as { success: boolean }).success ? 'yes' : 'no';
+    } catch (err) {
+        if (!secretKey) throw err;
+        return 'error';
+    }
 }

@@ -96,7 +96,7 @@ export interface SessionContext {
    * once the window has elapsed, and when the server could not read the
    * anchor. The client never computes any of that; it renders what it is told.
    */
-  outboundCoolingWindow: { unlockAtMs: number } | null;
+  outboundCoolingWindow: { unlockAtMs: number; turnstileSiteKey: string | null } | null;
 }
 
 /**

@@ -37,6 +37,7 @@ import type {
     InspectionTagApi,
     IntegrationsApi,
     IntegrationsAiApi,
+    IntegrationsTestStepsApi,
     InvoicesApi,
     MarketplaceApi,
     McpGrantsApi,
@@ -170,6 +171,7 @@ export interface Api {
     inspectionTag:      ReturnType<typeof hc<InspectionTagApi>>;
     integrations:       ReturnType<typeof hc<IntegrationsApi>>;
     integrationsAi:     ReturnType<typeof hc<IntegrationsAiApi>>;
+    integrationsTestSteps: ReturnType<typeof hc<IntegrationsTestStepsApi>>;
     imports:            ReturnType<typeof hc<MigrationIntakeApi>>;
     invoices:           ReturnType<typeof hc<InvoicesApi>>;
     marketplace:        ReturnType<typeof hc<MarketplaceApi>>;
@@ -278,6 +280,7 @@ export function createApi(context: LoadContext, opts: CreateApiOptions = {}): Ap
         inspectionTag:      mk<InspectionTagApi>(MOUNT.inspectionTag),
         integrations:       mk<IntegrationsApi>(MOUNT.integrations),
         integrationsAi:     mk<IntegrationsAiApi>(MOUNT.integrationsAi),
+        integrationsTestSteps: mk<IntegrationsTestStepsApi>(MOUNT.integrationsTestSteps),
         imports:            mk<MigrationIntakeApi>(MOUNT.imports),
         invoices:           mk<InvoicesApi>(MOUNT.invoices),
         marketplace:        mk<MarketplaceApi>(MOUNT.marketplace),

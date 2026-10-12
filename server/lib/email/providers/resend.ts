@@ -1,5 +1,5 @@
 import { logger } from '../../logger';
-import type { EmailFailureKind, EmailProvider, EmailSendArgs, EmailSendUsage, EmailWebhookContext, NormalizedEmailEvent } from '../provider';
+import type { EmailFailureKind, EmailQuotaWindow, EmailProvider, EmailSendArgs, EmailSendUsage, EmailWebhookContext, NormalizedEmailEvent } from '../provider';
 import {
   base64ToBytes,
   bytesToBase64,
@@ -93,6 +93,12 @@ export function classifyResendError(
     return 'transient';
 }
 
+/** Which quota a Resend 429 error name refers to, or undefined when it is neither. */
+export function quotaWindowFor(name: string | undefined): EmailQuotaWindow | undefined {
+    if (name === 'daily_quota_exceeded') return 'daily';
+    return name === 'monthly_quota_exceeded' ? 'monthly' : undefined;
+}
+
 /**
  * ResendProvider — thin fetch-based adapter over the Resend REST API.
  * Satisfies EmailProvider for send + credential validation.
@@ -105,7 +111,7 @@ export class ResendProvider implements EmailProvider {
     args: EmailSendArgs,
   ): Promise<
     | { ok: true; id?: string; usage?: EmailSendUsage }
-    | { ok: false; error: string; kind: EmailFailureKind; retryAfterSeconds?: number; usage?: EmailSendUsage }
+    | { ok: false; error: string; kind: EmailFailureKind; retryAfterSeconds?: number; quotaWindow?: EmailQuotaWindow; usage?: EmailSendUsage }
   > {
     const payload: Record<string, unknown> = {
       from: args.from,
@@ -161,9 +167,11 @@ export class ResendProvider implements EmailProvider {
     else if (kind === 'suppressed') logger.warn('[email] ResendProvider delivery failed (suppressed)', failure);
     else logger.error(`[email] ResendProvider delivery failed (${kind})`, failure);
     const retryAfterSeconds = kind === 'rate_limited' ? readRetryAfterSeconds(res.headers) : undefined;
+    const quotaWindow = kind === 'quota_exceeded' ? quotaWindowFor(errName) : undefined;
     return {
       ok: false, error: errMsg, kind,
       ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+      ...(quotaWindow ? { quotaWindow } : {}),
       ...(usage ? { usage } : {}),
     };
   }
@@ -221,7 +229,7 @@ export class ResendProvider implements EmailProvider {
    * `restricted_api_key` and reports `reason: 'restricted'`.
    */
   async listDomains(): Promise<
-    | { ok: true; total: number; verified: number }
+    | { ok: true; total: number; verified: number; domains: Array<{ name: string; status: string }> }
     | { ok: false; reason: 'restricted' | 'unreachable' | 'error'; status: number | null }
   > {
     let res: Response;
@@ -244,7 +252,13 @@ export class ResendProvider implements EmailProvider {
       const status = (d as { status?: unknown } | null)?.status;
       return typeof status === 'string' && status.toLowerCase() === 'verified';
     }).length;
-    return { ok: true, total: data.length, verified };
+    const domains = data.flatMap((d) => {
+      const row = d as { name?: unknown; status?: unknown } | null;
+      return typeof row?.name === 'string'
+        ? [{ name: row.name.toLowerCase(), status: typeof row.status === 'string' ? row.status.toLowerCase() : 'unknown' }]
+        : [];
+    });
+    return { ok: true, total: data.length, verified, domains };
   }
 
   /** Count of verified domains visible to this key (0 when the key cannot list). */

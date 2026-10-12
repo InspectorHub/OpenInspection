@@ -302,6 +302,8 @@ type AppVariables = AuthVariables & {
     /** The platform person behind this request, if any. Written only from signed
      *  material — the M2M header (seam guard) or a session claim (jwtAuth). */
     platformActor?: import('../lib/m2m-auth').PlatformActor;
+    /** Present when the request carried a Turnstile token; resolves true once it verifies. */
+    humanVerified?: import('../lib/email/outbound-cooling-window').HumanVerifier;
 };
 
 /**

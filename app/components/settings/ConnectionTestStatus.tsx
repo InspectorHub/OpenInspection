@@ -65,7 +65,8 @@ export function ConnectionTestStatus({
   const mine = useMemo(
     () =>
       results
-        .filter((r) => r.target === target)
+        // Step rows belong to the stepwise checklist, not the one-line status.
+        .filter((r) => r.target === target && r.step === null)
         .sort((a, b) => b.testedAt - a.testedAt),
     [results, target],
   );

@@ -18,6 +18,11 @@
  *      exempt for the same reason — which is also what makes the escape hatch
  *      in the UI notice a real one rather than a consolation.
  *
+ * INSIDE THE WINDOW a send is allowed when the request carries a fresh Turnstile
+ * token (`HumanVerifier`). The window itself stays: it is the observation
+ * period, and what it no longer does is stop a person who has just passed a
+ * challenge. A request that cannot present a token is refused as before.
+ *
  * WHY THE COST IS DELIVERABILITY, NOT SENDS. `inspectorhub.io` publishes
  * `p=reject` with Resend and SES aligned. The damage from 50 free emails per
  * throwaway company is what it does to paying customers' report email, not
@@ -139,6 +144,14 @@ export function unlockAtMs(tenantCreatedAtMs: number): number {
  * does not, so "off" is expressed by absence rather than by a branch inside
  * the transport.
  */
+/**
+ * Resolves true when the request in flight carries a Turnstile token that
+ * Cloudflare accepts. Built per request (see `diMiddleware`) and memoised, so a
+ * request that sends several messages pays for one verification, and a request
+ * that never reaches a gated send pays for none.
+ */
+export type HumanVerifier = () => Promise<boolean>;
+
 export interface OutboundCoolingPort {
     check(classId: string | undefined): Promise<void>;
 }
@@ -162,6 +175,9 @@ export function buildOutboundCoolingWindow(
     db: D1Database,
     tenantId: string,
     now: () => number = Date.now,
+    humanVerified?: HumanVerifier,
+    /** Rides along on the refusal so a page that has no session context can still show the challenge. */
+    turnstileSiteKey?: string | null,
 ): OutboundCoolingPort {
     return {
         async check(classId) {
@@ -190,7 +206,13 @@ export function buildOutboundCoolingWindow(
             const unlock = unlockAtMs(createdAt.getTime());
             if (now() >= unlock) return;
 
-            throw Errors.OutboundCoolingWindow({ unlockAtMs: unlock, windowHours: COOLING_WINDOW_HOURS });
+            // Inside the window a person may still send, by proving they are one.
+            // A request with no token (an API or MCP client, or a browser that
+            // has not been through the challenge) falls through to the refusal,
+            // whose code is what tells the web app to ask for the challenge.
+            if (humanVerified && await humanVerified()) return;
+
+            throw Errors.OutboundCoolingWindow({ unlockAtMs: unlock, windowHours: COOLING_WINDOW_HOURS, turnstileSiteKey: turnstileSiteKey ?? null });
         },
     };
 }

@@ -21,6 +21,8 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Avatar } from "@core/shared-ui";
 import { MessageThread, type ThreadMessage } from "~/components/messaging/MessageThread";
+import { useEnsureHuman } from "~/components/OutboundVerification";
+import { VerificationCancelledError } from "~/lib/verification-cancelled";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
@@ -144,6 +146,7 @@ function threadTime(ms: number, locale: string, timeZone: string): string {
 export default function MessagesPage() {
   const { threads, thread, selected } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
+  const ensureHuman = useEnsureHuman();
   // #106 - a send delivers a real message to a real person.
   // MessageThread owns the pending affordance and will not fire `onSend` again
   // until the previous one resolves.
@@ -176,6 +179,8 @@ export default function MessagesPage() {
   }));
 
   async function handleSend(body: string) {
+    // Throw (not return) on cancel so MessageThread keeps the draft text.
+    if (!(await ensureHuman())) throw new VerificationCancelledError();
     if (!selected) throw new Error("no thread");
     submitSend(
       { contactId: selected, body, inspectionId: mentionId },

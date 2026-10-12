@@ -4,6 +4,7 @@ import { SignerList, type SignerRow } from "~/components/agreements/SignerList";
 import type { action } from "~/routes/resources/agreement-signers";
 import { AGREEMENT_SIGNERS_ACTION } from "~/routes/resources/agreement-signers";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { useEnsureHuman } from "~/components/OutboundVerification";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -18,6 +19,7 @@ export function RequestDetail({ requestId }: { requestId: string }) {
   // Separate fetchers per competing mutation (RR rule: shared fetcher aborts in-flight).
   // #106 - a reminder sends a real email to a real signer. The two load
   // fetchers around it stay raw: they are selects, not writes.
+  const ensureHuman = useEnsureHuman();
   // submit-guard-allow-no-busy: the row swaps to a "sent" state on the reply.
   const { fetcher: remindFetcher, submit: submitRemind } = useGuardedSubmit<typeof action>();
   const copyFetcher = useFetcher<typeof action>();
@@ -50,7 +52,8 @@ export function RequestDetail({ requestId }: { requestId: string }) {
 
   // Remind is fire-and-forget through its own fetcher; the result (including a
   // 429/409 friendly message) renders as an inline banner, never an alert.
-  const onRemind = (signerId: string) => {
+  const onRemind = async (signerId: string) => {
+    if (!(await ensureHuman())) return;
     submitRemind({ intent: "remind", requestId, signerId }, post);
   };
 

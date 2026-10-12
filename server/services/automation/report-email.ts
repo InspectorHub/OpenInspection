@@ -11,6 +11,7 @@ import { createOiTemplateStore } from './template-store';
 import { createRecipientLocaleResolver } from '../../lib/i18n/recipient-locale';
 import { automationClassId } from '../../lib/notifications/automation-classes';
 import { coolingWindowUnlockAtMs, deferUntilCoolingWindowOpens } from './cooling-window';
+import { providerOutcomeFor, applyProviderOutcome } from './provider-deferral';
 import { reportDeliverySystemBlocks } from '../../lib/email-templates/renderer';
 import { readReportViewCountingEnabled } from '../../lib/report-views';
 import type { FlushInspection } from './shared';
@@ -222,7 +223,8 @@ export async function deliverReportEmail(
                 // provider request is built, so the retry raises the identical
                 // error, logs a second scary line about a PDF that was fine,
                 // and arrives at the same outer catch. Hand it straight up.
-                if (coolingWindowUnlockAtMs(err) !== null) throw err;
+                // Same for a provider refusal: the text-only retry would hit it again.
+                if (coolingWindowUnlockAtMs(err) !== null || providerOutcomeFor(err, Date.now())) throw err;
                 logger.error('AutomationService.flush: report PDF email send failed; falling back to text-only email',
                     { inspectionId: inspection.id, logId: log.id }, err instanceof Error ? err : undefined);
                 delivered = await emailSvc.sendReportReady(log.recipient, address, linkUrl, undefined, reportDelivery.renderHost);
@@ -254,6 +256,13 @@ export async function deliverReportEmail(
         const unlockAtMs = coolingWindowUnlockAtMs(err);
         if (unlockAtMs !== null) {
             await deferUntilCoolingWindowOpens(db, log.id, unlockAtMs);
+            return;
+        }
+        // A provider rate limit / daily quota keeps the row pending (a monthly
+        // quota fails it with a readable reason) — see ./provider-deferral.
+        const providerOutcome = providerOutcomeFor(err, Date.now());
+        if (providerOutcome) {
+            await applyProviderOutcome(db, log.id, providerOutcome);
             return;
         }
         await db.update(automationLogs)

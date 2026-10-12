@@ -6,7 +6,7 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 145,
+    "files": 146,
     "dollarMethods": 567,
     "apiWorker": 9
   },
@@ -89,6 +89,10 @@
     },
     "app/lib/tenant-brand.server.ts": {
       "dollarMethods": 1,
+      "apiWorker": 0
+    },
+    "app/lib/test-step.server.ts": {
+      "dollarMethods": 2,
       "apiWorker": 0
     },
     "app/lib/view-tracking.server.ts": {
@@ -488,7 +492,7 @@
       "apiWorker": 0
     },
     "app/routes/settings-communication.tsx": {
-      "dollarMethods": 21,
+      "dollarMethods": 20,
       "apiWorker": 0
     },
     "app/routes/settings-compliance.tsx": {
@@ -536,7 +540,7 @@
       "apiWorker": 2
     },
     "app/routes/settings-integrations.tsx": {
-      "dollarMethods": 11,
+      "dollarMethods": 10,
       "apiWorker": 0
     },
     "app/routes/settings-profile.tsx": {

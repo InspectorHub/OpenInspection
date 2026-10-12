@@ -4,6 +4,7 @@ import { RadioCardGroup } from "@core/shared-ui";
 import type { useFetcher } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
+import { EmailStepTest } from "~/components/settings/EmailStepTest";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import type { action } from "~/routes/settings-communication";
 import { m } from "~/paraglide/messages";
@@ -37,8 +38,6 @@ export function EmailSecretsPanel({
   secretFieldError,
   secretFormError,
   savingEmailSecrets,
-  resendTestFetcher,
-  resendTest,
   emailValidateFetcher,
   initialProvider = "resend",
   webhookBaseUrl = "",
@@ -59,8 +58,6 @@ export function EmailSecretsPanel({
   secretFieldError: (name: string) => string | undefined;
   secretFormError: (intent: string) => string | null;
   savingEmailSecrets: boolean;
-  resendTestFetcher: ActionFetcher;
-  resendTest: ActionFetcher["data"];
   emailValidateFetcher: ActionFetcher;
   initialProvider?: EmailByoProvider;
   /** Origin used to build the deliverability webhook URL hint (e.g. https://app…). */
@@ -241,19 +238,8 @@ export function EmailSecretsPanel({
         </div>
       </Form>
 
-      {/* Test connection — probes the STORED Resend key; shown for Resend only */}
-      {provider === "resend" && (
-        <TestConnectionButton fetcher={resendTestFetcher} intent="test-resend">
-          {resendTest && "intent" in resendTest && resendTest.intent === "test-resend" && resendTest.test && "domains" in resendTest.test && (
-            <span className="text-[12px] text-ih-fg-2">
-              {m.settings_emailsecrets_resend_connected({ count: resendTest.test.domains })}
-            </span>
-          )}
-          {resendTest && "intent" in resendTest && resendTest.intent === "test-resend" && "ok" in resendTest && !resendTest.ok && (
-            <span className="text-[12px] text-ih-bad-fg">{resendTest.error}</span>
-          )}
-        </TestConnectionButton>
-      )}
+      {/* Test connection for Resend: key, permissions, sender domain, real test email, quota, delivery */}
+      {provider === "resend" && <EmailStepTest results={testResults} />}
 
       {/* Validate credentials — generic probe for sendgrid / postmark / mailgun.
           The hidden `provider` input is a child of TestConnectionButton so it
