@@ -4,7 +4,7 @@ import { hasTrappingLayer, useLayer } from "./layers";
 // Hidden inputs and anything disabled are filtered again in focusableIn; the selector
 // states only what it can cheaply.
 const FOCUSABLE =
-  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable]:not([contenteditable="false"]), summary, iframe, audio[controls], video[controls]';
 
 /**
  * True when `el` is rendered and visible. Prefers the platform's checkVisibility; without

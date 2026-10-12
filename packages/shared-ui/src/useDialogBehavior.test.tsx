@@ -334,6 +334,53 @@ describe("focusable filtering", () => {
   });
 });
 
+describe("tab stops beyond buttons and links", () => {
+  it("a contenteditable as the last tabbable keeps the trap: Tab from it wraps to the first", () => {
+    render(
+      <Dlg open>
+        <button>first</button>
+        <div contentEditable suppressContentEditableWarning data-testid="editor">notes</div>
+      </Dlg>,
+    );
+    const editor = screen.getByTestId("editor");
+    editor.focus();
+    expect(document.activeElement).toBe(editor);
+    const prevented = !fireEvent.keyDown(editor, { key: "Tab" });
+    expect(prevented).toBe(true);
+    expect(document.activeElement).toBe(screen.getByText("first"));
+  });
+
+  it("contenteditable=false is not a tab stop", () => {
+    render(
+      <Dlg open>
+        <button>first</button>
+        <div contentEditable={false} data-testid="static">x</div>
+        <button>last</button>
+      </Dlg>,
+    );
+    const last = screen.getByText("last");
+    last.focus();
+    fireEvent.keyDown(last, { key: "Tab" });
+    expect(document.activeElement).toBe(screen.getByText("first"));
+  });
+
+  it("a summary as the last tabbable keeps the trap", () => {
+    render(
+      <Dlg open>
+        <button>first</button>
+        <details>
+          <summary data-testid="summary">more</summary>
+        </details>
+      </Dlg>,
+    );
+    const summary = screen.getByTestId("summary");
+    summary.focus();
+    expect(document.activeElement).toBe(summary);
+    fireEvent.keyDown(summary, { key: "Tab" });
+    expect(document.activeElement).toBe(screen.getByText("first"));
+  });
+});
+
 describe("a popover does not cancel a pending restore", () => {
   function Pop() {
     useLayer(true, {});

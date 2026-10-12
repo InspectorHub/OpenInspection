@@ -16,10 +16,10 @@ interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> 
 }
 
 const variantClasses: Record<IconButtonVariant, string> = {
-  primary: "bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600",
-  secondary: "bg-ih-bg-card border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted",
-  ghost: "text-ih-fg-2 hover:bg-ih-bg-muted",
-  danger: "bg-ih-bad text-ih-fg-inverse hover:opacity-90",
+  primary: "bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600 aria-disabled:hover:bg-ih-primary",
+  secondary: "bg-ih-bg-card border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted aria-disabled:hover:bg-ih-bg-card",
+  ghost: "text-ih-fg-2 hover:bg-ih-bg-muted aria-disabled:hover:bg-transparent",
+  danger: "bg-ih-bad text-ih-fg-inverse hover:opacity-90 aria-disabled:hover:opacity-50",
 };
 
 const sizeClasses: Record<IconButtonSize, string> = {
@@ -30,7 +30,7 @@ const sizeClasses: Record<IconButtonSize, string> = {
 
 // React 19: `ref` is a plain prop, so no forwardRef wrapper.
 export function IconButton({
-  variant = "ghost", size = "md", selected, pending, onClick, className = "", children, ref, ...props
+  variant = "ghost", size = "md", selected, pending, onClick, "aria-disabled": ariaDisabled, className = "", children, ref, ...props
 }: IconButtonProps & { ref?: React.Ref<HTMLButtonElement> }) {
     const selectedClass = selected ? "ring-2 ring-ih-primary ring-inset text-ih-primary-text" : "";
     return (
@@ -47,7 +47,8 @@ export function IconButton({
           className,
         )}
         {...props}
-        {...pendingProps(pending, onClick)}
+        aria-disabled={pending ? true : ariaDisabled}
+        onClick={pendingProps(pending, onClick).onClick}
       >
         {children}
       </button>

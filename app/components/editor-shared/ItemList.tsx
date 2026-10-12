@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, type KeyboardEvent } from "react";
 import { Button, IconButton, MenuItem, Popover } from "@core/shared-ui";
 import type { EditorMode } from "./editor-mode";
 import { useSortableReorder } from "./useSortableReorder";
@@ -15,7 +15,14 @@ import { ItemSubtreeDeleteModal, type PendingSubtreeDelete } from "./ItemSubtree
 // label, or rating dot. Desktop reveals on hover; touch always shows them.
 // Opacity, not visibility: a visibility:hidden ⋯ cannot take focus, so closing the confirm
 // dialog it opened (no hover, focus not in the row) could not hand focus back to it.
-const REVEAL = "opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
+const REVEAL = "opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 has-[[aria-expanded=true]]:opacity-100";
+
+// Keys typed in the portaled menu are not the row's, so the row's Alt+Arrow / F2 handler
+// must not see them. Escape and Tab stay: stopping them also stops the native event before
+// the window-level layer handler (Escape) and the dialog trap (Tab).
+function stopMenuKeys(e: KeyboardEvent) {
+  if (e.key !== "Escape" && e.key !== "Tab") e.stopPropagation();
+}
 
 interface SharedItemListProps {
   mode: EditorMode;
@@ -314,7 +321,7 @@ export function ItemList({
                   <Popover open={menuItemId === item.id} onClose={closeItemMenu} anchorRef={menuAnchorRef} align="right" anchorToggles portal panelRole="presentation">
                       {/* stopPropagation: React events bubble through the portal to the row's
                           Alt+Arrow / F2 handler; keys typed in the menu are not the row's. */}
-                      <div role="menu" className="w-36 py-1 text-[12px]" onKeyDown={(e) => e.stopPropagation()}>
+                      <div role="menu" className="w-36 py-1 text-[12px]" onKeyDown={stopMenuKeys}>
                         {onRenameItem && (
                           <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); setEditingId(item.id); }}>{m.editor_shared_menu_rename()}</MenuItem>
                         )}

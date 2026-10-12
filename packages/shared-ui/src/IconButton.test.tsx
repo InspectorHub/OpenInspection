@@ -78,4 +78,34 @@ describe("IconButton", () => {
     fireEvent.click(btn);
     expect(onClick).toHaveBeenCalledTimes(1);
   });
+
+  it("a caller-supplied aria-disabled survives when not pending, and pending still wins", () => {
+    const { rerender } = render(
+      <IconButton aria-label="Remove" aria-disabled="true">
+        <Icon name="filter" />
+      </IconButton>,
+    );
+    const btn = screen.getByRole("button", { name: "Remove" });
+    expect(btn.getAttribute("aria-disabled")).toBe("true");
+    rerender(
+      <IconButton aria-label="Remove" aria-disabled="false" pending>
+        <Icon name="filter" />
+      </IconButton>,
+    );
+    expect(btn.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it.each([
+    ["primary", "aria-disabled:hover:bg-ih-primary"],
+    ["secondary", "aria-disabled:hover:bg-ih-bg-card"],
+    ["ghost", "aria-disabled:hover:bg-transparent"],
+    ["danger", "aria-disabled:hover:opacity-50"],
+  ] as const)("%s variant suppresses its hover look while aria-disabled", (variant, cls) => {
+    render(
+      <IconButton aria-label="x" variant={variant} pending>
+        <Icon name="filter" />
+      </IconButton>,
+    );
+    expect(screen.getByRole("button", { name: "x" }).className.split(/\s+/)).toContain(cls);
+  });
 });

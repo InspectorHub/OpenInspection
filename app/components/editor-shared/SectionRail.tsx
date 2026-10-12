@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { Button, IconButton, MenuItem, Popover } from '@core/shared-ui';
 import { SectionDonut } from '../editor/SectionDonut';
 import { sectionIconFor } from '../editor/section-icons';
@@ -13,7 +13,14 @@ import { m } from '~/paraglide/messages';
 // is always shown. Space is reserved either way, so nothing shifts or overlaps.
 // Opacity, not visibility: a visibility:hidden ⋮ cannot take focus, so closing the confirm
 // dialog it opened (no hover, focus not in the row) could not hand focus back to it.
-const REVEAL = 'opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100';
+const REVEAL = 'opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 has-[[aria-expanded=true]]:opacity-100';
+
+// Keys typed in the portaled menu are not the row's, so the row's Alt+Arrow / F2 handler
+// must not see them. Escape and Tab stay: stopping them also stops the native event before
+// the window-level layer handler (Escape) and the dialog trap (Tab).
+function stopMenuKeys(e: KeyboardEvent) {
+  if (e.key !== 'Escape' && e.key !== 'Tab') e.stopPropagation();
+}
 
 interface SharedSectionRailProps {
  mode: EditorMode;
@@ -244,7 +251,7 @@ export function SectionRail({
    <Popover open={menuOpen} onClose={closeSectionMenu} anchorRef={menuAnchorRef} align="right" anchorToggles portal panelRole="presentation">
    {/* stopPropagation: React events bubble through the portal to the row's
        Alt+Arrow / F2 handler; keys typed in the menu are not the row's. */}
-   <div className="w-36 py-0.5 text-[12px]" role="menu" onKeyDown={(e) => e.stopPropagation()}>
+   <div className="w-36 py-0.5 text-[12px]" role="menu" onKeyDown={stopMenuKeys}>
     {onRenameSection && (
     <MenuItem
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); setEditingId(section.id); }}

@@ -73,6 +73,53 @@ test('item menu: Escape closes only the menu and refocuses the menu button', asy
   expect(document.activeElement).toBe(anchor);
 });
 
+test('item menu: Escape on a focused menu item closes the menu and refocuses the menu button', async () => {
+  render(
+    <ItemList mode="author" items={items} sectionId="s1" activeItemId="i1" onSelect={vi.fn()}
+      onDeleteItem={vi.fn()} onDuplicateItem={vi.fn()} />
+  );
+  const anchor = dots();
+  fireEvent.click(anchor);
+  const entry = screen.getByText('Duplicate');
+  act(() => entry.focus());
+  expect(document.activeElement).toBe(entry);
+  fireEvent.keyDown(entry, { key: 'Escape' });
+  await settle();
+  expect(screen.queryByRole('menu')).toBeNull();
+  expect(document.activeElement).toBe(anchor);
+});
+
+test('section menu: Escape on a focused menu item closes the menu and refocuses the menu button', async () => {
+  render(
+    <SectionRail mode="author" sections={sections} activeSection="s1" onSelect={() => {}}
+      onDeleteSection={vi.fn()} onDuplicateSection={vi.fn()} />
+  );
+  const anchor = dots();
+  fireEvent.click(anchor);
+  const entry = screen.getByText('Duplicate');
+  act(() => entry.focus());
+  fireEvent.keyDown(entry, { key: 'Escape' });
+  await settle();
+  expect(screen.queryByRole('menu')).toBeNull();
+  expect(document.activeElement).toBe(anchor);
+});
+
+test('item and section menus: the trigger slot stays revealed while its menu is open', () => {
+  const { unmount } = render(
+    <ItemList mode="author" items={items} sectionId="s1" activeItemId="i1" onSelect={vi.fn()}
+      onDeleteItem={vi.fn()} />
+  );
+  fireEvent.click(dots());
+  expect(dots().parentElement?.className).toContain('has-[[aria-expanded=true]]:opacity-100');
+  unmount();
+  render(
+    <SectionRail mode="author" sections={sections} activeSection="s1" onSelect={() => {}}
+      onDeleteSection={vi.fn()} />
+  );
+  fireEvent.click(dots());
+  expect(dots().parentElement?.className).toContain('has-[[aria-expanded=true]]:opacity-100');
+});
+
 test('item menu: clicking the menu button again toggles the menu closed', async () => {
   render(
     <ItemList mode="author" items={items} sectionId="s1" activeItemId="i1" onSelect={vi.fn()}

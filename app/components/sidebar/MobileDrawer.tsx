@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { NavLink } from "react-router";
 import { useCapabilities, useSessionContext } from "~/hooks/useSessionContext";
 import { IC, WORKSPACE_ITEMS, visibleNavItems } from "~/components/sidebar/nav-items";
@@ -6,6 +6,9 @@ import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { LocaleSwitcher } from "~/components/LocaleSwitcher";
 import { Avatar, Icon, useDialogBehavior } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+
+/** Tailwind `lg` (64rem), the breakpoint at which the panel's `lg:hidden` hides it. */
+const DRAWER_HIDDEN_QUERY = "(min-width: 1024px)";
 
 // ─── Mobile drawer ─────────────────────────────────────────────────────────────
 export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -24,6 +27,23 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
   const panelRef = useRef<HTMLDivElement>(null);
   // Hook runs before the early return: Escape, Tab trap, scroll lock and focus return.
   useDialogBehavior(open, onClose, panelRef);
+
+  // The panel is `lg:hidden`: once the viewport reaches `lg` it is display:none, but the dialog
+  // layer would stay registered (Tab swallowed, page scroll locked, Escape captured). Close it.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+  useEffect(() => {
+    if (!open || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia(DRAWER_HIDDEN_QUERY);
+    const closeWhenHidden = () => {
+      if (mq.matches) onCloseRef.current();
+    };
+    closeWhenHidden();
+    mq.addEventListener("change", closeWhenHidden);
+    return () => mq.removeEventListener("change", closeWhenHidden);
+  }, [open]);
 
   if (!open) return null;
   return (
