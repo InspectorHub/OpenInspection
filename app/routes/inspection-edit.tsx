@@ -8,6 +8,7 @@ import { findingKey } from "~/hooks/findings/shared";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useEnsureHuman } from "~/components/OutboundVerification";
+import { EditorHumanCheck } from "~/components/editor/EditorHumanCheck";
 import { useFindings, type AttachedRepairItem } from "~/hooks/useFindings";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
 import { useScopeLoader } from "~/hooks/useScopeLoader";
@@ -146,7 +147,17 @@ export { action } from "./inspection-edit/action.server";
 /* Component */
 /* ------------------------------------------------------------------ */
 
-export default function InspectionEditPage() {
+/** The editor sits outside the workspace layout, so it mounts the human check itself. */
+export default function InspectionEditRoute() {
+ const { outboundCoolingWindow } = useLoaderData<typeof loader>();
+ return (
+ <EditorHumanCheck coolingWindow={outboundCoolingWindow}>
+ <InspectionEditPage />
+ </EditorHumanCheck>
+ );
+}
+
+function InspectionEditPage() {
  const loaderData = useLoaderData<typeof loader>();
  const displayLocale = useDisplayLocale();
  const fetcher = useFetcher();
@@ -1876,6 +1887,7 @@ export default function InspectionEditPage() {
  status={state.inspection.status as string}
  publishError={publishError} isSubmitting={publishBusy}
  isAmendment={loaderData.nextPublishIsAmendment}
+ coolingUnlockAtMs={loaderData.outboundCoolingWindow?.unlockAtMs ?? null}
  onClose={() => { setPublishError(null); state.setShowPublishModal(false); }}
  onPublish={async (markComplete: boolean, extras: PublishExtras) => {
  if (!(await ensureHuman())) return;
