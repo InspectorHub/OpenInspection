@@ -79,8 +79,6 @@ export function escapeWillBeHandled(): boolean {
 }
 
 export interface LayerHandle {
-  /** This layer is the topmost one right now. */
-  isTop: () => boolean;
   /**
    * What sits above this layer: nothing, only overlays that do not trap focus (a popover,
    * a menu), or another trapping dialog.
@@ -118,7 +116,6 @@ export function useLayer(
   if (state.current.handle === null) {
     const s = state.current;
     s.handle = {
-      isTop: () => s.layer !== null && layers[layers.length - 1] === s.layer,
       coverage: () => {
         const at = s.layer ? layers.indexOf(s.layer) : -1;
         if (at < 0) return "none";
