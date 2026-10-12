@@ -163,13 +163,31 @@ export function Popover({
     };
     document.addEventListener("mousedown", handlePointerDown);
 
-    panelRef.current?.focus();
-
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
       anchorRef.current?.focus();
     };
   }, [open, ready]);
+
+  // Invariant: focus moves into the panel only once it is no longer
+  // `visibility: hidden` (a hidden element silently refuses focus). On a
+  // Popover's first open the passive effects above run BEFORE the re-render
+  // that the layout effect's setStyle schedules, so the panel is still hidden
+  // there; keying on `visible` defers the focus to the commit that reveals it.
+  // `visible` stays true after the first open, so later opens focus on `open`.
+  // Reposition keeps `visible` true, so focus is not re-taken on scroll/resize.
+  const visible = style.visibility !== "hidden";
+  useEffect(() => {
+    if (!open || !ready || !visible) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    // Do not steal focus the user already moved elsewhere (body or the anchor
+    // is where a click/keypress on the trigger leaves it).
+    const active = document.activeElement;
+    const anchor = anchorRef.current;
+    const focusIsFree = !active || active === document.body || (anchor?.contains(active) ?? false) || panel.contains(active);
+    if (focusIsFree) panel.focus();
+  }, [open, ready, visible]);
 
   if (!open || !ready) return null;
 
