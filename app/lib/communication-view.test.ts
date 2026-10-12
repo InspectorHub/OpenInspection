@@ -9,6 +9,7 @@
  * - Raw reason strings map to sentences in the UI, with the raw value kept
  *   visible in the fallback — never a bare machine string, never nothing.
  */
+import { RATE_LIMIT_DEFER_REASON, DAILY_QUOTA_DEFER_REASON, MONTHLY_QUOTA_FAIL_REASON } from "../../server/services/automation/provider-deferral";
 import { describe, it, expect } from "vitest";
 import {
   bucketMessages,
@@ -100,6 +101,20 @@ describe("groupDeliveries", () => {
       delivery({ noticeId: null }), // legacy row, same automationId + sendAt
     ];
     expect(groupDeliveries(rows)).toHaveLength(2);
+  });
+});
+
+describe("reasonText — the email provider's own limits", () => {
+  // Asserted against the strings the server actually writes, not a copy of them:
+  // a reworded reason on the server would otherwise fall through to "Skipped".
+  it.each([
+    ["rate limit", RATE_LIMIT_DEFER_REASON],
+    ["daily quota", DAILY_QUOTA_DEFER_REASON],
+    ["monthly quota", MONTHLY_QUOTA_FAIL_REASON],
+  ])("explains the %s reason instead of calling it skipped", (_name, raw) => {
+    const text = reasonText(raw)!;
+    expect(text).not.toContain(raw);
+    expect(text).not.toMatch(/^Skipped/);
   });
 });
 

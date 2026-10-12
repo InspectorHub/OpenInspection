@@ -19,6 +19,7 @@
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
+import { useChallengeOnRefusal } from "~/components/OutboundVerification";
 import { useState, useCallback, useEffect } from "react";
 import { useFetcher } from "react-router";
 import { m } from "~/paraglide/messages";
@@ -260,7 +261,7 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
   const [emailSent, setEmailSent] = useState(false);
 
   const introFetcher = useFetcher<{ ok?: boolean; error?: string }>();
-  const emailFetcher = useFetcher<{ ok?: boolean; error?: string }>();
+  const emailFetcher = useFetcher<{ ok?: boolean; error?: string; verifySiteKey?: string }>();
 
   const sorted = sortDefects(defects, sortKey);
   const phrases = resolveQuickPhrases(quickPhrases, seedQuickPhrases());
@@ -314,9 +315,12 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
     if (emailMsg) fd.append("message", emailMsg);
     emailFetcher.submit(fd, { method: "post", action: actionPath });
   };
+  // A company in its first 24 hours is asked for the human check; send again once passed.
+  const challenge = useChallengeOnRefusal(emailFetcher.data, emailFetcher.state, sendEmail);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+      {challenge}
       {/* Header */}
       <div>
         <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-3 mb-1">

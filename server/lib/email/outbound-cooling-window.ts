@@ -176,6 +176,8 @@ export function buildOutboundCoolingWindow(
     tenantId: string,
     now: () => number = Date.now,
     humanVerified?: HumanVerifier,
+    /** Rides along on the refusal so a page that has no session context can still show the challenge. */
+    turnstileSiteKey?: string | null,
 ): OutboundCoolingPort {
     return {
         async check(classId) {
@@ -210,7 +212,7 @@ export function buildOutboundCoolingWindow(
             // whose code is what tells the web app to ask for the challenge.
             if (humanVerified && await humanVerified()) return;
 
-            throw Errors.OutboundCoolingWindow({ unlockAtMs: unlock, windowHours: COOLING_WINDOW_HOURS });
+            throw Errors.OutboundCoolingWindow({ unlockAtMs: unlock, windowHours: COOLING_WINDOW_HOURS, turnstileSiteKey: turnstileSiteKey ?? null });
         },
     };
 }

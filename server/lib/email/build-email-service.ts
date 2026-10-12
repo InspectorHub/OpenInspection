@@ -12,6 +12,7 @@ import { buildEmailSuppression } from './suppression';
 import { buildEmailDedupe } from './dedupe';
 import { buildNotificationPreferences } from '../notifications/preference-port';
 import { buildUnsubscribeLinks } from '../notifications/unsubscribe-footer';
+import { resolveTurnstileSiteKey } from '../middleware/bot-protection';
 import { buildOutboundCoolingWindow, coolingWindowApplies, type HumanVerifier } from './outbound-cooling-window';
 import { getDeploymentProfile } from '../deployment-profile';
 import { logger } from '../logger';
@@ -31,7 +32,7 @@ import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
  */
 export interface EmailServiceEnv {
     DB: D1Database;
-    APP_MODE?: string;
+    APP_MODE?: string; TURNSTILE_SITE_KEY?: string; TURNSTILE_SECRET_KEY?: string;
     TENANT_CACHE: KVNamespace;
     /** Test-only email sink flag (see AppEnv.E2E_EMAIL_SINK). '1' ⇒ capture, don't send. */
     E2E_EMAIL_SINK?: string;
@@ -264,7 +265,7 @@ export function assembleTenantEmailService(
     // here with no cast, which is the whole point of that narrowing.
     const profile = getDeploymentProfile(env);
     const cooling = meterTenantId && coolingWindowApplies({ profile, platformFunded: !isByo, recipientInitiated: options.recipientInitiated })
-        ? buildOutboundCoolingWindow(env.DB, meterTenantId, Date.now, options.humanVerified)
+        ? buildOutboundCoolingWindow(env.DB, meterTenantId, Date.now, options.humanVerified, resolveTurnstileSiteKey(env))
         : undefined;
 
     // TEST-ONLY email sink (E2E). Capture every message to KV instead of

@@ -165,6 +165,15 @@ export function reasonText(reasonCode: string | null): string | null {
     // is the row's own `sendAt`, already on screen beside it.
     case "waiting — new company, client email unlocks 24h after signup":
       return m.comm_reason_cooling_window();
+    // The email provider's own limits (see the automation provider-deferral module).
+    // The first two are still owed and carry the same "waiting" meaning; the third
+    // is final for the month and says so.
+    case "waiting — email provider rate limit, retrying shortly":
+      return m.comm_reason_provider_rate_limit();
+    case "waiting — daily email sending limit reached, retrying after the next utc midnight":
+      return m.comm_reason_provider_daily_quota();
+    case "monthly email sending limit reached at the email provider; this message was not sent":
+      return m.comm_reason_provider_monthly_quota();
     default:                        return m.comm_reason_fallback({ raw: reasonCode });
   }
 }

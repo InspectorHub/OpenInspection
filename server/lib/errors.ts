@@ -133,7 +133,7 @@ export const Errors = {
     // 403 rather than 402/429 deliberately: this is not a quota and not a rate
     // limit, it is a permission that has not vested yet. The CODE, not the
     // status, is what distinguishes it.
-    OutboundCoolingWindow: (details: { unlockAtMs: number; windowHours: number }) =>
+    OutboundCoolingWindow: (details: { unlockAtMs: number; windowHours: number; turnstileSiteKey?: string | null }) =>
         new AppError(
             403,
             ErrorCode.OUTBOUND_COOLING_WINDOW,

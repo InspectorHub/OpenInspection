@@ -27,6 +27,7 @@ import {
   type LoaderResult,
 } from "~/components/portal/sections/RepairBuilderSection";
 import { m } from "~/paraglide/messages";
+import { humanCheckSiteKey } from "~/lib/outbound-refusal.server";
 
 export function meta() {
   return [{ title: m.repair_builder_meta_title() }];
@@ -224,7 +225,11 @@ export async function action({
         param: { shareToken },
         json: { to, message },
       });
-      if (!res.ok) return { ok: false as const, error: m.repair_builder_error_send_email() };
+      if (!res.ok) {
+        const verifySiteKey = await humanCheckSiteKey(res);
+        if (verifySiteKey) return { ok: false as const, verifySiteKey };
+        return { ok: false as const, error: m.repair_builder_error_send_email() };
+      }
       return { ok: true as const };
     }
 

@@ -29,6 +29,12 @@ describe('cooling window with human verification', () => {
         expect(verify).toHaveBeenCalledTimes(1);
     });
 
+    it('carries the site key on the refusal, so a page without a session can show the check', async () => {
+        createdAt = new Date(NOW - 60_000);
+        const p = buildOutboundCoolingWindow({} as D1Database, 't1', () => NOW, undefined, 'site-key-1');
+        await expect(p.check('report-ready')).rejects.toMatchObject({ details: { turnstileSiteKey: 'site-key-1' } });
+    });
+
     it('refuses inside the window when the token is rejected, with the same code', async () => {
         createdAt = new Date(NOW - 60_000);
         await expect(port(async () => false).check('report-ready')).rejects.toMatchObject({ code: ErrorCode.OUTBOUND_COOLING_WINDOW });

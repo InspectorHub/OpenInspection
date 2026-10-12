@@ -9,7 +9,7 @@ vi.mock("~/lib/turnstile", () => ({
   },
 }));
 
-import { OutboundVerificationProvider, useEnsureHuman } from "./OutboundVerification";
+import { OutboundVerificationProvider, useChallengeOnRefusal, useEnsureHuman } from "./OutboundVerification";
 
 function Probe({ onResult }: { onResult: (ok: boolean) => void }) {
   const ensureHuman = useEnsureHuman();
@@ -89,5 +89,32 @@ describe("OutboundVerificationProvider", () => {
     expect(first).toHaveBeenCalledWith(false);
     await act(async () => emitToken!("0.token-value-1234567890"));
     expect(second).toHaveBeenCalledWith(true);
+  });
+});
+
+describe("useChallengeOnRefusal", () => {
+  function Page({ data, resubmit }: { data?: { verifySiteKey?: string }; resubmit: () => void }) {
+    return <div>{useChallengeOnRefusal(data, "idle", resubmit)}</div>;
+  }
+
+  it("shows nothing for a normal response", () => {
+    render(<Page data={{}} resubmit={vi.fn()} />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("opens the check for a refusal and sends again once it is passed", async () => {
+    const resubmit = vi.fn();
+    render(<Page data={{ verifySiteKey: "k" }} resubmit={resubmit} />);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    await act(async () => emitToken!("0.token-value-1234567890"));
+    expect(resubmit).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("does not send again when the person cancels", async () => {
+    const resubmit = vi.fn();
+    render(<Page data={{ verifySiteKey: "k" }} resubmit={resubmit} />);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Cancel" })); });
+    expect(resubmit).not.toHaveBeenCalled();
   });
 });

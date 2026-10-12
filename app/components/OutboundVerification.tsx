@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Button, Modal } from "@core/shared-ui";
 import { setHumanToken } from "~/lib/human-token";
 import { useTurnstileWidget } from "~/lib/turnstile";
@@ -67,6 +67,41 @@ export function useHumanGatedSubmit() {
       }
     },
     [ensureHuman],
+  );
+}
+
+/**
+ * For a page with no session context (a public share page, the agent portal): the
+ * action reports `verifySiteKey` when the server refused the send because the
+ * company is inside its first 24 hours. This shows the challenge for that
+ * response and calls `resubmit` once the person has passed it. Render the
+ * returned element anywhere in the component.
+ */
+export function useChallengeOnRefusal(
+  data: { verifySiteKey?: string } | undefined,
+  state: string,
+  resubmit: () => void,
+): ReactNode {
+  const [open, setOpen] = useState<{ id: number; siteKey: string } | null>(null);
+  const handled = useRef<unknown>(null);
+  const counter = useRef(0);
+  useEffect(() => {
+    if (state !== "idle" || !data?.verifySiteKey || data === handled.current) return;
+    handled.current = data;
+    counter.current += 1;
+    setOpen({ id: counter.current, siteKey: data.verifySiteKey });
+  }, [data, state]);
+  if (!open) return null;
+  return (
+    <VerifyDialog
+      key={open.id}
+      step={open.id}
+      siteKey={open.siteKey}
+      onDone={(ok) => {
+        setOpen(null);
+        if (ok) resubmit();
+      }}
+    />
   );
 }
 

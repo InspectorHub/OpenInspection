@@ -1,6 +1,7 @@
-import { eq, and, or, sql, desc, lte } from 'drizzle-orm';
+import { eq, and, or, sql, desc, lte, inArray } from 'drizzle-orm';
 import { automationLogs, automations, contactRoleProfiles } from '../../lib/db/schema';
 import { COOLING_WINDOW_DEFER_REASON } from './cooling-window';
+import { RATE_LIMIT_DEFER_REASON, DAILY_QUOTA_DEFER_REASON } from './provider-deferral';
 import type { Constructor } from './shared';
 import type { AutomationBase } from './shared';
 
@@ -105,7 +106,9 @@ export function AutomationLogs<TBase extends Constructor<AutomationBase>>(Base: 
                         lte(automationLogs.sendAt, new Date(now)),
                         and(
                             eq(automationLogs.status, 'pending'),
-                            eq(automationLogs.error, COOLING_WINDOW_DEFER_REASON),
+                            // Held by the email provider's own limits: same shape, a
+                            // future send_at that is a platform clock, not the operator's.
+                            inArray(automationLogs.error, [COOLING_WINDOW_DEFER_REASON, RATE_LIMIT_DEFER_REASON, DAILY_QUOTA_DEFER_REASON]),
                         ),
                     ),
                 ))

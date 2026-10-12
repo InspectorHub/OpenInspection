@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildHumanVerifier } from '../../../server/lib/email/human-verifier';
-import { REQUEST_SCOPE } from '../../../server/lib/request-scope';
+import { REQUEST_SCOPE, createRequestScope } from '../../../server/lib/request-scope';
 
 afterEach(() => { vi.unstubAllGlobals(); });
 
@@ -17,7 +17,7 @@ const ctx = (headers: Record<string, string>, env: Record<string, unknown>) => {
         vars,
     };
 };
-const inProcess = { APP_MODE: 'saas', TURNSTILE_SECRET_KEY: 'real-secret', [REQUEST_SCOPE]: { once: (_k: string, fn: () => Promise<unknown>) => fn() } };
+const inProcess = () => ({ APP_MODE: 'saas', TURNSTILE_SECRET_KEY: 'real-secret', [REQUEST_SCOPE]: createRequestScope() });
 const external = { APP_MODE: 'saas', TURNSTILE_SECRET_KEY: 'real-secret' };
 const siteverify = (success: boolean) => vi.fn(async () => new Response(JSON.stringify({ success }), { status: 200 }));
 
@@ -32,13 +32,13 @@ describe('buildHumanVerifier', () => {
     });
 
     it('offers no verifier when the in-process request carries no token', () => {
-        expect(buildHumanVerifier(ctx({}, inProcess) as never)).toBeUndefined();
+        expect(buildHumanVerifier(ctx({}, inProcess()) as never)).toBeUndefined();
     });
 
     it('verifies once and memoises, for an in-process request with a token', async () => {
         const f = siteverify(true);
         vi.stubGlobal('fetch', f);
-        const c = ctx({ 'x-turnstile-token': 'a'.repeat(20) }, inProcess);
+        const c = ctx({ 'x-turnstile-token': 'a'.repeat(20) }, inProcess());
         const v = buildHumanVerifier(c as never)!;
         expect(await v()).toBe(true);
         expect(await v()).toBe(true);
@@ -48,8 +48,21 @@ describe('buildHumanVerifier', () => {
 
     it('reads a rejected token, and a failing siteverify, as not a person', async () => {
         vi.stubGlobal('fetch', siteverify(false));
-        expect(await buildHumanVerifier(ctx({ 'x-turnstile-token': 'a'.repeat(20) }, inProcess) as never)!()).toBe(false);
+        expect(await buildHumanVerifier(ctx({ 'x-turnstile-token': 'a'.repeat(20) }, inProcess()) as never)!()).toBe(false);
         vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network'); }));
-        expect(await buildHumanVerifier(ctx({ 'x-turnstile-token': 'a'.repeat(20) }, inProcess) as never)!()).toBe(false);
+        expect(await buildHumanVerifier(ctx({ 'x-turnstile-token': 'a'.repeat(20) }, inProcess()) as never)!()).toBe(false);
+    });
+});
+
+describe('buildHumanVerifier across the in-process calls of one page action', () => {
+    it('shares one siteverify between separate API calls that carry the same token', async () => {
+        const f = siteverify(true);
+        vi.stubGlobal('fetch', f);
+        const env = inProcess();
+        const first = buildHumanVerifier(ctx({ 'x-turnstile-token': 'a'.repeat(20) }, env) as never)!;
+        const second = buildHumanVerifier(ctx({ 'x-turnstile-token': 'a'.repeat(20) }, env) as never)!;
+        expect(await first()).toBe(true);
+        expect(await second()).toBe(true);
+        expect(f).toHaveBeenCalledTimes(1);
     });
 });
