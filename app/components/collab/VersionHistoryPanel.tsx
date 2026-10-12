@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type * as Y from "yjs";
-import { Modal } from "@core/shared-ui";
+import { Modal, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { applyItemPatch } from "../../../server/lib/collab/results-doc";
 import type { ResultsProjection } from "../../../server/lib/collab/results-doc.types";
 import { diffProjections, type FindingDiff, type ScalarField } from "~/lib/collab/snapshot-diff";
@@ -343,9 +343,9 @@ export function VersionHistoryPanel({
     const saveAction = (
         <button
             type="button"
-            onClick={handleSaveNow}
-            disabled={saving}
-            className="h-9 px-3 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary/85 disabled:opacity-50 inline-flex items-center gap-1.5"
+            // aria-disabled while saving: this sits inside an open Modal, where native disabled drops focus to <body>.
+            {...pendingProps(saving, handleSaveNow)}
+            className={`h-9 px-3 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary/85 inline-flex items-center gap-1.5 ${PENDING_CLASS}`}
         >
             {saving ? m.editor_collab_saving() : m.editor_collab_save_version_now()}
         </button>
@@ -438,17 +438,15 @@ export function VersionHistoryPanel({
                     <>
                         <button
                             type="button"
-                            onClick={() => setConfirmSeq(null)}
-                            disabled={restoring}
-                            className="px-4 h-10 rounded-xl border border-ih-border text-sm font-semibold text-ih-fg-3 hover:bg-ih-bg-muted disabled:opacity-50"
+                            {...pendingProps(restoring, () => setConfirmSeq(null))}
+                            className={`px-4 h-10 rounded-xl border border-ih-border text-sm font-semibold text-ih-fg-3 hover:bg-ih-bg-muted ${PENDING_CLASS}`}
                         >
                             {m.common_cancel()}
                         </button>
                         <button
                             type="button"
-                            onClick={handleConfirmRestore}
-                            disabled={restoring}
-                            className="px-4 h-10 rounded-xl bg-ih-primary text-ih-fg-inverse text-sm font-semibold hover:bg-ih-primary/85 disabled:opacity-50"
+                            {...pendingProps(restoring, handleConfirmRestore)}
+                            className={`px-4 h-10 rounded-xl bg-ih-primary text-ih-fg-inverse text-sm font-semibold hover:bg-ih-primary/85 ${PENDING_CLASS}`}
                         >
                             {restoring ? m.editor_collab_restoring() : m.editor_collab_restore_version()}
                         </button>

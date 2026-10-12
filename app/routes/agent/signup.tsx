@@ -8,6 +8,7 @@ import { makeAgentSignupSchema } from "~/lib/forms/auth.schema";
 import { safeReturnTo } from "../../../server/lib/mcp/safe-return-to";
 import { AgentTermsConsent, AgentSignupClosedNotice, type AgentTermsInForce } from "~/components/agent/AgentTermsConsent";
 import { AgentSignupPanel } from "~/components/agent/AgentSignupPanel";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -298,9 +299,10 @@ export default function AgentSignupPage() {
                 why, and the why is already on the page. */}
             <button
               type="submit"
-              disabled={submitting || closed}
+              disabled={closed}
+              {...pendingProps(submitting)}
               aria-describedby={closed ? "agent-signup-closed" : undefined}
-              className="w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-ih-fg-inverse bg-ih-primary rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              className={`w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-ih-fg-inverse bg-ih-primary rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity ${PENDING_CLASS}`}
             >
               {submitting ? m.auth_agent_signup_submit_pending() : m.auth_agent_signup_submit()}
             </button>

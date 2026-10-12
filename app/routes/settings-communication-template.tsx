@@ -6,6 +6,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { VariableChips } from "~/components/email-template/VariableChips";
 import { EmailPreview } from "~/components/email-template/EmailPreview";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 interface BlockField { key: string; label: string; multiline: boolean; value: string; }
@@ -180,7 +181,7 @@ function TemplateEditor({ detail }: { detail: Detail }) {
           </div>
 
           <div className="flex justify-end pt-2">
-            <button type="submit" disabled={saving} className="h-9 px-5 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
+            <button type="submit" {...pendingProps(saving)} className={`h-9 px-5 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 ${PENDING_CLASS}`}>
               {saving ? m.common_saving() : m.settings_comms_template_save_changes()}
             </button>
           </div>

@@ -11,7 +11,7 @@
  */
 import { useState } from "react";
 import { Form } from "react-router";
-import { Pill } from "@core/shared-ui";
+import { Pill, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 // ---------------------------------------------------------------------------
@@ -224,8 +224,8 @@ function StatusTimeline({
             name="intent"
             value="sms-compliance-resubmit"
             type="submit"
-            disabled={saving}
-            className="h-8 px-4 rounded-md bg-ih-bad text-ih-fg-inverse font-bold text-[13px] hover:opacity-90 transition-opacity disabled:opacity-60"
+            {...pendingProps(saving)}
+            className={`h-8 px-4 rounded-md bg-ih-bad text-ih-fg-inverse font-bold text-[13px] hover:opacity-90 transition-opacity disabled:opacity-60 ${PENDING_CLASS}`}
           >
             {saving ? m.settings_mcw_resubmitting() : m.settings_mcw_fix_resubmit()}
           </button>
@@ -322,8 +322,8 @@ export function ManagedComplianceWizard({ compliance, legalName, managedProvider
         <div className="flex justify-end">
           <button
             type="submit"
-            disabled={savingManagedProvider}
-            className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
+            {...pendingProps(savingManagedProvider)}
+            className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 ${PENDING_CLASS}`}
           >
             {savingManagedProvider ? m.common_saving() : m.settings_mcw_save_carrier()}
           </button>
@@ -504,8 +504,8 @@ export function ManagedComplianceWizard({ compliance, legalName, managedProvider
           <div className="flex justify-end pt-2 border-t border-ih-border">
             <button
               type="submit"
-              disabled={saving}
-              className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
+              {...pendingProps(saving)}
+              className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 ${PENDING_CLASS}`}
             >
               {saving ? m.settings_mcw_submitting() : m.settings_mcw_start_provisioning()}
             </button>

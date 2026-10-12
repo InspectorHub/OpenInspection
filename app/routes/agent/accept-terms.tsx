@@ -7,7 +7,7 @@ import { requireToken } from "~/lib/session.server";
 import { makeAgentTermsAcceptSchema } from "~/lib/forms/auth.schema";
 import { safeReturnTo } from "../../../server/lib/mcp/safe-return-to";
 import { AgentTermsConsent, type AgentTermsInForce } from "~/components/agent/AgentTermsConsent";
-import { Banner } from "@core/shared-ui";
+import { Banner, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -166,8 +166,8 @@ export default function AgentAcceptTermsPage() {
               />
               <button
                 type="submit"
-                disabled={submitting}
-                className="w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-ih-fg-inverse bg-ih-primary rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                {...pendingProps(submitting)}
+                className={`w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-ih-fg-inverse bg-ih-primary rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity ${PENDING_CLASS}`}
               >
                 {submitting
                   ? m.auth_agent_accept_terms_submit_pending()

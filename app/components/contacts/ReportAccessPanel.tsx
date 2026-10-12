@@ -1,5 +1,5 @@
 import { Link, useFetcher } from "react-router";
-import { Card } from "@core/shared-ui";
+import { Card, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export interface AccessRow {
@@ -58,8 +58,8 @@ export function ReportAccessPanel({
             <input type="hidden" name="intent" value="revoke-access" />
             <button
               type="submit"
-              disabled={revoking}
-              className="px-3 h-8 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-bad-fg hover:bg-ih-bg-muted transition-colors disabled:opacity-60"
+              {...pendingProps(revoking)}
+              className={`px-3 h-8 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-bad-fg hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}
             >
               {m.contacts_detail_access_revoke_all()}
             </button>
@@ -121,8 +121,8 @@ export function ReportAccessPanel({
                   <input type="hidden" name="inspectionId" value={a.inspectionId} />
                   <button
                     type="submit"
-                    disabled={revoking}
-                    className="text-[12px] font-bold text-ih-fg-3 hover:text-ih-bad-fg hover:underline disabled:opacity-60"
+                    {...pendingProps(revoking)}
+                    className={`text-[12px] font-bold text-ih-fg-3 hover:text-ih-bad-fg hover:underline ${PENDING_CLASS}`}
                   >
                     {m.contacts_detail_access_revoke()}
                   </button>

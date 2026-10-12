@@ -189,7 +189,7 @@ export default function PortalLanding() {
             label={m.portal_landing_email_label()}
             placeholder={m.portal_landing_email_placeholder()}
           />
-          <Button type="submit" variant="primary" size="lg" disabled={submitting} className="w-full">
+          <Button type="submit" variant="primary" size="lg" pending={submitting} className="w-full">
             {submitting ? m.portal_landing_submit_pending() : m.portal_landing_submit()}
           </Button>
         </Form>

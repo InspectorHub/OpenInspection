@@ -5,6 +5,7 @@ import { createApi } from "~/lib/api-client.server";
 import { brandFormat, EMPTY_BRAND } from "~/lib/brand";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { formatShapedDate, type InspectionDateTimeFormat } from "~/lib/format-date";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -350,9 +351,8 @@ export default function VerifyTokenPage() {
         <>
           <button
             type="button"
-            onClick={() => pdf.exportPdf(`/api/public/verify/report/${token}/pdf`, { filename: `signed-report-v${model.versionNumber}.pdf` })}
-            disabled={pdf.busy}
-            className="flex items-center justify-center gap-2 w-full rounded-lg border border-ih-border px-4 py-2.5 text-[13px] font-medium text-ih-fg-1 hover:bg-ih-bg-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            {...pendingProps(pdf.busy, () => pdf.exportPdf(`/api/public/verify/report/${token}/pdf`, { filename: `signed-report-v${model.versionNumber}.pdf` }))}
+            className={`flex items-center justify-center gap-2 w-full rounded-lg border border-ih-border px-4 py-2.5 text-[13px] font-medium text-ih-fg-1 hover:bg-ih-bg-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${PENDING_CLASS}`}
           >
             {pdfActionLabel(pdf, m.report_verify_download_pdf({ version: model.versionNumber }))}
           </button>

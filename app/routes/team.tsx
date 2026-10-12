@@ -13,7 +13,7 @@ import { resetMemberTwoFactor } from "./team.reset-two-factor.server";
 import { useDisplayLocale, useSessionContext } from "~/hooks/useSessionContext";
 import { importEntryHref } from "~/lib/import-entry-points";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table, Banner } from "@core/shared-ui";
+import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table, Banner, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { isAdminRole } from "~/lib/access";
@@ -278,7 +278,7 @@ export default function TeamPage() {
                           <resendFetcher.Form method="post" className="inline">
                             <input type="hidden" name="intent" value="resend-invite" />
                             <input type="hidden" name="token" value={member.token} />
-                            <button type="submit" disabled={resendFetcher.state !== "idle"} className="text-[12px] font-medium text-ih-primary-text hover:underline disabled:opacity-50">
+                            <button type="submit" {...pendingProps(resendFetcher.state !== "idle")} className={`text-[12px] font-medium text-ih-primary-text hover:underline ${PENDING_CLASS}`}>
                               {m.settings_team_resend_invite()}
                             </button>
                           </resendFetcher.Form>

@@ -81,7 +81,7 @@ export function ImportWizardShell({
                 <Button
                     data-testid="import-step-back"
                     variant="secondary"
-                    disabled={backIndex < 0 || busy}
+                    disabled={backIndex < 0} pending={busy}
                     onClick={() => onStep(steps[backIndex])}
                 >
                     {m.common_back()}
@@ -89,7 +89,7 @@ export function ImportWizardShell({
                 <Button
                     data-testid="import-step-next"
                     variant="primary"
-                    disabled={nextIndex >= steps.length || blockedReason !== null || busy}
+                    disabled={nextIndex >= steps.length || blockedReason !== null} pending={busy}
                     onClick={() => onStep(steps[nextIndex])}
                 >
                     {m.common_next()}

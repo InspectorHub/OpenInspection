@@ -1,6 +1,7 @@
 import { Form } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { m } from "~/paraglide/messages";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 export const ISN_SECRET_KEYS = ["ISN_DOMAIN", "ISN_COMPANY_KEY", "ISN_ACCESS_KEY", "ISN_SECRET_KEY"] as const;
 export type IsnSecrets = Record<(typeof ISN_SECRET_KEYS)[number], string>;
@@ -28,8 +29,8 @@ export function IsnPanel({ secrets, fieldError, saving }: IsnPanelProps) {
         <SecretField name="ISN_SECRET_KEY" label={m.settings_isn_secret_key_label()} value={secrets.ISN_SECRET_KEY}
           error={fieldError("ISN_SECRET_KEY")} />
         <div className="flex justify-end pt-2 border-t border-ih-border">
-          <button type="submit" disabled={saving}
-            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+          <button type="submit" {...pendingProps(saving)}
+            className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed ${PENDING_CLASS}`}>
             {saving ? m.common_saving() : m.common_save()}
           </button>
         </div>

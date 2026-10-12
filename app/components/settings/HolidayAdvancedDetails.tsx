@@ -1,4 +1,4 @@
-import { Banner, SegmentedControl, Select } from "@core/shared-ui";
+import { Banner, SegmentedControl, Select, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import type { CustomHoliday, HolidayInternalPolicy, HolidayPublicPolicy } from "./HolidayClosedPanel";
 import { SUPPORTED_STATE_CODES, regionOptionLabel } from "./holiday-region-options";
 import { formatDate } from "~/lib/format";
@@ -139,12 +139,10 @@ export function HolidayAdvancedDetails({
                 </span>
                 <button
                   type="button"
-                  // #106 - disabled while a write is in flight: the panel now
-                  // routes through a guard that REFUSES a second call, so an
-                  // enabled control here would swallow the click in silence.
-                  disabled={saving}
-                  onClick={() => onRemoveCustom(h.id)}
-                  className="text-[12px] font-bold text-ih-bad-fg hover:underline"
+                  // #106 - pending while a write is in flight: the panel's guard REFUSES a
+                  // second call; aria-disabled keeps focus and shows the refusal.
+                  {...pendingProps(saving, () => onRemoveCustom(h.id))}
+                  className={`text-[12px] font-bold text-ih-bad-fg hover:underline aria-disabled:no-underline ${PENDING_CLASS}`}
                 >
                   {m.common_remove()}
                 </button>
@@ -180,9 +178,9 @@ export function HolidayAdvancedDetails({
             </label>
             <button
               type="button"
-              onClick={onAddCustom}
-              disabled={saving || !newDate || !newName.trim()}
-              className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-50"
+              {...pendingProps(saving, onAddCustom)}
+              disabled={!newDate || !newName.trim()}
+              className={`h-8 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-50 ${PENDING_CLASS}`}
             >
               {m.common_add()}
             </button>
@@ -192,9 +190,8 @@ export function HolidayAdvancedDetails({
         <div className="flex items-center gap-3 pt-1">
           <button
             type="button"
-            onClick={onSave}
-            disabled={saving}
-            className="h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+            {...pendingProps(saving, onSave)}
+            className={`h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50 ${PENDING_CLASS}`}
           >
             {saving ? m.settings_holiday_save_pending() : m.settings_holiday_save()}
           </button>

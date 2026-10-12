@@ -129,7 +129,7 @@ export default function ResetPasswordPage() {
           </div>
         )}
 
-        <Button type="submit" variant="primary" size="lg" disabled={isSubmitting} className="w-full">
+        <Button type="submit" variant="primary" size="lg" pending={isSubmitting} className="w-full">
           {isSubmitting ? m.auth_reset_submit_pending() : m.auth_reset_submit()}
         </Button>
       </Form>

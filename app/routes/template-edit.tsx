@@ -503,7 +503,7 @@ export default function TemplateEditPage() {
           <Button variant="secondary" size="sm" onClick={() => setRatingModalOpen(true)}>
             {m.templates_edit_rating_system()}
           </Button>
-          <Button variant="primary" size="sm" onClick={handleSave} disabled={saving} aria-busy={saving || undefined}>
+          <Button variant="primary" size="sm" onClick={handleSave} pending={saving} aria-busy={saving || undefined}>
             {saving ? m.templates_edit_saving() : saveSuccess ? m.templates_edit_saved() : m.common_save()}
           </Button>
         </div>

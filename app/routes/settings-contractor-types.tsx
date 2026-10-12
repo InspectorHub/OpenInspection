@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLoaderData, useFetcher } from "react-router";
-import { Icon } from "@core/shared-ui";
+import { Icon, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import type { Route } from "./+types/settings-contractor-types";
@@ -77,8 +77,8 @@ function ContractorTypeRow({ t, idx, count, reordering, onMove, onRequestDelete 
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex flex-col">
-        <button onClick={() => onMove(idx, -1)} disabled={idx === 0 || reordering} aria-busy={reordering || undefined} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={m.settings_contractor_types_move_up_aria({ name: t.name })}><Icon name="chevU" size={14} /></button>
-        <button onClick={() => onMove(idx, 1)} disabled={idx === count - 1 || reordering} aria-busy={reordering || undefined} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={m.settings_contractor_types_move_down_aria({ name: t.name })}><Icon name="chevD" size={14} /></button>
+        <button disabled={idx === 0} {...pendingProps(reordering, () => onMove(idx, -1))} aria-busy={reordering || undefined} className={`text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none ${PENDING_CLASS}`} aria-label={m.settings_contractor_types_move_up_aria({ name: t.name })}><Icon name="chevU" size={14} /></button>
+        <button disabled={idx === count - 1} {...pendingProps(reordering, () => onMove(idx, 1))} aria-busy={reordering || undefined} className={`text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none ${PENDING_CLASS}`} aria-label={m.settings_contractor_types_move_down_aria({ name: t.name })}><Icon name="chevD" size={14} /></button>
       </div>
       {editing ? (
         <fetcher.Form method="POST" className="flex-1 flex gap-2" onSubmit={() => setEditing(false)}>

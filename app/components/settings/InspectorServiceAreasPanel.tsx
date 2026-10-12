@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Input, Select } from "@core/shared-ui";
+import { Input, Select, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import type { action } from "~/routes/settings-booking";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
@@ -36,7 +36,7 @@ export function parseZipList(raw: string): string[] {
  */
 export function InspectorServiceAreasPanel({ members }: { members: ServiceAreaMember[] }) {
   // #106 - both writes save an inspector's dispatch geography. Each button
-  // is already `disabled={saving}`, so the guard never has to refuse one.
+  // is already pending (aria-disabled) while `saving`, so the guard never has to refuse one.
   const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
   const [selectedId, setSelectedId] = useState(members[0]?.id ?? "");
   const selected = members.find((x) => x.id === selectedId) ?? null;
@@ -109,12 +109,12 @@ export function InspectorServiceAreasPanel({ members }: { members: ServiceAreaMe
         </p>
         <button
           type="button"
-          disabled={saving || !selectedId}
-          onClick={() => submit(
+          disabled={!selectedId}
+          {...pendingProps(saving, () => submit(
             { intent: "service-areas-save", userId: selectedId, zipPrefixes: parsed.join(",") },
             { method: "post" },
-          )}
-          className="h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+          ))}
+          className={`h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50 ${PENDING_CLASS}`}
         >
           {saving ? m.settings_holiday_save_pending() : m.settings_serviceareas_save()}
         </button>
@@ -137,12 +137,12 @@ export function InspectorServiceAreasPanel({ members }: { members: ServiceAreaMe
         </p>
         <button
           type="button"
-          disabled={saving || !selectedId}
-          onClick={() => submit(
+          disabled={!selectedId}
+          {...pendingProps(saving, () => submit(
             { intent: "service-origin-save", userId: selectedId, address: origin },
             { method: "post" },
-          )}
-          className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-40"
+          ))}
+          className={`h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-40 ${PENDING_CLASS}`}
         >
           {saving ? m.settings_holiday_save_pending() : m.settings_serviceareas_origin_save()}
         </button>

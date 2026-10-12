@@ -315,7 +315,7 @@ export default function MarketplacePage() {
                         variant="primary"
                         size="sm"
                         onClick={() => handleInstall(t.id)}
-                        disabled={installing}
+                        pending={installing}
                       >
                         {installingId === t.id ? m.marketplace_installing() : m.marketplace_install()}
                       </Button>

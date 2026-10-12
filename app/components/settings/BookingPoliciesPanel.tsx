@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SegmentedControl } from "@core/shared-ui";
+import { SegmentedControl, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { MoneyInput } from "~/components/MoneyInput";
 import {
   depositChoiceOf,
@@ -203,9 +203,8 @@ export function BookingPoliciesPanel({ initialConfig }: { initialConfig: TenantC
 
       <div className="flex items-center gap-3 pt-2">
         <button
-          onClick={handleSave}
-          disabled={saving}
-          className="h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+          {...pendingProps(saving, handleSave)}
+          className={`h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50 ${PENDING_CLASS}`}
         >
           {saving ? m.settings_holiday_save_pending() : m.settings_policies_save()}
         </button>

@@ -117,7 +117,7 @@ export function AgentReportActions({
           <Button
             variant="primary"
             size="md"
-            disabled={submitting}
+            pending={submitting}
             data-testid="agent-report-workspace-cta"
             onClick={() => {
               setError(false);

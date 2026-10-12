@@ -15,7 +15,7 @@
  */
 import { useRef, useState } from "react";
 import { Link } from "react-router";
-import { Popover } from "@core/shared-ui";
+import { Popover, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { NoticeList } from "./NoticeList";
 import type { NoticeRowData, NoticeRemedy } from "~/lib/notice-view";
@@ -106,10 +106,9 @@ export function NoticeBell({
             {unread > 0 && (
               <button
                 type="button"
-                onClick={onMarkAllRead}
-                disabled={busy}
+                {...pendingProps(busy, onMarkAllRead)}
                 aria-busy={busy || undefined}
-                className="text-[11px] font-semibold text-ih-fg-3 hover:text-ih-fg-1 disabled:opacity-40 transition-colors"
+                className={`text-[11px] font-semibold text-ih-fg-3 hover:text-ih-fg-1 transition-colors ${PENDING_CLASS}`}
               >
                 {m.notice_panel_mark_all()}
               </button>

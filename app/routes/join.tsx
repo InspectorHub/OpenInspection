@@ -145,7 +145,7 @@ export default function JoinPage() {
             </div>
           )}
 
-          <Button type="submit" variant="primary" size="lg" disabled={isSubmitting} className="w-full">
+          <Button type="submit" variant="primary" size="lg" pending={isSubmitting} className="w-full">
             {isSubmitting ? m.auth_join_submit_pending() : m.auth_join_submit()}
           </Button>
         </Form>

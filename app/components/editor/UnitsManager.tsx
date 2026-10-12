@@ -79,14 +79,14 @@ export function UnitsManager({ open, onClose, inspectionId, units, mode, fetcher
                   </p>
                 </div>
                 {mode === "per_unit" ? (
-                  <Button variant="secondary" size="sm" disabled={busy} onClick={() => setShowLossy(true)}>
+                  <Button variant="secondary" size="sm" pending={busy} onClick={() => setShowLossy(true)}>
                     {m.editor_unitsmanager_switch_to_tagged()}
                   </Button>
                 ) : (
                   <Button
                     variant="secondary"
                     size="sm"
-                    disabled={busy}
+                    pending={busy}
                     onClick={() => submit({ intent: "unit-mode-switch", mode: "per_unit" })}
                   >
                     {m.editor_unitsmanager_switch_to_per_unit()}
@@ -134,7 +134,7 @@ export function UnitsManager({ open, onClose, inspectionId, units, mode, fetcher
             </Button>
             <Button
               variant="danger"
-              disabled={busy}
+              pending={busy}
               onClick={() => submit({ intent: "unit-mode-switch", mode: "tagged" })}
             >
               {m.editor_unitsmanager_switch_flatten()}
@@ -256,7 +256,7 @@ function AddUnitForm({ busy, onSubmit }: { busy: boolean; onSubmit: (fields: Rec
         aria-label={m.editor_unitsmanager_new_unit_name()}
         className="flex-1 h-8 px-2.5 rounded-ih-input border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
       />
-      <Button variant="secondary" size="sm" disabled={busy || !trimmed} onClick={add}>
+      <Button variant="secondary" size="sm" pending={busy} disabled={!trimmed} onClick={add}>
         {m.common_add()}
       </Button>
     </div>
@@ -351,7 +351,7 @@ function BulkCreateForm({ busy, onSubmit }: { busy: boolean; onSubmit: (fields: 
             <span className="text-[11px] text-ih-fg-3 tabular-nums">
               {gridCount > 0 ? (gridCount === 1 ? m.editor_unitsmanager_creates_one({ count: gridCount }) : m.editor_unitsmanager_creates_many({ count: gridCount })) : m.editor_unitsmanager_grid_hint()}
             </span>
-            <Button variant="primary" size="sm" disabled={busy || gridCount <= 0} onClick={createGrid}>
+            <Button variant="primary" size="sm" pending={busy} disabled={gridCount <= 0} onClick={createGrid}>
               {m.editor_unitsmanager_create_units()}
             </Button>
           </div>
@@ -370,7 +370,7 @@ function BulkCreateForm({ busy, onSubmit }: { busy: boolean; onSubmit: (fields: 
             <span className="text-[11px] text-ih-fg-3 tabular-nums">
               {csvCount > 0 ? (csvCount === 1 ? m.editor_unitsmanager_row_one({ count: csvCount }) : m.editor_unitsmanager_row_many({ count: csvCount })) : m.editor_unitsmanager_csv_hint()}
             </span>
-            <Button variant="primary" size="sm" disabled={busy || csvCount <= 0} onClick={createCsv}>
+            <Button variant="primary" size="sm" pending={busy} disabled={csvCount <= 0} onClick={createCsv}>
               {m.editor_unitsmanager_create_units()}
             </Button>
           </div>

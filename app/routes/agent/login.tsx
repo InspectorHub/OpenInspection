@@ -172,7 +172,7 @@ export default function AgentLoginPage() {
           </div>
         )}
 
-        <Button type="submit" variant="primary" size="lg" disabled={isSubmittingPassword} className="w-full">
+        <Button type="submit" variant="primary" size="lg" pending={isSubmittingPassword} className="w-full">
           {isSubmittingPassword ? m.auth_agent_login_submit_pending() : m.auth_agent_login_submit()}
         </Button>
       </Form>
@@ -212,7 +212,7 @@ export default function AgentLoginPage() {
           aria-invalid={linkFields.linkEmail.errors ? true : undefined}
           error={linkFields.linkEmail.errors?.[0]}
         />
-        <Button type="submit" variant="link" size="sm" disabled={isSubmittingLink} className="px-0">
+        <Button type="submit" variant="link" size="sm" pending={isSubmittingLink} className="px-0">
           {isSubmittingLink ? m.auth_agent_login_link_submit_pending() : m.auth_agent_login_link_cta()}
         </Button>
       </Form>

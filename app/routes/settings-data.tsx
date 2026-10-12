@@ -137,7 +137,7 @@ export default function SettingsData() {
         )}
         <Button
           variant="secondary"
-          disabled={install.busy}
+          pending={install.busy}
           onClick={() => install.submit({ intent: "install-bundled-content" }, { method: "post" })}
         >
           {install.busy ? m.settings_data_bundled_button_busy() : m.settings_data_bundled_button()}

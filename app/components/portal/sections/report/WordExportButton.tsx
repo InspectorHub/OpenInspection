@@ -27,6 +27,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export type WordExportStatus = "queued" | "building" | "ready" | "failed";
@@ -180,9 +181,9 @@ export function WordExportButton({
   return (
     <button
       type="button"
-      onClick={enqueue}
-      disabled={busy}
-      className={`${PILL_BASE} bg-ih-bg-card border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-60 disabled:cursor-not-allowed`}
+      // aria-disabled while busy so focus stays on the button.
+      {...pendingProps(busy, enqueue)}
+      className={`${PILL_BASE} bg-ih-bg-card border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted ${PENDING_CLASS}`}
       data-testid="word-export-button"
     >
       {busy ? m.pca_word_export_preparing() : m.pca_word_export_label()}

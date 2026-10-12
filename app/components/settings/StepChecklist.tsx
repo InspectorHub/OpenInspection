@@ -12,6 +12,7 @@ import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { persistedOutcomes, type StepOutcome, type StepStatus } from "~/lib/test-steps";
 import type { ConnectionTestResult } from "~/lib/connection-test";
 import { m } from "~/paraglide/messages";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 /** What the route action returns for one step (see `app/lib/test-step.server.ts`). */
 interface StepActionData {
@@ -102,12 +103,12 @@ export function StepChecklist({
 
   const busy = active !== null || submitting;
   const btn =
-    "h-8 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60";
+    `h-8 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`;
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" disabled={busy} aria-busy={busy || undefined} className={btn} onClick={() => start([...steps])}>
+        <button type="button" aria-busy={busy || undefined} className={btn} {...pendingProps(busy, () => start([...steps]))}>
           {busy ? m.settings_testconn_busy() : m.settings_testconn_idle()}
         </button>
         {notice ? <span className="text-[11px] text-ih-fg-3">{notice}</span> : null}

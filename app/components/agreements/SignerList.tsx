@@ -173,8 +173,8 @@ export function SignerList({ signers, onRemind, onCopyLink, busy, nowMs }: Signe
                                         type="button"
                                         // In-flight reminder is aria-disabled, not native: the VerifyDialog it opens
                                         // must not record <body> as its focus-return target.
-                                        {...pendingProps(remindingId === s.id, () => handleRemind(s.id))}
-                                        disabled={!!busy || !canRemind}
+                                        {...pendingProps(remindingId === s.id || !!busy, () => handleRemind(s.id))}
+                                        disabled={!canRemind}
                                         title={reason ?? undefined}
                                         className={`text-[13px] font-semibold text-ih-primary-text hover:opacity-80 disabled:text-ih-fg-4 disabled:cursor-not-allowed disabled:hover:opacity-100 ${PENDING_CLASS}`}
                                     >
@@ -184,9 +184,8 @@ export function SignerList({ signers, onRemind, onCopyLink, busy, nowMs }: Signe
                                 {onCopyLink && (
                                     <button
                                         type="button"
-                                        onClick={() => handleCopy(s.id)}
-                                        disabled={!!busy}
-                                        className="text-[13px] font-semibold text-ih-primary-text hover:opacity-80 disabled:text-ih-fg-4 disabled:cursor-not-allowed"
+                                        {...pendingProps(!!busy, () => handleCopy(s.id))}
+                                        className={`text-[13px] font-semibold text-ih-primary-text hover:opacity-80 ${PENDING_CLASS}`}
                                     >
                                         {copiedId === s.id ? m.common_copied() : m.agreement_signers_copy()}
                                     </button>

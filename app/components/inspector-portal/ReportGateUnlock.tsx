@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, Button } from "@core/shared-ui";
+import { Modal, Button, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
@@ -64,9 +64,8 @@ export function ReportGateUnlock({
                 )}
                 <button
                     type="button"
-                    disabled={busy}
-                    onClick={() => guardedSubmit({ intent: "relock-report" }, { method: "post" })}
-                    className="mt-2 text-[12px] font-bold text-ih-primary-text hover:underline disabled:opacity-50"
+                    {...pendingProps(busy, () => guardedSubmit({ intent: "relock-report" }, { method: "post" }))}
+                    className={`mt-2 text-[12px] font-bold text-ih-primary-text hover:underline ${PENDING_CLASS}`}
                 >
                     {m.hub_gate_relock_action()}
                 </button>
@@ -100,7 +99,8 @@ export function ReportGateUnlock({
                             // cannot submit. Disabled rather than validated after
                             // the fact — there is nothing to explain, the field
                             // says what it wants.
-                            disabled={!reason.trim() || busy}
+                            disabled={!reason.trim()}
+                            pending={busy}
                             onClick={submit}
                         >
                             {m.hub_gate_unlock_confirm()}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Form } from "react-router";
-import { RadioCardGroup } from "@core/shared-ui";
+import { RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import type { useFetcher } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
@@ -125,8 +125,8 @@ export function SmsSecretsPanel({
             <p className="text-[12px] text-ih-bad-fg">{secretFormError("save-sms-secrets")}</p>
           )}
           <div className="flex justify-end pt-3 border-t border-ih-border">
-            <button type="submit" disabled={savingSmsSecrets}
-              className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
+            <button type="submit" {...pendingProps(savingSmsSecrets)}
+              className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 ${PENDING_CLASS}`}>
               {savingSmsSecrets ? m.common_saving() : m.settings_smssecrets_save({ provider: provider === "twilio" ? m.settings_sms_provider_twilio() : m.settings_sms_provider_telnyx() })}
             </button>
           </div>

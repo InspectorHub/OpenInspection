@@ -215,6 +215,33 @@ describe("AgentLoginPage rendering", () => {
     });
   });
 
+  it("keeps the submit button focusable while submitting (aria-disabled, not disabled) and ignores a second click", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => { release = r; });
+    let calls = 0;
+    const { getByLabelText, getByText, container } = renderPage(async () => {
+      calls += 1;
+      await gate;
+      return {};
+    });
+
+    fireEvent.change(getByLabelText("Email address"), { target: { value: "agent@example.com" } });
+    fireEvent.change(getByLabelText("Password"), { target: { value: "hunter2hunter2" } });
+    fireEvent.click(getByText("Log In"));
+
+    const busy = await waitFor(() => {
+      const el = container.querySelector('button[type="submit"][aria-disabled="true"]');
+      expect(el).not.toBeNull();
+      return el as HTMLButtonElement;
+    });
+    // Native `disabled` would drop focus to <body> mid-submit.
+    expect(busy.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(busy);
+    release();
+    await waitFor(() => expect(container.querySelector('button[aria-disabled="true"]')).toBeNull());
+    expect(calls).toBe(1);
+  });
+
   it("clicking the magic-link CTA submits the link intent and shows the confirmation", async () => {
     const seen: Record<string, FormDataEntryValue | null>[] = [];
     const { getByLabelText, getByText, findByText } = renderPage(async ({ request }) => {

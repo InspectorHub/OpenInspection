@@ -130,9 +130,8 @@ export function VisitRow({
                     {actions.includes("complete") && (
                         <button
                             type="button"
-                            disabled={busy}
-                            onClick={() => onAction("complete", visit)}
-                            className="text-[12px] font-bold text-ih-primary-text enabled:hover:underline disabled:opacity-40"
+                            {...pendingProps(busy, () => onAction("complete", visit))}
+                            className={`text-[12px] font-bold text-ih-primary-text hover:underline ${PENDING_CLASS}`}
                         >
                             {m.inspections_hub_visits_action_complete()}
                         </button>
@@ -140,9 +139,8 @@ export function VisitRow({
                     {actions.includes("results") && (
                         <button
                             type="button"
-                            disabled={busy}
-                            onClick={() => onAction("results", visit)}
-                            className="text-[12px] font-bold text-ih-primary-text enabled:hover:underline disabled:opacity-40"
+                            {...pendingProps(busy, () => onAction("results", visit))}
+                            className={`text-[12px] font-bold text-ih-primary-text hover:underline ${PENDING_CLASS}`}
                         >
                             {m.inspections_hub_visits_action_results()}
                         </button>

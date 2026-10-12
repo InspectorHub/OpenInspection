@@ -188,7 +188,7 @@ export default function SetupPage() {
             </div>
           )}
 
-          <Button type="submit" variant="primary" size="lg" disabled={isSubmitting} className="w-full">
+          <Button type="submit" variant="primary" size="lg" pending={isSubmitting} className="w-full">
             {isSubmitting ? m.auth_setup_submit_pending() : m.auth_setup_submit()}
           </Button>
         </Form>

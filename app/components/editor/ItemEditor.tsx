@@ -328,7 +328,7 @@ export function ItemEditor({
  );
  const defectPhotoChip = (target: { kind: "canned" | "custom"; id: string }, count: number) =>
  onAddDefectPhoto ? (
- <Button variant="ghost" size="sm" disabled={photoUploading} aria-label={m.editor_item_add_defect_photo_aria()} icon={addPhotoIcon}
+ <Button variant="ghost" size="sm" pending={photoUploading} aria-label={m.editor_item_add_defect_photo_aria()} icon={addPhotoIcon}
  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddDefectPhoto(target); }}
  className="mt-1.5 h-auto px-2 py-1 border border-dashed border-ih-border-strong text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary-text"
  >

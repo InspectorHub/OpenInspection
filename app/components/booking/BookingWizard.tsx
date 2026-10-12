@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { stepLabels, type CompanyProfile } from "./booking-constants";
 import { useTurnstileWidget } from "~/lib/turnstile";
 import { PropertyStep, ServicesStep, ScheduleStep, ConfirmStep } from "./BookingSteps";
@@ -266,7 +267,11 @@ export function BookingWizard({
                 {privacyUrl && <> {m.booking_privacy_see_our()} <a href={privacyUrl} target="_blank" rel="noreferrer" className="underline">{m.booking_link_privacy_policy()}</a>.</>}
               </p>
               <button
-                onClick={() => {
+                // Only the in-flight guard remains: the action has already been
+                // taken and this stops it being sent twice, which is a
+                // different question from "you may not act yet". aria-disabled,
+                // not native, so focus stays on the button.
+                {...pendingProps(submitting, () => {
                   if (needsTurnstile && !turnstileToken) {
                     setVerifyError(
                       verifyUnavailable
@@ -277,12 +282,8 @@ export function BookingWizard({
                   }
                   setVerifyError(null);
                   handleSubmit();
-                }}
-                // Only the in-flight guard remains: the action has already been
-                // taken and this stops it being sent twice, which is a
-                // different question from "you may not act yet".
-                disabled={submitting}
-                className="h-9 px-5 rounded-md bg-ih-primary text-ih-primary-fg font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                })}
+                className={`h-9 px-5 rounded-md bg-ih-primary text-ih-primary-fg font-bold text-[13px] hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}
               >
                 {submitting ? m.booking_submitting() : m.booking_wizard_submit()}
               </button>

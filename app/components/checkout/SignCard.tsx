@@ -10,6 +10,7 @@ import {
 } from "~/components/agreements/OnBehalfFields";
 import type { StepState } from "~/lib/checkout-steps";
 import { m } from "~/paraglide/messages";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 /* ------------------------------------------------------------------ */
 /*  Step 1 — Sign card                                                 */
@@ -37,6 +38,11 @@ export function SignCard({
     const [onBehalf, setOnBehalf] = useState<OnBehalfValue>(EMPTY_ON_BEHALF);
     const fetcher = useFetcher<{ ok?: boolean; error?: string }>();
     const submitting = fetcher.state !== "idle";
+    // Synchronous latch: two clicks in one frame both run before `submitting` has rendered.
+    const inFlight = useRef(false);
+    useEffect(() => {
+        if (!submitting) inFlight.current = false;
+    }, [submitting]);
 
     // The sign POST is dispatched via useFetcher to THIS route's action, which
     // forwards to the public sign endpoint through the BFF api client.
@@ -95,12 +101,14 @@ export function SignCard({
 
     // Sign POST goes through the route action (BFF) — never a client fetch.
     function submitSignature() {
+        if (inFlight.current) return;
         if (!hasMark) {
             setErrorMsg(m.checkout_sign_error_no_mark());
             return;
         }
         const canvas = canvasRef.current;
         if (!canvas) return;
+        inFlight.current = true;
         const signatureBase64 = canvas.toDataURL("image/png");
         const payload = onBehalfPayload(onBehalf);
         setErrorMsg(null);
@@ -203,17 +211,15 @@ export function SignCard({
                     <div className="flex gap-3 mt-4">
                         <button
                             type="button"
-                            onClick={clearSig}
-                            disabled={submitting}
-                            className="flex-1 h-10 px-4 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-3 text-sm font-semibold hover:bg-ih-bg-muted transition-all disabled:opacity-50"
+                            {...pendingProps(submitting, clearSig)}
+                            className={`flex-1 h-10 px-4 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-3 text-sm font-semibold hover:bg-ih-bg-muted transition-all disabled:opacity-50 ${PENDING_CLASS}`}
                         >
                             {m.common_clear()}
                         </button>
                         <button
                             type="button"
-                            onClick={submitSignature}
-                            disabled={submitting}
-                            className="flex-[2] h-10 px-4 bg-ih-primary text-ih-primary-fg rounded-md font-bold text-sm hover:bg-ih-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            {...pendingProps(submitting, submitSignature)}
+                            className={`flex-[2] h-10 px-4 bg-ih-primary text-ih-primary-fg rounded-md font-bold text-sm hover:bg-ih-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${PENDING_CLASS}`}
                         >
                             {submitting ? m.checkout_sign_submit_pending() : m.checkout_sign_submit()}
                         </button>

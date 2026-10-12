@@ -130,9 +130,12 @@ describe("public booking submit", () => {
 
     // The one disable that stays: guarding an in-flight submit is not the same
     // as pre-empting an unmet precondition.
-    it("still disables itself while a submit is in flight", () => {
+    // aria-disabled (not native) so a focused button keeps focus; its click is swallowed.
+    it("still refuses to act while a submit is in flight", () => {
         // The label swaps to the pending copy while in flight, so query that.
         renderWizard({ submitting: true, turnstileToken: "tok" });
-        expect(submitButton(true).disabled).toBe(true);
+        const btn = submitButton(true);
+        expect(btn.getAttribute("aria-disabled")).toBe("true");
+        expect(btn.hasAttribute("disabled")).toBe(false);
     });
 });

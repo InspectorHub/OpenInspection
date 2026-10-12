@@ -333,7 +333,7 @@ export function EditorHeader({
   variant="secondary"
   size="md"
   onClick={handleFinishFieldwork}
-  disabled={finishingFieldwork}
+  pending={finishingFieldwork}
   className={HEADER_OVERFLOW.finishFieldwork.inline}
   icon={<Icon name="check" className="w-3.5 h-3.5" />}
  >

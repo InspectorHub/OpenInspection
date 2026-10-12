@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SegmentedControl } from "@core/shared-ui";
+import { SegmentedControl, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { useCopyClipboard } from "~/hooks/useCopyClipboard";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
@@ -178,9 +178,8 @@ export function LegalDocsPanel({ initial }: { initial: LegalDocsInitial }) {
       <div className="flex items-center gap-3 flex-wrap">
         <button
           type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+          {...pendingProps(saving, handleSave)}
+          className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50 ${PENDING_CLASS}`}
         >
           {saving ? m.settings_compliance_saving() : m.common_save()}
         </button>

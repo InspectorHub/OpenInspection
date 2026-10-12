@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { useFetcher } from "react-router";
 import { m } from "~/paraglide/messages";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 /**
  * Shared "Test connection" control used by the Resend / Stripe / Gemini
@@ -32,8 +33,8 @@ export function TestConnectionButton({
       <input type="hidden" name="intent" value={intent} />
       <button
         type="submit"
-        disabled={busy}
-        className="h-8 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60"
+        {...pendingProps(busy)}
+        className={`h-8 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60 ${PENDING_CLASS}`}
       >
         {busy ? busyLabel : idleLabel}
       </button>

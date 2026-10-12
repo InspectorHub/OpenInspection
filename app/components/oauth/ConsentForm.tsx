@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { m } from "~/paraglide/messages";
 import type { ModuleGroup } from "../../../server/lib/mcp/tag-catalog";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 /**
  * The OAuth consent screen, lifted out of `routes/oauth/authorize.tsx`.
@@ -300,9 +301,9 @@ export function ConsentForm({
 
               data-testid="oauth-authorize-submit"
 
-              disabled={submitting}
+              {...pendingProps(submitting)}
 
-              className="flex-1 py-2.5 rounded-lg bg-ih-primary text-ih-fg-inverse font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className={`flex-1 py-2.5 rounded-lg bg-ih-primary text-ih-fg-inverse font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${PENDING_CLASS}`}
 
             >
 

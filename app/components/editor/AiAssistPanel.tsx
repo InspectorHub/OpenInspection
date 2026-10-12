@@ -112,7 +112,8 @@ export function AiAssistPanel({ notes, context, resultId, onAccept }: AiAssistPa
             variant="link"
             size="sm"
             onClick={improve}
-            disabled={busy || !notes.trim()}
+            pending={busy}
+            disabled={!notes.trim()}
             className="h-auto px-0 py-0 text-[11px]"
           >
             {busy ? m.editor_ai_assist_working() : m.editor_ai_assist_improve()}
@@ -147,10 +148,10 @@ export function AiAssistPanel({ notes, context, resultId, onAccept }: AiAssistPa
             </p>
           </div>
           <div className="flex items-center justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setDraft(null)} disabled={busy}>
+            <Button variant="ghost" size="sm" onClick={() => setDraft(null)} pending={busy}>
               {m.editor_ai_assist_discard()}
             </Button>
-            <Button variant="primary" size="sm" onClick={useReviewed} disabled={busy || !reviewed}>
+            <Button variant="primary" size="sm" onClick={useReviewed} pending={busy} disabled={!reviewed}>
               {busy ? m.editor_ai_assist_recording() : m.editor_ai_assist_use()}
             </Button>
           </div>

@@ -363,7 +363,8 @@ export function TemplateEditorModal({
               <Button
                 type="submit"
                 variant="secondary"
-                disabled={isTesting || !testTo.trim() || !body.trim()}
+                disabled={!testTo.trim() || !body.trim()}
+                pending={isTesting}
               >
                 {isTesting ? m.settings_sending() : m.settings_send()}
               </Button>

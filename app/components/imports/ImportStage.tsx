@@ -111,7 +111,7 @@ export function ImportStage({
                     {blockedReason && <Banner tone="warn">{blockedReason}</Banner>}
                     <Button
                         variant="primary"
-                        disabled={busy || blockedReason !== null}
+                        disabled={blockedReason !== null} pending={busy}
                         onClick={() => onApply(policy)}
                     >
                         {m.imports_apply()}

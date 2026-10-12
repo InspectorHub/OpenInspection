@@ -23,6 +23,7 @@ import { formatCurrency } from "~/lib/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { buildStripeElementsOptions } from "~/lib/stripe-elements-options";
 import { m } from "~/paraglide/messages";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 type Phase = "idle" | "loading" | "ready" | "settled" | "unavailable";
 
@@ -89,9 +90,8 @@ export function BookingDepositPanel({
         <>
           <button
             type="button"
-            onClick={startPayment}
-            disabled={phase === "loading"}
-            className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-wait"
+            {...pendingProps(phase === "loading", startPayment)}
+            className={`w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-wait ${PENDING_CLASS}`}
           >
             {phase === "loading" ? m.booking_deposit_starting() : m.booking_deposit_pay_button({ amount })}
           </button>
@@ -151,8 +151,8 @@ function DepositForm({ amount, returnUrl }: { amount: string; returnUrl: string 
       <PaymentElement />
       <button
         type="submit"
-        disabled={!stripe || submitting}
-        className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-wait"
+        disabled={!stripe} {...pendingProps(submitting)}
+        className={`w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-wait ${PENDING_CLASS}`}
       >
         {submitting ? m.booking_deposit_processing() : m.booking_deposit_pay_button({ amount })}
       </button>

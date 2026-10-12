@@ -273,9 +273,12 @@ describe("MappingStage: the answer the file does not contain", () => {
 });
 
 describe("MappingStage: while a submit is in flight", () => {
-    it("disables the controls as well as the button", () => {
-        renderStage(contacts(), true);
-        expect(save().disabled).toBe(true);
+    it("disables the controls and marks the button pending without a native disabled", () => {
+        const { onApply } = renderStage(contacts(), true);
+        expect(save().disabled).toBe(false);
+        expect(save().getAttribute("aria-disabled")).toBe("true");
+        fireEvent.click(save());
+        expect(onApply).not.toHaveBeenCalled();
         expect(asSelect(screen.getByLabelText("Name")).disabled).toBe(true);
     });
 });

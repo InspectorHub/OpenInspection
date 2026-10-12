@@ -3,6 +3,7 @@ import { brandTokens, type TenantBrand } from "~/lib/brand";
 import { useTurnstileWidget } from "~/lib/turnstile";
 import { LanguageChoice } from "~/components/booking/LanguageChoice";
 import { BOOKING_HORIZON_DAYS, addDaysCivil, todayCivil } from "~/components/booking/booking-date-rules";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -346,8 +347,8 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
         type="submit"
         // Only the in-flight guard: the challenge is reported after the click,
         // never pre-empted by a dead button.
-        disabled={submitting}
-        className="w-full px-4 py-3 bg-ih-primary text-ih-primary-fg rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+        {...pendingProps(submitting)}
+        className={`w-full px-4 py-3 bg-ih-primary text-ih-primary-fg rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity ${PENDING_CLASS}`}
       >
         {submitting ? m.booking_submitting() : m.booking_embed_submit()}
       </button>

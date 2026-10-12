@@ -76,18 +76,16 @@ export function QboConnectionPanel({
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
-            onClick={onSync}
-            disabled={busy}
+            {...pendingProps(busy, onSync)}
             aria-busy={syncing || undefined}
-            className="px-4 py-2 text-[12px] font-bold bg-ih-primary-tint text-ih-primary-text rounded-md hover:bg-ih-primary-tint transition-colors disabled:opacity-50"
+            className={`px-4 py-2 text-[12px] font-bold bg-ih-primary-tint text-ih-primary-text rounded-md hover:bg-ih-primary-tint transition-colors disabled:opacity-50 ${PENDING_CLASS}`}
           >
             {syncing ? m.settings_qbo_syncing() : m.settings_qbo_sync_now()}
           </button>
           <button
-            onClick={onTogglePause}
-            disabled={busy}
+            {...pendingProps(busy, onTogglePause)}
             aria-busy={busy || undefined}
-            className="px-4 py-2 text-[12px] font-bold bg-ih-bg-muted text-ih-fg-2 rounded-md hover:bg-ih-bg-muted transition-colors disabled:opacity-50"
+            className={`px-4 py-2 text-[12px] font-bold bg-ih-bg-muted text-ih-fg-2 rounded-md hover:bg-ih-bg-muted transition-colors disabled:opacity-50 ${PENDING_CLASS}`}
           >
             {status.syncEnabled ? m.settings_qbo_pause_sync() : m.settings_qbo_resume_sync()}
           </button>

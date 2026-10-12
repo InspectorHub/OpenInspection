@@ -15,6 +15,7 @@ import { CancellationFeeRow } from "./CancellationFeeRow";
 import type { action } from "~/routes/settings-booking";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 /**
  * The company cancellation ladder, and the agreement clause it depends on.
@@ -319,9 +320,8 @@ export function CancellationPolicyPanel({ policy, clause, agreements }: Props) {
       <div className="flex items-center gap-3 pt-2">
         <button
           type="button"
-          onClick={save}
-          disabled={saving}
-          className="h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+          {...pendingProps(saving, save)}
+          className={`h-8 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50 ${PENDING_CLASS}`}
         >
           {saving ? m.settings_holiday_save_pending() : m.settings_cancellation_save()}
         </button>
