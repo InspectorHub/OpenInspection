@@ -268,14 +268,13 @@ export function PeopleEditor({
                         {person.kind === "client" && !isPrimary && (
                           <button
                             type="button"
-                            onClick={() =>
+                            {...pendingProps(busy, () =>
                               submitPrimary(
                                 { intent: "person-make-primary", personId: person.id },
                                 { method: "post" },
-                              )
-                            }
-                            disabled={busy}
-                            className="text-[11px] font-bold text-ih-primary-text hover:underline disabled:opacity-60"
+                              ),
+                            )}
+                            className={`text-[11px] font-bold text-ih-primary-text hover:underline ${PENDING_CLASS}`}
                           >
                             {m.inspections_hub_people_make_primary()}
                           </button>
@@ -350,7 +349,8 @@ export function PeopleEditor({
             variant="secondary"
             size="sm"
             className="mt-2"
-            disabled={expiryBusy || expiryWouldChangeNothing}
+            disabled={expiryWouldChangeNothing}
+            pending={expiryBusy}
             onClick={() =>
               submitExpiry(
                 { intent: "report-link-expiry", ttl: JSON.stringify(ttl) },

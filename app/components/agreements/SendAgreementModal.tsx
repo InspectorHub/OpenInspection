@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Modal, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
@@ -123,6 +123,13 @@ export function SendAgreementModal({
     const [agreementId, setAgreementId] = useState(templates?.[0]?.id ?? "");
     const [error, setError] = useState<string | null>(null);
     const noTemplates = templates !== undefined && templates.length === 0;
+    const inFlight = useRef(false);
+
+    // Two clicks inside one frame both run before `busy` renders; release the
+    // latch only once the parent reports the send settled.
+    useEffect(() => {
+        if (!busy) inFlight.current = false;
+    }, [busy]);
 
     // The modal stays mounted (Modal renders null when closed), so reseed the
     // draft each time it opens — a reopened modal must start fresh, not resume
@@ -143,6 +150,8 @@ export function SendAgreementModal({
     const submit = () => {
         const problem = validateSigners(signers);
         if (problem) { setError(problem); return; }
+        if (inFlight.current) return;
+        inFlight.current = true;
         setError(null);
         onSend(buildSendPayload(signers, completionPolicy, agreementId));
     };
@@ -156,7 +165,7 @@ export function SendAgreementModal({
             footer={
                 <>
                     <Button variant="secondary" onClick={onClose} disabled={busy}>{m.common_cancel()}</Button>
-                    <Button variant="primary" onClick={submit} disabled={busy || noTemplates}>
+                    <Button variant="primary" onClick={submit} pending={busy} disabled={noTemplates}>
                         {busy ? m.agreement_send_pending() : m.agreement_send_submit()}
                     </Button>
                 </>

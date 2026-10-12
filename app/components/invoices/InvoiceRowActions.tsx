@@ -114,9 +114,8 @@ export function InvoiceRowActions({
         {getPayMethods().map((method) => (
           <button
             key={method.value}
-            onClick={() => onMarkPaid(method.value)}
-            disabled={busy}
-            className="px-2 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 hover:border-ih-ok-fg hover:text-ih-ok-fg transition-colors disabled:opacity-50"
+            {...pendingProps(busy, () => onMarkPaid(method.value))}
+            className={`px-2 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 hover:border-ih-ok-fg hover:text-ih-ok-fg transition-colors ${PENDING_CLASS}`}
           >
             {method.label}
           </button>

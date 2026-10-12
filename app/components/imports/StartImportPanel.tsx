@@ -376,7 +376,7 @@ export function StartImportPanel({
             {error && <Banner tone="danger">{error}</Banner>}
 
             <div className="flex items-center gap-3">
-                <Button type="submit" variant="primary" disabled={blockedReason !== null || busy}>
+                <Button type="submit" variant="primary" disabled={blockedReason !== null} pending={busy}>
                     {m.imports_upload_submit()}
                 </Button>
                 {/* Rendered only when it has something to say. An always-present

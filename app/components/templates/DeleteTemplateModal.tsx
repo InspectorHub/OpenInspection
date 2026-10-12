@@ -1,4 +1,4 @@
-import { Modal } from "@core/shared-ui";
+import { Modal, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 interface DeleteTemplateModalProps {
@@ -27,10 +27,9 @@ export function DeleteTemplateModal({ open, setDeleteConfirm, handleDelete, busy
           </button>
           <button
             type="button"
-            onClick={handleDelete}
-            disabled={busy}
+            {...pendingProps(busy, handleDelete)}
             aria-busy={busy || undefined}
-            className="h-8 px-4 rounded-md bg-ih-bad-fg text-white font-bold text-[13px] hover:bg-ih-bad-fg disabled:opacity-50"
+            className={`h-8 px-4 rounded-md bg-ih-bad-fg text-white font-bold text-[13px] hover:bg-ih-bad-fg ${PENDING_CLASS}`}
           >
             {m.common_delete()}
           </button>

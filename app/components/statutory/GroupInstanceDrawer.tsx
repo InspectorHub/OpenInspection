@@ -68,7 +68,7 @@ export function GroupInstanceDrawer({
                     <Button variant="ghost" onClick={onClose}>
                         {m.statutory_group_instance_cancel()}
                     </Button>
-                    <Button onClick={submit} disabled={saving}>
+                    <Button onClick={submit} pending={saving}>
                         {m.statutory_group_instance_save()}
                     </Button>
                 </div>

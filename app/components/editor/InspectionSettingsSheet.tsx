@@ -245,7 +245,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
             {saveState === "saving" && <span className="text-[12px] text-ih-watch-fg font-bold self-center">{m.editor_header_save_saving()}</span>}
             {saveState === "saved" && <span className="text-[12px] text-ih-ok-fg font-bold self-center">{m.editor_header_save_saved()}</span>}
             {saveState === "error" && <span className="text-[12px] text-ih-bad-fg font-bold self-center">{m.editor_settings_save_error()}</span>}
-            <Button variant="primary" type="submit" form="inspection-settings-form" disabled={saveState === "saving"}>
+            <Button variant="primary" type="submit" form="inspection-settings-form" pending={saveState === "saving"}>
               {m.editor_settings_save_changes()}
             </Button>
           </>
@@ -339,7 +339,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
                     in this drawer's width the button had to wrap its own label
                     onto two lines to make room for the sentence. */}
                 <div className="pt-1 space-y-1">
-                  <Button variant="secondary" size="sm" onClick={() => coverFileRef.current?.click()} disabled={coverFetcher.state !== "idle"} className="hover:border-ih-primary hover:text-ih-primary-text">
+                  <Button variant="secondary" size="sm" onClick={() => coverFileRef.current?.click()} pending={coverFetcher.state !== "idle"} className="hover:border-ih-primary hover:text-ih-primary-text">
                     {coverFetcher.state !== "idle" && coverFetcher.formData?.get("intent") === "upload-cover" ? m.editor_uploading() : m.editor_settings_cover_upload()}
                   </Button>
                   <p className="text-[11px] text-ih-fg-3">{m.editor_settings_cover_hint()}</p>

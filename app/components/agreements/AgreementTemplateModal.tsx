@@ -150,7 +150,7 @@ export function AgreementTemplateModal({
                     <Button variant="ghost" onClick={onClose} disabled={saving}>
                         {m.common_cancel()}
                     </Button>
-                    <Button variant="primary" onClick={submit} disabled={saving || loading || !!loadError}>
+                    <Button variant="primary" onClick={submit} pending={saving} disabled={loading || !!loadError}>
                         {saving ? m.common_saving() : m.common_save()}
                     </Button>
                 </>

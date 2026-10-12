@@ -147,12 +147,12 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  <Button variant="ghost" onClick={onClose}>{m.common_cancel()}</Button>
  <Button
  variant="secondary"
- disabled={isSubmitting}
+ pending={isSubmitting}
  onClick={() => onPublish(false, extras())}
  >{isSubmitting ? m.editor_publish_publishing() : m.editor_publish_just_publish()}</Button>
  <Button
  variant="primary"
- disabled={isSubmitting}
+ pending={isSubmitting}
  onClick={() => onPublish(true, extras())}
  >{isSubmitting ? m.editor_publish_publishing() : m.editor_publish_mark_complete_and_publish()}</Button>
  </>
@@ -161,7 +161,7 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  <Button variant="ghost" onClick={onClose}>{m.common_cancel()}</Button>
  <Button
  variant="primary"
- disabled={isSubmitting}
+ pending={isSubmitting}
  onClick={() => onPublish(false, extras())}
  >{isSubmitting ? m.editor_publish_publishing() : m.editor_publish_now()}</Button>
  </>

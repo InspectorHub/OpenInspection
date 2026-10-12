@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router";
-import { Modal, Icon } from "@core/shared-ui";
+import { Modal, Icon, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import type { Rule, Svc, TemplateSummary, RoleProfileOption, Conditions } from "~/routes/settings-automations";
@@ -24,9 +24,14 @@ export function AutomationEditorModal({
 }) {
   const parsed: Conditions = rule?.conditions ? (JSON.parse(rule.conditions) as Conditions) : {};
   // #106 - deleting an automation rule is irreversible. The delete button is
-  // already `disabled={submitting}`, so the guard never has to refuse a click.
+  // already `pending={submitting}`, so the guard never has to refuse a click.
   const { fetcher, submit, busy: submitting } = useGuardedSubmit<{ ok: boolean; error?: string }>();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Synchronous latch for the save form: two submits in one frame both run before `submitting` has rendered.
+  const saveInFlight = useRef(false);
+  useEffect(() => {
+    if (!submitting) saveInFlight.current = false;
+  }, [submitting]);
 
   // Track L (Task 9) — channel multi-select. Default email for a new rule.
   const initialChannels = rule?.channels?.length ? rule.channels : ["email"];
@@ -61,24 +66,32 @@ export function AutomationEditorModal({
       footer={
         <>
           {rule && !rule.isDefault && (
-            <button type="button" disabled={submitting}
-              onClick={() => {
+            <button type="button"
+              {...pendingProps(submitting, () => {
                 if (!confirmDelete) { setConfirmDelete(true); return; }
                 submit({ intent: "delete", id: rule.id }, { method: "post" });
-              }}
-              className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-bad-fg disabled:opacity-50">
+              })}
+              className={`h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-bad-fg ${PENDING_CLASS}`}>
               {confirmDelete ? m.settings_automations_confirm_delete() : m.common_delete()}
             </button>
           )}
           <div className="flex-1" />
           <button type="button" onClick={onClose} className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-fg-2">{m.common_cancel()}</button>
-          <button type="submit" form="automation-editor-form" disabled={submitting || saveBlocked}
+          <button type="submit" form="automation-editor-form" disabled={saveBlocked} {...pendingProps(submitting)}
             title={noChannel ? m.settings_automations_pick_channel_title() : undefined}
-            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] disabled:opacity-50">{m.common_save()}</button>
+            className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] disabled:opacity-50 ${PENDING_CLASS}`}>{m.common_save()}</button>
         </>
       }
     >
-      <fetcher.Form id="automation-editor-form" method="post" className="space-y-5">
+      <fetcher.Form
+        id="automation-editor-form"
+        method="post"
+        className="space-y-5"
+        onSubmit={(e) => {
+          if (saveInFlight.current) { e.preventDefault(); return; }
+          saveInFlight.current = true;
+        }}
+      >
         <input type="hidden" name="intent" value="save" />
         {rule && <input type="hidden" name="id" value={rule.id} />}
 

@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import Cropper from "react-easy-crop";
-import { useLayer } from "@core/shared-ui";
+import { useLayer, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { bakeCrop, normalizeRotation, type BakeFormat, type PixelCrop } from "./cropImage";
 import { m } from "~/paraglide/messages";
 
@@ -93,6 +93,8 @@ export function PhotoCropper({
   const [rotation, setRotation] = useState(0);
   const [pixels, setPixels] = useState<PixelCrop | null>(null);
   const [busy, setBusy] = useState(false);
+  // Synchronous latch: two clicks in one frame both run before `busy` has rendered.
+  const inFlight = useRef(false);
   const [bakeError, setBakeError] = useState<string | null>(null);
   // Plan 4 Q5 — the source image's long edge (natural px). Threaded into bakeCrop
   // so the crop rect is rescaled when the CDN returns a bounded variant.
@@ -107,7 +109,8 @@ export function PhotoCropper({
   }, []);
 
   async function handleSave() {
-    if (!pixels) return;
+    if (!pixels || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setBakeError(null);
     try {
@@ -123,7 +126,7 @@ export function PhotoCropper({
       // says why. Whatever the cause — an unreadable source, no canvas — the
       // one thing that must not happen is the button appearing inert.
       setBakeError(m.media_cropper_bake_failed());
-    } finally { setBusy(false); }
+    } finally { inFlight.current = false; setBusy(false); }
   }
 
   // Full-screen overlay: it takes Escape (and the scroll lock) so a dialog under it stays put.
@@ -181,7 +184,7 @@ export function PhotoCropper({
             <p role="alert" className="mr-auto text-[12px] text-ih-bad-fg font-medium">{bakeError}</p>
           )}
           <button type="button" onClick={onCancel} className="h-9 px-4 rounded-md border border-ih-border text-ih-fg-2 text-[13px] font-bold hover:bg-ih-bg-muted">{m.common_cancel()}</button>
-          <button type="button" onClick={handleSave} disabled={busy || !pixels} className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 disabled:opacity-50">
+          <button type="button" {...pendingProps(busy, handleSave)} disabled={!pixels} className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 disabled:opacity-50 ${PENDING_CLASS}`}>
             {busy ? m.common_saving() : saveLabel}
           </button>
         </div>

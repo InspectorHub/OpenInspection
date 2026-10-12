@@ -198,7 +198,7 @@ export function StatutorySourceRow({
                     </span>
                 </div>
 
-                <Button type="submit" variant="primary" disabled={busy}>
+                <Button type="submit" variant="primary" pending={busy}>
                     {busy ? m.statutory_source_submitting() : m.statutory_source_submit()}
                 </Button>
             </Form>

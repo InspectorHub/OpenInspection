@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from "react";
+import { PENDING_CLASS, pendingProps } from "@core/shared-ui";
 
 interface Props {
   onSubmit: (dataUri: string) => Promise<void> | void;
@@ -11,6 +12,7 @@ export function SignaturePad({ onSubmit, onCancel, label = "Sign" }: Props) {
   const [drawing, setDrawing] = useState(false);
   const [hasInk, setHasInk] = useState(false);
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,10 +62,12 @@ export function SignaturePad({ onSubmit, onCancel, label = "Sign" }: Props) {
   };
 
   const submit = async () => {
+    if (inFlight.current) return;
     if (!hasInk) {
       setError("Draw your signature first.");
       return;
     }
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -72,6 +76,7 @@ export function SignaturePad({ onSubmit, onCancel, label = "Sign" }: Props) {
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   };
@@ -109,9 +114,8 @@ export function SignaturePad({ onSubmit, onCancel, label = "Sign" }: Props) {
           )}
           <button
             type="button"
-            className="text-sm font-semibold bg-ih-primary text-ih-fg-inverse px-3 py-1 rounded"
-            onClick={submit}
-            disabled={busy}
+            className={`text-sm font-semibold bg-ih-primary text-ih-fg-inverse px-3 py-1 rounded ${PENDING_CLASS}`}
+            {...pendingProps(busy, submit)}
           >
             {busy ? "..." : label}
           </button>

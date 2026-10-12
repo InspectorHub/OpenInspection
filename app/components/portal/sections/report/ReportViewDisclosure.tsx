@@ -35,7 +35,9 @@
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
+import { useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
+import { PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { REPORT_VIEW_DISCLOSURE_VERSION } from "./report-view-disclosure-version";
 import type { ViewTrackingActionResult } from "~/routes/resources/view-tracking";
@@ -59,6 +61,11 @@ export function ReportViewDisclosure({
 }: ReportViewDisclosureProps) {
   const fetcher = useFetcher<ViewTrackingActionResult>();
   const busy = fetcher.state !== "idle";
+  // Synchronous latch: two clicks in one frame both submit before `busy` has rendered.
+  const inFlight = useRef(false);
+  useEffect(() => {
+    if (!busy) inFlight.current = false;
+  }, [busy]);
   // The stored answer wins over the loader's snapshot the moment we have one,
   // so the control reflects what the server did rather than what was true when
   // the page was rendered.
@@ -101,7 +108,15 @@ export function ReportViewDisclosure({
           </p>
         )}
 
-        <fetcher.Form method="post" action="/resources/view-tracking" className="mt-3">
+        <fetcher.Form
+          method="post"
+          action="/resources/view-tracking"
+          className="mt-3"
+          onSubmit={(e) => {
+            if (inFlight.current) { e.preventDefault(); return; }
+            inFlight.current = true;
+          }}
+        >
           <input type="hidden" name="inspectionId" value={inspectionId ?? ""} />
           <input type="hidden" name="token" value={token ?? ""} />
           {/* An explicit target state, never a toggle: a retried submit must
@@ -110,8 +125,9 @@ export function ReportViewDisclosure({
           <input type="hidden" name="objected" value={current ? "false" : "true"} />
           <button
             type="submit"
-            disabled={busy || !inspectionId}
-            className="inline-flex h-8 items-center px-3 rounded-lg border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 hover:text-ih-fg-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            disabled={!inspectionId}
+            {...pendingProps(busy)}
+            className={`inline-flex h-8 items-center px-3 rounded-lg border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 hover:text-ih-fg-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${PENDING_CLASS}`}
           >
             {busy
               ? m.report_view_disclosure_busy()

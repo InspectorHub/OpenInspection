@@ -207,7 +207,7 @@ export function OrderDetailsCard({
                         <Button variant="secondary" size="sm" type="button" onClick={() => setOpen(false)}>
                             {m.common_cancel()}
                         </Button>
-                        <Button variant="primary" size="sm" type="submit" disabled={saving}>
+                        <Button variant="primary" size="sm" type="submit" pending={saving}>
                             {m.common_save()}
                         </Button>
                     </div>

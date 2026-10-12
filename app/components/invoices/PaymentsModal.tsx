@@ -198,7 +198,7 @@ export function PaymentsModal({ invoice, payments, loading, fetcher, submit, bus
 
         {data?.ok === false && data.error && <Banner tone="danger">{data.error}</Banner>}
         {overpaymentRefused && (
-          <Button variant="secondary" onClick={() => submitPayment(true)} disabled={busy}>
+          <Button variant="secondary" onClick={() => submitPayment(true)} pending={busy}>
             {m.invoices_payments_record_anyway()}
           </Button>
         )}
@@ -272,7 +272,7 @@ export function PaymentsModal({ invoice, payments, loading, fetcher, submit, bus
                         />
                         <div className="flex justify-end gap-2">
                           <Button variant="secondary" onClick={() => setCorrecting(null)}>{m.common_cancel()}</Button>
-                          <Button variant="primary" disabled={busy} onClick={() => submitCorrection(p.id)}>
+                          <Button variant="primary" pending={busy} onClick={() => submitCorrection(p.id)}>
                             {m.invoices_payments_correct_submit()}
                           </Button>
                         </div>
@@ -320,7 +320,7 @@ export function PaymentsModal({ invoice, payments, loading, fetcher, submit, bus
             onChange={(e) => setNote(e.target.value)}
           />
           <div className="flex justify-end">
-            <Button variant="primary" disabled={busy} onClick={() => submitPayment(false)}>
+            <Button variant="primary" pending={busy} onClick={() => submitPayment(false)}>
               {busy ? m.invoices_payments_submitting() : m.invoices_payments_submit()}
             </Button>
           </div>

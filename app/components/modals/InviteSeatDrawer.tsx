@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
-import { Drawer } from "@core/shared-ui";
+import { Drawer, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { getCapabilities, TOGGLEABLE, type Capability, type CapabilitySet, type PermissionOverrides } from "../../../server/lib/auth/capabilities";
 // TOGGLEABLE is still the source of truth for computeOverrideDiff below; the
 // RENDERING now walks CAP_GROUPS so the two drawers cannot group differently.
@@ -121,6 +121,11 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
 
  const inviteFetcher = useFetcher<{ ok: boolean; intent?: string | null; error: string | null; url: string | null }>();
  const submitting = inviteFetcher.state !== "idle";
+ // Synchronous latch: two submits in one frame both run before `submitting` has rendered.
+ const inFlight = useRef(false);
+ useEffect(() => {
+  if (!submitting) inFlight.current = false;
+ }, [submitting]);
 
  useEffect(() => {
   const d = inviteFetcher.data;
@@ -136,7 +141,8 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
 
  function submitPermanent(e?: React.FormEvent) {
   e?.preventDefault();
-  if (submitting) return;
+  if (submitting || inFlight.current) return;
+  inFlight.current = true;
   setError("");
   // Only send capabilities that differ from the role template; the server
   // re-diffs and stores null when nothing differs.
@@ -164,7 +170,7 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
  seatLimit ? undefined : (
  <>
  <button type="button" onClick={onClose} className="px-4 h-10 rounded-xl border border-ih-border text-sm font-semibold text-ih-fg-3 hover:bg-ih-bg-muted">{m.common_cancel()}</button>
- <button type="submit" form={FORM_ID} disabled={submitting} className="px-4 h-10 rounded-xl bg-ih-primary text-ih-fg-inverse text-sm font-semibold hover:bg-ih-primary-600 disabled:opacity-50">{m.modal_invite_send()}</button>
+ <button type="submit" form={FORM_ID} {...pendingProps(submitting)} className={`px-4 h-10 rounded-xl bg-ih-primary text-ih-fg-inverse text-sm font-semibold hover:bg-ih-primary-600 ${PENDING_CLASS}`}>{m.modal_invite_send()}</button>
  </>
  )
  }

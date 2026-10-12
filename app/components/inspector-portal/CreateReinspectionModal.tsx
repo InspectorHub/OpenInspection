@@ -1,6 +1,6 @@
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { useFetcher } from "react-router";
-import { Input, Modal } from "@core/shared-ui";
+import { Input, Modal, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
 import type { ReinspectCandidate } from "~/lib/inspector-portal-helpers";
 import { m } from "~/paraglide/messages";
@@ -46,6 +46,11 @@ export function CreateReinspectionModal({
 }) {
   const hasCandidates = candidates.length > 0;
   const dateId = useId();
+  // Two clicks in one frame both run before `submitting` renders.
+  const inFlight = useRef(false);
+  useEffect(() => {
+    if (!submitting) inFlight.current = false;
+  }, [submitting]);
   return (
     <Modal
       open={open}
@@ -63,15 +68,27 @@ export function CreateReinspectionModal({
           <button
             type="submit"
             form={FORM_ID}
-            disabled={submitting || !hasCandidates}
-            className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
+            disabled={!hasCandidates}
+            {...pendingProps(submitting)}
+            className={`px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60 ${PENDING_CLASS}`}
           >
             {submitting ? m.hub_reinspect_pending() : m.hub_reinspect_submit()}
           </button>
         </>
       }
     >
-      <fetcher.Form id={FORM_ID} method="post" className="space-y-3">
+      <fetcher.Form
+        id={FORM_ID}
+        method="post"
+        className="space-y-3"
+        onSubmit={(e) => {
+          if (inFlight.current) {
+            e.preventDefault();
+            return;
+          }
+          inFlight.current = true;
+        }}
+      >
         <input type="hidden" name="intent" value="create-reinspection" />
         {/* F47 — the day the round is filed on. Outside the candidates branch on
             purpose: an empty baseline is exactly when an operator is scheduling

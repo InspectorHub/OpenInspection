@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, afterEach } from "vitest";
-import { render, cleanup, screen } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 import { IconButton } from "./IconButton";
 import { Icon } from "./Icon";
 
@@ -49,5 +49,33 @@ describe("IconButton", () => {
       </IconButton>,
     );
     expect(screen.getByRole("button", { name: "Filter" }).hasAttribute("aria-pressed")).toBe(false);
+  });
+
+  it("pending keeps focus, shows aria-disabled and swallows clicks", () => {
+    const onClick = vi.fn();
+    const { rerender } = render(
+      <IconButton aria-label="Remove" onClick={onClick}>
+        <Icon name="filter" />
+      </IconButton>,
+    );
+    const btn = screen.getByRole("button", { name: "Remove" });
+    btn.focus();
+    rerender(
+      <IconButton aria-label="Remove" onClick={onClick} pending>
+        <Icon name="filter" />
+      </IconButton>,
+    );
+    expect(btn.getAttribute("aria-disabled")).toBe("true");
+    expect(btn.hasAttribute("disabled")).toBe(false);
+    expect(document.activeElement).toBe(btn);
+    fireEvent.click(btn);
+    expect(onClick).not.toHaveBeenCalled();
+    rerender(
+      <IconButton aria-label="Remove" onClick={onClick}>
+        <Icon name="filter" />
+      </IconButton>,
+    );
+    fireEvent.click(btn);
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 });

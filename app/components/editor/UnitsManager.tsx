@@ -199,7 +199,7 @@ function UnitRow({
         className="flex-1 h-8 px-2.5 rounded-ih-input border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1"
       />
       <IconButton
-        disabled={busy}
+        pending={busy}
         onClick={() => onSubmit({ intent: "unit-duplicate", unitId: unit.id })}
         title={m.editor_unitsmanager_duplicate_title()}
         aria-label={m.editor_unitsmanager_duplicate_aria({ name: unit.name })}
@@ -211,7 +211,7 @@ function UnitRow({
         </svg>
       </IconButton>
       <IconButton
-        disabled={busy}
+        pending={busy}
         onClick={() => onSubmit({ intent: "unit-delete", unitId: unit.id })}
         title={m.editor_unitsmanager_remove_title()}
         aria-label={m.editor_unitsmanager_remove_aria({ name: unit.name })}

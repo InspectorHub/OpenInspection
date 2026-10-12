@@ -149,7 +149,8 @@ export function SendReportModal({
             variant="primary"
             type="submit"
             form={FORM_ID}
-            disabled={submitting || recipients.length === 0}
+            disabled={recipients.length === 0}
+            pending={submitting}
           >
             {submitting ? m.inspections_hub_send_report_sending() : m.inspections_hub_send_report_submit()}
           </Button>

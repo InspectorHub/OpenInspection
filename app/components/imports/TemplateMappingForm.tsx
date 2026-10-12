@@ -131,7 +131,8 @@ export function TemplateMappingForm({
             <div className="flex flex-wrap items-center gap-3">
                 <Button
                     variant="primary"
-                    disabled={busy || name === ""}
+                    disabled={name === ""}
+                    pending={busy}
                     onClick={() => { if (name !== "") onApply({ ...draft, name }); }}
                 >
                     {m.imports_mapping_template_save()}

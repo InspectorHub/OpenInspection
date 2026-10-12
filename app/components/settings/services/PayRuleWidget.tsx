@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import type { action } from "~/routes/settings-services";
 import { toHundredths, fromHundredths } from "~/lib/settings-services";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
@@ -167,9 +168,8 @@ function RuleRow({
 
                 <button
                     type="button"
-                    onClick={save}
-                    disabled={busy}
-                    className="h-7 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+                    {...pendingProps(busy, save)}
+                    className={`h-7 px-3 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}
                 >
                     {busy ? m.common_saving() : m.common_save()}
                 </button>

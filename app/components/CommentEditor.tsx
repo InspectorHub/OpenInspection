@@ -31,7 +31,7 @@ export interface CommentEditorProps {
  */
 export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: CommentEditorProps) {
   // #106 - user mutation: saves a canned comment. The Save button is
-  // already `disabled={saving}`, so the guard never has to refuse a click.
+  // already `pending={saving}`, so the guard never has to refuse a click.
   const { fetcher, submit, busy: saving } = useGuardedSubmit<{ ok?: boolean }>();
   const editing = !!comment;
   const [text, setText] = useState("");
@@ -88,7 +88,7 @@ export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: 
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>{m.common_cancel()}</Button>
-          <Button variant="primary" onClick={save} disabled={saving || !!error}>
+          <Button variant="primary" onClick={save} pending={saving} disabled={!!error}>
             {saving ? m.common_saving() : editing ? m.comment_editor_save_changes() : m.comment_editor_add()}
           </Button>
         </>

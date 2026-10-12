@@ -19,6 +19,7 @@
  *     program has already been told is insufficient.
  */
 import { useState } from "react";
+import { PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 
@@ -83,9 +84,8 @@ export function RetentionWindowSection({
                     />
                 </label>
                 <button
-                    onClick={handleSave}
-                    disabled={busy}
-                    className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+                    {...pendingProps(busy, handleSave)}
+                    className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}
                 >
                     {busy ? m.settings_compliance_saving() : m.common_save()}
                 </button>

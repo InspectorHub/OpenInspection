@@ -4,9 +4,9 @@
  * whether it is open and which inspections may be billed, and it posts back to
  * the route's own action.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
-import { Modal } from "@core/shared-ui";
+import { Modal, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { MoneyInput } from "~/components/MoneyInput";
 import { formatDate } from "~/lib/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
@@ -32,6 +32,11 @@ export function NewInvoiceModal({
   const fetcher = useFetcher<typeof action>();
   const locale = useDisplayLocale();
   const busy = fetcher.state !== "idle";
+  // Synchronous latch: two clicks in one frame both submit before `busy` has rendered.
+  const inFlight = useRef(false);
+  useEffect(() => {
+    if (!busy) inFlight.current = false;
+  }, [busy]);
   const [clientName, setClientName] = useState("");
   // Money stays in integer cents; the hidden `amount` field carries dollars to
   // the action (which multiplies by 100), so the wire contract is unchanged.
@@ -52,7 +57,14 @@ export function NewInvoiceModal({
 
   return (
     <Modal open={open} onClose={onClose} title={m.invoices_new_title()} size="md">
-      <fetcher.Form method="post" className="space-y-4">
+      <fetcher.Form
+        method="post"
+        className="space-y-4"
+        onSubmit={(e) => {
+          if (inFlight.current) { e.preventDefault(); return; }
+          inFlight.current = true;
+        }}
+      >
         <input type="hidden" name="intent" value="create-invoice" />
         <div>
           <label htmlFor="ninv-inspection" className={labelCls}>{m.invoices_new_inspection_label()}</label>
@@ -104,8 +116,8 @@ export function NewInvoiceModal({
             className="h-9 px-4 rounded-md border border-ih-border bg-ih-bg-card text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
             {m.common_cancel()}
           </button>
-          <button type="submit" disabled={busy}
-            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+          <button type="submit" {...pendingProps(busy)}
+            className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all ${PENDING_CLASS}`}>
             {busy ? m.invoices_new_creating() : m.invoices_new_create()}
           </button>
         </div>

@@ -1,11 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLoaderData } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-inspection-types";
 import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
-import { Modal } from "@core/shared-ui";
+import { Modal, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 // F68 — with no `meta` this page's browser tab reads only "OpenInspection".
@@ -87,6 +87,9 @@ export default function SettingsInspectionTypes() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  // Two clicks inside one frame both run before `saving` renders.
+  const saveInFlight = useRef(false);
+  useEffect(() => { if (!saving) saveInFlight.current = false; }, [saving]);
   const nameRef = useRef<HTMLInputElement>(null);
 
   if (data.forbidden) return <AccessDenied />;
@@ -104,7 +107,8 @@ export default function SettingsInspectionTypes() {
   }
 
   async function save() {
-    if (!form.name.trim() || saving) return;
+    if (!form.name.trim() || saveInFlight.current) return;
+    saveInFlight.current = true;
     setSaving(true);
     const body = {
       name: form.name,
@@ -297,9 +301,8 @@ export default function SettingsInspectionTypes() {
               {m.common_cancel()}
             </button>
             <button
-              onClick={save}
-              disabled={saving}
-              className="px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+              {...pendingProps(saving, save)}
+              className={`px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}
             >
               {saving ? m.settings_common_saving() : m.common_save()}
             </button>

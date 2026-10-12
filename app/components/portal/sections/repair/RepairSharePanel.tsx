@@ -7,7 +7,7 @@
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import { usePdfExport, pdfActionLabel, pdfBusyHint } from "~/hooks/usePdfExport";
-import { Button } from "@core/shared-ui";
+import { Button, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 interface RepairSharePanelProps {
@@ -56,9 +56,8 @@ export function RepairSharePanel({
             </button>
             <button
               type="button"
-              onClick={() => pdf.exportPdf(`/api/public/repair-request/share/${shareToken}/pdf`, { mode: "view", filename: `repair-request-${shareToken}.pdf` })}
-              disabled={pdf.busy}
-              className="inline-flex items-center h-9 px-4 rounded-lg border border-ih-border text-[13px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              {...pendingProps(pdf.busy, () => pdf.exportPdf(`/api/public/repair-request/share/${shareToken}/pdf`, { mode: "view", filename: `repair-request-${shareToken}.pdf` }))}
+              className={`inline-flex items-center h-9 px-4 rounded-lg border border-ih-border text-[13px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}
             >
               {pdfActionLabel(pdf, m.repair_share_view_pdf())}
             </button>

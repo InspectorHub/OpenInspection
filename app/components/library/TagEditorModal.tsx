@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Modal, Button, Input, Select } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
@@ -75,6 +76,11 @@ export function TagEditorModal({
 }) {
   const isEdit = tag !== null;
   const nameLocked = isEdit && !!tag.isSeed;
+  // Synchronous latch: two submits in one frame both run before `busy` has rendered.
+  const inFlight = useRef(false);
+  useEffect(() => {
+    if (!busy) inFlight.current = false;
+  }, [busy]);
 
   return (
     <Modal
@@ -84,7 +90,12 @@ export function TagEditorModal({
       size="md"
     >
       <form
-        onSubmit={(e) => { e.preventDefault(); onSubmit(e.currentTarget); }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (inFlight.current) return;
+          inFlight.current = true;
+          onSubmit(e.currentTarget);
+        }}
         className="space-y-4"
       >
         {/* Keyed so switching rows re-mounts the fields with the new tag's
@@ -120,7 +131,7 @@ export function TagEditorModal({
           <Button type="button" variant="secondary" onClick={onClose}>
             {m.library_tags_cancel()}
           </Button>
-          <Button type="submit" variant="primary" disabled={busy}>
+          <Button type="submit" variant="primary" pending={busy}>
             {busy ? m.library_tags_saving() : m.library_tags_save()}
           </Button>
         </div>
