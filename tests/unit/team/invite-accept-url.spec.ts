@@ -21,6 +21,7 @@
  * two failures above, so the last one is the important one: whatever else is
  * true, the result has to be a URL that survives leaving the building.
  */
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import type { Context } from 'hono';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -38,6 +39,33 @@ function ctx(opts: { appBaseUrl?: string; host?: string; url?: string }): Contex
         },
     } as unknown as Context<HonoConfig>;
 }
+
+/**
+ * The generated URL has to land on a page. `app/routes.ts` declared `join/:token`
+ * while this helper emitted `/join?token=`, so every issued link missed the
+ * route table. Asserted against the table itself, not a copy of the string.
+ */
+describe('inviteAcceptUrl resolves to a registered route', () => {
+    const table = readFileSync(new URL('../../../app/routes.ts', import.meta.url), 'utf8');
+    const declared = [...table.matchAll(/\broute\(\s*"([^"]*)"/g)].map((m) => m[1] ?? '');
+    const matches = (pattern: string, pathname: string) =>
+        new RegExp(`^/${pattern.replace(/:[A-Za-z0-9_]+/g, '[^/]+')}/?$`).test(pathname);
+
+    it('the pathname of a generated link matches a declared route', () => {
+        expect(declared.length, 'parsed zero routes from app/routes.ts').toBeGreaterThan(50);
+        const url = new URL(inviteAcceptUrl(ctx({ appBaseUrl: 'https://x.test' }), TOKEN));
+        expect(declared.some((p) => matches(p, url.pathname)), `no route declared for ${url.pathname}`).toBe(true);
+    });
+
+    it('the route that serves it reads the token from the query string', () => {
+        const loader = readFileSync(new URL('../../../app/routes/join.tsx', import.meta.url), 'utf8');
+        expect(loader).toMatch(/searchParams\.get\(["']token["']\)/);
+    });
+
+    it('CONTROL - the matcher rejects a path no route declares', () => {
+        expect(declared.some((p) => matches(p, '/join/extra/segments'))).toBe(false);
+    });
+});
 
 describe('inviteAcceptUrl', () => {
     it('uses the deployment base URL when one is configured', () => {

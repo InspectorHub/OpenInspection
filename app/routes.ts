@@ -80,7 +80,10 @@ export default [
   ]),
   // Standalone pages (own chrome, no sidebar)
   route("setup", "routes/setup.tsx"),
-  route("join/:token", "routes/join.tsx"),
+  // The invite accept URL is `/join?token=` (`inviteAcceptUrl`). The path-segment
+  // form never resolved to a working page and is kept only so it can redirect.
+  route("join", "routes/join.tsx"),
+  route("join/:token", "routes/join.tsx", { id: "join-path-token" }),
   route("version-diff/:id", "routes/version-diff.tsx"),
   // Standalone public — no layout (iframe-friendly). Company-level embed only
   // (no inspector slug); the server auto-assigns the first available inspector.

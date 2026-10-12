@@ -226,7 +226,8 @@ export function CalendarConnectPanel({
           <GoogleSignInButton
             onClick={handleConnect}
             label={connecting ? m.settings_calconnect_connecting() : m.settings_calconnect_continue_google()}
-            disabled={!oauthConfigured || connecting}
+            disabled={!oauthConfigured}
+            pending={connecting}
           />
           {!oauthConfigured && (
             <p className="text-[11px] text-ih-fg-3">

@@ -9,6 +9,7 @@ import { safeReturnTo } from "../../../server/lib/mcp/safe-return-to";
 import { AgentTermsConsent, type AgentTermsInForce } from "~/components/agent/AgentTermsConsent";
 import { Banner, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
 /**
  * The screen a signed-in agent is stopped on when their account holds no
@@ -126,6 +127,7 @@ export default function AgentAcceptTermsPage() {
   const { terms, returnTo } = useLoaderData<typeof loader>();
   const lastResult = useActionData<typeof action>();
   const navigation = useNavigation();
+  const latch = useSubmitLatch();
   const submitting = navigation.state === "submitting";
 
   const [form, fields] = useForm({
@@ -156,7 +158,7 @@ export default function AgentAcceptTermsPage() {
           </p>
 
           {terms ? (
-            <Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate>
+            <Form method="post" id={form.id} onSubmit={latch(form.onSubmit)} noValidate>
               <input type="hidden" name="returnTo" value={returnTo} />
               <AgentTermsConsent
                 terms={terms}

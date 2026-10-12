@@ -10,6 +10,7 @@ import { AgentTermsConsent, AgentSignupClosedNotice, type AgentTermsInForce } fr
 import { AgentSignupPanel } from "~/components/agent/AgentSignupPanel";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
 export function meta() {
   return [{ title: m.auth_agent_signup_meta_title() }];
@@ -163,6 +164,7 @@ export default function AgentSignupPage() {
   const { email, returnTo, terms } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
+  const latch = useSubmitLatch();
   const submitting = navigation.state === "submitting";
   // No published agent terms = signup closed, server-side. The form must not be
   // usable: see AgentSignupClosedNotice for what this state actually is.
@@ -210,7 +212,7 @@ export default function AgentSignupPage() {
             </div>
           )}
 
-          <Form method="post" autoComplete="off" id={form.id} onSubmit={form.onSubmit} noValidate>
+          <Form method="post" autoComplete="off" id={form.id} onSubmit={latch(form.onSubmit)} noValidate>
             {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
             <div className="space-y-5">
               <div>

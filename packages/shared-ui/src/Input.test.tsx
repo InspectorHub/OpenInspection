@@ -3,9 +3,11 @@
  * <Input> — the two behaviours the auth pages depend on, and which are the
  * reason those pages could stop hand-rolling their own field markup.
  */
-import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, afterEach } from "vitest";
+import { render, cleanup, screen } from "@testing-library/react";
 import { Input } from "./Input";
+
+afterEach(cleanup);
 
 describe("Input", () => {
   it("reserves the error line so a blur-time message cannot shove the next control", () => {
@@ -43,5 +45,13 @@ describe("Input", () => {
     const row = getByText("Forgot password?").parentElement!;
     expect(row.className).toContain("justify-between");
     expect(row.contains(container.querySelector("label"))).toBe(true);
+  });
+
+  it("a reserved slot shows the hint until an error replaces it", () => {
+    const { rerender } = render(<Input label="Password" hint="At least 8 characters" reserveErrorSpace />);
+    expect(screen.getByText("At least 8 characters")).toBeTruthy();
+    rerender(<Input label="Password" hint="At least 8 characters" error="Too short" reserveErrorSpace />);
+    expect(screen.queryByText("At least 8 characters")).toBeNull();
+    expect(screen.getByText("Too short")).toBeTruthy();
   });
 });

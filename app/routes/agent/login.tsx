@@ -8,6 +8,7 @@ import { makeAgentLoginSchema, makeAgentLoginLinkSchema } from "~/lib/forms/auth
 import { AuthShell } from "~/components/AuthShell";
 import { Input, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
 export function meta() {
   return [{ title: m.auth_agent_login_meta_title() }];
@@ -89,6 +90,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function AgentLoginPage() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
+  const latch = useSubmitLatch();
   const submittingIntent = navigation.formData?.get("intent");
   const isSubmittingPassword = navigation.state === "submitting" && submittingIntent !== "link";
   const isSubmittingLink = navigation.state === "submitting" && submittingIntent === "link";
@@ -146,7 +148,7 @@ export default function AgentLoginPage() {
         </>
       }
     >
-      <Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate className="space-y-4">
+      <Form method="post" id={form.id} onSubmit={latch(form.onSubmit)} noValidate className="space-y-4">
         <input type="hidden" name="intent" value="password" />
         <Input
           id={fields.email.id}
@@ -156,6 +158,7 @@ export default function AgentLoginPage() {
           label={m.auth_login_email_label()}
           aria-invalid={fields.email.errors ? true : undefined}
           error={fields.email.errors?.[0]}
+          reserveErrorSpace
         />
         <Input
           id={fields.password.id}
@@ -164,6 +167,7 @@ export default function AgentLoginPage() {
           label={m.auth_login_password_label()}
           aria-invalid={fields.password.errors ? true : undefined}
           error={fields.password.errors?.[0]}
+          reserveErrorSpace
         />
 
         {form.errors && (
@@ -198,7 +202,7 @@ export default function AgentLoginPage() {
       <Form
         method="post"
         id={linkForm.id}
-        onSubmit={linkForm.onSubmit}
+        onSubmit={latch(linkForm.onSubmit)}
         noValidate
         className="space-y-2"
       >
@@ -211,6 +215,7 @@ export default function AgentLoginPage() {
           label={m.auth_agent_login_link_email_label()}
           aria-invalid={linkFields.linkEmail.errors ? true : undefined}
           error={linkFields.linkEmail.errors?.[0]}
+          reserveErrorSpace
         />
         <Button type="submit" variant="link" size="sm" pending={isSubmittingLink} className="px-0">
           {isSubmittingLink ? m.auth_agent_login_link_submit_pending() : m.auth_agent_login_link_cta()}

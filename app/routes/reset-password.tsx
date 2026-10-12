@@ -8,6 +8,7 @@ import { makeResetPasswordSchema, makePasswordHint } from "~/lib/forms/auth.sche
 import { AuthShell } from "~/components/AuthShell";
 import { Input, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 
@@ -57,6 +58,7 @@ export default function ResetPasswordPage() {
   const done = !!(actionData && "done" in actionData);
   const lastResult = actionData && "done" in actionData ? undefined : actionData;
   const navigation = useNavigation();
+  const latch = useSubmitLatch();
   const isSubmitting = navigation.state === "submitting";
 
   useEffect(() => {
@@ -110,7 +112,7 @@ export default function ResetPasswordPage() {
 
   return (
     <AuthShell heading={m.auth_reset_heading()}>
-      <Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate className="space-y-4">
+      <Form method="post" id={form.id} onSubmit={latch(form.onSubmit)} noValidate className="space-y-4">
         <input type="hidden" name="token" value={token} />
         <Input
           id={fields.newPassword.id}
@@ -121,6 +123,7 @@ export default function ResetPasswordPage() {
           aria-invalid={fields.newPassword.errors ? true : undefined}
           hint={makePasswordHint()}
           error={fields.newPassword.errors?.[0]}
+          reserveErrorSpace
         />
 
         {form.errors && (

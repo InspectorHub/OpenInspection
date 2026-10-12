@@ -42,9 +42,14 @@ export function Input({
         } ${className}`}
         {...props}
       />
+      {/* A reserved slot also carries the hint while there is no error, so a field that has both
+          keeps its hint and still does not move the controls below it when the error arrives. */}
       {(error || reserveErrorSpace) && (
-        <p className={`text-[11px] text-ih-bad-fg mt-1 ${reserveErrorSpace ? "min-h-4" : ""}`} aria-live="polite">
-          {error ?? ""}
+        <p
+          className={`text-[11px] mt-1 ${error || !hint ? "text-ih-bad-fg" : "text-ih-fg-3"} ${reserveErrorSpace ? "min-h-4" : ""}`}
+          aria-live="polite"
+        >
+          {error ?? hint ?? ""}
         </p>
       )}
       {/* fg-3, not fg-4: at 11px this is normal-size text and needs 4.5:1.

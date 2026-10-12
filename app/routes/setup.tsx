@@ -7,6 +7,7 @@ import { createApi } from "~/lib/api-client.server";
 import { makeSetupSchema } from "~/lib/forms/auth.schema";
 import { Input, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
 export function meta() {
   return [{ title: m.auth_setup_meta_title() }];
@@ -80,6 +81,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function SetupPage() {
   const lastResult = useActionData<typeof action>();
   const navigation = useNavigation();
+  const latch = useSubmitLatch();
   const isSubmitting = navigation.state === "submitting";
   useLoaderData<typeof loader>();
 
@@ -112,7 +114,7 @@ export default function SetupPage() {
         <Form
           method="post"
           id={form.id}
-          onSubmit={form.onSubmit}
+          onSubmit={latch(form.onSubmit)}
           noValidate
           className="space-y-4"
         >
@@ -125,6 +127,7 @@ export default function SetupPage() {
             label={m.auth_setup_company_label()}
             aria-invalid={fields.workspaceName.errors ? true : undefined}
             error={fields.workspaceName.errors?.[0]}
+            reserveErrorSpace
           />
           <Input
             id={fields.adminName.id}
@@ -136,6 +139,7 @@ export default function SetupPage() {
             aria-invalid={fields.adminName.errors ? true : undefined}
             hint={m.auth_setup_name_help()}
             error={fields.adminName.errors?.[0]}
+            reserveErrorSpace
           />
           <Input
             id={fields.email.id}
@@ -144,6 +148,7 @@ export default function SetupPage() {
             label={m.auth_setup_email_label()}
             aria-invalid={fields.email.errors ? true : undefined}
             error={fields.email.errors?.[0]}
+            reserveErrorSpace
           />
           <Input
             id={fields.password.id}
@@ -152,6 +157,7 @@ export default function SetupPage() {
             label={m.auth_login_password_label()}
             aria-invalid={fields.password.errors ? true : undefined}
             error={fields.password.errors?.[0]}
+            reserveErrorSpace
           />
           <Input
             id={fields.setupCode.id}
@@ -162,6 +168,7 @@ export default function SetupPage() {
             className="font-mono"
             aria-invalid={fields.setupCode.errors ? true : undefined}
             error={fields.setupCode.errors?.[0]}
+            reserveErrorSpace
             hint={
               <>
                 <span className="font-medium text-ih-fg-2">{m.auth_setup_code_help_required()}</span>{" "}

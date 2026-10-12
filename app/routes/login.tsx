@@ -10,6 +10,7 @@ import { TwoFactorChallengeForm } from "~/components/auth/TwoFactorChallengeForm
 import { Input, Button } from "@core/shared-ui";
 import { safeReturnTo } from "../../server/lib/mcp/safe-return-to";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 
@@ -163,6 +164,7 @@ export default function LoginPage() {
   const data = useLoaderData<typeof loader>();
   const returnTo = data && "returnTo" in data ? (data.returnTo ?? "") : "";
   const navigation = useNavigation();
+  const latch = useSubmitLatch();
   const isSubmitting = navigation.state === "submitting";
 
   // A live challenge replaces the password form rather than sitting beside it:
@@ -214,7 +216,7 @@ export default function LoginPage() {
         <Form
           method="post"
           id={form.id}
-          onSubmit={form.onSubmit}
+          onSubmit={latch(form.onSubmit)}
           noValidate
           className="space-y-4"
         >

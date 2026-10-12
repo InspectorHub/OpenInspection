@@ -7,6 +7,7 @@ import { makeJoinSchema, makePasswordHint } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
 import { Input, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
 export function meta() {
   return [{ title: m.auth_join_meta_title() }];
@@ -15,6 +16,13 @@ export function meta() {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token") || "";
+
+  const pathToken = /^\/join\/([^/]+)\/?$/.exec(url.pathname)?.[1];
+  if (pathToken) {
+    let decoded = pathToken;
+    try { decoded = decodeURIComponent(pathToken); } catch { /* keep the raw segment; invite-info will reject it */ }
+    return redirect(`/join?${new URLSearchParams({ token: token || decoded }).toString()}`);
+  }
 
   if (!token) {
     return { valid: false, error: m.auth_join_error_missing_token(), invite: null, token: "" };
@@ -87,6 +95,7 @@ export default function JoinPage() {
   const { valid, error: loaderError, invite, token } = useLoaderData<typeof loader>();
   const lastResult = useActionData<typeof action>();
   const navigation = useNavigation();
+  const latch = useSubmitLatch();
   const isSubmitting = navigation.state === "submitting";
 
   const [form, fields] = useForm({
@@ -118,7 +127,7 @@ export default function JoinPage() {
         ? m.auth_join_subtitle_invited_as({ email: invite.email })
         : m.auth_join_subtitle_invited()}
     >
-        <Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate className="space-y-4">
+        <Form method="post" id={form.id} onSubmit={latch(form.onSubmit)} noValidate className="space-y-4">
           <input type="hidden" name="token" value={token} />
           <Input
             id={fields.name.id}
@@ -128,6 +137,7 @@ export default function JoinPage() {
             label={m.auth_join_name_label()}
             aria-invalid={fields.name.errors ? true : undefined}
             error={fields.name.errors?.[0]}
+            reserveErrorSpace
           />
           <Input
             id={fields.password.id}
@@ -137,6 +147,7 @@ export default function JoinPage() {
             aria-invalid={fields.password.errors ? true : undefined}
             hint={makePasswordHint()}
             error={fields.password.errors?.[0]}
+            reserveErrorSpace
           />
 
           {form.errors && (
