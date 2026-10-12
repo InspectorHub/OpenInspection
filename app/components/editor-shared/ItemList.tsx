@@ -302,7 +302,7 @@ export function ItemList({
               {structuralEditing && !batchMode && (
                 <div className={`shrink-0 w-6 flex items-center justify-center ${REVEAL}`}>
                   <IconButton
-                    onClick={(e) => { e.stopPropagation(); menuAnchorRef.current = e.currentTarget; openItemMenu(item.id, e.currentTarget); }}
+                    onClick={(e) => { e.stopPropagation(); menuAnchorRef.current = e.currentTarget; openItemMenu(item.id); }}
                     size="sm"
                     className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2"
                     aria-label={m.editor_shared_edit_label({ label: item.label })}
@@ -311,8 +311,10 @@ export function ItemList({
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
                   </IconButton>
-                  <Popover open={menuItemId === item.id} onClose={closeItemMenu} anchorRef={menuAnchorRef} align="right" anchorToggles>
-                      <div role="menu" className="w-36 py-1 text-[12px]">
+                  <Popover open={menuItemId === item.id} onClose={closeItemMenu} anchorRef={menuAnchorRef} align="right" anchorToggles portal panelRole="presentation">
+                      {/* stopPropagation: React events bubble through the portal to the row's
+                          Alt+Arrow / F2 handler; keys typed in the menu are not the row's. */}
+                      <div role="menu" className="w-36 py-1 text-[12px]" onKeyDown={(e) => e.stopPropagation()}>
                         {onRenameItem && (
                           <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); setEditingId(item.id); }}>{m.editor_shared_menu_rename()}</MenuItem>
                         )}

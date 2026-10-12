@@ -32,6 +32,8 @@ test('item menu: Delete -> confirm -> Escape returns focus to the menu button', 
   const anchor = dots();
   fireEvent.click(anchor);
   expect(screen.getByRole('menu')).toBeTruthy();
+  // The menu panel is not an (unnamed) dialog; only the confirm will be one.
+  expect(screen.queryAllByRole('dialog').length).toBe(0);
   fireEvent.click(screen.getByText('Delete'));
   await settle();
   expect(screen.queryByRole('menu')).toBeNull();
@@ -154,4 +156,73 @@ test('section menu positive control: Duplicate calls back', async () => {
   await settle();
   expect(onDuplicateSection).toHaveBeenCalledWith('s1');
   expect(screen.queryByRole('menu')).toBeNull();
+});
+
+test('item menu: the panel is portaled to document.body, outside the row', async () => {
+  render(
+    <ItemList mode="author" items={items} sectionId="s1" activeItemId="i1" onSelect={vi.fn()}
+      onDeleteItem={vi.fn()} />
+  );
+  fireEvent.click(dots());
+  const menu = screen.getByRole('menu');
+  const row = document.querySelector('[data-sortable-id="i1"]') as HTMLElement;
+  expect(row.contains(menu)).toBe(false);
+  expect(menu.parentElement?.parentElement).toBe(document.body);
+});
+
+test('section menu: the panel is portaled to document.body, outside the row', async () => {
+  render(
+    <SectionRail mode="author" sections={sections} activeSection="s1" onSelect={() => {}}
+      onDeleteSection={vi.fn()} />
+  );
+  fireEvent.click(dots());
+  const menu = screen.getByRole('menu');
+  const row = document.querySelector('[data-sortable-id="s1"]') as HTMLElement;
+  expect(row.contains(menu)).toBe(false);
+  expect(menu.parentElement?.parentElement).toBe(document.body);
+});
+
+test('item menu: Alt+ArrowDown and F2 inside the menu do not reach the row handlers', async () => {
+  const onMoveItem = vi.fn();
+  const onRenameItem = vi.fn();
+  render(
+    <ItemList mode="author" items={items} sectionId="s1" activeItemId="i1" onSelect={vi.fn()}
+      onMoveItem={onMoveItem} onRenameItem={onRenameItem} onDeleteItem={vi.fn()} />
+  );
+  // Positive control: the same keys on the row itself still work.
+  const rowButton = screen.getByText('Roof Covering');
+  fireEvent.keyDown(rowButton, { key: 'ArrowDown', altKey: true });
+  expect(onMoveItem).toHaveBeenCalledWith('i1', 1);
+  onMoveItem.mockClear();
+  fireEvent.keyDown(rowButton, { key: 'F2' });
+  expect(screen.getByLabelText('Item name')).toBeTruthy();
+  fireEvent.keyDown(screen.getByLabelText('Item name'), { key: 'Escape' });
+  await settle();
+
+  fireEvent.click(dots());
+  const menu = screen.getByRole('menu');
+  fireEvent.keyDown(menu, { key: 'ArrowDown', altKey: true });
+  fireEvent.keyDown(menu, { key: 'F2' });
+  expect(onMoveItem).not.toHaveBeenCalled();
+  expect(screen.queryByLabelText('Item name')).toBeNull();
+});
+
+test('section menu: Alt+ArrowDown and F2 inside the menu do not reach the row handlers', async () => {
+  const onMoveSection = vi.fn();
+  const onRenameSection = vi.fn();
+  render(
+    <SectionRail mode="author" sections={sections} activeSection="s1" onSelect={() => {}}
+      onMoveSection={onMoveSection} onRenameSection={onRenameSection} onDeleteSection={vi.fn()} />
+  );
+  const rowButton = screen.getByText('Roof');
+  fireEvent.keyDown(rowButton, { key: 'ArrowDown', altKey: true });
+  expect(onMoveSection).toHaveBeenCalledWith('s1', 1);
+  onMoveSection.mockClear();
+
+  fireEvent.click(dots());
+  const menu = screen.getByRole('menu');
+  fireEvent.keyDown(menu, { key: 'ArrowDown', altKey: true });
+  fireEvent.keyDown(menu, { key: 'F2' });
+  expect(onMoveSection).not.toHaveBeenCalled();
+  expect(screen.queryByLabelText('Section name')).toBeNull();
 });

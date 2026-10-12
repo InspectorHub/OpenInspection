@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLayer } from "./layers";
 
 /**
@@ -23,6 +24,14 @@ interface PopoverProps {
    *  anchor's own click handler can toggle it (otherwise mousedown closes and
    *  the click reopens). Default false: existing callers are unchanged. */
   anchorToggles?: boolean;
+  /** Render the PANEL in document.body instead of beside the trigger. Needed when an
+   *  ancestor creates a containing block for `position: fixed` (a transformed drawer)
+   *  or hides the trigger's subtree (hover-reveal opacity). The panel is rendered only
+   *  after mount, so SSR output is empty. Default false: existing callers unchanged. */
+  portal?: boolean;
+  /** ARIA role of the outer panel. Default "dialog"; pass "presentation" when the
+   *  children carry their own role (e.g. role="menu") so no unnamed dialog is exposed. */
+  panelRole?: string;
 }
 
 const PANEL_GAP_PX = 8;
@@ -40,8 +49,24 @@ const PANEL_GAP_PX = 8;
  * (which Modal/Drawer get for free from their full-screen scrim, which this
  * component doesn't have).
  */
-export function Popover({ open, onClose, anchorRef, children, align = "right", anchorToggles = false }: PopoverProps) {
+export function Popover({
+  open,
+  onClose,
+  anchorRef,
+  children,
+  align = "right",
+  anchorToggles = false,
+  portal = false,
+  panelRole = "dialog",
+}: PopoverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // document does not exist on the server: a portaled panel is only created after mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  // Invariant: the effects below run only once the panel element can exist.
+  const ready = !portal || mounted;
   const anchorTogglesRef = useRef(anchorToggles);
   useEffect(() => {
     anchorTogglesRef.current = anchorToggles;
@@ -106,7 +131,7 @@ export function Popover({ open, onClose, anchorRef, children, align = "right", a
   }, [align, anchorRef]);
 
   useIsomorphicLayoutEffect(() => {
-    if (!open) return;
+    if (!open || !ready) return;
     reposition();
     // `capture: true` so a scroll inside any ancestor container counts, not
     // only a scroll of the document itself.
@@ -117,7 +142,7 @@ export function Popover({ open, onClose, anchorRef, children, align = "right", a
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", onScroll);
     };
-  }, [open, reposition]);
+  }, [open, ready, reposition]);
 
   useLayer(open, { onEscape: onClose });
 
@@ -125,7 +150,7 @@ export function Popover({ open, onClose, anchorRef, children, align = "right", a
   // the anchor on close. Intentionally keyed on [open] only (see onCloseRef
   // above) so the lifecycle runs on open-toggle only, not on every render.
   useEffect(() => {
-    if (!open) return;
+    if (!open || !ready) return;
 
     // mousedown (not click) so this fires before any click-through to the
     // newly-focused element outside the panel — the standard dropdown/menu
@@ -144,16 +169,16 @@ export function Popover({ open, onClose, anchorRef, children, align = "right", a
       document.removeEventListener("mousedown", handlePointerDown);
       anchorRef.current?.focus();
     };
-  }, [open]);
+  }, [open, ready]);
 
-  if (!open) return null;
+  if (!open || !ready) return null;
 
-  return (
+  const panel = (
     <div
       ref={panelRef}
       tabIndex={-1}
-      role="dialog"
-      aria-modal="false"
+      role={panelRole}
+      aria-modal={panelRole === "dialog" ? "false" : undefined}
       style={style}
       /* border-STRONG, not border: a popover is frequently anchored to a
          control that already sits on a card (the sidebar, a toolbar), and
@@ -166,4 +191,7 @@ export function Popover({ open, onClose, anchorRef, children, align = "right", a
       {children}
     </div>
   );
+
+  // Click-outside above checks panelRef, so a portaled panel still counts as inside.
+  return portal ? createPortal(panel, document.body) : panel;
 }

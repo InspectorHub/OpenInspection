@@ -241,8 +241,10 @@ export function SectionRail({
    >
    <DotsIcon />
    </IconButton>
-   <Popover open={menuOpen} onClose={closeSectionMenu} anchorRef={menuAnchorRef} align="right" anchorToggles>
-   <div className="w-36 py-0.5 text-[12px]" role="menu">
+   <Popover open={menuOpen} onClose={closeSectionMenu} anchorRef={menuAnchorRef} align="right" anchorToggles portal panelRole="presentation">
+   {/* stopPropagation: React events bubble through the portal to the row's
+       Alt+Arrow / F2 handler; keys typed in the menu are not the row's. */}
+   <div className="w-36 py-0.5 text-[12px]" role="menu" onKeyDown={(e) => e.stopPropagation()}>
     {onRenameSection && (
     <MenuItem
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); setEditingId(section.id); }}
