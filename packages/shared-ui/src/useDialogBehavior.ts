@@ -4,6 +4,18 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
+ * The dialogs that are open right now, in the order they opened. Only the topmost
+ * answers the keyboard: with two stacked (a confirmation over a form, the human
+ * check over the publish dialog) each one's document-level handler used to fire,
+ * so Escape closed both and the two Tab traps pulled focus back and forth.
+ */
+const openDialogs: object[] = [];
+
+/** Body scroll is locked while ANY dialog is open, whatever order they close in. */
+let scrollLocks = 0;
+let scrollBefore = "";
+
+/**
  * Shared dialog chrome behavior for Modal and Drawer:
  * Escape-to-close, Tab focus trap, body scroll lock, focus capture on
  * open and focus restore on close. Keep this the ONLY implementation —
@@ -36,8 +48,11 @@ export function useDialogBehavior(
   useEffect(() => {
     if (!open) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
+    const me = {};
+    openDialogs.push(me);
 
     const handler = (e: KeyboardEvent) => {
+      if (openDialogs[openDialogs.length - 1] !== me) return;
       if (e.key === "Escape") {
         onCloseRef.current();
         return;
@@ -78,6 +93,7 @@ export function useDialogBehavior(
 
     return () => {
       document.removeEventListener("keydown", handler);
+      openDialogs.splice(openDialogs.indexOf(me), 1);
       previouslyFocused?.focus?.();
     };
     // Intentionally keyed on [open] only: onClose is read through onCloseRef and
@@ -86,10 +102,12 @@ export function useDialogBehavior(
 
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (scrollLocks++ === 0) {
+      scrollBefore = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
     return () => {
-      document.body.style.overflow = prev;
+      if (--scrollLocks === 0) document.body.style.overflow = scrollBefore;
     };
   }, [open]);
 }
