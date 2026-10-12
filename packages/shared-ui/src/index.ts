@@ -1,4 +1,4 @@
-export { Button, buttonClasses } from "./Button";
+export { Button, buttonClasses, pendingProps, PENDING_CLASS } from "./Button";
 export { IconButton } from "./IconButton";
 export { Pill, type PillTone } from "./Pill";
 export { StatCard } from "./StatCard";
@@ -29,3 +29,5 @@ export { SegmentedControl, type SegmentedControlOption } from "./SegmentedContro
 export { Avatar, avatarInitials, type AvatarSize, type AvatarVariant, type AvatarStatus } from "./Avatar";
 export { MenuItem } from "./MenuItem";
 export { useLayer, hasOpenLayer, escapeWillBeHandled } from "./layers";
+export { useDialogBehavior } from "./useDialogBehavior";
+export { useActionLatch } from "./useActionLatch";

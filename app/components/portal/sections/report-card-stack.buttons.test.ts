@@ -139,7 +139,7 @@ describe('report-card-stack buttons (Task 9)', () => {
     // are asserted, the same way the image-robustness spec verifies
     // onPhotoFailed across the ReportView/ReportMediaTile boundary.
     expect(text).toContain('onDownload={downloadPdf}');
-    expect(text).toContain('onClick={onDownload}');
+    expect(text).toContain('pendingProps(pdf.busy, onDownload)');
   });
 
   it('no native alert/confirm/prompt in downloadPdf handler', async () => {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Form, type useFetcher } from "react-router";
-import { Checkbox, Input } from "@core/shared-ui";
+import { Checkbox, Input, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
@@ -138,8 +138,8 @@ export function AiFeaturesPanel({ geminiConfigured, aiEnabled, courtesyTranslati
         </fieldset>
 
         <div className="flex justify-end pt-2 border-t border-ih-border">
-          <button type="submit" disabled={saving}
-            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+          <button type="submit" {...pendingProps(saving)}
+            className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed ${PENDING_CLASS}`}>
             {saving ? m.common_saving() : m.common_save()}
           </button>
         </div>

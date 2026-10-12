@@ -307,7 +307,7 @@ export default function InvoicesPage() {
         footer={
           <>
             <Button variant="secondary" onClick={() => setPendingVoid(null)}>{m.common_cancel()}</Button>
-            <Button variant="danger" onClick={confirmVoid} disabled={busy} aria-busy={busy || undefined}>
+            <Button variant="danger" onClick={confirmVoid} pending={busy} aria-busy={busy || undefined}>
               {m.invoices_action_void()}
             </Button>
           </>

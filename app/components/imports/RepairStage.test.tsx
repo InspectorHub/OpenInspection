@@ -108,10 +108,12 @@ describe("RepairStage: saving one field", () => {
     it("has nothing to save until something changes", () => {
         const { onSave } = renderStage();
         const save = screen.getAllByRole<HTMLButtonElement>("button", { name: "Save" })[1];
-        expect(save.disabled).toBe(true);
+        expect(save.getAttribute("aria-disabled")).toBe("true");
+        fireEvent.click(save);
+        expect(onSave).not.toHaveBeenCalled();
         fireEvent.change(screen.getByLabelText("Contact 4 type"), { target: { value: "agent" } });
-        expect((screen.getAllByRole<HTMLButtonElement>("button", { name: "Save" })[1]).disabled)
-            .toBe(false);
+        expect((screen.getAllByRole<HTMLButtonElement>("button", { name: "Save" })[1]).getAttribute("aria-disabled"))
+            .toBeNull();
         fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
         expect(onSave).toHaveBeenCalledWith("r2", {
             name: "Bob",

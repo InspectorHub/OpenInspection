@@ -42,7 +42,7 @@ export function ClientSmsConsent({
                     <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_sms_explainer()}</p>
                     <fetcher.Form method="post">
                         <input type="hidden" name="intent" value="attest-sms" />
-                        <Button type="submit" variant="secondary" size="sm" disabled={attesting}>
+                        <Button type="submit" variant="secondary" size="sm" pending={attesting}>
                             {attesting ? m.inspections_hub_sms_recording() : m.inspections_hub_sms_confirm()}
                         </Button>
                     </fetcher.Form>

@@ -60,10 +60,12 @@ function NarrativeBlock({
         {label} {busy ? <span className="text-ih-fg-3">{m.editor_pca_saving()}</span> : null}
       </span>
       <textarea
-        className="w-full rounded border border-ih-border bg-ih-bg-card p-2 text-sm text-ih-fg-1 disabled:opacity-60"
+        className="w-full rounded border border-ih-border bg-ih-bg-card p-2 text-sm text-ih-fg-1 aria-disabled:opacity-60"
         rows={3}
         value={value}
-        disabled={busy}
+        // readOnly + aria-disabled, not native disabled: a focused textarea that became disabled drops focus to <body>.
+        readOnly={busy}
+        aria-disabled={busy || undefined}
         aria-busy={busy || undefined}
         onChange={(e) => setValue(e.target.value)}
         onBlur={(e) => commit(e.target.value)}

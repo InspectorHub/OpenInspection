@@ -7,6 +7,7 @@ import { makeForgotPasswordSchema } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
 import { Input, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 
@@ -53,6 +54,7 @@ export default function ForgotPasswordPage() {
   // result to thread back into the form.
   const lastResult = actionData && "sent" in actionData ? undefined : actionData;
   const navigation = useNavigation();
+  const latch = useSubmitLatch();
   const isSubmitting = navigation.state === "submitting";
 
   const [form, fields] = useForm({
@@ -99,7 +101,7 @@ export default function ForgotPasswordPage() {
         </a>
       }
     >
-      <Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate className="space-y-4">
+      <Form method="post" id={form.id} onSubmit={latch(form.onSubmit)} noValidate className="space-y-4">
         <Input
           id={fields.email.id}
           name={fields.email.name}
@@ -108,9 +110,10 @@ export default function ForgotPasswordPage() {
           label={m.auth_login_email_label()}
           aria-invalid={fields.email.errors ? true : undefined}
           error={fields.email.errors?.[0]}
+          reserveErrorSpace
         />
 
-        <Button type="submit" variant="primary" size="lg" disabled={isSubmitting} className="w-full">
+        <Button type="submit" variant="primary" size="lg" pending={isSubmitting} className="w-full">
           {isSubmitting ? m.auth_forgot_submit_pending() : m.auth_forgot_submit()}
         </Button>
       </Form>

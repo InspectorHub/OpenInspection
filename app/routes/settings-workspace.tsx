@@ -8,6 +8,7 @@ import type { Route } from "./+types/settings-workspace";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { LogoField } from "~/components/settings/LogoField";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
 import { SectionNav } from "~/components/settings/SectionNav";
 import { ProfilePicker } from "~/components/settings/ProfilePicker";
@@ -144,6 +145,7 @@ export default function SettingsWorkspacePage() {
   const [profile, setProfile] = useState(branding.defaultProfileId ?? "signature");
   const displayLocale = useDisplayLocale();
 
+  const latch = useSubmitLatch();
   const [form, fields] = useForm({
     lastResult: actionData && "status" in actionData ? actionData : undefined,
     onValidate({ formData }) {
@@ -224,7 +226,7 @@ export default function SettingsWorkspacePage() {
       <Form
         method="post"
         id={form.id}
-        onSubmit={form.onSubmit}
+        onSubmit={latch(form.onSubmit)}
         noValidate
         className="space-y-5"
       >

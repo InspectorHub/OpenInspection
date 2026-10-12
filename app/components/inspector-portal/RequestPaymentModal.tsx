@@ -1,6 +1,6 @@
 import type { useFetcher } from "react-router";
 import { useHumanGatedSubmit } from "~/components/OutboundVerification";
-import { Modal } from "@core/shared-ui";
+import { Modal, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
 import { m } from "~/paraglide/messages";
 
@@ -49,8 +49,9 @@ export function RequestPaymentModal({
           <button
             type="submit"
             form={FORM_ID}
-            disabled={submitting || !recipientEmail}
-            className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
+            disabled={!recipientEmail}
+            {...pendingProps(submitting)}
+            className={`px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60 ${PENDING_CLASS}`}
           >
             {submitting ? m.hub_payment_pending() : submitLabel}
           </button>

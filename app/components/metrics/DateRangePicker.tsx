@@ -108,7 +108,7 @@ export function DateRangePicker({ range, today, locale, onChange }: DateRangePic
             "Jul 29, 2025 – Jul 29, 2026", the only preset whose span crosses a
             year and so prints both. At w-64 that label wrapped to two lines and
             broke the list's rhythm. */}
-        <div className="w-[21rem] p-2" role="dialog" aria-label={m.metrics_range_aria()}>
+        <div className="w-[21rem] p-2" role="group" aria-label={m.metrics_range_aria()}>
           <ul className="space-y-0.5">
             {PRESET_IDS.map((id) => {
               const isActive = id === active;

@@ -6,6 +6,8 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { VariableChips } from "~/components/email-template/VariableChips";
 import { EmailPreview } from "~/components/email-template/EmailPreview";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
 interface BlockField { key: string; label: string; multiline: boolean; value: string; }
@@ -88,6 +90,7 @@ function TemplateEditor({ detail }: { detail: Detail }) {
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const saving = nav.state !== "idle" && nav.formData?.get("intent") === "save";
+  const latch = useSubmitLatch();
 
   const [subject, setSubject] = useState(detail.subject);
   const [blocks, setBlocks] = useState<Record<string, string>>(Object.fromEntries(detail.blocks.map((b) => [b.key, b.value])));
@@ -117,10 +120,10 @@ function TemplateEditor({ detail }: { detail: Detail }) {
         />
         <div className="flex items-center gap-2">
           {confirmReset ? (
-            <Form method="post" className="flex items-center gap-2">
+            <Form method="post" onSubmit={latch()} className="flex items-center gap-2">
               <input type="hidden" name="intent" value="reset" />
               <span className="text-[12px] text-ih-fg-3">{m.settings_comms_template_reset_confirm()}</span>
-              <button type="submit" className="h-8 px-3 rounded-md bg-ih-bad-bg text-ih-bad-fg border border-ih-bad text-[12px] font-bold">{m.settings_comms_template_reset_button()}</button>
+              <button type="submit" {...pendingProps(nav.state !== "idle")} className={`h-8 px-3 rounded-md bg-ih-bad-bg text-ih-bad-fg border border-ih-bad text-[12px] font-bold ${PENDING_CLASS}`}>{m.settings_comms_template_reset_button()}</button>
               <button type="button" onClick={() => setConfirmReset(false)} className="h-8 px-3 rounded-md border border-ih-border text-[12px] text-ih-fg-2">{m.common_cancel()}</button>
             </Form>
           ) : (
@@ -136,7 +139,7 @@ function TemplateEditor({ detail }: { detail: Detail }) {
         <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">{actionData.error}</div>
       )}
 
-      <Form method="post" className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+      <Form method="post" onSubmit={latch()} className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
         <input type="hidden" name="intent" value="save" />
 
         <div className="space-y-5 bg-ih-bg-card border border-ih-border rounded-lg p-5">
@@ -180,7 +183,7 @@ function TemplateEditor({ detail }: { detail: Detail }) {
           </div>
 
           <div className="flex justify-end pt-2">
-            <button type="submit" disabled={saving} className="h-9 px-5 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
+            <button type="submit" {...pendingProps(nav.state !== "idle")} className={`h-9 px-5 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 ${PENDING_CLASS}`}>
               {saving ? m.common_saving() : m.settings_comms_template_save_changes()}
             </button>
           </div>

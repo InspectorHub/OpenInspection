@@ -134,10 +134,15 @@ export function PropertyTypeControl({
         label={m.editor_property_type_label()}
         hint={m.editor_property_type_hint()}
         value={current}
-        disabled={busy}
+        // aria-disabled, not native: a focused select that became disabled would drop focus to <body>.
+        // The change is ignored while the save is in flight (the controlled value snaps back).
+        aria-disabled={busy || undefined}
         options={options}
-        onChange={(e) => onPick(e.target.value)}
-        className="max-w-sm"
+        onChange={(e) => {
+          if (busy) return;
+          onPick(e.target.value);
+        }}
+        className="max-w-sm aria-disabled:opacity-50"
         data-testid="property-type-select"
       />
 
@@ -153,7 +158,7 @@ export function PropertyTypeControl({
             </Button>
             <Button
               variant="danger"
-              disabled={busy}
+              pending={busy}
               data-testid="property-type-confirm"
               onClick={() => pending !== null && save(pending)}
             >

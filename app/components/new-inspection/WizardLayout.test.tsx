@@ -47,7 +47,9 @@ describe("WizardLayout — submit-in-flight", () => {
     it("disables the submit button and spins it while a submit is in flight", () => {
         const { container } = renderLayout({ busy: true });
         const btn = createButton(container);
-        expect(btn.hasAttribute("disabled")).toBe(true);
+        // aria-disabled, not native: focus stays on Next while it spins.
+        expect(btn.getAttribute("aria-disabled")).toBe("true");
+        expect(btn.hasAttribute("disabled")).toBe(false);
         expect(btn.getAttribute("aria-busy")).toBe("true");
         expect(container.querySelector('[data-testid="wizard-next-spinner"]')).toBeTruthy();
     });

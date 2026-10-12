@@ -18,6 +18,7 @@
  * channel a drop-in instead of a rewrite.
  */
 import { useState } from "react";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { reasonText, type NoticeGroup, type NoticeChannel, type DeliveryRow } from "~/lib/communication-view";
@@ -158,10 +159,9 @@ export function OutboxList({
                         {onResend && r.source === "manual" && r.status === "failed" && r.roleKey && (r.channel === "email" || r.channel === "sms") && (
                           <button
                             type="button"
-                            onClick={() => onResend(r)}
-                            disabled={resending}
+                            {...pendingProps(resending, () => onResend(r))}
                             aria-busy={resending || undefined}
-                            className="mt-1 ml-1.5 inline-flex h-7 items-center px-2.5 rounded-lg border border-ih-border bg-ih-bg-card text-[11px] font-semibold text-ih-fg-2 hover:text-ih-fg-1 disabled:opacity-50 transition-colors"
+                            className={`mt-1 ml-1.5 inline-flex h-7 items-center px-2.5 rounded-lg border border-ih-border bg-ih-bg-card text-[11px] font-semibold text-ih-fg-2 hover:text-ih-fg-1 transition-colors ${PENDING_CLASS}`}
                           >
                             {m.comm_action_resend()}
                           </button>

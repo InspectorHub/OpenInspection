@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Icon, Button } from '@core/shared-ui';
+import { Icon, Button, useLayer } from '@core/shared-ui';
 import { usePointerGesture } from '../../hooks/usePointerGesture';
 import { MobileBottomDrawer } from '../MobileBottomDrawer';
 import { SpeedModeUndoToast } from './SpeedModeUndoToast';
@@ -104,6 +104,11 @@ export function SpeedMode({
     setPendingUndo(null);
   }, [item?.id]);
 
+  // Joins the shared layer stack for Escape and scroll lock, so a dialog opened from here
+  // (add-media chooser, camera, dock) sits above and Escape closes only the top layer.
+  // No Tab trap on purpose: Tab / Shift+Tab are Speed Mode's next/prev shortcuts (useKeyboard).
+  useLayer(!!item, { onEscape: onExit, lockScroll: true });
+
   if (!item) return null;
 
   const levels = ratingLevels && ratingLevels.length > 0 ? ratingLevels : SPEED_FALLBACK_LEVELS;
@@ -187,7 +192,7 @@ export function SpeedMode({
           className="absolute inset-0 z-10 bg-ih-backdrop flex items-center justify-center cursor-pointer"
           onPointerDown={dismissCoach}
           data-testid="speedmode-coach"
-          role="dialog"
+          role="status"
           aria-label={m.editor_speedmode_coach_aria()}
         >
           <div className="mx-6 max-w-sm rounded-xl border border-ih-border bg-ih-bg-card px-6 py-5 text-ih-fg-2 shadow-ih-popover">

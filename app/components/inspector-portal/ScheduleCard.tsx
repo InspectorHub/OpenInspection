@@ -91,7 +91,7 @@ export function ScheduleCard({
                     : m.inspections_hub_schedule_inspector_none()}
             </p>
             {error && <p className="text-[12px] text-ih-bad-fg mb-2">{error}</p>}
-            <Button variant="secondary" size="sm" onClick={() => setOpen(true)} disabled={saving}>
+            <Button variant="secondary" size="sm" onClick={() => setOpen(true)} pending={saving}>
                 {m.inspections_hub_schedule_edit()}
             </Button>
 
@@ -139,7 +139,7 @@ export function ScheduleCard({
                         <Button variant="secondary" size="sm" type="button" onClick={() => setOpen(false)}>
                             {m.common_cancel()}
                         </Button>
-                        <Button variant="primary" size="sm" type="submit" disabled={saving}>
+                        <Button variant="primary" size="sm" type="submit" pending={saving}>
                             {m.common_save()}
                         </Button>
                     </div>

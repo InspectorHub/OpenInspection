@@ -12,10 +12,14 @@ function Harness({
   open,
   onClose,
   align,
+  portal,
+  panelRole,
 }: {
   open: boolean;
   onClose: () => void;
   align?: "left" | "right";
+  portal?: boolean;
+  panelRole?: string;
 }) {
   const anchorRef = useRef<HTMLButtonElement>(null);
   return (
@@ -23,7 +27,7 @@ function Harness({
       <button ref={anchorRef} type="button">
         trigger
       </button>
-      <Popover open={open} onClose={onClose} anchorRef={anchorRef} align={align}>
+      <Popover open={open} onClose={onClose} anchorRef={anchorRef} align={align} portal={portal} panelRole={panelRole}>
         <button type="button">inside</button>
       </Popover>
     </div>
@@ -107,6 +111,133 @@ describe("Popover", () => {
  * test — it is the only view of the panel before any effect has run. In the
  * browser both the old and new code end up `fixed`; only the first frame differs.
  */
+describe("Popover portal + panelRole", () => {
+  it("renders the panel as a child of document.body, not beside the trigger", () => {
+    const { container } = render(<Harness open portal onClose={() => {}} />);
+    const panel = screen.getByRole("dialog");
+    expect(container.contains(panel)).toBe(false);
+    expect(panel.parentElement).toBe(document.body);
+  });
+
+  it("treats the portaled panel as inside for click-outside, and closes on outside mousedown", () => {
+    const onClose = vi.fn();
+    render(<Harness open portal onClose={onClose} />);
+    fireEvent.mouseDown(screen.getByText("inside"));
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.mouseDown(document.body);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes on Escape, moves focus in on open and back to the anchor on close", () => {
+    const onClose = vi.fn();
+    const { rerender } = render(<Harness open portal onClose={onClose} />);
+    expect(screen.getByRole("dialog").contains(document.activeElement)).toBe(true);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    rerender(<Harness open={false} portal onClose={onClose} />);
+    expect(document.activeElement?.textContent).toBe("trigger");
+    expect(screen.queryByText("inside")).toBeNull();
+  });
+
+  it("renders nothing on the server when portal is set", () => {
+    const html = renderToStaticMarkup(<Harness open portal onClose={() => {}} />);
+    expect(html).not.toContain("inside");
+  });
+
+  it("panelRole replaces the dialog role and drops aria-modal", () => {
+    render(<Harness open panelRole="presentation" onClose={() => {}} />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const panel = screen.getByText("inside").parentElement as HTMLElement;
+    expect(panel.getAttribute("role")).toBe("presentation");
+    expect(panel.hasAttribute("aria-modal")).toBe(false);
+  });
+});
+
+/** A trigger inside a wrapper that creates a containing block for `position: fixed`. */
+function TransformedHarness({ portal }: { portal?: boolean }) {
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  return (
+    <div data-testid="wrapper" style={{ translate: "0 0" }}>
+      <button ref={anchorRef} type="button">
+        trigger
+      </button>
+      <Popover open onClose={() => {}} anchorRef={anchorRef} portal={portal}>
+        <button type="button">inside</button>
+      </Popover>
+    </div>
+  );
+}
+
+describe("Popover inside a transformed ancestor", () => {
+  it("with portal, the panel escapes the wrapper and lives under document.body", () => {
+    render(<TransformedHarness portal />);
+    const panel = screen.getByRole("dialog");
+    expect(panel.parentElement).toBe(document.body);
+    expect(screen.getByTestId("wrapper").contains(panel)).toBe(false);
+  });
+
+  it("without portal (positive control), the panel stays inside the transformed wrapper", () => {
+    render(<TransformedHarness />);
+    const panel = screen.getByRole("dialog");
+    expect(screen.getByTestId("wrapper").contains(panel)).toBe(true);
+    expect(panel.parentElement).not.toBe(document.body);
+  });
+});
+
+/**
+ * A `visibility: hidden` element silently refuses focus() in real browsers, but
+ * happy-dom does not model that, so the invariant is asserted at the call: when
+ * the panel's focus() runs, its inline style must already be revealed. Under the
+ * old effect order the first open called focus() while still hidden.
+ */
+describe("Popover focus timing", () => {
+  function spyPanelFocus() {
+    const original = HTMLElement.prototype.focus;
+    const seen: Array<string | undefined> = [];
+    const spy = vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function (this: HTMLElement, ...args) {
+      if (this.getAttribute("tabindex") === "-1") seen.push(this.style.visibility);
+      return original.apply(this, args);
+    });
+    return { seen, spy };
+  }
+  afterEach(() => vi.restoreAllMocks());
+
+  for (const portal of [false, true]) {
+    it(`focuses the panel only once it is visible, on first open and re-open (portal=${portal})`, () => {
+      const { seen } = spyPanelFocus();
+      const { rerender } = render(<Harness open portal={portal} onClose={() => {}} />);
+      expect(seen).toEqual([""]);
+      const panel = screen.getByRole("dialog");
+      expect(panel.style.visibility).not.toBe("hidden");
+      expect(panel.contains(document.activeElement)).toBe(true);
+
+      rerender(<Harness open={false} portal={portal} onClose={() => {}} />);
+      expect(document.activeElement?.textContent).toBe("trigger");
+      rerender(<Harness open portal={portal} onClose={() => {}} />);
+      expect(seen).toEqual(["", ""]);
+      expect(screen.getByRole("dialog").contains(document.activeElement)).toBe(true);
+    });
+  }
+
+  it("does not re-take focus on reposition and does not steal focus moved elsewhere", () => {
+    const { seen } = spyPanelFocus();
+    const other = document.createElement("input");
+    document.body.appendChild(other);
+    other.focus();
+    render(<Harness open onClose={() => {}} />);
+    expect(seen).toEqual([]);
+    expect(document.activeElement).toBe(other);
+    other.remove();
+
+    cleanup();
+    seen.length = 0;
+    render(<Harness open onClose={() => {}} />);
+    expect(seen).toHaveLength(1);
+    fireEvent(window, new Event("resize"));
+    expect(seen).toHaveLength(1);
+  });
+});
+
 describe("Popover first-paint positioning", () => {
   it("is out of flow in its very first render, before any effect runs", () => {
     const html = renderToStaticMarkup(<Harness open={true} onClose={() => {}} />);

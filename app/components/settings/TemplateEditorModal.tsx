@@ -162,7 +162,8 @@ export function TemplateEditorModal({
             <Button
               type="submit"
               variant="primary"
-              disabled={isSaving || !name.trim() || !body.trim()}
+              pending={isSaving}
+              disabled={!name.trim() || !body.trim()}
             >
               {template ? m.common_save() : m.settings_msgtpl_create()}
             </Button>
@@ -363,7 +364,8 @@ export function TemplateEditorModal({
               <Button
                 type="submit"
                 variant="secondary"
-                disabled={isTesting || !testTo.trim() || !body.trim()}
+                disabled={!testTo.trim() || !body.trim()}
+                pending={isTesting}
               >
                 {isTesting ? m.settings_sending() : m.settings_send()}
               </Button>

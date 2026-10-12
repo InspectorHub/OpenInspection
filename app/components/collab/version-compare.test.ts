@@ -80,17 +80,16 @@ describe('VersionCompare (shell)', () => {
   it('renders the field diff (from → to) and recovers the OLD value', () => {
     const onRecoverField = vi.fn();
     const onRestoreWhole = vi.fn();
-    mount(
-      createElement(VersionCompare, {
-        open: true,
-        onClose: vi.fn(),
-        fromLabel: 'Version #3',
-        toLabel: 'Current',
-        diffs,
-        onRecoverField,
-        onRestoreWhole,
-      }),
-    );
+    const props = {
+      open: true,
+      onClose: vi.fn(),
+      fromLabel: 'Version #3',
+      toLabel: 'Current',
+      diffs,
+      onRecoverField,
+      onRestoreWhole,
+    };
+    mount(createElement(VersionCompare, props));
 
     // Both the old and the new scalar values are shown.
     expect(bodyText()).toContain('NI');
@@ -100,6 +99,11 @@ describe('VersionCompare (shell)', () => {
     // "Recover this value" passes the OLD value ('NI').
     click(buttonByText(/recover this value/i));
     expect(onRecoverField).toHaveBeenCalledWith('_default:s1:i1', 'rating', 'NI');
+
+    // The parent holds `busy` while a recovery runs and drops it when that finishes; only then is
+    // the next action accepted.
+    act(() => root!.render(createElement(VersionCompare, { ...props, busy: true })));
+    act(() => root!.render(createElement(VersionCompare, { ...props, busy: false })));
 
     // "Restore entire version" calls the whole-version restore.
     click(buttonByText(/restore entire version/i));

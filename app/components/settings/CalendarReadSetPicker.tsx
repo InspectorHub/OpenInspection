@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import type { action } from "~/routes/settings-schedule";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
@@ -138,9 +139,8 @@ export function CalendarReadSetPicker({ picker }: { picker: CalendarPickerData }
             <button
               type="button"
               data-testid="calpicker-save"
-              onClick={save}
-              disabled={saving}
-              className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
+              {...pendingProps(saving, save)}
+              className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}
             >
               {saving ? m.settings_calpicker_saving() : m.settings_calpicker_save()}
             </button>

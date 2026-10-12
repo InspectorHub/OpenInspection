@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useFetcher } from "react-router";
-import { Icon } from "@core/shared-ui";
+import { Icon, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 interface TemplateSummary {
@@ -222,9 +222,8 @@ export function TemplateCombobox({
                         <div className="p-2 border-t border-ih-border">
                             <button
                                 type="button"
-                                onClick={handleLoadMore}
-                                disabled={isLoadingMore}
-                                className="w-full h-7 rounded text-[12px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted disabled:opacity-50 transition-colors"
+                                {...pendingProps(isLoadingMore, handleLoadMore)}
+                                className={`w-full h-7 rounded text-[12px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}
                             >
                                 {isLoadingMore ? m.common_loading() : m.template_combobox_load_more()}
                             </button>

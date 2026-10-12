@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Card, Input, RadioCardGroup } from "@core/shared-ui";
 
 import {
@@ -53,6 +53,11 @@ export function TemplateMappingForm({
     onApply: (mapping: TemplateMapping) => void;
 }) {
     const [draft, setDraft] = useState<TemplateMapping>(mapping);
+    // Synchronous latch: two clicks in one frame both run before `busy` has rendered.
+    const inFlight = useRef(false);
+    useEffect(() => {
+        if (!busy) inFlight.current = false;
+    }, [busy]);
 
     // Asked only of a vocabulary that rates ITEMS, and only when there is one.
     const asks = inspection.ratingsDescribe === "items" && inspection.ratings.length > 0;
@@ -131,8 +136,13 @@ export function TemplateMappingForm({
             <div className="flex flex-wrap items-center gap-3">
                 <Button
                     variant="primary"
-                    disabled={busy || name === ""}
-                    onClick={() => { if (name !== "") onApply({ ...draft, name }); }}
+                    disabled={name === ""}
+                    pending={busy}
+                    onClick={() => {
+                        if (name === "" || inFlight.current) return;
+                        inFlight.current = true;
+                        onApply({ ...draft, name });
+                    }}
                 >
                     {m.imports_mapping_template_save()}
                 </Button>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLoaderData, useFetcher } from "react-router";
-import { Icon } from "@core/shared-ui";
+import { Icon, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import type { Route } from "./+types/settings-contractor-types";
@@ -77,8 +77,8 @@ function ContractorTypeRow({ t, idx, count, reordering, onMove, onRequestDelete 
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex flex-col">
-        <button onClick={() => onMove(idx, -1)} disabled={idx === 0 || reordering} aria-busy={reordering || undefined} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={m.settings_contractor_types_move_up_aria({ name: t.name })}><Icon name="chevU" size={14} /></button>
-        <button onClick={() => onMove(idx, 1)} disabled={idx === count - 1 || reordering} aria-busy={reordering || undefined} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={m.settings_contractor_types_move_down_aria({ name: t.name })}><Icon name="chevD" size={14} /></button>
+        <button disabled={idx === 0} {...pendingProps(reordering, () => onMove(idx, -1))} aria-busy={reordering || undefined} className={`text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none ${PENDING_CLASS}`} aria-label={m.settings_contractor_types_move_up_aria({ name: t.name })}><Icon name="chevU" size={14} /></button>
+        <button disabled={idx === count - 1} {...pendingProps(reordering, () => onMove(idx, 1))} aria-busy={reordering || undefined} className={`text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none ${PENDING_CLASS}`} aria-label={m.settings_contractor_types_move_down_aria({ name: t.name })}><Icon name="chevD" size={14} /></button>
       </div>
       {editing ? (
         <fetcher.Form method="POST" className="flex-1 flex gap-2" onSubmit={() => setEditing(false)}>
@@ -152,10 +152,10 @@ export default function SettingsContractorTypes() {
       <p className="text-[13px] text-ih-fg-3">{m.settings_contractor_types_intro()}</p>
 
       <div className="bg-ih-bg-card border border-ih-border rounded-lg p-4">
-        <createFetcher.Form method="POST" className="flex gap-2" onSubmit={() => setNewName("")}>
+        <createFetcher.Form method="POST" className="flex gap-2" onSubmit={(e) => { if (!newName.trim()) { e.preventDefault(); return; } setNewName(""); }}>
           <input type="hidden" name="intent" value="create" />
           <input name="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={m.settings_contractor_types_name_placeholder()} className={`flex-1 ${INPUT}`} />
-          <button type="submit" disabled={!newName.trim()} className="px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold disabled:opacity-50">{m.common_add()}</button>
+          <button type="submit" {...pendingProps(!newName.trim())} className={`px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold ${PENDING_CLASS}`}>{m.common_add()}</button>
         </createFetcher.Form>
       </div>
 

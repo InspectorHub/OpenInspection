@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Form, Link } from "react-router";
-import { SegmentedControl } from "@core/shared-ui";
+import { SegmentedControl, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { SecretField } from "~/components/SecretField";
 import { m } from "~/paraglide/messages";
 
@@ -68,8 +68,8 @@ export function GoogleCalendarPanel({
             <input type="hidden" name="googleOAuthMode" value={oauthMode} />
             <button
               type="submit"
-              disabled={savingOAuthMode || oauthMode === googleOAuthMode}
-              className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-50"
+              disabled={oauthMode === googleOAuthMode} {...pendingProps(savingOAuthMode)}
+              className={`h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-50 ${PENDING_CLASS}`}
             >
               {savingOAuthMode ? m.common_saving() : m.settings_gcal_save_oauth_mode()}
             </button>
@@ -123,8 +123,8 @@ export function GoogleCalendarPanel({
             <div className="flex justify-end">
               <button
                 type="submit"
-                disabled={savingCalendarSecrets}
-                className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
+                {...pendingProps(savingCalendarSecrets)}
+                className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 ${PENDING_CLASS}`}
               >
                 {savingCalendarSecrets ? m.common_saving() : m.settings_gcal_save_credentials()}
               </button>

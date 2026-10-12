@@ -130,7 +130,7 @@ export function Sidebar() {
         <button
           onClick={toggleCollapsed}
           aria-label={collapsed ? m.nav_action_expand_sidebar() : m.nav_action_collapse_sidebar()}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-10 flex items-center justify-center rounded-r-[6px] bg-ih-bg-card border border-l-0 border-ih-border text-ih-fg-4 opacity-0 hover:opacity-100 focus:opacity-100 group-hover:opacity-100 transition-opacity z-10 hover:text-ih-primary-text focus:outline-none focus:text-ih-primary-text"
+          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-10 flex items-center justify-center rounded-r-[6px] bg-ih-bg-card border border-l-0 border-ih-border text-ih-fg-4 opacity-0 hover:opacity-100 focus:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity z-10 hover:text-ih-primary-text focus:outline-none focus:text-ih-primary-text"
           title={collapsed ? m.nav_action_expand() : m.nav_action_collapse()}
         >
           {collapsed ? (

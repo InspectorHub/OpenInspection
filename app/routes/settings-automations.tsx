@@ -9,6 +9,8 @@ import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { AutomationEditorModal } from "~/components/settings/AutomationEditorModal";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -193,6 +195,7 @@ export default function SettingsAutomations() {
   const displayTz = useDisplayTimeZone();
   const locale = useDisplayLocale();
   const nav = useNavigation();
+  const latch = useSubmitLatch();
   const [editing, setEditing] = useState<Rule | null | "new">(null);
 
   if ("forbidden" in data) return <AccessDenied />;
@@ -210,15 +213,15 @@ export default function SettingsAutomations() {
         </button>
       </div>
 
-      <Form method="post" className="bg-ih-bg-card border border-ih-border rounded-lg p-4 space-y-2">
+      <Form method="post" onSubmit={latch()} className="bg-ih-bg-card border border-ih-border rounded-lg p-4 space-y-2">
         <input type="hidden" name="intent" value="save-review-url" />
         <label htmlFor="reviewUrl" className="block text-[12px] font-semibold text-ih-fg-2">{m.settings_automations_review_label()}</label>
         <p className="text-[11px] text-ih-fg-3">{m.settings_automations_review_hint()}</p>
         <div className="flex gap-2">
           <input id="reviewUrl" name="reviewUrl" type="url" defaultValue={reviewUrl} placeholder={m.settings_automations_review_placeholder()}
             className="flex-1 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1" />
-          <button type="submit" disabled={nav.state !== "idle"}
-            className="h-9 px-4 rounded-md bg-ih-bg-muted text-ih-fg-1 font-semibold text-[13px] border border-ih-border">{m.common_save()}</button>
+          <button type="submit" {...pendingProps(nav.state !== "idle")}
+            className={`h-9 px-4 rounded-md bg-ih-bg-muted text-ih-fg-1 font-semibold text-[13px] border border-ih-border ${PENDING_CLASS}`}>{m.common_save()}</button>
         </div>
       </Form>
 
@@ -238,12 +241,13 @@ export default function SettingsAutomations() {
                   <p className="text-[11px] text-ih-fg-3 mt-0.5">{TRIGGER_LABELS[rule.trigger] || rule.trigger} &rarr; {recipientLabel(rule, roleProfiles)}</p>
                 </div>
                 <button onClick={() => setEditing(rule)} className="text-[12px] text-ih-primary-text font-semibold">{m.common_edit()}</button>
-                <Form method="post" className="shrink-0">
+                <Form method="post" onSubmit={latch()} className="shrink-0">
                   <input type="hidden" name="intent" value="toggle" />
                   <input type="hidden" name="id" value={rule.id} />
                   <input type="hidden" name="active" value={String(rule.active)} />
                   <button type="submit" aria-label={rule.active ? m.settings_automations_disable_aria() : m.settings_automations_enable_aria()}
-                    className={`w-10 h-6 rounded-full relative transition-colors ${rule.active ? "bg-ih-primary" : "bg-ih-border-strong"}`}>
+                    {...pendingProps(nav.state !== "idle")}
+                    className={`w-10 h-6 rounded-full relative transition-colors ${PENDING_CLASS} ${rule.active ? "bg-ih-primary" : "bg-ih-border-strong"}`}>
                     <span className={`absolute w-4 h-4 bg-ih-bg-card rounded-full top-1 transition-all ${rule.active ? "right-1" : "left-1"}`} />
                   </button>
                 </Form>

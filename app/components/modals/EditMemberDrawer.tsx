@@ -18,9 +18,9 @@
  * colleague's access, and folding it in here would make it a two-click
  * accident.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
-import { Drawer } from "@core/shared-ui";
+import { Drawer, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { getCapabilities, type CapabilitySet } from "../../../server/lib/auth/capabilities";
 import { CAP_LABELS, CAP_GROUPS, computeOverrideDiff } from "./InviteSeatDrawer";
 import { m } from "~/paraglide/messages";
@@ -50,6 +50,11 @@ export function EditMemberDrawer({ open, onClose, member }: EditMemberDrawerProp
 
   const fetcher = useFetcher<{ ok: boolean; intent?: string | null; error: string | null }>();
   const submitting = fetcher.state !== "idle";
+  // Synchronous latch: two submits in one frame both run before `submitting` has rendered.
+  const inFlight = useRef(false);
+  useEffect(() => {
+    if (!submitting) inFlight.current = false;
+  }, [submitting]);
 
   // Seed from the member every time the drawer opens. Keyed on `open` and the
   // member id — NOT on the member object, which the parent recreates on every
@@ -82,7 +87,8 @@ export function EditMemberDrawer({ open, onClose, member }: EditMemberDrawerProp
 
   function submit(e?: React.FormEvent) {
     e?.preventDefault();
-    if (submitting || !member) return;
+    if (submitting || inFlight.current || !member) return;
+    inFlight.current = true;
     setError("");
     const diff = computeOverrideDiff(role, caps);
     const fd = new FormData();
@@ -109,7 +115,7 @@ export function EditMemberDrawer({ open, onClose, member }: EditMemberDrawerProp
             <button type="button" onClick={onClose} className="px-4 h-10 rounded-xl border border-ih-border text-sm font-semibold text-ih-fg-3 hover:bg-ih-bg-muted">
               {m.common_cancel()}
             </button>
-            <button type="submit" form={FORM_ID} disabled={submitting} className="px-4 h-10 rounded-xl bg-ih-primary text-ih-fg-inverse text-sm font-semibold hover:bg-ih-primary-600 disabled:opacity-50">
+            <button type="submit" form={FORM_ID} {...pendingProps(submitting)} className={`px-4 h-10 rounded-xl bg-ih-primary text-ih-fg-inverse text-sm font-semibold hover:bg-ih-primary-600 ${PENDING_CLASS}`}>
               {m.common_save()}
             </button>
           </>

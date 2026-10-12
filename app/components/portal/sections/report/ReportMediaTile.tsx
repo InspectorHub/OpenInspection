@@ -116,7 +116,7 @@ export function ReportMediaTile({ photo, alt, idx, printMode, onOpenLightbox, on
         title={m.pca_media_download_title({ name })}
         onClick={(e) => e.stopPropagation()}
         /* ds-allow: customer report render surface, not app chrome — fixed-dark download chip over media */
-        className="absolute top-1 right-1 rounded bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
+        className="absolute top-1 right-1 rounded bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
       >
         ↓
       </a>

@@ -39,6 +39,17 @@ export const SCRIPT_GATES = [
     // -digit milliseconds, the cheapest entry in this list.
     { key: 'chromerecord', label: 'Chrome-record judge self-test', script: 'check-chrome-record.mjs', fix: 'npm run lint:chrome-record', rung: PRECOMMIT, args: ['--self-test'] },
     { key: 'filesize', label: 'Large-file ratchet', script: 'check-file-size.mjs', fix: 'npm run lint:filesize', rung: PRECOMMIT },
+    // PRECOMMIT: a hand-drawn `fixed inset-0` dialog is typed in one sitting, and the
+    // author is present to reach for Modal / Drawer instead. The scan is a git ls-files
+    // plus a tokenising pass over ~840 files; cost is well under a second. Files that
+    // predate it are grandfathered in overlay-primitives-baseline.json (counts only shrink).
+    { key: 'overlays', label: 'Shared overlay primitives', script: 'check-overlay-primitives.mjs', fix: 'npm run lint:overlays', rung: PRECOMMIT },
+    // PRECOMMIT: both gates catch a thing typed in one sitting -- a submit button with no busy
+    // protection or a native disable that drops focus, and a control that is invisible until
+    // hovered or parked off-screen but still focusable. One git ls-files and a tokenising pass
+    // over ~570 .tsx files, well under a second. Neither carries a baseline (both are {}).
+    { key: 'busycontrols', label: 'Busy-control focus and double-submit', script: 'check-busy-controls.mjs', fix: 'npm run lint:busy-controls', rung: PRECOMMIT },
+    { key: 'hiddenfocusable', label: 'Hidden-but-focusable controls', script: 'check-hidden-focusable.mjs', fix: 'npm run lint:hidden-focusable', rung: PRECOMMIT },
     // PRECOMMIT, not PUSH. What this catches IS a keystroke: someone adds a key
     // to TemplateItem and does not add it to the five silent mirrors -- the ones
     // that strip it, never serialize it, or simply do not read it, all without

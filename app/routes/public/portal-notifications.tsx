@@ -198,7 +198,7 @@ export default function PortalNotificationsPage() {
             label={m.portal_landing_email_label()}
             placeholder={m.portal_landing_email_placeholder()}
           />
-          <Button type="submit" variant="primary" size="lg" disabled={submitting} className="w-full">
+          <Button type="submit" variant="primary" size="lg" pending={submitting} className="w-full">
             {/* Not "sign-in link": the heading above promised notification
                 settings, and a button naming a different destination is the
                 one line on this page a reader would have to reconcile. */}

@@ -15,7 +15,7 @@ import {
 import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "../../server/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { PageHeader, Card, Pill, Button, Modal, buttonClasses } from "@core/shared-ui";
+import { PageHeader, Card, Pill, Button, Modal, buttonClasses, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import DocumentsSection, {
   type DocumentItem,
   type DocumentCategory,
@@ -1070,8 +1070,8 @@ export default function InspectionHubPage() {
                     <input type="hidden" name="intent" value="unpublish" />
                     <button
                       type="submit"
-                      disabled={unpublishingReport}
-                      className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-60"
+                      {...pendingProps(unpublishingReport)}
+                      className={`px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-60 ${PENDING_CLASS}`}
                     >
                       {unpublishingReport ? m.inspections_hub_report_unpublishing() : m.inspections_hub_report_unpublish()}
                     </button>
@@ -1114,8 +1114,8 @@ export default function InspectionHubPage() {
                     <input type="hidden" name="intent" value="submit" />
                     <button
                       type="submit"
-                      disabled={submittingReport}
-                      className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
+                      {...pendingProps(submittingReport)}
+                      className={`px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60 ${PENDING_CLASS}`}
                     >
                       {submittingReport ? m.inspections_hub_report_submitting() : m.inspections_hub_report_submit()}
                     </button>
@@ -1126,8 +1126,8 @@ export default function InspectionHubPage() {
                     <input type="hidden" name="intent" value="return" />
                     <button
                       type="submit"
-                      disabled={returningReport}
-                      className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-60"
+                      {...pendingProps(returningReport)}
+                      className={`px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-60 ${PENDING_CLASS}`}
                     >
                       {returningReport ? m.inspections_hub_report_returning() : m.inspections_hub_report_return()}
                     </button>

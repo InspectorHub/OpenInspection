@@ -39,7 +39,7 @@ export function RestoreInspectionAction({
     className?: string;
 }) {
     // #106 - user mutation: restores a soft-deleted inspection. The button is
-    // already `disabled={busy}`.
+    // already `pending={busy}`.
     const { fetcher, submit: submitRestore, busy } = useGuardedSubmit<typeof restoreAction>();
     const [confirming, setConfirming] = useState(false);
 
@@ -60,7 +60,7 @@ export function RestoreInspectionAction({
                 variant={variant}
                 size="sm"
                 className={className ?? ""}
-                disabled={busy}
+                pending={busy}
                 onClick={() => setConfirming(true)}
             >
                 {busy ? m.inspections_hub_restore_working() : m.inspections_hub_restore_action()}

@@ -207,8 +207,9 @@ function RepairCell({
                 variant="secondary"
                 // Nothing to save while the box still holds what the entry
                 // holds. A live button there posts a write that changes nothing
-                // and reports success.
-                disabled={busy || draft === currentText(row)}
+                // and reports success. Pending, not native: pressing Save makes
+                // the draft equal the entry, and a native disable would drop focus.
+                pending={busy || draft === currentText(row)}
                 onClick={() => onSend(draft)}
             >
                 {m.imports_repair_save()}
@@ -217,7 +218,7 @@ function RepairCell({
                 <Button
                     size="sm"
                     variant="secondary"
-                    disabled={busy}
+                    pending={busy}
                     onClick={() => onSend(row.suggestion as string)}
                 >
                     {m.imports_repair_use_suggestion({ suggestion: row.suggestion })}

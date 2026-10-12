@@ -1,6 +1,6 @@
 import type { FindingDiff } from "~/lib/collab/snapshot-diff";
 import { m } from "~/paraglide/messages";
-import { useLayer } from "@core/shared-ui";
+import { PENDING_CLASS, pendingProps, useActionLatch, useLayer } from "@core/shared-ui";
 
 /**
  * #181 PR-H (Task H2) — version compare + field recovery modal.
@@ -63,6 +63,11 @@ export function VersionCompare({
     // Escape closes (unless busy) — mirrors the editor's other custom modals.
     useLayer(open, { onEscape: () => { if (!busy) onClose(); } });
 
+    // Two clicks inside one frame both run before `busy` renders. Recovering a field is synchronous
+    // and never raises `busy`, so the latch also reopens one macrotask later.
+    const latch = useActionLatch(busy);
+    const once = (run: () => void) => () => latch(run);
+
     if (!open) return null;
 
     const labelFor = (key: string) => itemLabelFor?.(key) ?? key;
@@ -109,9 +114,8 @@ export function VersionCompare({
                     </div>
                     <button
                         type="button"
-                        onClick={onClose}
-                        disabled={busy}
-                        className="px-3 py-1.5 rounded-md text-xs font-bold border border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted disabled:opacity-50 transition-colors"
+                        {...pendingProps(busy, onClose)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold border border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}
                     >
                         {m.common_close()}
                     </button>
@@ -177,15 +181,18 @@ export function VersionCompare({
                                             <div className="flex md:justify-end md:pt-5">
                                                 <button
                                                     type="button"
-                                                    onClick={() =>
-                                                        onRecoverField?.(
-                                                            diff.findingKey,
-                                                            change.field,
-                                                            change.from,
-                                                        )
-                                                    }
-                                                    disabled={busy || !onRecoverField}
-                                                    className="h-8 px-3 rounded-md text-[12px] font-bold bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600 disabled:opacity-50 transition-colors whitespace-nowrap"
+                                                    {...pendingProps(
+                                                        busy,
+                                                        once(() =>
+                                                            onRecoverField?.(
+                                                                diff.findingKey,
+                                                                change.field,
+                                                                change.from,
+                                                            ),
+                                                        ),
+                                                    )}
+                                                    disabled={!onRecoverField}
+                                                    className={`h-8 px-3 rounded-md text-[12px] font-bold bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600 disabled:opacity-50 transition-colors whitespace-nowrap ${PENDING_CLASS}`}
                                                     title={m.editor_collab_recover_title()}
                                                 >
                                                     {m.editor_collab_recover_value()}
@@ -221,18 +228,16 @@ export function VersionCompare({
                     </p>
                     <button
                         type="button"
-                        onClick={onClose}
-                        disabled={busy}
-                        className="h-10 px-4 rounded-md text-[12px] font-bold border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-50 transition-colors"
+                        {...pendingProps(busy, onClose)}
+                        className={`h-10 px-4 rounded-md text-[12px] font-bold border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}
                     >
                         {m.common_done()}
                     </button>
                     {onRestoreWhole && (
                         <button
                             type="button"
-                            onClick={onRestoreWhole}
-                            disabled={busy}
-                            className="h-10 px-4 rounded-md text-[12px] font-bold border border-ih-bad text-ih-bad-fg hover:bg-ih-bad-bg disabled:opacity-50 transition-colors"
+                            {...pendingProps(busy, once(onRestoreWhole))}
+                            className={`h-10 px-4 rounded-md text-[12px] font-bold border border-ih-bad text-ih-bad-fg hover:bg-ih-bad-bg transition-colors ${PENDING_CLASS}`}
                         >
                             {busy ? m.editor_collab_working() : m.editor_collab_restore_entire_version()}
                         </button>

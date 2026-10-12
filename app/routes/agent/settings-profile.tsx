@@ -215,7 +215,7 @@ export default function AgentSettingsProfilePage() {
               error={slugError ?? undefined}
             />
           </div>
-          <Button variant="primary" onClick={saveSlug} disabled={slugSaving}>
+          <Button variant="primary" onClick={saveSlug} pending={slugSaving}>
             {m.agent_portal_settings_slug_save()}
           </Button>
         </div>
@@ -320,8 +320,9 @@ export default function AgentSettingsProfilePage() {
         <Select
           label={m.agent_portal_settings_timezone_label()}
           value={tz}
-          onChange={(e) => saveTimezone(e.target.value)}
-          disabled={tzSaving}
+          onChange={(e) => { if (tzSaving) return; saveTimezone(e.target.value); }}
+          aria-disabled={tzSaving || undefined}
+          className="aria-disabled:opacity-50"
           options={[
             { value: "", label: m.agent_portal_settings_timezone_company_option() },
             ...TIMEZONE_SELECT_OPTIONS,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { useFetcher } from "react-router";
 import { Modal, Button, Checkbox } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
@@ -40,6 +40,11 @@ export function SendSmsModal({
     .map((p) => ({ contactId: p.contactId, roleKey: p.roleKey }));
 
   const submitting = fetcher.state !== "idle";
+  // Two clicks in one frame both run before `submitting` renders.
+  const inFlight = useRef(false);
+  useEffect(() => {
+    if (!submitting) inFlight.current = false;
+  }, [submitting]);
   const error =
     fetcher.data?.intent === "send-sms" && "ok" in fetcher.data && !fetcher.data.ok
       ? fetcher.data.error
@@ -77,7 +82,7 @@ export function SendSmsModal({
       size="md"
       footer={
         <div className="flex items-center justify-end gap-2">
-          <Button variant="secondary" size="sm" type="button" onClick={onClose} disabled={submitting}>
+          <Button variant="secondary" size="sm" type="button" onClick={onClose} pending={submitting}>
             {m.common_cancel()}
           </Button>
           <Button
@@ -85,14 +90,26 @@ export function SendSmsModal({
             size="sm"
             type="submit"
             form={FORM_ID}
-            disabled={submitting || recipients.length === 0}
+            disabled={recipients.length === 0}
+            pending={submitting}
           >
             {submitting ? m.inspections_hub_send_sms_sending() : m.inspections_hub_send_sms_submit()}
           </Button>
         </div>
       }
     >
-      <fetcher.Form method="post" id={FORM_ID} className="space-y-4">
+      <fetcher.Form
+        method="post"
+        id={FORM_ID}
+        className="space-y-4"
+        onSubmit={(e) => {
+          if (inFlight.current) {
+            e.preventDefault();
+            return;
+          }
+          inFlight.current = true;
+        }}
+      >
         <input type="hidden" name="intent" value="send-sms" />
         <input type="hidden" name="recipients" value={JSON.stringify(recipients)} />
         <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_send_sms_hint()}</p>

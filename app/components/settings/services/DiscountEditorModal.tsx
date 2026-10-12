@@ -54,7 +54,7 @@ export function DiscountEditorModal({
   return (
     <Modal open onClose={onClose} title={m.settings_discount_edit_title()} size="md">
       <form
-        onSubmit={(e) => { e.preventDefault(); onSubmit(e.currentTarget); }}
+        onSubmit={(e) => { e.preventDefault(); if (!busy) onSubmit(e.currentTarget); }}
         className="space-y-4"
       >
         <input type="hidden" name="id" value={discount.id} />
@@ -118,7 +118,7 @@ export function DiscountEditorModal({
           <Button type="button" variant="secondary" onClick={onClose}>
             {m.settings_discount_cancel()}
           </Button>
-          <Button type="submit" variant="primary" disabled={busy}>
+          <Button type="submit" variant="primary" pending={busy}>
             {busy ? m.settings_discount_saving() : m.settings_discount_save()}
           </Button>
         </div>

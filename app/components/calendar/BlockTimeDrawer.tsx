@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Drawer, Modal } from "@core/shared-ui";
+import { Drawer, Modal, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { blockFormSeed, type CalendarEvent } from "./calendar-helpers";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
@@ -46,7 +46,7 @@ export function BlockTimeDrawer({
 }: BlockTimeDrawerProps) {
   // #106 - creating, updating or deleting a time block changes what the
   // public booking page will offer. Both controls are already
-  // `disabled={submitting}`.
+  // `pending`.
   const { fetcher, submit, busy: submitting } = useGuardedSubmit<BlockActionData>();
   const titleRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
@@ -116,9 +116,8 @@ export function BlockTimeDrawer({
             {block && (
               <button
                 type="button"
-                onClick={() => setConfirmDelete(true)}
-                disabled={submitting}
-                className="mr-auto h-9 px-3 rounded-md border border-ih-bad text-[13px] font-bold text-ih-bad-fg hover:bg-ih-bad-bg disabled:opacity-50"
+                {...pendingProps(submitting, () => setConfirmDelete(true))}
+                className={`mr-auto h-9 px-3 rounded-md border border-ih-bad text-[13px] font-bold text-ih-bad-fg hover:bg-ih-bad-bg ${PENDING_CLASS}`}
               >
                 {m.common_delete()}
               </button>
@@ -133,8 +132,8 @@ export function BlockTimeDrawer({
             <button
               type="submit"
               form="block-time-form"
-              disabled={submitting}
-              className="h-9 px-4 rounded-md bg-ih-primary text-[13px] font-bold text-ih-fg-inverse hover:bg-ih-primary-600 disabled:opacity-50"
+              {...pendingProps(submitting, undefined)}
+              className={`h-9 px-4 rounded-md bg-ih-primary text-[13px] font-bold text-ih-fg-inverse hover:bg-ih-primary-600 ${PENDING_CLASS}`}
             >
               {submitting ? m.calendar_block_saving() : block ? m.calendar_block_save_changes() : m.calendar_block_time()}
             </button>
@@ -244,9 +243,8 @@ export function BlockTimeDrawer({
             </button>
             <button
               type="button"
-              onClick={deleteBlock}
-              disabled={submitting}
-              className="h-9 px-3 rounded-md bg-ih-bad text-[13px] font-bold text-white disabled:opacity-50"
+              {...pendingProps(submitting, deleteBlock)}
+              className={`h-9 px-3 rounded-md bg-ih-bad text-[13px] font-bold text-white ${PENDING_CLASS}`}
             >
               {m.common_delete()}
             </button>

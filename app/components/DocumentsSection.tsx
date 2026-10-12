@@ -13,6 +13,7 @@
  * lint:ds — literal colors are forbidden; only `ih-*` design tokens are used.
  */
 import { useRef, useState } from "react";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { formatDate } from "~/lib/format";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
@@ -192,9 +193,9 @@ export default function DocumentsSection({
               <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">{m.documents_category_label()}</span>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as DocumentCategory)}
-                disabled={uploading}
-                className="rounded-md border border-ih-border bg-ih-bg-card px-2 py-1.5 text-[13px] text-ih-fg-1 disabled:opacity-50"
+                onChange={(e) => { if (!uploading) setCategory(e.target.value as DocumentCategory); }}
+                aria-disabled={uploading || undefined}
+                className="rounded-md border border-ih-border bg-ih-bg-card px-2 py-1.5 text-[13px] text-ih-fg-1 aria-disabled:opacity-50"
               >
                 {DOCUMENT_CATEGORIES.map((c) => (
                   <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
@@ -207,9 +208,9 @@ export default function DocumentsSection({
                 <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">{m.documents_visibility_label()}</span>
                 <select
                   value={visibility}
-                  onChange={(e) => setVisibility(e.target.value as DocumentVisibility)}
-                  disabled={uploading}
-                  className="rounded-md border border-ih-border bg-ih-bg-card px-2 py-1.5 text-[13px] text-ih-fg-1 disabled:opacity-50"
+                  onChange={(e) => { if (!uploading) setVisibility(e.target.value as DocumentVisibility); }}
+                  aria-disabled={uploading || undefined}
+                  className="rounded-md border border-ih-border bg-ih-bg-card px-2 py-1.5 text-[13px] text-ih-fg-1 aria-disabled:opacity-50"
                 >
                   <option value="client_visible">{m.documents_visibility_client()}</option>
                   <option value="internal">{m.documents_visibility_internal()}</option>
@@ -223,9 +224,10 @@ export default function DocumentsSection({
                 type="text"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                disabled={uploading}
+                readOnly={uploading}
+                aria-disabled={uploading || undefined}
                 placeholder={m.documents_label_placeholder()}
-                className="rounded-md border border-ih-border bg-ih-bg-card px-2 py-1.5 text-[13px] text-ih-fg-1 placeholder:text-ih-fg-3 disabled:opacity-50"
+                className="rounded-md border border-ih-border bg-ih-bg-card px-2 py-1.5 text-[13px] text-ih-fg-1 placeholder:text-ih-fg-3 aria-disabled:opacity-50"
               />
             </label>
           </div>
@@ -245,17 +247,18 @@ export default function DocumentsSection({
             {uploading ? (
               <span className="text-[13px] font-semibold text-ih-fg-2">{m.documents_uploading()}</span>
             ) : (
-              <>
-                <span className="text-[13px] text-ih-fg-2">{m.documents_drag()}</span>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="rounded-md bg-ih-primary px-3 py-1.5 text-[13px] font-bold text-ih-fg-inverse transition-opacity hover:opacity-90"
-                >
-                  {m.documents_choose_file()}
-                </button>
-                <span className="text-[11px] text-ih-fg-3">{ACCEPT_ATTR.replace(/\./g, "").replace(/,/g, ", ")}</span>
-              </>
+              <span className="text-[13px] text-ih-fg-2">{m.documents_drag()}</span>
+            )}
+            {/* Stays mounted (aria-disabled) while uploading so a focused button keeps focus. */}
+            <button
+              type="button"
+              {...pendingProps(uploading, () => fileInputRef.current?.click())}
+              className={`rounded-md bg-ih-primary px-3 py-1.5 text-[13px] font-bold text-ih-fg-inverse transition-opacity hover:opacity-90 ${PENDING_CLASS}`}
+            >
+              {m.documents_choose_file()}
+            </button>
+            {!uploading && (
+              <span className="text-[11px] text-ih-fg-3">{ACCEPT_ATTR.replace(/\./g, "").replace(/,/g, ", ")}</span>
             )}
             <input
               ref={fileInputRef}

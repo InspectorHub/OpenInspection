@@ -7,6 +7,8 @@ import type { Route } from "./+types/settings-security";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { useFlash } from "~/hooks/useFlash";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { makeChangePasswordSchema, makeDeleteAccountSchema } from "~/lib/forms/settings.schema";
 import { ChangePasswordPanel } from "~/components/settings/security/ChangePasswordPanel";
 import { TwoFactorPanel } from "~/components/settings/security/TwoFactorPanel";
@@ -153,6 +155,7 @@ export default function SettingsSecurityPage() {
   const { user, secrets } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
+  const latch = useSubmitLatch();
   const [showPassword, setShowPassword] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -325,7 +328,7 @@ export default function SettingsSecurityPage() {
           <Form
             method="post"
             id={deleteForm.id}
-            onSubmit={deleteForm.onSubmit}
+            onSubmit={latch(deleteForm.onSubmit)}
             noValidate
             className="space-y-3 max-w-sm"
           >
@@ -357,8 +360,8 @@ export default function SettingsSecurityPage() {
                 className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
                 {m.common_cancel()}
               </button>
-              <button type="submit"
-                className="h-9 px-4 rounded-md bg-ih-bad text-white font-bold text-[13px] hover:bg-ih-bad/85 active:scale-[.98] transition-all">
+              <button type="submit" {...pendingProps(nav.state !== "idle")}
+                className={`h-9 px-4 rounded-md bg-ih-bad text-white font-bold text-[13px] hover:bg-ih-bad/85 active:scale-[.98] transition-all ${PENDING_CLASS}`}>
                 {m.settings_security_delete_confirm_button()}
               </button>
             </div>

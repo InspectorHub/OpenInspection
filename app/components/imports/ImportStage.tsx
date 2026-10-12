@@ -111,7 +111,7 @@ export function ImportStage({
                     {blockedReason && <Banner tone="warn">{blockedReason}</Banner>}
                     <Button
                         variant="primary"
-                        disabled={busy || blockedReason !== null}
+                        disabled={blockedReason !== null} pending={busy}
                         onClick={() => onApply(policy)}
                     >
                         {m.imports_apply()}
@@ -128,7 +128,7 @@ export function ImportStage({
                         {undoUntil ? m.imports_undo_until({ date: undoUntil }) : m.imports_undo_expired()}
                     </p>
                     {undoUntil && (
-                        <Button variant="secondary" disabled={busy} onClick={onRevert}>
+                        <Button variant="secondary" pending={busy} onClick={onRevert}>
                             {m.imports_revert()}
                         </Button>
                     )}

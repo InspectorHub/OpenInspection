@@ -6,6 +6,7 @@ import { formatCurrency } from "~/lib/format";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 import { buildStripeElementsOptions } from "~/lib/stripe-elements-options";
 import { m } from "~/paraglide/messages";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 /* ------------------------------------------------------------------ */
 /*  Step 2 — Pay card (reuses the invoice page's Stripe pay flow)       */
@@ -151,9 +152,8 @@ function PayPanel({
                 <>
                     <button
                         type="button"
-                        onClick={startPayment}
-                        disabled={phase === "loading"}
-                        className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait"
+                        {...pendingProps(phase === "loading", startPayment)}
+                        className={`w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait ${PENDING_CLASS}`}
                     >
                         {phase === "loading" ? m.checkout_pay_starting() : m.checkout_pay_button({ amount: formatCurrency(amountCents, { locale, currency }) })}
                     </button>
@@ -221,8 +221,8 @@ function CheckoutPayForm({ amountCents, returnUrl, currency: invoiceCurrency }: 
             <PaymentElement />
             <button
                 type="submit"
-                disabled={!stripe || submitting}
-                className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait"
+                disabled={!stripe} {...pendingProps(submitting)}
+                className={`w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait ${PENDING_CLASS}`}
             >
                 {submitting ? m.checkout_pay_processing() : m.checkout_pay_button({ amount: formatCurrency(amountCents, { locale, currency }) })}
             </button>

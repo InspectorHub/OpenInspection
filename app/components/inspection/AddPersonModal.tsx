@@ -161,7 +161,7 @@ export function AddPersonModal({
           <Button variant="secondary" onClick={onClose}>
             {m.common_cancel()}
           </Button>
-          <Button variant="primary" disabled={!canSubmit || submitting} onClick={handleSubmit}>
+          <Button variant="primary" disabled={!canSubmit} pending={submitting} onClick={handleSubmit}>
             {submitting ? m.inspections_hub_people_adding() : m.inspections_hub_people_submit()}
           </Button>
         </>

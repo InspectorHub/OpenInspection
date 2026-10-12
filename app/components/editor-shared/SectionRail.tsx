@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Button, IconButton, MenuItem } from '@core/shared-ui';
+import { useRef, useState, type KeyboardEvent } from 'react';
+import { Button, IconButton, MenuItem, Popover } from '@core/shared-ui';
 import { SectionDonut } from '../editor/SectionDonut';
 import { sectionIconFor } from '../editor/section-icons';
 import type { EditorMode } from './editor-mode';
@@ -12,7 +11,16 @@ import { m } from '~/paraglide/messages';
 // Handle + ⋮ live in reserved flex slots so they never occlude the section name
 // or progress donut. On desktop the glyph shows on hover; on touch (no hover) it
 // is always shown. Space is reserved either way, so nothing shifts or overlaps.
-const REVEAL = 'invisible group-hover:visible focus-within:visible [@media(hover:none)]:visible';
+// Opacity, not visibility: a visibility:hidden ⋮ cannot take focus, so closing the confirm
+// dialog it opened (no hover, focus not in the row) could not hand focus back to it.
+const REVEAL = 'opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 has-[[aria-expanded=true]]:opacity-100';
+
+// Keys typed in the portaled menu are not the row's, so the row's Alt+Arrow / F2 handler
+// must not see them. Escape and Tab stay: stopping them also stops the native event before
+// the window-level layer handler (Escape) and the dialog trap (Tab).
+function stopMenuKeys(e: KeyboardEvent) {
+  if (e.key !== 'Escape' && e.key !== 'Tab') e.stopPropagation();
+}
 
 interface SharedSectionRailProps {
  mode: EditorMode;
@@ -100,16 +108,16 @@ export function SectionRail({
 }: SharedSectionRailProps) {
  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
  const [editingId, setEditingId] = useState<string | null>(null);
- // The ⋯ menu is portaled to a viewport anchor so the section rail's
- // overflow-y-auto never clips the last section's menu.
- const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
+ // The ⋯ menu is a shared Popover (position: fixed, so the rail's overflow-y-auto
+ // never clips it). The open row's ⋯ button is kept so Popover focuses it on close:
+ // a confirm dialog opened by a menu action then records a mounted anchor, not <body>.
+ const menuAnchorRef = useRef<HTMLElement | null>(null);
  const openSectionMenu = (sectionId: string, el: HTMLElement) => {
-  if (openMenuId === sectionId) { setOpenMenuId(null); setMenuAnchor(null); return; }
-  const r = el.getBoundingClientRect();
+  if (openMenuId === sectionId) { setOpenMenuId(null); return; }
+  menuAnchorRef.current = el;
   setOpenMenuId(sectionId);
-  setMenuAnchor({ x: r.right, y: r.bottom });
  };
- const closeSectionMenu = () => { setOpenMenuId(null); setMenuAnchor(null); };
+ const closeSectionMenu = () => { setOpenMenuId(null); };
  const hasStructuralOps = Boolean(onAddSection || onDuplicateSection || onDeleteSection || onMoveSection || onRenameSection);
  // Drag-to-reorder via SortableJS (desktop: grab the handle; touch: 500ms
  // long-press). Disabled mid-rename so the input isn't torn out from under you.
@@ -240,14 +248,10 @@ export function SectionRail({
    >
    <DotsIcon />
    </IconButton>
-   {menuOpen && menuAnchor && createPortal(
-   <>
-   <div className="fixed inset-0 z-[60]" onClick={closeSectionMenu} />
-   <div
-    style={{ top: menuAnchor.y + 4, left: menuAnchor.x }}
-    className="fixed -translate-x-full z-[61] w-36 rounded-md shadow-ih-popover bg-ih-bg-card border border-ih-border py-0.5 text-[12px]"
-    role="menu"
-   >
+   <Popover open={menuOpen} onClose={closeSectionMenu} anchorRef={menuAnchorRef} align="right" anchorToggles portal panelRole="presentation">
+   {/* stopPropagation: React events bubble through the portal to the row's
+       Alt+Arrow / F2 handler; keys typed in the menu are not the row's. */}
+   <div className="w-36 py-0.5 text-[12px]" role="menu" onKeyDown={stopMenuKeys}>
     {onRenameSection && (
     <MenuItem
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); setEditingId(section.id); }}
@@ -288,9 +292,7 @@ export function SectionRail({
     </>
     )}
    </div>
-   </>,
-   document.body,
-   )}
+   </Popover>
   </div>
   )}
  </div>

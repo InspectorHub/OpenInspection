@@ -5,6 +5,7 @@ import { formatInspectionDateTime } from "~/lib/format-date";
 import { ErrorState } from "~/components/ErrorState";
 import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
 import { LazyViewerTimeZoneNotice } from "~/components/public/LazyViewerTimeZoneNotice";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { getLocale } from "~/paraglide/runtime";
 
@@ -149,8 +150,8 @@ function ConciergeConfirmBody() {
         <Form method="post">
           <button
             type="submit"
-            disabled={submitting}
-            className="w-full h-11 rounded-lg bg-ih-primary text-ih-fg-inverse text-sm font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
+            {...pendingProps(submitting)}
+            className={`w-full h-11 rounded-lg bg-ih-primary text-ih-fg-inverse text-sm font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-60 ${PENDING_CLASS}`}
           >
             {submitting ? m.concierge_confirm_submit_pending() : m.concierge_confirm_submit()}
           </button>

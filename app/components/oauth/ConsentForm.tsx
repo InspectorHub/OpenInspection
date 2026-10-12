@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { m } from "~/paraglide/messages";
 import type { ModuleGroup } from "../../../server/lib/mcp/tag-catalog";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 /**
  * The OAuth consent screen, lifted out of `routes/oauth/authorize.tsx`.
@@ -57,6 +58,14 @@ export function ConsentForm({
 }: ConsentFormProps) {
 
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const decided = useRef(false);
+  // A restore from the back/forward cache brings this page back with its JS state, `decided` included,
+  // while the POST has already been answered elsewhere: Allow and Cancel would stay dead. Start over.
+  useEffect(() => {
+    const reopen = (e: PageTransitionEvent) => { if (e.persisted) decided.current = false; };
+    window.addEventListener("pageshow", reopen);
+    return () => window.removeEventListener("pageshow", reopen);
+  }, []);
 
 
 
@@ -136,7 +145,14 @@ export function ConsentForm({
 
 
 
-        <form method="post" className="space-y-5">
+        <form
+          method="post"
+          className="space-y-5"
+          onSubmit={(e) => {
+            if (decided.current) e.preventDefault();
+            else decided.current = true;
+          }}
+        >
 
           <input type="hidden" name="oauthReq" value={oauthReqJson} />
 
@@ -286,7 +302,9 @@ export function ConsentForm({
 
               value="1"
 
-              className="flex-1 py-2.5 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 font-bold text-sm hover:bg-ih-bg-app transition-colors"
+              {...pendingProps(submitting)}
+
+              className={`flex-1 py-2.5 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 font-bold text-sm hover:bg-ih-bg-app transition-colors ${PENDING_CLASS}`}
 
             >
 
@@ -300,9 +318,9 @@ export function ConsentForm({
 
               data-testid="oauth-authorize-submit"
 
-              disabled={submitting}
+              {...pendingProps(submitting)}
 
-              className="flex-1 py-2.5 rounded-lg bg-ih-primary text-ih-fg-inverse font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className={`flex-1 py-2.5 rounded-lg bg-ih-primary text-ih-fg-inverse font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${PENDING_CLASS}`}
 
             >
 

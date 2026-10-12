@@ -333,10 +333,10 @@ describe("PaymentsModal — the guard (#106)", () => {
         expect((container.querySelectorAll('input[type="number"]')[1] as HTMLInputElement).value).toBe("50");
     });
 
-    it("disables both money buttons while the guard is in flight", () => {
+    it("marks both money buttons pending while the guard is in flight", () => {
         const { container, getByText } = renderModal([CASH], mockFetcher(), guardedSubmit(), true);
-        expect((getByText("Recording…").closest("button") as HTMLButtonElement).disabled).toBe(true);
+        expect((getByText("Recording…").closest("button") as HTMLButtonElement).getAttribute("aria-disabled")).toBe("true");
         fireEvent.click([...container.querySelectorAll("button")].find((b) => b.textContent === "Correct")!);
-        expect((getByText("Save correction").closest("button") as HTMLButtonElement).disabled).toBe(true);
+        expect((getByText("Save correction").closest("button") as HTMLButtonElement).getAttribute("aria-disabled")).toBe("true");
     });
 });

@@ -1,4 +1,4 @@
-import { Modal } from "@core/shared-ui";
+import { Modal, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -49,9 +49,8 @@ export function ConfirmDialog({
           </button>
           <button
             type="button"
-            onClick={onConfirm}
-            disabled={busy}
-            className={`px-4 py-2 rounded-md text-[13px] font-bold transition-opacity disabled:opacity-50 ${confirmClass}`}
+            {...pendingProps(busy, onConfirm)}
+            className={`px-4 py-2 rounded-md text-[13px] font-bold transition-opacity ${PENDING_CLASS} ${confirmClass}`}
           >
             {confirmLabel ?? m.common_delete()}
           </button>

@@ -19,6 +19,7 @@
  * after they click.
  */
 import { useState } from "react";
+import { PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 
@@ -65,9 +66,8 @@ export function ReportViewCountingSection({ initialEnabled }: { initialEnabled: 
                     <span className="text-[13px] text-ih-fg-1">{m.settings_compliance_views_label()}</span>
                 </label>
                 <button
-                    onClick={handleSave}
-                    disabled={busy}
-                    className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+                    {...pendingProps(busy, handleSave)}
+                    className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}
                 >
                     {busy ? m.settings_compliance_saving() : m.common_save()}
                 </button>

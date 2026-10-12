@@ -224,10 +224,10 @@ export default function SettingsInspectionPage() {
                 <label className="flex items-start gap-2.5 mt-4 pt-4 border-t border-ih-border cursor-pointer">
                     <input
                         type="checkbox"
-                        className="mt-0.5"
+                        className="mt-0.5 aria-disabled:opacity-50"
                         checked={archiveRevokes}
-                        onChange={(e) => saveArchiveRevokes(e.target.checked)}
-                        disabled={savingArchiveRevokes}
+                        onChange={(e) => { if (savingArchiveRevokes) return; saveArchiveRevokes(e.target.checked); }}
+                        aria-disabled={savingArchiveRevokes || undefined}
                         aria-busy={savingArchiveRevokes || undefined}
                     />
                     <span>
@@ -309,7 +309,10 @@ export function BulkLinkExpiry({ ttl, liveLinks }: { ttl: ReportLinkTtl; liveLin
                 // Nothing live to act on. Kept visible and disabled rather than
                 // hidden, so the absence reads as "none right now" instead of
                 // "this product cannot do that".
-                disabled={liveLinks === 0 || busy}
+                disabled={liveLinks === 0}
+                // Pending, not native disabled: the confirm Modal closes in the same batch busy flips,
+                // and focus must be able to return to this button.
+                pending={busy}
                 onClick={() => setConfirming(true)}
             >
                 {label}
@@ -329,7 +332,7 @@ export function BulkLinkExpiry({ ttl, liveLinks }: { ttl: ReportLinkTtl; liveLin
                         <Button variant="ghost" onClick={() => setConfirming(false)}>{m.common_cancel()}</Button>
                         <Button
                             variant="danger"
-                            disabled={busy}
+                            pending={busy}
                             onClick={() => {
                                 submit({ ttl: JSON.stringify(ttl) }, { method: 'post' });
                                 setConfirming(false);

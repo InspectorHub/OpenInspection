@@ -1,10 +1,14 @@
+import { useEffect, useRef } from "react";
 import { NavLink } from "react-router";
 import { useCapabilities, useSessionContext } from "~/hooks/useSessionContext";
 import { IC, WORKSPACE_ITEMS, visibleNavItems } from "~/components/sidebar/nav-items";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { LocaleSwitcher } from "~/components/LocaleSwitcher";
-import { Avatar, Icon } from "@core/shared-ui";
+import { Avatar, Icon, useDialogBehavior } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+
+/** Tailwind `lg` (64rem), the breakpoint at which the panel's `lg:hidden` hides it. */
+const DRAWER_HIDDEN_QUERY = "(min-width: 1024px)";
 
 // ─── Mobile drawer ─────────────────────────────────────────────────────────────
 export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -20,11 +24,39 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
   const showSwitchWorkspace = ctx?.branding?.isSaas && ctx?.branding?.portalBaseUrl;
   const privacyUrl = ctx?.branding?.privacyUrl ?? null;
 
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Hook runs before the early return: Escape, Tab trap, scroll lock and focus return.
+  useDialogBehavior(open, onClose, panelRef);
+
+  // The panel is `lg:hidden`: once the viewport reaches `lg` it is display:none, but the dialog
+  // layer would stay registered (Tab swallowed, page scroll locked, Escape captured). Close it.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+  useEffect(() => {
+    if (!open || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia(DRAWER_HIDDEN_QUERY);
+    const closeWhenHidden = () => {
+      if (mq.matches) onCloseRef.current();
+    };
+    closeWhenHidden();
+    mq.addEventListener("change", closeWhenHidden);
+    return () => mq.removeEventListener("change", closeWhenHidden);
+  }, [open]);
+
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 lg:hidden">
       <div className="absolute inset-0 bg-ih-backdrop" onClick={onClose} />
-      <div className="relative w-80 max-w-[85vw] h-full bg-ih-bg-card shadow-ih-popover flex flex-col">
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label={m.nav_user_menu_aria()}
+        className="relative w-80 max-w-[85vw] h-full bg-ih-bg-card shadow-ih-popover flex flex-col outline-none"
+      >
         <div className="p-4 flex items-center justify-between border-b border-ih-border">
           <div className="flex items-center gap-3">
             <img src={logoUrl} alt="" className="w-7 h-7 shrink-0" width={28} height={28} />

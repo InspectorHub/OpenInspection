@@ -1,6 +1,8 @@
-import { Form } from "react-router";
+import { Form, useNavigation } from "react-router";
 import type { FormMetadata } from "@conform-to/react";
 import type { ChangePasswordInput } from "~/lib/forms/settings.schema";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
 interface ChangePasswordPanelProps {
@@ -11,13 +13,15 @@ interface ChangePasswordPanelProps {
 }
 
 export function ChangePasswordPanel({ pwForm, pwFields, showPassword, setShowPassword }: ChangePasswordPanelProps) {
+  const latch = useSubmitLatch();
+  const busy = useNavigation().state !== "idle";
   return (
     <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
       <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_pw_heading()}</h3>
       <Form
         method="post"
         id={pwForm.id}
-        onSubmit={pwForm.onSubmit}
+        onSubmit={latch(pwForm.onSubmit)}
         noValidate
         className="space-y-4 max-w-md"
       >
@@ -60,9 +64,9 @@ export function ChangePasswordPanel({ pwForm, pwFields, showPassword, setShowPas
           {m.settings_pw_show()}
         </label>
         <div className="flex justify-end pt-2 border-t border-ih-border">
-          <button type="submit"
-            className="px-4 py-2 bg-ih-primary text-ih-fg-inverse rounded-md font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
-            {m.settings_pw_submit()}
+          <button type="submit" {...pendingProps(busy)}
+            className={`px-4 py-2 bg-ih-primary text-ih-fg-inverse rounded-md font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all ${PENDING_CLASS}`}>
+            {busy ? m.common_saving() : m.settings_pw_submit()}
           </button>
         </div>
       </Form>

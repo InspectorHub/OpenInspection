@@ -315,7 +315,7 @@ export default function MarketplacePage() {
                         variant="primary"
                         size="sm"
                         onClick={() => handleInstall(t.id)}
-                        disabled={installing}
+                        pending={installing}
                       >
                         {installingId === t.id ? m.marketplace_installing() : m.marketplace_install()}
                       </Button>
@@ -325,7 +325,7 @@ export default function MarketplacePage() {
                         variant="danger-link"
                         size="sm"
                         onClick={() => setUninstalling({ id: t.id, name: t.name, kind: t.kind ?? null })}
-                        disabled={removing}
+                        pending={removing}
                       >
                         {m.marketplace_uninstall()}
                       </Button>

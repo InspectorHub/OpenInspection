@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Modal, Button } from "@core/shared-ui";
+import { Modal, Button, PENDING_CLASS, pendingProps, useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -123,6 +123,10 @@ export function SendAgreementModal({
     const [agreementId, setAgreementId] = useState(templates?.[0]?.id ?? "");
     const [error, setError] = useState<string | null>(null);
     const noTemplates = templates !== undefined && templates.length === 0;
+    // Two clicks inside one frame both run before `busy` renders. The caller can also decline
+    // before it submits (the human check is dismissed), which never raises `busy`, so the latch
+    // reopens one macrotask later instead of waiting for a `busy` change.
+    const latch = useActionLatch(Boolean(busy));
 
     // The modal stays mounted (Modal renders null when closed), so reseed the
     // draft each time it opens — a reopened modal must start fresh, not resume
@@ -143,8 +147,10 @@ export function SendAgreementModal({
     const submit = () => {
         const problem = validateSigners(signers);
         if (problem) { setError(problem); return; }
-        setError(null);
-        onSend(buildSendPayload(signers, completionPolicy, agreementId));
+        latch(() => {
+            setError(null);
+            onSend(buildSendPayload(signers, completionPolicy, agreementId));
+        });
     };
 
     return (
@@ -155,8 +161,8 @@ export function SendAgreementModal({
             size="lg"
             footer={
                 <>
-                    <Button variant="secondary" onClick={onClose} disabled={busy}>{m.common_cancel()}</Button>
-                    <Button variant="primary" onClick={submit} disabled={busy || noTemplates}>
+                    <Button variant="secondary" onClick={onClose} pending={busy}>{m.common_cancel()}</Button>
+                    <Button variant="primary" onClick={submit} pending={busy} disabled={noTemplates}>
                         {busy ? m.agreement_send_pending() : m.agreement_send_submit()}
                     </Button>
                 </>
@@ -224,10 +230,9 @@ export function SendAgreementModal({
                         </select>
                         <button
                             type="button"
-                            onClick={() => removeRow(i)}
-                            disabled={busy || signers.length === 1}
+                            {...pendingProps(busy || signers.length === 1, () => removeRow(i))}
                             aria-label={m.agreement_send_remove_aria()}
-                            className="px-2 py-2 text-ih-fg-3 hover:text-ih-bad-fg disabled:opacity-40 disabled:cursor-not-allowed"
+                            className={`px-2 py-2 text-ih-fg-3 hover:text-ih-bad-fg ${PENDING_CLASS}`}
                         >
                             ✕
                         </button>
@@ -237,9 +242,8 @@ export function SendAgreementModal({
 
             <button
                 type="button"
-                onClick={addRow}
-                disabled={busy}
-                className="mt-3 text-[13px] font-semibold text-ih-primary-text hover:opacity-80 disabled:opacity-40"
+                {...pendingProps(busy, addRow)}
+                className={`mt-3 text-[13px] font-semibold text-ih-primary-text hover:opacity-80 ${PENDING_CLASS}`}
             >
                 {m.agreement_send_add()}
             </button>

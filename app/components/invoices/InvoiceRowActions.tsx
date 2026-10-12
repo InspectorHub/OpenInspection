@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { m } from "~/paraglide/messages";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 /**
  * The Action column of the invoices table — every verb one invoice offers.
@@ -88,10 +89,10 @@ export function InvoiceRowActions({
   ) : null;
 
   const voidAction = (
+    // pending, not native disabled: the void confirm closes in the batch busy flips and focus must return here.
     <button
-      onClick={onVoid}
-      disabled={busy}
-      className="px-3 h-7 rounded-md text-[12px] font-bold text-ih-bad-fg hover:underline disabled:opacity-50"
+      {...pendingProps(busy, onVoid)}
+      className={`px-3 h-7 rounded-md text-[12px] font-bold text-ih-bad-fg hover:underline ${PENDING_CLASS}`}
     >
       {m.invoices_action_void()}
     </button>
@@ -113,17 +114,15 @@ export function InvoiceRowActions({
         {getPayMethods().map((method) => (
           <button
             key={method.value}
-            onClick={() => onMarkPaid(method.value)}
-            disabled={busy}
-            className="px-2 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 hover:border-ih-ok-fg hover:text-ih-ok-fg transition-colors disabled:opacity-50"
+            {...pendingProps(busy, () => onMarkPaid(method.value))}
+            className={`px-2 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 hover:border-ih-ok-fg hover:text-ih-ok-fg transition-colors ${PENDING_CLASS}`}
           >
             {method.label}
           </button>
         ))}
         <button
-          onClick={onCancelPicker}
-          disabled={busy}
-          className="px-2 h-7 rounded-md text-[12px] font-semibold text-ih-fg-3 hover:text-ih-fg-2 disabled:opacity-50"
+          {...pendingProps(busy, onCancelPicker)}
+          className={`px-2 h-7 rounded-md text-[12px] font-semibold text-ih-fg-3 hover:text-ih-fg-2 ${PENDING_CLASS}`}
         >
           {m.common_cancel()}
         </button>

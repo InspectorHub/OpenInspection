@@ -74,7 +74,7 @@ export function RatingSystemEditor({
   onSaveLevels?: (levels: EditorLevel[]) => void;
 }) {
   // #106 - user mutation: saves a rating system and its levels. The Save
-  // button is already `disabled={saving || ...}`.
+  // button is already `pending={saving}`.
   const { fetcher, submit, busy: saving } = useGuardedSubmit<{ ok?: boolean; error?: string }>();
   const editing = !!system;
 
@@ -179,7 +179,7 @@ export function RatingSystemEditor({
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>{m.common_cancel()}</Button>
-          <Button variant="primary" onClick={save} disabled={saving || (!!error && error !== fetcher.data?.error)}>
+          <Button variant="primary" onClick={save} pending={saving} disabled={!!error && error !== fetcher.data?.error}>
             {saving ? m.common_saving() : editing ? m.rating_editor_save_changes() : m.rating_editor_create()}
           </Button>
         </>

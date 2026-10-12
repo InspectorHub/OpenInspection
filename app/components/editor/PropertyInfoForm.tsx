@@ -1,5 +1,6 @@
 import { useMemo, useCallback, useEffect, useState } from "react";
 import { useFetcher } from "react-router";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { isDedicatedFactKey } from "~/lib/property-facts-keys";
 import { m } from "~/paraglide/messages";
 
@@ -210,9 +211,10 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
           </h2>
           <button
             type="button"
-            onClick={runAutofill}
-            disabled={addressString.length < 5 || autofilling}
-            className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-primary-text hover:bg-ih-primary-tint disabled:opacity-50 disabled:cursor-not-allowed"
+            // Only the in-flight part is aria-disabled (focus stays on the button); too-short stays native.
+            {...pendingProps(autofilling, runAutofill)}
+            disabled={addressString.length < 5}
+            className={`h-8 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-primary-text hover:bg-ih-primary-tint disabled:opacity-50 disabled:cursor-not-allowed ${PENDING_CLASS}`}
           >
             {autofilling ? m.editor_property_autofill_loading() : m.editor_property_autofill_button()}
           </button>

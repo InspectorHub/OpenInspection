@@ -17,7 +17,7 @@
  * At most one remedy per row, and only where the path behind it is built.
  */
 import { m } from "~/paraglide/messages";
-import { EmptyState } from "@core/shared-ui";
+import { EmptyState, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { formatRelativeTime } from "~/lib/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import {
@@ -97,12 +97,11 @@ export function NoticeList({
                 </p>
                 <button
                   type="button"
-                  onClick={() => onDismiss(n.id)}
-                  disabled={busy}
+                  {...pendingProps(busy, () => onDismiss(n.id))}
                   aria-busy={busy || undefined}
                   aria-label={m.notice_dismiss_aria()}
                   title={m.notice_dismiss()}
-                  className="shrink-0 -mt-0.5 w-6 h-6 grid place-items-center rounded-md text-ih-fg-4 hover:text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-40 transition-colors"
+                  className={`shrink-0 -mt-0.5 w-6 h-6 grid place-items-center rounded-md text-ih-fg-4 hover:text-ih-fg-2 hover:bg-ih-bg-muted ${PENDING_CLASS} transition-colors`}
                 >
                   <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                     <path d="M3 3l6 6M9 3l-6 6" />

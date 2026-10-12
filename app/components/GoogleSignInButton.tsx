@@ -5,11 +5,15 @@
  *
  * ds-allow: Google's exact brand palette is required — steps outside ihp-* tokens.
  */
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+
 interface GoogleSignInButtonProps {
   href?: string;
   onClick?: () => void;
   label?: string;
   disabled?: boolean;
+  /** Click started a redirect: stays focusable (aria-disabled) and inert. */
+  pending?: boolean;
 }
 
 function GoogleGMark() {
@@ -40,10 +44,11 @@ export function GoogleSignInButton({
   onClick,
   label = "Continue with Google",
   disabled = false,
+  pending = false,
 }: GoogleSignInButtonProps) {
   // ds-allow: official Google button palette per branding guidelines
   const buttonClass =
-    "flex w-full items-center justify-center gap-3 h-[46px] rounded-lg border border-[#747775] bg-white px-4 text-[15px] font-medium text-[#1f1f1f] transition-colors hover:bg-[#f7f8fa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4285f4] disabled:opacity-60 disabled:pointer-events-none disabled:cursor-not-allowed";
+    `flex w-full items-center justify-center gap-3 h-[46px] rounded-lg border border-[#747775] bg-white px-4 text-[15px] font-medium text-[#1f1f1f] transition-colors hover:bg-[#f7f8fa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4285f4] disabled:opacity-60 disabled:pointer-events-none disabled:cursor-not-allowed ${PENDING_CLASS}`;
 
   const style = { fontFamily: "'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif" };
 
@@ -64,7 +69,7 @@ export function GoogleSignInButton({
     return (
       <button
         type="button"
-        onClick={onClick}
+        {...pendingProps(pending, onClick)}
         className={buttonClass}
         style={style}
       >
@@ -86,6 +91,7 @@ export function GoogleSignInButton({
   return (
     <a
       href={href}
+      {...pendingProps(pending)}
       className={buttonClass}
       style={style}
     >

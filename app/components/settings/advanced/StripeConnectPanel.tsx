@@ -1,4 +1,6 @@
-import { Form } from "react-router";
+import { Form, useNavigation } from "react-router";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import type { FormMetadata } from "@conform-to/react";
 import type { StripeConnectInput } from "~/lib/forms/settings-config.schema";
 import { m } from "~/paraglide/messages";
@@ -11,6 +13,8 @@ interface StripeConnectPanelProps {
 }
 
 export function StripeConnectPanel({ stripeConnected, stripeAccountId, stripeForm, stripeFields }: StripeConnectPanelProps) {
+  const latch = useSubmitLatch();
+  const busy = useNavigation().state !== "idle";
   return (
     <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
       <div className="flex items-center justify-between gap-4">
@@ -39,10 +43,10 @@ export function StripeConnectPanel({ stripeConnected, stripeAccountId, stripeFor
               {stripeAccountId}
             </code>
           </div>
-          <Form method="post">
+          <Form method="post" onSubmit={latch()}>
             <input type="hidden" name="intent" value="disconnect-stripe" />
-            <button type="submit"
-              className="h-9 px-4 rounded-md border border-ih-bad text-ih-bad-fg text-[13px] font-bold hover:bg-ih-bad-bg transition-colors">
+            <button type="submit" {...pendingProps(busy)}
+              className={`h-9 px-4 rounded-md border border-ih-bad text-ih-bad-fg text-[13px] font-bold hover:bg-ih-bad-bg transition-colors ${PENDING_CLASS}`}>
               {m.settings_calconnect_disconnect()}
             </button>
           </Form>
@@ -51,7 +55,7 @@ export function StripeConnectPanel({ stripeConnected, stripeAccountId, stripeFor
         <Form
           method="post"
           id={stripeForm.id}
-          onSubmit={stripeForm.onSubmit}
+          onSubmit={latch(stripeForm.onSubmit)}
           noValidate
           className="space-y-3 max-w-md"
         >
@@ -78,8 +82,8 @@ export function StripeConnectPanel({ stripeConnected, stripeAccountId, stripeFor
               {stripeForm.errors[0]}
             </div>
           )}
-          <button type="submit"
-            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
+          <button type="submit" {...pendingProps(busy)}
+            className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all ${PENDING_CLASS}`}>
             {m.settings_stripeconnect_connect_account()}
           </button>
         </Form>

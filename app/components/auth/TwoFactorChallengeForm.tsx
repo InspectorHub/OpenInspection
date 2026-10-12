@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Form, useNavigation } from "react-router";
 import { Input, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
@@ -25,10 +26,26 @@ export function TwoFactorChallengeForm({
   error?: string;
 }) {
   const navigation = useNavigation();
-  const submitting = navigation.state === "submitting";
+  // "loading" is the redirect target loading after the action answered: still busy, or a second
+  // click would post the same single-use code again.
+  const submitting = navigation.state !== "idle";
+  const inFlight = useRef(false);
+
+  // Two clicks inside one frame both submit before `submitting` renders.
+  useEffect(() => {
+    if (!submitting) inFlight.current = false;
+  }, [submitting]);
 
   return (
-    <Form method="post" className="space-y-4" noValidate>
+    <Form
+      method="post"
+      className="space-y-4"
+      noValidate
+      onSubmit={(e) => {
+        if (inFlight.current) e.preventDefault();
+        else inFlight.current = true;
+      }}
+    >
       <input type="hidden" name="challengeToken" value={challengeToken} />
       {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
 
@@ -48,7 +65,7 @@ export function TwoFactorChallengeForm({
         reserveErrorSpace
       />
 
-      <Button type="submit" variant="primary" size="lg" disabled={submitting} className="w-full">
+      <Button type="submit" variant="primary" size="lg" pending={submitting} className="w-full">
         {submitting ? m.auth_login_2fa_submit_pending() : m.auth_login_2fa_submit()}
       </Button>
 

@@ -57,7 +57,8 @@ export function AddVisitModal({
                     <Button
                         variant="primary"
                         size="sm"
-                        disabled={!eventTypeId || !when || submitting}
+                        disabled={!eventTypeId || !when}
+                        pending={submitting}
                         onClick={() => onAdd(eventTypeId, fromLocalInputValue(when), durationMin)}
                     >
                         {m.inspections_hub_visits_add()}

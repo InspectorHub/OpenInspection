@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRevalidator, useSearchParams } from "react-router";
-import { Banner, RadioCardGroup } from "@core/shared-ui";
+import { Banner, RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { GoogleSignInButton } from "~/components/GoogleSignInButton";
 import { CalendarGlyph } from "~/components/settings/CalendarGlyph";
 import { calendarOAuthErrorToast } from "~/lib/calendar-oauth-errors";
@@ -178,19 +178,17 @@ export function CalendarConnectPanel({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={syncing}
-              onClick={() => submitSync({ intent: "calendar-sync" }, { method: "post" })}
-              className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
+              {...pendingProps(syncing, () => submitSync({ intent: "calendar-sync" }, { method: "post" }))}
+              className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 ${PENDING_CLASS}`}
             >
               {syncing ? m.settings_calconnect_syncing() : m.settings_calconnect_sync_now()}
             </button>
             <button
               type="button"
-              disabled={disconnecting}
-              onClick={() =>
+              {...pendingProps(disconnecting, () =>
                 submitDisconnect({ intent: "calendar-disconnect" }, { method: "post" })
-              }
-              className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60"
+              )}
+              className={`h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60 ${PENDING_CLASS}`}
             >
               {disconnecting ? m.settings_calconnect_disconnecting() : m.settings_calconnect_disconnect()}
             </button>
@@ -228,7 +226,8 @@ export function CalendarConnectPanel({
           <GoogleSignInButton
             onClick={handleConnect}
             label={connecting ? m.settings_calconnect_connecting() : m.settings_calconnect_continue_google()}
-            disabled={!oauthConfigured || connecting}
+            disabled={!oauthConfigured}
+            pending={connecting}
           />
           {!oauthConfigured && (
             <p className="text-[11px] text-ih-fg-3">

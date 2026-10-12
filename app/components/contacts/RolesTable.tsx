@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { Card, Table, Pill, Button, EmptyState, Popover, type PillTone } from "@core/shared-ui";
 import { CapabilityMatrix } from "./CapabilityMatrix";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { KIND_LABEL, type RoleProfile } from "./contacts-helpers";
 
@@ -29,6 +31,7 @@ export function RolesTable({
   onCreate: () => void;
 }) {
   const deleteFetcher = useFetcher();
+  const latch = useSubmitLatch(deleteFetcher.state);
   const [matrixOpen, setMatrixOpen] = useState(false);
   const matrixAnchor = useRef<HTMLButtonElement>(null);
 
@@ -94,12 +97,14 @@ export function RolesTable({
                   method="post"
                   className="inline"
                   onClick={(e) => e.stopPropagation()}
+                  onSubmit={latch()}
                 >
                   <input type="hidden" name="intent" value={p.active ? "role-deactivate" : "role-reactivate"} />
                   <input type="hidden" name="id" value={p.id} />
                   <button
                     type="submit"
-                    className={`text-[12px] font-bold hover:underline ${p.active ? "text-ih-bad-fg" : "text-ih-primary-text"}`}
+                    {...pendingProps(deleteFetcher.state !== "idle")}
+                    className={`text-[12px] font-bold hover:underline ${PENDING_CLASS} ${p.active ? "text-ih-bad-fg" : "text-ih-primary-text"}`}
                   >
                     {p.active ? m.contacts_roles_action_deactivate() : m.contacts_roles_action_reactivate()}
                   </button>

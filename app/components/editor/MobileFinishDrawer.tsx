@@ -75,7 +75,7 @@ export function MobileFinishDrawer({
           <Button
             variant="secondary"
             className="w-full"
-            disabled={finishingFieldwork}
+            pending={finishingFieldwork}
             onClick={() => run(onFinishFieldwork)}
           >
             {finishingFieldwork ? m.editor_finish_fieldwork_pending() : m.editor_finish_fieldwork()}

@@ -1,5 +1,5 @@
 import { Form } from "react-router";
-import { RadioCardGroup } from "@core/shared-ui";
+import { RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import type { useFetcher } from "react-router";
 import { SmsSecretsPanel } from "~/components/settings/SmsSecretsPanel";
 import type { action } from "~/routes/settings-communication";
@@ -221,8 +221,8 @@ export function SmsDeliveryPanel({
           </div>
 
           <div className="flex justify-end pt-3 border-t border-ih-border">
-            <button type="submit" disabled={savingSmsConfig}
-              className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
+            <button type="submit" {...pendingProps(savingSmsConfig)}
+              className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 ${PENDING_CLASS}`}>
               {savingSmsConfig ? m.common_saving() : m.settings_smsdelivery_save()}
             </button>
           </div>

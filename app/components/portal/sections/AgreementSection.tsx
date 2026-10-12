@@ -37,6 +37,7 @@ import {
 // Type-only — erased at build, so no server module reaches the client bundle.
 import type { z } from "@hono/zod-openapi";
 import type { PublicAgreementBodySchema } from "../../../../server/lib/validations/agreement-public.schema";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 /**
  * Wire shape of GET /api/public/agreements/:token (Track I-a multi-signer),
@@ -112,6 +113,11 @@ export function AgreementSection({
   const signFetcher = useFetcher<ActionResult>();
   const declineFetcher = useFetcher<ActionResult>();
   const submitting = signFetcher.state !== "idle" || declineFetcher.state !== "idle";
+  // Synchronous latch: two clicks in one frame both run before `submitting` has rendered.
+  const inFlight = useRef(false);
+  useEffect(() => {
+    if (!submitting) inFlight.current = false;
+  }, [submitting]);
 
   useEffect(() => {
     if (signFetcher.state === "idle" && signFetcher.data) {
@@ -128,11 +134,13 @@ export function AgreementSection({
   }, [declineFetcher.state, declineFetcher.data]);
 
   const submitSignature = () => {
+    if (inFlight.current) return;
     const pad = padRef.current;
     if (!pad || pad.isEmpty()) {
       setErrorMsg(m.portal_agreement_error_draw_signature());
       return;
     }
+    inFlight.current = true;
     const signatureBase64 = pad.toDataURL();
     const payload = onBehalfPayload(onBehalf);
     setErrorMsg(null);
@@ -145,6 +153,8 @@ export function AgreementSection({
   };
 
   const submitDecline = () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setErrorMsg(null);
     const fd = new FormData();
     fd.set("intent", "decline");
@@ -295,9 +305,9 @@ export function AgreementSection({
             <div className="flex gap-3 mt-4 mb-6">
               <button
                 type="button"
-                onClick={submitSignature}
-                disabled={submitting || !hasMark}
-                className="w-full h-11 px-4 bg-ih-primary text-ih-primary-fg rounded-md font-bold text-sm hover:bg-ih-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                {...pendingProps(submitting, submitSignature)}
+                disabled={!hasMark}
+                className={`w-full h-11 px-4 bg-ih-primary text-ih-primary-fg rounded-md font-bold text-sm hover:bg-ih-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${PENDING_CLASS}`}
               >
                 {signFetcher.state !== "idle" ? m.portal_agreement_signing_pending() : m.portal_agreement_sign_submit()}
               </button>
@@ -324,9 +334,8 @@ export function AgreementSection({
                   />
                   <button
                     type="button"
-                    onClick={submitDecline}
-                    disabled={submitting}
-                    className="mt-3 px-5 py-2 rounded-lg bg-ih-bad text-white text-[10px] font-bold uppercase tracking-widest hover:bg-ih-bad/85 transition disabled:opacity-50"
+                    {...pendingProps(submitting, submitDecline)}
+                    className={`mt-3 px-5 py-2 rounded-lg bg-ih-bad text-white text-[10px] font-bold uppercase tracking-widest hover:bg-ih-bad/85 transition disabled:opacity-50 ${PENDING_CLASS}`}
                   >
                     {declineFetcher.state !== "idle" ? m.portal_agreement_declining_pending() : m.portal_agreement_decline_submit()}
                   </button>

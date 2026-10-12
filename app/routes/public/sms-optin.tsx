@@ -2,6 +2,7 @@ import { useLoaderData, useActionData, useNavigation, Form } from "react-router"
 import type { Route } from "./+types/sms-optin";
 import { createApi } from "~/lib/api-client.server";
 import { SmsDisclosure } from "~/components/notifications/SmsDisclosure";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -111,8 +112,8 @@ export default function SmsOptinPage() {
                 <Form method="post">
                     <button
                         type="submit"
-                        disabled={submitting}
-                        className="w-full px-4 py-3 rounded-xl bg-ih-primary text-ih-fg-inverse text-sm font-semibold disabled:opacity-50 transition-opacity"
+                        {...pendingProps(submitting)}
+                        className={`w-full px-4 py-3 rounded-xl bg-ih-primary text-ih-fg-inverse text-sm font-semibold disabled:opacity-50 transition-opacity ${PENDING_CLASS}`}
                     >
                         {submitting ? m.sms_optin_submit_pending() : m.sms_optin_submit()}
                     </button>

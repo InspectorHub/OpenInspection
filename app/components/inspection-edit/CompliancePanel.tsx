@@ -220,7 +220,7 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
           {existing.signedAt ? (
             <div className="text-[11px] text-ih-fg-3">{m.editor_compliance_signed()} {formatDateTime(existing.signedAt, { locale, timeZone: displayTz })}</div>
           ) : null}
-          <Button variant="danger-link" size="sm" disabled={removing} onClick={() => setConfirmOpen(true)}>
+          <Button variant="danger-link" size="sm" pending={removing} onClick={() => setConfirmOpen(true)}>
             {removing ? m.editor_compliance_removing() : m.common_remove()}
           </Button>
         </div>
@@ -260,7 +260,7 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
             variant="primary"
             size="sm"
             onClick={submitSignoff}
-            disabled={saving || !personId.trim() || !name.trim()}
+            disabled={!personId.trim() || !name.trim()} pending={saving}
             className="w-full"
           >
             {saving ? m.editor_compliance_signing() : m.editor_compliance_sign_off()}
@@ -513,7 +513,7 @@ function DocReviewSection({ items }: { items: DocumentReviewItemView[] }) {
           <Button
             variant="link"
             size="sm"
-            disabled={seeding}
+            pending={seeding}
             onClick={() => submitSeed({ intent: "compliance-doc-review-seed" }, { method: "POST" })}
           >
             {seeding ? m.common_loading() : m.editor_compliance_load_checklist()}

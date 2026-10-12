@@ -32,7 +32,7 @@ export function GateToggle({
     testId?: string;
 }) {
     // #106 — the toggle writes an order-level gate; it goes through the guard.
-    // The checkbox is already `disabled={saving}` while in flight, so the guard
+    // The checkbox ignores changes (aria-disabled) while in flight, so the guard
     // never has to refuse a second change the user could still make.
     const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
 
@@ -52,18 +52,21 @@ export function GateToggle({
                 <input
                     type="checkbox"
                     checked={shown}
-                    disabled={saving}
+                    // aria-disabled, not native: a focused checkbox that became disabled drops focus to <body>.
+                    // The change is ignored while saving and the controlled value stays put.
+                    aria-disabled={saving || undefined}
                     data-testid={testId}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                        if (saving) return;
                         submit(
                             {
                                 intent: "save-order",
                                 payload: JSON.stringify({ [field]: e.target.checked }),
                             },
                             { method: "post" },
-                        )
-                    }
-                    className="mt-0.5 h-4 w-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
+                        );
+                    }}
+                    className="mt-0.5 h-4 w-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30 aria-disabled:opacity-50"
                 />
                 <span>{label}</span>
             </label>

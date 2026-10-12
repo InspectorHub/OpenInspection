@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { Card, Pill, Button, Modal } from "@core/shared-ui";
+import { Card, Pill, Button, Modal, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { AddPersonModal } from "./AddPersonModal";
@@ -268,14 +268,13 @@ export function PeopleEditor({
                         {person.kind === "client" && !isPrimary && (
                           <button
                             type="button"
-                            onClick={() =>
+                            {...pendingProps(busy, () =>
                               submitPrimary(
                                 { intent: "person-make-primary", personId: person.id },
                                 { method: "post" },
-                              )
-                            }
-                            disabled={busy}
-                            className="text-[11px] font-bold text-ih-primary-text hover:underline disabled:opacity-60"
+                              ),
+                            )}
+                            className={`text-[11px] font-bold text-ih-primary-text hover:underline ${PENDING_CLASS}`}
                           >
                             {m.inspections_hub_people_make_primary()}
                           </button>
@@ -288,19 +287,21 @@ export function PeopleEditor({
                         {person.email && (person.access?.status ?? "not_sent") !== "not_sent" && (
                           <button
                             type="button"
-                            onClick={() => setResetTarget(person)}
-                            disabled={busy}
-                            className="text-[11px] font-bold text-ih-fg-2 hover:underline disabled:opacity-60"
+                            // Pending, not native disabled: the confirm closes in the batch busy flips,
+                            // and a disabled trigger would drop focus to <body>.
+                            {...pendingProps(busy, () => setResetTarget(person))}
+                            className={`text-[11px] font-bold text-ih-fg-2 hover:underline ${PENDING_CLASS}`}
                           >
                             {m.inspections_hub_people_reset()}
                           </button>
                         )}
                         <button
                           type="button"
-                          onClick={() => setRemoveTarget(person)}
-                          disabled={busy || sole}
+                          // Pending (in-flight) is aria-disabled; only the sole-client rule stays native.
+                          {...pendingProps(busy, () => setRemoveTarget(person))}
+                          disabled={sole}
                           title={sole ? m.inspections_hub_people_remove_sole_reason() : undefined}
-                          className={`text-[11px] font-bold disabled:opacity-50 disabled:cursor-not-allowed ${
+                          className={`text-[11px] font-bold disabled:opacity-50 disabled:cursor-not-allowed ${PENDING_CLASS} ${
                             sole ? "text-ih-fg-3" : "text-ih-bad-fg hover:underline"
                           }`}
                         >
@@ -348,7 +349,8 @@ export function PeopleEditor({
             variant="secondary"
             size="sm"
             className="mt-2"
-            disabled={expiryBusy || expiryWouldChangeNothing}
+            disabled={expiryWouldChangeNothing}
+            pending={expiryBusy}
             onClick={() =>
               submitExpiry(
                 { intent: "report-link-expiry", ttl: JSON.stringify(ttl) },
@@ -384,7 +386,7 @@ export function PeopleEditor({
             <Button variant="ghost" onClick={() => setRemoveTarget(null)}>{m.common_cancel()}</Button>
             <Button
               variant="danger"
-              disabled={removeBusy}
+              pending={removeBusy}
               onClick={() => removeTarget && handleRemove(removeTarget.id)}
             >{m.inspections_hub_people_remove_cta()}</Button>
           </>
@@ -404,7 +406,7 @@ export function PeopleEditor({
             <Button variant="ghost" onClick={() => setResetTarget(null)}>{m.common_cancel()}</Button>
             <Button
               variant="danger"
-              disabled={resetBusy}
+              pending={resetBusy}
               onClick={() => resetTarget && handleReset(resetTarget.id)}
             >{m.inspections_hub_people_reset_cta()}</Button>
           </>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLoaderData, Form, useActionData } from "react-router";
+import { useLoaderData, Form, useActionData, useNavigation } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { didSaveService } from "~/lib/settings-services";
 import { useForm } from "@conform-to/react";
@@ -19,6 +19,8 @@ import { loadPayRuleMap, savePayRule, deletePayRule } from "~/lib/settings/pay-r
 import type { PayRule } from "~/components/settings/services/PayRuleWidget";
 import { parseDepositPolicy } from "~/lib/deposit-policy-form";
 import type { DepositPolicy } from "../../server/lib/billing/deposit-policy";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -305,6 +307,8 @@ export default function SettingsServices() {
   // Conform owns only the create-service form. The toggle-service form posts
   // hidden fields only (no text validation), so it stays a plain <Form>. Guard
   // against feeding a non-Conform actionData ({ ok: true }) into useForm.
+  const latch = useSubmitLatch();
+  const nav = useNavigation();
   const [form, fields] = useForm({
     lastResult: actionData && "status" in actionData ? actionData : undefined,
     onValidate({ formData }) {
@@ -339,7 +343,7 @@ export default function SettingsServices() {
         <Form
           method="post"
           id={form.id}
-          onSubmit={form.onSubmit}
+          onSubmit={latch(form.onSubmit)}
           noValidate
           className="bg-ih-bg-card border border-ih-border rounded-lg p-4 space-y-3"
         >
@@ -354,7 +358,7 @@ export default function SettingsServices() {
             <button type="button" onClick={() => setShowForm(false)} className="h-8 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
               {m.common_cancel()}
             </button>
-            <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
+            <button type="submit" {...pendingProps(nav.state !== "idle")} className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}>
               {m.common_save()}
             </button>
           </div>

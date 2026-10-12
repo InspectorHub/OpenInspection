@@ -1,8 +1,10 @@
-import { Form } from "react-router";
+import { Form, useNavigation } from "react-router";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import { ServiceFields } from "./ServiceFields";
 import { makeUpdateServiceSchema } from "~/lib/forms/settings.schema";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
 interface EditableService {
@@ -40,6 +42,8 @@ export function ServiceEditForm({
   otherServices?: Array<{ id: string; name: string; templateId: string | null }>;
   onCancel: () => void;
 }) {
+  const latch = useSubmitLatch();
+  const busy = useNavigation().state !== "idle";
   const [form, fields] = useForm({
     id: `edit-service-${service.id}`,
     defaultValue: {
@@ -59,7 +63,7 @@ export function ServiceEditForm({
     <Form
       method="post"
       id={form.id}
-      onSubmit={form.onSubmit}
+      onSubmit={latch(form.onSubmit)}
       noValidate
       className="bg-ih-bg-card border border-ih-border rounded-lg p-4 space-y-3"
     >
@@ -90,9 +94,10 @@ export function ServiceEditForm({
         </button>
         <button
           type="submit"
-          className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
+          {...pendingProps(busy)}
+          className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}
         >
-          {m.common_save()}
+          {busy ? m.common_saving() : m.common_save()}
         </button>
       </div>
     </Form>

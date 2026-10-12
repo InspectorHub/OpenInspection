@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Form } from "react-router";
-import { RadioCardGroup } from "@core/shared-ui";
+import { RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import type { useFetcher } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
@@ -125,8 +125,8 @@ export function SmsSecretsPanel({
             <p className="text-[12px] text-ih-bad-fg">{secretFormError("save-sms-secrets")}</p>
           )}
           <div className="flex justify-end pt-3 border-t border-ih-border">
-            <button type="submit" disabled={savingSmsSecrets}
-              className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
+            <button type="submit" {...pendingProps(savingSmsSecrets)}
+              className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 ${PENDING_CLASS}`}>
               {savingSmsSecrets ? m.common_saving() : m.settings_smssecrets_save({ provider: provider === "twilio" ? m.settings_sms_provider_twilio() : m.settings_sms_provider_telnyx() })}
             </button>
           </div>
@@ -165,8 +165,8 @@ export function SmsSecretsPanel({
               className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
             />
           </div>
-          <button type="submit" disabled={smsTestFetcher.state !== "idle"}
-            className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
+          <button type="submit" {...pendingProps(smsTestFetcher.state !== "idle")}
+            className={`h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}>
             {smsTestFetcher.state !== "idle" ? m.settings_smssecrets_sending() : m.settings_smssecrets_send_test()}
           </button>
           {smsTestFetcher.data && "intent" in smsTestFetcher.data && smsTestFetcher.data.intent === "test-sms" && "ok" in smsTestFetcher.data && (

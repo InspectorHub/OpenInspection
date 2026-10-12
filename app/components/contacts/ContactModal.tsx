@@ -5,6 +5,7 @@ import { makeAddContactSchema } from "~/lib/forms/contacts.schema";
 import { Modal, Button } from "@core/shared-ui";
 import { SUPPORTED_CONTACT_LOCALES } from "../../../server/lib/i18n/contact-locale";
 import { localeLabel } from "~/lib/locales";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 import type { Contact } from "./contacts-helpers";
 
@@ -19,6 +20,7 @@ export function ContactModal({
 }) {
   const fetcher = useFetcher();
   const isEdit = !!contact;
+  const latch = useSubmitLatch(fetcher.state);
 
   // Conform: server validation flows back through fetcher.data (same as
   // useActionData but scoped to this fetcher). Cast to SubmissionResult<string[]>
@@ -52,17 +54,17 @@ export function ContactModal({
       footer={
         <>
           <Button variant="secondary" type="button" onClick={onClose}>{m.common_cancel()}</Button>
-          <Button variant="primary" type="submit" form={form.id}>{m.common_save()}</Button>
+          <Button variant="primary" type="submit" form={form.id} pending={fetcher.state !== "idle"}>{m.common_save()}</Button>
         </>
       }
     >
       <fetcher.Form
         method="post"
         id={form.id}
-        onSubmit={(e) => {
+        onSubmit={latch((e) => {
           form.onSubmit(e);
           if (fetcherOk) setTimeout(onClose, 200);
-        }}
+        })}
         noValidate
         className="space-y-4"
       >

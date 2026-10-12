@@ -3,6 +3,7 @@ import { useRevalidator } from "react-router";
 import { m } from "~/paraglide/messages";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { DiscountEditorModal, type EditableDiscount } from "./DiscountEditorModal";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 interface Discount {
   id: string;
@@ -68,9 +69,8 @@ export function DiscountCodesPanel({ discounts }: { discounts: Discount[] }) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setEditing(d)}
-                  disabled={busy}
-                  className="text-[12px] font-semibold text-ih-primary-text hover:underline disabled:opacity-50"
+                  {...pendingProps(busy, () => setEditing(d))}
+                  className={`text-[12px] font-semibold text-ih-primary-text hover:underline aria-disabled:no-underline disabled:opacity-50 ${PENDING_CLASS}`}
                 >
                   {m.settings_discount_edit_action()}
                 </button>

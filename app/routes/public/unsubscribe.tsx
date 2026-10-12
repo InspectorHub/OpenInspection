@@ -1,6 +1,7 @@
 import { useLoaderData, useActionData, useNavigation, Form } from "react-router";
 import type { Route } from "./+types/unsubscribe";
 import { createApi } from "~/lib/api-client.server";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -121,8 +122,8 @@ export default function UnsubscribePage() {
                     <input type="hidden" name="enabled" value="true" />
                     <button
                         type="submit"
-                        disabled={submitting}
-                        className="text-sm font-semibold text-ih-primary underline disabled:opacity-50"
+                        {...pendingProps(submitting)}
+                        className={`text-sm font-semibold text-ih-primary underline disabled:opacity-50 ${PENDING_CLASS}`}
                     >
                         {submitting ? m.public_unsubscribe_resubscribe_pending() : m.public_unsubscribe_resubscribe()}
                     </button>
@@ -163,8 +164,8 @@ export default function UnsubscribePage() {
                 <input type="hidden" name="enabled" value="false" />
                 <button
                     type="submit"
-                    disabled={submitting}
-                    className="w-full px-4 py-3 rounded-xl bg-ih-primary text-ih-fg-inverse text-sm font-semibold disabled:opacity-50 transition-opacity"
+                    {...pendingProps(submitting)}
+                    className={`w-full px-4 py-3 rounded-xl bg-ih-primary text-ih-fg-inverse text-sm font-semibold disabled:opacity-50 transition-opacity ${PENDING_CLASS}`}
                 >
                     {submitting ? m.public_unsubscribe_confirm_pending() : m.public_unsubscribe_confirm()}
                 </button>

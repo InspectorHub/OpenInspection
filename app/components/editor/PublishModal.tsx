@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Modal, Button, Banner, buttonClasses } from "@core/shared-ui";
+import { Modal, Button, Banner, buttonClasses, useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { formatShapedDateTime } from "~/lib/format-date";
 import { useSessionContext, useChromeDateTimeFormat, useDisplayTimeZone } from "~/hooks/useSessionContext";
@@ -107,6 +107,11 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  const extras = (): PublishExtras =>
   isAmendment && summary.trim() ? { summary: summary.trim() } : {};
  const [receiptOpen, setReceiptOpen] = useState(false);
+ // Two clicks in one frame both run before `isSubmitting` has rendered. The caller can also decline
+ // before it submits (the human check is dismissed), which never raises `isSubmitting`, so the latch
+ // reopens one macrotask later instead of waiting for a `isSubmitting` change.
+ const latch = useActionLatch(isSubmitting);
+ const publish = (markComplete: boolean) => latch(() => onPublish(markComplete, extras()));
  /** Set while a publish is in flight, so a plain Cancel shows no receipt. */
  const submitSeen = useRef(false);
  /**
@@ -147,13 +152,13 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  <Button variant="ghost" onClick={onClose}>{m.common_cancel()}</Button>
  <Button
  variant="secondary"
- disabled={isSubmitting}
- onClick={() => onPublish(false, extras())}
+ pending={isSubmitting}
+ onClick={() => publish(false)}
  >{isSubmitting ? m.editor_publish_publishing() : m.editor_publish_just_publish()}</Button>
  <Button
  variant="primary"
- disabled={isSubmitting}
- onClick={() => onPublish(true, extras())}
+ pending={isSubmitting}
+ onClick={() => publish(true)}
  >{isSubmitting ? m.editor_publish_publishing() : m.editor_publish_mark_complete_and_publish()}</Button>
  </>
  ) : (
@@ -161,8 +166,8 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  <Button variant="ghost" onClick={onClose}>{m.common_cancel()}</Button>
  <Button
  variant="primary"
- disabled={isSubmitting}
- onClick={() => onPublish(false, extras())}
+ pending={isSubmitting}
+ onClick={() => publish(false)}
  >{isSubmitting ? m.editor_publish_publishing() : m.editor_publish_now()}</Button>
  </>
  )

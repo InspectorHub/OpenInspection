@@ -333,7 +333,7 @@ export function EditorHeader({
   variant="secondary"
   size="md"
   onClick={handleFinishFieldwork}
-  disabled={finishingFieldwork}
+  pending={finishingFieldwork}
   className={HEADER_OVERFLOW.finishFieldwork.inline}
   icon={<Icon name="check" className="w-3.5 h-3.5" />}
  >
@@ -362,7 +362,8 @@ export function EditorHeader({
  <Button
   variant="primary"
   onClick={onPublishClick}
-  disabled={openingPublish}
+  // pending (not disabled) keeps focus on the button; see Button. onPublishClick also refuses re-entry.
+  pending={openingPublish}
   data-testid="editor-publish-btn"
   icon={
    <svg

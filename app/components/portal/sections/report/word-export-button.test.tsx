@@ -88,7 +88,9 @@ describe("WordExportButton", () => {
     await waitFor(() => {
       const btn = getByTestId("word-export-button") as HTMLButtonElement;
       expect(btn.textContent).toBe("Preparing…");
-      expect(btn.disabled).toBe(true);
+      // aria-disabled (pending), not native, so a focused button keeps focus.
+      expect(btn.getAttribute("aria-disabled")).toBe("true");
+      expect(btn.disabled).toBe(false);
     });
   });
 

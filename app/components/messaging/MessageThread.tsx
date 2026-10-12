@@ -23,6 +23,7 @@
  *   through a BFF resource route. This component cannot tell, and must not.
  */
 import { useEffect, useRef, useState } from "react";
+import { Button, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { bucketMessages, dayKeyInZone, dayLabel, type MessageRow } from "~/lib/communication-view";
@@ -219,9 +220,8 @@ export function MessageThread({
                 />
                 <button
                   type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 hover:text-ih-fg-1 disabled:opacity-50 transition-colors"
+                  {...pendingProps(uploading, () => fileRef.current?.click())}
+                  className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 hover:text-ih-fg-1 transition-colors ${PENDING_CLASS}`}
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                     <path d="M13 7.5 8.3 12.2a3.2 3.2 0 0 1-4.5-4.5L8.9 2.6a2.1 2.1 0 0 1 3 3L7.2 10.3a1 1 0 0 1-1.5-1.5L10 4.6" />
@@ -231,14 +231,12 @@ export function MessageThread({
               </>
             )}
           </div>
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!composeBody.trim() || sending}
-            className="px-4 py-2 rounded-xl bg-ih-primary text-ih-primary-fg text-sm font-semibold disabled:opacity-50 transition-opacity"
-          >
+          {/* pending, not disabled: the human check opened by onSend must not record <body> as its focus-return target.
+              The empty-body case is pending too: handleSend clears the body on success while Send is focused, and a
+              native disabled would drop that focus to <body>. */}
+          <Button variant="primary" onClick={handleSend} pending={sending || !composeBody.trim()}>
             {sending ? m.portal_messages_send_pending() : m.portal_messages_send()}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

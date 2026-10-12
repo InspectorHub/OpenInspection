@@ -55,9 +55,10 @@ export function LogoUploader({ currentUrl, uploading, onSelect, size = "default"
             ref={inputRef}
             type="file"
             accept="image/png,image/svg+xml,image/jpeg,image/webp"
-            disabled={uploading}
+            aria-disabled={uploading || undefined}
             className="sr-only"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) onSelect(f); e.target.value = ""; }}
+            onClick={(e) => { if (uploading) e.preventDefault(); }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f && !uploading) onSelect(f); e.target.value = ""; }}
           />
           {uploading ? m.media_logo_uploading() : m.media_logo_upload()}
         </label>

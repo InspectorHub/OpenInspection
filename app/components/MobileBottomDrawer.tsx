@@ -1,4 +1,5 @@
-import { useLayer } from '@core/shared-ui';
+import { useRef } from 'react';
+import { useDialogBehavior } from '@core/shared-ui';
 
 export interface MobileBottomDrawerProps {
     open:    boolean;
@@ -11,11 +12,13 @@ export interface MobileBottomDrawerProps {
 
 /**
  * Generic bottom-sheet primitive for the mobile layout: backdrop click +
- * Escape close, scroll-lock while open, slides up via translate. Three
+ * Escape close, scroll-lock, Tab trap, initial focus and focus return while open,
+ * slides up via translate. Three
  * editor drawers (Sections / Items / Preview) share this primitive.
  */
 export function MobileBottomDrawer({ open, onClose, title, children, heightFraction = 0.7 }: MobileBottomDrawerProps) {
-    useLayer(open, { onEscape: onClose, lockScroll: true });
+    const sheetRef = useRef<HTMLDivElement>(null);
+    useDialogBehavior(open, onClose, sheetRef);
 
     return (
         <>
@@ -26,10 +29,15 @@ export function MobileBottomDrawer({ open, onClose, title, children, heightFract
                 }`}
             />
             <div
+                ref={sheetRef}
+                tabIndex={-1}
                 role="dialog"
                 aria-modal="true"
                 aria-label={title}
-                className={`fixed left-0 right-0 bottom-0 z-50 bg-ih-bg-card rounded-t-2xl shadow-ih-popover flex flex-col transition-transform ${
+                // Closed, the sheet is only parked below the viewport: keep it out of the tab order and the accessibility tree.
+                inert={!open}
+                aria-hidden={open ? undefined : true}
+                className={`fixed left-0 right-0 bottom-0 z-50 bg-ih-bg-card rounded-t-2xl shadow-ih-popover flex flex-col outline-none transition-transform ${
                     open ? 'translate-y-0' : 'translate-y-full'
                 }`}
                 style={{ height: `${Math.round(heightFraction * 100)}vh` }}

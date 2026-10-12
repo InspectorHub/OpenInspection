@@ -6,11 +6,12 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
-import { Button, Pill, TabStrip, EmptyState, Card, Modal } from "@core/shared-ui";
+import { Button, Pill, TabStrip, EmptyState, Card, Modal, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import {
   TemplateEditorModal, smsSegmentsClient,
   type MessageTemplate, type EditorTarget,
 } from "~/components/settings/TemplateEditorModal";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 import { SUPPORTED_CONTACT_LOCALES } from "../../server/lib/i18n/contact-locale";
@@ -300,6 +301,7 @@ function TemplateList({
   onDelete: (t: MessageTemplate) => void;
 }) {
   const fetcher = useFetcher<{ ok: boolean; error?: string }>();
+  const latch = useSubmitLatch(fetcher.state);
 
   if (groups.length === 0) {
     return (
@@ -338,12 +340,13 @@ function TemplateList({
               <VariantRow group={g} onEdit={onEdit} onAddVariant={onAddVariant} onDelete={onDelete} />
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <fetcher.Form method="post">
+              <fetcher.Form method="post" onSubmit={latch()}>
                 <input type="hidden" name="intent" value="duplicate" />
                 <input type="hidden" name="id" value={t.id} />
                 <button
                   type="submit"
-                  className="text-[12px] text-ih-fg-3 font-semibold hover:text-ih-fg-1"
+                  {...pendingProps(fetcher.state !== "idle")}
+                  className={`text-[12px] text-ih-fg-3 font-semibold hover:text-ih-fg-1 ${PENDING_CLASS}`}
                 >
                   {m.settings_msgtpl_duplicate()}
                 </button>
@@ -440,6 +443,7 @@ function DeleteModal({
     if (fetcher.state === "idle" && fetcher.data?.ok) onClose();
   }, [fetcher.state, fetcher.data, onClose]);
 
+  const latch = useSubmitLatch(fetcher.state);
   const isConflict = fetcher.data?.conflict === true;
   const referencing = fetcher.data?.referencing ?? [];
 
@@ -454,10 +458,10 @@ function DeleteModal({
             {m.common_cancel()}
           </Button>
           {!isConflict && (
-            <fetcher.Form method="post">
+            <fetcher.Form method="post" onSubmit={latch()}>
               <input type="hidden" name="intent" value="delete" />
               <input type="hidden" name="id" value={template.id} />
-              <Button type="submit" variant="danger" disabled={fetcher.state !== "idle"}>
+              <Button type="submit" variant="danger" pending={fetcher.state !== "idle"}>
                 {m.common_delete()}
               </Button>
             </fetcher.Form>

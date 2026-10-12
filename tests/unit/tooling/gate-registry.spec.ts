@@ -297,6 +297,17 @@ describe('gate registry', () => {
             // tenant in the handler, so the question is asked at the keystroke.
             // One regex walk of server/**/*.ts, beside `rawnul` in cost.
             'tenantemail',
+            // A hand-drawn `fixed inset-0` dialog has none of the shared Escape, Tab trap,
+            // scroll lock or focus return. One tokenising walk of app/ and packages/*/src,
+            // beside `filesize` in cost; it carries a counted baseline for the files that
+            // predate it.
+            'overlays',
+            // A submit button with no busy protection, or a native disable that drops focus, and a
+            // control hidden until hover or parked off-screen yet still focusable, are each typed in
+            // one sitting and the author is present to fix them. Both walk app/**/*.tsx once with a
+            // tokeniser, beside the overlays gate in cost, and neither carries a baseline.
+            'busycontrols',
+            'hiddenfocusable',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);

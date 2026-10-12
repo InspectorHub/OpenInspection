@@ -127,7 +127,7 @@ export default function MarketplaceUpdatePage() {
           <div className="px-4 pb-4">
             <Form method="post">
               <input type="hidden" name="choice" value="keep" />
-              <Button type="submit" variant="primary" disabled={submitting}>
+              <Button type="submit" variant="primary" pending={submitting}>
                 {submitting ? m.marketplace_update_submitting() : m.marketplace_update_clean_submit({ semver: preview.toSemver })}
               </Button>
             </Form>
@@ -213,7 +213,7 @@ export default function MarketplaceUpdatePage() {
           </p>
 
           <div className="flex items-center gap-2">
-            <Button type="submit" variant={replacing ? "danger" : "primary"} disabled={submitting}>
+            <Button type="submit" variant={replacing ? "danger" : "primary"} pending={submitting}>
               {submitting
                 ? m.marketplace_update_submitting()
                 : replacing

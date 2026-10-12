@@ -13,8 +13,9 @@
  *     backstops a race.
  *   - { used, max, billingUrl } → at cap; billingUrl omitted hides the CTA.
  */
-import { describe, it, expect, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, cleanup, act } from "@testing-library/react";
+import { useFetcher } from "react-router";
 import { createElement } from "react";
 
 vi.mock("react-router", async () => {
@@ -71,5 +72,47 @@ describe("InviteSeatDrawer — at-open seat-limit gate", () => {
         const { getByText, queryByText } = render(<InviteSeatDrawer open onClose={() => {}} />);
         expect(queryByText(/Seat limit reached/)).toBeNull();
         expect(getByText("Email")).toBeTruthy();
+    });
+});
+
+describe("InviteSeatDrawer in-flight latch", () => {
+    const fetcherState = { state: "idle" as "idle" | "submitting", submit: vi.fn() };
+
+    function ui() {
+        return <InviteSeatDrawer open onClose={() => {}} />;
+    }
+
+    function form(): HTMLFormElement {
+        const f = document.getElementById("invite-seat-form");
+        if (!(f instanceof HTMLFormElement)) throw new Error("form not rendered");
+        return f;
+    }
+
+    beforeEach(() => {
+        fetcherState.state = "idle";
+        fetcherState.submit.mockReset();
+        vi.mocked(useFetcher).mockImplementation(
+            () => ({ state: fetcherState.state, data: undefined, submit: fetcherState.submit, load: vi.fn() }) as unknown as ReturnType<typeof useFetcher>,
+        );
+    });
+    afterEach(cleanup);
+
+    it("submits once when two submits land in one frame", () => {
+        render(ui());
+        const f = form();
+        act(() => { f.requestSubmit(); f.requestSubmit(); });
+        expect(fetcherState.submit).toHaveBeenCalledTimes(1);
+    });
+
+    it("releases when the fetcher returns to idle so a failed invite can be retried", () => {
+        const { rerender } = render(ui());
+        act(() => { form().requestSubmit(); form().requestSubmit(); });
+        expect(fetcherState.submit).toHaveBeenCalledTimes(1);
+        fetcherState.state = "submitting";
+        rerender(ui());
+        fetcherState.state = "idle";
+        rerender(ui());
+        act(() => { form().requestSubmit(); });
+        expect(fetcherState.submit).toHaveBeenCalledTimes(2);
     });
 });

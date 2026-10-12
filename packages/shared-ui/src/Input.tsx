@@ -42,10 +42,22 @@ export function Input({
         } ${className}`}
         {...props}
       />
-      {(error || reserveErrorSpace) && (
-        <p className={`text-[11px] text-ih-bad-fg mt-1 ${reserveErrorSpace ? "min-h-4" : ""}`} aria-live="polite">
-          {error ?? ""}
-        </p>
+      {/* A reserved slot holds the hint and the error in one grid cell and shows one of them, so the slot is
+          as tall as the taller of the two: a hint that wraps to two lines is replaced by a one-line error
+          without moving the controls below it. */}
+      {reserveErrorSpace ? (
+        <div className="mt-1 grid min-h-4 text-[11px]" aria-live="polite">
+          {hint && (
+            <p className={`col-start-1 row-start-1 text-ih-fg-3 ${error ? "invisible" : ""}`}>{hint}</p>
+          )}
+          <p className={`col-start-1 row-start-1 text-ih-bad-fg ${error ? "" : "invisible"}`}>{error ?? ""}</p>
+        </div>
+      ) : (
+        error && (
+          <p className="text-[11px] text-ih-bad-fg mt-1" aria-live="polite">
+            {error}
+          </p>
+        )
       )}
       {/* fg-3, not fg-4: at 11px this is normal-size text and needs 4.5:1.
           fg-4 is 2.56:1 on a light card and 3.07:1 on a dark one. See

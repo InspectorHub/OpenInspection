@@ -16,6 +16,7 @@ import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { buildStripeElementsOptions } from "~/lib/stripe-elements-options";
 import { m } from "~/paraglide/messages";
 import { money } from "./payment-helpers";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 type PayPhase = "idle" | "loading" | "ready" | "unavailable" | "paid_already";
 
@@ -75,9 +76,8 @@ export function StripePayPanel({ id, portalToken, balanceDue, inspectorName, bra
         <>
           <button
             type="button"
-            onClick={startPayment}
-            disabled={phase === "loading"}
-            className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0"
+            {...pendingProps(phase === "loading", startPayment)}
+            className={`w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0 ${PENDING_CLASS}`}
           >
             {phase === "loading" ? m.portal_pay_starting_checkout() : m.portal_pay_amount({ amount: money(balanceDue, cur) })}
           </button>
@@ -145,8 +145,8 @@ function CheckoutForm({ balanceDue, returnUrl, currency }: { balanceDue: number;
       <PaymentElement />
       <button
         type="submit"
-        disabled={!stripe || submitting}
-        className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0"
+        disabled={!stripe} {...pendingProps(submitting)}
+        className={`w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0 ${PENDING_CLASS}`}
       >
         {submitting ? m.portal_pay_processing() : m.portal_pay_amount({ amount: money(balanceDue, { currency }) })}
       </button>

@@ -77,7 +77,7 @@ export function StatutoryUpdateConfirm({
                         {m.statutory_update_confirm_cancel()}
                     </Button>
                     {ready && (
-                        <Button type="button" variant="primary" disabled={submitting} onClick={onConfirm}>
+                        <Button type="button" variant="primary" pending={submitting} onClick={onConfirm}>
                             {m.statutory_update_confirm_submit()}
                         </Button>
                     )}

@@ -147,8 +147,11 @@ describe("ImportStage: a run that is neither ready nor applied", () => {
 });
 
 describe("ImportStage: while a submit is in flight", () => {
-    it("disables the button it would be pressed twice through", () => {
-        renderStage({ busy: true });
-        expect(importButton().disabled).toBe(true);
+    it("marks the button pending (aria-disabled, focus kept) and swallows a second press", () => {
+        const { onApply } = renderStage({ busy: true });
+        expect(importButton().disabled).toBe(false);
+        expect(importButton().getAttribute("aria-disabled")).toBe("true");
+        fireEvent.click(importButton());
+        expect(onApply).not.toHaveBeenCalled();
     });
 });

@@ -140,14 +140,15 @@ export function SmsConsentBlock({
                 {canGrant && (
                     <Button
                         variant="primary"
-                        disabled={busy || (!implied && !ack)}
+                        disabled={!implied && !ack}
+                        pending={busy}
                         onClick={() => onGrant!(implied ? 0 : consent.disclosure!.version)}
                     >
                         {implied ? m.notif_prefs_sms_resume() : m.notif_prefs_sms_grant()}
                     </Button>
                 )}
                 {on && (
-                    <Button variant="secondary" onClick={onStop} disabled={busy}>
+                    <Button variant="secondary" onClick={onStop} pending={busy}>
                         {m.notif_prefs_sms_stop()}
                     </Button>
                 )}

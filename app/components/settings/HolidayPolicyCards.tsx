@@ -1,4 +1,4 @@
-import { Select } from "@core/shared-ui";
+import { PENDING_CLASS, Select, pendingProps } from "@core/shared-ui";
 import { SUPPORTED_STATE_CODES, regionOptionLabel } from "./holiday-region-options";
 import { m } from "~/paraglide/messages";
 
@@ -86,9 +86,8 @@ export function HolidayPolicyCards({
               role="radio"
               aria-checked={selected}
               data-testid={`holiday-policy-${policy.id}`}
-              onClick={() => onSelect(policy.id)}
-              disabled={saving}
-              className={`text-left rounded-md border px-3 py-3 transition-colors ${
+              {...pendingProps(saving, () => onSelect(policy.id))}
+              className={`text-left rounded-md border px-3 py-3 transition-colors ${PENDING_CLASS} ${
                 selected
                   ? "border-ih-primary bg-ih-primary-tint ring-2 ring-ih-primary/10"
                   : "border-ih-border bg-ih-bg-card hover:bg-ih-bg-muted"

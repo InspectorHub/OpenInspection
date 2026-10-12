@@ -114,6 +114,35 @@ describe("PropertyTypeControl", () => {
     });
   });
 
+  it("keeps focus on the select while saving: aria-disabled, not native, and a second change is ignored", async () => {
+    // The write never settles, so the control stays busy for the whole assertion.
+    const calls: Record<string, string>[] = [];
+    const Stub = createRoutesStub([
+      {
+        path: "/edit",
+        Component: () => (
+          <PropertyTypeControl {...COMMERCIAL} propertyType="single_family" commercialSubtype={null} reportTier={null} perUnitMode={false} hasPcaNarrative={false} />
+        ),
+        action: async ({ request }) => {
+          calls.push(Object.fromEntries(await request.formData()) as Record<string, string>);
+          return new Promise(() => {});
+        },
+      },
+      { path: "/resources/cost-items", loader: () => ({ items: [] }) },
+    ]);
+    const { findByTestId } = render(<Stub initialEntries={["/edit"]} />);
+    const select = (await findByTestId("property-type-select")) as unknown as HTMLSelectElement;
+    select.focus();
+    fireEvent.change(select, { target: { value: "multi_unit" } });
+    await waitFor(() => expect(calls).toHaveLength(1));
+    await waitFor(() => expect(select.getAttribute("aria-disabled")).toBe("true"));
+    expect(select.disabled).toBe(false);
+    expect(document.activeElement).toBe(select);
+
+    fireEvent.change(select, { target: { value: "commercial" } });
+    expect(calls, "a change while the save is in flight must be ignored").toHaveLength(1);
+  });
+
   it("cancelling writes nothing at all", async () => {
     const { findByTestId, findByText, calls } = renderControl();
     fireEvent.change(await findByTestId("property-type-select"), { target: { value: "multi_unit" } });

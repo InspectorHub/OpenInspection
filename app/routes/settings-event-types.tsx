@@ -1,11 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLoaderData } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-event-types";
 import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
-import { Table, Modal } from "@core/shared-ui";
+import { Table, Modal, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { MoneyInput } from "~/components/MoneyInput";
 import { m } from "~/paraglide/messages";
 
@@ -63,6 +63,9 @@ export default function SettingsEventTypes() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  // Two clicks inside one frame both run before `saving` renders.
+  const saveInFlight = useRef(false);
+  useEffect(() => { if (!saving) saveInFlight.current = false; }, [saving]);
   const nameRef = useRef<HTMLInputElement>(null);
 
   if ("forbidden" in data) return <AccessDenied />;
@@ -88,6 +91,8 @@ export default function SettingsEventTypes() {
   }
 
   async function save() {
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
     setSaving(true);
     // An empty follow-up box is OMITTED, never sent as 0: the PUT schema is a
     // `.partial()`, so an absent key leaves the stored delay alone, while a 0
@@ -241,9 +246,8 @@ export default function SettingsEventTypes() {
               {m.common_cancel()}
             </button>
             <button
-              onClick={save}
-              disabled={saving}
-              className="px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+              {...pendingProps(saving, save)}
+              className={`px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold hover:bg-ih-primary-600 transition-colors ${PENDING_CLASS}`}
             >
               {saving ? m.settings_common_saving() : m.common_save()}
             </button>

@@ -95,7 +95,8 @@ describe("CostItemsPanel", () => {
 
       const systemInput = screen.getByPlaceholderText("e.g. roof") as HTMLInputElement;
       expect(systemInput.disabled).toBe(true);
-      expect((screen.getByText("Remove") as HTMLButtonElement).disabled).toBe(true);
+      // Remove is aria-disabled (pending), not native, so focus is never dropped.
+      expect(screen.getByText("Remove").closest("button")!.getAttribute("aria-disabled")).toBe("true");
 
       // Even if a field edit manages to reach the commit handler while the
       // row is still pending (e.g. a blur that lands before React commits

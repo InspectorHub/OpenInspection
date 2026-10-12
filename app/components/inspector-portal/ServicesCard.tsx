@@ -145,7 +145,7 @@ export function ServicesCard({
                         variant="secondary"
                         size="sm"
                         onClick={() => setAddOpen(true)}
-                        disabled={adding}
+                        pending={adding}
                     >
                         {m.inspections_hub_services_add()}
                     </Button>
@@ -190,7 +190,7 @@ export function ServicesCard({
                         <Button
                             variant="primary"
                             size="sm"
-                            disabled={removingBusy}
+                            pending={removingBusy}
                             onClick={() => {
                                 if (!removing) return;
                                 if (submitRemove({ intent: "service-remove", lineId: removing.id }, { method: "post" })) {
@@ -257,7 +257,8 @@ function AddServiceModal({
                     <Button
                         variant="primary"
                         size="sm"
-                        disabled={!serviceId || submitting}
+                        disabled={!serviceId}
+                        pending={submitting}
                         onClick={() => onAdd(serviceId, isOverride ? cents : null)}
                     >
                         {m.inspections_hub_services_add()}
@@ -351,7 +352,7 @@ function RepriceModal({
                     <Button
                         variant="primary"
                         size="sm"
-                        disabled={submitting}
+                        pending={submitting}
                         onClick={() => onSave(line.id, cents === (line.priceSnapshot ?? null) ? null : cents)}
                     >
                         {m.common_save()}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Form } from "react-router";
-import { RadioCardGroup } from "@core/shared-ui";
+import { RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import type { useFetcher } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
@@ -231,8 +231,8 @@ export function EmailSecretsPanel({
           <p className="text-[12px] text-ih-bad-fg">{secretFormError("save-email-secrets")}</p>
         )}
         <div className="flex justify-end pt-3 border-t border-ih-border">
-          <button type="submit" disabled={savingEmailSecrets}
-            className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+          <button type="submit" {...pendingProps(savingEmailSecrets)}
+            className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${PENDING_CLASS}`}>
             {savingEmailSecrets ? m.common_saving() : m.settings_emailsecrets_save({ provider: PROVIDER_LABELS[provider] })}
           </button>
         </div>

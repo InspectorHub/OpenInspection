@@ -55,7 +55,7 @@ export function AgentReportActions({
   reportPath,
 }: AgentReportActionsProps) {
   // #106 - user mutation: mints a magic-login and creates the agent workspace
-  // session. The CTA is already `disabled={submitting}`.
+  // session. The CTA is already `pending={submitting}`.
   const { fetcher, submit, busy: submitting } = useGuardedSubmit<AgentMagicLoginActionResult>();
   const [error, setError] = useState(false);
   const [sent, setSent] = useState(false);
@@ -117,7 +117,7 @@ export function AgentReportActions({
           <Button
             variant="primary"
             size="md"
-            disabled={submitting}
+            pending={submitting}
             data-testid="agent-report-workspace-cta"
             onClick={() => {
               setError(false);

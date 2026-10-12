@@ -263,7 +263,7 @@ function ColumnMappingForm({
             <div className="flex flex-wrap items-center gap-3">
                 <Button
                     variant="primary"
-                    disabled={busy || missing !== null}
+                    disabled={missing !== null} pending={busy}
                     onClick={() => { if (!missing) onApply(cleaned(draft)); }}
                 >
                     {m.imports_mapping_save()}

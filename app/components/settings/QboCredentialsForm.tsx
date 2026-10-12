@@ -1,6 +1,7 @@
 import { Form } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { m } from "~/paraglide/messages";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 /** The three names that can live either in the Worker env or in the tenant's row. */
 export interface QboCredentialTriple {
@@ -97,8 +98,8 @@ export function QboCredentialsForm({
         <div className="flex justify-end pt-2 border-t border-ih-border">
           <button
             type="submit"
-            disabled={saving}
-            className="h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            {...pendingProps(saving)}
+            className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed ${PENDING_CLASS}`}
           >
             {saving ? m.common_saving() : m.settings_qbo_save_credentials()}
           </button>

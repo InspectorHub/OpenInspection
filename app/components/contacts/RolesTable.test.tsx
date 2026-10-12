@@ -6,14 +6,15 @@
  * can never be deleted — see server/api/role-profiles.ts), and routes a row
  * click to the caller's onEdit (opens RoleProfileModal in edit mode).
  */
-import { describe, it, expect, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, act, cleanup } from "@testing-library/react";
 import { createElement } from "react";
 
 vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof import("react-router")>("react-router");
   return {
     ...actual,
+    useNavigation: () => ({ state: "idle" }),
     useFetcher: vi.fn(() => ({
       state: "idle",
       data: undefined,
@@ -111,5 +112,25 @@ describe("RolesTable", () => {
     );
     getByText("Add Role").click();
     expect(onCreate).toHaveBeenCalled();
+  });
+});
+
+describe("RolesTable - double activation", () => {
+  afterEach(cleanup);
+
+  it("lets only one of two same-frame clicks on Deactivate post", () => {
+    let posted = 0;
+    const count = (e: Event) => { if (!e.defaultPrevented) posted += 1; };
+    document.addEventListener("submit", count);
+    try {
+      const { getByText } = render(
+        <RolesTable roleProfiles={[CLIENT_ROLE]} onEdit={vi.fn()} onCreate={vi.fn()} />,
+      );
+      const button = getByText("Deactivate");
+      act(() => { button.click(); button.click(); });
+      expect(posted).toBe(1);
+    } finally {
+      document.removeEventListener("submit", count);
+    }
   });
 });
