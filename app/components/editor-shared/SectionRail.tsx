@@ -11,7 +11,9 @@ import { m } from '~/paraglide/messages';
 // Handle + ⋮ live in reserved flex slots so they never occlude the section name
 // or progress donut. On desktop the glyph shows on hover; on touch (no hover) it
 // is always shown. Space is reserved either way, so nothing shifts or overlaps.
-const REVEAL = 'invisible group-hover:visible focus-within:visible [@media(hover:none)]:visible';
+// Opacity, not visibility: a visibility:hidden ⋮ cannot take focus, so closing the confirm
+// dialog it opened (no hover, focus not in the row) could not hand focus back to it.
+const REVEAL = 'opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100';
 
 interface SharedSectionRailProps {
  mode: EditorMode;

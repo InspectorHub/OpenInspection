@@ -13,7 +13,9 @@ import { ItemSubtreeDeleteModal, type PendingSubtreeDelete } from "./ItemSubtree
 
 // Handle + ⋯ occupy reserved flex slots so they never cover the item number,
 // label, or rating dot. Desktop reveals on hover; touch always shows them.
-const REVEAL = "invisible group-hover:visible focus-within:visible [@media(hover:none)]:visible";
+// Opacity, not visibility: a visibility:hidden ⋯ cannot take focus, so closing the confirm
+// dialog it opened (no hover, focus not in the row) could not hand focus back to it.
+const REVEAL = "opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
 interface SharedItemListProps {
   mode: EditorMode;
