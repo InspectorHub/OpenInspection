@@ -119,7 +119,7 @@ export function DashboardInspectionRow({
         </div>
       </Link>
       {/* Hover actions: open editor + status transition (visible on hover) */}
-      <div className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 flex items-center gap-1.5">
+      <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity shrink-0 flex items-center gap-1.5">
         <Link
           to={`/inspections/${insp.id}/edit`}
           aria-label={m.dashboard_row_open_editor()}

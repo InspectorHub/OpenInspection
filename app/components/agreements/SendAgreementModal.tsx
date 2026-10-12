@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Modal, Button } from "@core/shared-ui";
+import { Modal, Button, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -164,7 +164,7 @@ export function SendAgreementModal({
             size="lg"
             footer={
                 <>
-                    <Button variant="secondary" onClick={onClose} disabled={busy}>{m.common_cancel()}</Button>
+                    <Button variant="secondary" onClick={onClose} pending={busy}>{m.common_cancel()}</Button>
                     <Button variant="primary" onClick={submit} pending={busy} disabled={noTemplates}>
                         {busy ? m.agreement_send_pending() : m.agreement_send_submit()}
                     </Button>
@@ -233,10 +233,9 @@ export function SendAgreementModal({
                         </select>
                         <button
                             type="button"
-                            onClick={() => removeRow(i)}
-                            disabled={busy || signers.length === 1}
+                            {...pendingProps(busy || signers.length === 1, () => removeRow(i))}
                             aria-label={m.agreement_send_remove_aria()}
-                            className="px-2 py-2 text-ih-fg-3 hover:text-ih-bad-fg disabled:opacity-40 disabled:cursor-not-allowed"
+                            className={`px-2 py-2 text-ih-fg-3 hover:text-ih-bad-fg ${PENDING_CLASS}`}
                         >
                             ✕
                         </button>
@@ -246,9 +245,8 @@ export function SendAgreementModal({
 
             <button
                 type="button"
-                onClick={addRow}
-                disabled={busy}
-                className="mt-3 text-[13px] font-semibold text-ih-primary-text hover:opacity-80 disabled:opacity-40"
+                {...pendingProps(busy, addRow)}
+                className={`mt-3 text-[13px] font-semibold text-ih-primary-text hover:opacity-80 ${PENDING_CLASS}`}
             >
                 {m.agreement_send_add()}
             </button>

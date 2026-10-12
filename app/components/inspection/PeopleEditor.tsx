@@ -386,7 +386,7 @@ export function PeopleEditor({
             <Button variant="ghost" onClick={() => setRemoveTarget(null)}>{m.common_cancel()}</Button>
             <Button
               variant="danger"
-              disabled={removeBusy}
+              pending={removeBusy}
               onClick={() => removeTarget && handleRemove(removeTarget.id)}
             >{m.inspections_hub_people_remove_cta()}</Button>
           </>
@@ -406,7 +406,7 @@ export function PeopleEditor({
             <Button variant="ghost" onClick={() => setResetTarget(null)}>{m.common_cancel()}</Button>
             <Button
               variant="danger"
-              disabled={resetBusy}
+              pending={resetBusy}
               onClick={() => resetTarget && handleReset(resetTarget.id)}
             >{m.inspections_hub_people_reset_cta()}</Button>
           </>

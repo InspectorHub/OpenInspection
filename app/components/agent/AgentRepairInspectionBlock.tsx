@@ -15,6 +15,7 @@
  */
 import { useState } from "react";
 import { useFetcher } from "react-router";
+import { PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { RepairDefectRowView, type RepairDefectPhoto } from "~/components/portal/sections/repair/RepairDefectRowView";
 import { RepairSharePanel } from "~/components/portal/sections/repair/RepairSharePanel";
 import { useChallengeOnRefusal } from "~/components/OutboundVerification";
@@ -112,9 +113,8 @@ export function AgentRepairInspectionBlock({
           <button
             type="button"
             data-testid={`repair-share-${inspectionId}`}
-            onClick={share}
-            disabled={shareFetcher.state !== "idle"}
-            className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors disabled:opacity-60"
+            {...pendingProps(shareFetcher.state !== "idle", share)}
+            className={`h-8 px-3 rounded-md border border-ih-border text-[12px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}
           >
             {shareFetcher.state === "idle"
               ? m.agent_portal_repair_share_action()

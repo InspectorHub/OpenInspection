@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useLayer } from "@core/shared-ui";
+import { PENDING_CLASS, pendingProps, useLayer } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -223,9 +223,8 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
           <h2 className="text-[15px] font-bold text-ih-fg-1">{m.media_video_add_heading()}</h2>
           <button
             type="button"
-            onClick={onClose}
-            disabled={busy}
-            className="min-h-[44px] min-w-[44px] rounded-lg px-3 text-[13px] font-bold text-ih-fg-3 hover:text-ih-fg-1 disabled:opacity-40"
+            {...pendingProps(busy, onClose)}
+            className={`min-h-[44px] min-w-[44px] rounded-lg px-3 text-[13px] font-bold text-ih-fg-3 hover:text-ih-fg-1 ${PENDING_CLASS}`}
           >
             {m.common_cancel()}
           </button>

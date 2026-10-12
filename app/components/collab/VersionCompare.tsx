@@ -121,9 +121,8 @@ export function VersionCompare({
                     </div>
                     <button
                         type="button"
-                        onClick={onClose}
-                        disabled={busy}
-                        className="px-3 py-1.5 rounded-md text-xs font-bold border border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted disabled:opacity-50 transition-colors"
+                        {...pendingProps(busy, onClose)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold border border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}
                     >
                         {m.common_close()}
                     </button>
@@ -236,9 +235,8 @@ export function VersionCompare({
                     </p>
                     <button
                         type="button"
-                        onClick={onClose}
-                        disabled={busy}
-                        className="h-10 px-4 rounded-md text-[12px] font-bold border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-50 transition-colors"
+                        {...pendingProps(busy, onClose)}
+                        className={`h-10 px-4 rounded-md text-[12px] font-bold border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}
                     >
                         {m.common_done()}
                     </button>

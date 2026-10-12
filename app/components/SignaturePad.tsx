@@ -100,15 +100,14 @@ export function SignaturePad({ onSubmit, onCancel, label = "Sign" }: Props) {
       <div className="flex gap-2 mt-3">
         <button
           type="button"
-          className="text-sm text-ih-fg-3 underline"
-          onClick={clear}
-          disabled={busy}
+          className={`text-sm text-ih-fg-3 underline ${PENDING_CLASS}`}
+          {...pendingProps(busy, clear)}
         >
           Clear
         </button>
         <div className="ml-auto flex gap-2">
           {onCancel && (
-            <button type="button" className="text-sm" onClick={onCancel} disabled={busy}>
+            <button type="button" className={`text-sm ${PENDING_CLASS}`} {...pendingProps(busy, onCancel)}>
               Cancel
             </button>
           )}

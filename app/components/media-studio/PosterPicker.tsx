@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useFetcher } from "react-router";
-import { useLayer } from "@core/shared-ui";
+import { PENDING_CLASS, pendingProps, useLayer } from "@core/shared-ui";
 import { framesForDuration } from "../../../server/lib/media/poster-timestamp";
 import { m } from "~/paraglide/messages";
 
@@ -134,9 +134,8 @@ export function PosterPicker({
           </button>
           <button
             type="button"
-            onClick={setPoster}
-            disabled={unavailable || saving}
-            className="min-h-[44px] rounded-xl bg-ih-primary px-5 text-[14px] font-bold text-ih-fg-inverse hover:bg-ih-primary-600 disabled:opacity-50"
+            {...pendingProps(unavailable || saving, setPoster)}
+            className={`min-h-[44px] rounded-xl bg-ih-primary px-5 text-[14px] font-bold text-ih-fg-inverse hover:bg-ih-primary-600 ${PENDING_CLASS}`}
           >
             {m.media_poster_set()}
           </button>

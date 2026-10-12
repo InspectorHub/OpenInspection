@@ -121,9 +121,8 @@ export function InvoiceRowActions({
           </button>
         ))}
         <button
-          onClick={onCancelPicker}
-          disabled={busy}
-          className="px-2 h-7 rounded-md text-[12px] font-semibold text-ih-fg-3 hover:text-ih-fg-2 disabled:opacity-50"
+          {...pendingProps(busy, onCancelPicker)}
+          className={`px-2 h-7 rounded-md text-[12px] font-semibold text-ih-fg-3 hover:text-ih-fg-2 ${PENDING_CLASS}`}
         >
           {m.common_cancel()}
         </button>

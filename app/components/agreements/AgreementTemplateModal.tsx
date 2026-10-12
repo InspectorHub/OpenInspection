@@ -147,10 +147,10 @@ export function AgreementTemplateModal({
             initialFocusRef={nameRef}
             footer={
                 <>
-                    <Button variant="ghost" onClick={onClose} disabled={saving}>
+                    <Button variant="ghost" onClick={onClose} pending={saving}>
                         {m.common_cancel()}
                     </Button>
-                    <Button variant="primary" onClick={submit} pending={saving} disabled={loading || !!loadError}>
+                    <Button variant="primary" onClick={submit} pending={saving || loading} disabled={!!loadError}>
                         {saving ? m.common_saving() : m.common_save()}
                     </Button>
                 </>

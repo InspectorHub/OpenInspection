@@ -164,9 +164,8 @@ export function StripePaymentsPanel({
       <div className="pt-3 space-y-1.5">
         <div className="flex items-center justify-between">
           <p className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.14em]">{m.settings_stripe_recent_deliveries()}</p>
-          <button type="button" onClick={() => revalidator.revalidate()}
-            disabled={revalidator.state !== "idle"}
-            className="h-7 px-2.5 rounded-md border border-ih-border bg-ih-bg-card text-[11px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
+          <button type="button" {...pendingProps(revalidator.state !== "idle", () => revalidator.revalidate())}
+            className={`h-7 px-2.5 rounded-md border border-ih-border bg-ih-bg-card text-[11px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}>
             {revalidator.state !== "idle" ? m.settings_stripe_refreshing() : m.settings_stripe_refresh()}
           </button>
         </div>

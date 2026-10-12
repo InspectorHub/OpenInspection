@@ -82,7 +82,7 @@ export function SendSmsModal({
       size="md"
       footer={
         <div className="flex items-center justify-end gap-2">
-          <Button variant="secondary" size="sm" type="button" onClick={onClose} disabled={submitting}>
+          <Button variant="secondary" size="sm" type="button" onClick={onClose} pending={submitting}>
             {m.common_cancel()}
           </Button>
           <Button

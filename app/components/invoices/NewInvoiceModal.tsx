@@ -112,8 +112,8 @@ export function NewInvoiceModal({
           <p className="text-[12px] text-ih-bad-fg">{fetcher.data.error}</p>
         )}
         <div className="flex justify-end gap-3 pt-2 border-t border-ih-border">
-          <button type="button" onClick={onClose} disabled={busy}
-            className="h-9 px-4 rounded-md border border-ih-border bg-ih-bg-card text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
+          <button type="button" {...pendingProps(busy, onClose)}
+            className={`h-9 px-4 rounded-md border border-ih-border bg-ih-bg-card text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}>
             {m.common_cancel()}
           </button>
           <button type="submit" {...pendingProps(busy)}

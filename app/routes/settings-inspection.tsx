@@ -332,7 +332,7 @@ export function BulkLinkExpiry({ ttl, liveLinks }: { ttl: ReportLinkTtl; liveLin
                         <Button variant="ghost" onClick={() => setConfirming(false)}>{m.common_cancel()}</Button>
                         <Button
                             variant="danger"
-                            disabled={busy}
+                            pending={busy}
                             onClick={() => {
                                 submit({ ttl: JSON.stringify(ttl) }, { method: 'post' });
                                 setConfirming(false);

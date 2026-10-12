@@ -165,8 +165,8 @@ export function SmsSecretsPanel({
               className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
             />
           </div>
-          <button type="submit" disabled={smsTestFetcher.state !== "idle"}
-            className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
+          <button type="submit" {...pendingProps(smsTestFetcher.state !== "idle")}
+            className={`h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}>
             {smsTestFetcher.state !== "idle" ? m.settings_smssecrets_sending() : m.settings_smssecrets_send_test()}
           </button>
           {smsTestFetcher.data && "intent" in smsTestFetcher.data && smsTestFetcher.data.intent === "test-sms" && "ok" in smsTestFetcher.data && (
