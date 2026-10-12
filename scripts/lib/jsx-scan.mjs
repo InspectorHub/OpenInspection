@@ -160,7 +160,7 @@ export function findOpeningTags(a, nameRe) {
 /** The source between an element's opening tag and its matching close tag ('' when self-closing). */
 export function elementBody(a, tag) {
     if (tag.selfClosing) return '';
-    const esc = tag.name.replace(/[.]/g, '\\.');
+    const esc = tag.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const same = findOpeningTags(a, new RegExp(`^${esc}$`));
     const re = new RegExp(`<(/?)${esc}(?=[\\s/>])`, 'g');
     re.lastIndex = tag.end;
