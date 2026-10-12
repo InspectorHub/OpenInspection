@@ -42,6 +42,8 @@ function onWindowKeyDown(e: KeyboardEvent): void {
   // A widget that already used this Escape (closed its own suggestion list, reverted
   // an edit) calls preventDefault() in its React handler, which runs before this one.
   if (e.defaultPrevented) return;
+  // Escape that cancels an IME composition belongs to the input method, not to the overlay.
+  if (e.isComposing) return;
   const handler = layers[layers.length - 1]?.getEscape();
   if (!handler) return;
   e.preventDefault();

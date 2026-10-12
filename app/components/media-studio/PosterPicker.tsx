@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useFetcher } from "react-router";
+import { useLayer } from "@core/shared-ui";
 import { framesForDuration } from "../../../server/lib/media/poster-timestamp";
 import { m } from "~/paraglide/messages";
 
@@ -71,6 +72,9 @@ export function PosterPicker({
     );
     onClose();
   };
+
+  // Full-screen overlay: it takes Escape (and the scroll lock) so a dialog under it stays put.
+  useLayer(true, { onEscape: onClose, lockScroll: true });
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={m.media_poster_heading()}>

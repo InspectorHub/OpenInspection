@@ -1,5 +1,5 @@
 import { eq, and, lte, gte, notInArray, ne } from 'drizzle-orm';
-import { automations, automationLogs, inspections, tenantConfigs } from '../../lib/db/schema';
+import { automations, automationLogs, inspections, tenantConfigs, tenants } from '../../lib/db/schema';
 import { wallClockToEpochMs, resolveTenantTimeZone } from '../../lib/tz';
 import { nanoid } from 'nanoid';
 import { REPORT_STATUS } from '../../lib/status/report-status';
@@ -45,6 +45,10 @@ export function AutomationReminders<TBase extends Constructor<AutomationBase & H
             };
 
             for (const rule of rules) {
+                // No new reminders for a suspended company: flush would hold them anyway.
+                const owner = await db.select({ status: tenants.status }).from(tenants)
+                    .where(eq(tenants.id, rule.tenantId)).get();
+                if (owner?.status === 'suspended') continue;
                 const tenantTz = await loadTenantTz(rule.tenantId);
                 // Window upper bound = lead + 1.5d buffer so a same-day cron still
                 // catches an appointment whose lead window opens within the next day.

@@ -134,17 +134,12 @@ export function PhotoAnnotator({
   }, [labelInput]);
 
   /* -------------------------------------------------------------- */
-  /* Escape to close (label input swallows it first)                 */
+  /* Escape to close (the label input cancels its own Escape first)                 */
   /* -------------------------------------------------------------- */
   useLayer(open && mounted, {
-    onEscape: () => {
-      if (labelInput) {
-        setLabelInput(null);
-        setLabelText("");
-        return;
-      }
-      onClose();
-    },
+    // The label input cancels itself on Escape (and calls preventDefault), so by the time the
+    // stack hears one the label box is already gone: this is always "close the annotator".
+    onEscape: onClose,
   });
 
   /* -------------------------------------------------------------- */

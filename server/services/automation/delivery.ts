@@ -139,6 +139,11 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             const normal = await baseSelect()
                 .where(and(
                     eq(automationLogs.status, 'pending'),
+                    // A suspended company (including one scheduled for deletion) sends
+                    // nothing: its rows wait, still pending, and an unsuspended company
+                    // resumes. The HTTP guard only stops requests; this is the same rule
+                    // for the cron path, which never passes through it.
+                    ne(tenants.status, 'suspended'),
                     lte(automationLogs.sendAt, now),
                     // `ne()` is NULL-blind in SQL — a ruleless row would fail
                     // this predicate and vanish from BOTH batches. It belongs to
@@ -168,6 +173,7 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             const reminderRows = await baseSelect()
                 .where(and(
                     eq(automationLogs.status, 'pending'),
+                    ne(tenants.status, 'suspended'),
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     eq(automations.trigger, 'inspection.reminder' as any),
                 ));

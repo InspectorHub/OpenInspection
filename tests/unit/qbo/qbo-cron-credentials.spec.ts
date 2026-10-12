@@ -92,6 +92,19 @@ describe('the QBO cron resolves credentials per tenant', () => {
         expect(constructedWith.clientId).toBe('tenant-id');
     });
 
+    it('does not sync a suspended company, and syncs it again once reactivated', async () => {
+        const fx = await install(await standaloneQboEnv({
+            tenantSecrets: { QBO_CLIENT_ID: 'tenant-id', QBO_CLIENT_SECRET: 'tenant-secret' },
+        }));
+        const { tenants } = await import('../../../server/lib/db/schema');
+        await fx.db.update(tenants).set({ status: 'suspended' });
+        await runQBOCDC(fx.env as never);
+        expect(runCDCSync).not.toHaveBeenCalled();
+        await fx.db.update(tenants).set({ status: 'active' });
+        await runQBOCDC(fx.env as never);
+        expect(runCDCSync).toHaveBeenCalledTimes(1);
+    });
+
     it('names the tenant and the missing keys when it skips, instead of blaming configuration', async () => {
         const fx = await install(await standaloneQboEnv({
             tenantSecrets: { QBO_CLIENT_ID: 'only-half' },

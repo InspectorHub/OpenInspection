@@ -7,9 +7,10 @@
  * means. `scheduled.ts` is the entry point and should read as a list of what
  * runs, not as the bodies of each one.
  */
-import { eq } from 'drizzle-orm';
+import { and, eq, notInArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { qboConnections } from '../../lib/db/schema/qbo';
+import { tenants } from '../../lib/db/schema/tenant/core';
 import { logger } from '../../lib/logger';
 import { InvoiceService } from '../invoice.service';
 import { QBOService } from '../qbo.service';
@@ -59,7 +60,13 @@ export async function runQBOCDC(env: QboCronEnv): Promise<void> {
     const invoiceSvc = new InvoiceService(env.DB);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = drizzle(env.DB as any);
-    const connections = await db.select().from(qboConnections).where(eq(qboConnections.syncEnabled, true)).all();
+    // A suspended company (including one scheduled for deletion) is not synced: it has stopped
+    // working, so there is nobody to reconcile for and no reason to spend QuickBooks calls on it.
+    // The sweep reads from `lastSyncAt`, so a company that is reactivated catches up on what it missed.
+    const connections = await db.select().from(qboConnections).where(and(
+        eq(qboConnections.syncEnabled, true),
+        notInArray(qboConnections.tenantId, db.select({ id: tenants.id }).from(tenants).where(eq(tenants.status, 'suspended'))),
+    )).all();
 
     for (const conn of connections) {
         const { credentials, missing } = await resolveQboCredentialsForTenant(env, conn.tenantId);

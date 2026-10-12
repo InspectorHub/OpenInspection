@@ -2,7 +2,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup, fireEvent } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { hasOpenLayer } from "@core/shared-ui";
+import { hasOpenLayer, Modal } from "@core/shared-ui";
+import { AddMediaChooser } from "~/components/editor/AddMediaChooser";
 import { KeyboardHud } from "~/components/editor/KeyboardHud";
 import { VersionCompare } from "~/components/collab/VersionCompare";
 import { UserMenuPopover } from "~/components/sidebar/UserMenuPopover";
@@ -67,5 +68,27 @@ describe("Escape on layer-backed overlays", () => {
     render(menu(false, onClose));
     esc();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("a full-screen sheet over a modal takes Escape, the modal keeps its form", () => {
+    const sheet = vi.fn();
+    const modal = vi.fn();
+    render(
+      <Modal open title="Form" onClose={modal}>
+        <AddMediaChooser onClose={sheet} onTakePhoto={() => {}} onAddFromLibrary={() => {}} onPickVideo={() => {}} />
+      </Modal>,
+    );
+    esc();
+    expect(sheet).toHaveBeenCalledTimes(1);
+    expect(modal).not.toHaveBeenCalled();
+  });
+
+  it("an Escape that cancels an IME composition does not close the overlay", () => {
+    const onClose = vi.fn();
+    render(<KeyboardHud onClose={onClose} />);
+    fireEvent.keyDown(document, { key: "Escape", isComposing: true });
+    expect(onClose).not.toHaveBeenCalled();
+    esc();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

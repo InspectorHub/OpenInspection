@@ -7,6 +7,7 @@
  * per-row work around it, which is what their batch caps bound.
  */
 import { and, eq, inArray, isNull, lt, notInArray, or } from 'drizzle-orm';
+import { tenants } from '../../lib/db/schema/tenant/core';
 import { qboConnections } from '../../lib/db/schema/qbo';
 import { syncOutbox } from '../../lib/db/schema/tenant/integration';
 import { messagingCompliance } from '../../lib/db/schema/compliance';
@@ -32,7 +33,11 @@ export const qboCdcJob: CronJob = {
         return exists(
             db(env).select({ tenantId: qboConnections.tenantId })
                 .from(qboConnections)
-                .where(eq(qboConnections.syncEnabled, true))
+                // Suspended companies are not synced; see runQBOCDC.
+                .where(and(
+                    eq(qboConnections.syncEnabled, true),
+                    notInArray(qboConnections.tenantId, db(env).select({ id: tenants.id }).from(tenants).where(eq(tenants.status, 'suspended'))),
+                ))
                 .limit(1).get(),
         );
     },
@@ -140,9 +145,13 @@ export const calendarSyncJob: CronJob = {
         return exists(
             db(env).select({ id: calendarConnections.id })
                 .from(calendarConnections)
-                .where(or(
-                    isNull(calendarConnections.lastSyncAt),
-                    lt(calendarConnections.lastSyncAt, dueBefore),
+                .where(and(
+                    or(
+                        isNull(calendarConnections.lastSyncAt),
+                        lt(calendarConnections.lastSyncAt, dueBefore),
+                    ),
+                    // Suspended companies are not synced; see sweepCalendarSyncs.
+                    notInArray(calendarConnections.tenantId, db(env).select({ id: tenants.id }).from(tenants).where(eq(tenants.status, 'suspended'))),
                 ))
                 .limit(1).get(),
         );

@@ -68,7 +68,7 @@
   "server/api/inspections/results.ts": 449,
   "app/lib/collab/results-doc-connection.ts": 435,
   "server/api/inspections/media.ts": 435,
-  "app/components/media-studio/VideoCapture.tsx": 433,
+  "app/components/media-studio/VideoCapture.tsx": 437,
   "app/routes/public/portal-inspection.tsx": 430,
   "server/lib/compliance/erasure-manifest.ts": 427,
   "server/services/template.service.ts": 427,

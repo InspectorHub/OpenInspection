@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useLayer } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -210,6 +211,9 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
   // The pick button is disabled while busy OR (R2 only) until the privacy
   // notice has been accepted.
   const pickDisabled = busy || (provider === "r2" && !accepted);
+
+  // Full-screen sheet: takes Escape; an upload in flight keeps it open, like its backdrop.
+  useLayer(true, { onEscape: () => { if (!busy) onClose(); }, lockScroll: true });
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={m.media_video_add_aria()}>
