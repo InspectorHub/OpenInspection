@@ -73,8 +73,11 @@ export function useChallengeOnRefusal(
   data: { verifySiteKey?: string } | undefined,
   state: string,
   resubmit: () => void,
-): ReactNode {
+): { dialog: ReactNode; blocked: boolean } {
   const [open, setOpen] = useState<{ id: number; siteKey: string } | null>(null);
+  // True once the check was passed and the re-send was refused anyway: the page should
+  // show its own error then (and only then, not behind the dialog on the first refusal).
+  const [blocked, setBlocked] = useState(false);
   const handled = useRef<unknown>(null);
   const counter = useRef(0);
   // When the page last sent again after a passed check. A refusal right after that is
@@ -85,24 +88,28 @@ export function useChallengeOnRefusal(
     handled.current = data;
     if (!data.verifySiteKey) {
       retriedAt.current = 0;
+      setBlocked(false);
       return;
     }
     // Refused again straight after a passed check: asking again would loop forever
     // (the server cannot accept this token). Stop and let the page show its error.
     if (Date.now() - retriedAt.current < RETRY_WINDOW_MS) {
       retriedAt.current = 0;
+      setBlocked(true);
       return;
     }
+    setBlocked(false);
     counter.current += 1;
     setOpen({ id: counter.current, siteKey: data.verifySiteKey });
   }, [data, state]);
-  if (!open) return null;
-  return (
+  const dialog = !open ? null : (
     <VerifyDialog
       key={open.id}
       step={open.id}
       siteKey={open.siteKey}
       onDone={(ok) => {
+        // A late callback from a dialog that has since been replaced is ignored.
+        if (counter.current !== open.id) return;
         setOpen(null);
         if (ok) {
           retriedAt.current = Date.now();
@@ -111,10 +118,11 @@ export function useChallengeOnRefusal(
       }}
     />
   );
+  return { dialog, blocked };
 }
 
 /** How long a refusal after a re-send counts as the answer to that re-send. */
-const RETRY_WINDOW_MS = 30_000;
+const RETRY_WINDOW_MS = 90_000;
 
 interface Pending {
   id: number;
@@ -159,7 +167,7 @@ export function OutboundVerificationProvider({
     if (!current || current.id !== id) return;
     pendingRef.current = null;
     setPending(null);
-    current?.resolve(ok);
+    current.resolve(ok);
   }, []);
 
   return (

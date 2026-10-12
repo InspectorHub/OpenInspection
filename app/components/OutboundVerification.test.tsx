@@ -94,7 +94,8 @@ describe("OutboundVerificationProvider", () => {
 
 describe("useChallengeOnRefusal", () => {
   function Page({ data, resubmit }: { data?: { verifySiteKey?: string }; resubmit: () => void }) {
-    return <div>{useChallengeOnRefusal(data, "idle", resubmit)}</div>;
+    const challenge = useChallengeOnRefusal(data, "idle", resubmit);
+    return <div>{challenge.dialog}<span data-testid="blocked">{String(challenge.blocked)}</span></div>;
   }
 
   it("shows nothing for a normal response", () => {
@@ -123,9 +124,12 @@ describe("useChallengeOnRefusal", () => {
     const { rerender } = render(<Page data={{ verifySiteKey: "k" }} resubmit={resubmit} />);
     await act(async () => emitToken!("0.token-value-1234567890"));
     expect(resubmit).toHaveBeenCalledOnce();
-    // The same refusal comes back for the re-send: no second dialog.
+    // The same refusal comes back for the re-send: no second dialog, and the page is told
+    // the check could not be completed so it can show its own error.
+    expect(screen.getByTestId("blocked").textContent).toBe("false");
     rerender(<Page data={{ verifySiteKey: "k" }} resubmit={resubmit} />);
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByTestId("blocked").textContent).toBe("true");
     // A later, separate refusal is a new attempt and asks again.
     rerender(<Page data={{ verifySiteKey: "k" }} resubmit={resubmit} />);
     expect(screen.getByRole("dialog")).toBeTruthy();

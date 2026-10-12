@@ -320,7 +320,7 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
-      {challenge}
+      {challenge.dialog}
       {/* Header */}
       <div>
         <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-3 mb-1">
@@ -434,7 +434,7 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
           emailMsg={emailMsg}
           emailSent={emailSent}
           emailSubmitting={emailFetcher.state === "submitting"}
-          emailError={emailFetcher.data?.error}
+          emailError={emailFetcher.data?.verifySiteKey && !challenge.blocked ? undefined : emailFetcher.data?.error}
           onCopyShareLink={copyShareLink}
           onEmailToChange={setEmailTo}
           onEmailMsgChange={setEmailMsg}

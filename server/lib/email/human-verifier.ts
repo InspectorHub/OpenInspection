@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import type { HumanVerifier } from './outbound-cooling-window';
 import { isInProcessRequest, memoOnce } from '../request-scope';
+import { logger } from '../logger';
 import { resolveTurnstile, verifyTurnstileOutcome } from '../middleware/bot-protection';
 
 /**
@@ -21,10 +22,15 @@ export function buildHumanVerifier(c: Context): HumanVerifier | undefined {
     // Keyed by the token on the OUTER request's scope: a token redeems once, so every
     // in-process call of one page action must share a single answer, or the second
     // send of the same action would be refused for a token the first one spent.
-    const attempt = async (): Promise<'yes' | 'no' | 'error'> => {
+    const attempt = async (idempotencyKey: string): Promise<'yes' | 'no' | 'error'> => {
         const policy = resolveTurnstile(c.env);
         if (!policy.enforced) return 'no';
-        try { return await verifyTurnstileOutcome(token, policy.secret); } catch { return 'error'; }
+        try {
+            return await verifyTurnstileOutcome(token, policy.secret, idempotencyKey);
+        } catch {
+            logger.warn('[human-check] verification unavailable (secret missing?)');
+            return 'error';
+        }
     };
     // One answer per token per page action, shared by every in-process call and by
     // concurrent callers. A could-not-tell answer gets one fresh attempt INSIDE the
@@ -32,8 +38,11 @@ export function buildHumanVerifier(c: Context): HumanVerifier | undefined {
     // also fails is the person treated as unverified.
     const verifier: HumanVerifier = async () => {
         const outcome = await memoOnce(c.env, `human-verified:${token}`, async () => {
-            const first = await attempt();
-            return first === 'error' ? attempt() : first;
+            // The same key on both tries: a first request that reached Cloudflare and only
+            // lost its answer must not turn into "already redeemed" on the retry.
+            const key = crypto.randomUUID();
+            const first = await attempt(key);
+            return first === 'error' ? attempt(key) : first;
         });
         return outcome === 'yes';
     };
