@@ -53,7 +53,7 @@ function durationLabel(minutes: number | null): string {
   return m.settings_services_duration_m({ minutes: split.minutes });
 }
 
-export function ToggleServiceForm({ svc }: { svc: Pick<Service, "id" | "active"> }) {
+function ToggleServiceForm({ svc }: { svc: Pick<Service, "id" | "active"> }) {
   const latch = useSubmitLatch();
   const busy = useNavigation().state !== "idle";
   return (

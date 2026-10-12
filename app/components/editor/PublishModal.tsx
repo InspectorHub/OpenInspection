@@ -32,7 +32,7 @@ export interface PublishModalProps {
   * `extras` carries the fields collected below — the owning route must send them
   * with the publish, not beside it.
   */
- onPublish: (markComplete: boolean, extras: PublishExtras) => void | Promise<void>;
+ onPublish: (markComplete: boolean, extras: PublishExtras) => void | Promise<void>; // i18n-literal-ok: a TypeScript type, not UI text
  /**
   * Whether the next publish creates version > 1 — i.e. this is a REVISION.
   *
