@@ -891,18 +891,6 @@ function InspectionEditPage() {
   );
  }, [findings, state.activeItemId, state.currentSection, state.currentSectionItems]);
 
- useEffect(() => {
-  if (!tagPickerOpen) return;
-  const handler = (e: KeyboardEvent) => {
-   if (e.key === "Escape") {
-    e.preventDefault();
-    setTagPickerOpen(false);
-   }
-  };
-  window.addEventListener("keydown", handler);
-  return () => window.removeEventListener("keydown", handler);
- }, [tagPickerOpen]);
-
  /* ---------------------------------------------------------------- */
  /* Track fetcher state for save indicator */
  /* ---------------------------------------------------------------- */

@@ -2,7 +2,7 @@
 import React, { useRef } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup, fireEvent, screen } from "@testing-library/react";
-import { Modal, Drawer, Popover, useLayer, hasOpenLayer } from "@core/shared-ui";
+import { Modal, Drawer, Popover, useLayer, hasOpenLayer, escapeWillBeHandled } from "@core/shared-ui";
 
 /** Module state is shared across tests: unmounting everything must leave it empty. */
 afterEach(() => {
@@ -182,6 +182,36 @@ describe("layer stack", () => {
     expect(document.body.style.overflow).toBe("");
   });
 
+  it("reports escapeWillBeHandled only when the top layer answers Escape", () => {
+    const { rerender } = render(<Probe open />);
+    expect(hasOpenLayer()).toBe(true);
+    expect(escapeWillBeHandled()).toBe(false);
+    rerender(<Probe open onEscape={() => {}} />);
+    expect(escapeWillBeHandled()).toBe(true);
+  });
+
+  it("does not overwrite an overflow value some other writer set while locked", () => {
+    const { unmount } = render(<Probe open lockScroll />);
+    document.body.style.overflow = "clip";
+    unmount();
+    expect(document.body.style.overflow).toBe("clip");
+    document.body.style.overflow = "";
+  });
+
+  it("a layer that is not registered (invisible) takes no Escape", () => {
+    const hidden = vi.fn();
+    const visible = vi.fn();
+    render(
+      <>
+        <Probe open onEscape={visible} />
+        <Probe open={false} onEscape={hidden} />
+      </>,
+    );
+    esc();
+    expect(visible).toHaveBeenCalledTimes(1);
+    expect(hidden).not.toHaveBeenCalled();
+  });
+
   it("reports hasOpenLayer for non-layer hotkey handlers", () => {
     expect(hasOpenLayer()).toBe(false);
     const { rerender } = render(<Probe open />);
@@ -341,6 +371,41 @@ describe("composed overlays", () => {
     rerender(<Host open />);
     expect(screen.getByRole("dialog").contains(document.activeElement)).toBe(true);
     rerender(<Host open={false} />);
+    expect(document.activeElement).toBe(screen.getByText("trigger"));
+  });
+
+  it("leaves Tab alone for focus inside a popover above a dialog", () => {
+    render(
+      <>
+        <Modal open title="M" onClose={() => {}}>
+          <button type="button">m1</button>
+        </Modal>
+        <Probe open onEscape={() => {}} />
+        <button type="button">outside</button>
+      </>,
+    );
+    const outside = screen.getByText("outside");
+    outside.focus();
+    // A non-trapping overlay above: focus outside the dialog root is not pulled back.
+    expect(fireEvent.keyDown(outside, { key: "Tab" })).toBe(true);
+  });
+
+  it("restores the trigger when parent and child dialogs close in the same commit", async () => {
+    const Host = ({ open }: { open: boolean }) => (
+      <>
+        <button type="button">trigger</button>
+        <Modal open={open} title="Outer" onClose={() => {}}>
+          <Modal open={open} title="Inner" onClose={() => {}}>
+            <button type="button">in</button>
+          </Modal>
+        </Modal>
+      </>
+    );
+    const { rerender } = render(<Host open={false} />);
+    screen.getByText("trigger").focus();
+    rerender(<Host open />);
+    rerender(<Host open={false} />);
+    await Promise.resolve();
     expect(document.activeElement).toBe(screen.getByText("trigger"));
   });
 });

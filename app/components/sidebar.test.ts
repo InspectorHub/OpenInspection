@@ -149,13 +149,6 @@ describe('Sidebar', () => {
     expect(text).toContain('aria-label=');
   });
 
-  it('IA-25: popover closes on Escape key (registered on the shared layer stack)', async () => {
-    const src = await import('~/components/sidebar/UserMenuPopover?raw');
-    const text = (src as unknown as { default: string }).default;
-    // Escape is answered by the layer stack (behavior is covered in overlay-escape.test.tsx)
-    expect(text).toContain('useLayer(open, { onEscape: onClose })');
-  });
-
   it('IA-25: MobileDrawer renders menu items flat (no nested popover component)', async () => {
     const src = await import('~/components/sidebar/MobileDrawer?raw');
     const drawerBlock = (src as unknown as { default: string }).default;

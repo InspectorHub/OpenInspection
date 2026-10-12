@@ -39,7 +39,8 @@ export function InspectorToolsDock({
   // Escape via useDialogBehavior). Without this the menu could only be dismissed
   // by clicking its click-outside backdrop — and that full-screen backdrop
   // intercepts pointer events over the rest of the editor until it closes.
-  useLayer(dockOpen, { onEscape: () => setDockOpen(false) });
+  // Not while the dock is hidden (speed mode renders nothing): an invisible layer would eat Escape.
+  useLayer(dockOpen && !hidden, { onEscape: () => setDockOpen(false) });
 
   if (hidden) return null;
 

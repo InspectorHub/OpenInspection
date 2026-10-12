@@ -136,7 +136,7 @@ export function PhotoAnnotator({
   /* -------------------------------------------------------------- */
   /* Escape to close (label input swallows it first)                 */
   /* -------------------------------------------------------------- */
-  useLayer(open, {
+  useLayer(open && mounted, {
     onEscape: () => {
       if (labelInput) {
         setLabelInput(null);
