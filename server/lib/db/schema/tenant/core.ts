@@ -456,4 +456,8 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
      */
     reportViewCountingEnabled: integer('is_report_view_counting_enabled', { mode: 'boolean' })
         .notNull().default(false),
+    // Native clients lock their local data after this many days without a
+    // successful refresh. Enforced on the device; the server only publishes it.
+    // Appended at END per the D1 add-column-at-end rule (tenant_configs is FK-referenced).
+    offlineMaxDays: integer('offline_max_days').notNull().default(30),
 });

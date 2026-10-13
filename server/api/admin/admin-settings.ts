@@ -133,6 +133,7 @@ const TenantConfigGetResponseSchema = z.object({
         agreementRetentionYears: z.number().int().describe('Years signed agreements are retained before the GDPR retention sweep destroys them (Track I-a). Default 6.'),
         reportPdfRetentionYears: z.number().int().describe('Years a rendered report PDF is kept. 0 = indefinite. Default 7 is a platform default, not a statutory requirement.'),
         reportViewCountingEnabled: z.boolean().describe('Whether this workspace counts report opens. Default false.'),
+        offlineMaxDays: z.number().int().describe('Days a native client may stay offline before it locks local data. Default 30.'),
         reviewUrl: z.string().nullable().optional().describe('Track J (#122) — company review link, or null.'),
         smsMode: z.enum(['platform', 'own', 'managed_shared', 'managed_dedicated']).describe('Track L (D3) — SMS sender mode.'),
         companyPhone: z.string().nullable().optional().describe('Track L — call-back number rendered as {{company_phone}} in SMS copy.'),
@@ -444,6 +445,7 @@ const adminSettingsRoutes = createApiRouter()
                 agreementRetentionYears: config?.agreementRetentionYears ?? 6,
                 reportPdfRetentionYears: resolveReportPdfRetentionYears(config),
                 reportViewCountingEnabled: config?.reportViewCountingEnabled ?? false,
+                offlineMaxDays: (config?.offlineMaxDays as number | undefined) ?? 30,
                 reviewUrl: config?.reviewUrl ?? null,
                 smsMode: (config?.smsMode as 'platform' | 'own' | 'managed_shared' | 'managed_dedicated') ?? 'platform',
                 companyPhone: (config?.companyPhone as string | null) ?? null,
@@ -499,6 +501,9 @@ const adminSettingsRoutes = createApiRouter()
         }
         if (body.agreementRetentionYears !== undefined) {
             update.agreementRetentionYears = body.agreementRetentionYears;
+        }
+        if (body.offlineMaxDays !== undefined) {
+            update.offlineMaxDays = body.offlineMaxDays;
         }
         if (body.reviewUrl !== undefined) {
             update.reviewUrl = body.reviewUrl || null;
