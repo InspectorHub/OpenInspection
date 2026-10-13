@@ -47,6 +47,14 @@ const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as Execut
 /**
  * Stands in for the consent page's action, plus two test-only probes that need
  * the provider helpers the library injects into the request env.
+ *
+ * Correspondence with the real route (app/routes/oauth/authorize.tsx): the
+ * `includes('native')` test below is the action's `isNativeAuthRequest` branch,
+ * and the 404/400/403 refusals come from the same completeNativeAuthorization it
+ * calls. This copy does NOT guard the real branch: the loader and action
+ * themselves are exercised in app/routes/oauth/oauth-authorize.test.ts, where
+ * removing the branch turns a test red. Here the point is the provider-side
+ * lifecycle.
  */
 async function appOrConsent(req: Request, e: Record<string, unknown>, c: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
@@ -236,6 +244,51 @@ describe('native client OAuth lifecycle (real provider)', () => {
         expect(await grantCount()).toBe(before - 1);
         // The revoked grant's access token no longer works.
         expect((await sessionContext(third.access_token)).status).toBe(401);
+    });
+
+    it('with the switch turned off, a native refresh is 400 invalid_grant and the grant is revoked; with it on it refreshes', async () => {
+        const clientId = await registerClient();
+        const kept = (await (await authorizeAndExchange(clientId, 'native', USER)).json()) as Tokens;
+        const dropped = (await (await authorizeAndExchange(clientId, 'native', OTHER_USER)).json()) as Tokens;
+        const refresh = (via: Call, t: Tokens) => via(new Request(`${ORIGIN}/oauth/token`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: t.refresh_token!, client_id: clientId }).toString(),
+        }));
+        const usersBefore = await grantCount(USER);
+        const othersBefore = await grantCount(OTHER_USER);
+
+        // Switch off: refused, and the grant is gone rather than left to keep sliding.
+        const off = await refresh(callIn(mcpOnlyEnv), dropped);
+        expect(off.status).toBe(400);
+        expect(((await off.json()) as { error: string }).error).toBe('invalid_grant');
+        expect(await grantCount(OTHER_USER)).toBe(othersBefore - 1);
+
+        // Control: the same refresh on the opted-in deployment succeeds and keeps its grant.
+        const on = await refresh(call, kept);
+        expect(on.status).toBe(200);
+        expect(await grantCount(USER)).toBe(usersBefore);
+    });
+
+    it('a native-grant token presented to /mcp is refused with 403', async () => {
+        const clientId = await registerClient();
+        const t = (await (await authorizeAndExchange(clientId, 'native')).json()) as Tokens;
+        const res = await call(new Request(`${ORIGIN}/mcp`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${t.access_token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+        }));
+        expect(res.status).toBe(403);
+        // Control: an MCP grant's token gets past the same guard and reaches the MCP server. This
+        // workers project has no INSPECTOR_MCP Durable Object, so reaching it surfaces as the
+        // agent's missing-binding error; the native request above never got that far.
+        const mcp = (await (await authorizeAndExchange(clientId, 'read:inspections')).json()) as Tokens;
+        const reached = await call(new Request(`${ORIGIN}/mcp`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${mcp.access_token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+        })).then((r) => (r.status === 403 ? 'forbidden' : 'answered'), (e: unknown) => String(e));
+        expect(reached === 'answered' || reached.includes('INSPECTOR_MCP')).toBe(true);
     });
 
     it('revokeAllUserGrants cuts off every native grant of that user and leaves another user alone', async () => {

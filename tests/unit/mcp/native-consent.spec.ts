@@ -4,11 +4,32 @@ import type { AuthRequest, OAuthHelpers } from '@cloudflare/workers-oauth-provid
 const writeAuditLog = vi.fn();
 vi.mock('../../../server/lib/audit', () => ({ writeAuditLog: (p: unknown) => writeAuditLog(p) }));
 
-import { isNativeAuthRequest, isNativeRedirectUri, completeNativeAuthorization } from '../../../server/lib/auth/native-consent';
+import {
+  isNativeAuthRequest, isNativeRedirectUri, completeNativeAuthorization, hasNativePkce, nativeRedirectDisplay,
+} from '../../../server/lib/auth/native-consent';
 
 const authReq = (scope: string[]): AuthRequest => ({
   responseType: 'code', clientId: 'c1', redirectUri: 'io.example.app:/cb', scope, state: 's',
-} as AuthRequest);
+  codeChallenge: 'x'.repeat(43), codeChallengeMethod: 'S256',
+});
+
+describe('hasNativePkce', () => {
+  it('is true only for a non-empty challenge with the S256 method', () => {
+    expect(hasNativePkce(authReq(['native']))).toBe(true);
+    expect(hasNativePkce({ ...authReq(['native']), codeChallenge: undefined })).toBe(false);
+    expect(hasNativePkce({ ...authReq(['native']), codeChallenge: '' })).toBe(false);
+    expect(hasNativePkce({ ...authReq(['native']), codeChallengeMethod: 'plain' })).toBe(false);
+    expect(hasNativePkce({ ...authReq(['native']), codeChallengeMethod: undefined })).toBe(false);
+  });
+});
+
+describe('nativeRedirectDisplay', () => {
+  it('names the scheme of a private-use redirect and flags a loopback one', () => {
+    expect(nativeRedirectDisplay('io.inspectorhub.app:/oauth/callback')).toEqual({ loopback: false, scheme: 'io.inspectorhub.app' });
+    expect(nativeRedirectDisplay('http://127.0.0.1:53682/cb')).toEqual({ loopback: true, scheme: '' });
+    expect(nativeRedirectDisplay('http://[::1]/cb')).toEqual({ loopback: true, scheme: '' });
+  });
+});
 
 function oauth() {
   const completeAuthorization = vi.fn(async (_opts: { scope: string[]; props: Record<string, unknown> }) => ({ redirectTo: 'io.example.app:/cb?code=abc' }));
@@ -106,6 +127,26 @@ describe('completeNativeAuthorization', () => {
     await completeNativeAuthorization({
       ...base, oauth: helpers, authReq: loopback, identity: { userId: 'u1', tenantId: 't1', role: 'inspector' },
     });
+    expect(completeAuthorization).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a request without a PKCE S256 challenge with 400 and no grant', async () => {
+    const { helpers, completeAuthorization } = oauth();
+    const identity = { userId: 'u1', tenantId: 't1', role: 'inspector' } as const;
+    const variants: AuthRequest[] = [
+      { ...authReq(['native']), codeChallenge: undefined, codeChallengeMethod: undefined },
+      { ...authReq(['native']), codeChallengeMethod: 'plain' },
+      { ...authReq(['native']), codeChallengeMethod: undefined },
+    ];
+    for (const bad of variants) {
+      const err = await completeNativeAuthorization({ ...base, oauth: helpers, authReq: bad, identity }).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(Response);
+      expect((err as Response).status).toBe(400);
+    }
+    expect(completeAuthorization).not.toHaveBeenCalled();
+    expect(writeAuditLog).not.toHaveBeenCalled();
+    // Control: the S256 request is granted.
+    await completeNativeAuthorization({ ...base, oauth: helpers, authReq: authReq(['native']), identity });
     expect(completeAuthorization).toHaveBeenCalledTimes(1);
   });
 

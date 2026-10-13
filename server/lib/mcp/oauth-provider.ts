@@ -1,8 +1,8 @@
 import { OAuthError, OAuthProvider, getOAuthApi, type OAuthProviderOptions, type TokenExchangeCallbackResult } from '@cloudflare/workers-oauth-provider';
-import { nativeTokenExchange } from '../auth/native-token';
+import { isNativeProps, nativeTokenExchange } from '../auth/native-token';
 import { InspectorMcp } from '../../durable-objects/inspector-mcp';
 import type { McpProps } from '../../durable-objects/inspector-mcp';
-import { oauthProviderEnabled } from './flag';
+import { nativeClientEnabled, oauthProviderEnabled } from './flag';
 import { assertCompanySlugMatches, slugFromMcpPath, stripMcpSlugPrefix } from './identity-bridge';
 import { getDeploymentProfile, type ProfileEnv } from '../deployment-profile';
 
@@ -64,6 +64,15 @@ export function buildOAuthHandler(
             e: unknown,
             ctx: ExecutionContext & { props?: McpProps },
         ): Response | Promise<Response> {
+            // A native grant is a full session, not an MCP grant. It has no module
+            // scopes, so it would reach the MCP server with nothing to call by
+            // accident; refuse it outright instead of relying on that.
+            if (isNativeProps(ctx.props)) {
+                return new Response(JSON.stringify({ error: 'forbidden' }), {
+                    status: 403,
+                    headers: { 'content-type': 'application/json' },
+                });
+            }
             const url = new URL(req.url);
             const urlSlug = slugFromMcpPath(url.pathname);
             if (urlSlug === null) return baseServeHandler.fetch(req, e, ctx);
@@ -123,9 +132,15 @@ export function buildOAuthHandler(
         tokenExchangeCallback: async (opts): Promise<TokenExchangeCallbackResult | void> => {
             const decision = nativeTokenExchange(opts.props, opts.grantType, Math.floor(Date.now() / 1000));
             if (!decision) return;
-            if (decision.kind === 'deny') {
+            // A grant outlives the switch that allowed it: with native clients turned
+            // off, revoke instead of letting refreshes keep it alive and keep
+            // resetting its idle clock.
+            const off = !nativeClientEnabled(env);
+            if (off || decision.kind === 'deny') {
                 await getOAuthApi(options, env).revokeGrant(opts.grantId, opts.userId);
-                throw new OAuthError('invalid_grant', { description: 'Refresh token unused for too long' });
+                throw new OAuthError('invalid_grant', {
+                    description: off ? 'Native clients are not enabled' : 'Refresh token unused for too long',
+                });
             }
             // The provider tests for the PRESENCE of `refreshTokenTTL` on a code exchange, so the
             // native result carries it as an explicit undefined (no fixed expiry). The library types

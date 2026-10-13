@@ -19,7 +19,7 @@ import { writeAuditLog } from "../../../server/lib/audit";
 import { getDeploymentProfile } from "../../../server/lib/deployment-profile";
 import { nativeClientEnabled } from "../../../server/lib/mcp/flag";
 import type { WorkerEnv } from "../../../workers/env";
-import { completeNativeAuthorization, isNativeAuthRequest, isNativeRedirectUri } from "../../../server/lib/auth/native-consent";
+import { completeNativeAuthorization, hasNativePkce, isNativeAuthRequest, isNativeRedirectUri, nativeRedirectDisplay } from "../../../server/lib/auth/native-consent";
 
 export function meta() {
   return [{ title: m.oauth_authorize_meta_title() }];
@@ -156,10 +156,15 @@ export async function loader({ request, url, context }: Route.LoaderArgs) {
 
   // A native grant equals a full session, so it is only offered where the
   // operator opted in (404, as when OAuth is not mounted) and only for a
-  // redirect that can reach the user's own device (400).
+  // redirect that can reach the user's own device (400), with PKCE S256 so a
+  // look-alike app holding the same scheme cannot redeem the code (400).
   const native = isNativeAuthRequest(authReq.scope);
   if (native && !nativeClientEnabled(env)) throw new Response("Not Found", { status: 404 });
-  if (native && !isNativeRedirectUri(authReq.redirectUri)) throw new Response("Bad Request", { status: 400 });
+  if (native && (!isNativeRedirectUri(authReq.redirectUri) || !hasNativePkce(authReq))) {
+    throw new Response("Bad Request", { status: 400 });
+  }
+  // Only what the user can judge: the scheme (or loopback), never the full URL.
+  const { loopback: redirectLoopback, scheme: redirectScheme } = nativeRedirectDisplay(authReq.redirectUri);
 
   return {
     clientName,
@@ -168,6 +173,8 @@ export async function loader({ request, url, context }: Route.LoaderArgs) {
     canWrite: roleCanWrite(identity.role),
     oauthReqJson: JSON.stringify(authReq),
     native,
+    redirectLoopback,
+    redirectScheme,
   };
 }
 
@@ -284,7 +291,7 @@ export default function AuthorizePage() {
   const data = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   if (data.native) {
-    return <NativeConsent appName={data.clientName} oauthReqJson={data.oauthReqJson} submitting={navigation.state === "submitting"} />;
+    return <NativeConsent appName={data.clientName} redirectScheme={data.redirectScheme} redirectLoopback={data.redirectLoopback} oauthReqJson={data.oauthReqJson} submitting={navigation.state === "submitting"} />;
   }
   return (
     <ConsentForm

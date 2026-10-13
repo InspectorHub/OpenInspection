@@ -5,6 +5,10 @@ import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 export interface NativeConsentProps {
   /** The registered client's display name, shown as the app being signed in. */
   appName: string;
+  /** Private-use scheme the app will be opened through; empty for a loopback redirect. */
+  redirectScheme: string;
+  /** True when the app is reached on this computer (loopback) rather than by a scheme. */
+  redirectLoopback: boolean;
   oauthReqJson: string;
   submitting?: boolean;
 }
@@ -15,7 +19,7 @@ export interface NativeConsentProps {
  * choose from, only a decision. Same native-form shape as `ConsentForm`: it
  * posts the same `oauthReq` field and Cancel posts `cancel`.
  */
-export function NativeConsent({ appName, oauthReqJson, submitting = false }: NativeConsentProps) {
+export function NativeConsent({ appName, redirectScheme, redirectLoopback, oauthReqJson, submitting = false }: NativeConsentProps) {
   const decided = useRef(false);
   // A restore from the back/forward cache brings this page back with `decided` set while the POST
   // was answered elsewhere; start over so the buttons are not dead.
@@ -36,7 +40,12 @@ export function NativeConsent({ appName, oauthReqJson, submitting = false }: Nat
         <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">
           {m.oauth_native_heading({ appName })}
         </h1>
-        <p className="text-sm text-ih-fg-3 mb-8">{m.oauth_native_description()}</p>
+        {/* The app name comes from open dynamic registration, so it proves nothing; say so, and show where the app will be opened. */}
+        <p className="text-xs font-bold uppercase tracking-wide text-ih-fg-3 mb-3">{m.oauth_native_unverified()}</p>
+        <p className="text-sm text-ih-fg-3 mb-3">{m.oauth_native_description()}</p>
+        <p className="text-sm text-ih-fg-2 mb-8 break-all">
+          {redirectLoopback ? m.oauth_native_opens_via_computer() : m.oauth_native_opens_via({ scheme: redirectScheme })}
+        </p>
 
         {/* busy-controls-allow: the onSubmit below latches the decision in the decided ref and preventDefaults every later submit in the same frame */}
         <form

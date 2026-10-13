@@ -35,6 +35,34 @@ export function isNativeRedirectUri(uri: string): boolean {
   return u.protocol.slice(0, -1).includes('.');
 }
 
+/**
+ * A native authorization must carry a PKCE S256 challenge. The provider only
+ * enforces PKCE when the request includes a challenge, and a private-use scheme
+ * can be claimed by a second app on the same device, so without this a
+ * look-alike app could take the code from the redirect and redeem it as a
+ * public client. `allowPlainPKCE: false` already refuses `plain` at parse time;
+ * this refuses the absence of PKCE.
+ */
+export function hasNativePkce(authReq: Pick<AuthRequest, 'codeChallenge' | 'codeChallengeMethod'>): boolean {
+  return !!authReq.codeChallenge && authReq.codeChallengeMethod === 'S256';
+}
+
+/**
+ * What the consent page may say about where the app will be opened: the
+ * private-use scheme, or "this computer" for a loopback redirect. Never the full
+ * URL: the path and query carry nothing the user can judge.
+ */
+export function nativeRedirectDisplay(uri: string): { loopback: boolean; scheme: string } {
+  let u: URL;
+  try {
+    u = new URL(uri);
+  } catch {
+    return { loopback: false, scheme: '' };
+  }
+  if (u.protocol === 'http:') return { loopback: true, scheme: '' };
+  return { loopback: false, scheme: u.protocol.slice(0, -1) };
+}
+
 export interface NativeConsentInput {
   env: { NATIVE_CLIENT_ENABLED?: string };
   oauth: OAuthHelpers;
@@ -59,6 +87,7 @@ export async function completeNativeAuthorization(input: NativeConsentInput): Pr
   // grant must not be obtainable on a deployment that never opted in.
   if (!nativeClientEnabled(env)) throw new Response('Not Found', { status: 404 });
   if (!isNativeRedirectUri(authReq.redirectUri)) throw new Response('Bad Request', { status: 400 });
+  if (!hasNativePkce(authReq)) throw new Response('Bad Request', { status: 400 });
   if (identity.role === 'agent') throw new Response('Forbidden', { status: 403 });
   const props: NativeProps = {
     kind: 'native',
