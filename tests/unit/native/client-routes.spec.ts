@@ -33,7 +33,7 @@ describe('native version handshake (real app)', () => {
   async function call(
     path: string,
     headers: Record<string, string> = {},
-    opts: { auth?: string | null; env?: Record<string, string> } = {},
+    opts: { auth?: string | null; env?: Record<string, string>; init?: RequestInit } = {},
   ): Promise<Response> {
     h ??= await createHarness('standalone');
     const env = {
@@ -42,7 +42,7 @@ describe('native version handshake (real app)', () => {
     const exec = makeExecutionContext({ label: 'client-version' });
     const auth = opts.auth === undefined ? 'u:g:s' : opts.auth;
     const all = { ...(auth ? { authorization: `Bearer ${auth}` } : {}), ...headers };
-    const res = await app.request(path, { headers: all }, env, exec.ctx);
+    const res = await app.request(path, { ...opts.init, headers: all }, env, exec.ctx);
     await exec.settle();
     return res;
   }
@@ -92,6 +92,18 @@ describe('native version handshake (real app)', () => {
     expect(sync.status, await sync.clone().text()).not.toBe(426);
     expect(sync.headers.get('X-Client-Upgrade')).toBe('required');
     expect((await call('/api/inspections', OLD)).status).toBe(426);
+  });
+
+  it('does not 426 an old app on the offline import path, while a sibling POST under the same inspection still does', async () => {
+    const id = '00000000-0000-4000-8000-0000000000c1';
+    const body = Uint8Array.from([1, 2, 3]);
+    const init = { method: 'POST', body };
+    const headers = { ...OLD, 'content-length': String(body.length) };
+    const imp = await call(`/api/inspections/${id}/collab/import`, headers, { init });
+    expect(imp.status, await imp.clone().text()).not.toBe(426);
+    expect(imp.headers.get('X-Client-Upgrade')).toBe('required');
+    // Control: the version rule is live for this caller and path family.
+    expect((await call(`/api/inspections/${id}/collab/restore`, headers, { init })).status).toBe(426);
   });
 
   it('lets a current app through with no upgrade header', async () => {

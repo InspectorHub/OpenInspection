@@ -44,6 +44,7 @@ import { getDrizzle } from '../../lib/route-helpers';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../../lib/db/schema';
 import { parseReinspectionStatuses } from '../../lib/reinspection-status';
+import { forwardCollabImport } from '../../lib/collab/import-route';
 
 /**
  * Result of the shared fail-closed auth: either an early `Response` (the caller
@@ -358,6 +359,16 @@ const collabRoutes = createApiRouter()
             body: JSON.stringify(parsed.data),
         });
         return stub.fetch(fwd);
+    })
+    // ── POST /:id/collab/import — apply an offline client's Yjs update ─────────
+    // Raw bytes, so no zod body schema; see `forwardCollabImport` for how the
+    // size is bounded. The DO snapshots first and refuses what it cannot undo.
+    // Idempotent by construction: re-applying a Yjs update changes nothing, so
+    // a retry after any failure is safe without an Idempotency-Key.
+    .post('/:id/collab/import', async (c) => {
+        const auth = await authorizeCollab(c);
+        if (!auth.ok) return auth.response;
+        return forwardCollabImport(c, { ...auth, stub: collabStub(c, auth.tenantId, auth.reportId) });
     });
 
 export default collabRoutes;

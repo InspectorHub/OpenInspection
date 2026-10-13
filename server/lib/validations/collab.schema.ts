@@ -61,3 +61,9 @@ export const CollabTicketResponseSchema = createApiResponseSchema(z.object({
     ticket: z.string().describe('Opaque one-time ticket to pass as the ticket query parameter of the WebSocket URL'),
     expiresIn: z.number().int().describe('Seconds the ticket stays valid'),
 }));
+
+/** What the Durable Object answers when an offline update was applied and persisted. */
+export const CollabImportResultSchema = z.object({
+    ok: z.literal(true),
+    snapshotSeq: z.number().int().nonnegative().describe('Sequence number of the snapshot taken just before the import'),
+});

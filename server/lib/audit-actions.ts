@@ -46,6 +46,11 @@ export type AuditAction =
     | 'inspection.template_upgraded'
     | 'inspection.results_batch_patched'
     | 'inspection.sync_conflict_resolved'
+    // An offline client's Yjs update applied to the live results document. Audited
+    // because it can change many findings at once and is the one write that
+    // arrives from a device rather than from a person at the editor; the
+    // snapshot it forces is what makes it undoable.
+    | 'inspection.collab.import'
     | 'inspection.share_agent'
     | 'inspection.property_facts.update'
     | 'inspection.pca_narrative.update'

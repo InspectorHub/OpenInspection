@@ -52,6 +52,7 @@ import { findingKeysFromTemplateSnapshot } from '../lib/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import { purgePathMatches } from './purge-path';
+import { importResponse } from './inspection-doc-import';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -133,6 +134,7 @@ interface ResultsSnapshot {
      *   'connect'  — the pre-merge boundary capture taken when a client reconnects,
      *                BEFORE its buffered offline edits merge (preserves the
      *                about-to-be-overwritten value for the H2 compare/recover UI).
+     *   'import'   — the mandatory capture before an offline client's update is applied.
      * Optional so legacy snapshots persisted before this field stay readable.
      */
     reason?:    SnapshotReason;
@@ -140,7 +142,7 @@ interface ResultsSnapshot {
 }
 
 /** Discriminator for why a snapshot was captured. */
-type SnapshotReason = 'periodic' | 'manual' | 'connect';
+type SnapshotReason = 'periodic' | 'manual' | 'connect' | 'import';
 
 /** Snapshot metadata (the list view omits the heavy `projection` payload). */
 type ResultsSnapshotMeta = Omit<ResultsSnapshot, 'projection'>;
@@ -318,12 +320,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             // Identity is forwarded by the authorized route — store for D1
             // persistence. The DO never uses these for access control (the
             // authorized route is the trust boundary).
-            const headerTenantId     = req.headers.get('x-tenant-id');
-            const headerInspectionId = req.headers.get('x-inspection-id');
-            const headerReportId     = req.headers.get('x-report-id');
-            if (headerTenantId)     this.tenantId     = headerTenantId;
-            if (headerInspectionId) this.inspectionId = headerInspectionId;
-            if (headerReportId) this.reportId = headerReportId;
+            this.adoptIdentityHeaders(req);
 
             // M3: fail-closed — reject the upgrade if identity is unknown from
             // both headers and stored state (hydrate() would have loaded it).
@@ -334,7 +331,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             // I1: persist identity to DO storage on the first WS accept so a
             // hibernation-reconstructed DO knows its tenant/inspection even
             // before the next client connects (alarm() can then flush to D1).
-            if (!this.identityPersisted || headerReportId) {
+            if (!this.identityPersisted || req.headers.get('x-report-id')) {
                 await this.ctx.storage.put<PersistedIdentity>(IDENTITY_KEY, {
                     tenantId:     this.tenantId,
                     inspectionId: this.inspectionId,
@@ -430,17 +427,17 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         // + broadcast so all clients resync. The authorized route forwards the same
         // identity headers as /restore; identity is set below from request headers.
         if (url.pathname.endsWith('/restructure') && req.method === 'POST') {
-            // Capture identity from headers forwarded by the authorized route,
-            // mirroring the /ws path identity acquisition (the DO trusts the route).
-            const headerTenantId     = req.headers.get('x-tenant-id');
-            const headerInspectionId = req.headers.get('x-inspection-id');
-            const headerReportId     = req.headers.get('x-report-id');
-            if (headerTenantId)     this.tenantId     = headerTenantId;
-            if (headerInspectionId) this.inspectionId = headerInspectionId;
-            if (headerReportId) this.reportId = headerReportId;
-
+            this.adoptIdentityHeaders(req);
             await this.restructure();
             return Response.json({ ok: true });
+        }
+
+        // An offline client's Yjs update, behind a mandatory snapshot; hydrated first, like /followup.
+        if (url.pathname.endsWith('/import') && req.method === 'POST') {
+            if (!this.adoptIdentityHeaders(req)) return new Response('missing tenant/inspection identity', { status: 400 });
+            await this.hydrateFromD1Once();
+            return importResponse(this.doc, new Uint8Array(await req.arrayBuffer()),
+                () => this.captureSnapshot(req.headers.get('x-user-id'), 'import'), () => this.persist());
         }
 
         // #119 — record a carried item's follow-up disposition. Same identity
@@ -449,15 +446,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         // no prior state, and patching an empty document and persisting it would
         // write an empty projection over the round's carried items.
         if (url.pathname.endsWith('/followup') && req.method === 'POST') {
-            const headerTenantId     = req.headers.get('x-tenant-id');
-            const headerInspectionId = req.headers.get('x-inspection-id');
-            const headerReportId     = req.headers.get('x-report-id');
-            if (headerTenantId)     this.tenantId     = headerTenantId;
-            if (headerInspectionId) this.inspectionId = headerInspectionId;
-            if (headerReportId)     this.reportId     = headerReportId;
-            if (!this.tenantId || !this.inspectionId) {
-                return new Response('missing tenant/inspection identity', { status: 400 });
-            }
+            if (!this.adoptIdentityHeaders(req)) return new Response('missing tenant/inspection identity', { status: 400 });
 
             let body: { itemId?: unknown; status?: unknown; notes?: unknown };
             try {
@@ -855,6 +844,17 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    /** Take the identity the authorized route forwarded (an absent header keeps what hibernation restored); true once tenant and inspection are known. */
+    private adoptIdentityHeaders(req: Request): boolean {
+        const tenantId     = req.headers.get('x-tenant-id');
+        const inspectionId = req.headers.get('x-inspection-id');
+        const reportId     = req.headers.get('x-report-id');
+        if (tenantId)     this.tenantId     = tenantId;
+        if (inspectionId) this.inspectionId = inspectionId;
+        if (reportId)     this.reportId     = reportId;
+        return !!this.tenantId && !!this.inspectionId;
+    }
 
     /**
      * I1: Load the persisted Y.Doc binary AND the stored tenant/inspection
