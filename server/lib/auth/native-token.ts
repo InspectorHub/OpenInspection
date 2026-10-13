@@ -24,7 +24,7 @@ export interface NativeProps {
  * structurally so the real `OAuthHelpers` satisfies it and a test double does
  * not have to fabricate the rest of the surface.
  */
-export interface TokenUnwrapper {
+interface TokenUnwrapper {
   unwrapToken(token: string): Promise<{
     /** The access token's own scope; an RFC 8693 exchange can narrow it below the grant's. */
     scope: string[];

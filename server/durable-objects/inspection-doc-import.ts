@@ -19,7 +19,7 @@ import type { PhotoEntry } from '../lib/collab/results-doc.types';
  * it is broadcast to connected editors, persisted, and counted toward the
  * automatic snapshot cadence.
  */
-export const IMPORT_ORIGIN: unique symbol = Symbol('collab-import-origin');
+const IMPORT_ORIGIN: unique symbol = Symbol('collab-import-origin');
 
 /**
  * Largest update accepted, in bytes. The route enforces it before reading the
@@ -44,7 +44,7 @@ export type ImportFailure =
  * existing import snapshot, or null when there is none, because no snapshot
  * was taken for this call.
  */
-export type ImportResult = { ok: true; snapshotSeq: number | null; changed: boolean } | ImportFailure;
+type ImportResult = { ok: true; snapshotSeq: number | null; changed: boolean } | ImportFailure;
 
 /** Sequence number of the newest import snapshot among `snapshots`, or null when there is none. */
 export function newestImportSeq(snapshots: readonly { seq: number; reason?: string }[]): number | null {
@@ -149,7 +149,7 @@ export function trialApply(doc: Y.Doc, update: Uint8Array): { ok: true; changed:
  *      of the document. An edit that races in between the snapshot and the apply
  *      is merged by Yjs either way.
  */
-export async function applyImport(
+async function applyImport(
     doc: Y.Doc,
     update: Uint8Array,
     snapshot: () => Promise<{ seq: number }>,
@@ -212,7 +212,7 @@ export async function importResponse(
 /** Most pendingId to key pairs one call may carry. */
 export const MAX_PENDING_ENTRIES = 1000;
 /** Largest request body, in characters, accepted before it is parsed. */
-export const MAX_PENDING_BODY_CHARS = 512 * 1024;
+const MAX_PENDING_BODY_CHARS = 512 * 1024;
 
 const PENDING_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const KEY_CHARS = /^[A-Za-z0-9_./-]+$/;
@@ -225,14 +225,11 @@ export type ResolvePendingFailure =
     | { ok: false; status: 500; reason: 'apply_failed' }
     | { ok: false; status: 503; reason: 'persist_failed' };
 
-/** `matched` pending entries were replaced; `unmatched` map ids had no pending entry left (a repeat, or a photo that was removed). */
-export type ResolvePendingResult = { ok: true; matched: number; unmatched: number; changed: boolean } | ResolvePendingFailure;
-
 /** The identity an object is addressed with; every key must sit under this tenant and inspection. */
 export interface PendingScope { tenantId: string; inspectionId: string }
 
 /** The only R2 prefix a resolved photo may point into. */
-export function photoKeyPrefix(scope: PendingScope): string {
+function photoKeyPrefix(scope: PendingScope): string {
     return `${scope.tenantId}/inspections/${scope.inspectionId}/photos/`;
 }
 

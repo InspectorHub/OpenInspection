@@ -9,11 +9,11 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 109 |
-| Columns | 1266 |
+| Tables | 110 |
+| Columns | 1272 |
 | Indexes (excluding primary keys) | 183 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 613 (48%) |
+| Columns carrying a source comment | 615 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants`
 
-That is 13 of 109. If a table you just added appears here,
+That is 13 of 110. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 206 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 207 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -1714,6 +1714,23 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - `idx_notifications_tenant_user_created` (tenant_id, user_id, created_at)
 - `idx_notifications_tenant_user_unread` (tenant_id, user_id, read_at)
 - `idx_notifications_tenant_contact_created` (tenant_id, contact_id, created_at)
+
+---
+
+## `offline_import_applied`
+
+<sub>server/lib/db/schema/offline-import.ts · 6 columns · primary key `tenant_id, idempotency_key`</sub>
+
+> Queued writes an offline package has already applied, one row per (tenant, key). The 24 hour idempotency ledger is not enough on its own: an `inspection.update` carried by a package is a PATCH, a last-writer-wins overwrite, so replaying it after the ledger row expired would put an old value over a newer edit.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `tenant_id` | text | PK NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `idempotency_key` | text | PK NN |  |  | The queue entry's idempotency key, verbatim as the device minted it. |
+| `op` | text | NN |  | `inspection.create, inspection.update, inspection.complete` |  |
+| `inspection_id` | text | NN |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `applied_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `applied_by` | text | NN |  |  | The importing member, taken from the verified session. |
 
 ---
 

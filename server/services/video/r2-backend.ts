@@ -24,8 +24,8 @@ import { signUploadToken } from '../../lib/video-upload-token';
 import type { VideoBackend, VideoDetails, VideoRef } from './types';
 
 /** Upload token lifetime for the web editor, and for a native client whose upload may be queued offline. */
-export const WEB_UPLOAD_TTL_SEC = 900;
-export const NATIVE_UPLOAD_TTL_SEC = 86400;
+const WEB_UPLOAD_TTL_SEC = 900;
+const NATIVE_UPLOAD_TTL_SEC = 86400;
 
 // ── Key parsing helper ────────────────────────────────────────────────────────
 

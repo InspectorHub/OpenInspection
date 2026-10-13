@@ -13,7 +13,7 @@
  * fault imports) so a harness that rejects everything cannot pass.
  */
 import { env as testEnv, runInDurableObject } from 'cloudflare:test';
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import * as Y from 'yjs';
 import app from '../../../server/index';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
@@ -22,6 +22,7 @@ import { collabDocName } from '../../../server/lib/collab/doc-name';
 import { seedResultsDoc, applyItemPatch, pushPendingPhoto, projectResults } from '../../../server/lib/collab/results-doc';
 import type { InspectionDocDO } from '../../../server/durable-objects/inspection-doc';
 import type { PhotoEntry } from '../../../server/lib/collab/results-doc.types';
+import { InspectionService } from '../../../server/services/inspection.service';
 import { applyMigrations } from '../migration-replay';
 import { buildPackage, JPEG_BYTES, type PackageSpec } from '../../unit/helpers/offline-package-fixture';
 
@@ -84,7 +85,7 @@ async function call(path: string, init: RequestInit & { token?: string; env?: Re
     return res;
 }
 
-interface ImportBody { success: boolean; data?: { inspections: number; photos: number; outbox: { applied: number; skipped: number }; yjs: { changed: number; unchanged: number } } }
+interface ImportBody { success: boolean; data?: { inspections: number; photos: number; outbox: { applied: number; skipped: number; failed: Array<{ idempotencyKey: string; op: string; inspectionId: string; status: number }> }; yjs: { changed: number; unchanged: number } } }
 
 function importPackage(token: string, zip: Uint8Array, opts: { headers?: Record<string, string>; contentLength?: string | null; env?: Record<string, unknown> } = {}): Promise<Response> {
     const headers = new Headers({ 'content-type': 'application/zip', ...opts.headers });
@@ -155,6 +156,11 @@ async function photoKeys(insp: Created): Promise<string[]> {
     return listed.objects.map((o) => o.key).sort();
 }
 
+async function recordedCount(key: string): Promise<number> {
+    const row = await b.DB.prepare('SELECT count(*) AS n FROM offline_import_applied WHERE tenant_id = ? AND idempotency_key = ?').bind(TENANT, key).first<{ n: number }>();
+    return row?.n ?? 0;
+}
+
 async function auditRows(): Promise<Array<{ user_id: string | null; metadata: string | null }>> {
     const rows = await b.DB.prepare("SELECT user_id, metadata FROM audit_logs WHERE tenant_id = ? AND action = 'native.offline_import'")
         .bind(TENANT).all<{ user_id: string | null; metadata: string | null }>();
@@ -217,7 +223,7 @@ describe('POST /api/client/import', () => {
         expect(res.status, await res.clone().text()).toBe(200);
         expect(await body(res)).toEqual({
             success: true,
-            data: { inspections: 1, photos: 1, outbox: { applied: 2, skipped: 0 }, yjs: { changed: 1, unchanged: 0 } },
+            data: { inspections: 1, photos: 1, outbox: { applied: 2, skipped: 0, failed: [] }, yjs: { changed: 1, unchanged: 0 } },
         });
 
         expect(await addressOf(insp.id)).toBe('99 Changed Avenue, Town');
@@ -240,7 +246,7 @@ describe('POST /api/client/import', () => {
         const rows = (await auditRows()).filter((r) => (r.metadata ?? '').includes(insp.id) || (r.metadata ?? '').includes(author.id));
         expect(rows).toHaveLength(1);
         expect(rows[0]!.user_id).toBe(manager.id);
-        expect(JSON.parse(rows[0]!.metadata ?? '{}')).toMatchObject({ exportedBy: author.id, inspections: 1, photos: 1, applied: 2, skipped: 0, changed: 1 });
+        expect(JSON.parse(rows[0]!.metadata ?? '{}')).toMatchObject({ exportedBy: author.id, inspections: 1, photos: 1, applied: 2, skipped: 0, failed: 0, changed: 1 });
     });
 
     it('creates an inspection the package carries, then fills it', async () => {
@@ -319,7 +325,7 @@ describe('POST /api/client/import', () => {
         const second = await importPackage(manager.token, zip);
         expect(second.status, await second.clone().text()).toBe(200);
         expect((await body(second)).data).toEqual({
-            inspections: 1, photos: 1, outbox: { applied: 0, skipped: 2 }, yjs: { changed: 0, unchanged: 1 },
+            inspections: 1, photos: 1, outbox: { applied: 0, skipped: 2, failed: [] }, yjs: { changed: 0, unchanged: 1 },
         });
         expect(await photoKeys(insp)).toEqual(keysAfterFirst);
         expect(await inspectionCount()).toBe(inspectionsAfterFirst);
@@ -344,7 +350,7 @@ describe('POST /api/client/import', () => {
         await b.DB.prepare('DELETE FROM idempotency_keys WHERE tenant_id = ?').bind(TENANT).run();
         const second = await importPackage(manager.token, zip);
         expect(second.status, await second.clone().text()).toBe(200);
-        expect((await body(second)).data?.outbox).toEqual({ applied: 0, skipped: 1 });
+        expect((await body(second)).data?.outbox).toEqual({ applied: 0, skipped: 1, failed: [] });
         expect(await inspectionCount()).toBe(count);
     });
 
@@ -464,27 +470,180 @@ describe('POST /api/client/import', () => {
 
     // ── 7. A queued write that fails ──────────────────────────────────────────
 
-    it('answers with the failing entry and stays safe to retry', async () => {
+    it('imports the results and photos even when a queued write is refused, and reports the entry', async () => {
         const insp = await createInspection(author);
         const goodKey = fresh('k');
         const badKey = fresh('k');
         const good = { idempotencyKey: goodKey, op: 'inspection.update', payload: { id: insp.id, propertyAddress: '40 Applied Road, Town' } };
         const bad = { idempotencyKey: badKey, op: 'inspection.update', payload: { id: insp.id, status: 'not-a-status' } };
+        const zip = buildPackage(pkg({ exportedBy: author.id }, insp, { outbox: [good, bad] }));
 
-        const refused = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, insp, { outbox: [good, bad] })));
-        expect(refused.status, await refused.clone().text()).toBe(400);
-        expect(JSON.stringify(await refused.json())).toContain(badKey);
-        // The yjs and photo steps come after the queued writes and did not run.
-        expect(await ratingOf(insp)).toBeUndefined();
-        expect(await photoKeys(insp)).toEqual([]);
+        const res = await importPackage(manager.token, zip);
+        expect(res.status, await res.clone().text()).toBe(200);
+        expect((await body(res)).data).toEqual({
+            inspections: 1, photos: 1, yjs: { changed: 1, unchanged: 0 },
+            outbox: { applied: 1, skipped: 0, failed: [{ idempotencyKey: badKey, op: 'inspection.update', inspectionId: insp.id, status: 400 }] },
+        });
+        // The inspector's field work is in, the good write applied, the refused one changed nothing.
+        expect(await ratingOf(insp)).toBe('RR');
+        expect(await photoKeys(insp)).toHaveLength(1);
         expect(await addressOf(insp.id)).toBe('40 Applied Road, Town');
+        const audit = (await auditRows()).filter((r) => (r.metadata ?? '').includes(insp.id) || (r.metadata ?? '').includes(author.id));
+        expect(audit.map((r) => (JSON.parse(r.metadata ?? '{}') as { failed?: number }).failed)).toContain(1);
 
-        // The device fixes the bad entry and sends the package again: the good one is a repeat.
+        // Importing the package again: the refused entry is still reported, everything else is a repeat.
+        const again = await importPackage(manager.token, zip);
+        expect(again.status, await again.clone().text()).toBe(200);
+        expect((await body(again)).data).toEqual({
+            inspections: 1, photos: 1, yjs: { changed: 0, unchanged: 1 },
+            outbox: { applied: 0, skipped: 1, failed: [{ idempotencyKey: badKey, op: 'inspection.update', inspectionId: insp.id, status: 400 }] },
+        });
+
+        // The device fixes the entry (same key, valid payload) and sends again: it applies now.
         const fixed = { ...bad, payload: { id: insp.id, propertyAddress: '41 Second Road, Town' } };
         const ok = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, insp, { outbox: [good, fixed] })));
         expect(ok.status, await ok.clone().text()).toBe(200);
-        expect((await body(ok)).data?.outbox).toEqual({ applied: 1, skipped: 1 });
+        expect((await body(ok)).data?.outbox).toEqual({ applied: 1, skipped: 1, failed: [] });
+        expect(await addressOf(insp.id)).toBe('41 Second Road, Town');
+    });
+
+    it('reports an update refused because the inspection was cancelled, and still imports its results', async () => {
+        const insp = await createInspection(author);
+        const cancel = await call(`/api/inspections/${insp.id}/cancel`, {
+            method: 'POST', token: manager.token, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ reason: 'other' }),
+        });
+        expect(cancel.status, await cancel.clone().text()).toBe(200);
+        const key = fresh('k');
+        const queued = { idempotencyKey: key, op: 'inspection.update', payload: { id: insp.id, status: 'confirmed' } };
+        const res = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, insp, { outbox: [queued] })));
+        expect(res.status, await res.clone().text()).toBe(200);
+        expect((await body(res)).data?.outbox.failed).toEqual([{ idempotencyKey: key, op: 'inspection.update', inspectionId: insp.id, status: 400 }]);
         expect(await ratingOf(insp)).toBe('RR');
+        expect(await photoKeys(insp)).toHaveLength(1);
+    });
+
+    it('stops the whole request on a server error in a queued write, and a retry completes it', async () => {
+        const insp = await createInspection(author);
+        const key = fresh('k');
+        const zip = buildPackage(pkg({ exportedBy: author.id }, insp, {
+            outbox: [{ idempotencyKey: key, op: 'inspection.update', payload: { id: insp.id, propertyAddress: '42 Retry Road, Town' } }],
+        }));
+        // The first lookup is the import's own authorization check; the second is the PATCH route's.
+        // Only that one is made to fail, so the failure lands inside the queued write.
+        let failing = false;
+        let lookups = 0;
+        const real = InspectionService.prototype.getInspection;
+        const spy = vi.spyOn(InspectionService.prototype, 'getInspection').mockImplementation(function (this: InspectionService, id: string, tenantId: string) {
+            if (id === insp.id && failing && ++lookups >= 2) return Promise.reject(new Error('simulated outage'));
+            return real.call(this, id, tenantId);
+        });
+        try {
+            failing = true;
+            lookups = 0;
+            const res = await importPackage(manager.token, zip);
+            expect(res.status, await res.clone().text()).toBe(503);
+            expect(await addressOf(insp.id)).toBe('1 Original Road, Anytown');
+            expect(await recordedCount(key)).toBe(0);
+
+            failing = false;
+            const retry = await importPackage(manager.token, zip);
+            expect(retry.status, await retry.clone().text()).toBe(200);
+            expect((await body(retry)).data?.outbox).toEqual({ applied: 1, skipped: 0, failed: [] });
+            expect(await addressOf(insp.id)).toBe('42 Retry Road, Town');
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    // ── 7b. A repeat after the 24 hour ledger is gone ─────────────────────────
+
+    it('does not put an old queued update over a newer edit when the same package is imported after the ledger expired', async () => {
+        const insp = await createInspection(author);
+        const updateKey = fresh('k');
+        const completeKey = fresh('k');
+        const zip = buildPackage(pkg({ exportedBy: author.id }, insp, {
+            outbox: [
+                { idempotencyKey: updateKey, op: 'inspection.update', payload: { id: insp.id, propertyAddress: '12 Old St' } },
+                { idempotencyKey: completeKey, op: 'inspection.complete', payload: { id: insp.id } },
+            ],
+        }));
+        const first = await importPackage(manager.token, zip);
+        expect(first.status, await first.clone().text()).toBe(200);
+        expect((await body(first)).data?.outbox).toEqual({ applied: 2, skipped: 0, failed: [] });
+        expect(await addressOf(insp.id)).toBe('12 Old St');
+
+        // Someone else edits the address, and the 24 hour ledger forgets everything.
+        await b.DB.prepare('UPDATE inspections SET property_address = ? WHERE id = ?').bind('12 Old Street', insp.id).run();
+        await b.DB.prepare('DELETE FROM idempotency_keys').run();
+
+        const again = await importPackage(manager.token, zip);
+        expect(again.status, await again.clone().text()).toBe(200);
+        expect((await body(again)).data?.outbox).toEqual({ applied: 0, skipped: 2, failed: [] });
+        expect(await addressOf(insp.id), 'the later edit must survive a repeat import').toBe('12 Old Street');
+
+        // Control: an entry with a NEW key in the same shape of package still applies.
+        const newer = { idempotencyKey: fresh('k'), op: 'inspection.update', payload: { id: insp.id, propertyAddress: '13 New Avenue' } };
+        const next = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, insp, { outbox: [newer] })));
+        expect(next.status, await next.clone().text()).toBe(200);
+        expect((await body(next)).data?.outbox).toEqual({ applied: 1, skipped: 0, failed: [] });
+        expect(await addressOf(insp.id)).toBe('13 New Avenue');
+
+        // The record names the tenant, the operation, the inspection and the importer.
+        const row = await b.DB.prepare('SELECT tenant_id, op, inspection_id, applied_by, applied_at FROM offline_import_applied WHERE idempotency_key = ?')
+            .bind(updateKey).first<{ tenant_id: string; op: string; inspection_id: string; applied_by: string; applied_at: number }>();
+        expect(row).toMatchObject({ tenant_id: TENANT, op: 'inspection.update', inspection_id: insp.id, applied_by: manager.id });
+        expect(row!.applied_at).toBeGreaterThan(Date.now() - 60_000);
+    });
+
+    it('scopes the applied record to the workspace: another workspace has the same key and this one is not skipped (positive control: its own record is)', async () => {
+        const insp = await createInspection(author);
+        const sharedKey = fresh('k');
+        const ownKey = fresh('k');
+        const now = Date.now();
+        const insert = (tenant: string, key: string) => b.DB.prepare(
+            'INSERT INTO offline_import_applied (tenant_id, idempotency_key, op, inspection_id, applied_at, applied_by) VALUES (?, ?, ?, ?, ?, ?)',
+        ).bind(tenant, key, 'inspection.update', 'elsewhere', now, 'someone').run();
+        await insert(OTHER_TENANT, sharedKey);
+        await insert(TENANT, ownKey);
+        const zip = buildPackage(pkg({ exportedBy: author.id }, insp, {
+            outbox: [
+                { idempotencyKey: sharedKey, op: 'inspection.update', payload: { id: insp.id, propertyAddress: '60 Shared Key Road' } },
+                { idempotencyKey: ownKey, op: 'inspection.update', payload: { id: insp.id, propertyAddress: '61 Own Key Road' } },
+            ],
+        }));
+        const res = await importPackage(manager.token, zip);
+        expect(res.status, await res.clone().text()).toBe(200);
+        expect((await body(res)).data?.outbox).toEqual({ applied: 1, skipped: 1, failed: [] });
+        expect(await addressOf(insp.id)).toBe('60 Shared Key Road');
+    });
+
+    it('records nothing for a refused write, so the same key applies once the entry is valid', async () => {
+        const insp = await createInspection(author);
+        const key = fresh('k');
+        const refused = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, insp, {
+            outbox: [{ idempotencyKey: key, op: 'inspection.update', payload: { id: insp.id, status: 'not-a-status' } }],
+        })));
+        expect(refused.status, await refused.clone().text()).toBe(200);
+        expect((await body(refused)).data?.outbox.failed).toHaveLength(1);
+        expect(await recordedCount(key)).toBe(0);
+
+        const fixed = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, insp, {
+            outbox: [{ idempotencyKey: key, op: 'inspection.update', payload: { id: insp.id, propertyAddress: '62 Fixed Road' } }],
+        })));
+        expect((await body(fixed)).data?.outbox).toEqual({ applied: 1, skipped: 0, failed: [] });
+        expect(await recordedCount(key)).toBe(1);
+    });
+
+    it('imports a second, different package sent under the same Idempotency-Key header', async () => {
+        const first = await createInspection(author);
+        const second = await createInspection(author);
+        const headers = { 'Idempotency-Key': fresh('shared-header') };
+        const one = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, first)), { headers });
+        expect(one.status, await one.clone().text()).toBe(200);
+        const two = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, second)), { headers });
+        expect(two.status, await two.clone().text()).toBe(200);
+        expect(two.headers.get('Idempotency-Replayed')).toBeNull();
+        expect(await ratingOf(second), 'the second package must be imported, not answered from the first').toBe('RR');
     });
 
     // ── 8. Request framing ────────────────────────────────────────────────────

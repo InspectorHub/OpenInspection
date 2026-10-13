@@ -91,6 +91,9 @@ export type { NotificationPreference, NewNotificationPreference } from './notifi
 // Generic idempotency ledger (portal #107) — one row per (tenant, key).
 export { idempotencyKeys } from './idempotency';
 export type { IdempotencyKey, NewIdempotencyKey } from './idempotency';
+// Queued writes an imported offline package has applied (outlives the 24h idempotency ledger).
+export { offlineImportApplied } from './offline-import';
+export type { OfflineImportApplied } from './offline-import';
 // Pay splits (#278) — per-service-line inspector earnings, recorded not derived.
 export { servicePayRules, inspectionServicePaySplits } from './pay-split';
 export type { ServicePayRule, InspectionServicePaySplit } from './pay-split';

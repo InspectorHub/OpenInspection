@@ -5,12 +5,13 @@
  * here is enforced BEFORE the bytes it protects are produced:
  *
  *  - the request body is only read once its declared length is under the cap,
- *    into a buffer allocated at that length, so the transfer cannot grow past it;
+ *    as chunks, refusing any that would pass the declared length (no buffer is sized from
+ *    the header, so a declaration alone costs nothing);
  *  - the zip's central directory is listed with a filter that decompresses
  *    nothing, and the entry count, every entry name, every declared size and the
  *    declared total are judged from that listing;
- *  - entries are then inflated one at a time, by name, so the working set is the
- *    compressed package plus one entry rather than the whole archive.
+ *  - entries are then inflated in batches of bounded size, by name, so the working
+ *    set is the compressed package plus one batch rather than the whole archive.
  *
  * fflate allocates each entry's output at the size the directory declares and does
  * not grow it. A directory that understates an entry therefore truncates it (it
@@ -107,27 +108,66 @@ export function listPackage(zip: Uint8Array): PackageListing {
     return refusal ? { ok: false, reason: refusal } : { ok: true, entries };
 }
 
+/** Most declared bytes one inflate pass holds at once; see `readPackageEntries`. */
+const READ_BATCH_BYTES = 8 * MIB;
+
 /**
- * Inflate one entry that `listPackage` accepted. Null when the archive does not
- * yield it at the size the directory declared (a damaged or lying archive).
+ * Inflate entries that `listPackage` accepted, in the order given. `wanted` maps
+ * each entry name to the size the directory declared for it; an entry the archive
+ * does not yield at that size (a damaged or lying archive) comes back as null.
+ *
+ * Every inflate pass re-reads the whole central directory, so passes are the
+ * cost to ration: entries are grouped into batches of up to READ_BATCH_BYTES
+ * declared bytes and each batch is one pass. A package of two thousand small
+ * entries is therefore read in one pass rather than two thousand, while a few
+ * large photos still leave only one batch resident at a time. The caller should
+ * drop an entry before asking for the next one.
  */
-export function readPackageEntry(zip: Uint8Array, name: string, declaredSize: number): Uint8Array | null {
-    try {
-        const out = unzipSync(zip, { filter: (info) => info.name === name });
-        const bytes = out[name];
-        return bytes && bytes.byteLength === declaredSize ? bytes : null;
-    } catch {
-        return null;
+export function* readPackageEntries(
+    zip: Uint8Array,
+    wanted: ReadonlyMap<string, number>,
+): Generator<[name: string, bytes: Uint8Array | null]> {
+    const names = [...wanted.keys()];
+    let start = 0;
+    while (start < names.length) {
+        let end = start;
+        let bytes = 0;
+        while (end < names.length && (end === start || bytes + (wanted.get(names[end]!) ?? 0) <= READ_BATCH_BYTES)) {
+            bytes += wanted.get(names[end]!) ?? 0;
+            end++;
+        }
+        const batch = new Set(names.slice(start, end));
+        let out: Record<string, Uint8Array>;
+        try {
+            out = unzipSync(zip, { filter: (info) => batch.has(info.name) });
+        } catch {
+            out = {};
+        }
+        for (const name of batch) {
+            const got = out[name];
+            yield [name, got && got.byteLength === wanted.get(name) ? got : null];
+        }
+        start = end;
     }
+}
+
+/** One entry, at the size the directory declared. Null when the archive does not yield it. */
+export function readPackageEntry(zip: Uint8Array, name: string, declaredSize: number): Uint8Array | null {
+    for (const [, bytes] of readPackageEntries(zip, new Map([[name, declaredSize]]))) return bytes;
+    return null;
 }
 
 export type BoundedBody = { ok: true; bytes: Uint8Array } | { ok: false; status: 400 | 411 | 413 };
 
 /**
- * Read the whole request body into a buffer allocated at the declared length.
- * A body that does not match its declared length is refused rather than
- * truncated or padded, and nothing is read at all when the declaration is
- * missing, malformed or over the cap.
+ * Read the whole request body, never holding more than has actually arrived.
+ * The declared length is checked against the cap and against what the stream
+ * delivers, but it is NOT used to size a buffer: a client that declares the
+ * maximum and then sends nothing would otherwise pin that much memory per
+ * request for as long as it cared to wait. Chunks are collected as they come and
+ * joined once at the end. A body that does not match its declared length is
+ * refused rather than truncated or padded, and nothing is read at all when the
+ * declaration is missing, malformed or over the cap.
  */
 export async function readPackageBody(req: Request, limit: number = MAX_PACKAGE_BYTES): Promise<BoundedBody> {
     const declared = req.headers.get('content-length');
@@ -137,7 +177,7 @@ export async function readPackageBody(req: Request, limit: number = MAX_PACKAGE_
     if (length > limit) return { ok: false, status: 413 };
     if (!req.body) return length === 0 ? { ok: true, bytes: new Uint8Array(0) } : { ok: false, status: 400 };
 
-    const bytes = new Uint8Array(length);
+    const chunks: Uint8Array[] = [];
     const reader = req.body.getReader();
     let filled = 0;
     for (;;) {
@@ -147,8 +187,15 @@ export async function readPackageBody(req: Request, limit: number = MAX_PACKAGE_
             await reader.cancel();
             return { ok: false, status: 400 };
         }
-        bytes.set(value, filled);
+        chunks.push(value);
         filled += value.byteLength;
     }
-    return filled === length ? { ok: true, bytes } : { ok: false, status: 400 };
+    if (filled !== length) return { ok: false, status: 400 };
+    const bytes = new Uint8Array(length);
+    let at = 0;
+    for (const chunk of chunks) {
+        bytes.set(chunk, at);
+        at += chunk.byteLength;
+    }
+    return { ok: true, bytes };
 }

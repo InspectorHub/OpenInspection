@@ -15,6 +15,13 @@
       "when": 1791883711118,
       "tag": "0001_offline_max_days",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791904609284,
+      "tag": "0002_offline_import_applied",
+      "breakpoints": true
     }
   ]
 }

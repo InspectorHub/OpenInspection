@@ -9,9 +9,9 @@
  *     must either be one the IMPORTER may edit or be created by the package's own
  *     outbox, and every id the other entries mention must be in the manifest. A
  *     package that fails any of this changes nothing, for every inspection in it.
- *  2. APPLY: queued writes, then photos, then Yjs updates, then pending-photo
- *     resolution. Each step is idempotent, so a request that fails part-way is
- *     retried by sending the same package again.
+ *  2. APPLY: queued creates, then photos, then Yjs updates with pending-photo
+ *     resolution, then the remaining queued writes. Each step is idempotent, so a
+ *     request that fails part-way is retried by sending the same package again.
  *
  * Authority comes from the request alone. The caller's own credentials replay the
  * queued writes (so each one is checked by the route it targets, with the
@@ -24,10 +24,10 @@
 import type { Context } from 'hono';
 import { and, eq, inArray } from 'drizzle-orm';
 import { Errors, type AppError } from '../lib/errors';
+import { applyOutbox, type OutboxFailure } from './offline-import-outbox';
 import { auditFromContext } from '../lib/audit';
 import { inspections } from '../lib/db/schema';
 import { getDrizzle } from '../lib/route-helpers';
-import { logger } from '../lib/logger';
 import { r2Keys } from '../lib/r2-keys';
 import { imagesBinding } from '../lib/media/serve-photo';
 import { signedPhotoExtFor, storePhotoAtKey } from '../lib/media/store-photo';
@@ -35,7 +35,7 @@ import { authorizeCollab, collabStub, type AuthResult } from '../lib/collab/auth
 import { importUpdateIntoDo } from '../lib/collab/import-route';
 import { resolvePendingInDo } from '../lib/collab/resolve-pending-route';
 import {
-    MANIFEST_ENTRY, MEDIA_INDEX_ENTRY, OUTBOX_ENTRY, listPackage, mediaEntryName, readPackageEntry, yjsEntryName,
+    MANIFEST_ENTRY, MEDIA_INDEX_ENTRY, OUTBOX_ENTRY, listPackage, mediaEntryName, readPackageEntries, readPackageEntry, yjsEntryName,
 } from '../lib/native/offline-zip';
 import {
     MediaIndexSchema, OfflinePackageManifestSchema, OutboxSchema,
@@ -46,7 +46,7 @@ import type { HonoConfig } from '../types/hono';
 export interface OfflineImportResult {
     inspections: number;
     photos: number;
-    outbox: { applied: number; skipped: number };
+    outbox: { applied: number; skipped: number; failed: OutboxFailure[] };
     yjs: { changed: number; unchanged: number };
 }
 
@@ -168,81 +168,25 @@ async function validate(c: Context<HonoConfig>, zip: Uint8Array): Promise<Import
     return { manifest, outbox, media, entries, identities, created };
 }
 
-/** The in-process request that replays one queued write with the caller's own credentials. */
-function outboxRequest(c: Context<HonoConfig>, entry: OutboxEntry): Request {
-    const { id, ...rest } = entry.payload;
-    const headers = new Headers({ 'Idempotency-Key': entry.idempotencyKey });
-    // Only the caller's credentials travel. Version-handshake and other client
-    // headers do not: this is the server calling itself, not the device.
-    for (const name of ['authorization', 'cookie']) {
-        const v = c.req.header(name);
-        if (v) headers.set(name, v);
-    }
-    const url = (path: string) => new URL(path, c.req.url);
-    switch (entry.op) {
-        case 'inspection.create':
-            headers.set('content-type', 'application/json');
-            return new Request(url('/api/inspections'), { method: 'POST', headers, body: JSON.stringify(entry.payload) });
-        case 'inspection.update':
-            headers.set('content-type', 'application/json');
-            return new Request(url(`/api/inspections/${id}`), { method: 'PATCH', headers, body: JSON.stringify(rest) });
-        case 'inspection.complete':
-            return new Request(url(`/api/inspections/${id}/complete`), { method: 'POST', headers });
-    }
-}
-
-function detailed(err: AppError, details: unknown): AppError {
-    err.details = details;
-    return err;
-}
-
-function failureFor(status: number, message: string, details: unknown): AppError {
-    if (status === 401 || status === 403) return detailed(Errors.Forbidden(message), details);
-    if (status === 404) return detailed(Errors.NotFound(message), details);
-    if (status === 409) return detailed(Errors.Conflict(message), details);
-    if (status === 422) return Errors.UnprocessableEntity(message, details);
-    if (status >= 500) return Errors.ServiceUnavailable(message, details);
-    return Errors.BadRequest(message, details);
-}
-
-function executionContext(c: Context<HonoConfig>): ExecutionContext | undefined {
-    try { return c.executionCtx; } catch { return undefined; }
-}
-
-async function applyOutbox(c: Context<HonoConfig>, outbox: readonly OutboxEntry[]): Promise<{ applied: number; skipped: number }> {
-    // Creates first, then the rest, each group in the order the device queued it.
-    const ordered = [...outbox.filter((e) => e.op === 'inspection.create'), ...outbox.filter((e) => e.op !== 'inspection.create')];
-    const { app } = await import('../index');
-    let applied = 0;
-    let skipped = 0;
-    for (const entry of ordered) {
-        const res = await app.fetch(outboxRequest(c, entry), c.env, executionContext(c));
-        if (!res.ok) {
-            logger.warn('offline import: a queued write was refused', { op: entry.op, status: res.status });
-            throw failureFor(res.status, `Queued write ${entry.idempotencyKey} (${entry.op}) was refused`, {
-                idempotencyKey: entry.idempotencyKey, op: entry.op, inspectionId: entry.payload.id, status: res.status,
-            });
-        }
-        // A create that answers 200 found the inspection already there; any other
-        // write is a repeat when the idempotency layer replayed its stored answer.
-        const repeat = res.headers.get('Idempotency-Replayed') === 'true'
-            || (entry.op === 'inspection.create' && res.status === 200);
-        if (repeat) skipped++; else applied++;
-    }
-    return { applied, skipped };
-}
-
 /** Write each photo at the key its (tenant, inspection, pendingId) fixes; a repeat overwrites. */
 async function storePhotos(c: Context<HonoConfig>, zip: Uint8Array, plan: ImportPlan, tenantId: string): Promise<Map<string, Record<string, string>>> {
     const keysByInspection = new Map<string, Record<string, string>>();
     const bucket = c.env.PHOTOS;
     if (plan.media.length > 0 && !bucket) throw Errors.ServiceUnavailable('Photo storage is unavailable');
+    // Entries are inflated in bounded batches, one pass per batch (see readPackageEntries).
+    const wanted = new Map<string, number>();
+    for (const m of plan.media) {
+        const ext = signedPhotoExtFor(m.contentType);
+        const name = ext ? mediaEntryName(m.pendingId, ext) : undefined;
+        const size = name === undefined ? undefined : plan.entries.get(name);
+        if (name !== undefined && size !== undefined) wanted.set(name, size);
+    }
+    const inflated = readPackageEntries(zip, wanted);
     for (const m of plan.media) {
         const ext = signedPhotoExtFor(m.contentType);
         if (!ext || !bucket) continue; // unreachable: validate() proved both
-        const name = mediaEntryName(m.pendingId, ext);
-        const size = plan.entries.get(name);
-        const bytes = size === undefined ? null : readPackageEntry(zip, name, size);
+        const next = inflated.next();
+        const bytes = next.done || next.value[0] !== mediaEntryName(m.pendingId, ext) ? null : next.value[1];
         if (!bytes) throw Errors.BadRequest(`Photo ${m.pendingId} could not be read from the package`);
         const key = r2Keys.inspectionPhoto(tenantId, m.inspectionId, m.pendingId, ext);
         await storePhotoAtKey(bucket, imagesBinding(c.env), key, new File([bytes], `${m.pendingId}.${ext}`, { type: m.contentType }));
@@ -268,7 +212,17 @@ export async function importOfflinePackage(c: Context<HonoConfig>, zip: Uint8Arr
     const plan = await validate(c, zip);
 
     // ---- phase 2: writes -------------------------------------------------
-    const outbox = await applyOutbox(c, plan.outbox);
+    // Order matters. The creates come first because everything after them needs
+    // the inspection to exist. The photos and the results come next, and the
+    // other queued writes come LAST: photos and results are the inspector's field
+    // work, they are idempotent and lossless, and a device that is lost makes the
+    // package their only copy, so a queued status change the server refuses (an
+    // inspection cancelled since) must not be able to keep them out. A refusal of
+    // that kind is reported per entry; anything transient (5xx, 429) still stops
+    // the request so the client retries the whole package.
+    const creates = plan.outbox.filter((e) => e.op === 'inspection.create');
+    const rest = plan.outbox.filter((e) => e.op !== 'inspection.create');
+    const created = await applyOutbox(c, creates, { tolerateRefusals: false });
 
     // Inspections the package just created need their own authorization now that they exist.
     for (const id of plan.created) {
@@ -280,12 +234,18 @@ export async function importOfflinePackage(c: Context<HonoConfig>, zip: Uint8Arr
     const keysByInspection = await storePhotos(c, zip, plan, tenantId);
 
     const yjs = { changed: 0, unchanged: 0 };
+    const updates = new Map<string, number>();
+    for (const { id } of plan.manifest.inspections) {
+        const size = plan.entries.get(yjsEntryName(id));
+        if (size !== undefined) updates.set(yjsEntryName(id), size);
+    }
+    const inflatedUpdates = readPackageEntries(zip, updates);
     for (const { id } of plan.manifest.inspections) {
         const identity = plan.identities.get(id);
         if (!identity) throw Errors.Internal();
         const stub = collabStub(c, identity.tenantId, identity.reportId);
-        const size = plan.entries.get(yjsEntryName(id));
-        const update = size === undefined ? null : readPackageEntry(zip, yjsEntryName(id), size);
+        const next = inflatedUpdates.next();
+        const update = next.done || next.value[0] !== yjsEntryName(id) ? null : next.value[1];
         if (!update) throw Errors.BadRequest(`Yjs state for inspection ${id} could not be read from the package`);
 
         const imported = await importUpdateIntoDo(stub, identity, update);
@@ -299,6 +259,13 @@ export async function importOfflinePackage(c: Context<HonoConfig>, zip: Uint8Arr
         }
     }
 
+    const others = await applyOutbox(c, rest, { tolerateRefusals: true });
+    const outbox = {
+        applied: created.applied + others.applied,
+        skipped: created.skipped + others.skipped,
+        failed: others.failed,
+    };
+
     const photos = plan.media.length;
     auditFromContext(c, 'native.offline_import', 'tenant', {
         entityId: tenantId,
@@ -309,6 +276,7 @@ export async function importOfflinePackage(c: Context<HonoConfig>, zip: Uint8Arr
             photos,
             applied: outbox.applied,
             skipped: outbox.skipped,
+            failed: outbox.failed.length,
             changed: yjs.changed,
         },
     });

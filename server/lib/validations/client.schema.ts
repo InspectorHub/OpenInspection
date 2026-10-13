@@ -26,6 +26,12 @@ export const ImportOfflinePackageResponseSchema = createApiResponseSchema(z.obje
     outbox: z.object({
         applied: z.number().int().describe('Queued writes executed by this import'),
         skipped: z.number().int().describe('Queued writes that had already been applied'),
+        failed: z.array(z.object({
+            idempotencyKey: z.string(),
+            op: z.enum(['inspection.create', 'inspection.update', 'inspection.complete']),
+            inspectionId: z.string(),
+            status: z.number().int().describe('HTTP status the target route refused it with'),
+        })).describe('Queued writes the server refused. The results and photos in the package were still imported; these entries need attention on the device.'),
     }),
     yjs: z.object({
         changed: z.number().int().describe('Inspections whose results changed'),

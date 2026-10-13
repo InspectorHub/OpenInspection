@@ -3,15 +3,23 @@
  * inflated. Every refusal is paired with a positive control (the same package
  * minus the fault is accepted) so a reader that rejects everything cannot pass.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { zipSync } from 'fflate';
 import {
     OfflinePackageManifestSchema, OutboxEntrySchema, OutboxSchema, MediaIndexSchema, OFFLINE_ID_PATTERN,
 } from '../../../server/lib/native/offline-package';
 import {
-    listPackage, readPackageEntry, readPackageBody, MAX_PACKAGE_BYTES, MAX_MEDIA_ENTRY_BYTES, MAX_PACKAGE_ENTRIES,
+    listPackage, readPackageEntry, readPackageEntries, readPackageBody, MAX_PACKAGE_BYTES, MAX_MEDIA_ENTRY_BYTES, MAX_PACKAGE_ENTRIES,
 } from '../../../server/lib/native/offline-zip';
 import { buildPackage } from '../helpers/offline-package-fixture';
+
+// Counts inflate passes. Every pass re-reads the zip's whole central directory, so the count is
+// the cost of reading a package's entries, independent of how fast the machine is.
+const passes = vi.hoisted(() => ({ count: 0 }));
+vi.mock('fflate', async (importOriginal) => {
+    const real = await importOriginal<typeof import('fflate')>();
+    return { ...real, unzipSync: ((...args: Parameters<typeof real.unzipSync>) => { passes.count++; return real.unzipSync(...args); }) as typeof real.unzipSync };
+});
 
 const manifest = {
     format: 'openinspection-offline-package',
@@ -194,6 +202,44 @@ describe('offline package archive listing', () => {
         expect(readPackageEntry(zip, 'yjs/absent.bin', 3)).toBeNull();
     });
 
+    it('reads many entries in one inflate pass rather than one pass each', () => {
+        const files: Record<string, Uint8Array> = { 'manifest.json': new Uint8Array([123, 125]) };
+        for (let i = 0; i < 1500; i++) files[`media/p${i}.jpg`] = new Uint8Array([i % 251, 1, 2]);
+        const zip = zipSync(files);
+        const listing = listPackage(zip);
+        expect(listing.ok).toBe(true);
+        if (!listing.ok) return;
+        const wanted = new Map([...listing.entries].filter(([name]) => name.startsWith('media/')));
+        expect(wanted.size).toBe(1500);
+
+        passes.count = 0;
+        let read = 0;
+        for (const [name, bytes] of readPackageEntries(zip, wanted)) {
+            expect(bytes, name).not.toBeNull();
+            read++;
+        }
+        expect(read).toBe(1500);
+        expect(passes.count).toBe(1);
+
+        // Control: a single-entry read is exactly one pass, so the counter does count passes.
+        passes.count = 0;
+        expect(readPackageEntry(zip, 'media/p7.jpg', 3)).toEqual(new Uint8Array([7, 1, 2]));
+        expect(passes.count).toBe(1);
+    });
+
+    it('bounds how much one inflate pass holds: large entries are split into several passes', () => {
+        const big = (seed: number) => Uint8Array.from({ length: 5 * 1024 * 1024 }, (_, i) => (i * 7 + seed) & 255);
+        const zip = zipSync({ 'media/a.jpg': big(1), 'media/b.jpg': big(2), 'media/c.jpg': big(3) }, { level: 0 });
+        const listing = listPackage(zip);
+        expect(listing.ok).toBe(true);
+        if (!listing.ok) return;
+        passes.count = 0;
+        const sizes: number[] = [];
+        for (const [, bytes] of readPackageEntries(zip, listing.entries)) sizes.push(bytes?.byteLength ?? -1);
+        expect(sizes).toEqual([5 * 1024 * 1024, 5 * 1024 * 1024, 5 * 1024 * 1024]);
+        expect(passes.count).toBe(3);
+    });
+
     it('lists a package built the way the import specs build one', () => {
         const zip = buildPackage({
             tenantId: 't', inspections: [{ id: 'insp-1', reportId: 'r' }], yjs: { 'insp-1': new Uint8Array([1]) },
@@ -226,5 +272,36 @@ describe('offline package request body', () => {
         // Declared shorter than sent, and declared longer than sent.
         expect(await readPackageBody(req('2', new Uint8Array([1, 2, 3])))).toEqual({ ok: false, status: 400 });
         expect(await readPackageBody(req('5', new Uint8Array([1, 2, 3])))).toEqual({ ok: false, status: 400 });
+    });
+
+    it('does not reserve memory for a declared length that never arrives', async () => {
+        const declared = MAX_PACKAGE_BYTES;
+        let arrayBuffersWhilePending = 0;
+        const baseline = process.memoryUsage().arrayBuffers;
+        const slow = new ReadableStream<Uint8Array>({
+            pull(controller) {
+                // The reader is attached and waiting for the rest; whatever it reserved is live now.
+                arrayBuffersWhilePending = process.memoryUsage().arrayBuffers;
+                controller.close();
+            },
+            start(controller) { controller.enqueue(new Uint8Array([1, 2, 3])); },
+        });
+        const request = new Request('http://x/api/client/import', {
+            method: 'POST', headers: { 'content-length': String(declared) }, body: slow, duplex: 'half',
+        } as RequestInit);
+        expect(await readPackageBody(request)).toEqual({ ok: false, status: 400 });
+        // A 24 MiB pre-allocation would show up as ~24 MiB here; three bytes of body must not.
+        expect(arrayBuffersWhilePending - baseline).toBeLessThan(4 * 1024 * 1024);
+    });
+
+    it('reads a body delivered in several chunks (positive control for the chunked path)', async () => {
+        const parts = [new Uint8Array([1, 2]), new Uint8Array([3]), new Uint8Array([4, 5, 6])];
+        const stream = new ReadableStream<Uint8Array>({
+            start(controller) { for (const p of parts) controller.enqueue(p); controller.close(); },
+        });
+        const request = new Request('http://x/api/client/import', {
+            method: 'POST', headers: { 'content-length': '6' }, body: stream, duplex: 'half',
+        } as RequestInit);
+        expect(await readPackageBody(request)).toEqual({ ok: true, bytes: new Uint8Array([1, 2, 3, 4, 5, 6]) });
     });
 });

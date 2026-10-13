@@ -26,6 +26,8 @@ const DEFAULT_OFFLINE_DAYS = 30;
 const MIN_OFFLINE_DAYS = 1;
 const MAX_OFFLINE_DAYS = 365;
 
+type TenantConfigPatch = Parameters<ReturnType<typeof createApi>["admin"]["tenant-config"]["$patch"]>[0]["json"];
+
 interface ErasureDecision {
   table: string;
   action: string;
@@ -171,6 +173,16 @@ export async function action({ request, context }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = String(form.get("intent"));
 
+  // Every save on this page is one PATCH of the tenant config. One call site, so the
+  // action's in-process API fan-out stays where the middleware budget put it.
+  const savePatch = async (json: TenantConfigPatch) => {
+    const res = await api.admin["tenant-config"].$patch({ json });
+    if (!res.ok) {
+      return { ok: false, intent, message: await patchErrorMessage(res) };
+    }
+    return { ok: true, intent };
+  };
+
   if (intent === "retention-save") {
     const raw = String(form.get("retentionYears") ?? "");
     const years = Number(raw);
@@ -188,13 +200,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         message: m.settings_compliance_retention_range_error({ min: MIN_RETENTION_YEARS, max: MAX_RETENTION_YEARS }),
       };
     }
-    const res = await api.admin["tenant-config"].$patch({
-      json: { agreementRetentionYears: years },
-    });
-    if (!res.ok) {
-      return { ok: false, intent, message: await patchErrorMessage(res) };
-    }
-    return { ok: true, intent };
+    return savePatch({ agreementRetentionYears: years });
   }
 
   if (intent === "pdf-retention-save") {
@@ -208,13 +214,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     ) {
       return { ok: false, intent, message: m.settings_compliance_pdf_range_error() };
     }
-    const res = await api.admin["tenant-config"].$patch({
-      json: { reportPdfRetentionYears: years },
-    });
-    if (!res.ok) {
-      return { ok: false, intent, message: await patchErrorMessage(res) };
-    }
-    return { ok: true, intent };
+    return savePatch({ reportPdfRetentionYears: years });
   }
 
   if (intent === "offline-save") {
@@ -227,21 +227,11 @@ export async function action({ request, context }: Route.ActionArgs) {
         message: m.settings_compliance_offline_range_error({ min: MIN_OFFLINE_DAYS, max: MAX_OFFLINE_DAYS }),
       };
     }
-    const res = await api.admin["tenant-config"].$patch({ json: { offlineMaxDays: days } });
-    if (!res.ok) {
-      return { ok: false, intent, message: await patchErrorMessage(res) };
-    }
-    return { ok: true, intent };
+    return savePatch({ offlineMaxDays: days });
   }
 
   if (intent === "view-counting-save") {
-    const res = await api.admin["tenant-config"].$patch({
-      json: { reportViewCountingEnabled: String(form.get("enabled")) === "1" },
-    });
-    if (!res.ok) {
-      return { ok: false, intent, message: await patchErrorMessage(res) };
-    }
-    return { ok: true, intent };
+    return savePatch({ reportViewCountingEnabled: String(form.get("enabled")) === "1" });
   }
 
   if (intent === "legal-save") {
@@ -257,19 +247,13 @@ export async function action({ request, context }: Route.ActionArgs) {
         message: m.settings_compliance_legal_custom_required(),
       };
     }
-    const res = await api.admin["tenant-config"].$patch({
-      json: {
-        legalMode,
-        customPrivacyUrl: legalMode === "custom" ? customPrivacyUrl : null,
-        customTermsUrl: legalMode === "custom" ? customTermsUrl : null,
-        privacyBody: privacyBody.trim() ? privacyBody : null,
-        termsBody: termsBody.trim() ? termsBody : null,
-      },
+    return savePatch({
+      legalMode,
+      customPrivacyUrl: legalMode === "custom" ? customPrivacyUrl : null,
+      customTermsUrl: legalMode === "custom" ? customTermsUrl : null,
+      privacyBody: privacyBody.trim() ? privacyBody : null,
+      termsBody: termsBody.trim() ? termsBody : null,
     });
-    if (!res.ok) {
-      return { ok: false, intent, message: await patchErrorMessage(res) };
-    }
-    return { ok: true, intent };
   }
 
   return { ok: false, intent };

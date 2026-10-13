@@ -32,7 +32,7 @@ export interface WsTicket {
 const TICKET_WS_PATH = /^\/api\/inspections\/([^/]+)\/(?:collab|presence)\/ws$/;
 
 /** The inspection id a ticket-eligible WebSocket path addresses, or null for any other path. */
-export function wsTicketInspectionId(path: string): string | null {
+function wsTicketInspectionId(path: string): string | null {
     return TICKET_WS_PATH.exec(path)?.[1] ?? null;
 }
 
@@ -68,7 +68,7 @@ function parseTicket(raw: string): WsTicket | null {
  * KV offers no compare-and-delete, so two requests landing in the same instant
  * could both read it; the 60 s life and the per-inspection binding bound that.
  */
-export async function consumeWsTicket(kv: KVNamespace, id: string): Promise<WsTicket | null> {
+async function consumeWsTicket(kv: KVNamespace, id: string): Promise<WsTicket | null> {
     const key = `${KEY_PREFIX}${id}`;
     const raw = await kv.get(key);
     if (!raw) return null;

@@ -55,6 +55,13 @@ export function idempotencyMiddleware(opts: IdempotencyOptions = {}): Middleware
         const key = c.req.header('Idempotency-Key');
         if (!key || !methods.has(c.req.method.toUpperCase())) return next();
 
+        // A zip body cannot be fingerprinted without buffering it, which would consume the
+        // stream the route reads itself (the offline package import reads it under a hard
+        // size cap). With no fingerprint, one key reused for two different packages would
+        // replay the first one's answer and import nothing. The route is idempotent per
+        // queued write on its own, so it takes no cached answer from this layer.
+        if ((c.req.header('content-type') ?? '').includes('application/zip')) return next();
+
         const tenantId = c.get('tenantId');
         if (!tenantId) return next();
 
