@@ -64,6 +64,79 @@ async function readBoundedBody(req: Request, limit: number): Promise<BoundedBody
     return { ok: true, bytes };
 }
 
+/** The verified identity the object is addressed with; only `authorizeCollab` may produce one. */
+export interface CollabImportIdentity {
+    tenantId: string;
+    inspectionId: string;
+    reportId: string;
+    userId: string;
+}
+
+export type CollabImportOutcome =
+    | { ok: true; snapshotSeq: number | null; changed: boolean }
+    | { ok: false; status: 400 | 413 | 422 | 502 | 503; reason: string };
+
+/**
+ * Send already-read update bytes to the document object and say what happened,
+ * as data. Nothing is thrown for an expected failure and nothing is audited here:
+ * a caller that imports many updates (the offline bundle) audits each in its own
+ * terms, and `forwardCollabImport` audits the single-update route.
+ *
+ * The identity must come from `authorizeCollab`; it is the only identity sent.
+ */
+export async function importUpdateIntoDo(
+    stub: CollabImportTarget['stub'],
+    identity: CollabImportIdentity,
+    bytes: Uint8Array,
+): Promise<CollabImportOutcome> {
+    if (bytes.byteLength === 0) return { ok: false, status: 400, reason: 'empty' };
+    if (bytes.byteLength > MAX_IMPORT_BYTES) return { ok: false, status: 413, reason: 'too_large' };
+
+    let res: Response;
+    try {
+        res = await stub.fetch(new Request('https://do.local/import', {
+            method: 'POST',
+            headers: {
+                'Content-Type':    'application/octet-stream',
+                'x-tenant-id':     identity.tenantId,
+                'x-inspection-id': identity.inspectionId,
+                'x-report-id':     identity.reportId,
+                'x-user-id':       identity.userId,
+            },
+            body: bytes,
+        }));
+    } catch (err) {
+        logger.error('collab: the document object could not be reached for an import', { inspectionId: identity.inspectionId }, err instanceof Error ? err : undefined);
+        return { ok: false, status: 502, reason: 'do_unreachable' };
+    }
+
+    let answer: unknown;
+    try {
+        answer = await res.json();
+    } catch {
+        answer = undefined;
+    }
+
+    if (!res.ok) {
+        const reason = typeof answer === 'object' && answer !== null && 'reason' in answer && typeof answer.reason === 'string'
+            ? answer.reason
+            : 'do_error';
+        switch (res.status) {
+            case 400: case 413: case 422: case 503:
+                return { ok: false, status: res.status, reason };
+            default:
+                return { ok: false, status: 502, reason };
+        }
+    }
+
+    const parsed = CollabImportResultSchema.safeParse(answer);
+    if (!parsed.success) {
+        logger.error('collab: unexpected import answer from the document object', { inspectionId: identity.inspectionId });
+        return { ok: false, status: 502, reason: 'unexpected_answer' };
+    }
+    return { ok: true, snapshotSeq: parsed.data.snapshotSeq, changed: parsed.data.changed };
+}
+
 export async function forwardCollabImport(c: Context<HonoConfig>, target: CollabImportTarget): Promise<Response> {
     const body = await readBoundedBody(c.req.raw, MAX_IMPORT_BYTES);
     if (!body.ok) {
@@ -72,27 +145,12 @@ export async function forwardCollabImport(c: Context<HonoConfig>, target: Collab
     }
     if (body.bytes.byteLength === 0) return c.json({ error: 'empty import' }, 400);
 
-    const res = await target.stub.fetch(new Request('https://do.local/import', {
-        method: 'POST',
-        headers: {
-            'Content-Type':    'application/octet-stream',
-            'x-tenant-id':     target.tenantId,
-            'x-inspection-id': target.inspectionId,
-            'x-report-id':     target.reportId,
-            'x-user-id':       target.userId,
-        },
-        body: body.bytes,
-    }));
-    if (!res.ok) return res;
+    const out = await importUpdateIntoDo(target.stub, target, body.bytes);
+    if (!out.ok) return c.json({ ok: false, reason: out.reason }, out.status);
 
-    const parsed = CollabImportResultSchema.safeParse(await res.json());
-    if (!parsed.success) {
-        logger.error('collab: unexpected import answer from the document object', { inspectionId: target.inspectionId });
-        return c.json({ error: 'unexpected import answer' }, 502);
-    }
     auditFromContext(c, 'inspection.collab.import', 'inspection', {
         entityId: target.inspectionId,
-        metadata: { snapshotSeq: parsed.data.snapshotSeq, bytes: body.bytes.byteLength },
+        metadata: { snapshotSeq: out.snapshotSeq, changed: out.changed, bytes: body.bytes.byteLength },
     });
-    return c.json(parsed.data, 200);
+    return c.json({ ok: true, snapshotSeq: out.snapshotSeq, changed: out.changed }, 200);
 }

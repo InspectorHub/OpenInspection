@@ -174,7 +174,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'inspection.share_agent': { family: 'inspection', label: 'audit_action_inspection_share_agent', meta: { agentEmail: 'person' }, status: { kind: 'live' } },
     'inspection.status_change': { family: 'inspection', label: 'audit_action_inspection_status_change', meta: { feeCents: 'count', from: 'from', reason: 'reason', refundCents: 'count', refundPaymentId: 'id', to: 'to' }, status: { kind: 'live' } },
     'inspection.status_changed': { family: 'inspection', label: 'audit_action_inspection_status_changed', meta: {}, status: { kind: 'superseded', by: 'inspection.status_change' } },
-    'inspection.collab.import': { family: 'inspection', label: 'audit_action_inspection_collab_import', meta: { bytes: 'count', snapshotSeq: 'id' }, status: { kind: 'live' } },
+    'inspection.collab.import': { family: 'inspection', label: 'audit_action_inspection_collab_import', meta: { bytes: 'count', changed: 'flag', snapshotSeq: 'id' }, status: { kind: 'live' } },
     'inspection.sync_conflict_resolved': { family: 'inspection', label: 'audit_action_inspection_sync_conflict_resolved', meta: {}, status: { kind: 'live' } },
     'inspection.template_snapshot.update': { family: 'inspection', label: 'audit_action_inspection_template_snapshot_update', meta: { sectionCount: 'count' }, status: { kind: 'live' } },
     'inspection.template_upgraded': {

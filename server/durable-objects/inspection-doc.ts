@@ -52,7 +52,7 @@ import { findingKeysFromTemplateSnapshot } from '../lib/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import { purgePathMatches } from './purge-path';
-import { importResponse } from './inspection-doc-import';
+import { importResponse, newestImportSeq } from './inspection-doc-import';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -436,8 +436,8 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         if (url.pathname.endsWith('/import') && req.method === 'POST') {
             if (!this.adoptIdentityHeaders(req)) return new Response('missing tenant/inspection identity', { status: 400 });
             await this.hydrateFromD1Once();
-            return importResponse(this.doc, new Uint8Array(await req.arrayBuffer()),
-                () => this.captureSnapshot(req.headers.get('x-user-id'), 'import'), () => this.persist());
+            return importResponse(this.doc, new Uint8Array(await req.arrayBuffer()), () => this.captureSnapshot(req.headers.get('x-user-id'), 'import'), () => this.persist(),
+                async () => newestImportSeq(asSnapshotArray(await this.ctx.storage.get(SNAPSHOTS_KEY))));
         }
 
         // #119 — record a carried item's follow-up disposition. Same identity

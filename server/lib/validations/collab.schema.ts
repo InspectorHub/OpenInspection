@@ -65,5 +65,8 @@ export const CollabTicketResponseSchema = createApiResponseSchema(z.object({
 /** What the Durable Object answers when an offline update was applied and persisted. */
 export const CollabImportResultSchema = z.object({
     ok: z.literal(true),
-    snapshotSeq: z.number().int().nonnegative().describe('Sequence number of the snapshot taken just before the import'),
+    snapshotSeq: z.number().int().nonnegative().nullable()
+        .describe('Sequence number of the snapshot taken just before the import; for an import that changed nothing, the newest earlier import snapshot, or null when there is none'),
+    changed: z.boolean()
+        .describe('False when the update left the document exactly as it was (a repeat or a retry); no snapshot was taken for it'),
 });

@@ -36,7 +36,56 @@ export type ImportFailure =
     /** The pre-import snapshot could not be written, so nothing was applied. */
     | { ok: false; status: 503; reason: 'snapshot_failed' };
 
-export type ImportResult = { ok: true; snapshotSeq: number } | ImportFailure;
+/**
+ * `changed` is false when the update left the document exactly as it was (a
+ * repeat of an earlier import, or a retry). `snapshotSeq` is then the newest
+ * existing import snapshot, or null when there is none, because no snapshot
+ * was taken for this call.
+ */
+export type ImportResult = { ok: true; snapshotSeq: number | null; changed: boolean } | ImportFailure;
+
+/** Sequence number of the newest import snapshot among `snapshots`, or null when there is none. */
+export function newestImportSeq(snapshots: readonly { seq: number; reason?: string }[]): number | null {
+    let seq: number | null = null;
+    for (const snap of snapshots) {
+        if (snap.reason === 'import' && (seq === null || snap.seq > seq)) seq = snap.seq;
+    }
+    return seq;
+}
+
+/** What a document has parked because it could not integrate it yet. */
+interface PendingState {
+    structsBytes: number;
+    missing: Map<number, number>;
+    dsBytes: number;
+}
+
+function pendingOf(doc: Y.Doc): PendingState {
+    const structs = doc.store.pendingStructs;
+    const ds = doc.store.pendingDs;
+    return {
+        structsBytes: structs ? structs.update.byteLength : 0,
+        missing: structs ? new Map(structs.missing) : new Map(),
+        dsBytes: ds ? ds.byteLength : 0,
+    };
+}
+
+/**
+ * True when applying the update parked MORE than the copy already had parked.
+ * The copy inherits whatever the live document has not been able to integrate
+ * (`encodeStateAsUpdate` folds pending data in), so "anything pending" would
+ * refuse every import once the live document had a gap of its own. What matters
+ * is only what this update added: a new missing dependency, or more parked bytes.
+ */
+function parkedMore(before: PendingState, after: PendingState): boolean {
+    if (after.dsBytes > before.dsBytes) return true;
+    if (after.structsBytes > before.structsBytes) return true;
+    for (const [client, clock] of after.missing) {
+        const was = before.missing.get(client);
+        if (was === undefined || clock > was) return true;
+    }
+    return false;
+}
 
 /**
  * Prove an update applies cleanly WITHOUT touching the live document.
@@ -51,17 +100,25 @@ export type ImportResult = { ok: true; snapshotSeq: number } | ImportFailure;
  * An update whose causal dependencies are missing does not throw either: Yjs
  * parks the unreachable part in `pendingStructs`/`pendingDs` and reports
  * success. That would answer 200 for a bundle that was only partly applied, and
- * the client would discard its copy, so it is refused instead.
+ * the client would discard its copy, so it is refused instead. Only what the
+ * update itself parks counts; a gap the live document already had is not the
+ * caller's fault.
+ *
+ * Also reports whether the update changes anything. `Y.snapshot` is the state
+ * vector plus a delete set derived from the struct store, so comparing the
+ * copy's snapshot with the live one sees an update that only deletes (which
+ * leaves the state vector alone) as a change.
  */
-function trialApply(doc: Y.Doc, update: Uint8Array): ImportFailure | null {
+export function trialApply(doc: Y.Doc, update: Uint8Array): { ok: true; changed: boolean } | ImportFailure {
     const trial = new Y.Doc();
     try {
         Y.applyUpdate(trial, Y.encodeStateAsUpdate(doc));
+        const before = pendingOf(trial);
         Y.applyUpdate(trial, update);
-        if (trial.store.pendingStructs !== null || trial.store.pendingDs !== null) {
+        if (parkedMore(before, pendingOf(trial))) {
             return { ok: false, status: 422, reason: 'unmet_dependencies' };
         }
-        return null;
+        return { ok: true, changed: !Y.equalSnapshots(Y.snapshot(trial), Y.snapshot(doc)) };
     } catch {
         return { ok: false, status: 400, reason: 'malformed' };
     } finally {
@@ -76,29 +133,32 @@ function trialApply(doc: Y.Doc, update: Uint8Array): ImportFailure | null {
  *   1. Validate on a copy. A bad update costs nothing: no snapshot slot (the
  *      ring keeps 25, so garbage must not be able to push real history out) and
  *      no change to the document.
- *   2. Take the pre-import snapshot. It must succeed. An import that cannot be
+ *   2. An update that changes nothing (a repeat, or a retry after a failed
+ *      persist) takes no snapshot and applies nothing: a snapshot of an
+ *      unchanged state would only push real history out of the ring, and on a
+ *      retry would bury the genuine "before the import" snapshot under one that
+ *      already contains it.
+ *   3. Take the pre-import snapshot. It must succeed. An import that cannot be
  *      undone is refused, which is the opposite of the fail-open connect
  *      snapshot on purpose.
- *   3. Apply to the live document. The snapshot projects the document right
- *      after its storage read and then writes under the object's input gate, which
- *      holds back other events while a storage operation is pending; the apply
- *      follows synchronously. So the snapshot is the state the import landed on,
- *      and an edit that races in is merged by Yjs either way.
- *
- * Re-importing the same bytes is safe: Yjs integrates a struct once, so a repeat
- * changes nothing. It does take another snapshot, which is the price of never
- * having to decide whether an import was "the same one".
+ *   4. Apply to the live document. The snapshot reads the document, then writes
+ *      under the object's input gate, which holds back other events while that
+ *      storage operation is pending, so the snapshot is a consistent past state
+ *      of the document. An edit that races in between the snapshot and the apply
+ *      is merged by Yjs either way.
  */
 export async function applyImport(
     doc: Y.Doc,
     update: Uint8Array,
     snapshot: () => Promise<{ seq: number }>,
+    latestImportSeq: () => Promise<number | null>,
 ): Promise<ImportResult> {
     if (update.byteLength === 0) return { ok: false, status: 400, reason: 'empty' };
     if (update.byteLength > MAX_IMPORT_BYTES) return { ok: false, status: 413, reason: 'too_large' };
 
-    const rejected = trialApply(doc, update);
-    if (rejected) return rejected;
+    const trial = trialApply(doc, update);
+    if (!trial.ok) return trial;
+    if (!trial.changed) return { ok: true, snapshotSeq: await latestImportSeq(), changed: false };
 
     let seq: number;
     try {
@@ -108,7 +168,7 @@ export async function applyImport(
     }
 
     Y.applyUpdate(doc, update, IMPORT_ORIGIN);
-    return { ok: true, snapshotSeq: seq };
+    return { ok: true, snapshotSeq: seq, changed: true };
 }
 
 /**
@@ -116,16 +176,19 @@ export async function applyImport(
  *
  * A failed persist is a 503, not a swallowed error. The update is already in the
  * live document and the object's debounced persist retries it, but the caller
- * must not be told "done" before it is durable. Retrying is safe because a
- * repeat of the same update changes nothing.
+ * must not be told "done" before it is durable. Retrying is safe: the retry is
+ * judged against the in-memory document, which already holds the update, so it
+ * reports no change and takes no second snapshot, but it still persists, so a 200
+ * always means durable.
  */
 export async function importResponse(
     doc: Y.Doc,
     update: Uint8Array,
     snapshot: () => Promise<{ seq: number }>,
     persist: () => Promise<void>,
+    latestImportSeq: () => Promise<number | null>,
 ): Promise<Response> {
-    const out = await applyImport(doc, update, snapshot);
+    const out = await applyImport(doc, update, snapshot, latestImportSeq);
     if (!out.ok) return Response.json({ ok: false, reason: out.reason }, { status: out.status });
     try {
         await persist();
@@ -133,5 +196,5 @@ export async function importResponse(
         logger.error('collab: persist after import failed', {}, err instanceof Error ? err : undefined);
         return Response.json({ ok: false, reason: 'persist_failed' }, { status: 503 });
     }
-    return Response.json({ ok: true, snapshotSeq: out.snapshotSeq });
+    return Response.json({ ok: true, snapshotSeq: out.snapshotSeq, changed: out.changed });
 }

@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import collabRoutes from '../../../server/api/inspections/collab';
 import { MAX_IMPORT_BYTES } from '../../../server/durable-objects/inspection-doc-import';
+import { importUpdateIntoDo } from '../../../server/lib/collab/import-route';
 import type { HonoConfig } from '../../../server/types/hono';
 
 const getInspectionRoster = vi.fn();
@@ -36,7 +37,7 @@ vi.mock('../../../server/lib/audit', async (importOriginal) => ({
 }));
 
 const PATH = '/api/inspections/insp1/collab/import';
-const OK_ANSWER = () => Response.json({ ok: true, snapshotSeq: 7 });
+const OK_ANSWER = () => Response.json({ ok: true, snapshotSeq: 7, changed: true });
 
 function makeMockDo(answer: () => Response = OK_ANSWER) {
     const stubFetch = vi.fn().mockImplementation(() => Promise.resolve(answer()));
@@ -157,7 +158,7 @@ describe('POST /:id/collab/import — forwarding', () => {
             'x-tenant-id': 'evil-tenant', 'x-user-id': 'evil-user', 'x-report-id': 'evil-report', 'x-inspection-id': 'evil-insp',
         });
         expect(res.status, await res.clone().text()).toBe(200);
-        expect(await res.json()).toEqual({ ok: true, snapshotSeq: 7 });
+        expect(await res.json()).toEqual({ ok: true, snapshotSeq: 7, changed: true });
 
         expect(mockDo.idFromName).toHaveBeenCalledWith('t1:rpt-insp1');
         expect(mockDo.stubFetch).toHaveBeenCalledTimes(1);
@@ -177,7 +178,7 @@ describe('POST /:id/collab/import — forwarding', () => {
         expect(auditFromContext).toHaveBeenCalledTimes(1);
         expect(auditFromContext.mock.calls[0].slice(1)).toEqual([
             'inspection.collab.import', 'inspection',
-            { entityId: 'insp1', metadata: { snapshotSeq: 7, bytes: BYTES.length } },
+            { entityId: 'insp1', metadata: { snapshotSeq: 7, changed: true, bytes: BYTES.length } },
         ]);
     });
 
@@ -187,6 +188,24 @@ describe('POST /:id/collab/import — forwarding', () => {
         const res = await post(app, BYTES, withLength(BYTES.length));
         expect(res.status).toBe(503);
         expect(await res.json()).toEqual({ ok: false, reason: 'snapshot_failed' });
+        expect(auditFromContext).not.toHaveBeenCalled();
+    });
+
+    it('audits an import that changed nothing, with changed false and no snapshot', async () => {
+        const mockDo = makeMockDo(() => Response.json({ ok: true, snapshotSeq: null, changed: false }));
+        const { app } = buildApp({ mockDo });
+        const res = await post(app, BYTES, withLength(BYTES.length));
+        expect(await res.json()).toEqual({ ok: true, snapshotSeq: null, changed: false });
+        expect(auditFromContext.mock.calls[0][3]).toEqual({
+            entityId: 'insp1', metadata: { snapshotSeq: null, changed: false, bytes: BYTES.length },
+        });
+    });
+
+    it('answers 502 and writes no audit row when the DO answers 200 with something that is not JSON', async () => {
+        const mockDo = makeMockDo(() => new Response('<html>oops</html>', { status: 200 }));
+        const { app } = buildApp({ mockDo });
+        const res = await post(app, BYTES, withLength(BYTES.length));
+        expect(res.status).toBe(502);
         expect(auditFromContext).not.toHaveBeenCalled();
     });
 
@@ -246,5 +265,56 @@ describe('POST /:id/collab/import — body bounds', () => {
         expect(mockDo.stubFetch).not.toHaveBeenCalled();
 
         expect((await post(app, BYTES, withLength(BYTES.length))).status).toBe(200);
+    });
+});
+
+describe('importUpdateIntoDo — failures come back as data', () => {
+    const IDENTITY = { tenantId: 't1', inspectionId: 'insp1', reportId: 'rpt-insp1', userId: 'u1' };
+    beforeEach(() => vi.clearAllMocks());
+    const stubOf = (answer: () => Response | Promise<Response>) => ({ fetch: vi.fn().mockImplementation(() => Promise.resolve().then(answer)) });
+
+    it('returns the success shape and sends the identity it was given, writing no audit row', async () => {
+        const stub = stubOf(OK_ANSWER);
+        const out = await importUpdateIntoDo(stub, IDENTITY, BYTES);
+        expect(out).toEqual({ ok: true, snapshotSeq: 7, changed: true });
+        const fwd = stub.fetch.mock.calls[0][0] as Request;
+        expect(fwd.headers.get('x-tenant-id')).toBe('t1');
+        expect(fwd.headers.get('x-user-id')).toBe('u1');
+        expect(new Uint8Array(await fwd.arrayBuffer())).toEqual(BYTES);
+        expect(auditFromContext).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        [400, 'malformed'], [413, 'too_large'], [422, 'unmet_dependencies'], [503, 'snapshot_failed'],
+    ] as const)('maps a DO %i refusal to data carrying its reason', async (status, reason) => {
+        const out = await importUpdateIntoDo(stubOf(() => Response.json({ ok: false, reason }, { status })), IDENTITY, BYTES);
+        expect(out).toEqual({ ok: false, status, reason });
+    });
+
+    it('maps an unrecognised DO status, or a refusal without a reason, to 502 without throwing', async () => {
+        expect(await importUpdateIntoDo(stubOf(() => Response.json({ ok: false, reason: 'boom' }, { status: 500 })), IDENTITY, BYTES))
+            .toEqual({ ok: false, status: 502, reason: 'boom' });
+        expect(await importUpdateIntoDo(stubOf(() => new Response('plain text', { status: 400 })), IDENTITY, BYTES))
+            .toEqual({ ok: false, status: 400, reason: 'do_error' });
+    });
+
+    it('maps a non-JSON 200, a malformed 200, and a thrown fetch to 502', async () => {
+        expect(await importUpdateIntoDo(stubOf(() => new Response('nope')), IDENTITY, BYTES))
+            .toEqual({ ok: false, status: 502, reason: 'unexpected_answer' });
+        expect(await importUpdateIntoDo(stubOf(() => Response.json({ ok: true })), IDENTITY, BYTES))
+            .toEqual({ ok: false, status: 502, reason: 'unexpected_answer' });
+        const throwing = { fetch: vi.fn().mockRejectedValue(new Error('network')) };
+        expect(await importUpdateIntoDo(throwing, IDENTITY, BYTES))
+            .toEqual({ ok: false, status: 502, reason: 'do_unreachable' });
+    });
+
+    it('refuses empty and oversized bytes without addressing the DO', async () => {
+        const stub = stubOf(OK_ANSWER);
+        expect(await importUpdateIntoDo(stub, IDENTITY, new Uint8Array(0))).toEqual({ ok: false, status: 400, reason: 'empty' });
+        expect(await importUpdateIntoDo(stub, IDENTITY, new Uint8Array(MAX_IMPORT_BYTES + 1))).toEqual({ ok: false, status: 413, reason: 'too_large' });
+        expect(stub.fetch).not.toHaveBeenCalled();
+        // Control: bytes within bounds do reach it.
+        expect((await importUpdateIntoDo(stub, IDENTITY, BYTES)).ok).toBe(true);
+        expect(stub.fetch).toHaveBeenCalledTimes(1);
     });
 });

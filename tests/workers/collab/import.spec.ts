@@ -21,7 +21,7 @@ import * as decoding from 'lib0/decoding';
 import * as encoding from 'lib0/encoding';
 import { INSPECTION_RESULTS_TEST_DDL } from '../../helpers/inline-ddl';
 import { seedResultsDoc, applyItemPatch, projectResults } from '../../../server/lib/collab/results-doc';
-import { MAX_IMPORT_BYTES } from '../../../server/durable-objects/inspection-doc-import';
+import { MAX_IMPORT_BYTES, trialApply } from '../../../server/durable-objects/inspection-doc-import';
 import type { InspectionDocDO } from '../../../server/durable-objects/inspection-doc';
 import type { ResultsProjection } from '../../../server/lib/collab/results-doc.types';
 
@@ -164,8 +164,9 @@ describe('DO /import — apply an offline Yjs update behind a mandatory snapshot
 
         const res = await f.stub.fetch(importRequest(f.inspectionId, update));
         expect(res.status, await res.clone().text()).toBe(200);
-        const out = (await res.json()) as { ok: boolean; snapshotSeq: number };
+        const out = (await res.json()) as { ok: boolean; snapshotSeq: number; changed: boolean };
         expect(out.ok).toBe(true);
+        expect(out.changed).toBe(true);
 
         const list = await snapshotList(f);
         const newest = list[0];
@@ -186,17 +187,80 @@ describe('DO /import — apply an offline Yjs update behind a mandatory snapshot
         const projectionAfterFirst = await liveProjection(f.stub);
         const stateAfterFirst = await liveState(f.stub);
 
+        const snapshotsAfterFirst = await snapshotList(f);
         const second = await f.stub.fetch(importRequest(f.inspectionId, update));
         expect(second.status, await second.clone().text()).toBe(200);
+        // Nothing changed, so it says so and points at the snapshot the first import took.
+        expect(await second.json()).toEqual({ ok: true, snapshotSeq: snapshotsAfterFirst[0].seq, changed: false });
 
         expect(await liveProjection(f.stub)).toEqual(projectionAfterFirst);
         expect(await liveState(f.stub)).toEqual(stateAfterFirst);
+        // A repeat takes no snapshot.
+        expect(await snapshotList(f)).toEqual(snapshotsAfterFirst);
 
         // Control: a DIFFERENT update does change the document, so the equality
         // above is evidence of idempotency and not of an import that does nothing.
         const other = offlineUpdate(f.baseState, rate('FI'));
         expect((await f.stub.fetch(importRequest(f.inspectionId, other))).status).toBe(200);
         expect(await liveState(f.stub)).not.toEqual(stateAfterFirst);
+        // ... and, unlike a repeat, it spends a snapshot.
+        expect((await snapshotList(f)).length).toBe(snapshotsAfterFirst.length + 1);
+    });
+
+    it('thirty repeats of one import do not push a manual snapshot out of the 25-entry ring', async () => {
+        const f = await seededServer();
+        const manual = await f.stub.fetch('https://do.local/snapshots', {
+            method: 'POST',
+            headers: { 'x-tenant-id': TENANT, 'x-inspection-id': f.inspectionId, 'x-user-id': 'u-manual' },
+        });
+        expect(manual.status).toBe(200);
+        const update = offlineUpdate(f.baseState, rate('RR'));
+
+        for (let i = 0; i < 30; i++) {
+            const res = await f.stub.fetch(importRequest(f.inspectionId, update));
+            expect(res.status, await res.clone().text()).toBe(200);
+        }
+
+        const list = await snapshotList(f);
+        expect(list.map((s) => s.reason).sort()).toEqual(['import', 'manual']);
+
+        // Control: genuinely different imports DO spend slots, so the ring would have
+        // evicted the manual snapshot if the repeats above had been snapshotted.
+        for (let i = 0; i < 26; i++) {
+            const res = await f.stub.fetch(importRequest(f.inspectionId, offlineUpdate(f.baseState, rate('R' + i))));
+            expect(res.status, await res.clone().text()).toBe(200);
+        }
+        expect((await snapshotList(f)).some((s) => s.reason === 'manual')).toBe(false);
+    });
+
+    it('treats an update that only deletes as a change, and its repeat as none', async () => {
+        const f = await seededServer();
+        // A map entry the server holds; a device deleting it leaves the state vector alone.
+        const base = await runInDurableObject(f.stub, (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            io.doc.getMap('probe').set('k', 1);
+            return Y.encodeStateAsUpdate(io.doc);
+        });
+        const deleteOnly = offlineUpdate(base, (doc) => { doc.getMap('probe').delete('k'); });
+        const baseDoc = new Y.Doc();
+        Y.applyUpdate(baseDoc, base);
+        const deviceDoc = new Y.Doc();
+        Y.applyUpdate(deviceDoc, deleteOnly);
+        // Premise: the state vectors are identical, so only the delete set differs.
+        expect(Y.encodeStateVector(deviceDoc)).toEqual(Y.encodeStateVector(baseDoc));
+
+        const snapshotsBefore = (await snapshotList(f)).length;
+        const first = await f.stub.fetch(importRequest(f.inspectionId, deleteOnly));
+        expect(first.status, await first.clone().text()).toBe(200);
+        expect(((await first.json()) as { changed: boolean }).changed).toBe(true);
+        expect((await snapshotList(f)).length).toBe(snapshotsBefore + 1);
+        const hasKey = await runInDurableObject(f.stub, (instance: InspectionDocDO) =>
+            (instance as unknown as DOInternals).doc.getMap('probe').has('k'));
+        expect(hasKey).toBe(false);
+
+        const again = await f.stub.fetch(importRequest(f.inspectionId, deleteOnly));
+        expect(((await again.json()) as { changed: boolean }).changed).toBe(false);
+        expect((await snapshotList(f)).length).toBe(snapshotsBefore + 1);
     });
 
     it('refuses with 503 and leaves the document untouched when the snapshot cannot be written', async () => {
@@ -377,5 +441,83 @@ describe('DO /import — apply an offline Yjs update behind a mandatory snapshot
             expect(Y.encodeStateAsUpdate(io.doc)).toEqual(stateAfterFailure);
             expect(projectResults(io.doc)[KEY]?.rating).toBe('RR');
         });
+    });
+
+    it('a retry after a failed persist takes no second snapshot, so the real pre-import one stays the newest', async () => {
+        const f = await seededServer();
+        const update = offlineUpdate(f.baseState, rate('RR'));
+
+        await runInDurableObject(f.stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            const realPersist = io.persist.bind(io);
+            io.persist = () => Promise.reject(new Error('d1 unavailable'));
+            try {
+                expect((await io.fetch(importRequest(f.inspectionId, update))).status).toBe(503);
+            } finally {
+                io.persist = realPersist;
+            }
+        });
+
+        const afterFailure = await snapshotList(f);
+        expect(afterFailure).toHaveLength(1);
+        expect((await snapshotProjection(f, afterFailure[0].seq))[KEY]?.rating).toBe('NI');
+
+        // The retry is judged against the in-memory document, which already holds the
+        // update, so it is "no change": no snapshot. It still persists, so a 200 keeps
+        // meaning durable.
+        let persisted = 0;
+        await runInDurableObject(f.stub, (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            const realPersist = io.persist.bind(io);
+            io.persist = () => { persisted++; return realPersist(); };
+        });
+        const retry = await f.stub.fetch(importRequest(f.inspectionId, update));
+        expect(retry.status, await retry.clone().text()).toBe(200);
+        expect(await retry.json()).toEqual({ ok: true, snapshotSeq: afterFailure[0].seq, changed: false });
+        expect(await snapshotList(f)).toEqual(afterFailure);
+        expect(persisted).toBe(1);
+    });
+
+    // ── A live document that already has a gap of its own ─────────────────────
+
+    /** A delta from a client whose history the server never saw: Yjs parks it. */
+    function strangerDelta(rating: string): Uint8Array {
+        const stranger = new Y.Doc();
+        seedResultsDoc(stranger, [{ findingKey: KEY }]);
+        const base = Y.encodeStateVector(stranger);
+        applyItemPatch(stranger, KEY, 'rating', rating);
+        return Y.encodeStateAsUpdate(stranger, base);
+    }
+
+    it('still accepts a good update when the live document already has pending structs, and still refuses a new gap', async () => {
+        const f = await seededServer();
+        await runInDurableObject(f.stub, (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            Y.applyUpdate(io.doc, strangerDelta('FI'));
+            // Premise: the live document really is carrying a parked update.
+            expect(io.doc.store.pendingStructs).not.toBeNull();
+        });
+
+        const good = await f.stub.fetch(importRequest(f.inspectionId, offlineUpdate(f.baseState, rate('RR'))));
+        expect(good.status, await good.clone().text()).toBe(200);
+        expect((await liveProjection(f.stub))[KEY]?.rating).toBe('RR');
+
+        const newGap = await f.stub.fetch(importRequest(f.inspectionId, strangerDelta('SR')));
+        expect(newGap.status).toBe(422);
+    });
+
+    it('trialApply compares against the pending state of the live document itself', () => {
+        const live = new Y.Doc();
+        seedResultsDoc(live, [{ findingKey: KEY }]);
+        const good = offlineUpdate(Y.encodeStateAsUpdate(live), rate('RR'));
+
+        // Control: a clean live document accepts the good update and refuses a gap.
+        expect(trialApply(live, good)).toEqual({ ok: true, changed: true });
+        expect(trialApply(live, strangerDelta('FI'))).toMatchObject({ ok: false, status: 422 });
+
+        Y.applyUpdate(live, strangerDelta('FI'));
+        expect(live.store.pendingStructs).not.toBeNull();
+        expect(trialApply(live, good)).toEqual({ ok: true, changed: true });
+        expect(trialApply(live, strangerDelta('SR'))).toMatchObject({ ok: false, status: 422 });
     });
 });
