@@ -397,13 +397,16 @@ const coreRoutes = createApiRouter()
             resolvedAgentId = body.agentContactId;
         }
 
-        const inspection = await service.createInspection(tenantId, {
+        const { inspection, created } = await service.createInspectionOnce(tenantId, {
             ...createData,
             inspectorId:       body.inspectorId || c.get('user').sub,
             referredByAgentId: resolvedAgentId ?? null,
             // IA-1: pass the resolved contact ids through; createInspection stores them.
             clientContactId,
         } as Parameters<typeof service.createInspection>[1]);
+        // A concurrent request with the same client id won the insert: this one is a
+        // replay, so it answers like one and repeats none of the side effects below.
+        if (!created) return c.json({ success: true, data: { inspection } }, 200);
 
         // IA-1: Apply serviceSelections price overrides — replace null priceOverride
         // for any service whose id appears in serviceSelections with a set override.

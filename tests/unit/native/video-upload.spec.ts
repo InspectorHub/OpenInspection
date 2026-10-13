@@ -119,6 +119,44 @@ describe('video upload (real app)', () => {
             expect(refused.status).toBe(401);
         });
 
+        it('refuses an upload once its issuer was removed (401) or the inspection is gone (404), but not before', async () => {
+            const out = await create();
+            const url = pathOf(out.uploadURL);
+            expect((await u!.call(url, { method: 'POST', body: filePart('video/mp4', MP4) }, { auth: null })).status).toBe(200);
+            u!.r2.store.clear();
+            await u!.h.db.update(schema.users).set({ deletedAt: new Date() }).where(eq(schema.users.id, INSPECTOR_ID));
+            const removed = await u!.call(url, { method: 'POST', body: filePart('video/mp4', MP4) }, { auth: null });
+            expect(removed.status).toBe(401);
+            await u!.h.db.update(schema.users).set({ deletedAt: null }).where(eq(schema.users.id, INSPECTOR_ID));
+            await u!.h.db.delete(schema.inspections).where(eq(schema.inspections.id, INSPECTION_ID));
+            const gone = await u!.call(url, { method: 'POST', body: filePart('video/mp4', MP4) }, { auth: null });
+            expect(gone.status).toBe(404);
+            expect(u!.r2.store.size).toBe(0);
+        });
+
+        it('still accepts a legacy video token that names no issuer, while the inspection exists', async () => {
+            u = await createUploadHarness();
+            const legacy = await signUploadToken({ tenantId: TENANT_ID, inspectionId: INSPECTION_ID, mediaId: 'legacy-media' }, 600, JWT_SECRET);
+            const ok = await u.call(`/api/public/uploads/video?token=${legacy}`, { method: 'POST', body: filePart('video/mp4', MP4) }, { auth: null });
+            expect(ok.status, await ok.clone().text()).toBe(200);
+            await u.h.db.delete(schema.inspections).where(eq(schema.inspections.id, INSPECTION_ID));
+            const gone = await u.call(`/api/public/uploads/video?token=${legacy}`, { method: 'POST', body: filePart('video/mp4', MP4) }, { auth: null });
+            expect(gone.status).toBe(404);
+        });
+
+        it('requires a Content-Length (411) and refuses an oversized one (413)', async () => {
+            const out = await create();
+            const url = pathOf(out.uploadURL);
+            const contentType = new Request('http://x/', { method: 'POST', body: filePart('video/mp4', MP4) }).headers.get('content-type') ?? '';
+            const chunked = new ReadableStream<Uint8Array>({ start(ctl) { ctl.enqueue(MP4); ctl.close(); } });
+            const noLength = await u!.call(url, { method: 'POST', headers: { 'content-type': contentType }, body: chunked, duplex: 'half' } as RequestInit, { auth: null });
+            expect(noLength.status).toBe(411);
+            const huge = await u!.call(url, { method: 'POST', headers: { 'content-type': contentType, 'content-length': String(300 * 1024 * 1024) }, body: MP4 }, { auth: null });
+            expect(huge.status).toBe(413);
+            expect(u!.r2.store.size).toBe(0);
+            expect((await u!.call(url, { method: 'POST', body: filePart('video/mp4', MP4) }, { auth: null })).status).toBe(200);
+        });
+
         it('finalizes after a background upload, once, with a native token', async () => {
             const out = await create();
             const ref = out.ref as R2Ref;

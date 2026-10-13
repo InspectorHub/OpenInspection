@@ -34,7 +34,7 @@ export interface VideoBackend {
      * lifetime and points it at the token-only route. Backends that hand out a
      * provider URL ignore it.
      */
-    createUpload(inspectionId: string, opts?: { native?: boolean }): Promise<{ uploadURL: string; ref: VideoRef }>;
+    createUpload(inspectionId: string, opts?: { native?: boolean; userId?: string }): Promise<{ uploadURL: string; ref: VideoRef }>;
 
     /**
      * Finalize an upload: insert (or idempotently update) the inspection_media_pool

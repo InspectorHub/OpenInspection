@@ -15,6 +15,8 @@ export interface UploadTokenClaims {
     mediaId: string;
     /** File extension the object is stored under. Photo tokens carry it so the key is fixed at issue time. */
     ext?: string;
+    /** The signed-in member the token was minted for. A public upload route re-checks they are still a member. Absent on tokens minted before the field existed. */
+    userId?: string;
 }
 
 /**
@@ -131,6 +133,7 @@ export async function verifyUploadToken(
             inspectionId: payload.inspectionId,
             mediaId: payload.mediaId,
             ...(payload.ext !== undefined ? { ext: payload.ext } : {}),
+            ...(typeof payload.userId === 'string' && payload.userId.length > 0 ? { userId: payload.userId } : {}),
             exp: payload.exp,
         };
     } catch (err) {

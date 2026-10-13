@@ -80,12 +80,12 @@ export class R2VideoBackend implements VideoBackend {
      * forwards untrusted keys to the bucket. A native client is pointed at the
      * token-only public route, because its access token may have expired by then.
      */
-    async createUpload(inspectionId: string, opts?: { native?: boolean }): Promise<{ uploadURL: string; ref: VideoRef }> {
+    async createUpload(inspectionId: string, opts?: { native?: boolean; userId?: string }): Promise<{ uploadURL: string; ref: VideoRef }> {
         const mediaId = crypto.randomUUID();
         const native = opts?.native === true;
 
         const token = await signUploadToken(
-            { tenantId: this.tenantId, inspectionId, mediaId },
+            { tenantId: this.tenantId, inspectionId, mediaId, ...(opts?.userId ? { userId: opts.userId } : {}) },
             native ? NATIVE_UPLOAD_TTL_SEC : WEB_UPLOAD_TTL_SEC,
             this.jwtSecret,
         );

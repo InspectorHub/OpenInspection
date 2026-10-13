@@ -198,10 +198,21 @@ export class InspectionCoreService extends InspectionSubService {
         return (await this.sdb.getById(inspections, id)) ? (await this.getInspection(id, tenantId)).inspection : null;
     }
 
-    /**
-     * Creates a new inspection.
-     */
+    /** Creates a new inspection. See `createInspectionOnce` for the replay semantics. */
     async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string }): Promise<Inspection> {
+        return (await this.createInspectionOnce(tenantId, data)).inspection;
+    }
+
+    /**
+     * Creates a new inspection and says whether THIS call created it. `created`
+     * is false only when a client-chosen id was already the caller's own row
+     * because a concurrent request with the same id won the insert; that caller
+     * gets the existing row back and none of the create's side effects ran for it.
+     */
+    async createInspectionOnce(
+        tenantId: string,
+        data: CreateInspectionData & { inspectorId?: string; clientContactId?: string },
+    ): Promise<{ inspection: Inspection; created: boolean }> {
         if (!this.sdb) throw new Error('ScopedDB session missing');
         const id = data.id ?? crypto.randomUUID();
         const createdAt = new Date();
@@ -241,27 +252,10 @@ export class InspectionCoreService extends InspectionSubService {
         const defaultPaymentRequired   = tenantPolicy?.blockUnpaid ?? false;
         const defaultAgreementRequired = tenantPolicy?.blockUnsignedAgreement ?? false;
 
-        // #180 — Atomic discount redemption. When a discountCodeId is supplied,
-        // attempt an atomic cap-guarded increment. If the cap has been reached
-        // (redeemDiscountCode returns false), drop the discount from the persisted
-        // row but still create the inspection successfully. The preview-only
-        // validateDiscountCode path is unaffected.
+        // #180 — the discount is redeemed only AFTER the row exists (see below), so a
+        // request that loses a same-id insert race never spends a use of the code.
         const rawDiscountCodeId = (data as { discountCodeId?: string | null }).discountCodeId ?? null;
         const rawDiscountAmount = (data as { discountAmount?: number | null }).discountAmount ?? null;
-
-        let persistedDiscountCodeId: string | null = null;
-        let persistedDiscountAmount: number = 0;
-
-        if (rawDiscountCodeId) {
-            const svcSvc = new ServiceService(this.db);
-            const redeemed = await svcSvc.redeemDiscountCode(tenantId, rawDiscountCodeId);
-            if (redeemed) {
-                persistedDiscountCodeId = rawDiscountCodeId;
-                persistedDiscountAmount = rawDiscountAmount ?? 0;
-            }
-            // If redeemed === false: cap hit or code gone — drop the discount silently;
-            // the inspection is still created without it.
-        }
 
         // Task 13 (people-role-profiles) — the client/agent identity is NOT
         // stored on the inspections row anymore (clientContactId/clientName/
@@ -300,10 +294,9 @@ export class InspectionCoreService extends InspectionSubService {
             // Wizard step 1; decides what the report becomes (report-tier.ts,
             // pca-report-block.ts, the units surface). null = unclassified.
             propertyType:      data.propertyType ?? null,
-            // #180 — discount columns set after atomic redemption above.
-            // null/0 when no code was supplied or the cap blocked redemption.
-            discountCodeId:    persistedDiscountCodeId,
-            discountAmount:    persistedDiscountAmount,
+            // #180 — written by the redemption step after the insert; null/0 until then.
+            discountCodeId:    null,
+            discountAmount:    0,
             // Round-2 #10 — block-report gating defaults inherited from tenant
             // policy. The Sprint 1 D-7 ReportGatePage check at /report/:id
             // reads these per-inspection columns directly.
@@ -319,12 +312,29 @@ export class InspectionCoreService extends InspectionSubService {
         // must never burn a free tenant's lifetime slot.
         await this.planQuota?.consumeInspection(tenantId);
         try { await this.sdb.insert(inspections, newInspection); } catch (err) {
+            // No row was created, so the allowance taken above goes back. Without
+            // this a replayed offline create (same id, still in flight) would be
+            // charged twice.
+            await this.planQuota?.releaseInspection(tenantId);
             // Only a client-chosen id can collide. The caller's own tenant is read first,
             // so another tenant's row is never touched: absent here means someone else holds it.
             if (!data.id || !isUniqueViolation(err, 'inspections.id')) throw err;
             const own = await this.findInspectionById(tenantId, id);
-            if (own) return own;
+            if (own) return { inspection: own, created: false };
             throw new AppError(409, ErrorCode.ID_CONFLICT, 'That inspection id is already in use.');
+        }
+        // #180 — Atomic discount redemption, now that this call owns the row. If the
+        // cap has been reached (redeemDiscountCode returns false) the inspection
+        // simply keeps no discount. A failure between insert and redemption leaves
+        // the inspection undiscounted, never a discount that was not redeemed.
+        let persistedDiscountCodeId: string | null = null;
+        let persistedDiscountAmount = 0;
+        if (rawDiscountCodeId && await new ServiceService(this.db).redeemDiscountCode(tenantId, rawDiscountCodeId)) {
+            persistedDiscountCodeId = rawDiscountCodeId;
+            persistedDiscountAmount = rawDiscountAmount ?? 0;
+            await db.update(inspections)
+                .set({ discountCodeId: persistedDiscountCodeId, discountAmount: persistedDiscountAmount })
+                .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
         }
         // Before the results row, because that row has to NAME it: a NULL
         // `report_id` is accepted silently and reads match a sibling document
@@ -394,13 +404,15 @@ export class InspectionCoreService extends InspectionSubService {
             serviceIds:        data.serviceIds,
         });
 
-        return {
+        return { created: true, inspection: {
             ...newInspection,
+            discountCodeId: persistedDiscountCodeId,
+            discountAmount: persistedDiscountAmount,
             clientName: clientNameInput,
             clientEmail: clientEmailInput,
             inspectorId: newInspection.inspectorId as string | null,
             createdAt: safeISODate(newInspection.createdAt)
-        } as Inspection;
+        } as Inspection };
     }
 
     /** #119 — creates a follow-up round over a published baseline. Body in `./inspection-reinspection.service`. */

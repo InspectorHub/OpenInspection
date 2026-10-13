@@ -45,12 +45,13 @@ const mediaUploadUrlRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const { pendingId, contentType } = c.req.valid('json');
         const tenantId = c.get('tenantId');
+        const userId = c.get('user').sub;
         // Ownership check (404 on another tenant's inspection). Tenant is from the credential.
         await c.var.services.inspection.getInspection(id, tenantId);
 
         const ext = SIGNED_PHOTO_EXT[contentType];
         const token = await signUploadToken(
-            { tenantId, inspectionId: id, mediaId: pendingId, ext },
+            { tenantId, inspectionId: id, mediaId: pendingId, ext, userId },
             PHOTO_UPLOAD_TTL_SEC,
             c.env.JWT_SECRET,
             'photo',

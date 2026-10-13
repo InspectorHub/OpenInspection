@@ -101,11 +101,7 @@ export class InspectionService {
         return this.core.getStats(tenantId);
     }
 
-    /**
-     * Design System 0520 subsystem E P1.2 — Publish pre-flight gates: loads the
-     * inspection + parsed inspection_results.data and delegates to the pure
-     * aggregator in server/lib/preflight.ts.
-     */
+    /** Publish pre-flight gates (pure aggregator in server/lib/preflight.ts). */
     async computePreflight(inspectionId: string, tenantId: string) {
         return this.core.computePreflight(inspectionId, tenantId);
     }
@@ -123,6 +119,11 @@ export class InspectionService {
     /** Creates a new inspection. */
     async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string }): Promise<Inspection> {
         return this.core.createInspection(tenantId, data);
+    }
+
+    /** As createInspection, plus whether this call made the row (false: a same-id replay that lost the insert race). */
+    async createInspectionOnce(tenantId: string, data: Parameters<InspectionService['createInspection']>[1]) {
+        return this.core.createInspectionOnce(tenantId, data);
     }
 
     /**
@@ -168,13 +169,7 @@ export class InspectionService {
         return this.core.getReinspectCandidates(tenantId, baselineId);
     }
 
-    /**
-     * IA-1: Post-create hook — write priceOverride onto inspection_services rows
-     * that were already inserted by createInspection. Called by the handler AFTER
-     * createInspection returns so it can use the resolved inspection id.
-     * Only rows whose serviceId appears in selections AND carry a priceOverrideCents
-     * value are updated; rows without an override are left with priceOverride=null.
-     */
+    /** IA-1: Post-create hook — write priceOverride onto the inspection_services rows createInspection inserted. */
     async applyServicePriceOverrides(
         inspectionId: string,
         tenantId: string,

@@ -71,8 +71,17 @@ export async function createUploadHarness(): Promise<UploadHarness> {
         const auth = opts.auth === undefined ? NATIVE_TOKEN : opts.auth;
         const headers = new Headers(init.headers);
         if (auth) headers.set('authorization', `Bearer ${auth}`);
+        let body = init.body;
+        if (body instanceof FormData) {
+            // A real client sends a multipart body with its length; the in-process request does not add one.
+            const encoded = new Request('http://x/', { method: 'POST', body });
+            headers.set('content-type', encoded.headers.get('content-type') ?? '');
+            const bytes = new Uint8Array(await encoded.arrayBuffer());
+            if (!headers.has('content-length')) headers.set('content-length', String(bytes.byteLength));
+            body = bytes;
+        }
         const exec = makeExecutionContext({ label: 'native-upload' });
-        const res = await app.request(path, { ...init, headers }, env, exec.ctx);
+        const res = await app.request(path, { ...init, body, headers }, env, exec.ctx);
         await exec.settle();
         return res;
     };

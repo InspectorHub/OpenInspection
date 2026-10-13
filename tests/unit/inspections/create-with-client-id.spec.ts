@@ -10,9 +10,10 @@
  * Every refusal is paired with a positive control (the same call with a fresh
  * id, or without an id, still creates).
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { eq, count } from 'drizzle-orm';
 import { app } from '../../../server/index';
+import { InspectionService } from '../../../server/services/inspection.service';
 import { makeExecutionContext } from '../helpers/exec-ctx';
 import * as schema from '../../../server/lib/db/schema';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
@@ -137,6 +138,97 @@ describe('POST /api/inspections with a client-generated id', () => {
     ]);
     expect([a.status, b.status].every((s) => s === 200 || s === 201), `${a.status} ${b.status}`).toBe(true);
     expect(await inspectionCount()).toBe(1);
+  });
+});
+
+describe('POST /api/inspections with a client id: two requests that both pass the early check', () => {
+  let h: Harness | undefined;
+  afterEach(() => { vi.restoreAllMocks(); h?.close(); h = undefined; });
+
+  const DISCOUNT_ID = 'dc-offline-1';
+
+  async function seed(mode: 'saas' | 'standalone'): Promise<Harness> {
+    const created = await createHarness(mode);
+    await created.db.insert(schema.templates).values({
+      id: BODY.templateId, tenantId: TENANT_ID, name: 'Standard', schema: { sections: [] }, version: 1, createdAt: new Date(),
+    } as typeof schema.templates.$inferInsert);
+    await created.db.insert(schema.discountCodes).values({
+      id: DISCOUNT_ID, tenantId: TENANT_ID, code: 'OFFLINE10', type: 'fixed', value: 1000, maxUses: null, usesCount: 0, createdAt: new Date(),
+    });
+    return created;
+  }
+
+  /** Holds the first two early-check lookups until both have arrived, so both requests see "no such inspection". */
+  function interleaveEarlyChecks(): void {
+    let arrived = 0;
+    let release: () => void = () => undefined;
+    const bothArrived = new Promise<void>((resolve) => { release = resolve; });
+    const original = InspectionService.prototype.findInspectionById;
+    vi.spyOn(InspectionService.prototype, 'findInspectionById').mockImplementation(async function (this: InspectionService, tenantId: string, id: string) {
+      if (arrived >= 2) return original.call(this, tenantId, id);
+      arrived += 1;
+      if (arrived === 2) release();
+      await bothArrived;
+      return null;
+    });
+  }
+
+  async function post(body: unknown): Promise<Response> {
+    const keyring = await buildKeyring(h!.env as unknown as Record<string, string | undefined>);
+    const now = Math.floor(Date.now() / 1000);
+    const jwt = await signJwt({
+      sub: INSPECTOR_ID, role: 'inspector', 'custom:userRole': 'inspector', 'custom:tenantId': TENANT_ID, iat: now, exp: now + 3600,
+    }, keyring);
+    const exec = makeExecutionContext({ label: 'create-race' });
+    const res = await app.request('/api/inspections', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${jwt}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }, h!.env, exec.ctx);
+    await exec.settle();
+    return res;
+  }
+
+  it('consumes the allowance, the discount and the audit trail once, and answers the loser 200', async () => {
+    h = await seed('saas');
+    interleaveEarlyChecks();
+    const body = { ...BODY, id: CLIENT_ID, discountCodeId: DISCOUNT_ID, discountAmount: 1000 };
+    const [a, b] = await Promise.all([post(body), post(body)]);
+    expect([a.status, b.status].sort(), `${await a.clone().text()} ${await b.clone().text()}`).toEqual([200, 201]);
+
+    const rows = await h.db.select().from(schema.inspections).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.discountCodeId).toBe(DISCOUNT_ID);
+    const code = await h.db.select().from(schema.discountCodes).where(eq(schema.discountCodes.id, DISCOUNT_ID)).get();
+    expect(code?.usesCount).toBe(1);
+    const counter = await h.db.select().from(schema.usageCounters).where(eq(schema.usageCounters.metric, 'inspections')).get();
+    expect(counter?.value).toBe(1);
+    const audits = await h.db.select().from(schema.auditLogs).where(eq(schema.auditLogs.action, 'inspection.create')).all();
+    expect(audits).toHaveLength(1);
+  });
+
+  it('refunds the allowance when the id belongs to another workspace (409), and a fresh id still creates (control)', async () => {
+    h = await seed('saas');
+    await h.db.insert(schema.tenants).values({
+      id: OTHER_TENANT_ID, slug: 'other-co', status: 'active', tier: 'free',
+      maxUsers: 5, deploymentMode: 'shared', createdAt: new Date(),
+    });
+    await h.db.insert(schema.inspections).values({
+      id: CLIENT_ID, tenantId: OTHER_TENANT_ID, propertyAddress: '99 Other Street', status: 'requested',
+      date: '2026-06-01', createdAt: new Date(),
+    } as typeof schema.inspections.$inferInsert);
+
+    const refused = await post({ ...BODY, id: CLIENT_ID, discountCodeId: DISCOUNT_ID, discountAmount: 1000 });
+    expect(refused.status, await refused.clone().text()).toBe(409);
+    const afterRefusal = await h.db.select().from(schema.usageCounters).where(eq(schema.usageCounters.tenantId, TENANT_ID)).all();
+    expect(afterRefusal.find((r) => r.metric === 'inspections')?.value ?? 0).toBe(0);
+    const code = await h.db.select().from(schema.discountCodes).where(eq(schema.discountCodes.id, DISCOUNT_ID)).get();
+    expect(code?.usesCount).toBe(0);
+
+    const fresh = await post({ ...BODY, id: '33333333-0000-4000-8000-000000000002' });
+    expect(fresh.status, await fresh.clone().text()).toBe(201);
+    const afterFresh = await h.db.select().from(schema.usageCounters).where(eq(schema.usageCounters.tenantId, TENANT_ID)).all();
+    expect(afterFresh.find((r) => r.metric === 'inspections')?.value).toBe(1);
   });
 });
 

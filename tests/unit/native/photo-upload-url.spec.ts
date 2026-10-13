@@ -6,9 +6,11 @@
  * below is paired with a positive control on the same harness.
  */
 import { describe, it, expect, afterEach } from 'vitest';
+import { eq } from 'drizzle-orm';
+import * as schema from '../../../server/lib/db/schema';
 import { signUploadToken } from '../../../server/lib/video-upload-token';
 import {
-    createUploadHarness, filePart, jsonPost, INSPECTION_ID, OTHER_TENANT_INSPECTION_ID, TENANT_ID, type UploadHarness,
+    createUploadHarness, filePart, jsonPost, INSPECTION_ID, INSPECTOR_ID, OTHER_TENANT_INSPECTION_ID, TENANT_ID, type UploadHarness,
 } from '../helpers/native-upload-harness';
 
 const PENDING = '55555555-0000-4000-8000-000000000001';
@@ -154,10 +156,60 @@ describe('photo upload URL (real app)', () => {
         expect(u!.r2.store.has(key)).toBe(true);
     });
 
+    it('refuses an upload once the inspection is gone (404), but not before', async () => {
+        const { url } = await mintUrl();
+        const before = await u!.call(url, { method: 'POST', body: filePart('image/jpeg') }, { auth: null });
+        expect(before.status, await before.clone().text()).toBe(200);
+        u!.r2.store.clear();
+        await u!.h.db.delete(schema.inspections).where(eq(schema.inspections.id, INSPECTION_ID));
+        const after = await u!.call(url, { method: 'POST', body: filePart('image/jpeg') }, { auth: null });
+        expect(after.status).toBe(404);
+        expect(u!.r2.store.size).toBe(0);
+    });
+
+    it('refuses an upload from a token whose issuer has since been removed (401), but not before', async () => {
+        const { url } = await mintUrl();
+        const before = await u!.call(url, { method: 'POST', body: filePart('image/jpeg') }, { auth: null });
+        expect(before.status, await before.clone().text()).toBe(200);
+        u!.r2.store.clear();
+        await u!.h.db.update(schema.users).set({ deletedAt: new Date() }).where(eq(schema.users.id, INSPECTOR_ID));
+        const after = await u!.call(url, { method: 'POST', body: filePart('image/jpeg') }, { auth: null });
+        expect(after.status).toBe(401);
+        expect(u!.r2.store.size).toBe(0);
+    });
+
+    it('refuses a photo token that names no issuer (401); the same token with an issuer is accepted', async () => {
+        u = await createUploadHarness();
+        const claims = { tenantId: TENANT_ID, inspectionId: INSPECTION_ID, mediaId: PENDING, ext: 'jpg' };
+        const anonymous = await signUploadToken(claims, 600, JWT_SECRET, 'photo');
+        const named = await signUploadToken({ ...claims, userId: INSPECTOR_ID }, 600, JWT_SECRET, 'photo');
+        const refused = await u.call(`/api/public/uploads/photo?token=${anonymous}`, { method: 'POST', body: filePart('image/jpeg') }, { auth: null });
+        expect(refused.status).toBe(401);
+        expect(u.r2.store.size).toBe(0);
+        const ok = await u.call(`/api/public/uploads/photo?token=${named}`, { method: 'POST', body: filePart('image/jpeg') }, { auth: null });
+        expect(ok.status, await ok.clone().text()).toBe(200);
+    });
+
+    it('requires a Content-Length (411) and refuses an oversized one (413) before reading the body', async () => {
+        const { url } = await mintUrl();
+        const contentType = new Request('http://x/', { method: 'POST', body: filePart('image/jpeg') }).headers.get('content-type') ?? '';
+        const chunked = new ReadableStream<Uint8Array>({ start(ctl) { ctl.enqueue(new Uint8Array([1])); ctl.close(); } });
+        const noLength = await u!.call(url, { method: 'POST', headers: { 'content-type': contentType }, body: chunked, duplex: 'half' } as RequestInit, { auth: null });
+        expect(noLength.status).toBe(411);
+        const junk = await u!.call(url, { method: 'POST', headers: { 'content-type': contentType, 'content-length': 'abc' }, body: new Uint8Array([1]) }, { auth: null });
+        expect(junk.status).toBe(411);
+        const huge = await u!.call(url, { method: 'POST', headers: { 'content-type': contentType, 'content-length': String(50 * 1024 * 1024) }, body: new Uint8Array([1]) }, { auth: null });
+        expect(huge.status).toBe(413);
+        expect(u!.r2.store.size).toBe(0);
+        // Control: the ordinary request, which carries a correct length, goes through.
+        const ok = await u!.call(url, { method: 'POST', body: filePart('image/jpeg') }, { auth: null });
+        expect(ok.status, await ok.clone().text()).toBe(200);
+    });
+
     it('keeps photo and video tokens apart in both directions', async () => {
         u = await createUploadHarness();
         const claims = { tenantId: TENANT_ID, inspectionId: INSPECTION_ID, mediaId: PENDING };
-        const photoToken = await signUploadToken({ ...claims, ext: 'jpg' }, 600, JWT_SECRET, 'photo');
+        const photoToken = await signUploadToken({ ...claims, ext: 'jpg', userId: INSPECTOR_ID }, 600, JWT_SECRET, 'photo');
         const videoToken = await signUploadToken(claims, 600, JWT_SECRET);
         const photoOnVideo = await u.call(`/api/public/uploads/video?token=${photoToken}`, { method: 'POST', body: filePart('video/mp4') }, { auth: null });
         const videoOnPhoto = await u.call(`/api/public/uploads/photo?token=${videoToken}`, { method: 'POST', body: filePart('image/jpeg') }, { auth: null });
