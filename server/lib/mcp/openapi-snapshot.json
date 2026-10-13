@@ -7542,6 +7542,54 @@
     "description": "Computes the fee, the refund and the reason a cancellation would produce, so whoever cancels sees the result before confirming it. Read-only."
   },
   {
+    "operationId": "getClientCompat",
+    "method": "GET",
+    "pathTemplate": "/api/client/compat",
+    "scopes": [
+      "read"
+    ],
+    "tag": "client",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "platform",
+          "in": "query",
+          "required": true,
+          "description": "Native client platform identifier",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "ios",
+              "android",
+              "windows"
+            ],
+            "description": "Native client platform identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Get native client version compatibility policy",
+    "description": "Returns the minimum supported and recommended native app versions for a platform, where to download updates, and the server contract version. Public: a client calls it before signing in."
+  },
+  {
+    "operationId": "getClientSession",
+    "method": "GET",
+    "pathTemplate": "/api/client/session",
+    "scopes": [
+      "read"
+    ],
+    "tag": "client",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Get the signed-in native client session",
+    "description": "Returns the identity behind a native access token and the tenant offline access limit, which the device uses to decide when to lock local data."
+  },
+  {
     "operationId": "getCommunicationConfig",
     "method": "GET",
     "pathTemplate": "/api/admin/communication",

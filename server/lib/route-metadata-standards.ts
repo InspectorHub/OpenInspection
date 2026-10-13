@@ -23,6 +23,9 @@ export const VALID_TAGS = [
     // templates, contacts or team members, so filing it under any one of them
     // would hide it from readers of the other two.
     'imports',
+    // Native (iOS/Android/desktop) client handshake: version policy and the
+    // signed-in session summary, which have no entity to be filed under.
+    'client',
 ] as const;
 
 export const VALID_SECONDARY_TAGS = ['public', 'm2m', 'beta', 'webhook'] as const;

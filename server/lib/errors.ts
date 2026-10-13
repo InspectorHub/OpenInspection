@@ -64,6 +64,10 @@ export enum ErrorCode {
     // the short inline retry. Nothing is wrong with the message or the account;
     // trying again in a few seconds is the right response.
     EMAIL_RATE_LIMITED = 'EMAIL_RATE_LIMITED',
+    // A native app build below the operator's minimum supported version called
+    // a route that is not sync, upload or import. 426 rather than 400/403: the
+    // request is fine, the client binary is what must change.
+    CLIENT_UPGRADE_REQUIRED = 'CLIENT_UPGRADE_REQUIRED',
 }
 
 /**

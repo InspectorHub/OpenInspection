@@ -32,6 +32,7 @@ import { readPlatformActorClaim } from '../platform-actor-claims';
 import { QBO_CALLBACK_PATH } from '../qbo-oauth-paths';
 import { memoOnce } from '../request-scope';
 import { looksLikeOpaqueOAuthToken, resolveNativeToken } from '../auth/native-token';
+import { enforceClientVersion } from '../native/client-version';
 
 // Static asset extensions — these bypass JWT verification. We use a strict allowlist
 // rather than path.includes('.') so a dot inside a path segment (e.g. "/inspections/foo.bar")
@@ -75,6 +76,7 @@ async function applyNativeIdentity(c: Context<HonoConfig>, token: string): Promi
     c.set('userRole', native.role);
     c.set('user', { sub: native.userId, role: native.role, tenantId: native.tenantId });
     c.set('nativeClient', true);
+    enforceClientVersion(c);
 }
 
 /** Verify a session JWT and write its identity onto the request context. */
@@ -243,7 +245,7 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
     // SameSite=Strict, so no cookie is on that request — the route is authorized
     // by a single-use, 600s, owner/manager-issued `state` instead. See
     // `server/api/qbo-oauth.ts`.
-    const isPublic = path.startsWith('/api/__test__/') || path.startsWith('/api/public/') || path.startsWith('/api/platform/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/invoice/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/v/') || path.startsWith('/.well-known/') || isStaticAssetPath(path) || path.startsWith('/webhooks/') || path === QBO_CALLBACK_PATH || path.startsWith('/unsubscribe/') || path.startsWith('/repair-request/') || path.startsWith('/repair-builder/') || path.startsWith('/api/portal/') || path.startsWith('/portal/');
+    const isPublic = path.startsWith('/api/__test__/') || path.startsWith('/api/public/') || path.startsWith('/api/platform/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/invoice/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/v/') || path.startsWith('/.well-known/') || isStaticAssetPath(path) || path.startsWith('/webhooks/') || path === QBO_CALLBACK_PATH || path.startsWith('/unsubscribe/') || path.startsWith('/repair-request/') || path.startsWith('/repair-builder/') || path.startsWith('/api/portal/') || path.startsWith('/portal/') || path === '/api/client/compat';
 
     if (isAuthPublic || isPublic || isAgentPublic || isConciergePublic || path === '/setup') return next();
 

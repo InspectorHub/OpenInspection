@@ -31,7 +31,6 @@ import { idempotencyMiddleware } from './lib/middleware/idempotency';
 import { agreementSignPath, agreementRenderPath } from './lib/public-urls';
 import { loadVerifyData } from './lib/verify-data';
 
-
 import coreAuthRoutes, { ssoRootRoutes } from './api/auth';
 import testHooksRoutes from './api/test-hooks';
 import identityRoutes from './api/identity';
@@ -67,6 +66,7 @@ import calendarRoutes from './api/calendar';
 import calendarEventsRoutes from './api/calendar-events';
 import scheduleWeekSummaryRoutes from './api/schedule-week-summary';
 import teamRoutes from './api/team';
+import { clientRoutes } from './api/client';
 import contactRoutes from './api/contacts';
 import contactsImportRoutes from './api/contacts/import';
 import migrationIntakeRoutes from './api/migration-intake';
@@ -177,7 +177,6 @@ app.get('/status', (c) => c.json({
     buildTime: BUILD.buildTime,
     timestamp: new Date().toISOString(),
 }));
-
 
 /**
  * Global Error Handler
@@ -436,6 +435,7 @@ const routes = app
   .route('/api/calendar', calendarRoutes)
   .route('/api/schedule', scheduleWeekSummaryRoutes)
   .route('/api/team', teamRoutes)
+  .route('/api/client', clientRoutes)
   .route('/api/contacts', contactRoutes)
   // Import sub-router — extracted to fix hono/client type-collapse (C-10)
   .route('/api/contacts', contactsImportRoutes)

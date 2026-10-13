@@ -16,7 +16,7 @@ export interface BrowserRun {
  * Global environment bindings for the Cloudflare Worker.
  * Defines the expected resources from wrangler.jsonc.
  */
-export interface AppEnv {
+export interface AppEnv extends NativeVersionEnv {
     // Infrastructure
     DB: D1Database;
     TENANT_CACHE: KVNamespace;
@@ -280,6 +280,7 @@ export interface AppEnv {
     QBO_ENV?: string;
 }
 
+import type { NativeVersionEnv } from '../lib/native/client-version';
 import type { AppServices } from './app-services';
 import type { AuthVariables } from './auth';
 import type { DeploymentProfile } from '../lib/deployment-profile';
