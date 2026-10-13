@@ -33,6 +33,7 @@ import { QBO_CALLBACK_PATH } from '../qbo-oauth-paths';
 import { memoOnce } from '../request-scope';
 import { looksLikeOpaqueOAuthToken, resolveNativeToken } from '../auth/native-token';
 import { enforceClientVersion } from '../native/client-version';
+import { applyWsTicketIdentity } from '../native/ws-ticket';
 
 // Static asset extensions — these bypass JWT verification. We use a strict allowlist
 // rather than path.includes('.') so a dot inside a path segment (e.g. "/inspections/foo.bar")
@@ -254,12 +255,16 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
 
     const token = bearerToken(c) ?? getCookie(c, AUTH_COOKIE_NAME);
 
-    if (!token) return next();
-
-    // Native clients present the OAuth provider's opaque access token; every
-    // other caller presents a session JWT. Both end in the same identity shape
-    // and fall through to the tenant-isolation guard and scoped-DB injection.
-    if (looksLikeOpaqueOAuthToken(token)) {
+    // A token-less WebSocket upgrade may carry a one-time ticket instead (native
+    // clients cannot set headers on a socket). Without one this is the usual
+    // anonymous pass-through; with one, the identity lands here so the tenant
+    // guard and scoped-DB injection below apply to it like any other.
+    //
+    // Otherwise native clients present the OAuth provider's opaque access token
+    // and every other caller a session JWT. All end in the same identity shape.
+    if (!token) {
+        if (!(await applyWsTicketIdentity(c))) return next();
+    } else if (looksLikeOpaqueOAuthToken(token)) {
         await applyNativeIdentity(c, token);
     } else {
         await applyJwtIdentity(c, token);

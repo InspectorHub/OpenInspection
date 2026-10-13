@@ -24,10 +24,17 @@
  * (server/api/inspections.ts), same as the other sub-routers.
  */
 
+import { createRoute } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { createApiRouter } from '../../lib/openapi-router';
 import { logger } from '../../lib/logger';
-import { CollabFollowupRequestSchema, CollabRestoreRequestSchema, CollabSnapshotParamSchema } from '../../lib/validations/collab.schema';
+import {
+    CollabFollowupRequestSchema, CollabRestoreRequestSchema, CollabSnapshotParamSchema,
+    CollabTicketParamSchema, CollabTicketResponseSchema,
+} from '../../lib/validations/collab.schema';
+import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { Errors } from '../../lib/errors';
+import { issueWsTicket, WS_TICKET_TTL_S } from '../../lib/native/ws-ticket';
 import type { HonoConfig } from '../../types/hono';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 import { getInspectionRoster } from '../../lib/inspection/roster';
@@ -126,7 +133,37 @@ function collabStub(c: Context<HonoConfig>, tenantId: string, reportId: string) 
     return ns.get(doId);
 }
 
+const issueCollabTicketRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/{id}/collab/ticket', operationId: 'issueCollabTicket', tags: ['client'],
+    summary: 'Issue a one-time WebSocket ticket',
+    description: 'Exchanges the signed-in native client identity for a single-use ticket, valid for sixty seconds and for one inspection, which authenticates the collab or presence WebSocket upgrade through the ticket query parameter because a WebView socket cannot send an Authorization header.',
+    request: { params: CollabTicketParamSchema },
+    responses: { 200: { description: 'One-time ticket', content: { 'application/json': { schema: CollabTicketResponseSchema } } } },
+}, { scopes: ['write'], tier: 'excluded' }));
+
 const collabRoutes = createApiRouter()
+    // Native identity only, and the same checks as the socket itself: a ticket is
+    // never issued for an inspection the caller could not open.
+    .openapi(issueCollabTicketRoute, async (c) => {
+        if (!c.get('nativeClient')) throw Errors.Unauthorized('Native session required');
+        const auth = await authorizeCollab(c);
+        if (!auth.ok) {
+            const { status } = auth.response;
+            if (status === 403) throw Errors.Forbidden();
+            if (status === 404) throw Errors.NotFound();
+            if (status === 501) throw Errors.ServiceUnavailable('Collaboration is unavailable');
+            throw Errors.Unauthorized();
+        }
+        const kv = c.env.TENANT_CACHE;
+        if (!kv) throw Errors.ServiceUnavailable('Ticket storage is unavailable');
+        // Role comes from the identity the middleware verified, never from the request.
+        const role = c.get('userRole');
+        if (!role) throw Errors.Unauthorized();
+        const ticket = await issueWsTicket(kv, {
+            tenantId: auth.tenantId, userId: auth.userId, role, inspectionId: auth.inspectionId,
+        });
+        return c.json({ success: true as const, data: { ticket, expiresIn: WS_TICKET_TTL_S } }, 200);
+    })
     .get('/:id/collab/ws', async (c) => {
         // ── (0) WebSocket protocol check (ws-only) ────────────────────────────
         if (c.req.header('Upgrade') !== 'websocket') {

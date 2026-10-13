@@ -17,6 +17,8 @@ export interface VersionPolicy {
  * set the server never asks any app to update.
  */
 export interface NativeVersionEnv {
+  /** Operator opt-in for native clients; declared here so AppEnv carries it for the flag helpers. */
+  NATIVE_CLIENT_ENABLED?: string;
   NATIVE_MIN_VERSION_IOS?: string;
   NATIVE_MIN_VERSION_ANDROID?: string;
   NATIVE_MIN_VERSION_WINDOWS?: string;

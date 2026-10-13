@@ -6,6 +6,7 @@
  * that lives in this validations module (never inline in the handler).
  */
 import { z } from '@hono/zod-openapi';
+import { createApiResponseSchema } from './shared.schema';
 
 /**
  * Body of `POST /:id/collab/restore` — the snapshot `seq` to restore to.
@@ -49,3 +50,14 @@ export const CollabFollowupRequestSchema = z.object({
 export const CollabSnapshotParamSchema = z.object({
     seq: z.coerce.number().int().nonnegative(),
 });
+
+/** Path param of `POST /:id/collab/ticket` — the inspection the socket will open. */
+export const CollabTicketParamSchema = z.object({
+    id: z.string().trim().min(1).describe('Inspection the one-time WebSocket ticket is issued for'),
+});
+
+/** Response of `POST /:id/collab/ticket` — an opaque single-use credential. */
+export const CollabTicketResponseSchema = createApiResponseSchema(z.object({
+    ticket: z.string().describe('Opaque one-time ticket to pass as the ticket query parameter of the WebSocket URL'),
+    expiresIn: z.number().int().describe('Seconds the ticket stays valid'),
+}));

@@ -10008,6 +10008,34 @@
     "description": "Auto-generated placeholder for inviteTenant (POST /invite, admin domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "issueCollabTicket",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/collab/ticket",
+    "scopes": [
+      "write"
+    ],
+    "tag": "client",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection the one-time WebSocket ticket is issued for",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection the one-time WebSocket ticket is issued for"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Issue a one-time WebSocket ticket",
+    "description": "Exchanges the signed-in native client identity for a single-use ticket, valid for sixty seconds and for one inspection, which authenticates the collab or presence WebSocket upgrade through the ticket query parameter because a WebView socket cannot send an Authorization header."
+  },
+  {
     "operationId": "joinTeamFromInvite",
     "method": "POST",
     "pathTemplate": "/api/auth/join",
