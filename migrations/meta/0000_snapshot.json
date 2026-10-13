@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "38205577-a1ac-4d65-8836-5721fa63a0a9",
+  "id": "26c2df7a-c33c-4e4c-8664-877391a24305",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_terms_acceptances": {
@@ -908,6 +908,13 @@
         "sender_identity": {
           "name": "sender_identity",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "human_verified_at": {
+          "name": "human_verified_at",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -11369,6 +11376,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "step": {
+          "name": "step",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         }
       },
