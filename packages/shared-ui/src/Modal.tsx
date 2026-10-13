@@ -1,6 +1,6 @@
 import React, { useId, useRef } from "react";
 import { useDialogBehavior } from "./useDialogBehavior";
-import { ClickShield, useCloseShield } from "./useCloseShield";
+import { useCloseShield } from "./useCloseShield";
 
 interface ModalProps {
   open: boolean;
@@ -23,9 +23,9 @@ export function Modal({ open, onClose, title, size = "md", children, footer, ini
   const titleId = useId();
 
   useDialogBehavior(open, onClose, ref, initialFocusRef);
-  const shielded = useCloseShield(open);
+  useCloseShield(open);
 
-  if (!open) return shielded ? <ClickShield /> : null;
+  if (!open) return null;
 
   return (
     <div
