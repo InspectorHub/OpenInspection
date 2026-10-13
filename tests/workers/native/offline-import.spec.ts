@@ -604,7 +604,7 @@ describe('POST /api/client/import', () => {
         const now = Date.now();
         const insert = (tenant: string, key: string) => b.DB.prepare(
             'INSERT INTO offline_import_applied (tenant_id, idempotency_key, op, inspection_id, applied_at, applied_by) VALUES (?, ?, ?, ?, ?, ?)',
-        ).bind(tenant, key, 'inspection.update', 'elsewhere', now, 'someone').run();
+        ).bind(tenant, key, 'inspection.update', insp.id, now, 'someone').run();
         await insert(OTHER_TENANT, sharedKey);
         await insert(TENANT, ownKey);
         const zip = buildPackage(pkg({ exportedBy: author.id }, insp, {
@@ -617,6 +617,52 @@ describe('POST /api/client/import', () => {
         expect(res.status, await res.clone().text()).toBe(200);
         expect((await body(res)).data?.outbox).toEqual({ applied: 1, skipped: 1, failed: [] });
         expect(await addressOf(insp.id)).toBe('60 Shared Key Road');
+    });
+
+    it('keys the applied record by inspection as well: one key recorded for inspection A does not skip a write to inspection B (positive control: A\'s own repeat is skipped)', async () => {
+        const a = await createInspection(author);
+        const other = await createInspection(author);
+        const key = fresh('k');
+        await b.DB.prepare(
+            'INSERT INTO offline_import_applied (tenant_id, idempotency_key, op, inspection_id, applied_at, applied_by) VALUES (?, ?, ?, ?, ?, ?)',
+        ).bind(TENANT, key, 'inspection.update', a.id, Date.now(), 'someone').run();
+        const forOther = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, other, {
+            outbox: [{ idempotencyKey: key, op: 'inspection.update', payload: { id: other.id, propertyAddress: '70 Same Key Road' } }],
+        })));
+        expect(forOther.status, await forOther.clone().text()).toBe(200);
+        expect((await body(forOther)).data?.outbox).toEqual({ applied: 1, skipped: 0, failed: [] });
+        expect(await addressOf(other.id)).toBe('70 Same Key Road');
+        expect(await recordedCount(key)).toBe(2);
+
+        const forA = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, a, {
+            outbox: [{ idempotencyKey: key, op: 'inspection.update', payload: { id: a.id, propertyAddress: '71 Must Not Apply Road' } }],
+        })));
+        expect(forA.status, await forA.clone().text()).toBe(200);
+        expect((await body(forA)).data?.outbox).toEqual({ applied: 0, skipped: 1, failed: [] });
+        expect(await addressOf(a.id)).not.toBe('71 Must Not Apply Road');
+    });
+
+    it('does not report a deleted inspection for a create that reuses a key another inspection recorded (positive control: the same id is reported)', async () => {
+        const key = fresh('k');
+        const recordedFor = fresh('insp-gone');
+        const id = fresh('insp-newcreate');
+        await b.DB.prepare(
+            'INSERT INTO offline_import_applied (tenant_id, idempotency_key, op, inspection_id, applied_at, applied_by) VALUES (?, ?, ?, ?, ?, ?)',
+        ).bind(TENANT, key, 'inspection.create', recordedFor, Date.now(), 'someone').run();
+        const make = (inspectionId: string) => buildPackage({
+            tenantId: TENANT, exportedBy: author.id, inspections: [{ id: inspectionId, reportId: 'device-report' }],
+            yjs: { [inspectionId]: deviceState('RR') },
+            outbox: [{ idempotencyKey: key, op: 'inspection.create', payload: { id: inspectionId, propertyAddress: '72 Reused Key Road, Town', templateId: TEMPLATE } }],
+        });
+        const revive = await importPackage(manager.token, make(recordedFor));
+        expect(revive.status, await revive.clone().text()).toBe(409);
+        expect(await revive.text()).toContain('PACKAGE_INSPECTION_DELETED');
+
+        const res = await importPackage(manager.token, make(id));
+        expect(res.status, await res.clone().text()).toBe(200);
+        expect((await body(res)).data?.outbox).toEqual({ applied: 1, skipped: 0, failed: [] });
+        expect(await addressOf(id)).toBe('72 Reused Key Road, Town');
+        expect(await recordedCount(key)).toBe(2);
     });
 
     it('records nothing for a refused write, so the same key applies once the entry is valid', async () => {

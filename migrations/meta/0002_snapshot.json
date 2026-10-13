@@ -6792,12 +6792,13 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "offline_import_applied_tenant_id_idempotency_key_pk": {
+        "offline_import_applied_tenant_id_idempotency_key_inspection_id_pk": {
           "columns": [
             "tenant_id",
-            "idempotency_key"
+            "idempotency_key",
+            "inspection_id"
           ],
-          "name": "offline_import_applied_tenant_id_idempotency_key_pk"
+          "name": "offline_import_applied_tenant_id_idempotency_key_inspection_id_pk"
         }
       },
       "uniqueConstraints": {},

@@ -1719,16 +1719,16 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `offline_import_applied`
 
-<sub>server/lib/db/schema/offline-import.ts · 6 columns · primary key `tenant_id, idempotency_key`</sub>
+<sub>server/lib/db/schema/offline-import.ts · 6 columns · primary key `tenant_id, idempotency_key, inspection_id`</sub>
 
-> Queued writes an offline package has already applied, one row per (tenant, key). The 24 hour idempotency ledger is not enough on its own: an `inspection.update` carried by a package is a PATCH, a last-writer-wins overwrite, so replaying it after the ledger row expired would put an old value over a newer edit.
+> Queued writes an offline package has already applied, one row per (tenant, key, inspection).
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
 | `tenant_id` | text | PK NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
-| `idempotency_key` | text | PK NN |  |  | The queue entry's idempotency key, verbatim as the device minted it. |
+| `idempotency_key` | text | PK NN |  |  | The queue entry's idempotency key, verbatim as the device minted it. The device mints it, so nothing stops two packages from using the same one for different inspections: the inspection id is part of the primary key, and a record only counts for the inspection it was written for. |
 | `op` | text | NN |  | `inspection.create, inspection.update, inspection.complete` |  |
-| `inspection_id` | text | NN |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `inspection_id` | text | PK NN |  |  | *The inspection (order) this belongs to. App-layer reference.* |
 | `applied_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `applied_by` | text | NN |  |  | The importing member, taken from the verified session. |
 

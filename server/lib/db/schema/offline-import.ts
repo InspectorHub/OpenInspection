@@ -1,7 +1,7 @@
 import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
 
 /**
- * Queued writes an offline package has already applied, one row per (tenant, key).
+ * Queued writes an offline package has already applied, one row per (tenant, key, inspection).
  *
  * The 24 hour idempotency ledger is not enough on its own: an `inspection.update`
  * carried by a package is a PATCH, a last-writer-wins overwrite, so replaying it
@@ -23,7 +23,9 @@ import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core'
  */
 export const offlineImportApplied = sqliteTable('offline_import_applied', {
     tenantId:       text('tenant_id').notNull(),
-    // The queue entry's idempotency key, verbatim as the device minted it.
+    // The queue entry's idempotency key, verbatim as the device minted it. The device mints it, so
+    // nothing stops two packages from using the same one for different inspections: the inspection id
+    // is part of the primary key, and a record only counts for the inspection it was written for.
     idempotencyKey: text('idempotency_key').notNull(),
     op:             text('op', { enum: ['inspection.create', 'inspection.update', 'inspection.complete'] }).notNull(),
     inspectionId:   text('inspection_id').notNull(),
@@ -31,7 +33,7 @@ export const offlineImportApplied = sqliteTable('offline_import_applied', {
     // The importing member, taken from the verified session.
     appliedBy:      text('applied_by').notNull(),
 }, (t) => [
-    primaryKey({ columns: [t.tenantId, t.idempotencyKey] }),
+    primaryKey({ columns: [t.tenantId, t.idempotencyKey, t.inspectionId] }),
 ]);
 
 export type OfflineImportApplied = typeof offlineImportApplied.$inferSelect;

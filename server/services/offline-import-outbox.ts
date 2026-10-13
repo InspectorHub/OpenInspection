@@ -13,7 +13,7 @@
  *    ledger row expired would put an old value over a newer edit. A CREATE is
  *    recorded too, because the client id only holds while the inspection exists:
  *    once an admin deletes it, a repeat would create it again and the results and
- *    photos would follow. An entry whose key is recorded is skipped BEFORE the
+ *    photos would follow. An entry whose key is recorded for its own inspection is skipped BEFORE the
  *    route is called, and a key is recorded only after the route answered 2xx
  *    (a create that answers 200 found the inspection already there and counts),
  *    so a refused entry stays retryable. The importer refuses a package whose
@@ -107,15 +107,26 @@ function isPermanentRefusal(status: number): boolean {
     return status >= 400 && status < 500 && status !== 408 && status !== 429;
 }
 
-export async function recordedKeys(c: Context<HonoConfig>, tenantId: string, keys: readonly string[]): Promise<Set<string>> {
+/**
+ * Which of `entries` already have a record. The device mints the key, so the same
+ * key can name different inspections in two packages: a record counts only for the
+ * inspection it was written for.
+ */
+async function recordedEntries(c: Context<HonoConfig>, tenantId: string, entries: readonly OutboxEntry[]): Promise<Set<OutboxEntry>> {
     const db = getDrizzle(c);
-    const found = new Set<string>();
+    const inspectionsByKey = new Map<string, Set<string>>();
+    const keys = [...new Set(entries.map((e) => e.idempotencyKey))];
     for (let i = 0; i < keys.length; i += LOOKUP_CHUNK) {
-        const rows = await db.select({ key: offlineImportApplied.idempotencyKey }).from(offlineImportApplied)
+        const rows = await db.select({ key: offlineImportApplied.idempotencyKey, inspectionId: offlineImportApplied.inspectionId })
+            .from(offlineImportApplied)
             .where(and(eq(offlineImportApplied.tenantId, tenantId), inArray(offlineImportApplied.idempotencyKey, keys.slice(i, i + LOOKUP_CHUNK))));
-        for (const r of rows) found.add(r.key);
+        for (const r of rows) {
+            const ids = inspectionsByKey.get(r.key) ?? new Set<string>();
+            ids.add(r.inspectionId);
+            inspectionsByKey.set(r.key, ids);
+        }
     }
-    return found;
+    return new Set(entries.filter((e) => inspectionsByKey.get(e.idempotencyKey)?.has(e.payload.id)));
 }
 
 async function record(c: Context<HonoConfig>, tenantId: string, userId: string, entry: OutboxEntry): Promise<void> {
@@ -139,8 +150,8 @@ export async function findDeletedCreates(
 ): Promise<string[]> {
     const creates = candidates.filter((e) => e.op === 'inspection.create');
     if (creates.length === 0) return [];
-    const recorded = await recordedKeys(c, tenantId, creates.map((e) => e.idempotencyKey));
-    return creates.filter((e) => recorded.has(e.idempotencyKey)).map((e) => e.payload.id);
+    const recorded = await recordedEntries(c, tenantId, creates);
+    return creates.filter((e) => recorded.has(e)).map((e) => e.payload.id);
 }
 
 /**
@@ -160,11 +171,11 @@ export async function applyOutbox(
     const userId = c.get('user')?.sub;
     if (!tenantId || !userId) throw Errors.Unauthorized();
 
-    const already = await recordedKeys(c, tenantId, entries.map((e) => e.idempotencyKey));
+    const already = await recordedEntries(c, tenantId, entries);
     const { app } = await import('../index');
 
     for (const entry of entries) {
-        if (already.has(entry.idempotencyKey)) {
+        if (already.has(entry)) {
             result.skipped++;
             continue;
         }

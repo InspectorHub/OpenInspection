@@ -5,5 +5,5 @@ CREATE TABLE `offline_import_applied` (
 	`inspection_id` text NOT NULL,
 	`applied_at` integer NOT NULL,
 	`applied_by` text NOT NULL,
-	PRIMARY KEY(`tenant_id`, `idempotency_key`)
+	PRIMARY KEY(`tenant_id`, `idempotency_key`, `inspection_id`)
 );

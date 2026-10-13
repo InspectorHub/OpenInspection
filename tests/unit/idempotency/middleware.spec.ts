@@ -34,6 +34,7 @@ function buildApp(handler: Handler, tenantId = 't1') {
     };
     app.post('/thing', run);
     app.post('/api/client/import', run);
+    app.post('/api/client/import-foo', run);
     return app;
 }
 
@@ -86,6 +87,14 @@ describe('idempotencyMiddleware', () => {
         const app = buildApp(ok);
         await postZip(app, '/thing', 'zip-other', [1, 2, 3]);
         const second = await postZip(app, '/thing', 'zip-other', [1, 2, 3]);
+        expect(second.headers.get('Idempotency-Replayed')).toBe('true');
+        expect(ran).toBe(1);
+    });
+
+    it('exempts only the exact import path: a sibling path that merely starts with it is still guarded', async () => {
+        const app = buildApp(ok);
+        await postZip(app, '/api/client/import-foo', 'zip-sibling', [1, 2, 3]);
+        const second = await postZip(app, '/api/client/import-foo', 'zip-sibling', [1, 2, 3]);
         expect(second.headers.get('Idempotency-Replayed')).toBe('true');
         expect(ran).toBe(1);
     });
