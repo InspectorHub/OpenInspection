@@ -292,6 +292,9 @@ export default defineConfig({
         { name: 'auth-password-reset', testMatch: 'auth-password-reset.spec.ts', dependencies: ['api'] },
         // Enrols the seeded admin in 2FA and disables it again, so it is serial.
         { name: 'auth-two-factor', testMatch: 'auth-two-factor.spec.ts', dependencies: ['api'] },
+        // Invites a throwaway member off the shared admin and removes them through
+        // the Team page; never touches the admin or the seeded inspector.
+        { name: 'team-remove-member', testMatch: 'team-remove-member.spec.ts', dependencies: ['api'] },
         // Both run the setup wizard. They used to send their own company names
         // ("Branding Corp", "Timezone Corp"), which meant whichever reached
         // /api/auth/setup first named the tenant for the whole run.

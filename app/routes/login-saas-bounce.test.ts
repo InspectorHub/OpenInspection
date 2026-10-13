@@ -53,19 +53,19 @@ describe('login loader — SaaS portal bounce (B-26)', () => {
 
     it('saas mode WITHOUT PORTAL_API_URL falls through to the local form (fail-open, matches the API guard)', async () => {
         const res = await loader(args({ APP_MODE: 'saas' }));
-        expect(res).toEqual({ returnTo: null });
+        expect(res).toEqual({ returnTo: null, app: false });
     });
 
     it('standalone mode renders the local form (no bounce)', async () => {
         const res = await loader(args({ PORTAL_API_URL: 'https://inspectorhub.io' }));
-        expect(res).toEqual({ returnTo: null });
+        expect(res).toEqual({ returnTo: null, app: false });
     });
 });
 
 describe('login loader — returnTo (B3)', () => {
     it('passes a same-origin returnTo through to the form (unauthenticated)', async () => {
         const res = await loader(args({}, { returnTo: '/oauth/authorize?client_id=abc&scope=read' }));
-        expect(res).toEqual({ returnTo: '/oauth/authorize?client_id=abc&scope=read' });
+        expect(res).toEqual({ returnTo: '/oauth/authorize?client_id=abc&scope=read', app: false });
     });
 
     it('redirects an already-authenticated user to the same-origin returnTo', async () => {

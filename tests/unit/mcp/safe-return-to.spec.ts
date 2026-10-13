@@ -50,6 +50,24 @@ describe('safeReturnTo', () => {
         });
     });
 
+    describe('control characters — rejected', () => {
+        // WHATWG URL parsing deletes tab, CR and LF anywhere in the input, so a
+        // tab between the slashes reads as '//evil.test' once a browser follows
+        // the Location header, even though it passes the prefix checks as written.
+        it('rejects a tab between the slashes', () => {
+            expect(safeReturnTo('/\t/evil.test', '/default')).toBe('/default');
+        });
+
+        it('rejects a newline between the slashes', () => {
+            expect(safeReturnTo('/\n/evil.test', '/default')).toBe('/default');
+        });
+
+        it('rejects a carriage return and a NUL', () => {
+            expect(safeReturnTo('/\r/evil.test', '/default')).toBe('/default');
+            expect(safeReturnTo('/a\u0000b', '/default')).toBe('/default');
+        });
+    });
+
     describe('null / empty — fallback returned', () => {
         it('returns fallback for null', () => {
             expect(safeReturnTo(null, '/default')).toBe('/default');

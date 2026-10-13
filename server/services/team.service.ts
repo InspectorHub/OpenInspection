@@ -312,6 +312,20 @@ export class TeamService {
             .get();
         if (!user) throw Errors.NotFound('Member not found');
 
+        // A workspace with no owner cannot be administered by anyone. The
+        // endpoint is open to managers, so the requester is not necessarily
+        // the owner being removed; same rule as updateMember's role change.
+        if (user.role === 'owner') {
+            const otherOwners = await db.select({ id: users.id }).from(users)
+                .where(and(
+                    eq(users.tenantId, tenantId),
+                    eq(users.role, 'owner'),
+                    ne(users.id, userId),
+                    isNull(users.deletedAt),
+                )).limit(1);
+            if (otherOwners.length === 0) throw Errors.BadRequest('Cannot remove the last owner');
+        }
+
         // Soft-delete rather than hard-delete: `inspections.inspector_id`
         // FK-references `users.id`, so a member with inspections can't be
         // hard-deleted under D1 FK enforcement, and hard-deleting would orphan

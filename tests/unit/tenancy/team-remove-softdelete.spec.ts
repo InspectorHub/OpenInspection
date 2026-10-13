@@ -301,4 +301,38 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         const row = await testDb.select().from(schema.users).where(eq(schema.users.id, MEMBER)).get();
         expect(row!.deletedAt).not.toBeNull(); // the soft-delete itself still committed
     });
+
+    it('refuses to remove the last owner, leaving the workspace administrable', async () => {
+        // A manager can reach this endpoint, so the requester need not be the
+        // owner being removed. Without the check the tenant is left with no one
+        // able to restore an owner (mirrors updateMember's last-owner rule).
+        const MANAGER = '33333333-3333-3333-3333-3333333333d1';
+        await testDb.insert(schema.users).values({
+            id: MANAGER, tenantId: TENANT, email: 'manager@acme.test',
+            passwordHash: 'x', role: 'manager', createdAt: new Date(),
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, undefined, kv as any);
+
+        await expect(team.removeMember(TENANT, ADMIN, MANAGER)).rejects.toThrow('Cannot remove the last owner');
+
+        const row = await testDb.select().from(schema.users).where(eq(schema.users.id, ADMIN)).get();
+        expect(row!.deletedAt).toBeNull();
+        expect(kv.put).not.toHaveBeenCalled();
+    });
+
+    it('still removes an owner when another owner remains', async () => {
+        const SECOND_OWNER = '44444444-4444-4444-4444-4444444444d1';
+        await testDb.insert(schema.users).values({
+            id: SECOND_OWNER, tenantId: TENANT, email: 'owner2@acme.test',
+            passwordHash: 'x', role: 'owner', createdAt: new Date(),
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, undefined, kv as any);
+
+        await team.removeMember(TENANT, SECOND_OWNER, ADMIN);
+
+        const row = await testDb.select().from(schema.users).where(eq(schema.users.id, SECOND_OWNER)).get();
+        expect(row!.deletedAt).not.toBeNull();
+    });
 });

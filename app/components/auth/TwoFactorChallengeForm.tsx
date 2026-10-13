@@ -19,10 +19,13 @@ import { m } from "~/paraglide/messages";
 export function TwoFactorChallengeForm({
   challengeToken,
   returnTo,
+  app = false,
   error,
 }: {
   challengeToken: string;
   returnTo: string;
+  /** The sign-in was started by the native client (`app=1`). */
+  app?: boolean;
   error?: string;
 }) {
   const navigation = useNavigation();
@@ -36,6 +39,15 @@ export function TwoFactorChallengeForm({
     if (!submitting) inFlight.current = false;
   }, [submitting]);
 
+  // Starting over must resume the same authorization: a bare /login would drop
+  // `returnTo` and `app`, and the person would sign in only to land on the
+  // dashboard instead of the consent screen that sent them here.
+  const resume = new URLSearchParams();
+  if (app) resume.set("app", "1");
+  if (returnTo) resume.set("returnTo", returnTo);
+  const resumeQuery = resume.toString();
+  const startOverHref = resumeQuery ? `/login?${resumeQuery}` : "/login";
+
   return (
     <Form
       method="post"
@@ -48,6 +60,7 @@ export function TwoFactorChallengeForm({
     >
       <input type="hidden" name="challengeToken" value={challengeToken} />
       {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
+      {app ? <input type="hidden" name="app" value="1" /> : null}
 
       <p className="text-[13px] text-ih-fg-2">{m.auth_login_2fa_help()}</p>
 
@@ -72,7 +85,7 @@ export function TwoFactorChallengeForm({
       {/* Not a "cancel". The challenge expires in five minutes and a person who
           cannot reach their authenticator needs a way back to the start rather
           than a dead form. */}
-      <a href="/login" className="block text-center text-xs font-bold text-ih-primary-text hover:underline">
+      <a href={startOverHref} className="block text-center text-xs font-bold text-ih-primary-text hover:underline">
         {m.auth_login_2fa_start_over()}
       </a>
     </Form>

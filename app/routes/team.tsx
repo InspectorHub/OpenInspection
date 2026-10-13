@@ -9,7 +9,9 @@ import { EditMemberDrawer, type EditableMember } from "~/components/modals/EditM
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { InviteLinkModal, type InviteLinkTarget } from "~/components/modals/InviteLinkModal";
 import { ResetTwoFactorDialog, type ResetTwoFactorTarget } from "~/components/modals/ResetTwoFactorDialog";
-import { resetMemberTwoFactor } from "./team.reset-two-factor.server";
+import { RemoveMemberDialog } from "~/components/modals/RemoveMemberDialog";
+import { useRemoveMember } from "~/components/modals/useRemoveMember";
+import { handleTeamAction } from "./team.actions.server";
 import { useDisplayLocale, useSessionContext } from "~/hooks/useSessionContext";
 import { importEntryHref } from "~/lib/import-entry-points";
 import { Breadcrumb } from "~/components/Breadcrumb";
@@ -85,24 +87,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
-  const form = await request.formData();
-  const intent = form.get("intent") as string;
-  const api = createApi(context, { token });
-
-  if (intent === "cancel-invite") {
-    const inviteToken = form.get("token") as string;
-    const res = await api.team.invites[":token"].$delete({ param: { token: inviteToken } });
-    return { ok: res.ok };
-  }
-  if (intent === "reset-two-factor") {
-    return resetMemberTwoFactor(api, form.get("id") as string);
-  }
-  if (intent === "resend-invite") {
-    const inviteToken = form.get("token") as string;
-    const res = await api.team.invites[":token"].resend.$post({ param: { token: inviteToken } });
-    return { ok: res.ok, resent: res.ok };
-  }
-  return { ok: false };
+  return handleTeamAction(createApi(context, { token }), await request.formData());
 }
 
 
@@ -120,6 +105,7 @@ export default function TeamPage() {
   // a reset that silently rode a cancel's in-flight guard would be dropped.
   const { submit: submitResetTwoFactor, busy: resetTwoFactorBusy } = useGuardedSubmit<{ ok?: boolean }>();
   const [pendingReset, setPendingReset] = useState<ResetTwoFactorTarget | null>(null);
+  const removeMember = useRemoveMember();
   const resendFetcher = useFetcher<{ ok?: boolean; resent?: boolean }>();
   const resendLatch = useSubmitLatch(resendFetcher.state);
   const [pendingCancel, setPendingCancel] = useState<{ token: string; email: string } | null>(null);
@@ -324,6 +310,15 @@ export default function TeamPage() {
                           the wider admin tier — and offering it on a member
                           with no enrolment would answer with a refusal the
                           owner could have been spared. */}
+                      {member.email.toLowerCase() !== sessionCtx?.user?.email?.toLowerCase() && (
+                        <button
+                          type="button"
+                          onClick={() => removeMember.open({ id: member.id as string, name: member.name || member.email })}
+                          className="text-[12px] font-medium text-ih-bad-fg hover:underline"
+                        >
+                          {m.common_remove()}
+                        </button>
+                      )}
                       {isOwner && member.totpEnabled === true && (
                         <button
                           type="button"
@@ -379,6 +374,7 @@ export default function TeamPage() {
         }}
         onCancel={() => setPendingCancel(null)}
       />
+      <RemoveMemberDialog {...removeMember.dialogProps} />
       <ResetTwoFactorDialog
         target={pendingReset}
         busy={resetTwoFactorBusy}
