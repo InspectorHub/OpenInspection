@@ -70,3 +70,11 @@ export const CollabImportResultSchema = z.object({
     changed: z.boolean()
         .describe('False when the update left the document exactly as it was (a repeat or a retry); no snapshot was taken for it'),
 });
+
+/** What the Durable Object answers when pending photo entries were swapped for their R2 keys and persisted. */
+export const CollabResolvePendingResultSchema = z.object({
+    ok: z.literal(true),
+    matched: z.number().int().nonnegative().describe('Pending photo entries replaced by this call'),
+    unmatched: z.number().int().nonnegative().describe('Map ids that had no pending entry left (a repeat, or a photo that was removed)'),
+    changed: z.boolean().describe('False when nothing was replaced, so the document is exactly as it was'),
+});

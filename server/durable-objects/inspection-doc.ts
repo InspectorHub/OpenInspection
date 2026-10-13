@@ -47,12 +47,12 @@ import {
     removeFindingKeys,
 } from '../lib/collab/results-doc';
 import type { ResultsProjection } from '../lib/collab/results-doc.types';
-import { applyFollowupPatch, resolveCarriedFindingKey } from '../lib/collab/followup-patch';
+import { followupResponse } from '../lib/collab/followup-patch';
 import { findingKeysFromTemplateSnapshot } from '../lib/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import { purgePathMatches } from './purge-path';
-import { importResponse, newestImportSeq } from './inspection-doc-import';
+import { importResponse, newestImportSeq, resolvePendingResponse } from './inspection-doc-import';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -440,6 +440,13 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                 async () => newestImportSeq(asSnapshotArray(await this.ctx.storage.get(SNAPSHOTS_KEY))));
         }
 
+        // Swap pending photo entries for their R2 keys after an offline import; same trust boundary as /import.
+        if (url.pathname.endsWith('/resolve-pending') && req.method === 'POST') {
+            this.adoptIdentityHeaders(req);
+            await this.hydrateFromD1Once();
+            return resolvePendingResponse(this.doc, await req.text(), { tenantId: this.tenantId, inspectionId: this.inspectionId }, () => this.persist());
+        }
+
         // #119 — record a carried item's follow-up disposition. Same identity
         // headers and same trust boundary as /restructure above. The D1 hydration
         // is NOT optional: this is the one mutating path that can reach a DO with
@@ -447,29 +454,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         // write an empty projection over the round's carried items.
         if (url.pathname.endsWith('/followup') && req.method === 'POST') {
             if (!this.adoptIdentityHeaders(req)) return new Response('missing tenant/inspection identity', { status: 400 });
-
-            let body: { itemId?: unknown; status?: unknown; notes?: unknown };
-            try {
-                body = (await req.json()) as typeof body;
-            } catch {
-                return new Response('invalid body', { status: 400 });
-            }
-            const itemId = typeof body.itemId === 'string' ? body.itemId : '';
-            if (!itemId) return new Response('invalid itemId', { status: 400 });
-            const status = typeof body.status === 'string' && body.status.length > 0 ? body.status : null;
-            const notes  = typeof body.notes === 'string' ? body.notes : undefined;
-
-            await this.hydrateFromD1Once();
-            const resolved = resolveCarriedFindingKey(this.doc, itemId);
-            if (!resolved.ok) {
-                return Response.json(
-                    { ok: false, reason: resolved.reason },
-                    { status: resolved.reason === 'ambiguous' ? 409 : 404 },
-                );
-            }
-            applyFollowupPatch(this.doc, resolved.findingKey, notes === undefined ? { status } : { status, notes });
-            await this.persist();
-            return Response.json({ ok: true, findingKey: resolved.findingKey });
+            return followupResponse(this.doc, req, () => this.hydrateFromD1Once(), () => this.persist());
         }
 
         // Destruction. Called by TenantPurgeService for every report the tenant
