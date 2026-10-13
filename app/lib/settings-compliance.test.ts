@@ -165,3 +165,28 @@ describe('settings-compliance action (G4 BFF)', () => {
         expect(res).toMatchObject({ ok: false, intent: 'retention-save', message: 'nope' });
     });
 });
+
+describe('settings-compliance offline access limit', () => {
+    it('loader returns offlineMaxDays from tenant-config, default 30', async () => {
+        getTenantConfig.mockResolvedValue(jsonRes({ success: true, data: { offlineMaxDays: 45 } }));
+        expect((await loader(loaderArgs())).offlineMaxDays).toBe(45);
+        getTenantConfig.mockResolvedValue(jsonRes(null, false));
+        expect((await loader(loaderArgs())).offlineMaxDays).toBe(30);
+    });
+
+    it('intent=offline-save PATCHes tenant-config with the integer day count', async () => {
+        const res = await action(actionArgs({ intent: 'offline-save', offlineMaxDays: '45' }));
+        expect(patchTenantConfig).toHaveBeenCalledWith({ json: { offlineMaxDays: 45 } });
+        expect(res).toMatchObject({ ok: true, intent: 'offline-save' });
+    });
+
+    it.each(['0', '366', '1.5', 'abc', ''])(
+        'rejects offline limit %s without calling the API',
+        async (bad) => {
+            const res = await action(actionArgs({ intent: 'offline-save', offlineMaxDays: bad }));
+            expect(patchTenantConfig).not.toHaveBeenCalled();
+            expect(res).toMatchObject({ ok: false, intent: 'offline-save' });
+        },
+    );
+});
+
