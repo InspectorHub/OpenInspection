@@ -57,6 +57,21 @@ describe('NEVER_BLOCK_PATHS', () => {
     expect(blocked('/api/client/session')).toBe(false);
     expect(blocked('/api/client/compat')).toBe(false);
   });
+  it('lets the ticket, presence and video upload calls through', () => {
+    expect(blocked('/api/inspections/abc/collab/ticket')).toBe(false);
+    expect(blocked('/api/inspections/abc/presence/ws')).toBe(false);
+    expect(blocked('/api/tenant/presence/ws')).toBe(false);
+    expect(blocked('/api/inspections/abc/media/video/create-upload')).toBe(false);
+    expect(blocked('/api/inspections/abc/media/video/finalize')).toBe(false);
+    expect(blocked('/api/inspections/abc/media/video/r2-upload')).toBe(false);
+    expect(blocked('/api/inspections/abc/media/video/r2-upload-poster')).toBe(false);
+  });
+  it('still blocks neighbouring paths that are not part of capture or sync', () => {
+    expect(blocked('/api/inspections/abc/media/video')).toBe(true);
+    expect(blocked('/api/inspections/abc/media/video/delete')).toBe(true);
+    expect(blocked('/api/inspections/abc/collab/ticket/extra')).toBe(true);
+    expect(blocked('/api/tenant/settings')).toBe(true);
+  });
   it('blocks everything else', () => {
     expect(blocked('/api/inspections')).toBe(true);
     expect(blocked('/api/inspections/abc')).toBe(true);

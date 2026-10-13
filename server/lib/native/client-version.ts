@@ -76,8 +76,10 @@ export function upgradeStatus(version: string | undefined, policy: VersionPolicy
  * device must always be deliverable, so sync, upload and import never 426.
  */
 export const NEVER_BLOCK_PATHS: readonly RegExp[] = [
-  /^\/api\/inspections\/[^/]+\/collab\/(ws|import)$/,
-  /^\/api\/inspections\/[^/]+\/media\/upload-url$/,
+  /^\/api\/inspections\/[^/]+\/collab\/(ws|import|ticket)$/,
+  /^\/api\/inspections\/[^/]+\/presence\/ws$/,
+  /^\/api\/tenant\/presence\/ws$/,
+  /^\/api\/inspections\/[^/]+\/media\/(upload-url|video\/(create-upload|finalize|r2-upload|r2-upload-poster))$/,
   /^\/api\/public\/uploads\//,
   /^\/api\/client\/(session|import|compat)$/,
 ];
