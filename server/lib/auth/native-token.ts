@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, isNull } from 'drizzle-orm';
 import { users } from '../db/schema';
+import { nativeClientEnabled } from '../mcp/flag';
 
 /** The scope a native client requests and the consent page grants. */
 export const NATIVE_SCOPE = 'native';
@@ -34,6 +35,7 @@ export interface TokenUnwrapper {
 export interface NativeTokenEnv {
   DB: D1Database;
   OAUTH_PROVIDER?: TokenUnwrapper;
+  NATIVE_CLIENT_ENABLED?: string;
 }
 
 function isNativeRole(role: string): role is NativeRole {
@@ -69,7 +71,7 @@ export function looksLikeOpaqueOAuthToken(token: string): boolean {
  * failed open.
  */
 export async function resolveNativeToken(env: NativeTokenEnv, token: string): Promise<NativeProps | null> {
-  if (!env.OAUTH_PROVIDER) return null;
+  if (!nativeClientEnabled(env) || !env.OAUTH_PROVIDER) return null;
   const summary = await env.OAUTH_PROVIDER.unwrapToken(token);
   if (!summary) return null;
   if (!summary.grant.scope.includes(NATIVE_SCOPE) || !summary.scope.includes(NATIVE_SCOPE)) return null;

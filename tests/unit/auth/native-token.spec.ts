@@ -27,6 +27,7 @@ import { createHarness, INSPECTOR_ID, TENANT_ID, type Harness } from '../helpers
 
 const TENANT = '00000000-0000-4000-8000-0000000000aa';
 const USER = '00000000-0000-4000-8000-0000000000bb';
+const ON = { NATIVE_CLIENT_ENABLED: 'true' };
 const props: NativeProps = { kind: 'native', userId: USER, tenantId: TENANT, role: 'inspector', lastUsedAt: 0 };
 
 /** `tokenScope` is the access token's own scope; it defaults to the grant's. */
@@ -76,33 +77,33 @@ describe('resolveNativeToken', () => {
   it('resolves an active member holding a native grant (positive control)', async () => {
     const DB = await unitEnv();
     const OAUTH_PROVIDER = provider({ 'u:g:s': { scope: [NATIVE_SCOPE], props } });
-    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER }, 'u:g:s')).toEqual(props);
+    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER, ...ON }, 'u:g:s')).toEqual(props);
   });
   it('rejects an MCP grant that lacks the native scope', async () => {
     const DB = await unitEnv();
     const OAUTH_PROVIDER = provider({ 'u:g:s': { scope: ['read:*', 'write:*'], props } });
-    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER }, 'u:g:s')).toBeNull();
+    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER, ...ON }, 'u:g:s')).toBeNull();
   });
   it('rejects a removed member even if the grant still exists', async () => {
     const DB = await unitEnv(true);
     const OAUTH_PROVIDER = provider({ 'u:g:s': { scope: [NATIVE_SCOPE], props } });
-    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER }, 'u:g:s')).toBeNull();
+    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER, ...ON }, 'u:g:s')).toBeNull();
   });
   it('takes the role from the users row, not from the grant props', async () => {
     const DB = await unitEnv(false, 'inspector');
     const stale: NativeProps = { ...props, role: 'manager' };
     const OAUTH_PROVIDER = provider({ 'u:g:s': { scope: [NATIVE_SCOPE], props: stale } });
-    expect((await resolveNativeToken({ DB, OAUTH_PROVIDER }, 'u:g:s'))?.role).toBe('inspector');
+    expect((await resolveNativeToken({ DB, OAUTH_PROVIDER, ...ON }, 'u:g:s'))?.role).toBe('inspector');
   });
   it('keeps a role the row still holds (positive control for the demotion case)', async () => {
     const DB = await unitEnv(false, 'manager');
     const OAUTH_PROVIDER = provider({ 'u:g:s': { scope: [NATIVE_SCOPE], props: { ...props, role: 'manager' } } });
-    expect((await resolveNativeToken({ DB, OAUTH_PROVIDER }, 'u:g:s'))?.role).toBe('manager');
+    expect((await resolveNativeToken({ DB, OAUTH_PROVIDER, ...ON }, 'u:g:s'))?.role).toBe('manager');
   });
   it('rejects a user whose current role is not a native role', async () => {
     const DB = await unitEnv(false, 'agent');
     const OAUTH_PROVIDER = provider({ 'u:g:s': { scope: [NATIVE_SCOPE], props } });
-    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER }, 'u:g:s')).toBeNull();
+    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER, ...ON }, 'u:g:s')).toBeNull();
   });
   it('rejects a token whose own scope was narrowed below native', async () => {
     const DB = await unitEnv();
@@ -110,21 +111,28 @@ describe('resolveNativeToken', () => {
       'u:narrow:s': { scope: [NATIVE_SCOPE], tokenScope: ['read:*'], props },
       'u:g:s': { scope: [NATIVE_SCOPE], tokenScope: [NATIVE_SCOPE], props },
     });
-    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER }, 'u:narrow:s')).toBeNull();
-    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER }, 'u:g:s')).toEqual(props);
+    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER, ...ON }, 'u:narrow:s')).toBeNull();
+    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER, ...ON }, 'u:g:s')).toEqual(props);
   });
   it('rejects a grant whose props are not native props', async () => {
     const DB = await unitEnv();
     const OAUTH_PROVIDER = provider({ 'u:g:s': { scope: [NATIVE_SCOPE], props: { kind: 'mcp' } } });
-    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER }, 'u:g:s')).toBeNull();
+    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER, ...ON }, 'u:g:s')).toBeNull();
   });
   it('rejects an unknown or expired token', async () => {
     const DB = await unitEnv();
-    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER: provider({}) }, 'u:g:s')).toBeNull();
+    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER: provider({}), ...ON }, 'u:g:s')).toBeNull();
+  });
+  it('returns null when NATIVE_CLIENT_ENABLED is off, and resolves once it is on', async () => {
+    const DB = await unitEnv();
+    const OAUTH_PROVIDER = provider({ 'u:g:s': { scope: [NATIVE_SCOPE], props } });
+    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER }, 'u:g:s')).toBeNull();
+    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER, NATIVE_CLIENT_ENABLED: '0' }, 'u:g:s')).toBeNull();
+    expect(await resolveNativeToken({ DB, OAUTH_PROVIDER, NATIVE_CLIENT_ENABLED: 'true' }, 'u:g:s')).toEqual(props);
   });
   it('returns null when the provider is not mounted', async () => {
     const DB = await unitEnv();
-    expect(await resolveNativeToken({ DB }, 'u:g:s')).toBeNull();
+    expect(await resolveNativeToken({ DB, ...ON }, 'u:g:s')).toBeNull();
   });
 });
 
@@ -137,7 +145,7 @@ describe('GET /api/session/context with an OAuth access token (real app)', () =>
   };
 
   async function get(harness: Harness, grants: GrantMap, token: string): Promise<Response> {
-    const env = { ...harness.env, OAUTH_PROVIDER: provider(grants) } as typeof harness.env;
+    const env = { ...harness.env, NATIVE_CLIENT_ENABLED: 'true', OAUTH_PROVIDER: provider(grants) } as typeof harness.env;
     const exec = makeExecutionContext({ label: 'session-context' });
     const res = await app.request('/api/session/context', { headers: { authorization: `Bearer ${token}` } }, env, exec.ctx);
     await exec.settle();
@@ -178,6 +186,17 @@ describe('GET /api/session/context with an OAuth access token (real app)', () =>
     expect((await get(h, grants, 'u:g:s')).status).toBe(200);
   });
 
+  it('answers 401 for a valid native grant when NATIVE_CLIENT_ENABLED is unset', async () => {
+    h = await createHarness('standalone');
+    const grants: GrantMap = { 'u:g:s': { scope: [NATIVE_SCOPE], props: nativeProps } };
+    const off = { ...h.env, OAUTH_PROVIDER: provider(grants) } as typeof h.env;
+    const exec = makeExecutionContext({ label: 'session-context-off' });
+    const res = await app.request('/api/session/context', { headers: { authorization: 'Bearer u:g:s' } }, off, exec.ctx);
+    await exec.settle();
+    expect(res.status).toBe(401);
+    expect((await get(h, grants, 'u:g:s')).status).toBe(200);
+  });
+
   it('answers 401 for an unknown opaque token', async () => {
     h = await createHarness('standalone');
     expect((await get(h, {}, 'u:g:s')).status).toBe(401);
@@ -212,6 +231,7 @@ describe('SaaS tenant isolation guard with a native token', () => {
     probe.get('/api/probe', (c) => c.json({ tenantId: c.get('tenantId') }));
     const env = {
       ...harness.env,
+      NATIVE_CLIENT_ENABLED: 'true',
       OAUTH_PROVIDER: provider({ 'u:g:s': { scope: [NATIVE_SCOPE], props: nativeProps } }),
     } as typeof harness.env;
     const exec = makeExecutionContext({ label: 'saas-guard' });

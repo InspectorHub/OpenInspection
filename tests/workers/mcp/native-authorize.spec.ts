@@ -40,6 +40,8 @@ const env = {
     MCP_ENABLED: 'true',
     NATIVE_CLIENT_ENABLED: 'true',
 } as unknown as Record<string, unknown>;
+/** Same deployment with only MCP opted in: the OAuth provider is mounted, native clients are not. */
+const mcpOnlyEnv = { ...env, NATIVE_CLIENT_ENABLED: undefined } as Record<string, unknown>;
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
 
 /**
@@ -54,10 +56,17 @@ async function appOrConsent(req: Request, e: Record<string, unknown>, c: Executi
         const who = url.searchParams.get('as') ?? USER;
         let redirectTo: string;
         if ((authReq.scope ?? []).includes('native')) {
-            redirectTo = await completeNativeAuthorization({
-                oauth, db: b.DB, authReq, clientName: 'Field App', ctx: undefined,
-                identity: { userId: who, tenantId: TENANT, role: 'inspector' },
-            });
+            try {
+                redirectTo = await completeNativeAuthorization({
+                    env: e as { NATIVE_CLIENT_ENABLED?: string },
+                    oauth, db: b.DB, authReq, clientName: 'Field App', ctx: undefined,
+                    identity: { userId: who, tenantId: TENANT, role: 'inspector' },
+                });
+            } catch (err) {
+                // The consent action lets a refusal Response propagate to the router.
+                if (err instanceof Response) return err;
+                throw err;
+            }
         } else {
             ({ redirectTo } = await oauth.completeAuthorization({
                 request: authReq, userId: who, scope: authReq.scope ?? [], metadata: { clientName: 'MCP' },
@@ -77,8 +86,10 @@ async function appOrConsent(req: Request, e: Record<string, unknown>, c: Executi
     return app.fetch(req, e as never, c);
 }
 
-const handler = () => buildOAuthHandler(appOrConsent as never, env as never);
-const call = (req: Request) => Promise.resolve(handler().fetch(req, env, ctx));
+const callIn = (e: Record<string, unknown>) => (req: Request) =>
+    Promise.resolve(buildOAuthHandler(appOrConsent as never, e as never).fetch(req, e, ctx));
+const call = callIn(env);
+type Call = typeof call;
 
 function b64url(bytes: Uint8Array): string {
     return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -90,8 +101,8 @@ async function pkcePair() {
     return { verifier, challenge: b64url(new Uint8Array(digest)) };
 }
 
-async function registerClient(): Promise<string> {
-    const res = await call(new Request(`${ORIGIN}/oauth/register`, {
+async function registerClient(via: Call = call): Promise<string> {
+    const res = await via(new Request(`${ORIGIN}/oauth/register`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -112,22 +123,27 @@ const token = (form: Record<string, string>) => call(new Request(`${ORIGIN}/oaut
     body: new URLSearchParams(form).toString(),
 }));
 
-/** Authorize with PKCE and exchange the code. Returns the raw token response. */
-async function authorizeAndExchange(clientId: string, scope: string, as = USER) {
+/** Authorize with PKCE; returns the authorize response and the verifier. */
+async function authorize(clientId: string, scope: string, via: Call, as = USER) {
     const { verifier, challenge } = await pkcePair();
     const authUrl = new URL(`${ORIGIN}/oauth/authorize`);
     authUrl.search = new URLSearchParams({
         response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, scope, state: 'st',
         code_challenge: challenge, code_challenge_method: 'S256', as,
     }).toString();
-    const authRes = await call(new Request(authUrl));
+    return { authRes: await via(new Request(authUrl)), verifier };
+}
+
+/** Authorize with PKCE and exchange the code. Returns the raw token response. */
+async function authorizeAndExchange(clientId: string, scope: string, as = USER) {
+    const { authRes, verifier } = await authorize(clientId, scope, call, as);
     expect(authRes.status).toBe(302);
     const code = new URL(authRes.headers.get('Location')!).searchParams.get('code');
     expect(code).toBeTruthy();
     return token({ grant_type: 'authorization_code', code: code!, redirect_uri: REDIRECT, client_id: clientId, code_verifier: verifier });
 }
 
-const sessionContext = (accessToken: string) => call(new Request(`${ORIGIN}/api/session/context`, {
+const sessionContext = (accessToken: string, via: Call = call) => via(new Request(`${ORIGIN}/api/session/context`, {
     headers: { Authorization: `Bearer ${accessToken}` },
 }));
 
@@ -150,6 +166,25 @@ describe('native client OAuth lifecycle (real provider)', () => {
     });
 
     afterEach(() => vi.useRealTimers());
+
+    it('with only MCP enabled, a scope=native authorization is refused and an MCP-scope one still works', async () => {
+        const via = callIn(mcpOnlyEnv);
+        const clientId = await registerClient(via);
+        const refused = await authorize(clientId, 'native', via);
+        expect(refused.authRes.status).toBe(404);
+        expect(new URL(refused.authRes.headers.get('Location') ?? 'http://none.invalid').searchParams.get('code')).toBeNull();
+        // Positive control: the same deployment, same client, MCP scope.
+        const ok = await authorize(clientId, 'read:inspections', via);
+        expect(ok.authRes.status).toBe(302);
+        expect(new URL(ok.authRes.headers.get('Location')!).searchParams.get('code')).toBeTruthy();
+    });
+
+    it('a native-shaped token is refused by /api/* when NATIVE_CLIENT_ENABLED is unset, and works when set', async () => {
+        const clientId = await registerClient();
+        const t = (await (await authorizeAndExchange(clientId, 'native')).json()) as Tokens;
+        expect((await sessionContext(t.access_token)).status).toBe(200);
+        expect((await sessionContext(t.access_token, callIn(mcpOnlyEnv))).status).toBe(401);
+    });
 
     it('issues a 1h access token and a refresh token; the access token reaches /api/*', async () => {
         const clientId = await registerClient();

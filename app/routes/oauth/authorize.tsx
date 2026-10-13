@@ -17,8 +17,9 @@ import { m } from "~/paraglide/messages";
 import { cloudflareContext, getCloudflareEnv } from "~/lib/load-context";
 import { writeAuditLog } from "../../../server/lib/audit";
 import { getDeploymentProfile } from "../../../server/lib/deployment-profile";
+import { nativeClientEnabled } from "../../../server/lib/mcp/flag";
 import type { WorkerEnv } from "../../../workers/env";
-import { completeNativeAuthorization, isNativeAuthRequest } from "../../../server/lib/auth/native-consent";
+import { completeNativeAuthorization, isNativeAuthRequest, isNativeRedirectUri } from "../../../server/lib/auth/native-consent";
 
 export function meta() {
   return [{ title: m.oauth_authorize_meta_title() }];
@@ -26,10 +27,11 @@ export function meta() {
 
 /**
  * Env the shared `WorkerEnv` omits on purpose. OAUTH_PROVIDER: wrapper-injected,
- * never a binding, sole consumer.
+ * never a binding, sole consumer. NATIVE_CLIENT_ENABLED: operator opt-in var.
  */
 interface AuthorizeEnv {
   OAUTH_PROVIDER?: OAuthHelpers;
+  NATIVE_CLIENT_ENABLED?: string;
 }
 
 /** Resolved end-user identity backing an OAuth grant. */
@@ -152,13 +154,20 @@ export async function loader({ request, url, context }: Route.LoaderArgs) {
   const client = await env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
   const clientName = client?.clientName?.trim() || m.oauth_authorize_client_fallback();
 
+  // A native grant equals a full session, so it is only offered where the
+  // operator opted in (404, as when OAuth is not mounted) and only for a
+  // redirect that can reach the user's own device (400).
+  const native = isNativeAuthRequest(authReq.scope);
+  if (native && !nativeClientEnabled(env)) throw new Response("Not Found", { status: 404 });
+  if (native && !isNativeRedirectUri(authReq.redirectUri)) throw new Response("Bad Request", { status: 400 });
+
   return {
     clientName,
     role: identity.role,
     modules: visibleModuleGroups(identity.role),
     canWrite: roleCanWrite(identity.role),
     oauthReqJson: JSON.stringify(authReq),
-    native: isNativeAuthRequest(authReq.scope),
+    native,
   };
 }
 
@@ -203,6 +212,7 @@ export async function action({ request, url, context }: Route.ActionArgs) {
 
   if (isNativeAuthRequest(authReq.scope)) {
     const redirectTo = await completeNativeAuthorization({
+      env,
       oauth: env.OAUTH_PROVIDER,
       db: env.DB,
       authReq,
