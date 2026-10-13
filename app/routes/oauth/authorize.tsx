@@ -268,10 +268,14 @@ export { ConsentForm, type ConsentFormProps } from "~/components/oauth/ConsentFo
 // Imported as well as re-exported: `AuthorizePage` below renders it, and a
 // bare `export ... from` does not bind the name locally.
 import { ConsentForm } from "~/components/oauth/ConsentForm";
+import { NativeConsent } from "~/components/oauth/NativeConsent";
 
 export default function AuthorizePage() {
   const data = useLoaderData<typeof loader>();
   const navigation = useNavigation();
+  if (data.native) {
+    return <NativeConsent appName={data.clientName} oauthReqJson={data.oauthReqJson} submitting={navigation.state === "submitting"} />;
+  }
   return (
     <ConsentForm
       clientName={data.clientName}
