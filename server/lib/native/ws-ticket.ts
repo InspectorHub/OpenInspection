@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import type { HonoConfig } from '../../types/hono';
 import type { Role } from '../auth/roles';
 import { isRole } from '../auth/roles';
+import { currentNativeRole } from '../auth/native-token';
 import { Errors } from '../errors';
 import { nativeClientEnabled } from '../mcp/flag';
 
@@ -82,7 +83,8 @@ export async function consumeWsTicket(kv: KVNamespace, id: string): Promise<WsTi
  * upgrade, not a ticket-eligible path, or no `ticket` parameter), in which case
  * the caller carries on exactly as before. Once a ticket IS presented, every
  * failure is a 401: unknown, expired, already used, issued for another
- * inspection, or native clients switched off.
+ * inspection, user removed or no longer holding a native role, or native clients
+ * switched off.
  */
 export async function applyWsTicketIdentity(c: Context<HonoConfig>): Promise<boolean> {
     const presented = c.req.query('ticket');
@@ -95,8 +97,14 @@ export async function applyWsTicketIdentity(c: Context<HonoConfig>): Promise<boo
     const ticket = await consumeWsTicket(kv, presented);
     if (!ticket || ticket.inspectionId !== inspectionId) throw Errors.Unauthorized('Invalid or expired ticket');
 
+    // The ticket proves who asked, not who they are now: a member removed or
+    // demoted since it was issued must not open a session. Role comes from the row.
+    const role = await currentNativeRole(c.env.DB, ticket.userId, ticket.tenantId);
+    if (!role) throw Errors.Unauthorized('Invalid or expired ticket');
+
     c.set('tenantId', ticket.tenantId);
-    c.set('userRole', ticket.role);
-    c.set('user', { sub: ticket.userId, role: ticket.role, tenantId: ticket.tenantId });
+    c.set('userRole', role);
+    c.set('user', { sub: ticket.userId, role, tenantId: ticket.tenantId });
+    c.set('nativeClient', true);
     return true;
 }

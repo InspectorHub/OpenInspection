@@ -60,7 +60,7 @@ describe('CORS for native app origins (real app)', () => {
       const res = await preflight(origin);
       expect(res.status).toBeLessThan(300);
       expect(res.headers.get('Access-Control-Allow-Origin')).toBe(origin);
-      expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+      expect(res.headers.get('Access-Control-Allow-Credentials')).toBeNull();
       const allowed = csv(res.headers.get('Access-Control-Allow-Headers'));
       for (const name of ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Client-Version', 'X-Client-Platform']) {
         expect(allowed, name).toContain(name.toLowerCase());
@@ -79,6 +79,8 @@ describe('CORS for native app origins (real app)', () => {
       expect(res.headers.get('X-Client-Upgrade')).toBe('required');
       expect(res.headers.get('Access-Control-Allow-Origin')).toBe(origin);
       expect(csv(res.headers.get('Access-Control-Expose-Headers'))).toContain('x-client-upgrade');
+      expect(csv(res.headers.get('Access-Control-Expose-Headers'))).not.toContain('set-cookie');
+      expect(res.headers.get('Access-Control-Allow-Credentials')).toBeNull();
     });
   }
 
@@ -86,6 +88,7 @@ describe('CORS for native app origins (real app)', () => {
     const pre = await preflight(OTHER_ORIGIN);
     expect(pre.status).toBeLessThan(300);
     expect(pre.headers.get('Access-Control-Allow-Origin')).toBe(OTHER_ORIGIN);
+    expect(pre.headers.get('Access-Control-Allow-Credentials')).toBe('true');
     expect(csv(pre.headers.get('Access-Control-Allow-Headers'))).toEqual(['content-type', 'authorization', 'x-csrf-token', 'x-token-relay']);
 
     const res = await send('/api/client/compat?platform=ios', { headers: { Origin: OTHER_ORIGIN } });

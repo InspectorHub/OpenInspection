@@ -29,12 +29,14 @@ const baselineCors = cors({
     exposeHeaders: ['Set-Cookie'],
 });
 
+// The WebView authenticates with a Bearer header, which does not depend on the CORS
+// credentials mode, so these origins get no Allow-Credentials and no Set-Cookie exposure.
 const nativeCors = cors({
     origin: (origin) => (NATIVE_APP_ORIGINS.includes(origin) ? origin : ''),
-    credentials: true,
+    credentials: false,
     allowHeaders: [...API_ALLOW_HEADERS, ...nativeCorsHeaders.allowHeaders],
     allowMethods: API_ALLOW_METHODS,
-    exposeHeaders: ['Set-Cookie', ...nativeCorsHeaders.exposeHeaders],
+    exposeHeaders: [...nativeCorsHeaders.exposeHeaders],
 });
 
 /** CORS for /api/*: the native app origins get the extra headers, every other origin the baseline. */

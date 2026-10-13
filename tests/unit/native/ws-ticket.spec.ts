@@ -8,8 +8,13 @@
  * Every refusal has a positive control (the same ticket, used correctly once).
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { Hono } from 'hono';
 import type { Mock } from 'vitest';
 import { app } from '../../../server/index';
+import { jwtAuthMiddleware } from '../../../server/lib/middleware/jwt-auth';
+import { AppError } from '../../../server/lib/errors';
+import type { HonoConfig } from '../../../server/types/hono';
 import { makeExecutionContext } from '../helpers/exec-ctx';
 import * as schema from '../../../server/lib/db/schema';
 import { createPrimaryReport } from '../../../server/lib/inspection/reports';
@@ -246,5 +251,109 @@ describe('one-time WebSocket tickets (real app)', () => {
     const res = await app.request(`/api/inspections/${MINE}/collab/ws?ticket=${ticket}`, { headers: { Upgrade: 'websocket' } }, off, exec.ctx);
     await exec.settle();
     expect(res.status).toBe(401);
+    // Control: the same ticket works with native clients switched on.
+    const on = makeExecutionContext({ label: 'ws-ticket-on' });
+    const ok = await app.request(`/api/inspections/${MINE}/collab/ws?ticket=${ticket}`, { headers: { Upgrade: 'websocket' } }, t.env, on.ctx);
+    await on.settle();
+    expect(ok.status, await ok.clone().text()).toBe(200);
+  });
+
+  it('a ticket whose user was removed after issue is 401 (control: the same flow while active is 200)', async () => {
+    const t = await setup();
+    const ticket = await t.issued(MINE);
+    const control = await t.issued(MINE);
+    expect((await t.upgrade(`/api/inspections/${MINE}/collab/ws`, control)).status).toBe(200);
+    await h!.db.update(schema.users).set({ deletedAt: new Date() }).where(eq(schema.users.id, INSPECTOR_ID));
+    const res = await t.upgrade(`/api/inspections/${MINE}/collab/ws`, ticket);
+    expect(res.status, await res.clone().text()).toBe(401);
+    expect(t.collab.stubFetch).toHaveBeenCalledTimes(1); // only the control
+  });
+
+  it('a session-cookie (non-native) JWT cannot issue a ticket (control: native bearer can)', async () => {
+    const t = await setup();
+    const { buildKeyring, signJwt } = await import('../../../server/lib/jwt-keyring');
+    const keyring = await buildKeyring(h!.env as unknown as Record<string, string | undefined>);
+    const now = Math.floor(Date.now() / 1000);
+    const jwt = await signJwt({
+      sub: INSPECTOR_ID, role: 'inspector', 'custom:userRole': 'inspector', 'custom:tenantId': TENANT_ID, iat: now, exp: now + 3600,
+    }, keyring);
+    const res = await t.call(`/api/inspections/${MINE}/collab/ticket`, {
+      method: 'POST', headers: { Cookie: `__Host-inspector_token=${jwt}` },
+    });
+    expect([401, 403]).toContain(res.status);
+    expect(t.kv.put.mock.calls.filter((c) => String(c[0]).startsWith('wsticket:'))).toHaveLength(0);
+    expect(typeof (await t.issued(MINE))).toBe('string');
+  });
+
+  describe('identity written by a redeemed ticket (probe app, real middleware)', () => {
+    async function probe(mode: 'standalone' | 'saas', resolvedTenantId?: string) {
+      h = await createHarness(mode);
+      const app2 = new Hono<HonoConfig>();
+      app2.use('*', async (c, next) => {
+        c.set('profile', { mode } as HonoConfig['Variables']['profile']);
+        if (resolvedTenantId) c.set('resolvedTenantId', resolvedTenantId);
+        await next();
+      });
+      app2.use('*', jwtAuthMiddleware);
+      app2.onError((err, c) => (err instanceof AppError ? c.json({ error: err.message }, err.status) : c.text('boom', 500)));
+      app2.get('/api/inspections/:id/collab/ws', (c) => c.json({
+        tenantId: c.get('tenantId'), userRole: c.get('userRole'), user: c.get('user'),
+        nativeClient: c.get('nativeClient'), scoped: !!c.get('sdb'),
+      }));
+      const env = { ...h.env, NATIVE_CLIENT_ENABLED: 'true' } as unknown as typeof h.env;
+      const kv = h.env.TENANT_CACHE as unknown as { put(k: string, v: string): Promise<void> };
+      const open = async (ticket: string) => {
+        const exec = makeExecutionContext({ label: 'ws-ticket-probe' });
+        const res = await app2.request(`/api/inspections/${MINE}/collab/ws?ticket=${ticket}`, { headers: { Upgrade: 'websocket' } }, env, exec.ctx);
+        await exec.settle();
+        return res;
+      };
+      const forge = (id: string, role: string) => kv.put(`wsticket:${id}`, JSON.stringify({
+        tenantId: TENANT_ID, userId: INSPECTOR_ID, role, inspectionId: MINE,
+      }));
+      return { open, forge, db: h.db };
+    }
+
+    it('sets the full native variable set, including nativeClient and the scoped db', async () => {
+      const t = await probe('standalone');
+      await t.forge('full', 'inspector');
+      const res = await t.open('full');
+      expect(res.status, await res.clone().text()).toBe(200);
+      expect(await res.json()).toEqual({
+        tenantId: TENANT_ID, userRole: 'inspector',
+        user: { sub: INSPECTOR_ID, role: 'inspector', tenantId: TENANT_ID },
+        nativeClient: true, scoped: true,
+      });
+    });
+
+    it('takes the role from the user row now, not the ticket (control: unchanged row keeps its role)', async () => {
+      const t = await probe('standalone');
+      await t.db.update(schema.users).set({ role: 'manager' }).where(eq(schema.users.id, INSPECTOR_ID));
+      await t.forge('same', 'manager');
+      const same = await (await t.open('same')).json() as { userRole: string };
+      expect(same.userRole).toBe('manager');
+      await t.db.update(schema.users).set({ role: 'inspector' }).where(eq(schema.users.id, INSPECTOR_ID));
+      await t.forge('stale', 'manager');
+      const stale = await (await t.open('stale')).json() as { userRole: string; user: { role: string } };
+      expect(stale.userRole).toBe('inspector');
+      expect(stale.user.role).toBe('inspector');
+    });
+
+    it('a row whose role is not a native role is 401', async () => {
+      const t = await probe('standalone');
+      await t.db.update(schema.users).set({ role: 'agent' }).where(eq(schema.users.id, INSPECTOR_ID));
+      await t.forge('agent', 'inspector');
+      expect((await t.open('agent')).status).toBe(401);
+    });
+
+    it('SaaS: a ticket tenant that differs from the resolved tenant is 403 (control: equal is 200)', async () => {
+      const bad = await probe('saas', OTHER_TENANT_ID);
+      await bad.forge('x', 'inspector');
+      expect((await bad.open('x')).status).toBe(403);
+      h?.close();
+      const good = await probe('saas', TENANT_ID);
+      await good.forge('y', 'inspector');
+      expect((await good.open('y')).status).toBe(200);
+    });
   });
 });

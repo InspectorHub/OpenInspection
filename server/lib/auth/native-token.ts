@@ -58,6 +58,21 @@ export function looksLikeOpaqueOAuthToken(token: string): boolean {
 }
 
 /**
+ * The user's CURRENT role if they are still an active member of the tenant and
+ * hold a role a native client may act with, else null. Shared by every native
+ * entry (bearer token, WebSocket ticket) so none trusts a role captured earlier.
+ */
+export async function currentNativeRole(db: D1Database, userId: string, tenantId: string): Promise<NativeRole | null> {
+  const row = await drizzle(db)
+    .select({ role: users.role })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.tenantId, tenantId), isNull(users.deletedAt)))
+    .get();
+  if (!row || !isNativeRole(row.role)) return null;
+  return row.role;
+}
+
+/**
  * Resolve a native client's access token to an identity, or null.
  *
  * Three conditions, all required: the provider knows the token and it has not
@@ -77,13 +92,9 @@ export async function resolveNativeToken(env: NativeTokenEnv, token: string): Pr
   if (!summary.grant.scope.includes(NATIVE_SCOPE) || !summary.scope.includes(NATIVE_SCOPE)) return null;
   const props = summary.grant.props;
   if (!isNativeProps(props)) return null;
-  const row = await drizzle(env.DB)
-    .select({ id: users.id, role: users.role })
-    .from(users)
-    .where(and(eq(users.id, props.userId), eq(users.tenantId, props.tenantId), isNull(users.deletedAt)))
-    .get();
-  if (!row || !isNativeRole(row.role)) return null;
-  return { ...props, role: row.role };
+  const role = await currentNativeRole(env.DB, props.userId, props.tenantId);
+  if (!role) return null;
+  return { ...props, role };
 }
 
 const ACCESS_TOKEN_TTL_S = 3600;
