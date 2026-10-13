@@ -20,7 +20,6 @@ import {
     MovePhotoSchema,
 } from '../../lib/validations/inspection.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
-
 /**
  * Photo Upload
  *

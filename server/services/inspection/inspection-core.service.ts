@@ -2,8 +2,10 @@ import { eq, and, inArray } from 'drizzle-orm';
 import { inspections, inspectionResults, templates, tenantConfigs, agreementRequests, contactRoleProfiles } from '../../lib/db/schema';
 import { resolveAgentRepairAccess, type AgentRepairAccess } from '../../lib/people/agent-repair-access';
 import { contacts } from '../../lib/db/schema/contact';
+import { softUpsertClientContact } from './create-client-contact';
+import { isUniqueViolation } from '../../lib/db/unique-violation';
 import { PeopleService } from '../people.service';
-import { Errors } from '../../lib/errors';
+import { AppError, ErrorCode, Errors } from '../../lib/errors';
 import { safeISODate } from '../../lib/date';
 import { logger } from '../../lib/logger';
 import { createPrimaryReport } from '../../lib/inspection/reports';
@@ -190,12 +192,18 @@ export class InspectionCoreService extends InspectionSubService {
         };
     }
 
+    /** The caller's own inspection with this id, or null: another tenant's id reads as absent. */
+    async findInspectionById(tenantId: string, id: string): Promise<Inspection | null> {
+        if (!this.sdb) throw new Error('ScopedDB session missing');
+        return (await this.sdb.getById(inspections, id)) ? (await this.getInspection(id, tenantId)).inspection : null;
+    }
+
     /**
      * Creates a new inspection.
      */
     async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string }): Promise<Inspection> {
         if (!this.sdb) throw new Error('ScopedDB session missing');
-        const id = crypto.randomUUID();
+        const id = data.id ?? crypto.randomUUID();
         const createdAt = new Date();
         const status = INSPECTION_STATUS.REQUESTED;
         const date = data.date || createdAt.toISOString();
@@ -310,7 +318,14 @@ export class InspectionCoreService extends InspectionSubService {
         // inspection — a failed validation (e.g. a bad contact reference)
         // must never burn a free tenant's lifetime slot.
         await this.planQuota?.consumeInspection(tenantId);
-        await this.sdb.insert(inspections, newInspection);
+        try { await this.sdb.insert(inspections, newInspection); } catch (err) {
+            // Only a client-chosen id can collide. The caller's own tenant is read first,
+            // so another tenant's row is never touched: absent here means someone else holds it.
+            if (!data.id || !isUniqueViolation(err, 'inspections.id')) throw err;
+            const own = await this.findInspectionById(tenantId, id);
+            if (own) return own;
+            throw new AppError(409, ErrorCode.ID_CONFLICT, 'That inspection id is already in use.');
+        }
         // Before the results row, because that row has to NAME it: a NULL
         // `report_id` is accepted silently and reads match a sibling document
         // or none. See `lib/inspection/reports.ts`.
@@ -341,39 +356,12 @@ export class InspectionCoreService extends InspectionSubService {
         }
         await fireAutomation(this.db, tenantId, id, 'inspection.created');
 
-        // Soft-upsert the client into Contacts so it shows up in the Contacts list
-        // for future re-use (search, agent linking). Idempotent on tenantId+email
-        // (or tenantId+name if no email). Failures are non-fatal — inspection
-        // creation must not break because of a contact-side issue. Captures the
-        // resolved/created contact id for the inspection_people write below.
-        let resolvedClientContactId: string | null = clientContactIdInput;
-        if (clientNameInput !== 'Private Client') {
-            try {
-                const matchConds = [eq(contacts.tenantId, tenantId), eq(contacts.type, 'client')];
-                if (clientEmailInput) matchConds.push(eq(contacts.email, clientEmailInput));
-                else matchConds.push(eq(contacts.name, clientNameInput));
-                const existing = await db.select().from(contacts).where(and(...matchConds)).get();
-                if (existing) {
-                    resolvedClientContactId = resolvedClientContactId ?? existing.id;
-                } else {
-                    const newContactId = crypto.randomUUID();
-                    await db.insert(contacts).values({
-                        id: newContactId,
-                        tenantId,
-                        type: 'client',
-                        name: clientNameInput,
-                        email: clientEmailInput,
-                        phone: clientPhoneInput,
-                        agency: null,
-                        notes: null,
-                        createdAt: createdAt,
-                    });
-                    resolvedClientContactId = resolvedClientContactId ?? newContactId;
-                }
-            } catch (err) {
-                logger.error('contact upsert from inspection failed', { inspectionId: id }, err instanceof Error ? err : undefined);
-            }
-        }
+        // Soft-upsert the client into Contacts (non-fatal; see the helper); the
+        // resolved id feeds the inspection_people write below.
+        const resolvedClientContactId = clientNameInput === 'Private Client'
+            ? clientContactIdInput
+            : await softUpsertClientContact(db, tenantId,
+                { name: clientNameInput, email: clientEmailInput, phone: clientPhoneInput, createdAt }, clientContactIdInput, id);
 
         // Task 7 (people-role-profiles) — mirror the primary client, buyer's
         // agent, and listing agent into the inspection_people join table.

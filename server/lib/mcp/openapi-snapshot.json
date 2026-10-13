@@ -2113,6 +2113,36 @@
     "description": "Auto-generated placeholder for createInspectionItemsPhotosAnnotation (POST /{id}/items/{itemId}/photos/{photoIndex}/annotation, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "createInspectionPhotoUploadUrl",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/media/upload-url",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection the photo belongs to",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection the photo belongs to"
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/PhotoUploadUrlRequest"
+      }
+    },
+    "summary": "Mint a signed photo upload URL",
+    "description": "Mint a signed, 24-hour photo upload URL for a native client. The URL needs no Authorization header, so a background upload survives an expired access token. The same pendingId always maps to the same storage key."
+  },
+  {
     "operationId": "createInspectionRequest",
     "method": "POST",
     "pathTemplate": "/api/inspection-requests",

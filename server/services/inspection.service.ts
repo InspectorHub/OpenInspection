@@ -102,25 +102,25 @@ export class InspectionService {
     }
 
     /**
-     * Fetches a single inspection with its template.
-     */
-    /**
-     * Design System 0520 subsystem E P1.2 — Publish pre-flight gates.
-     *
-     * Loads the inspection + parsed inspection_results.data and
-     * delegates to the pure aggregator in server/lib/preflight.ts.
+     * Design System 0520 subsystem E P1.2 — Publish pre-flight gates: loads the
+     * inspection + parsed inspection_results.data and delegates to the pure
+     * aggregator in server/lib/preflight.ts.
      */
     async computePreflight(inspectionId: string, tenantId: string) {
         return this.core.computePreflight(inspectionId, tenantId);
     }
 
+    /** Fetches a single inspection with its template. */
     async getInspection(id: string, tenantId: string) {
         return this.core.getInspection(id, tenantId);
     }
 
-    /**
-     * Creates a new inspection.
-     */
+    /** The caller's own inspection with this id, or null (a replayed create). */
+    async findInspectionById(tenantId: string, id: string): Promise<Inspection | null> {
+        return this.core.findInspectionById(tenantId, id);
+    }
+
+    /** Creates a new inspection. */
     async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string }): Promise<Inspection> {
         return this.core.createInspection(tenantId, data);
     }

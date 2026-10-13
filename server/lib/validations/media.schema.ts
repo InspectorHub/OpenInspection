@@ -68,3 +68,21 @@ export const SetPosterSchema = z.object({
     posterPct: z.number().min(0).max(1)
         .describe('Poster timestamp as a fraction of duration (0..1)'),
 }).openapi('SetPoster');
+
+// ── Signed photo upload URLs (background uploads from a native client) ───────
+// The client mints the media id itself (`pendingId`), so a retry or a replay
+// after a long offline period addresses the same object and overwrites it
+// rather than adding a second one.
+
+export const PhotoUploadUrlRequestSchema = z.object({
+    pendingId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, 'Use 1-64 letters, digits, hyphens or underscores')
+        .describe('Client-generated media id; repeating the request with the same id yields the same storage key'),
+    contentType: z.enum(['image/jpeg', 'image/png', 'image/heic'])
+        .describe('Content type of the photo that will be uploaded to the returned URL'),
+}).openapi('PhotoUploadUrlRequest');
+
+export const PhotoUploadUrlResponseSchema = z.object({
+    url: z.string().describe('Relative upload URL carrying a signed token; POST the photo as multipart field "file" to it'),
+    key: z.string().describe('Storage key the photo will be written to'),
+    expiresAt: z.number().int().describe('Token expiry as epoch milliseconds'),
+}).openapi('PhotoUploadUrlResponse');

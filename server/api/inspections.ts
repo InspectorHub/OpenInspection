@@ -27,6 +27,7 @@ import hierarchyRoutes from './inspections/hierarchy';
 import bulkRoutes from './inspections/bulk';
 import scheduleRoutes from './inspections/schedule';
 import mediaRoutes from './inspections/media';
+import mediaUploadUrlRoutes from './inspections/media-upload-url';
 import mediaStudioRoutes from './inspections/media-studio';
 import publishRoutes from './inspections/publish';
 import reportGateRoutes from './inspections/report-gate';
@@ -63,6 +64,7 @@ export const inspectionsRoutes = createApiRouter()
     .route('/', coreRoutes)
     .route('/', resultsRoutes)
     .route('/', mediaRoutes)
+    .route('/', mediaUploadUrlRoutes)
     .route('/', mediaStudioRoutes)
     .route('/', publishRoutes)
     .route('/', reportGateRoutes)

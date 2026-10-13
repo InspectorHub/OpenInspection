@@ -102,6 +102,7 @@ import publicSlugRoutes from './api/public-slug';
 import unsubscribeRoutes from './api/unsubscribe';
 import publicShareRoutes from './api/public-share';
 import publicReportRoutes from './api/public-report';
+import { publicUploadsRoutes } from './api/public/uploads';
 import clientDocumentsRoutes, { inspectorDocumentsRoutes } from './api/client-documents';
 import profileRoutes from './api/profile';
 import conciergeRoutes from './api/concierge';
@@ -381,6 +382,8 @@ const routes = app
   // Signed email unsubscribe. MUST stay under /api/public — that prefix is what
   // keeps it outside the agent-terms gate; see server/api/unsubscribe.ts.
   .route('/api/public', unsubscribeRoutes)
+  // Native background uploads: authorized by the signed token in the query string, not a session.
+  .route('/api/public', publicUploadsRoutes)
   // Unified client portal — magic-link request/redeem + session-gated data routes.
   // The :tenant slug lives inside the route definitions (tenantRouter resolves it).
   .route('/api/portal', portalRoutes)

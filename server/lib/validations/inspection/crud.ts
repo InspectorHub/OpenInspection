@@ -47,6 +47,9 @@ export const InspectionListQuerySchema = z.object({
  * Validation schema for creating a new inspection.
  */
 export const CreateInspectionSchema = z.object({
+    id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, 'Use 1-64 letters, digits, hyphens or underscores').optional()
+        .openapi({ example: '550e8400-e29b-41d4-a716-446655440000' })
+        .describe('Client-generated identifier (opaque, safe characters only); repeating a create with the same id returns the existing inspection'),
     propertyAddress: z.string().min(5, 'Property address is too short').openapi({ example: '123 Main St, Anytown' }).describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
     clientName: z.string().min(1, 'Client name is required').default('Private Client').openapi({ example: 'John Doe' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
     // iter-1 production bug #1 — the dashboard's New Inspection modal posts

@@ -14,7 +14,7 @@ import { Errors } from '../../lib/errors';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 import { getInspectionRoster } from '../../lib/inspection/roster';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
-import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema, PatchInspectionResponseSchema } from '../../lib/validations/inspection.schema';
+import { InspectionSchema, UpdateInspectionSchema, PatchInspectionResponseSchema } from '../../lib/validations/inspection.schema';
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
 import { inspections as inspectionTable, inspectionResults } from '../../lib/db/schema';
 import { datePatchValues } from '../../services/inspection/reschedule-date';
@@ -33,6 +33,7 @@ import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/ema
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import { getDrizzle } from '../../lib/route-helpers';
 import { patchRevisionReport } from './patch-revision-report';
+import { createInspectionRoute } from './core-create-route';
 
 /**
  * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
@@ -174,40 +175,6 @@ const updateInspectionRoute = createRoute(withMcpMetadata({
         400: { description: 'A refused patch: a dangling soft reference (DB-16); status:cancelled, which only POST /{id}/cancel may write (#78); or any status change on an already-cancelled inspection, which only POST /{id}/uncancel may make (#81)' },
     },
     operationId: "patchInspection"
-}, { scopes: ['write'], tier: 'primary' }));
-
-/**
- * POST /api/inspections
- */
-const createInspectionRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/',
-    tags: ["inspections"],
-    summary: "Create inspection for current tenant",
-    description: "Initialize a new inspection for a property. (POST /, inspections domain).",
-    request: {
-        body: {
-            content: {
-                'application/json': {
-                    schema: CreateInspectionSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
-                },
-            },
-        },
-    },
-    middleware: [requireRole('owner', 'manager', 'inspector')],
-    responses: {
-        201: {
-            content: {
-                'application/json': {
-                    schema: createApiResponseSchema(z.object({
-                        inspection: InspectionSchema.describe('TODO describe inspection field for the OpenInspection MCP integration'),
-                    })),
-                },
-            },
-            description: 'Created',
-        },
-    },
-    operationId: "createInspection"
 }, { scopes: ['write'], tier: 'primary' }));
 
 /**
@@ -371,6 +338,14 @@ const coreRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const service = c.var.services.inspection;
         const contactService = c.var.services.contact;
+
+        // A replay of a create that named its own id (an offline device coming
+        // back after the Idempotency-Key window): answer with the inspection
+        // that already exists and run none of the create's side effects again.
+        if (body.id) {
+            const existing = await service.findInspectionById(tenantId, body.id);
+            if (existing) return c.json({ success: true, data: { inspection: existing } }, 200);
+        }
 
         const civilDate = String(body.date ?? '').slice(0, 10);
         if (/^\d{4}-\d{2}-\d{2}$/.test(civilDate)) {

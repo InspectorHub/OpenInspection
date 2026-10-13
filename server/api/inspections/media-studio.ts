@@ -348,7 +348,7 @@ const mediaStudioRoutes = createApiRouter()
         const { backend, provider } = await resolveVideoBackend(c);
         let out: { uploadURL: string; ref: { provider: 'stream'; streamUid: string } | { provider: 'r2'; mediaId: string; r2Key: string } };
         try {
-            out = await backend.createUpload(id);
+            out = await backend.createUpload(id, { native: c.get('nativeClient') === true });
         } catch (err) {
             // Cloudflare Stream rejects the direct-upload mint when the account has
             // no allocated minutes / Stream isn't provisioned (QuotaReachedError),

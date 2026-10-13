@@ -65,6 +65,8 @@ describe('NEVER_BLOCK_PATHS', () => {
     expect(blocked('/api/inspections/abc/media/video/finalize')).toBe(false);
     expect(blocked('/api/inspections/abc/media/video/r2-upload')).toBe(false);
     expect(blocked('/api/inspections/abc/media/video/r2-upload-poster')).toBe(false);
+    expect(blocked('/api/public/uploads/photo')).toBe(false);
+    expect(blocked('/api/public/uploads/video')).toBe(false);
   });
   it('still blocks neighbouring paths that are not part of capture or sync', () => {
     expect(blocked('/api/inspections/abc/media/video')).toBe(true);

@@ -27,8 +27,14 @@ export interface VideoDetails {
  * fails closed on any mismatch.
  */
 export interface VideoBackend {
-    /** Mint a one-shot upload URL and return a VideoRef identifying the pending video. */
-    createUpload(inspectionId: string): Promise<{ uploadURL: string; ref: VideoRef }>;
+    /**
+     * Mint a one-shot upload URL and return a VideoRef identifying the pending video.
+     * `native` marks a request from a native client, whose upload may start long
+     * after it was queued: a backend that signs its own URL lengthens the token's
+     * lifetime and points it at the token-only route. Backends that hand out a
+     * provider URL ignore it.
+     */
+    createUpload(inspectionId: string, opts?: { native?: boolean }): Promise<{ uploadURL: string; ref: VideoRef }>;
 
     /**
      * Finalize an upload: insert (or idempotently update) the inspection_media_pool

@@ -68,6 +68,10 @@ export enum ErrorCode {
     // a route that is not sync, upload or import. 426 rather than 400/403: the
     // request is fine, the client binary is what must change.
     CLIENT_UPGRADE_REQUIRED = 'CLIENT_UPGRADE_REQUIRED',
+    // A create named an id that already belongs to a record this caller cannot
+    // see. Distinct from CONFLICT so a client that mints its own ids can tell
+    // "pick another id" from every other 409.
+    ID_CONFLICT = 'ID_CONFLICT',
 }
 
 /**
