@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useEffect, useState } from "react";
 import { useFetcher } from "react-router";
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 import { isDedicatedFactKey } from "~/lib/property-facts-keys";
 import { m } from "~/paraglide/messages";
 
@@ -187,9 +187,14 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
     // are intentionally read fresh at fire time (RR fetcher-effect convention).
   }, [autofillFetcher.state, autofillFetcher.data]);
 
+  // Each lookup is a billed public-records call, so a same-frame repeat must not issue a second one;
+  // pendingProps only goes inert after the render.
+  const autofillLatch = useActionLatch(autofilling);
   function runAutofill() {
-    setAutofillMsg(null);
-    autofillFetcher.submit({ intent: "autofill-property-facts", addressString }, { method: "post" });
+    autofillLatch(() => {
+      setAutofillMsg(null);
+      autofillFetcher.submit({ intent: "autofill-property-facts", addressString }, { method: "post" });
+    });
   }
 
   return (

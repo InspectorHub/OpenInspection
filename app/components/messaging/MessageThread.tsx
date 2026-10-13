@@ -23,7 +23,7 @@
  *   through a BFF resource route. This component cannot tell, and must not.
  */
 import { useEffect, useRef, useState } from "react";
-import { Button, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button, pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { bucketMessages, dayKeyInZone, dayLabel, type MessageRow } from "~/lib/communication-view";
@@ -92,7 +92,15 @@ export function MessageThread({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
-  async function handleSend() {
+  // `sending` only reads true after a render, so two clicks in one frame would both pass the
+  // check in sendNow and post the message twice.
+  const sendLatch = useActionLatch(sending);
+
+  function handleSend() {
+    sendLatch(() => { void sendNow(); });
+  }
+
+  async function sendNow() {
     const body = composeBody.trim();
     if (!body || sending) return;
     setSending(true);

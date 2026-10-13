@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Button } from "@core/shared-ui";
+import { Button, useActionLatch } from "@core/shared-ui";
 import { formatDollars } from "~/lib/money";
 import { MoneyInput } from "~/components/MoneyInput";
 import { CostExportButtons } from "~/components/CostExportButtons";
@@ -73,6 +73,7 @@ async function submitCostItem(
     fd.set("sortOrder", String(item.sortOrder ?? 0));
   }
   try {
+    // busy-controls-allow: update sets absolute column values and delete removes by id with no error on a missing row (CostItemService.update/remove), so a repeat is harmless
     const res = await fetch("/resources/cost-items", { method: "POST", credentials: "include", body: fd });
     if (!res.ok) return { success: false };
     return (await res.json()) as { success: boolean; id?: string };
@@ -122,6 +123,9 @@ export function CostItemsPanel({
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, id: result.id! } : r)));
     }
   }
+
+  // Two clicks in one frame would add two draft rows (and start two creates) before anything re-renders.
+  const addLatch = useActionLatch(false);
 
   function addRow() {
     const draft = blankRow(rows.length);
@@ -173,7 +177,7 @@ export function CostItemsPanel({
           {/* Export the current Opinion of Cost — only worth offering once at
               least one line exists (empty exports are just a header row). */}
           {rows.length > 0 && <CostExportButtons inspectionId={inspectionId} variant="panel" />}
-          <Button variant="link" size="sm" onClick={addRow}>
+          <Button variant="link" size="sm" onClick={() => addLatch(addRow)}>
             {m.editor_cost_add_item()}
           </Button>
         </div>

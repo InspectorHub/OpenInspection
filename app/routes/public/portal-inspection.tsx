@@ -21,7 +21,8 @@
  *     call, since the typed client does not auto-forward the browser cookie.
  */
 import { redirect, useLoaderData, useRevalidator, useSearchParams } from "react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useActionLatch } from "@core/shared-ui";
 import type { Route } from "./+types/portal-inspection";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
@@ -326,6 +327,10 @@ export default function PortalInspection() {
   const [docUploading, setDocUploading] = useState(false);
   const [docError, setDocError] = useState<string | null>(null);
   const tokenSuffix = token ? `?token=${encodeURIComponent(token)}` : "";
+  // Same-frame guards: `docUploading` only lands after a render, so two drops in one frame would store the file
+  // twice; and a second delete of the same document answers 404, which would show a false "delete failed".
+  const uploadLatch = useActionLatch(docUploading);
+  const deleteInFlight = useRef(new Set<string>());
 
   const onUpload = async (
     file: File,
@@ -365,6 +370,8 @@ export default function PortalInspection() {
   };
 
   const onDelete = async (docId: string) => {
+    if (deleteInFlight.current.has(docId)) return;
+    deleteInFlight.current.add(docId);
     setDocError(null);
     try {
       const res = await fetch(
@@ -378,6 +385,8 @@ export default function PortalInspection() {
       revalidator.revalidate();
     } catch {
       setDocError(m.portal_inspection_doc_delete_error());
+    } finally {
+      deleteInFlight.current.delete(docId);
     }
   };
 
@@ -399,7 +408,7 @@ export default function PortalInspection() {
       agentReport={agentReport}
       docUploading={docUploading}
       docError={docError}
-      onUpload={onUpload}
+      onUpload={(file, opts) => uploadLatch(() => { void onUpload(file, opts); })}
       onDelete={onDelete}
       notifications={notifications}
     />

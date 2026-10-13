@@ -15,6 +15,7 @@ import { importEntryHref } from "~/lib/import-entry-points";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table, Banner, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 import { isAdminRole } from "~/lib/access";
 import { ROLE_TONES, expiryLabel, lastActiveLabel, type Member, type LoaderActiveUser, type LoaderInvite } from "./team.shapes";
@@ -120,6 +121,7 @@ export default function TeamPage() {
   const { submit: submitResetTwoFactor, busy: resetTwoFactorBusy } = useGuardedSubmit<{ ok?: boolean }>();
   const [pendingReset, setPendingReset] = useState<ResetTwoFactorTarget | null>(null);
   const resendFetcher = useFetcher<{ ok?: boolean; resent?: boolean }>();
+  const resendLatch = useSubmitLatch(resendFetcher.state);
   const [pendingCancel, setPendingCancel] = useState<{ token: string; email: string } | null>(null);
 
   // Which pending invite's link is on screen. The dialog itself is
@@ -275,7 +277,7 @@ export default function TeamPage() {
                               {m.settings_team_invite_link_action()}
                             </button>
                           )}
-                          <resendFetcher.Form method="post" className="inline">
+                          <resendFetcher.Form method="post" className="inline" onSubmit={resendLatch()}>
                             <input type="hidden" name="intent" value="resend-invite" />
                             <input type="hidden" name="token" value={member.token} />
                             <button type="submit" {...pendingProps(resendFetcher.state !== "idle")} className={`text-[12px] font-medium text-ih-primary-text hover:underline ${PENDING_CLASS}`}>

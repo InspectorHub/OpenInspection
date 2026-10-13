@@ -90,8 +90,8 @@ describe('busy-controls detector', () => {
     describe('a bare <button> inside a form defaults to submit', () => {
         it('flags a <button> with no type inside <form>, <Form> and fetcher.Form', () => {
             expect(rules('<form><button>Save</button></form>')).toEqual(['submit-unprotected']);
-            expect(rules('const l = useSubmitLatch(go); <Form method="post"><div><button>Save</button></div></Form>')).toEqual(['submit-unprotected']);
-            expect(rules('const l = useSubmitLatch(go); <fetcher.Form method="post"><button>Save</button></fetcher.Form>')).toEqual(['submit-unprotected']);
+            expect(rules('<Form method="post" onSubmit={latch()}><div><button>Save</button></div></Form>')).toEqual(['submit-unprotected']);
+            expect(rules('<fetcher.Form method="post" onSubmit={latch()}><button>Save</button></fetcher.Form>')).toEqual(['submit-unprotected']);
         });
         it('does not flag it when protected, typed as button, outside the form, or a shared-ui <Button>', () => {
             expect(rules('<form><button disabled={!ok}>Save</button></form>')).toEqual([]);
@@ -162,7 +162,7 @@ describe('busy-controls detector', () => {
         });
     });
 
-    describe('form-without-latch (file-level, coarse by design)', () => {
+    describe('form-without-latch (per form: the guard must be reachable from that form)', () => {
         const nl = String.fromCharCode(10);
         it.each([
             ['fetcher.Form', '<fetcher.Form method="post"><input /></fetcher.Form>'],
@@ -170,24 +170,37 @@ describe('busy-controls detector', () => {
             ['<Form method="post">', '<Form method="post"><input /></Form>'],
             ['<form onSubmit>', '<form onSubmit={go}><input /></form>'],
             ['a dynamic method', '<Form method={m}><input /></Form>'],
-        ])('flags %s in a file with no same-frame protection', (_n, src) => {
+        ])('flags %s with no guard reachable', (_n, src) => {
             expect(rules(src)).toEqual(['form-without-latch']);
         });
-        it.each(['useSubmitLatch', 'useActionLatch', 'useGuardedSubmit', 'latch(', 'inFlight', 'gatedSubmit', 'guardedSubmit', 'busyRef'])(
-            'is clean when the file names %s',
-            (id) => {
-                expect(rules(`const g = ${id}${id.endsWith('(') ? ')' : ''};${nl}<Form method="post"><input /></Form>`)).toEqual([]);
-            },
-        );
+        it('is clean when the form tag itself calls a guard', () => {
+            expect(rules('<Form method="post" onSubmit={latch()}><input /></Form>')).toEqual([]);
+            expect(rules('<form onSubmit={(e) => { if (saveInFlight.current) e.preventDefault(); }}><input /></form>')).toEqual([]);
+            expect(rules('<form onSubmit={latchSubmit(go)}><input /></form>')).toEqual([]);
+        });
+        it('is clean when the named handler reaches a guard, directly or through one more function', () => {
+            expect(rules('function onSubmit(e) { e.preventDefault(); latch(confirm); }' + nl + '<form onSubmit={onSubmit}><input /></form>')).toEqual([]);
+            expect(rules('const { submit } = useGuardedSubmit();' + nl + 'function save() { submit(x); }' + nl + '<form onSubmit={save}><input /></form>')).toEqual([]);
+            expect(rules('const h = useSubmitLatch(s);' + nl + 'const go = h();' + nl + '<form onSubmit={go}><input /></form>')).toEqual([]);
+        });
+        it('FLAGS a file that names a guard but does not wire it to this form (the old coarse pass)', () => {
+            expect(rules('const l = useSubmitLatch(go);' + nl + '<Form method="post"><input /></Form>')).toEqual(['form-without-latch']);
+            expect(rules('const l = useSubmitLatch(go);' + nl + '<form onSubmit={go}><input /></form>')).toEqual(['form-without-latch']);
+        });
+        it('two forms, one latch: the wired one is clean and the unwired one is flagged', () => {
+            const v = run('const l = useSubmitLatch(s);' + nl + '<Form method="post" onSubmit={l()}><input /></Form>' + nl + '<fetcher.Form method="post" />').violations;
+            expect(v.map((x) => x.line)).toEqual([3]);
+        });
         it('does not flag a GET form or a form with neither method nor onSubmit', () => {
             expect(rules('<Form method="get"><input /></Form>')).toEqual([]);
             expect(rules("<form method={'GET'}><input /></form>")).toEqual([]);
             expect(rules('<Form action="/x"><input /></Form>')).toEqual([]);
         });
-        it('still flags when the protection is named only in a comment or a string', () => {
+        it('still flags when the guard is named only in a comment or a string', () => {
             expect(rules('// useSubmitLatch lives in the parent' + nl + '<Form method="post" />')).toEqual(['form-without-latch']);
             expect(rules('/* latch( */ <form onSubmit={go} />')).toEqual(['form-without-latch']);
-            expect(rules('const s = "useActionLatch inFlight";' + nl + '<Form method="post" />')).toEqual(['form-without-latch']);
+            expect(rules('const s = "useActionLatch inFlight";' + nl + '<form onSubmit={s}><input /></form>')).toEqual(['form-without-latch']);
+            expect(rules('function go() { const s = "latch()"; }' + nl + '<form onSubmit={go} />')).toEqual(['form-without-latch']);
         });
         it('honours the allow marker with a reason, not an empty one', () => {
             expect(rules('{/* busy-controls-allow: idempotent upload */}' + nl + '<Form method="post" />')).toEqual([]);
@@ -197,8 +210,53 @@ describe('busy-controls detector', () => {
             const v = run('const a = 1;' + nl + '<Form method="post"/>' + nl + '<form onSubmit={go}/>').violations;
             expect(v.map((x) => x.line)).toEqual([2, 3]);
         });
-        it('documented coarse bound: two forms and one protection identifier in the file is clean', () => {
-            expect(rules('const l = useSubmitLatch(go);' + nl + '<Form method="post"><input /></Form><fetcher.Form method="post" />')).toEqual([]);
+    });
+
+    describe('raw-submit-unlatched (a fetcher.submit with no form to latch)', () => {
+        const nl = String.fromCharCode(10);
+        it('flags a handler that calls fetcher.submit with no guard reachable', () => {
+            expect(rules('function send() { emailFetcher.submit(fd, { method: "post" }); }')).toEqual(['raw-submit-unlatched']);
+            expect(rules('const send = () => { saveFetcher.submit(fd, { method: "put" }); };')).toEqual(['raw-submit-unlatched']);
+            expect(rules('<Button onClick={() => coverFetcher.submit(fd, { method: "delete" })} />')).toEqual(['raw-submit-unlatched']);
+        });
+        it('is clean when the calling function reaches a guard', () => {
+            expect(rules('function send() { latch(() => emailFetcher.submit(fd, { method: "post" })); }')).toEqual([]);
+            expect(rules('const send = () => { if (inFlight.current) return; inFlight.current = true; emailFetcher.submit(fd, { method: "post" }); };')).toEqual([]);
+            expect(rules('function C() { const saveLatch = useActionLatch(b); const send = () => saveLatch(() => saveFetcher.submit(fd, { method: "post" })); return null; }')).toEqual([]);
+        });
+        it('is clean when the function is handed to a guard by name, even though the guard is called elsewhere', () => {
+            expect(rules('function C() { const emailLatch = useActionLatch(b); const sendEmail = () => { emailFetcher.submit(fd, { method: "post" }); }; return <B onClick={() => emailLatch(sendEmail)} />; }')).toEqual([]);
+            expect(rules('function C() { const sendEmail = () => { emailFetcher.submit(fd, { method: "post" }); }; return <B onClick={sendEmail} />; }')).toEqual(['raw-submit-unlatched']);
+        });
+        it('does not let a guard elsewhere in the same COMPONENT cover a handler', () => {
+            expect(rules(['function C({ a }: P) {', '  const l = useActionLatch(b);', '  const other = () => l(x);', '  const send = () => {', '    saveFetcher.submit(fd, { method: "post" });', '  };', '  return null;', '}'].join(String.fromCharCode(10)))).toEqual(['raw-submit-unlatched']);
+        });
+        it('does not mistake the guarded hook\'s plain submit( for a raw fetcher call', () => {
+            expect(rules('const { submit } = useGuardedSubmit();' + nl + 'function go() { submit(fd); }')).toEqual([]);
+        });
+        it('flags a bare fetch( that writes, and not one that reads', () => {
+            expect(rules('async function go() { await fetch("/x", { method: "POST", body }); }')).toEqual(['raw-submit-unlatched']);
+            expect(rules('async function go() { await fetch("/x"); }')).toEqual([]);
+            expect(rules('async function go() { await fetch("/x", { method: "GET" }); }')).toEqual([]);
+            expect(rules('async function go() { await latch(() => fetch("/x", { method: "post" })); }')).toEqual([]);
+        });
+        it('an allow marker above the STATEMENT covers a call that is not the first token of it', () => {
+            const src = ['async function go() {', '  // busy-controls-allow: a repeat deletes nothing the second time', '  const res = await fetch("/x", { method: "DELETE" });', '}'].join(String.fromCharCode(10));
+            expect(rules(src)).toEqual([]);
+            expect(rules(src.replace('busy-controls-allow: a repeat deletes nothing the second time', 'no marker here'))).toEqual(['raw-submit-unlatched']);
+        });
+        it('does not flag a read: a submit with no method, or an explicit GET, is a search or a load', () => {
+            expect(rules('function find() { searchFetcher.submit(fd); }')).toEqual([]);
+            expect(rules('function find() { searchFetcher.submit({ q }, { method: "get" }); }')).toEqual([]);
+        });
+        it('flags a method that is not a literal, since it may write', () => {
+            expect(rules('function s() { saveFetcher.submit(fd, { method: verb }); }')).toEqual(['raw-submit-unlatched']);
+        });
+        it('a guard in ANOTHER function of the same file does not cover this one', () => {
+            expect(rules('function a() { latch(x); }' + nl + 'function b() { saveFetcher.submit(fd, { method: "post" }); }')).toEqual(['raw-submit-unlatched']);
+        });
+        it('honours the allow marker with a reason', () => {
+            expect(rules('function s() {' + nl + '// busy-controls-allow: the server short-circuits a repeat' + nl + 'saveFetcher.submit(fd, { method: "post" }); }')).toEqual([]);
         });
     });
 });

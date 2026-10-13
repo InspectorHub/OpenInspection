@@ -148,6 +148,7 @@ export default function SettingsInspectionTypes() {
 
   async function toggleOrg(ot: OrgSubtype) {
     const next = !ot.enabled;
+    // busy-controls-allow: both clicks in one frame read the same ot.enabled and send the same explicit { enabled: next }; PUT /api/admin/inspection-types/:id applies that value with a tenant-scoped UPDATE (no toggle on the server), so a repeat rewrites the same value
     const res = await fetch(`/api/admin/inspection-types/${ot.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

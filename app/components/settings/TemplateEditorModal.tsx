@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import { Button, Pill, Modal } from "@core/shared-ui";
 import { useHumanGatedSubmit } from "~/components/OutboundVerification";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 import { SUPPORTED_CONTACT_LOCALES } from "../../../server/lib/i18n/contact-locale";
 import { localeLabel } from "~/lib/locales";
@@ -81,6 +82,10 @@ export function TemplateEditorModal({
   const [body, setBody] = useState(template?.body ?? prefill?.body ?? "");
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const gatedSubmit = useHumanGatedSubmit();
+  // Same-frame guards: `pending` only shows once React renders, so a double click would otherwise post twice.
+  // Two latches, because the save form and the test-send form share one fetcher but are different actions.
+  const saveLatch = useSubmitLatch(fetcher.state);
+  const testSendLatch = useSubmitLatch(fetcher.state);
   const [testTo, setTestTo] = useState("");
   const [testSent, setTestSent] = useState(false);
 
@@ -148,7 +153,7 @@ export function TemplateEditorModal({
           <Button variant="secondary" onClick={onClose}>
             {m.common_cancel()}
           </Button>
-          <fetcher.Form method="post">
+          <fetcher.Form method="post" onSubmit={saveLatch()}>
             <input type="hidden" name="intent" value={template ? "update" : "create"} />
             {template && <input type="hidden" name="id" value={template.id} />}
             <input type="hidden" name="channel" value={channel} />
@@ -297,6 +302,7 @@ export function TemplateEditorModal({
               <span className="text-xs font-bold text-ih-fg-2 uppercase tracking-wide">
                 {m.settings_msgtpl_preview_label()}
               </span>
+              {/* busy-controls-allow: the preview intent posts to a route that only interpolates the template into a rendered string and persists nothing */}
               <previewFetcher.Form method="post">
                 <input type="hidden" name="intent" value="preview" />
                 <input type="hidden" name="channel" value="email" />
@@ -354,7 +360,9 @@ export function TemplateEditorModal({
             </div>
             <fetcher.Form
               method="post"
-              onSubmit={isEmail ? gatedSubmit : undefined}
+              // The latch sits OUTSIDE the human gate: a duplicate is dropped before it can ask for (and burn) a
+              // fresh human-check token. The gate's own re-fired submit is what closes it.
+              onSubmit={testSendLatch(isEmail ? gatedSubmit : undefined)}
             >
               <input type="hidden" name="intent" value="test-send" />
               <input type="hidden" name="channel" value={channel} />

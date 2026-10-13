@@ -14,7 +14,10 @@
  *    and names no same-frame guard (useSubmitLatch, useActionLatch, useGuardedSubmit, latch(, inFlight,
  *    gatedSubmit, guardedSubmit, busyRef). File-level and coarse on purpose: it catches a file with NO
  *    guard, it cannot prove each form is wired to one. pendingProps alone applies only after React
- *    renders the busy state, so a fast double click still posts twice.
+ *    renders the busy state, so a fast double click still posts twice. Checked PER FORM: the guard must be
+ *    reachable from that form's own onSubmit (named in the tag, or in the handler it names, up to three hops);
+ *  - a <x>Fetcher.submit( or bare fetch( call that WRITES (an explicit post / put / patch / delete, or a method that is not a
+ *    literal) in a function that reaches no same-frame guard. A plain or GET submit is a search or a load.
  *
  * The opening tag is parsed for real (multi-line, nested braces), not matched per line.
  * Exception: a comment `busy-controls-allow: <reason>` inside the tag or just above it (it exempts
@@ -38,6 +41,7 @@ runJsxGate({
         { rule: 'submit-unprotected', src: '<button type="submit">Save</button>' },
         { rule: 'native-disable-busy', src: '<Button disabled={isSaving}>Go</Button>' },
         { rule: 'form-without-latch', src: '<Form method="post"><input /></Form>' },
+        { rule: 'raw-submit-unlatched', src: 'function go() { saveFetcher.submit(fd, { method: "post" }); }' },
     ],
     fixHint: [
         'Use <Button pending={busy}> or <button {...pendingProps(busy, onClick)} className={PENDING_CLASS}>',

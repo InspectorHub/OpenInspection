@@ -150,7 +150,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - **`packages/shared-ui/`** — Design System 0523 token-based React components.
 - **`packages/api-types/`** — Re-exports the Hono app type so `hono/client` gets full end-to-end type safety.
 
-**Token Relay BFF** pattern: the React Router v8 server holds the JWT cookie and forwards it to the in-process API on every request, so the browser never sees the token.
+**Token Relay BFF** pattern: the React Router v8 server holds the JWT cookie and forwards it to the in-process API on every request, so loaders and actions never hand the token to page code. The browser still holds the same JWT as an HttpOnly `__Host-inspector_token` cookie (`createSessionWithToken`), so a same-origin `fetch('/api/…')` from a component is authenticated; new code prefers an action + `useFetcher`, which keeps the typed client and error handling.
 
 ### Authentication
 - JWT-based (ES256 / ECDSA P-256, HttpOnly cookie `__Host-inspector_token`). Multi-version keyring with `kid` header for safe rotation — see `server/lib/jwt-keyring.ts`.
@@ -294,6 +294,16 @@ CI is a strict superset of pre-commit, not the same set: the hook runs the `prec
 - **Hook mechanism**: `.githooks/pre-commit`, activated by the `prepare` npm script (`git config core.hooksPath .githooks`) on `npm install`/`npm ci` — native git hooks, **no husky**.
 - **Pre-commit** (`.githooks/pre-commit`): tiered type-check (scoped to staged files — skip / api-only / full) → `lint-staged` (eslint --fix, `ESLINT_FAST=1`) → every gate declared at the `precommit` rung in `scripts/lib/gate-registry.mjs`, run in ONE node process by `scripts/run-gates.mjs`. That is two dozen gates, not the three this line used to name; the registry is the list and must not be copied here. Commits with no staged `.ts`/`.tsx` skip the type-check entirely. The Worker bundle-size gate is NOT here — it lives in `.githooks/pre-push`.
 - **CI** (`.github/workflows/ci.yml`, Node 22): nine parallel jobs — `typecheck-app`, `lint-eslint`, `lint-gates` (+ `db:check`), `test-unit` (4 shards), `test-contract`, `test-workers`, `test-web` (4 shards), `build` (+ bundle size), and `e2e` (a 2-way matrix). `verify` does no work of its own: it is the aggregate job branch protection keys off, and it waits on all nine including `e2e`. CodeQL runs separately (`codeql.yml`). Details: `docs/develop/testing.md`.
+
+## Double-click and double-submit rules
+
+Two clicks (or Enter twice) can land in the same frame, before React renders any busy state. `<Button pending>` and `pendingProps` only take effect after that render, so they are not a guard against a repeat.
+
+- **Any control that starts a write needs a same-frame guard**, not only a pending state: `useSubmitLatch(fetcher.state)` and `onSubmit={latch()}` for a router form, `useActionLatch(busy)` for a handler (`latch(() => fetcher.submit(...))`), or `useGuardedSubmit`. The latch must take its decision before anything is consumed (a human-check token, a PaymentIntent).
+- **A dialog that closes on its first click must not pass the second click to the page under it.** `Modal` and `Drawer` do this for you (`useCloseShield`); a hand-built overlay is already forbidden by `lint:overlays`.
+- **Gate: `npm run lint:busy-controls`** (precommit rung). It checks, per form, that a guard is reachable from that form's own `onSubmit`, and that a `fetcher.submit(` or `fetch(` that writes sits in a function that reaches one. A GET or method-less call is a read and is not flagged. It scans untracked files too. It is not a data-flow proof: a guard named anywhere in the same small function counts, and a guard in another file is invisible.
+- **When a repeat is genuinely harmless** (idempotent write, read-only POST), put `// busy-controls-allow: <the reason, verified in the server handler>` above the statement or form. A reason you have not checked is not a reason. The baseline stays empty.
+- Tests for a latch put two triggers in ONE `act()` with native `.click()` or `dispatchEvent` (`fireEvent` flushes between calls and hides the bug), add a control that a later trigger still goes through, and are proven red with the guard removed.
 
 ## Comment Rules
 

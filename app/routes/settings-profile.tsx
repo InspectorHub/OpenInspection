@@ -9,7 +9,7 @@ import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeProfileSchema, overrideFieldFromForm } from "~/lib/forms/settings.schema";
-import { Select, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Select, pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezone-options";
 import { LOCALE_OPTIONS } from "~/lib/locales";
 import { DateTimeFormatFields } from "~/components/settings/DateTimeFormatFields";
@@ -337,9 +337,12 @@ export default function SettingsProfilePage() {
   useEffect(() => {
     if (credImageFetcher.state === "idle") setUploadingCredId(null);
   }, [credImageFetcher.state]);
-  const onCredAdd = () => credFetcher.submit({ intent: "credential-add" }, { method: "post" });
+  // One latch for every credential write: a double click on Add would create two blank rows, and a
+  // second Delete writes a second audit entry, all before the fetcher's pending state renders.
+  const credLatch = useActionLatch(credFetcher.state !== "idle");
+  const onCredAdd = () => credLatch(() => credFetcher.submit({ intent: "credential-add" }, { method: "post" }));
   const onCredUpdate = (id: string, patch: { label?: string; memberNumber?: string }) =>
-    credFetcher.submit(
+    credLatch(() => credFetcher.submit(
       {
         intent: "credential-update",
         id,
@@ -347,10 +350,10 @@ export default function SettingsProfilePage() {
         ...(patch.memberNumber !== undefined ? { memberNumber: patch.memberNumber } : {}),
       },
       { method: "post" },
-    );
-  const onCredDelete = (id: string) => credFetcher.submit({ intent: "credential-delete", id }, { method: "post" });
+    ));
+  const onCredDelete = (id: string) => credLatch(() => credFetcher.submit({ intent: "credential-delete", id }, { method: "post" }));
   const onCredReorder = (orderedIds: string[]) =>
-    credFetcher.submit({ intent: "credential-reorder", ids: orderedIds.join(",") }, { method: "post" });
+    credLatch(() => credFetcher.submit({ intent: "credential-reorder", ids: orderedIds.join(",") }, { method: "post" }));
   const onCredUpload = (id: string, file: File) => {
     setUploadingCredId(id);
     setLastUploadCredId(id);

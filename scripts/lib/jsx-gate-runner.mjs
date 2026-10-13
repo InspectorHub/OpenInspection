@@ -1,7 +1,8 @@
 /**
  * Shared runner for the JSX ratchet gates (busy-controls, hidden-focusable).
  *
- * Walks the ROOTS below (app/ and, where it exists, packages/shared-ui/src; *.tsx, tests excluded),
+ * Walks the ROOTS below (app/ and, where it exists, packages/shared-ui/src; *.tsx, tests excluded;
+ * tracked and untracked-but-not-ignored files alike),
  * runs a detector per file, and compares violation
  * counts per file with a { path: count } baseline. It prints BOTH numbers -- sites looked
  * at and violations found -- so an empty result cannot read as green, and it fails when it
@@ -21,7 +22,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ROOTS = ['app', 'packages/shared-ui/src'];
 
 const isTest = (p) => /\.(?:test|spec)\.tsx$/.test(p) || p.includes('/__tests__/') || p.includes('/node_modules/');
-const lsFiles = (...specs) => execFileSync('git', ['ls-files', '-z', '--', ...specs], {
+// Tracked AND untracked-but-not-ignored files: a new file is scanned from the moment it exists, not from
+// the moment it is staged. (`git ls-files` alone listed only the index, so a violation in a file nobody had
+// `git add`ed yet was invisible to a gate run before the commit.)
+const lsFiles = (...specs) => execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...specs], {
     cwd: ROOT,
     encoding: 'buffer',
     maxBuffer: 64 * 1024 * 1024,
