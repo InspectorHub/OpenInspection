@@ -24,6 +24,7 @@ import {
 } from '../lib/validations/identity.schema';
 import { exportAccount, softDeleteAccount } from '../services/account.service';
 import { getDrizzle } from '../lib/route-helpers';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
 function getCallerUserId(c: Context<HonoConfig>): string {
     const sub = (c.get('user') as { sub?: string } | undefined)?.sub;
@@ -98,7 +99,7 @@ const identityRoutes = createApiRouter()
         const { confirmEmail } = c.req.valid('json');
         const db = getDrizzle(c);
         try {
-            const data = await softDeleteAccount(db, userId, confirmEmail, c.env.TENANT_CACHE);
+            const data = await softDeleteAccount(db, userId, confirmEmail, c.env.TENANT_CACHE, (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER);
             return c.json({ success: true as const, data }, 200);
         } catch (e) {
             if (e instanceof Error && /not found/i.test(e.message)) {

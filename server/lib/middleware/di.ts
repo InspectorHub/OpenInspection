@@ -210,11 +210,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     // returns undefined when SYNC_QUEUE is absent (standalone)
                     // → AuthService.append no-ops (guarded by `if (this.outbox)`),
                     // so no portal code runs and no dead sync_outbox rows accumulate.
-                    target.auth = new AuthService(
-                        c.env.DB,
-                        c.env.TENANT_CACHE,
-                        buildOutbox(),
-                    );
+                    target.auth = new AuthService(c.env.DB, c.env.TENANT_CACHE, buildOutbox(), (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER);
                     break;
                 case 'outbox':
                     // SaaS-only: concrete sink exists only when SYNC_QUEUE is

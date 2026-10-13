@@ -16,6 +16,8 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users, contacts, inspections } from '../lib/db/schema';
 import { redactIdentityForExport, type WithheldField } from '../lib/compliance/account-export-manifest';
 import { logger } from '../lib/logger';
+import { revokeUserGrantsBestEffort } from '../lib/mcp/grants';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
 export interface AccountExport {
     exportedAt: string;
@@ -70,6 +72,7 @@ export async function softDeleteAccount(
     userId: string,
     confirmEmail: string,
     kv?: KVNamespace,
+    oauth?: OAuthHelpers,
 ): Promise<AccountDeleteResult> {
     const identity = await db.select().from(users).where(eq(users.id, userId)).get();
     if (!identity) throw new Error('Identity not found');
@@ -96,6 +99,10 @@ export async function softDeleteAccount(
             });
         }
     }
+
+    // Grants never read the marker above; revoke them so a refresh token cannot
+    // outlive the account.
+    await revokeUserGrantsBestEffort(oauth, userId, 'self-delete');
 
     return { deletedAt: deletedAt.toISOString(), identityId: userId };
 }
