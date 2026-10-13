@@ -68,4 +68,7 @@ export interface AuthVariables {
      *  with private/public keys imported once. Handlers that sign or verify
      *  JWTs should `await c.var.keyringPromise`. */
     keyringPromise?: Promise<JwtKeyring>;
+    /** Set when the request authenticated with a native client's OAuth access token
+     *  rather than a session JWT. */
+    nativeClient?: boolean;
 }
