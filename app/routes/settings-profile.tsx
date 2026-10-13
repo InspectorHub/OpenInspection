@@ -9,7 +9,7 @@ import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeProfileSchema, overrideFieldFromForm } from "~/lib/forms/settings.schema";
-import { Select, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Select, pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezone-options";
 import { LOCALE_OPTIONS } from "~/lib/locales";
 import { DateTimeFormatFields } from "~/components/settings/DateTimeFormatFields";
@@ -337,9 +337,15 @@ export default function SettingsProfilePage() {
   useEffect(() => {
     if (credImageFetcher.state === "idle") setUploadingCredId(null);
   }, [credImageFetcher.state]);
-  const onCredAdd = () => credFetcher.submit({ intent: "credential-add" }, { method: "post" });
+  // A latch for the click-driven writes: a double click on Add would create two blank rows, and a
+  // second Delete writes a second audit entry, all before the fetcher's pending state renders.
+  const credLatch = useActionLatch(credFetcher.state !== "idle");
+  // Label and member number save on blur, which a touch tap delivers in the same task as the click on
+  // Add or Remove that moved the focus. Sharing one latch would swallow that click, so the blur save has its own.
+  const credUpdateLatch = useActionLatch(credFetcher.state !== "idle");
+  const onCredAdd = () => credLatch(() => credFetcher.submit({ intent: "credential-add" }, { method: "post" }));
   const onCredUpdate = (id: string, patch: { label?: string; memberNumber?: string }) =>
-    credFetcher.submit(
+    credUpdateLatch(() => credFetcher.submit(
       {
         intent: "credential-update",
         id,
@@ -347,11 +353,14 @@ export default function SettingsProfilePage() {
         ...(patch.memberNumber !== undefined ? { memberNumber: patch.memberNumber } : {}),
       },
       { method: "post" },
-    );
-  const onCredDelete = (id: string) => credFetcher.submit({ intent: "credential-delete", id }, { method: "post" });
+    ));
+  const onCredDelete = (id: string) => credLatch(() => credFetcher.submit({ intent: "credential-delete", id }, { method: "post" }));
   const onCredReorder = (orderedIds: string[]) =>
-    credFetcher.submit({ intent: "credential-reorder", ids: orderedIds.join(",") }, { method: "post" });
-  const onCredUpload = (id: string, file: File) => {
+    credLatch(() => credFetcher.submit({ intent: "credential-reorder", ids: orderedIds.join(",") }, { method: "post" }));
+  // Each upload purges the row's old image then writes a new random-keyed one, so two uploads
+  // started in one frame would both read the same old key and leave one object orphaned.
+  const credImageLatch = useActionLatch(credImageFetcher.state !== "idle");
+  const onCredUpload = (id: string, file: File) => credImageLatch(() => {
     setUploadingCredId(id);
     setLastUploadCredId(id);
     const f = new FormData();
@@ -359,7 +368,7 @@ export default function SettingsProfilePage() {
     f.append("id", id);
     f.append("image", file);
     credImageFetcher.submit(f, { method: "post", encType: "multipart/form-data" });
-  };
+  });
 
   // Timezone field — the tenant's own display tz. The <select> stays
   // uncontrolled (Conform reparses its DOM value on submit); we mirror the

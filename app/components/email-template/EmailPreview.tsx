@@ -21,6 +21,7 @@ export function EmailPreview({ subject, blocks }: { trigger: string; subject: st
       fd.set("intent", "preview");
       fd.set("subject", subject);
       for (const [k, v] of Object.entries(blocks)) fd.set(`block:${k}`, v);
+      // busy-controls-allow: the intent=preview action only renders the template against sample data (previewRoute in server/api/email-templates.ts has no insert, update or send), so a repeat returns the same HTML and persists nothing
       fetcher.submit(fd, { method: "post" });
     }, 350);
     return () => { if (timer.current) clearTimeout(timer.current); };

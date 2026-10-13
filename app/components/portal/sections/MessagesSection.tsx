@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router";
 import { m } from "~/paraglide/messages";
 import { MessageThread, type ThreadMessage } from "~/components/messaging/MessageThread";
@@ -96,31 +96,48 @@ export function MessagesSection({
     loadMessages();
   }, [loadMessages]);
 
+  // Same-frame guards. The composer's busy flags only land after a render, so two events in one frame would
+  // each post: a duplicate message to the inspector, or a duplicate stored upload plus message.
+  const sendInFlight = useRef(false);
+  const attachInFlight = useRef(false);
+
   async function handleSend(body: string) {
-    const res = await fetch(`${base}${tokenQuery}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body }),
-    });
-    if (!res.ok) throw new Error("send failed");
-    await loadMessages();
+    if (sendInFlight.current) return;
+    sendInFlight.current = true;
+    try {
+      const res = await fetch(`${base}${tokenQuery}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      });
+      if (!res.ok) throw new Error("send failed");
+      await loadMessages();
+    } finally {
+      sendInFlight.current = false;
+    }
   }
 
   // Attach: upload first, then send a bodied message carrying the descriptor.
   async function handleAttach(file: File) {
-    const fd = new FormData();
-    fd.append("file", file);
-    const up = await fetch(`${base}/upload${tokenQuery}`, { method: "POST", body: fd });
-    if (!up.ok) throw new Error("upload failed");
-    const json = (await up.json()) as { data?: { id: string; key: string; name: string; size: number; type: string; uploadedAt: number } };
-    if (!json.data) throw new Error("upload failed");
-    const res = await fetch(`${base}${tokenQuery}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: json.data.name, attachments: [json.data] }),
-    });
-    if (!res.ok) throw new Error("send failed");
-    await loadMessages();
+    if (attachInFlight.current) return;
+    attachInFlight.current = true;
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const up = await fetch(`${base}/upload${tokenQuery}`, { method: "POST", body: fd });
+      if (!up.ok) throw new Error("upload failed");
+      const json = (await up.json()) as { data?: { id: string; key: string; name: string; size: number; type: string; uploadedAt: number } };
+      if (!json.data) throw new Error("upload failed");
+      const res = await fetch(`${base}${tokenQuery}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: json.data.name, attachments: [json.data] }),
+      });
+      if (!res.ok) throw new Error("send failed");
+      await loadMessages();
+    } finally {
+      attachInFlight.current = false;
+    }
   }
 
   // Viewer-relative direction: in the CLIENT's view, their own side is

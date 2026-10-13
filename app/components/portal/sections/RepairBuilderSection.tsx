@@ -21,6 +21,7 @@
  */
 import { useState, useCallback, useEffect } from "react";
 import { useFetcher } from "react-router";
+import { useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { useChallengeOnRefusal } from "~/components/OutboundVerification";
 import { RepairDefectRow } from "./repair/RepairDefectRow";
@@ -280,6 +281,7 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
     fd.append("_intent", "set-intro");
     fd.append("rrId", rrId);
     fd.append("customIntro", customIntro);
+    // busy-controls-allow: setIntro is an absolute UPDATE of customIntro (same text in, same row out), so a repeat rewrites the same value
     introFetcher.submit(fd, { method: "post", action: actionPath });
   }, [rrId, token, customIntro, introFetcher, actionPath]);
 
@@ -317,6 +319,9 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
   };
   // A company in its first 24 hours is asked for the human check; send again once passed.
   const challenge = useChallengeOnRefusal(emailFetcher.data, emailFetcher.state, sendEmail);
+  // The pending button only goes inert after a render; the latch stops a same-frame double click
+  // from emailing the client twice.
+  const emailLatch = useActionLatch(emailFetcher.state !== "idle");
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
@@ -438,7 +443,7 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
           onCopyShareLink={copyShareLink}
           onEmailToChange={setEmailTo}
           onEmailMsgChange={setEmailMsg}
-          onSendEmail={sendEmail}
+          onSendEmail={() => emailLatch(sendEmail)}
         />
       )}
 

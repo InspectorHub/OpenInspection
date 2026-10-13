@@ -3,6 +3,7 @@ import { useFetcher } from "react-router";
 import { Banner, Input, RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import type { action } from "~/routes/settings-booking";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
 export type RoutingStrategy = "first_available" | "least_loaded" | "closest";
@@ -45,6 +46,7 @@ export function BookingRoutingPanel({
   // `geocodeFetcher` below stays a plain lookup.
   const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
   const geocodeFetcher = useFetcher<typeof action>();
+  const geocodeLatch = useSubmitLatch(geocodeFetcher.state);
   const [strategy, setStrategy] = useState<RoutingStrategy>(initial.routingStrategy);
   const [leadHours, setLeadHours] = useState(String(initial.minLeadHours));
   const [cutoff, setCutoff] = useState(initial.sameDayCutoffTime ?? "");
@@ -135,7 +137,7 @@ export function BookingRoutingPanel({
         ) : (
           <p className="text-[12px] text-ih-fg-3">{m.settings_routing_anchor_no_address()}</p>
         )}
-        <geocodeFetcher.Form method="post">
+        <geocodeFetcher.Form method="post" onSubmit={geocodeLatch()}>
           <input type="hidden" name="intent" value="routing-geocode-company" />
           <button
             type="submit"

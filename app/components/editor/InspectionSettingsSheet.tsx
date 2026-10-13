@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
-import { Drawer, Button } from "@core/shared-ui";
+import { Drawer, Button, useActionLatch } from "@core/shared-ui";
 import { TemplateCombobox } from "~/components/TemplateCombobox";
 import { CoverCropper, coverCropFor, type StoredCoverCrop } from "~/components/media-studio/CoverCropper";
 import { fullResUrl } from "~/components/media-studio/cropImage";
@@ -149,6 +149,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
   function selectCover(key: string) {
     if (coverKey === key) {
       setCoverKey("");
+      // busy-controls-allow: clearing the cover PATCHes coverPhotoId to null, an absolute set, so a repeat writes the same value
       coverFetcher.submit({ intent: "set-cover", coverPhotoId: "" }, { method: "post" });
       return;
     }
@@ -158,11 +159,16 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
 
   // DB-16 — direct cover upload (Spectora parity). The file rides the BFF relay
   // via the editor route's `upload-cover` intent (pool upload + set cover).
+  // The latch drops a same-frame repeat: the pending state lands a render too late to stop a
+  // duplicate photo.
+  const coverLatch = useActionLatch(coverFetcher.state !== "idle");
   function uploadCover(file: File) {
-    const fd = new FormData();
-    fd.append("intent", "upload-cover");
-    fd.append("file", file);
-    coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+    coverLatch(() => {
+      const fd = new FormData();
+      fd.append("intent", "upload-cover");
+      fd.append("file", file);
+      coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+    });
   }
 
   // When an upload-cover round-trip succeeds, append the new photo to the grid
@@ -400,7 +406,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
               : coverCropFor(loadFetcher.data?.inspection, cropSource.key)
           }
           onCancel={() => setCropSource(null)}
-          onSave={(blob, c) => {
+          onSave={(blob, c) => coverLatch(() => {
             const crop = { aspect: c.aspect, orientation: c.orientation, ...c.pixels };
             setSessionCrop({ key: cropSource.key, crop });
             const fd = new FormData();
@@ -410,7 +416,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
             fd.append("image", new File([blob], "cover.jpg", { type: "image/jpeg" }));
             coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
             setCropSource(null);
-          }}
+          })}
         />
       )}
     </>

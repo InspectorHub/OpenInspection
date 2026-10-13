@@ -93,6 +93,7 @@ export function ProfilePhotoCard({ photoUrl }: { photoUrl: string | null }) {
             const fd = new FormData();
             fd.append("intent", "photo-upload");
             fd.append("photo", new File([blob], "avatar.jpg", { type: "image/jpeg" }));
+            // busy-controls-allow: the profile photo handler writes to the deterministic key {tenant}/inspector-photos/{userId}.{ext} (r2Keys.inspectorPhoto) and sets users.photo_url to that same path, so a repeat overwrites the same object and leaves no orphan or second row
             fetcher.submit(fd, { method: "POST", encType: "multipart/form-data" });
             closeCropper();
           }}

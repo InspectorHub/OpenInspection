@@ -81,7 +81,7 @@ import { UnitsManager } from "~/components/editor/UnitsManager";
 import { CostItemsHost } from "~/components/editor/CostItemsHost";
 import type { ResultMap } from "~/hooks/useInspection";
 import type { PublishReadiness, PublishBlockingDefect } from "~/lib/types";
-import { Button, IconButton, SegmentedControl } from "@core/shared-ui";
+import { Button, IconButton, SegmentedControl, useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -229,6 +229,7 @@ function InspectionEditPage() {
  // keeps the optimistic local-state update; onCommit (this) persists.
  const propertyFactsFetcher = useFetcher();
  const savePropertyFacts = useCallback((facts: Record<string, unknown>) => {
+  // busy-controls-allow: onCommit hands a FULL snapshot and the PATCH replaces those fields, so a repeat rewrites the same values
   propertyFactsFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify(facts) }, { method: "POST" });
  }, [propertyFactsFetcher]);
  // Commercial PCA Phase U (Batch C2b) — the units-manager mutation fetcher
@@ -569,6 +570,7 @@ function InspectionEditPage() {
  // merged/in-flight bookkeeping + the shared-fetcher abort race). This wrapper
  // just also sets the active-unit UI state.
  const submitScope = useCallback(
+  // busy-controls-allow: load-scope is a read relay (GET of one scope's results, no write), so a repeat only refetches the same slice
   (scope: string) => scopeFetcher.submit({ intent: "load-scope", scope }, { method: "POST" }),
   [scopeFetcher],
  );
@@ -753,6 +755,7 @@ function InspectionEditPage() {
  // DB-16 — dedicated fetcher for set/clear report cover (avoids the
  // shared-fetcher abort hazard; the loader revalidates the cover after).
  const coverFetcher = useFetcher();
+ const coverLatch = useActionLatch(coverFetcher.state !== "idle");
 
  /* ---------------------------------------------------------------- */
  /* D8 — structural editing (section add/dup/delete/move)           */
@@ -1183,6 +1186,7 @@ function InspectionEditPage() {
   formData.append("customId", target.id);
   formData.append("defectKind", target.kind);
   }
+  // busy-controls-allow: a file input's change event fires once per file-chooser selection (the chooser is modal) and the input is reset after it is read, so there is no double click to repeat; a latch here would sit after the async bake and could drop a legitimate second batch
   uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
  }
 
@@ -1218,7 +1222,8 @@ function InspectionEditPage() {
   const f = new File([blobs[i]], `burst-${i + 1}.jpg`, { type: "image/jpeg" });
   formData.append("file", orig ? f : await preprocessImage(f));
  }
- uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
+ // busy-controls-allow: a file input's change event fires once per file-chooser selection (the chooser is modal) and the input is reset after it is read, so there is no double click to repeat; a latch here would sit after the async bake and could drop a legitimate second batch
+  uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
  })();
  },
  [state.burstCameraItemId, state.inspection.id, uploadFetcher],
@@ -2095,6 +2100,7 @@ function InspectionEditPage() {
  isCover={!!photoStudioKey && (state.inspection.coverPhotoId as string | null) === photoStudioKey}
  onSetCover={photoStudioKey ? () => {
   const isCover = (state.inspection.coverPhotoId as string | null) === photoStudioKey;
+  // busy-controls-allow: the value is computed from rendered state, not toggled server-side, so a repeat PATCHes the same coverPhotoId
   coverFetcher.submit(
    { intent: "set-cover", coverPhotoId: isCover ? "" : photoStudioKey },
    { method: "post" },
@@ -2116,6 +2122,7 @@ function InspectionEditPage() {
     fd.append("nodes", nodesJson);
     if (sectionId) fd.append("sectionId", sectionId);
     fd.append("image", new File([blob], "annotated.png", { type: "image/png" }));
+    // busy-controls-allow: the annotation bake writes a deterministic R2 key (inspectionPhotoAnnotated) and replaces the photo's annotatedKey, so a repeat rewrites the same object and row
     coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
    }
   }
@@ -2203,6 +2210,7 @@ function InspectionEditPage() {
    saving={instanceSubmit.busy}
    onClose={() => setAddingToGroup(null)}
    onSave={(group, fields) => {
+     // busy-controls-allow: instanceSubmit is useGuardedSubmit, whose submit drops a second call through a synchronous inFlight ref
      instanceSubmit.submit(
        {
          intent: "add-statutory-instance",
@@ -2252,7 +2260,9 @@ function InspectionEditPage() {
    fd.append("sourceKey", galleryCropSource.key);
    fd.append("crop", JSON.stringify(crop));
    fd.append("image", new File([blob], "cover.jpg", { type: "image/jpeg" }));
-   coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+   // A repeat bakes a second derivative under a fresh random R2 key and orphans the first
+   // (setCroppedCover), so drop a same-frame second Save.
+   coverLatch(() => coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" }));
    setGalleryCropSource(null);
   }}
  />

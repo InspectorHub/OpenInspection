@@ -62,6 +62,7 @@ export function PosterPicker({
 
   const setPoster = () => {
     const f = frames[selected];
+    // busy-controls-allow: the poster endpoint sets thumbnailTimestampPct on the Stream video and posterPct on the pool row to the posted absolute value (videoPosterRoute, MediaVideoService.setPoster), so a repeat rewrites the same value and creates no row or object
     fetcher.submit(
       JSON.stringify({ streamUid, posterPct: f.pct }),
       {

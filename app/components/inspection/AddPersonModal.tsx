@@ -89,6 +89,7 @@ export function AddPersonModal({
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (value.trim().length >= 2) {
       debounceRef.current = setTimeout(() => {
+        // busy-controls-allow: the search-contacts handler only issues a GET contacts query (read-only) and a repeat returns the same list
         searchFetcher.submit({ intent: "search-contacts", search: value.trim() }, { method: "post" });
       }, 300);
     }

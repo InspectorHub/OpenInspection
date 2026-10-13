@@ -27,7 +27,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 export type WordExportStatus = "queued" | "building" | "ready" | "failed";
@@ -81,6 +81,9 @@ export function WordExportButton({
   const [unavailable, setUnavailable] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const lastHandled = useRef<ExportActionResult | undefined>(undefined);
+  // The pending button only goes inert after a render; the latch stops a same-frame double click
+  // from queueing two exports.
+  const latch = useActionLatch(fetcher.state !== "idle");
 
   // Consume fetcher results (enqueue OR status-poll response) exactly once
   // per response — `fetcher.data` keeps the same reference across renders,
@@ -123,6 +126,7 @@ export function WordExportButton({
     if (!exportId || (status !== "queued" && status !== "building")) return;
     const timer = setInterval(() => {
       if (fetcher.state !== "idle") return;
+      // busy-controls-allow: export-word-status is a read: the route action only GETs the export row status (report-card-stack action), and the poll is already skipped while the fetcher is busy
       fetcher.submit({ intent: "export-word-status", exportId }, { method: "POST" });
     }, pollIntervalMs);
     return () => clearInterval(timer);
@@ -132,10 +136,10 @@ export function WordExportButton({
 
   if (!available) return null;
 
-  const enqueue = () => {
+  const enqueue = () => latch(() => {
     setErrorMessage(null);
     fetcher.submit({ intent: "export-word-enqueue" }, { method: "POST" });
-  };
+  });
 
   if (unavailable) {
     return (

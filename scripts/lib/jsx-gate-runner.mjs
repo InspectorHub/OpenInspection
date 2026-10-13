@@ -1,7 +1,8 @@
 /**
  * Shared runner for the JSX ratchet gates (busy-controls, hidden-focusable).
  *
- * Walks the ROOTS below (app/ and, where it exists, packages/shared-ui/src; *.tsx, tests excluded),
+ * Walks the ROOTS below (app/ and, where it exists, packages/shared-ui/src; *.tsx, tests excluded;
+ * tracked and untracked-but-not-ignored files alike),
  * runs a detector per file, and compares violation
  * counts per file with a { path: count } baseline. It prints BOTH numbers -- sites looked
  * at and violations found -- so an empty result cannot read as green, and it fails when it
@@ -21,7 +22,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ROOTS = ['app', 'packages/shared-ui/src'];
 
 const isTest = (p) => /\.(?:test|spec)\.tsx$/.test(p) || p.includes('/__tests__/') || p.includes('/node_modules/');
-const lsFiles = (...specs) => execFileSync('git', ['ls-files', '-z', '--', ...specs], {
+// Tracked AND untracked-but-not-ignored files: a new file is scanned from the moment it exists, not from
+// the moment it is staged. (`git ls-files` alone listed only the index, so a violation in a file nobody had
+// `git add`ed yet was invisible to a gate run before the commit.)
+const lsFiles = (...specs) => execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...specs], {
     cwd: ROOT,
     encoding: 'buffer',
     maxBuffer: 64 * 1024 * 1024,
@@ -43,8 +47,11 @@ export function missedControls(detect, controls) {
  */
 export function runJsxGate(cfg) {
     const tag = `[${cfg.name}]`;
-    const files = [...new Set(lsFiles(...ROOTS.map((r) => `:(glob)${r}/**/*.tsx`)))].filter((p) => !isTest(p)).sort();
-    const counted = lsFiles(...ROOTS).filter((p) => p.endsWith('.tsx') && !isTest(p));
+    // A tracked file that was deleted from disk but not yet `git rm`ed is still in the index; it is not a file to scan.
+    // `counted` is deduped too: a path in a merge conflict is listed once per stage.
+    const present = (p) => existsSync(join(ROOT, p));
+    const files = [...new Set(lsFiles(...ROOTS.map((r) => `:(glob)${r}/**/*.tsx`)))].filter((p) => !isTest(p) && present(p)).sort();
+    const counted = [...new Set(lsFiles(...ROOTS).filter((p) => p.endsWith('.tsx') && !isTest(p) && present(p)))];
     const baselinePath = join(ROOT, cfg.baselineFile);
     const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf8')) : {};
 

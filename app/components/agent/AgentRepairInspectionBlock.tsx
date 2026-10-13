@@ -15,7 +15,7 @@
  */
 import { useState } from "react";
 import { useFetcher } from "react-router";
-import { PENDING_CLASS, pendingProps } from "@core/shared-ui";
+import { PENDING_CLASS, pendingProps, useActionLatch } from "@core/shared-ui";
 import { RepairDefectRowView, type RepairDefectPhoto } from "~/components/portal/sections/repair/RepairDefectRowView";
 import { RepairSharePanel } from "~/components/portal/sections/repair/RepairSharePanel";
 import { useChallengeOnRefusal } from "~/components/OutboundVerification";
@@ -101,6 +101,9 @@ export function AgentRepairInspectionBlock({
   };
   // A company in its first 24 hours is asked for the human check; send again once passed.
   const challenge = useChallengeOnRefusal(emailFetcher.data, emailFetcher.state, sendEmail);
+  // Same-frame double-click guards: the pending state only lands after a render.
+  const shareLatch = useActionLatch(shareFetcher.state !== "idle");
+  const emailLatch = useActionLatch(emailFetcher.state !== "idle");
 
   return (
     <div data-testid={`repair-inspection-${inspectionId}`} className="p-5 space-y-3">
@@ -113,7 +116,7 @@ export function AgentRepairInspectionBlock({
           <button
             type="button"
             data-testid={`repair-share-${inspectionId}`}
-            {...pendingProps(shareFetcher.state !== "idle", share)}
+            {...pendingProps(shareFetcher.state !== "idle", () => shareLatch(share))}
             className={`h-8 px-3 rounded-md border border-ih-border text-[12px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}
           >
             {shareFetcher.state === "idle"
@@ -159,7 +162,7 @@ export function AgentRepairInspectionBlock({
           onCopyShareLink={copyShareLink}
           onEmailToChange={setEmailTo}
           onEmailMsgChange={setEmailMsg}
-          onSendEmail={sendEmail}
+          onSendEmail={() => emailLatch(sendEmail)}
         />
       )}
     </div>

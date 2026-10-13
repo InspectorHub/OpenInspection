@@ -3,6 +3,7 @@ import { useLoaderData, useFetcher } from "react-router";
 import { Icon, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import type { Route } from "./+types/settings-contractor-types";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -72,6 +73,8 @@ const INPUT = "px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[
 
 function ContractorTypeRow({ t, idx, count, reordering, onMove, onRequestDelete }: { t: ContractorType; idx: number; count: number; reordering: boolean; onMove: (idx: number, dir: -1 | 1) => void; onRequestDelete: () => void }) {
   const fetcher = useFetcher<typeof action>();
+  // A repeated rename writes a second `contractor_type.updated` audit entry; the pending state lands a render too late.
+  const renameLatch = useSubmitLatch(fetcher.state);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(t.name);
   return (
@@ -81,7 +84,7 @@ function ContractorTypeRow({ t, idx, count, reordering, onMove, onRequestDelete 
         <button disabled={idx === count - 1} {...pendingProps(reordering, () => onMove(idx, 1))} aria-busy={reordering || undefined} className={`text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none ${PENDING_CLASS}`} aria-label={m.settings_contractor_types_move_down_aria({ name: t.name })}><Icon name="chevD" size={14} /></button>
       </div>
       {editing ? (
-        <fetcher.Form method="POST" className="flex-1 flex gap-2" onSubmit={() => setEditing(false)}>
+        <fetcher.Form method="POST" className="flex-1 flex gap-2" onSubmit={renameLatch(() => setEditing(false))}>
           <input type="hidden" name="intent" value="rename" />
           <input type="hidden" name="id" value={t.id} />
           <input name="name" value={name} onChange={(e) => setName(e.target.value)} autoFocus className={`flex-1 ${INPUT} py-1.5`} />
@@ -107,6 +110,7 @@ function ContractorTypeRow({ t, idx, count, reordering, onMove, onRequestDelete 
 export default function SettingsContractorTypes() {
   const data = useLoaderData<typeof loader>();
   const createFetcher = useFetcher<typeof action>();
+  const createLatch = useSubmitLatch(createFetcher.state);
   const { fetcher: reorderFetcher, submit: submitReorder, busy: reordering } = useGuardedSubmit<typeof action>();
   const { submit: submitDelete, busy: deletingType } = useGuardedSubmit<typeof action>();
   const preflightFetcher = useFetcher<typeof action>();
@@ -132,6 +136,7 @@ export default function SettingsContractorTypes() {
 
   function requestDelete(t: ContractorType) {
     setPendingDelete(t);
+    // busy-controls-allow: the preflight intent only runs a GET reference count and writes nothing, so a repeat is a harmless re-read
     preflightFetcher.submit({ intent: "preflight", id: t.id }, { method: "POST" });
   }
 
@@ -152,7 +157,7 @@ export default function SettingsContractorTypes() {
       <p className="text-[13px] text-ih-fg-3">{m.settings_contractor_types_intro()}</p>
 
       <div className="bg-ih-bg-card border border-ih-border rounded-lg p-4">
-        <createFetcher.Form method="POST" className="flex gap-2" onSubmit={(e) => { if (!newName.trim()) { e.preventDefault(); return; } setNewName(""); }}>
+        <createFetcher.Form method="POST" className="flex gap-2" onSubmit={createLatch((e) => { if (!newName.trim()) { e.preventDefault(); return; } setNewName(""); })}>
           <input type="hidden" name="intent" value="create" />
           <input name="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={m.settings_contractor_types_name_placeholder()} className={`flex-1 ${INPUT}`} />
           <button type="submit" {...pendingProps(!newName.trim())} className={`px-4 py-2 rounded-md bg-ih-primary text-ih-fg-inverse text-[13px] font-bold ${PENDING_CLASS}`}>{m.common_add()}</button>

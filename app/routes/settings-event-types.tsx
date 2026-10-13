@@ -132,6 +132,7 @@ export default function SettingsEventTypes() {
   }
 
   async function confirmDelete(t: EventType) {
+    // busy-controls-allow: DELETE /api/admin/event-types/:id runs EventService.deactivateEventType, which deletes the row or sets active=false by id and answers 200 even when the row is already gone, and the list update only filters by id, so a repeat changes nothing
     const res = await fetch(`/api/admin/event-types/${t.id}`, {
       method: "DELETE",
       credentials: "same-origin",

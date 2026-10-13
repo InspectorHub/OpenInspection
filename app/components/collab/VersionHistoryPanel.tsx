@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type * as Y from "yjs";
-import { Modal, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Modal, pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 import { applyItemPatch } from "../../../server/lib/collab/results-doc";
 import type { ResultsProjection } from "../../../server/lib/collab/results-doc.types";
 import { diffProjections, type FindingDiff, type ScalarField } from "~/lib/collab/snapshot-diff";
@@ -167,6 +167,10 @@ export function VersionHistoryPanel({
     const [confirmSeq, setConfirmSeq] = useState<number | null>(null);
     const [restoring, setRestoring] = useState(false);
     const [restoreError, setRestoreError] = useState<string | null>(null);
+    // Same-frame guards: the pending state only lands after a render, so two clicks in one frame would each
+    // capture a version (save) or each re-run the restore and write a second pre-restore version row.
+    const saveLatch = useActionLatch(saving);
+    const restoreLatch = useActionLatch(restoring);
 
     // #181 PR-H — Compare-against-current modal state.
     const [compareOpen, setCompareOpen] = useState(false);
@@ -344,7 +348,7 @@ export function VersionHistoryPanel({
         <button
             type="button"
             // aria-disabled while saving: this sits inside an open Modal, where native disabled drops focus to <body>.
-            {...pendingProps(saving, handleSaveNow)}
+            {...pendingProps(saving, () => saveLatch(handleSaveNow))}
             className={`h-9 px-3 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary/85 inline-flex items-center gap-1.5 ${PENDING_CLASS}`}
         >
             {saving ? m.editor_collab_saving() : m.editor_collab_save_version_now()}
@@ -445,7 +449,7 @@ export function VersionHistoryPanel({
                         </button>
                         <button
                             type="button"
-                            {...pendingProps(restoring, handleConfirmRestore)}
+                            {...pendingProps(restoring, () => restoreLatch(handleConfirmRestore))}
                             className={`px-4 h-10 rounded-xl bg-ih-primary text-ih-fg-inverse text-sm font-semibold hover:bg-ih-primary/85 ${PENDING_CLASS}`}
                         >
                             {restoring ? m.editor_collab_restoring() : m.editor_collab_restore_version()}

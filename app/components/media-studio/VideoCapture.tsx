@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { PENDING_CLASS, pendingProps, useLayer } from "@core/shared-ui";
+import { PENDING_CLASS, pendingProps, useActionLatch, useLayer } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -65,6 +65,9 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
   const [progress, setProgress] = useState(0);
   // R2 privacy notice: upload is blocked until the user explicitly accepts.
   const [accepted, setAccepted] = useState(false);
+  const busy = phase !== "pick";
+  // Same-frame guard: each upload mints a pool row and an R2/Stream object, and `busy` only lands after a render.
+  const uploadLatch = useActionLatch(busy);
 
   const handleFile = async (file: File) => {
     setError(null);
@@ -75,6 +78,9 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
       return;
     }
 
+    // Busy from the first request on, so a later pick cannot start a second upload while create-upload is in flight.
+    setPhase("uploading");
+    setProgress(0);
     try {
       // Step 1: mint an upload URL + a backend ref.
       const createRes = await fetch(`/api/inspections/${inspectionId}/media/video/create-upload`, {
@@ -207,7 +213,6 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
     }
   };
 
-  const busy = phase !== "pick";
   // The pick button is disabled while busy OR (R2 only) until the privacy
   // notice has been accepted.
   const pickDisabled = busy || (provider === "r2" && !accepted);
@@ -239,7 +244,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
           onChange={(e) => {
             const f = e.target.files?.[0];
             e.currentTarget.value = "";
-            if (f) void handleFile(f);
+            if (f) uploadLatch(() => void handleFile(f));
           }}
         />
 

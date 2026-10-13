@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLoaderData, Link, isRouteErrorResponse, useRouteError, useFetcher, useNavigate, useRevalidator } from "react-router";
 import type { Route } from "./+types/inspector-portal";
 import { requireToken } from "~/lib/session.server";
@@ -15,7 +15,7 @@ import {
 import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "../../server/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { PageHeader, Card, Pill, Button, Modal, buttonClasses, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { PageHeader, Card, Pill, Button, Modal, buttonClasses, pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import DocumentsSection, {
   type DocumentItem,
@@ -657,6 +657,10 @@ export default function InspectionHubPage() {
   // then revalidate the loader to refresh the list.
   const [docUploading, setDocUploading] = useState(false);
   const [docError, setDocError] = useState<string | null>(null);
+  // Same-frame guards: `docUploading` only lands after a render, so two drops in one frame would store the file
+  // twice; and a second delete of the same document answers 404, which would show a false "delete failed".
+  const docUploadLatch = useActionLatch(docUploading);
+  const docDeleteInFlight = useRef(new Set<string>());
 
   const onDocUpload = async (
     file: File,
@@ -692,6 +696,8 @@ export default function InspectionHubPage() {
   };
 
   const onDocDelete = async (docId: string) => {
+    if (docDeleteInFlight.current.has(docId)) return;
+    docDeleteInFlight.current.add(docId);
     setDocError(null);
     try {
       const res = await fetch(`/api/inspections/${inspection.id}/documents/${docId}`, {
@@ -704,6 +710,8 @@ export default function InspectionHubPage() {
       revalidator.revalidate();
     } catch {
       setDocError(m.inspections_hub_doc_delete_failed());
+    } finally {
+      docDeleteInFlight.current.delete(docId);
     }
   };
 
@@ -726,9 +734,13 @@ export default function InspectionHubPage() {
   // signer rows into the action; the pre-sign modal is keyed by envelope id
   // (which row's "Sign now" was pressed) and closes itself on success.
   const ensureHuman = useEnsureHuman();
+  // Same-frame guards: a repeat would email every signer a second signing request (send-agreement) or append a
+  // second `agreement.inspector_signed` row to the e-sign audit log (inspector-sign), and the modal's `busy` only
+  // lands after a render.
+  const agreementLatch = useActionLatch(agreementModal.busy);
   const submitSendAgreement = async (payload: SendAgreementPayload) => {
     if (!(await ensureHuman())) return;
-    agreementModal.fetcher.submit(
+    agreementLatch(() => agreementModal.fetcher.submit(
       {
         intent: "send-agreement",
         agreementId: payload.agreementId,
@@ -736,16 +748,17 @@ export default function InspectionHubPage() {
         signers: JSON.stringify(payload.signers),
       },
       { method: "post" },
-    );
+    ));
   };
 
   const [preSigningId, setPreSigningId] = useState<string | null>(null);
   const preSignModal = useModalFetcher<typeof action>("inspector-sign");
+  const preSignLatch = useActionLatch(preSignModal.busy);
   const submitPreSignature = (dataUri: string) => {
-    preSignModal.fetcher.submit(
+    preSignLatch(() => preSignModal.fetcher.submit(
       { intent: "inspector-sign", envelopeId: preSigningId ?? "", signatureBase64: dataUri },
       { method: "post" },
-    );
+    ));
   };
   useEffect(() => {
     if (preSignModal.succeeded) setPreSigningId(null);
@@ -1261,7 +1274,7 @@ export default function InspectionHubPage() {
         showVisibilityToggle
         allowDeleteAny
         downloadHref={(docId) => `/api/inspections/${inspection.id}/documents/${docId}`}
-        onUpload={onDocUpload}
+        onUpload={(file, opts) => docUploadLatch(() => { void onDocUpload(file, opts); })}
         onDelete={onDocDelete}
         uploading={docUploading}
         error={docError}
