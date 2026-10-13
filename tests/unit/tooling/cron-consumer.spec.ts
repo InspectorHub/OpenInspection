@@ -77,6 +77,21 @@ describe('handleCronBatch', () => {
         expect(kv.put).not.toHaveBeenCalled();
     });
 
+    it('does not touch KV when the sweep neither had a cursor nor produced one', async () => {
+        // The common tick: nothing stored going in, nothing to store coming out. A delete of the
+        // absent key was one KV operation per job per tick against a 1,000-a-day free budget.
+        const kv = { get: vi.fn(), put: vi.fn(), delete: vi.fn() };
+        const job = { key: 'retention-agreements', run: vi.fn().mockResolvedValue({ processed: 0, nextCursor: null }) };
+        const m = msg({ job: 'retention-agreements', cursor: null, hop: 0 });
+        await handleCronBatch(
+            { CRON_QUEUE: { send: vi.fn() }, TENANT_CACHE: kv } as never,
+            { messages: [m] } as never, [job] as never,
+        );
+        expect(kv.delete).not.toHaveBeenCalled();
+        expect(kv.put).not.toHaveBeenCalled();
+        expect(m.ack).toHaveBeenCalled();
+    });
+
     it('runs a job from the cursor the message carries, not from the start', async () => {
         // The positive control for the paging contract: a resumed sweep that
         // silently restarted from the beginning would still ack, still

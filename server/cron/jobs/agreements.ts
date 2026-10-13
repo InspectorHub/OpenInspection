@@ -6,8 +6,9 @@
  * rather than one. A single block cannot hold two definitions of due.
  */
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, inArray, isNull, lt } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { agreementRequests } from '../../lib/db/schema/inspection/agreements';
+import { tenantConfigs } from '../../lib/db/schema';
 import { AgreementService } from '../../services/agreement.service';
 import { logger } from '../../lib/logger';
 import { TICK, db, exists, type CronJob } from '../types';
@@ -55,16 +56,22 @@ export const retentionAgreementsJob: CronJob = {
     trigger: TICK,
     modes: ['standalone', 'saas'],
     maxBatch: 50,
-    // runRetentionSweep()'s own candidate predicate, as a LIMIT 1. The
-    // per-tenant window is applied in JS from a joined config value, so this
-    // is a superset — it can enqueue a pass that purges nothing, and cannot
-    // withhold one that would.
+    // runRetentionSweep()'s candidate predicate WITH the retention window applied:
+    // signed, not purged, and signed longer ago than the tenant's window (6 years
+    // when it has no config row). Without the window this was true for every
+    // signed agreement ever, so the job was enqueued on every tick and purged
+    // nothing. A year is counted as 365 days here, which puts the cutoff at or
+    // after the sweep's calendar one: a superset, so it can enqueue a pass that
+    // purges nothing (a legal hold, a leap day) and cannot withhold one that would.
     probe: (env) => exists(
         db(env).select({ id: agreementRequests.id })
             .from(agreementRequests)
+            .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, agreementRequests.tenantId))
             .where(and(
                 eq(agreementRequests.status, 'signed'),
+                isNotNull(agreementRequests.signedAt),
                 isNull(agreementRequests.purgedAt),
+                sql`${agreementRequests.signedAt} < ${Date.now()} - coalesce(${tenantConfigs.agreementRetentionYears}, 6) * ${365 * 24 * 60 * 60 * 1000}`,
             ))
             .limit(1).get(),
     ),
