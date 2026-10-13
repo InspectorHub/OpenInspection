@@ -194,16 +194,24 @@ describe("PublishModal — the in-flight latch", () => {
   });
 
   it("does not reopen at a microtask: a handler that settled but whose isSubmitting has not rendered yet stays latched", async () => {
-    const onPublish = vi.fn().mockResolvedValue(undefined);
-    render(<PublishModal {...props({ onPublish })} />);
-    act(() => {
-      publishBtn().click();
-    });
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    fireEvent.click(publishBtn());
-    expect(onPublish).toHaveBeenCalledTimes(1);
+    // The latch reopens one MACROTASK after closing. On a loaded runner act()'s own awaits can yield long enough for a
+    // real setTimeout(0) to fire (it failed in both full web runs while passing alone), so hold the macrotask back and
+    // let only microtasks pass.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const onPublish = vi.fn().mockResolvedValue(undefined);
+      render(<PublishModal {...props({ onPublish })} />);
+      act(() => {
+        publishBtn().click();
+      });
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      fireEvent.click(publishBtn());
+      expect(onPublish).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
