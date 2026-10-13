@@ -19,8 +19,14 @@ import { logger } from '../logger';
 
 /** Revokes every OAuth grant currently held by the given user. */
 export async function revokeAllUserGrants(oauth: OAuthHelpers, userId: string): Promise<void> {
-    const { items } = await oauth.listUserGrants(userId);
-    await Promise.all(items.map((grant) => oauth.revokeGrant(grant.id, userId)));
+    // A page is at most `limit` grants (KV list pagination); a user with more
+    // than one page would otherwise keep every grant past the first.
+    let cursor: string | undefined;
+    do {
+        const page = await (cursor ? oauth.listUserGrants(userId, { cursor }) : oauth.listUserGrants(userId));
+        await Promise.all(page.items.map((grant) => oauth.revokeGrant(grant.id, userId)));
+        cursor = page.cursor;
+    } while (cursor);
 }
 
 /**

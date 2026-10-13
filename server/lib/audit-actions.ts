@@ -153,6 +153,7 @@ export type AuditAction =
     | 'sms.compliance.provision'
     | 'sms.compliance.resubmit'
     | 'mcp.grant.created'
+    | 'native.grant.created'
     | 'mcp.grant.revoked'
     // Commercial PCA Phase M — ASTM compliance artifacts (dual sign-off / PSQ / doc-review).
     | 'inspection.compliance.signoff'

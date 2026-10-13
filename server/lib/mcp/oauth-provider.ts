@@ -1,4 +1,5 @@
-import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
+import { OAuthError, OAuthProvider, getOAuthApi, type OAuthProviderOptions, type TokenExchangeCallbackResult } from '@cloudflare/workers-oauth-provider';
+import { nativeTokenExchange } from '../auth/native-token';
 import { InspectorMcp } from '../../durable-objects/inspector-mcp';
 import type { McpProps } from '../../durable-objects/inspector-mcp';
 import { oauthProviderEnabled } from './flag';
@@ -85,7 +86,7 @@ export function buildOAuthHandler(
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const provider = new OAuthProvider<any>({
+    const options: OAuthProviderOptions<any> = {
         apiRoute,
         apiHandler,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -114,7 +115,28 @@ export function buildOAuthHandler(
         // protected. Setting this to false both narrows the advertisement to
         // `["S256"]` and makes the parse REFUSE plain instead of accepting it.
         allowPlainPKCE: false,
-    });
+        // Native grants: 1h access token, refresh token with no fixed expiry and
+        // a sliding 90-day idle limit (see nativeTokenExchange). MCP grants
+        // return undefined and keep the library defaults. A denial revokes the
+        // grant, then throws OAuthError so the client gets 400 invalid_grant;
+        // any other thrown error would surface as a 500.
+        tokenExchangeCallback: async (opts): Promise<TokenExchangeCallbackResult | void> => {
+            const decision = nativeTokenExchange(opts.props, opts.grantType, Math.floor(Date.now() / 1000));
+            if (!decision) return;
+            if (decision.kind === 'deny') {
+                await getOAuthApi(options, env).revokeGrant(opts.grantId, opts.userId);
+                throw new OAuthError('invalid_grant', { description: 'Refresh token unused for too long' });
+            }
+            // The provider tests for the PRESENCE of `refreshTokenTTL` on a code exchange, so the
+            // native result carries it as an explicit undefined (no fixed expiry). The library types
+            // it as `number`, which `exactOptionalPropertyTypes` will not widen; Object.assign copies
+            // the key, undefined value included, without an assertion.
+            const result: TokenExchangeCallbackResult = {};
+            Object.assign(result, decision.result);
+            return result;
+        },
+    };
+    const provider = new OAuthProvider<any>(options); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     return { fetch: (req, e, ctx) => provider.fetch(req, e, ctx) };
 }

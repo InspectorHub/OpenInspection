@@ -57,7 +57,7 @@ export default defineConfig({
                 // chain reads on every request. Without them the chain throws
                 // before it does any of the work `middleware-d1-floor.spec.ts`
                 // exists to count.
-                kvNamespaces: { TENANT_CACHE: 'test-tenant-cache' },
+                kvNamespaces: { TENANT_CACHE: 'test-tenant-cache', OAUTH_KV: 'test-oauth-kv' },
                 bindings: {
                     JWT_CURRENT_KID: 'v1',
                     JWT_PRIVATE_KEY_V1: testKeyPair.privateKey,

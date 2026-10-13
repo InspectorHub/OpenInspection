@@ -83,3 +83,31 @@ export async function resolveNativeToken(env: NativeTokenEnv, token: string): Pr
   if (!row || !isNativeRole(row.role)) return null;
   return { ...props, role: row.role };
 }
+
+const ACCESS_TOKEN_TTL_S = 3600;
+/** A native grant unused for this long is refused and revoked. */
+export const NATIVE_IDLE_LIMIT_S = 90 * 86400;
+
+export type NativeExchangeDecision =
+  | { kind: 'allow'; result: { accessTokenTTL: number; refreshTokenTTL?: undefined; newProps?: NativeProps } }
+  | { kind: 'deny' };
+
+/**
+ * Native refresh tokens follow the common sliding rule: they never expire on a
+ * fixed date, but a grant left unused for 90 days is refused. The provider fixes
+ * a refresh expiry per grant and cannot change it on refresh, so the idle clock
+ * lives in the grant props and is checked here.
+ *
+ * `refreshTokenTTL: undefined` is only legal on the code exchange; the provider
+ * rejects the key on a refresh (even when undefined), so the refresh result
+ * must not carry it. Returns undefined for non-native grants (library defaults).
+ */
+export function nativeTokenExchange(props: unknown, grantType: string, nowSec: number): NativeExchangeDecision | undefined {
+  if (!isNativeProps(props)) return undefined;
+  const newProps: NativeProps = { ...props, lastUsedAt: nowSec };
+  if (grantType === 'authorization_code') {
+    return { kind: 'allow', result: { accessTokenTTL: ACCESS_TOKEN_TTL_S, refreshTokenTTL: undefined, newProps } };
+  }
+  if (nowSec - props.lastUsedAt > NATIVE_IDLE_LIMIT_S) return { kind: 'deny' };
+  return { kind: 'allow', result: { accessTokenTTL: ACCESS_TOKEN_TTL_S, newProps } };
+}

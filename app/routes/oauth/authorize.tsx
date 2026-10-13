@@ -18,6 +18,7 @@ import { cloudflareContext, getCloudflareEnv } from "~/lib/load-context";
 import { writeAuditLog } from "../../../server/lib/audit";
 import { getDeploymentProfile } from "../../../server/lib/deployment-profile";
 import type { WorkerEnv } from "../../../workers/env";
+import { completeNativeAuthorization, isNativeAuthRequest } from "../../../server/lib/auth/native-consent";
 
 export function meta() {
   return [{ title: m.oauth_authorize_meta_title() }];
@@ -112,16 +113,21 @@ export function isRegisteredRedirectUri(
  * normalized `url`, not `request.url`, whose `.data` suffix under
  * v8_passThroughRequests would be baked into the returnTo (bites on the action
  * path: a form POST from a client-side navigation).
+ *
+ * A native client's request (scope=native in the query) adds `app=1` so the
+ * login page can tell it is serving the app's sign-in. The scope is read from
+ * the query because no session exists yet to parse the request with.
  */
 function loginRedirect(env: WorkerEnv & AuthorizeEnv, url: URL): Response {
   const { loginRedirectBase } = getDeploymentProfile(env);
+  const app = isNativeAuthRequest(url.searchParams.get("scope")?.split(" ")) ? "app=1&" : "";
   if (loginRedirectBase) {
     // Cross-origin bounce to the portal — send the absolute authorize URL.
-    return redirect(`${loginRedirectBase}/login?returnTo=${encodeURIComponent(url.href)}`);
+    return redirect(`${loginRedirectBase}/login?${app}returnTo=${encodeURIComponent(url.href)}`);
   }
   // Standalone: relative path back to this same authorize URL (incl. query).
   const here = `${url.pathname}${url.search}`;
-  return redirect(`/login?returnTo=${encodeURIComponent(here)}`);
+  return redirect(`/login?${app}returnTo=${encodeURIComponent(here)}`);
 }
 
 export async function loader({ request, url, context }: Route.LoaderArgs) {
@@ -152,6 +158,7 @@ export async function loader({ request, url, context }: Route.LoaderArgs) {
     modules: visibleModuleGroups(identity.role),
     canWrite: roleCanWrite(identity.role),
     oauthReqJson: JSON.stringify(authReq),
+    native: isNativeAuthRequest(authReq.scope),
   };
 }
 
@@ -192,6 +199,18 @@ export async function action({ request, url, context }: Route.ActionArgs) {
     u.searchParams.set("error", "access_denied");
     if (authReq.state) u.searchParams.set("state", authReq.state);
     return redirect(u.toString());
+  }
+
+  if (isNativeAuthRequest(authReq.scope)) {
+    const redirectTo = await completeNativeAuthorization({
+      oauth: env.OAUTH_PROVIDER,
+      db: env.DB,
+      authReq,
+      clientName,
+      identity,
+      ctx: context?.get(cloudflareContext).ctx,
+    });
+    return redirect(redirectTo);
   }
 
   const visible = visibleModuleGroups(identity.role);
