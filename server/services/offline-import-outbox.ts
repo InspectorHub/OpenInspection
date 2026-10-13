@@ -4,15 +4,21 @@
  * Three guards stand between a package and a double write, and they cover
  * different things:
  *
- *  - a CREATE is held by the client-chosen inspection id: replaying it finds the
- *    row and answers 200, however much time has passed;
+ *  - a CREATE is held by the client-chosen inspection id: replaying it while the
+ *    inspection exists finds the row and answers 200;
  *  - the 24 hour `Idempotency-Key` ledger replays the stored answer for a repeat
  *    that arrives inside its window (kept, because it is harmless);
- *  - an UPDATE or COMPLETE is a last-writer-wins overwrite, so a repeat after the
- *    ledger row expired would put an old value over a newer edit. The
- *    `offline_import_applied` table is what holds the line there: an entry whose
- *    key is recorded is skipped BEFORE the route is called, and a key is recorded
- *    only after the route answered 2xx, so a refused entry stays retryable.
+ *  - the `offline_import_applied` table holds the line for every operation. An
+ *    UPDATE or COMPLETE is a last-writer-wins overwrite, so a repeat after the
+ *    ledger row expired would put an old value over a newer edit. A CREATE is
+ *    recorded too, because the client id only holds while the inspection exists:
+ *    once an admin deletes it, a repeat would create it again and the results and
+ *    photos would follow. An entry whose key is recorded is skipped BEFORE the
+ *    route is called, and a key is recorded only after the route answered 2xx
+ *    (a create that answers 200 found the inspection already there and counts),
+ *    so a refused entry stays retryable. The importer refuses a package whose
+ *    recorded create names an inspection that no longer exists; see
+ *    `findDeletedCreates`.
  *
  * Crash window: the record is written straight after the route answers. If the
  * Worker dies between the two, a retry applies that one write again. That is the
@@ -101,7 +107,7 @@ function isPermanentRefusal(status: number): boolean {
     return status >= 400 && status < 500 && status !== 408 && status !== 429;
 }
 
-async function recordedKeys(c: Context<HonoConfig>, tenantId: string, keys: readonly string[]): Promise<Set<string>> {
+export async function recordedKeys(c: Context<HonoConfig>, tenantId: string, keys: readonly string[]): Promise<Set<string>> {
     const db = getDrizzle(c);
     const found = new Set<string>();
     for (let i = 0; i < keys.length; i += LOOKUP_CHUNK) {
@@ -121,6 +127,23 @@ async function record(c: Context<HonoConfig>, tenantId: string, userId: string, 
 }
 
 /**
+ * Ids of inspections this package would create although an earlier import
+ * already did: `candidates` are the creates whose inspection is NOT in the
+ * database, and a recorded create among them means it was created and later
+ * deleted. Reads only.
+ */
+export async function findDeletedCreates(
+    c: Context<HonoConfig>,
+    tenantId: string,
+    candidates: readonly OutboxEntry[],
+): Promise<string[]> {
+    const creates = candidates.filter((e) => e.op === 'inspection.create');
+    if (creates.length === 0) return [];
+    const recorded = await recordedKeys(c, tenantId, creates.map((e) => e.idempotencyKey));
+    return creates.filter((e) => recorded.has(e.idempotencyKey)).map((e) => e.payload.id);
+}
+
+/**
  * Replay `entries` in order. With `tolerateRefusals` a permanent 4xx from the
  * target route is reported in `failed` and the next entry still runs; without it,
  * and for every 5xx, 408 and 429 either way, the first refusal throws and the
@@ -137,13 +160,11 @@ export async function applyOutbox(
     const userId = c.get('user')?.sub;
     if (!tenantId || !userId) throw Errors.Unauthorized();
 
-    // Creates are held by the client id; only overwrites need the durable record.
-    const guarded = (e: OutboxEntry) => e.op !== 'inspection.create';
-    const already = await recordedKeys(c, tenantId, entries.filter(guarded).map((e) => e.idempotencyKey));
+    const already = await recordedKeys(c, tenantId, entries.map((e) => e.idempotencyKey));
     const { app } = await import('../index');
 
     for (const entry of entries) {
-        if (guarded(entry) && already.has(entry.idempotencyKey)) {
+        if (already.has(entry.idempotencyKey)) {
             result.skipped++;
             continue;
         }
@@ -157,7 +178,7 @@ export async function applyOutbox(
             }
             throw failureFor(res.status, `Queued write ${entry.idempotencyKey} (${entry.op}) was refused`, details);
         }
-        if (guarded(entry)) await record(c, tenantId, userId, entry);
+        await record(c, tenantId, userId, entry);
         // A create that answers 200 found the inspection already there; any other
         // write is a repeat when the idempotency layer replayed its stored answer.
         const repeat = res.headers.get('Idempotency-Replayed') === 'true'

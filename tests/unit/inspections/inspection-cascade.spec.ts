@@ -92,6 +92,12 @@ describe('deleteInspectionCascade', () => {
         expect(names.has('inspections')).toBe(false);
     });
 
+    it('keeps the offline import record: it is what stops a repeat import from reviving a deleted inspection', () => {
+        const names = new Set(inspectionScopedTables().map(getTableName));
+        expect(names.has('offline_import_applied')).toBe(false);
+        expect(names.has('inspection_results')).toBe(true);
+    });
+
     /**
      * A published report's courtesy translation dies with the inspection.
      *

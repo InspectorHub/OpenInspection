@@ -7,7 +7,9 @@
  *     directory, the manifest, media index and outbox are parsed, the manifest's
  *     tenant must be the session's tenant, every inspection the package names
  *     must either be one the IMPORTER may edit or be created by the package's own
- *     outbox, and every id the other entries mention must be in the manifest. A
+ *     outbox (unless an earlier import already created it and it has since been
+ *     deleted, which refuses the package with 409 PACKAGE_INSPECTION_DELETED), and
+ *     every id the other entries mention must be in the manifest. A
  *     package that fails any of this changes nothing, for every inspection in it.
  *  2. APPLY: queued creates, then photos, then Yjs updates with pending-photo
  *     resolution, then the remaining queued writes. Each step is idempotent, so a
@@ -23,8 +25,8 @@
 
 import type { Context } from 'hono';
 import { and, eq, inArray } from 'drizzle-orm';
-import { Errors, type AppError } from '../lib/errors';
-import { applyOutbox, type OutboxFailure } from './offline-import-outbox';
+import { AppError, ErrorCode, Errors } from '../lib/errors';
+import { applyOutbox, findDeletedCreates, type OutboxFailure } from './offline-import-outbox';
 import { auditFromContext } from '../lib/audit';
 import { inspections } from '../lib/db/schema';
 import { getDrizzle } from '../lib/route-helpers';
@@ -156,6 +158,20 @@ async function validate(c: Context<HonoConfig>, zip: Uint8Array): Promise<Import
             throw Errors.BadRequest(`Invalid offline package: inspection ${id} was exported from a different report`);
         }
         identities.set(id, auth);
+    }
+
+    // A create an earlier import already applied, for an inspection that is gone
+    // now, was deleted on purpose. Running it again would bring the inspection
+    // back and the results and photos with it, so the whole package is refused
+    // before anything is written.
+    const missingCreates = outbox.filter((e) => e.op === 'inspection.create' && !existing.has(e.payload.id));
+    const deleted = await findDeletedCreates(c, tenantId, missingCreates);
+    if (deleted.length > 0) {
+        throw new AppError(
+            409, ErrorCode.PACKAGE_INSPECTION_DELETED,
+            `Inspection ${deleted[0]} was created by an earlier import of this package and has since been deleted`,
+            { inspectionId: deleted[0], inspectionIds: deleted },
+        );
     }
 
     // An inspection that does not exist must be created by the package itself.

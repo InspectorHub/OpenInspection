@@ -294,6 +294,15 @@ describe('offline package request body', () => {
         expect(arrayBuffersWhilePending - baseline).toBeLessThan(4 * 1024 * 1024);
     });
 
+    it('measures a real allocation the same way (positive control for the pre-allocation check above)', () => {
+        const baseline = process.memoryUsage().arrayBuffers;
+        const held = new Uint8Array(MAX_PACKAGE_BYTES);
+        held[held.length - 1] = 1; // keep the buffer live and touched until the measurement
+        const grown = process.memoryUsage().arrayBuffers - baseline;
+        expect(held[held.length - 1]).toBe(1);
+        expect(grown, 'the measurement must be able to see a 24 MiB buffer').toBeGreaterThan(4 * 1024 * 1024);
+    });
+
     it('reads a body delivered in several chunks (positive control for the chunked path)', async () => {
         const parts = [new Uint8Array([1, 2]), new Uint8Array([3]), new Uint8Array([4, 5, 6])];
         const stream = new ReadableStream<Uint8Array>({

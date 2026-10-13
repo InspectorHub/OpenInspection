@@ -15,6 +15,8 @@
 import { env as testEnv, runInDurableObject } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import * as Y from 'yjs';
+import { drizzle } from 'drizzle-orm/d1';
+import { deleteInspectionCascade } from '../../../server/services/inspection/inspection-cascade';
 import app from '../../../server/index';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { NATIVE_SCOPE, type NativeProps } from '../../../server/lib/auth/native-token';
@@ -631,6 +633,96 @@ describe('POST /api/client/import', () => {
             outbox: [{ idempotencyKey: key, op: 'inspection.update', payload: { id: insp.id, propertyAddress: '62 Fixed Road' } }],
         })));
         expect((await body(fixed)).data?.outbox).toEqual({ applied: 1, skipped: 0, failed: [] });
+        expect(await recordedCount(key)).toBe(1);
+    });
+
+    // ── 7c. A create is recorded too ──────────────────────────────────────────
+
+    it('refuses to bring back an inspection that an earlier import created and an admin then deleted (positive control: the replay before the delete)', async () => {
+        const id = fresh('insp-revive');
+        const createKey = fresh('k');
+        const spec: PackageSpec = {
+            tenantId: TENANT, exportedBy: author.id, inspections: [{ id, reportId: 'device-report' }],
+            yjs: { [id]: deviceState('RR', 'pend-1') },
+            media: [{ pendingId: 'pend-1', inspectionId: id, contentType: 'image/jpeg' }],
+            outbox: [{ idempotencyKey: createKey, op: 'inspection.create', payload: { id, propertyAddress: '8 Revive Road, Town', templateId: TEMPLATE } }],
+        };
+        const zip = buildPackage(spec);
+        const first = await importPackage(manager.token, zip);
+        expect(first.status, await first.clone().text()).toBe(200);
+        expect((await body(first)).data?.outbox).toEqual({ applied: 1, skipped: 0, failed: [] });
+        expect(await recordedCount(createKey)).toBe(1);
+
+        // Control: while the inspection exists, a repeat succeeds and everything is skipped.
+        const replay = await importPackage(manager.token, zip);
+        expect(replay.status, await replay.clone().text()).toBe(200);
+        expect((await body(replay)).data).toMatchObject({ outbox: { applied: 0, skipped: 1, failed: [] }, yjs: { changed: 0, unchanged: 1 } });
+
+        const reportRow = await b.DB.prepare('SELECT id FROM reports WHERE inspection_id = ?').bind(id).first<{ id: string }>();
+        const insp: Created = { id, reportId: reportRow!.id };
+        const snapshotsBefore = await snapshotCount(insp);
+        // The results object debounces a persist after the import. Let that debounce go (timer and alarm)
+        // so it cannot write into the inspection while the test deletes it; the delete itself is the subject here.
+        await runInDurableObject(stubFor(insp), async (instance: InspectionDocDO, state) => {
+            const timers = instance as unknown as { persistTimer: ReturnType<typeof setTimeout> | null };
+            if (timers.persistTimer !== null) clearTimeout(timers.persistTimer);
+            timers.persistTimer = null;
+            await state.storage.deleteAlarm();
+        });
+        await deleteInspectionCascade(drizzle(b.DB), b.PHOTOS, TENANT, id);
+        expect(await addressOf(id)).toBeNull();
+        expect(await photoKeys(insp)).toEqual([]);
+        const countAfterDelete = await inspectionCount();
+
+        const again = await importPackage(manager.token, zip);
+        expect(again.status, await again.clone().text()).toBe(409);
+        const text = await again.text();
+        expect(text).toContain('PACKAGE_INSPECTION_DELETED');
+        expect(text).toContain(id);
+
+        // Nothing was written: no inspection, no photo, no snapshot, no second record.
+        expect(await addressOf(id)).toBeNull();
+        expect(await inspectionCount()).toBe(countAfterDelete);
+        expect(await photoKeys(insp)).toEqual([]);
+        expect(await snapshotCount(insp)).toBe(snapshotsBefore);
+        expect(await recordedCount(createKey)).toBe(1);
+    });
+
+    it('records nothing for a create the server refused, so the same key creates once the entry is valid', async () => {
+        const id = fresh('insp-badcreate');
+        const key = fresh('k');
+        const make = (templateId: string) => buildPackage({
+            tenantId: TENANT, exportedBy: author.id, inspections: [{ id, reportId: 'device-report' }],
+            yjs: { [id]: deviceState('RR') },
+            outbox: [{ idempotencyKey: key, op: 'inspection.create', payload: { id, propertyAddress: '9 Refused Road, Town', templateId } }],
+        });
+        const refused = await importPackage(manager.token, make('no-such-template'));
+        expect(refused.status, await refused.clone().text()).toBeGreaterThanOrEqual(400);
+        expect(await addressOf(id)).toBeNull();
+        expect(await recordedCount(key)).toBe(0);
+
+        const fixed = await importPackage(manager.token, make(TEMPLATE));
+        expect(fixed.status, await fixed.clone().text()).toBe(200);
+        expect((await body(fixed)).data?.outbox).toEqual({ applied: 1, skipped: 0, failed: [] });
+        expect(await addressOf(id)).toBe('9 Refused Road, Town');
+        expect(await recordedCount(key)).toBe(1);
+    });
+
+    it('does not treat another workspace\'s create record as this workspace\'s (positive control: its own record is kept)', async () => {
+        const id = fresh('insp-xtenant');
+        const key = fresh('k');
+        await b.DB.prepare(
+            'INSERT INTO offline_import_applied (tenant_id, idempotency_key, op, inspection_id, applied_at, applied_by) VALUES (?, ?, ?, ?, ?, ?)',
+        ).bind(OTHER_TENANT, key, 'inspection.create', id, Date.now(), 'someone').run();
+        const zip = buildPackage({
+            tenantId: TENANT, exportedBy: author.id, inspections: [{ id, reportId: 'device-report' }],
+            yjs: { [id]: deviceState('RR') },
+            outbox: [{ idempotencyKey: key, op: 'inspection.create', payload: { id, propertyAddress: '10 Other Tenant Road, Town', templateId: TEMPLATE } }],
+        });
+        const res = await importPackage(manager.token, zip);
+        expect(res.status, await res.clone().text()).toBe(200);
+        expect((await body(res)).data?.outbox).toEqual({ applied: 1, skipped: 0, failed: [] });
+        expect(await addressOf(id)).toBe('10 Other Tenant Road, Town');
         expect(await recordedCount(key)).toBe(1);
     });
 

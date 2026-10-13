@@ -41,6 +41,7 @@ const importOfflinePackageRoute = createRoute(withMcpMetadata({
         200: { description: 'Package imported', content: { 'application/json': { schema: ImportOfflinePackageResponseSchema } } },
         400: { description: 'The package is malformed, or names something outside its manifest' },
         403: { description: 'The package belongs to another workspace, or the caller cannot edit one of its inspections' },
+        409: { description: 'PACKAGE_INSPECTION_DELETED: the package would create an inspection that an earlier import created and that has since been deleted; nothing was written' },
         411: { description: 'Content-Length is required' },
         413: { description: 'The package exceeds the size limit' },
     },

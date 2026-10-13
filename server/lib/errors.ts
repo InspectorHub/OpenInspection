@@ -72,6 +72,11 @@ export enum ErrorCode {
     // see. Distinct from CONFLICT so a client that mints its own ids can tell
     // "pick another id" from every other 409.
     ID_CONFLICT = 'ID_CONFLICT',
+    // An offline package would create an inspection that an earlier import of the
+    // same package already created and that has since been deleted. Importing it
+    // again would bring the deleted inspection back, so the whole package is
+    // refused. `details.inspectionId` names the inspection.
+    PACKAGE_INSPECTION_DELETED = 'PACKAGE_INSPECTION_DELETED',
 }
 
 /**

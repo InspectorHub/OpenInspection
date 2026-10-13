@@ -197,5 +197,7 @@ export async function readPackageBody(req: Request, limit: number = MAX_PACKAGE_
         bytes.set(chunk, at);
         at += chunk.byteLength;
     }
+    // Drop the pieces now that they are joined, so the peak stays near one copy.
+    chunks.length = 0;
     return { ok: true, bytes };
 }

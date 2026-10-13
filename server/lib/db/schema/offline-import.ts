@@ -9,6 +9,11 @@ import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core'
  * table is what keeps a repeat import from doing that, for as long as the row
  * exists.
  *
+ * An `inspection.create` is recorded as well. The client-chosen id only keeps a
+ * create from running twice while the inspection exists; once it is deleted, the
+ * record is what tells the importer not to bring it back. For that reason the
+ * inspection delete cascade leaves this table alone.
+ *
  * Rows are written only after the target route answered 2xx. They are never
  * swept: each is a few dozen bytes and only an imported package produces one, so
  * the table grows with imports, not with traffic. A retention policy is a

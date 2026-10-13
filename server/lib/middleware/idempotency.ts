@@ -60,7 +60,8 @@ export function idempotencyMiddleware(opts: IdempotencyOptions = {}): Middleware
         // size cap). With no fingerprint, one key reused for two different packages would
         // replay the first one's answer and import nothing. The route is idempotent per
         // queued write on its own, so it takes no cached answer from this layer.
-        if ((c.req.header('content-type') ?? '').includes('application/zip')) return next();
+        // Narrowed to that one route: a zip body anywhere else is guarded like any other request.
+        if (c.req.path.startsWith('/api/client/import') && (c.req.header('content-type') ?? '').includes('application/zip')) return next();
 
         const tenantId = c.get('tenantId');
         if (!tenantId) return next();

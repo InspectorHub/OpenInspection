@@ -5,7 +5,7 @@
  * rather than inferred from a response body.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { createTestDb, setupSchema } from '../db';
 import { idempotencyMiddleware } from '../../../server/lib/middleware/idempotency';
 import { claimKey } from '../../../server/lib/idempotency/store';
@@ -28,11 +28,21 @@ function buildApp(handler: Handler, tenantId = 't1') {
         await next();
     });
     app.use('*', idempotencyMiddleware({ getDb: () => db as never }));
-    app.post('/thing', async (c) => {
+    const run = async (c: Context<HonoConfig>) => {
         const out = await handler();
         return c.json(out.body as Record<string, unknown>, out.status as 200);
-    });
+    };
+    app.post('/thing', run);
+    app.post('/api/client/import', run);
     return app;
+}
+
+function postZip(app: ReturnType<typeof buildApp>, path: string, key: string, bytes: number[]) {
+    return app.request(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/zip', 'Idempotency-Key': key },
+        body: new Uint8Array(bytes),
+    });
 }
 
 function post(app: ReturnType<typeof buildApp>, key?: string, body: unknown = BODY) {
@@ -61,6 +71,23 @@ describe('idempotencyMiddleware', () => {
         expect((await post(app)).status).toBe(200);
         expect((await post(app)).status).toBe(200);
         expect(ran).toBe(2);
+    });
+
+    it('leaves a zip body on the offline package import to that route: one key, two packages, two runs', async () => {
+        const app = buildApp(ok);
+        expect((await postZip(app, '/api/client/import', 'zip-k', [1, 2, 3])).status).toBe(200);
+        const second = await postZip(app, '/api/client/import', 'zip-k', [9, 9, 9, 9]);
+        expect(second.status).toBe(200);
+        expect(second.headers.get('Idempotency-Replayed')).toBeNull();
+        expect(ran).toBe(2);
+    });
+
+    it('still guards a zip body on any other path (positive control: the same two posts replay)', async () => {
+        const app = buildApp(ok);
+        await postZip(app, '/thing', 'zip-other', [1, 2, 3]);
+        const second = await postZip(app, '/thing', 'zip-other', [1, 2, 3]);
+        expect(second.headers.get('Idempotency-Replayed')).toBe('true');
+        expect(ran).toBe(1);
     });
 
     it('runs the handler on a claim and returns its response', async () => {

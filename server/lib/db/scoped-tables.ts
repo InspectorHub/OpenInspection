@@ -23,5 +23,11 @@ export const tenantScopedTables = (): SQLiteTable[] =>
 // Tables owned by a single inspection (every table with an `inspection_id`
 // column). Used by the inspection-delete cascade. `inspections` itself is keyed
 // by `id`, not `inspection_id`, so it is not in this set and is deleted last.
+//
+// `offline_import_applied` is excluded on purpose: its `inspection.create` rows
+// are how a repeat import of an offline package learns that an inspection it
+// would create was created before and then deliberately deleted. Deleting the
+// record with the inspection would let that package bring it back. The rows hold
+// ids only, and a tenant purge still removes them (they carry `tenant_id`).
 export const inspectionScopedTables = (): SQLiteTable[] =>
-    tablesWithColumn('inspectionId');
+    tablesWithColumn('inspectionId', new Set(['offline_import_applied']));
