@@ -1,6 +1,7 @@
 import { Form } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 interface TurnstilePanelProps {
@@ -10,6 +11,7 @@ interface TurnstilePanelProps {
 }
 
 export function TurnstilePanel({ value, fieldError, saving }: TurnstilePanelProps) {
+  const latch = useSubmitLatch();
   return (
     <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
       <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_turnstile_heading()}</h3>
@@ -20,7 +22,7 @@ export function TurnstilePanel({ value, fieldError, saving }: TurnstilePanelProp
           {m.settings_turnstile_dashboard_link()}
         </a>.
       </p>
-      <Form method="post" className="space-y-3 max-w-xl">
+      <Form method="post" className="space-y-3 max-w-xl" onSubmit={latch()}>
         <input type="hidden" name="intent" value="save-turnstile" />
         <SecretField
           name="TURNSTILE_SECRET_KEY"

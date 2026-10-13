@@ -6,6 +6,7 @@ import { SecretField } from "~/components/SecretField";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import type { action } from "~/routes/settings-communication";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
 type SmsTestFetcher = ReturnType<typeof useFetcher<typeof action>>;
 
@@ -50,12 +51,14 @@ export function SmsSecretsPanel({
   /** Persisted "Test connection" history (shared loader list, filtered to sms). */
   testResults?: ConnectionTestResult[];
 }) {
+  const latch = useSubmitLatch();
+  const testLatch = useSubmitLatch(smsTestFetcher.state);
   const [provider, setProvider] = useState<ByoProvider>(initialProvider);
 
   return (
     <>
         {/* Provider selector + credentials */}
-        <Form method="post" className="space-y-4 pt-4 border-t border-ih-border">
+        <Form method="post" className="space-y-4 pt-4 border-t border-ih-border" onSubmit={latch()}>
           <input type="hidden" name="intent" value="save-sms-secrets" />
           {/* Hidden field carries the selected provider so the action can read it */}
           <input type="hidden" name="sms_byo_provider" value={provider} />
@@ -156,7 +159,7 @@ export function SmsSecretsPanel({
         )}
 
         {/* Send test SMS */}
-        <smsTestFetcher.Form method="post" className="flex flex-wrap items-end gap-3 pt-4 border-t border-ih-border">
+        <smsTestFetcher.Form method="post" className="flex flex-wrap items-end gap-3 pt-4 border-t border-ih-border" onSubmit={testLatch()}>
           <input type="hidden" name="intent" value="test-sms" />
           <div className="flex-1 min-w-[200px]">
             <label htmlFor="sms-test-to" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_smssecrets_test_label()}</label>

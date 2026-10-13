@@ -13,6 +13,7 @@ import { useState } from "react";
 import { Form } from "react-router";
 import { Pill, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -249,6 +250,7 @@ export function ManagedComplianceWizard({ compliance, legalName, managedProvider
   const isNotStarted = compliance.complianceStatus === "not_started";
   const isRejected = compliance.complianceStatus === "rejected";
   const showForm = isNotStarted || isRejected;
+  const latch = useSubmitLatch();
 
   // Carrier selector state — initialized from the loader-supplied stored value.
   const [carrier, setCarrier] = useState<"twilio" | "telnyx">(managedProvider ?? "twilio");
@@ -284,7 +286,7 @@ export function ManagedComplianceWizard({ compliance, legalName, managedProvider
     <div className="space-y-5">
       {/* Managed carrier selector — Twilio or Telnyx for this tenant's dedicated number.
           Separate from the BYO provider shown in 'own' mode (smsByoProvider). */}
-      <Form method="post" className="space-y-3 pb-4 border-b border-ih-border">
+      <Form method="post" className="space-y-3 pb-4 border-b border-ih-border" onSubmit={latch()}>
         <input type="hidden" name="intent" value="save-managed-provider" />
         <input type="hidden" name="managedProvider" value={carrier} />
         <div className="space-y-1.5">
@@ -341,7 +343,7 @@ export function ManagedComplianceWizard({ compliance, legalName, managedProvider
           id="managed-compliance-form"
           method="post"
           className="space-y-4"
-          onSubmit={() => setAttempted(true)}
+          onSubmit={latch(() => setAttempted(true))}
         >
           <input type="hidden" name="intent" value="sms-compliance-provision" />
 

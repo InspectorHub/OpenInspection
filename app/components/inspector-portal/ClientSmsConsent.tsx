@@ -3,6 +3,7 @@ import { Button } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import type { PillTone } from "~/lib/hub-blocks";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import type { action } from "~/routes/inspector-portal";
 
 /**
@@ -23,6 +24,7 @@ export function ClientSmsConsent({
     fetcher: ReturnType<typeof useFetcher<typeof action>>;
     attesting: boolean;
 }) {
+    const latch = useSubmitLatch(fetcher.state);
     const error =
         fetcher.data?.intent === "attest-sms" && !fetcher.data.ok ? fetcher.data.error : undefined;
 
@@ -40,7 +42,7 @@ export function ClientSmsConsent({
             {consent !== "granted" && (
                 <>
                     <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_sms_explainer()}</p>
-                    <fetcher.Form method="post">
+                    <fetcher.Form method="post" onSubmit={latch()}>
                         <input type="hidden" name="intent" value="attest-sms" />
                         <Button type="submit" variant="secondary" size="sm" pending={attesting}>
                             {attesting ? m.inspections_hub_sms_recording() : m.inspections_hub_sms_confirm()}

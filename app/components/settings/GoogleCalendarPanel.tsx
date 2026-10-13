@@ -3,6 +3,7 @@ import { Form, Link } from "react-router";
 import { SegmentedControl, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { SecretField } from "~/components/SecretField";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
 type GoogleOAuthMode = "platform" | "own";
 
@@ -29,6 +30,7 @@ export function GoogleCalendarPanel({
   savingOAuthMode: boolean;
 }) {
   const [oauthMode, setOauthMode] = useState<GoogleOAuthMode>(isSaas ? googleOAuthMode : "own");
+  const latch = useSubmitLatch();
 
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
@@ -63,7 +65,7 @@ export function GoogleCalendarPanel({
               ? m.settings_gcal_mode_platform_desc()
               : m.settings_gcal_mode_own_desc()}
           </p>
-          <Form method="post" className="flex justify-end">
+          <Form method="post" className="flex justify-end" onSubmit={latch()}>
             <input type="hidden" name="intent" value="save-google-oauth-mode" />
             <input type="hidden" name="googleOAuthMode" value={oauthMode} />
             <button
@@ -95,7 +97,7 @@ export function GoogleCalendarPanel({
             </a>
             {m.settings_gcal_redirect_uri()} <code className="text-[11px] font-mono">/api/calendar/callback</code>
           </p>
-          <Form method="post" className="space-y-4">
+          <Form method="post" className="space-y-4" onSubmit={latch()}>
             <input type="hidden" name="intent" value="save-calendar-secrets" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <SecretField

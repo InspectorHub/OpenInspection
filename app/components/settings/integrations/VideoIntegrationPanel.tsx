@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Form } from "react-router";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 interface VideoIntegrationPanelProps {
@@ -18,6 +19,7 @@ export function VideoIntegrationPanel({
   serverError,
   serverField,
 }: VideoIntegrationPanelProps) {
+  const latch = useSubmitLatch();
   const [useStream, setUseStream] = useState(videoMode === "stream");
   const [subdomain, setSubdomain] = useState(streamCustomerSubdomain);
   const [subdomainError, setSubdomainError] = useState<string | undefined>(
@@ -99,7 +101,7 @@ export function VideoIntegrationPanel({
         </div>
       )}
 
-      <Form method="post" className="space-y-4" onSubmit={handleSubmit}>
+      <Form method="post" className="space-y-4" onSubmit={latch(handleSubmit)}>
         <input type="hidden" name="intent" value="save-video" />
 
         {/* Stream toggle */}

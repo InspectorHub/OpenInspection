@@ -3,6 +3,7 @@ import type { Route } from "./+types/sms-optin";
 import { createApi } from "~/lib/api-client.server";
 import { SmsDisclosure } from "~/components/notifications/SmsDisclosure";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -62,6 +63,7 @@ export default function SmsOptinPage() {
     const actionData = useActionData<typeof action>();
     const navigation = useNavigation();
     const submitting = navigation.state === "submitting";
+    const latch = useSubmitLatch();
 
     if (!data) {
         return (
@@ -109,7 +111,7 @@ export default function SmsOptinPage() {
                         {actionData.error}
                     </p>
                 )}
-                <Form method="post">
+                <Form method="post" onSubmit={latch()}>
                     <button
                         type="submit"
                         {...pendingProps(submitting)}

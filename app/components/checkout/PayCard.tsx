@@ -6,7 +6,7 @@ import { formatCurrency } from "~/lib/format";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 import { buildStripeElementsOptions } from "~/lib/stripe-elements-options";
 import { m } from "~/paraglide/messages";
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 
 /* ------------------------------------------------------------------ */
 /*  Step 2 — Pay card (reuses the invoice page's Stripe pay flow)       */
@@ -106,6 +106,7 @@ function PayPanel({
     const locale = useDisplayLocale();
     const sessionCurrency = useDisplayCurrency();
     const currency = invoiceCurrency || sessionCurrency;
+    const latch = useActionLatch(phase === "loading");
 
     async function startPayment() {
         if (!portalToken) {
@@ -152,7 +153,7 @@ function PayPanel({
                 <>
                     <button
                         type="button"
-                        {...pendingProps(phase === "loading", startPayment)}
+                        {...pendingProps(phase === "loading", () => latch(startPayment))}
                         className={`w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait ${PENDING_CLASS}`}
                     >
                         {phase === "loading" ? m.checkout_pay_starting() : m.checkout_pay_button({ amount: formatCurrency(amountCents, { locale, currency }) })}
@@ -200,9 +201,9 @@ function CheckoutPayForm({ amountCents, returnUrl, currency: invoiceCurrency }: 
     const locale = useDisplayLocale();
     const sessionCurrency = useDisplayCurrency();
     const currency = invoiceCurrency || sessionCurrency;
+    const latch = useActionLatch(submitting);
 
-    async function onSubmit(e: React.FormEvent) {
-        e.preventDefault();
+    async function confirm() {
         if (!stripe || !elements) return;
         setSubmitting(true);
         setError(null);
@@ -214,6 +215,11 @@ function CheckoutPayForm({ amountCents, returnUrl, currency: invoiceCurrency }: 
             setError(payErr.message ?? m.checkout_pay_error_failed());
             setSubmitting(false);
         }
+    }
+
+    function onSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        latch(confirm);
     }
 
     return (

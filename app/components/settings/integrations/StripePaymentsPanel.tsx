@@ -7,6 +7,7 @@ import { WebhookStatusBadge } from "./WebhookStatusBadge";
 import { useChromeDateTimeFormat, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { formatShapedDateTime } from "~/lib/format-date";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 type WebhookLogEntry = { ts: string; eventType: string; result: string };
@@ -60,6 +61,7 @@ export function StripePaymentsPanel({
 }: StripePaymentsPanelProps) {
   // Eager-after-error client validation: validate on submit; after the first
   // failed submit, re-validate on every change inside the form.
+  const latch = useSubmitLatch();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submittedOnce, setSubmittedOnce] = useState(false);
 
@@ -100,12 +102,12 @@ export function StripePaymentsPanel({
       <Form
         method="post"
         className="space-y-4 max-w-xl"
-        onSubmit={(e) => {
+        onSubmit={latch((e) => {
           const errs = validateStripeForm(new FormData(e.currentTarget));
           setSubmittedOnce(true);
           setFieldErrors(errs);
           if (Object.keys(errs).length > 0) e.preventDefault();
-        }}
+        })}
         onChange={(e) => {
           if (submittedOnce) {
             setFieldErrors(validateStripeForm(new FormData(e.currentTarget)));

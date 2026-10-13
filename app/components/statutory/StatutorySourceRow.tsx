@@ -168,6 +168,7 @@ export function StatutorySourceRow({
                 </Banner>
             )}
 
+            {/* busy-controls-allow: idempotent multipart upload; the server admits exactly one byte sequence per revision, so a second post overwrites the stored bytes with themselves (see the component doc comment) */}
             <Form method="post" encType="multipart/form-data" className="space-y-3">
                 {/* Both identify the target, and both travel in the BODY. The
                     revision label is the authority's own and contains slashes

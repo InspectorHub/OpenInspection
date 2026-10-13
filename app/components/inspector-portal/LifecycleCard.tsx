@@ -65,6 +65,7 @@ export function LifecycleCard({
                         never a precondition — it outranked Publish report, which
                         is the irreversible one. */}
                     <div className="flex flex-wrap items-center gap-2">
+                        {/* busy-controls-allow: POST /:id/complete is idempotent server-side (an already completed inspection short-circuits before any write or automation), so a same-frame double click is harmless */}
                         <fetcher.Form method="post">
                             <input type="hidden" name="intent" value="complete" />
                             <Button type="submit" variant="secondary" size="sm" disabled={marking}>

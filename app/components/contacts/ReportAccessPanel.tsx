@@ -1,6 +1,7 @@
 import { Link, useFetcher } from "react-router";
 import { Card, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
 export interface AccessRow {
   inspectionId: string;
@@ -43,6 +44,7 @@ export function ReportAccessPanel({
 }) {
   const revokeFetcher = useFetcher<{ ok: boolean; revoked: number }>();
   const revoking = revokeFetcher.state !== "idle";
+  const latch = useSubmitLatch(revokeFetcher.state);
   // While a revoke is in flight the PREVIOUS result is stale — reporting it
   // would answer the new request with the old request's number.
   const revokeResult = revoking ? null : revokeFetcher.data;
@@ -54,7 +56,7 @@ export function ReportAccessPanel({
           {m.contacts_detail_access_heading()}
         </h2>
         {!accessFailed && access.length > 0 && (
-          <revokeFetcher.Form method="post">
+          <revokeFetcher.Form method="post" onSubmit={latch()}>
             <input type="hidden" name="intent" value="revoke-access" />
             <button
               type="submit"
@@ -116,7 +118,7 @@ export function ReportAccessPanel({
                       client would be a second, wrong answer. */}
                   <p className="text-[11px] text-ih-fg-3">{a.roleLabel ?? a.role}</p>
                 </div>
-                <revokeFetcher.Form method="post">
+                <revokeFetcher.Form method="post" onSubmit={latch()}>
                   <input type="hidden" name="intent" value="revoke-access" />
                   <input type="hidden" name="inspectionId" value={a.inspectionId} />
                   <button

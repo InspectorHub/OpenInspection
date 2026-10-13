@@ -202,3 +202,30 @@ describe("embedded booking form: bot challenge", () => {
         expect(postedUrl()).toContain("embed=1");
     });
 });
+
+describe("embedded booking form: same-frame duplicate submits", () => {
+    it("posts one booking for two submits in one frame, and again once the first settles", async () => {
+        renderEmbed({ siteKey: "" });
+        fillRequired();
+        const form = document.querySelector("form")!;
+        const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+        act(() => { fireEvent.submit(form); fireEvent.submit(form); });
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(button.getAttribute("aria-disabled")).not.toBe("true"));
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        submit();
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    });
+
+    it("a duplicate vetoed for a missing token never reaches fetch, and a solved submit still goes through", async () => {
+        renderEmbed();
+        fillRequired();
+        const form = document.querySelector("form")!;
+        act(() => { fireEvent.submit(form); fireEvent.submit(form); });
+        expect(fetchMock).not.toHaveBeenCalled();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        act(() => solve!("tok"));
+        submit();
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    });
+});
