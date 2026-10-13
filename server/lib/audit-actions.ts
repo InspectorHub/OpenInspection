@@ -159,6 +159,10 @@ export type AuditAction =
     | 'sms.compliance.resubmit'
     | 'mcp.grant.created'
     | 'native.grant.created'
+    // An offline package imported by a member other than (or the same as) the one who
+    // exported it. One entry per import: the package's contents change many
+    // records at once, and `exportedBy` here is the exporter's claim, not authority.
+    | 'native.offline_import'
     | 'mcp.grant.revoked'
     // Commercial PCA Phase M — ASTM compliance artifacts (dual sign-off / PSQ / doc-review).
     | 'inspection.compliance.signoff'

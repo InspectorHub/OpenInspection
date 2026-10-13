@@ -19,3 +19,16 @@ export const ClientSessionResponseSchema = createApiResponseSchema(z.object({
     role: z.string().describe('Role of the signed-in user'),
     offlineMaxDays: z.number().int().describe('Days the device may stay offline before locking'),
 }));
+
+export const ImportOfflinePackageResponseSchema = createApiResponseSchema(z.object({
+    inspections: z.number().int().describe('Inspections the package covered'),
+    photos: z.number().int().describe('Photos written to storage'),
+    outbox: z.object({
+        applied: z.number().int().describe('Queued writes executed by this import'),
+        skipped: z.number().int().describe('Queued writes that had already been applied'),
+    }),
+    yjs: z.object({
+        changed: z.number().int().describe('Inspections whose results changed'),
+        unchanged: z.number().int().describe('Inspections whose results were already up to date'),
+    }),
+}));

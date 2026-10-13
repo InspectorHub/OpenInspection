@@ -9864,6 +9864,22 @@
     "description": "Auto-generated placeholder for importMarketplace (POST /{id}/import, marketplace domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "importOfflinePackage",
+    "method": "POST",
+    "pathTemplate": "/api/client/import",
+    "scopes": [
+      "write"
+    ],
+    "tag": "client",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Import an exported offline data package",
+    "description": "Imports a zip written by a native device that could not sync, on behalf of the signed-in member. The whole package is validated and every inspection in it is authorized for the caller before anything is written, so a package that names one inspection the caller may not edit changes nothing. Importing the same package again is safe and reports its queued writes as skipped. Requires a Content-Length header."
+  },
+  {
     "operationId": "importTenant",
     "method": "POST",
     "pathTemplate": "/api/admin/import",

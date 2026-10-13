@@ -197,6 +197,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     },
     'mcp.grant.created': { family: 'mcp_grant', label: 'audit_action_mcp_grant_created', meta: { clientId: 'id' }, status: { kind: 'live' } },
     'native.grant.created': { family: 'mcp_grant', label: 'audit_action_native_grant_created', meta: { clientId: 'id' }, status: { kind: 'live' } },
+    'native.offline_import': { family: 'tenant', label: 'audit_action_native_offline_import', meta: { applied: 'count', changed: 'count', deviceId: 'name', exportedBy: 'person', inspections: 'count', photos: 'count', skipped: 'count' }, status: { kind: 'live' } },
     'mcp.grant.revoked': { family: 'mcp_grant', label: 'audit_action_mcp_grant_revoked', meta: { admin: 'person', targetUserId: 'person' }, status: { kind: 'live' } },
     // The import pipeline, one entry per decision. `migration.abandoned` and
     // `migration.remapped` carry no metadata on purpose: what they record is
