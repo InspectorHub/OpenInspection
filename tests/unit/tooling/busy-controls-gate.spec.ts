@@ -90,8 +90,8 @@ describe('busy-controls detector', () => {
     describe('a bare <button> inside a form defaults to submit', () => {
         it('flags a <button> with no type inside <form>, <Form> and fetcher.Form', () => {
             expect(rules('<form><button>Save</button></form>')).toEqual(['submit-unprotected']);
-            expect(rules('<Form method="post"><div><button>Save</button></div></Form>')).toEqual(['submit-unprotected']);
-            expect(rules('<fetcher.Form method="post"><button>Save</button></fetcher.Form>')).toEqual(['submit-unprotected']);
+            expect(rules('const l = useSubmitLatch(go); <Form method="post"><div><button>Save</button></div></Form>')).toEqual(['submit-unprotected']);
+            expect(rules('const l = useSubmitLatch(go); <fetcher.Form method="post"><button>Save</button></fetcher.Form>')).toEqual(['submit-unprotected']);
         });
         it('does not flag it when protected, typed as button, outside the form, or a shared-ui <Button>', () => {
             expect(rules('<form><button disabled={!ok}>Save</button></form>')).toEqual([]);
@@ -159,6 +159,46 @@ describe('busy-controls detector', () => {
         it('exempts only the next tag, not the ones after it', () => {
             const src = '{/* busy-controls-allow: ok */}\n<button type="submit">A</button>\n<button type="submit">B</button>';
             expect(run(src).violations.map((v) => v.line)).toEqual([3]);
+        });
+    });
+
+    describe('form-without-latch (file-level, coarse by design)', () => {
+        const nl = String.fromCharCode(10);
+        it.each([
+            ['fetcher.Form', '<fetcher.Form method="post"><input /></fetcher.Form>'],
+            ['a member .Form', '<save.Form method="put"><input /></save.Form>'],
+            ['<Form method="post">', '<Form method="post"><input /></Form>'],
+            ['<form onSubmit>', '<form onSubmit={go}><input /></form>'],
+            ['a dynamic method', '<Form method={m}><input /></Form>'],
+        ])('flags %s in a file with no same-frame protection', (_n, src) => {
+            expect(rules(src)).toEqual(['form-without-latch']);
+        });
+        it.each(['useSubmitLatch', 'useActionLatch', 'useGuardedSubmit', 'latch(', 'inFlight', 'gatedSubmit', 'guardedSubmit', 'busyRef'])(
+            'is clean when the file names %s',
+            (id) => {
+                expect(rules(`const g = ${id}${id.endsWith('(') ? ')' : ''};${nl}<Form method="post"><input /></Form>`)).toEqual([]);
+            },
+        );
+        it('does not flag a GET form or a form with neither method nor onSubmit', () => {
+            expect(rules('<Form method="get"><input /></Form>')).toEqual([]);
+            expect(rules("<form method={'GET'}><input /></form>")).toEqual([]);
+            expect(rules('<Form action="/x"><input /></Form>')).toEqual([]);
+        });
+        it('still flags when the protection is named only in a comment or a string', () => {
+            expect(rules('// useSubmitLatch lives in the parent' + nl + '<Form method="post" />')).toEqual(['form-without-latch']);
+            expect(rules('/* latch( */ <form onSubmit={go} />')).toEqual(['form-without-latch']);
+            expect(rules('const s = "useActionLatch inFlight";' + nl + '<Form method="post" />')).toEqual(['form-without-latch']);
+        });
+        it('honours the allow marker with a reason, not an empty one', () => {
+            expect(rules('{/* busy-controls-allow: idempotent upload */}' + nl + '<Form method="post" />')).toEqual([]);
+            expect(rules('{/* busy-controls-allow: */}' + nl + '<Form method="post" />')).toEqual(['form-without-latch']);
+        });
+        it('reports the form tag line, once per unprotected form', () => {
+            const v = run('const a = 1;' + nl + '<Form method="post"/>' + nl + '<form onSubmit={go}/>').violations;
+            expect(v.map((x) => x.line)).toEqual([2, 3]);
+        });
+        it('documented coarse bound: two forms and one protection identifier in the file is clean', () => {
+            expect(rules('const l = useSubmitLatch(go);' + nl + '<Form method="post"><input /></Form><fetcher.Form method="post" />')).toEqual([]);
         });
     });
 });

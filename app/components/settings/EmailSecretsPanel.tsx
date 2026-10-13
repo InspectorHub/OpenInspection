@@ -8,6 +8,7 @@ import { EmailStepTest } from "~/components/settings/EmailStepTest";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import type { action } from "~/routes/settings-communication";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
 type ActionFetcher = ReturnType<typeof useFetcher<typeof action>>;
 
@@ -96,6 +97,7 @@ export function EmailSecretsPanel({
     },
   };
   const [provider, setProvider] = useState<EmailByoProvider>(initialProvider);
+  const latch = useSubmitLatch();
   const webhookField = WEBHOOK_FIELDS[provider];
   const webhookUrl =
     webhookBaseUrl && tenantSlug
@@ -109,7 +111,7 @@ export function EmailSecretsPanel({
         {m.settings_emailsecrets_desc()}
       </p>
 
-      <Form method="post" className="space-y-4">
+      <Form method="post" className="space-y-4" onSubmit={latch()}>
         <input type="hidden" name="intent" value="save-email-secrets" />
         {/* Hidden field carries the selected provider so the action can read it */}
         <input type="hidden" name="email_byo_provider" value={provider} />

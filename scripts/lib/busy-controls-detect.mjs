@@ -1,5 +1,6 @@
 /**
- * Detector for lint:busy-controls. Two rules over <button> / <Button> opening tags:
+ * Detector for lint:busy-controls. Two rules over <button> / <Button> opening tags, and a third over
+ * form opening tags (form-without-latch, below):
  *
  *  submit-unprotected   type="submit" with none of pending, pendingProps or disabled
  *                       (a bare aria-disabled / aria-busy does not block a click or Enter).
@@ -22,6 +23,19 @@
  * only <button> / <Button> opening tags, so what a wrapper renders is its own file's business, and a
  * `disabled` forwarded through `{...props}` is invisible. Server-rendered or spread-supplied `type` too.
  *
+ * form-without-latch  a file that renders a state-changing form -- `<form>`, `<Form>`, `<fetcher.Form>` or
+ *                       `<x.Form>` with a `method` whose value is not a literal get/GET, or with an `onSubmit`
+ *                       -- and names NO same-frame protection anywhere: useSubmitLatch, useActionLatch,
+ *                       useGuardedSubmit, latch(, inFlight, gatedSubmit, guardedSubmit, busyRef. pendingProps
+ *                       only takes effect after React renders the busy state, so a fast double click posts
+ *                       twice; those guards close the gap in the same frame.
+ *                       COARSE ON PURPOSE: it is a file-level presence check. It catches a file with NO guard
+ *                       at all (the bug class) and cannot prove each form in a file is wired to the guard --
+ *                       a file with two forms and one latch is clean. Identifiers are read from the
+ *                       comment-blanked text and never from a string, so a mention in either does not count.
+ *                       A guard that lives in another file (a parent component, a shared hook) is invisible;
+ *                       that is what the allow marker is for, with the reason naming where the guard is.
+ *
  * Exception: a comment `busy-controls-allow: <reason>` inside the tag or on the line(s) just above it;
  * it exempts exactly the next opening tag and needs a real reason (see jsx-scan.mjs hasAllowMarker).
  */
@@ -39,6 +53,22 @@ const STATE_RE = /\bstate\s*[!=]==?\s*["'](?:idle|submitting|loading)["']/;
 const STRING_COMPARISON = /[A-Za-z_$][\w$.]*\s*[!=]==?\s*(["'`])(?:\.|(?!\1).)*\1|(["'`])(?:\.|(?!\2).)*\2\s*[!=]==?\s*[A-Za-z_$][\w$.]*/g;
 const STRING_LITERAL = /(["'`])(?:\.|(?!\1).)*\1/g;
 const FORM_NAME = /^(?:form|Form|[A-Za-z_$][\w$]*\.Form)$/;
+
+const SAME_FRAME_GUARD = /\b(?:useSubmitLatch|useActionLatch|useGuardedSubmit|inFlight|gatedSubmit|guardedSubmit|busyRef)\b|\blatch\(/g;
+const LITERAL_GET = /^\{?\s*(["'`])get\1\s*\}?$/i;
+
+/** True when the file names a same-frame guard outside comments and strings. */
+function hasSameFrameGuard(a) {
+    for (const m of a.text.matchAll(SAME_FRAME_GUARD)) if (!a.str[m.index]) return true;
+    return false;
+}
+
+/** True when a form tag can change state: a non-literal-GET `method`, or any `onSubmit`. */
+function changesState(tag) {
+    const method = tag.attrs.find((x) => x.name === 'method');
+    if (method && !(method.value && LITERAL_GET.test(method.value.trim()))) return true;
+    return tag.attrs.some((x) => x.name === 'onSubmit');
+}
 
 /** True when an expression reads a busy flag: a whole busy identifier, or the fetcher.state test. */
 function namesBusy(value) {
@@ -87,6 +117,17 @@ export function detectBusyControls(src) {
                 line: tag.line,
                 rule: 'native-disable-busy',
                 message: `<${tag.name} disabled=${disabled.value.replace(/\s+/g, ' ').slice(0, 60)}> natively disables while busy and drops focus; use pending / pendingProps`,
+            });
+        }
+    }
+    const guarded = hasSameFrameGuard(a);
+    if (!guarded) {
+        for (const form of findOpeningTags(a, FORM_NAME)) {
+            if (!changesState(form) || hasAllowMarker(a, 'busy-controls-allow', form)) continue;
+            violations.push({
+                line: form.line,
+                rule: 'form-without-latch',
+                message: `<${form.name}> changes state and this file names no same-frame guard (useSubmitLatch / useActionLatch / useGuardedSubmit / latch( / inFlight / gatedSubmit / guardedSubmit / busyRef); pending alone lets a fast double click post twice`,
             });
         }
     }

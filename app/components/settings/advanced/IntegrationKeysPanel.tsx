@@ -1,6 +1,7 @@
 import { Form } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 interface IntegrationKeysPanelProps {
@@ -14,13 +15,14 @@ interface IntegrationKeysPanelProps {
 }
 
 export function IntegrationKeysPanel({ secrets, fieldError, saving }: IntegrationKeysPanelProps) {
+  const latch = useSubmitLatch();
   return (
     <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
       <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_intkeys_heading()}</h3>
       <p className="text-[13px] text-ih-fg-3">
         {m.settings_intkeys_desc()}
       </p>
-      <Form method="post" className="space-y-4 max-w-xl">
+      <Form method="post" className="space-y-4 max-w-xl" onSubmit={latch()}>
         <input type="hidden" name="intent" value="save-advanced-secrets" />
         <SecretField
           name="GOOGLE_PLACES_API_KEY"

@@ -2,6 +2,7 @@ import { useLoaderData, useActionData, useNavigation, Form } from "react-router"
 import type { Route } from "./+types/unsubscribe";
 import { createApi } from "~/lib/api-client.server";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -88,6 +89,7 @@ export default function UnsubscribePage() {
     const actionData = useActionData<typeof action>();
     const navigation = useNavigation();
     const submitting = navigation.state === "submitting";
+    const latch = useSubmitLatch();
 
     if (!data) {
         return (
@@ -118,7 +120,7 @@ export default function UnsubscribePage() {
                     <strong className="text-ih-fg-1">{data.companyName}</strong>.
                 </p>
                 <p className="text-sm text-ih-fg-3 mb-5">{m.public_unsubscribe_still_sent()}</p>
-                <Form method="post">
+                <Form method="post" onSubmit={latch()}>
                     <input type="hidden" name="enabled" value="true" />
                     <button
                         type="submit"
@@ -160,7 +162,7 @@ export default function UnsubscribePage() {
             {/* A POST, never a GET. The link that got the reader here was fetched
                 by every scanner between the sender and their inbox; this is the
                 first thing on the path a person had to do on purpose. */}
-            <Form method="post">
+            <Form method="post" onSubmit={latch()}>
                 <input type="hidden" name="enabled" value="false" />
                 <button
                     type="submit"

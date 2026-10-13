@@ -1,6 +1,7 @@
 import { Form } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 export const ISN_SECRET_KEYS = ["ISN_DOMAIN", "ISN_COMPANY_KEY", "ISN_ACCESS_KEY", "ISN_SECRET_KEY"] as const;
@@ -14,11 +15,12 @@ interface IsnPanelProps {
 
 /** ISN (Inspection Support Network): the company's credentials. */
 export function IsnPanel({ secrets, fieldError, saving }: IsnPanelProps) {
+  const latch = useSubmitLatch();
   return (
     <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
       <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_isn_heading()}</h3>
       <p className="text-[13px] text-ih-fg-3">{m.settings_isn_desc()}</p>
-      <Form method="post" className="space-y-4 max-w-xl">
+      <Form method="post" className="space-y-4 max-w-xl" onSubmit={latch()}>
         <input type="hidden" name="intent" value="save-isn" />
         <SecretField name="ISN_DOMAIN" type="text" label={m.settings_isn_domain_label()} value={secrets.ISN_DOMAIN}
           error={fieldError("ISN_DOMAIN")} hint={m.settings_isn_domain_hint()} />

@@ -25,6 +25,7 @@ import { Banner, Button, Card, EmptyState, PageHeader, RadioCardGroup } from "@c
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { EditedCommentPair, type EditedCommentPairData } from "~/components/marketplace/EditedCommentPair";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -98,6 +99,7 @@ export default function MarketplaceUpdatePage() {
   const navigation = useNavigation();
   const navigate = useNavigate();
   const locale = useDisplayLocale();
+  const latch = useSubmitLatch();
 
   // Keeping is the default. The destructive option has to be reached for.
   const [choice, setChoice] = useState<"keep" | "replace">("keep");
@@ -125,7 +127,7 @@ export default function MarketplaceUpdatePage() {
             description={m.marketplace_update_clean_desc({ total: preview.total, semver: preview.toSemver })}
           />
           <div className="px-4 pb-4">
-            <Form method="post">
+            <Form method="post" onSubmit={latch()}>
               <input type="hidden" name="choice" value="keep" />
               <Button type="submit" variant="primary" pending={submitting}>
                 {submitting ? m.marketplace_update_submitting() : m.marketplace_update_clean_submit({ semver: preview.toSemver })}
@@ -182,7 +184,7 @@ export default function MarketplaceUpdatePage() {
 
       {/* The choice, after the evidence. */}
       <Card className="p-4 space-y-4">
-        <Form method="post" className="space-y-4">
+        <Form method="post" className="space-y-4" onSubmit={latch()}>
           <input type="hidden" name="choice" value={choice} />
           <RadioCardGroup
             name="choice-display"

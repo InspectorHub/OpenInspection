@@ -16,6 +16,7 @@ import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/
 import { getEffectivePriceCents } from "../../server/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, Card, Pill, Button, Modal, buttonClasses, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import DocumentsSection, {
   type DocumentItem,
   type DocumentCategory,
@@ -758,6 +759,7 @@ export default function InspectionHubPage() {
   const submittingReport = submitReport.state !== "idle";
   const returningReport = returnReport.state !== "idle";
   const unpublishingReport = unpublishReport.state !== "idle";
+  const latchSubmit = useSubmitLatch(submitReport.state), latchReturn = useSubmitLatch(returnReport.state), latchUnpublish = useSubmitLatch(unpublishReport.state);
 
   // Create-re-inspection modal — its own dedicated fetcher (B-17). Only
   // published baselines can re-inspect. Unlike the other modals it does NOT
@@ -1066,7 +1068,7 @@ export default function InspectionHubPage() {
                   {m.inspections_hub_report_repair_log()}
                 </Link>
                 {reportActionList.includes('unpublish') && (
-                  <unpublishReport.Form method="post">
+                  <unpublishReport.Form method="post" onSubmit={latchUnpublish()}>
                     <input type="hidden" name="intent" value="unpublish" />
                     <button
                       type="submit"
@@ -1110,7 +1112,7 @@ export default function InspectionHubPage() {
                   </Button>
                 )}
                 {reportActionList.includes('submit') && (
-                  <submitReport.Form method="post">
+                  <submitReport.Form method="post" onSubmit={latchSubmit()}>
                     <input type="hidden" name="intent" value="submit" />
                     <button
                       type="submit"
@@ -1122,7 +1124,7 @@ export default function InspectionHubPage() {
                   </submitReport.Form>
                 )}
                 {reportActionList.includes('return') && (
-                  <returnReport.Form method="post">
+                  <returnReport.Form method="post" onSubmit={latchReturn()}>
                     <input type="hidden" name="intent" value="return" />
                     <button
                       type="submit"

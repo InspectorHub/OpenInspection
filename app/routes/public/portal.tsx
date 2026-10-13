@@ -19,6 +19,7 @@ import InspectionList, { type InspectionRow } from "~/components/portal/Inspecti
 import { PublicLegalFooter } from "~/components/PublicLegalFooter";
 import { signOut } from "~/components/portal/sign-out";
 import { Input, Button } from "@core/shared-ui";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -123,6 +124,7 @@ export default function PortalLanding() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
+  const latch = useSubmitLatch();
 
   if (data.authed) {
     const tenant = data.tenant;
@@ -179,7 +181,7 @@ export default function PortalLanding() {
            copy-paste. The tenant's brand accent still applies: brandTokens
            (on the page wrapper) re-points the primary tokens these
            components consume. */
-        <Form method="post" className="space-y-3">
+        <Form method="post" className="space-y-3" onSubmit={latch()}>
           <Input
             id="portal-email"
             name="email"

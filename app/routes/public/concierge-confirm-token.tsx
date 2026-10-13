@@ -6,6 +6,7 @@ import { ErrorState } from "~/components/ErrorState";
 import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
 import { LazyViewerTimeZoneNotice } from "~/components/public/LazyViewerTimeZoneNotice";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 import { getLocale } from "~/paraglide/runtime";
 
@@ -81,6 +82,7 @@ function ConciergeConfirmBody() {
     : date;
   const nav = useNavigation();
   const submitting = nav.state === "submitting";
+  const latch = useSubmitLatch();
 
   if (status === "not-found" || status === "error" || !view) {
     return (
@@ -147,7 +149,7 @@ function ConciergeConfirmBody() {
           </p>
         )}
 
-        <Form method="post">
+        <Form method="post" onSubmit={latch()}>
           <button
             type="submit"
             {...pendingProps(submitting)}

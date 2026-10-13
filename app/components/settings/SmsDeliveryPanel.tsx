@@ -6,6 +6,7 @@ import type { action } from "~/routes/settings-communication";
 import type { ManagedComplianceData } from "~/components/settings/ManagedComplianceWizard";
 import type { ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
 type SmsTestFetcher = ReturnType<typeof useFetcher<typeof action>>;
 
@@ -102,6 +103,7 @@ export function SmsDeliveryPanel({
   // Toll-free verification is Twilio-specific; Telnyx has a different inbound/
   // compliance flow, so the compliance block below is gated to Twilio.
   const smsProviderLabel = byoProvider === "telnyx" ? m.settings_sms_provider_telnyx() : m.settings_sms_provider_twilio();
+  const latch = useSubmitLatch();
   return (
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
         <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_smsdelivery_heading()}</h3>
@@ -110,7 +112,7 @@ export function SmsDeliveryPanel({
         </p>
 
         {/* Mode + company phone */}
-        <Form method="post" className="space-y-4">
+        <Form method="post" className="space-y-4" onSubmit={latch()}>
           <input type="hidden" name="intent" value="save-sms-config" />
           <input type="hidden" name="smsMode" value={smsMode} />
 

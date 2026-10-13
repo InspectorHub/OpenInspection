@@ -43,6 +43,7 @@ import {
   type NotificationsLoaderResult,
 } from "~/lib/portal-notification-preferences";
 import { Input, Button } from "@core/shared-ui";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -127,6 +128,7 @@ export default function PortalNotificationsPage() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
+  const latch = useSubmitLatch();
 
   if (data.authed) {
     return (
@@ -188,7 +190,7 @@ export default function PortalNotificationsPage() {
           <p className="text-[13px] text-ih-fg-3 mt-3">{m.portal_landing_sent_recovery()}</p>
         </div>
       ) : (
-        <Form method="post" className="space-y-3">
+        <Form method="post" className="space-y-3" onSubmit={latch()}>
           <Input
             id="portal-notifications-email"
             name="email"

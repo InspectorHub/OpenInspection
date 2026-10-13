@@ -16,7 +16,7 @@ import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { buildStripeElementsOptions } from "~/lib/stripe-elements-options";
 import { m } from "~/paraglide/messages";
 import { money } from "./payment-helpers";
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 
 type PayPhase = "idle" | "loading" | "ready" | "unavailable" | "paid_already";
 
@@ -34,6 +34,7 @@ export function StripePayPanel({ id, portalToken, balanceDue, inspectorName, bra
   // Hub's `?section=payment` tab when mounted inline — so Stripe redirects back to
   // wherever the client started paying.
   const [returnUrl, setReturnUrl] = useState("");
+  const latch = useActionLatch(phase === "loading");
 
   async function startPayment() {
     setReturnUrl(typeof window !== "undefined" ? window.location.href : "");
@@ -76,7 +77,7 @@ export function StripePayPanel({ id, portalToken, balanceDue, inspectorName, bra
         <>
           <button
             type="button"
-            {...pendingProps(phase === "loading", startPayment)}
+            {...pendingProps(phase === "loading", () => latch(startPayment))}
             className={`w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0 ${PENDING_CLASS}`}
           >
             {phase === "loading" ? m.portal_pay_starting_checkout() : m.portal_pay_amount({ amount: money(balanceDue, cur) })}
@@ -121,9 +122,9 @@ function CheckoutForm({ balanceDue, returnUrl, currency }: { balanceDue: number;
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const latch = useActionLatch(submitting);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function confirm() {
     if (!stripe || !elements) return;
     setSubmitting(true);
     setError(null);
@@ -138,6 +139,11 @@ function CheckoutForm({ balanceDue, returnUrl, currency }: { balanceDue: number;
       setError(payErr.message ?? m.portal_pay_error_generic());
       setSubmitting(false);
     }
+  }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    latch(confirm);
   }
 
   return (

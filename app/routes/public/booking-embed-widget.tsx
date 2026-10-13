@@ -3,7 +3,7 @@ import { brandTokens, type TenantBrand } from "~/lib/brand";
 import { useTurnstileWidget } from "~/lib/turnstile";
 import { LanguageChoice } from "~/components/booking/LanguageChoice";
 import { BOOKING_HORIZON_DAYS, addDaysCivil, todayCivil } from "~/components/booking/booking-date-rules";
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -122,6 +122,7 @@ export function EmbedWizard({
 
 function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string | null }) {
   const [submitting, setSubmitting] = useState(false);
+  const latch = useActionLatch(submitting);
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null);
 
   /**
@@ -238,7 +239,7 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={(e) => { e.preventDefault(); latch(() => { void handleSubmit(e); }); }}>
       <input type="hidden" name="slug" value={data.slug} />
       <input type="hidden" name="inspectorId" value={data.inspectorId} />
 

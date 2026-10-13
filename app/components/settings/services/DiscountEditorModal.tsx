@@ -53,6 +53,7 @@ export function DiscountEditorModal({
 
   return (
     <Modal open onClose={onClose} title={m.settings_discount_edit_title()} size="md">
+      {/* busy-controls-allow: this form only hands its fields to onSubmit; the parent DiscountCodesPanel posts them through useGuardedSubmit, which drops a second call in the same frame */}
       <form
         onSubmit={(e) => { e.preventDefault(); if (!busy) onSubmit(e.currentTarget); }}
         className="space-y-4"

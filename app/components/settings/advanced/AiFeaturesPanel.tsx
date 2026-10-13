@@ -6,6 +6,7 @@ import { TestConnectionButton } from "~/components/settings/TestConnectionButton
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import type { action } from "~/routes/settings-advanced";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
 interface AiFeaturesPanelProps {
   geminiConfigured: boolean;
@@ -26,6 +27,7 @@ interface AiFeaturesPanelProps {
 }
 
 export function AiFeaturesPanel({ geminiConfigured, aiEnabled, courtesyTranslationEnabled, aiBaseUrl, aiModel, value, fieldError, saving, geminiTestFetcher, testResults = [] }: AiFeaturesPanelProps) {
+  const latch = useSubmitLatch();
   const aiTest = geminiTestFetcher.data;
   // Held in state so the Test button can probe what is ON SCREEN rather than
   // what was last saved — testing the saved value would answer a question
@@ -51,7 +53,7 @@ export function AiFeaturesPanel({ geminiConfigured, aiEnabled, courtesyTranslati
           configures, so naming one provider here would be the same defect the
           old Test button had: describing a fixed vendor the engine no longer has. */}
       <p className="text-[13px] text-ih-fg-3">{m.settings_ai_desc()}</p>
-      <Form method="post" className="space-y-3 max-w-xl">
+      <Form method="post" className="space-y-3 max-w-xl" onSubmit={latch()}>
         <input type="hidden" name="intent" value="save-ai" />
         {/* Lets the action accept a confirmation for a key that is already
             stored, without the workspace re-entering the credential. */}

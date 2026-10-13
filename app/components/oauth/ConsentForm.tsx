@@ -145,6 +145,7 @@ export function ConsentForm({
 
 
 
+        {/* busy-controls-allow: the onSubmit below latches the decision in the decided ref and preventDefaults every later submit in the same frame */}
         <form
           method="post"
           className="space-y-5"

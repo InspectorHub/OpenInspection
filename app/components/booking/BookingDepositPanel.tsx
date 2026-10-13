@@ -23,7 +23,7 @@ import { formatCurrency } from "~/lib/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { buildStripeElementsOptions } from "~/lib/stripe-elements-options";
 import { m } from "~/paraglide/messages";
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 
 type Phase = "idle" | "loading" | "ready" | "settled" | "unavailable";
 
@@ -48,6 +48,7 @@ export function BookingDepositPanel({
   const [returnUrl, setReturnUrl] = useState("");
 
   const amount = formatCurrency(depositCents, { locale, currency });
+  const latch = useActionLatch(phase === "loading");
 
   async function startPayment() {
     setReturnUrl(typeof window !== "undefined" ? window.location.href : "");
@@ -90,7 +91,7 @@ export function BookingDepositPanel({
         <>
           <button
             type="button"
-            {...pendingProps(phase === "loading", startPayment)}
+            {...pendingProps(phase === "loading", () => latch(startPayment))}
             className={`w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-wait ${PENDING_CLASS}`}
           >
             {phase === "loading" ? m.booking_deposit_starting() : m.booking_deposit_pay_button({ amount })}
@@ -128,9 +129,9 @@ function DepositForm({ amount, returnUrl }: { amount: string; returnUrl: string 
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const latch = useActionLatch(submitting);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function confirm() {
     if (!stripe || !elements) return;
     setSubmitting(true);
     setError(null);
@@ -144,6 +145,11 @@ function DepositForm({ amount, returnUrl }: { amount: string; returnUrl: string 
       setError(payErr.message ?? m.booking_deposit_error_generic());
       setSubmitting(false);
     }
+  }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    latch(confirm);
   }
 
   return (

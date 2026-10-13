@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { useFetcher } from "react-router";
 import { m } from "~/paraglide/messages";
+import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 
 /**
@@ -28,8 +29,9 @@ export function TestConnectionButton({
   children?: ReactNode;
 }) {
   const busy = fetcher.state !== "idle";
+  const latch = useSubmitLatch(fetcher.state);
   return (
-    <fetcher.Form method="post" className="flex flex-wrap items-center gap-3">
+    <fetcher.Form method="post" className="flex flex-wrap items-center gap-3" onSubmit={latch()}>
       <input type="hidden" name="intent" value={intent} />
       <button
         type="submit"
