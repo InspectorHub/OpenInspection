@@ -1,7 +1,7 @@
 import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
 import { InspectorMcp } from '../../durable-objects/inspector-mcp';
 import type { McpProps } from '../../durable-objects/inspector-mcp';
-import { mcpEnabled } from './flag';
+import { oauthProviderEnabled } from './flag';
 import { assertCompanySlugMatches, slugFromMcpPath, stripMcpSlugPrefix } from './identity-bridge';
 import { getDeploymentProfile, type ProfileEnv } from '../deployment-profile';
 
@@ -18,11 +18,11 @@ type FetchFn = (req: Request, env: any, ctx: ExecutionContext) => Response | Pro
  * worker-configuration.d.ts; regenerate with `wrangler types` once OAUTH_KV /
  * INSPECTOR_MCP are confirmed provisioned to update the global Env type.
  */
-type McpFlagEnv = { MCP_ENABLED?: string } & ProfileEnv;
+type McpFlagEnv = { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string } & ProfileEnv;
 
 /**
- * Wraps `appFetch` with an OAuthProvider when the MCP_ENABLED flag is set.
- * Returns `{ fetch: appFetch }` unchanged when the flag is off — the caller
+ * Wraps `appFetch` with an OAuthProvider when MCP or native clients are enabled.
+ * Returns `{ fetch: appFetch }` unchanged when both flags are off — the caller
  * is unaffected and the OAuth surface is not mounted at all.
  *
  * apiRoute strategy (docs/develop/conventions/mcp-oauth-notes.md §4 / §11.3), read from
@@ -41,7 +41,7 @@ export function buildOAuthHandler(
     appFetch: FetchFn,
     env: McpFlagEnv,
 ): { fetch: FetchFn } {
-    if (!mcpEnabled(env)) return { fetch: appFetch };
+    if (!oauthProviderEnabled(env)) return { fetch: appFetch };
 
     // A literal path prefix — every /mcp* request goes through token auth.
     // Slug validation (spec §6) is applied in the wrapper below.
