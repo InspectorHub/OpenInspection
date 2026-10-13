@@ -54,7 +54,11 @@ export async function handleCronBatch(
             // Writing null on completion matters just as much: a stale cursor
             // that is never cleared means the sweep never sees its first page
             // again.
-            await writeCursor(env, jobKey, nextCursor);
+            // Nothing to write when there was no cursor going in and none coming
+            // out: the dispatcher hands over the stored cursor, so a null in the
+            // message means none is stored. Deleting the absent key anyway cost a
+            // KV delete per job per tick, against a free-plan budget of 1,000 a day.
+            if (cursor !== null || nextCursor !== null) await writeCursor(env, jobKey, nextCursor);
             if (nextCursor !== null && hop < MAX_HOPS) {
                 try {
                     await env.CRON_QUEUE?.send({ job: jobKey, cursor: nextCursor, hop: hop + 1 });
