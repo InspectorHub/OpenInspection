@@ -39,6 +39,7 @@ const HOME_FILES = [
     `${SHARED}/Popover.tsx`,
     `${SHARED}/layers.ts`,
     `${SHARED}/useDialogBehavior.ts`,
+    `${SHARED}/useCloseShield.tsx`,
 ];
 /** Homes that must be SEEN as overlays by the detector (they hold real overlay markup). */
 const MUST_DETECT = [`${SHARED}/Modal.tsx`, `${SHARED}/Drawer.tsx`];

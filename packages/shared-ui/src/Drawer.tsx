@@ -1,5 +1,6 @@
 import React, { useId, useRef } from "react";
 import { useDialogBehavior } from "./useDialogBehavior";
+import { ClickShield, useCloseShield } from "./useCloseShield";
 
 interface DrawerProps {
   open: boolean;
@@ -26,8 +27,9 @@ export function Drawer({ open, onClose, title, children, footer, wide = false, i
   const titleId = useId();
 
   useDialogBehavior(open, onClose, ref, initialFocusRef);
+  const shielded = useCloseShield(open);
 
-  if (!open) return null;
+  if (!open) return shielded ? <ClickShield /> : null;
 
   return (
     <div
