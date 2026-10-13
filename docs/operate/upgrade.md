@@ -141,14 +141,17 @@ with your data intact, and the column stays until the situation is resolved.
 
 A baseline rebuild replaces the *contents* of `migrations/0000_baseline.sql` with one regenerated file and deletes the forward files it now covers — keeping the same filename that was already there. `wrangler d1 migrations apply` compares filenames against the `d1_migrations` table in your database and applies whatever names are missing. After a rebuild both sides say `0000_baseline.sql`, so there is nothing missing, so nothing runs. Your schema stays where it was and the new Worker code is written against where it should have gone.
 
-**This has now happened twice, and which steps below apply to you depends on where you are coming from:**
+**This has now happened three times, and which steps below apply to you depends on where you are coming from:**
 
 | rebuild | what it folded into `0000_baseline.sql` | columns it retired |
 |---|---|---|
 | **2026-08-13** | a sixty-nine file chain | **nine** — [step 5](#5-apply-the-column-retirements-by-hand) |
 | **2026-09-09** | the forty-eight file chain that grew after it | **none** |
+| **2026-10-13** | the two forward files that grew after it (`0001_integration_test_step.sql`, `0002_automation_log_human_verified.sql`) | **none** |
 
 The 2026-09-09 rebuild changes no schema whatsoever, and that was measured rather than assumed: built independently into two throwaway databases, the forty-eight file chain and the single regenerated baseline produce the same **1263 columns** and the same **183 indexes**, with nothing on either side that the other lacks.
+
+The 2026-10-13 rebuild changes no schema either: the three-file chain and the single regenerated baseline were built into two throwaway databases and compared object by object — the same 292 schema objects with the same columns in the same order. The only difference is how SQLite stored the DDL text of two tables whose columns used to be added by `ALTER TABLE`. A database that applied those two forward files is case **B** below: its ledger names them, this checkout no longer does, and step 4 removes the rows.
 
 So if you already reconciled across the 2026-08-13 rebuild, **step 5 does not apply to you** — there is nothing to retire. Step 3 still does, unless your ledger already names every file the pre-rebuild tree carried; that is exactly what step 3 checks, and running it when there is nothing to apply is a no-op. If you are crossing both rebuilds, do the whole thing.
 

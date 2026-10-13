@@ -17,12 +17,14 @@
     "remote)` for a standalone self-host running `npm run db:lag`. Keys not listed here read as",
     "an empty allowlist, which is the safe default: every unexpected name fails.",
     "",
-    "WHY EVERY LIST BELOW IS EMPTY. This deployment reconciled the baseline rebuild by rewriting",
+    "WHY MOST LISTS BELOW ARE EMPTY. This deployment reconciled the baseline rebuilds by rewriting",
     "the ledger rather than by allowlisting: the rows naming the superseded migrations were",
     "deleted, leaving only `0000_baseline.sql`, which wrangler already considers applied. Nothing",
     "is left for the gate to forgive. An empty list is a declaration, not an oversight — and a",
     "declared name that the database no longer carries fails the gate as a stale allowlist, so",
     "these lists must be emptied again whenever a ledger is rewritten.",
+    "",
+    "The `saas` list is the exception: after the 2026-10-13 rebuild its ledger still names the two forward files that rebuild folded in, and they are left in place on purpose.",
     "",
     "ADD A NAME HERE ONLY IF you deliberately chose to leave the pre-rebuild rows in place, and",
     "only after confirming that the database's SCHEMA is current. This file silences a report; it",
@@ -30,7 +32,7 @@
     "docs/operate/upgrade.md instead — the ledger rewrite it describes leaves this file empty."
   ],
   "saas": {
-    "acceptedExtra": []
+    "acceptedExtra": ["0001_integration_test_step.sql", "0002_automation_log_human_verified.sql"]
   },
   "local-d1": {
     "acceptedExtra": []

@@ -1,1 +1,0 @@
-ALTER TABLE `automation_logs` ADD `human_verified_at` integer;

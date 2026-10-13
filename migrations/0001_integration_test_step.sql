@@ -1,1 +1,0 @@
-ALTER TABLE `integration_test_results` ADD `step` text;

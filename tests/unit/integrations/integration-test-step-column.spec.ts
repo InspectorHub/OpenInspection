@@ -17,10 +17,13 @@ describe('integration_test_results.step', () => {
         expect(last.getSQLType()).toBe('text');
     });
 
-    it('has a forward migration that adds exactly that column', () => {
-        // migrefs-allow: the test pins the exact SQL of the migration that adds the column
-        const sql = readFileSync('migrations/0001_integration_test_step.sql', 'utf8');
-        expect(sql.trim()).toBe('ALTER TABLE `integration_test_results` ADD `step` text;');
+    it('is created by the baseline migration, last in the table', () => {
+        // migrefs-allow: the test pins the baseline DDL the column ships in
+        const sql = readFileSync('migrations/0000_baseline.sql', 'utf8');
+        const start = sql.indexOf('CREATE TABLE `integration_test_results`');
+        const table = sql.slice(start, sql.indexOf(');', start));
+        const cols = table.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('`'));
+        expect(cols[cols.length - 1]).toBe('`step` text');
     });
 
     it('recordIntegrationTest persists the step, and null when none is given', async () => {
