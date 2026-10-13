@@ -169,8 +169,6 @@ function InspectionEditPage() {
  // FE-2: photo uploads also get a dedicated fetcher — sharing the mutation
  // fetcher would let an autosave abort an in-flight upload (and vice versa).
  const uploadFetcher = useFetcher();
- // A repeat upload-photo creates duplicate media rows and R2 objects; pendingProps only land after a render.
- const uploadLatch = useActionLatch(uploadFetcher.state !== "idle");
  // Publish gets its own fetcher so a publish precondition failure (e.g. "not
  // completed") is NOT swallowed by the generic autosave "Save failed" toast
  // (which only watches fetcher/notesFetcher/uploadFetcher). The real server
@@ -1188,7 +1186,8 @@ function InspectionEditPage() {
   formData.append("customId", target.id);
   formData.append("defectKind", target.kind);
   }
-  uploadLatch(() => uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" }));
+  // busy-controls-allow: a file input's change event fires once per file-chooser selection (the chooser is modal) and the input is reset after it is read, so there is no double click to repeat; a latch here would sit after the async bake and could drop a legitimate second batch
+  uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
  }
 
  if (overflow) {
@@ -1203,7 +1202,7 @@ function InspectionEditPage() {
  if (cameraInputRef.current) cameraInputRef.current.value = "";
  if (libraryInputRef.current) libraryInputRef.current.value = "";
  },
- [state.activeItemId, state.inspection.id, uploadFetcher, collab?.doc, state.sectionIdForItem, state.currentSection, activeUnitId, uploadLatch],
+ [state.activeItemId, state.inspection.id, uploadFetcher, collab?.doc, state.sectionIdForItem, state.currentSection, activeUnitId],
  );
 
  const handleBurstCommit = useCallback(
@@ -1223,10 +1222,11 @@ function InspectionEditPage() {
   const f = new File([blobs[i]], `burst-${i + 1}.jpg`, { type: "image/jpeg" });
   formData.append("file", orig ? f : await preprocessImage(f));
  }
- uploadLatch(() => uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" }));
+ // busy-controls-allow: a file input's change event fires once per file-chooser selection (the chooser is modal) and the input is reset after it is read, so there is no double click to repeat; a latch here would sit after the async bake and could drop a legitimate second batch
+  uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
  })();
  },
- [state.burstCameraItemId, state.inspection.id, uploadFetcher, uploadLatch],
+ [state.burstCameraItemId, state.inspection.id, uploadFetcher],
  );
 
  // Attach uploaded photo keys once the action responds — to the item, or
@@ -2210,6 +2210,7 @@ function InspectionEditPage() {
    saving={instanceSubmit.busy}
    onClose={() => setAddingToGroup(null)}
    onSave={(group, fields) => {
+     // busy-controls-allow: instanceSubmit is useGuardedSubmit, whose submit drops a second call through a synchronous inFlight ref
      instanceSubmit.submit(
        {
          intent: "add-statutory-instance",

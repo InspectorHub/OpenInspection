@@ -116,8 +116,8 @@ function enclosingFunctions(code, at) {
             if (depth > 0) { depth -= 1; continue; }
             const from = Math.max(0, k - 200);
             const head = code.slice(from, k);
-            if (!/(?:=>|\bfunction\b[^{]*|\)\s*(?::\s*[\w<>\[\]|. ]+)?)\s*$/.test(head)) continue;
-            const named = /(?:\bfunction\s+([A-Za-z_$][\w$]*)|\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=>]+)?=>)\s*$/.exec(head);
+            if (!/(?:=>|\bfunction\b[^{]*|\)\s*(?::\s*[\w<>[\]|. ]+)?)\s*$/.test(head)) continue;
+            const named = /(?:\bfunction\s+([A-Za-z_$][\w$]*)|\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(?:use(?:Callback|Memo)\(\s*)?(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=>]+)?=>)\s*$/.exec(head);
             // `function Name({ a }: Props) {` has a brace inside its own parameter list, so read the name after the last `function`.
             const declared = /^function\s+([A-Za-z_$][\w$]*)/.exec(head.slice(Math.max(0, head.lastIndexOf('function'))));
             const name = named?.[1] ?? named?.[2] ?? (head.includes('function') ? declared?.[1] ?? '' : '');
@@ -128,7 +128,8 @@ function enclosingFunctions(code, at) {
                 if (code[end] === '{') d += 1;
                 else if (code[end] === '}') d -= 1;
             }
-            const boundary = Math.max(head.lastIndexOf(';\n'), head.lastIndexOf('}\n'), 0);
+            const cut = [...head.matchAll(/[;}]\s*\n/g)].pop();
+            const boundary = cut ? cut.index : 0;
             out.push({ text: code.slice(from + boundary, end), name });
         }
     }
@@ -142,7 +143,7 @@ function guardedAt(code, at) {
     if (GUARD_TEST.test(lead.slice(Math.max(lead.lastIndexOf(';'), lead.lastIndexOf('{'), lead.lastIndexOf('}')) + 1))) return true;
     for (const fn of enclosingFunctions(code, at)) {
         if (GUARD_TEST.test(fn.text)) return true;
-        if (fn.name && new RegExp(`[lL]atch\\w*\\([^;]*\\b${fn.name}\\b|(?:useGuardedSubmit|gatedSubmit)\\([^;]*\\b${fn.name}\\b`).test(code)) return true;
+        if (fn.name && new RegExp(`[lL]atch\\w*\\(\\s*(?:async\\s+)?(?:\\([^)]*\\)\\s*=>\\s*(?:\\{\\s*)?(?:void\\s+|await\\s+)?)?${fn.name}\\b|(?:useGuardedSubmit|gatedSubmit)\\(\\s*(?:\\([^)]*\\)\\s*=>\\s*(?:\\{\\s*)?(?:void\\s+|await\\s+)?)?${fn.name}\\b`).test(code)) return true;
     }
     return false;
 }
@@ -159,16 +160,23 @@ function callArgs(text, str, from) {
     return text.slice(from, k - 1);
 }
 
-/** True for a submit that writes: an explicit post / put / patch / delete method, or a method that is not a literal. A plain submit is a GET (a search, a load). */
+/**
+ * True for a submit that writes: an explicit post / put / patch / delete method, or a method that is not a literal
+ * (shorthand `{ method }` or a variable). Only a `method` key that sits directly in an object literal argument counts, never one
+ * inside a nested value (`body: JSON.stringify({ method: 'card' })`). A plain or GET submit is a search or a load.
+ */
 function mutates(args) {
-    const m = /\bmethod\s*:\s*(["'`]?)([^,}"'`\s]*)/.exec(args);
-    if (!m) return false;
-    return m[1] === '' || /^(?:post|put|patch|delete)$/i.test(m[2]);
-}
-
-/** True when the file names a same-frame guard outside comments and strings. */
-function hasSameFrameGuard(a) {
-    for (const m of a.text.matchAll(SAME_FRAME_GUARD)) if (!a.str[m.index]) return true;
+    let depth = 0;
+    for (let k = 0; k < args.length; k += 1) {
+        const ch = args[k];
+        if (ch === '{' || ch === '(' || ch === '[') { depth += 1; continue; }
+        if (ch === '}' || ch === ')' || ch === ']') { depth -= 1; continue; }
+        if (depth !== 1 || !/["'`m]/.test(ch) || /[A-Za-z0-9_$]/.test(args[k - 1] ?? ' ')) continue;
+        const key = /^(["'`]?)method\1(?![\w$])\s*(:\s*(["'`]?)([^,}"'`\s]*))?/.exec(args.slice(k));
+        if (!key) continue;
+        if (!key[2]) return true;
+        return key[3] === '' || /^(?:post|put|patch|delete)$/i.test(key[4]);
+    }
     return false;
 }
 
@@ -244,8 +252,8 @@ export function detectBusyControls(src) {
     // A raw `<fetcher>.submit(` that WRITES, from a handler, is a request issued with no <form> to latch.
     // A bare `fetch(` that writes is the same thing without the router: nothing renders between two clicks either.
     const calls = [
-        ...code.matchAll(/\b([A-Za-z_$][\w$]*(?:[Ff]etcher|[Ff]etch)\w*)\.submit\(/g),
-        ...code.matchAll(/(?<![.\w$])(fetch)\(/g),
+        ...code.matchAll(/\b([A-Za-z_$][\w$]*)\.submit\(/g),
+        ...code.matchAll(/(?<![.\w$])(?:(?:window|globalThis)\.)?(fetch)\(/g),
     ];
     for (const m of calls) {
         const at = m.index;

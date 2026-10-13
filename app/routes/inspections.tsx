@@ -553,6 +553,7 @@ export default function InspectionsPage() {
     if (selectedIds.size === 0) return;
     const ids = [...selectedIds];
     for (const id of ids) {
+      // busy-controls-allow: DELETE /api/inspections/:id resolves the row through getInspection first, which answers 404 once the cascade has removed it, so a repeat writes nothing
       fetcher.submit({ intent: "delete", id }, { method: "post" });
     }
     purgeOfflineData(ids);
@@ -600,6 +601,7 @@ export default function InspectionsPage() {
 
   /* ---- Status transition ---- */
   const transitionStatus = (id: string, status: string) => {
+    // busy-controls-allow: PATCH /api/inspections/:id sets the status absolutely (a repeat rewrites the same value) and only audits a change from the stored status, so it sends no email or SMS and adds no second audit row
     fetcher.submit({ intent: "status", id, status }, { method: "post" });
   };
 

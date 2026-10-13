@@ -138,6 +138,7 @@ export function SavedSignatureCard({ savedSignature }: { savedSignature: string 
     const fd = new FormData();
     fd.append("intent", "save-signature");
     fd.append("signatureBase64", dataUri);
+    // busy-controls-allow: save-signature writes users.default_signature_base64 for the signed-in user (saveUserDefaultSignature), an absolute set with no row or object created, so a repeat stores the same value
     fetcher.submit(fd, { method: "post" });
   };
 

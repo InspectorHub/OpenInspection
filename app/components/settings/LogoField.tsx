@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useFetcher } from "react-router";
+import { useActionLatch } from "@core/shared-ui";
 import { LogoUploader } from "~/components/media-studio/LogoUploader";
 import { m } from "~/paraglide/messages";
 
@@ -28,6 +29,9 @@ export interface LogoFieldProps {
 export function LogoField({ initialUrl }: LogoFieldProps) {
   const fetcher = useFetcher<LogoUploadResult>();
   const [logoUrl, setLogoUrl] = useState<string | null>(initialUrl);
+  // Each upload writes a new random-keyed R2 object and repoints the logo at it, so a repeat in the
+  // same frame (before `uploading` renders) would orphan the first object.
+  const uploadLatch = useActionLatch(fetcher.state !== "idle");
 
   useEffect(() => {
     const d = fetcher.data;
@@ -53,12 +57,12 @@ export function LogoField({ initialUrl }: LogoFieldProps) {
       <LogoUploader
         currentUrl={logoUrl}
         uploading={fetcher.state !== "idle"}
-        onSelect={(file) => {
+        onSelect={(file) => uploadLatch(() => {
           const fd = new FormData();
           fd.append("intent", "logo-upload");
           fd.append("logo", file);
           fetcher.submit(fd, { method: "POST", encType: "multipart/form-data" });
-        }}
+        })}
       />
       {failed ? (
         <p role="alert" className="text-[11px] text-ih-bad-fg leading-tight">{failed}</p>

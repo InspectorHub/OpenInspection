@@ -245,6 +245,31 @@ describe('busy-controls detector', () => {
             expect(rules(src)).toEqual([]);
             expect(rules(src.replace('busy-controls-allow: a repeat deletes nothing the second time', 'no marker here'))).toEqual(['raw-submit-unlatched']);
         });
+        it('sees a plain `fetcher.submit(` and any receiver name, not only xFetcher', () => {
+            expect(rules('function g() { fetcher.submit(fd, { method: "post" }); }')).toEqual(['raw-submit-unlatched']);
+            expect(rules('function g() { install.submit(fd, { method: "post" }); }')).toEqual(['raw-submit-unlatched']);
+            expect(rules('function g() { form.submit(); }')).toEqual([]);
+        });
+        it('sees window.fetch and globalThis.fetch, and not a method named fetch on another object', () => {
+            expect(rules('async function g() { await window.fetch("/x", { method: "POST" }); }')).toEqual(['raw-submit-unlatched']);
+            expect(rules('async function g() { await globalThis.fetch("/x", { method: "DELETE" }); }')).toEqual(['raw-submit-unlatched']);
+            expect(rules('async function g() { await cache.fetch("/x", { method: "POST" }); }')).toEqual([]);
+        });
+        it('reads only a top-level `method` key: a nested one neither hides nor creates a write', () => {
+            expect(rules('async function g() { await fetch(u, { body: JSON.stringify({ method: "card" }), method: "POST" }); }')).toEqual(['raw-submit-unlatched']);
+            expect(rules('async function g() { await fetch(u, { body: JSON.stringify({ method: m }) }); }')).toEqual([]);
+            expect(rules('async function g() { await fetch(u, { method }); }')).toEqual(['raw-submit-unlatched']);
+            expect(rules('async function g() { await fetch(u, { "method": "put" }); }')).toEqual(['raw-submit-unlatched']);
+        });
+        it('a latch call elsewhere in the JSX does not clear an unrelated handler of the same name', () => {
+            const src = ['function C() {', '  const send = () => {', '    saveFetcher.submit(fd, { method: "post" });', '  };', '  return (', '    <div>', '      <A onClick={() => saveLatch(a)} />', '      <B onClick={send} />', '    </div>', '  );', '}'].join(String.fromCharCode(10));
+            expect(rules(src)).toEqual(['raw-submit-unlatched']);
+        });
+        it('is not fooled by CRLF line endings: a guard on the previous line does not cover the next function', () => {
+            const crlf = String.fromCharCode(13) + String.fromCharCode(10);
+            const src = ['function C() {', '  const l = useActionLatch(b);', '  const send = () => {', '    saveFetcher.submit(fd, { method: "post" });', '  };', '}'].join(crlf);
+            expect(rules(src)).toEqual(['raw-submit-unlatched']);
+        });
         it('does not flag a read: a submit with no method, or an explicit GET, is a search or a load', () => {
             expect(rules('function find() { searchFetcher.submit(fd); }')).toEqual([]);
             expect(rules('function find() { searchFetcher.submit({ q }, { method: "get" }); }')).toEqual([]);

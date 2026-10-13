@@ -126,6 +126,7 @@ export function WordExportButton({
     if (!exportId || (status !== "queued" && status !== "building")) return;
     const timer = setInterval(() => {
       if (fetcher.state !== "idle") return;
+      // busy-controls-allow: export-word-status is a read: the route action only GETs the export row status (report-card-stack action), and the poll is already skipped while the fetcher is busy
       fetcher.submit({ intent: "export-word-status", exportId }, { method: "POST" });
     }, pollIntervalMs);
     return () => clearInterval(timer);

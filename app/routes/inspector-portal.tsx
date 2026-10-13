@@ -734,9 +734,13 @@ export default function InspectionHubPage() {
   // signer rows into the action; the pre-sign modal is keyed by envelope id
   // (which row's "Sign now" was pressed) and closes itself on success.
   const ensureHuman = useEnsureHuman();
+  // Same-frame guards: a repeat would email every signer a second signing request (send-agreement) or append a
+  // second `agreement.inspector_signed` row to the e-sign audit log (inspector-sign), and the modal's `busy` only
+  // lands after a render.
+  const agreementLatch = useActionLatch(agreementModal.busy);
   const submitSendAgreement = async (payload: SendAgreementPayload) => {
     if (!(await ensureHuman())) return;
-    agreementModal.fetcher.submit(
+    agreementLatch(() => agreementModal.fetcher.submit(
       {
         intent: "send-agreement",
         agreementId: payload.agreementId,
@@ -744,16 +748,17 @@ export default function InspectionHubPage() {
         signers: JSON.stringify(payload.signers),
       },
       { method: "post" },
-    );
+    ));
   };
 
   const [preSigningId, setPreSigningId] = useState<string | null>(null);
   const preSignModal = useModalFetcher<typeof action>("inspector-sign");
+  const preSignLatch = useActionLatch(preSignModal.busy);
   const submitPreSignature = (dataUri: string) => {
-    preSignModal.fetcher.submit(
+    preSignLatch(() => preSignModal.fetcher.submit(
       { intent: "inspector-sign", envelopeId: preSigningId ?? "", signatureBase64: dataUri },
       { method: "post" },
-    );
+    ));
   };
   useEffect(() => {
     if (preSignModal.succeeded) setPreSigningId(null);

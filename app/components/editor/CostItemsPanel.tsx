@@ -73,7 +73,7 @@ async function submitCostItem(
     fd.set("sortOrder", String(item.sortOrder ?? 0));
   }
   try {
-    // busy-controls-allow: update sets absolute column values and delete removes by id with no error on a missing row (CostItemService.update/remove), so a repeat is harmless
+    // busy-controls-allow: update sets absolute column values and delete removes by id with no error on a missing row (CostItemService.update/remove), so a repeat is harmless; the same fetch also carries intent=create, which is not idempotent and is guarded at its only call sites (addRow behind addLatch, and a temp row's follow-up create behind saving[id])
     const res = await fetch("/resources/cost-items", { method: "POST", credentials: "include", body: fd });
     if (!res.ok) return { success: false };
     return (await res.json()) as { success: boolean; id?: string };

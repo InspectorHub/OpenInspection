@@ -138,7 +138,10 @@ export default function SettingsData() {
         <Button
           variant="secondary"
           pending={install.busy}
-          onClick={() => install.submit({ intent: "install-bundled-content" }, { method: "post" })}
+          onClick={() => {
+            // busy-controls-allow: install is useGuardedSubmit, whose submit drops a second call through a synchronous inFlight ref (and the server install is idempotent by name)
+            install.submit({ intent: "install-bundled-content" }, { method: "post" });
+          }}
         >
           {install.busy ? m.settings_data_bundled_button_busy() : m.settings_data_bundled_button()}
         </Button>
