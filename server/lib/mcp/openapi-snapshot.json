@@ -508,18 +508,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Concierge inspection awaiting approval.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Concierge inspection awaiting approval."
           }
         }
       ],
       "body": null
     },
     "summary": "Approve a concierge booking awaiting inspector review",
-    "description": "Auto-generated placeholder for approveInspection (POST /{id}/concierge/approve, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Approves a concierge booking that is waiting for inspector review. The booking moves from awaiting inspector to awaiting client, a confirmation link is created, and the client is emailed that link so they can confirm the appointment. Responds 409 if the booking is not currently awaiting inspector approval, 400 if the inspection has no client email on file, and 404 if the inspection does not exist. Not idempotent: a second call fails with 409. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "archiveAgentNotice",
@@ -564,11 +564,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the pool photo and the item belong to.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the pool photo and the item belong to."
           }
         }
       ],
@@ -577,7 +577,7 @@
       }
     },
     "summary": "Attach a pool photo to an inspection item",
-    "description": "Auto-generated placeholder for attachInspection (POST /{id}/media/attach, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Attaches a media pool photo to a checklist item (or to an item within a section), appending it to that item's photo list in the inspection's results. The pool entry is removed as part of the attach, but the stored image file is kept, so the photo then lives only on the item. A results row is created if none exists. Returns the storage key and the new position of the photo in the item's list. Records an inspection.media.attach audit entry. Not idempotent: a repeat fails with 404 because the pool entry is gone. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "attestSmsConsent",
@@ -758,11 +758,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the units are added to.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the units are added to."
           }
         }
       ],
@@ -771,7 +771,7 @@
       }
     },
     "summary": "Bulk-create units under an inspection (floors×stacks or CSV)",
-    "description": "Auto-generated placeholder for bulkCreateInspectionUnits (POST /{id}/units/bulk, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Creates many units at once under one parent (or at the top level) and returns their ids. Two input styles: a floors-by-stacks grid, or pasted CSV text, each expanded into labelled units. Every created node is a regular unit. Labels that collide with an existing sibling or repeat within the batch are skipped silently, so the returned ids can be fewer than requested, or empty. All rows are inserted together. Refused with 400 when the parent is already at the deepest allowed level or the input cannot be parsed. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "bulkInspection",
@@ -1029,18 +1029,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Id of the inspection to copy.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Id of the inspection to copy."
           }
         }
       ],
       "body": null
     },
     "summary": "Clone inspection for current tenant",
-    "description": "Auto-generated placeholder for cloneInspection (POST /{id}/clone, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Creates a new inspection as a copy of an existing one. The copy gets a new id, today's date and time, status draft and payment status unpaid; every other column of the source record is carried over as stored, and the source's client and agent links and its lead and helper assignments are copied onto it. Findings, photos and reports are not copied by this route. Counts as one new inspection against the company's plan quota, and a quota-threshold notice may be sent when the limit is approached. Records an inspection.create audit entry noting the source id. Not idempotent: each call makes another copy. Responds 404 if the source is missing. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "cloneRatingSystem",
@@ -2048,11 +2048,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection id."
           }
         }
       ],
@@ -2061,7 +2061,7 @@
       }
     },
     "summary": "Record inspector signature on an inspection (authenticated)",
-    "description": "Auto-generated placeholder for createInspectionInspectorSignature (POST /{id}/inspector-signature, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Stores the inspector's drawn signature image on the inspection's primary report. It is saved inside that report's results data, replacing any signature saved earlier, and a results row is created if the report has none yet. Safe to repeat: the last call wins. savedAt in the response simply echoes the signedAt the client sent, not a server time. Responds 404 if the inspection or its primary report is missing. Does not email anyone or write an audit record. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "createInspectionItemsPhotosAnnotation",
@@ -2078,39 +2078,39 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the photo belongs to.",
           "schema": {
             "type": "string",
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the photo belongs to."
           }
         },
         {
           "name": "itemId",
           "in": "path",
           "required": true,
-          "description": "TODO describe itemId field for the OpenInspection MCP integration",
+          "description": "Id of the checklist item whose photo is annotated.",
           "schema": {
             "type": "string",
-            "description": "TODO describe itemId field for the OpenInspection MCP integration"
+            "description": "Id of the checklist item whose photo is annotated."
           }
         },
         {
           "name": "photoIndex",
           "in": "path",
           "required": false,
-          "description": "TODO describe photoIndex field for the OpenInspection MCP integration",
+          "description": "Zero-based position of the photo within the item photo list. Integer, at least 0.",
           "schema": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "TODO describe photoIndex field for the OpenInspection MCP integration"
+            "description": "Zero-based position of the photo within the item photo list. Integer, at least 0."
           }
         }
       ],
       "body": null
     },
     "summary": "Save photo annotation (composite PNG + Konva nodes JSON)",
-    "description": "Auto-generated placeholder for createInspectionItemsPhotosAnnotation (POST /{id}/items/{itemId}/photos/{photoIndex}/annotation, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Saves an annotated version of a checklist item photo from a multipart upload: image is the flattened PNG rendering and nodes is the JSON describing the drawn shapes, kept so the annotation can be edited again. The PNG is written to photo storage next to the original, which is kept untouched, and a repeat save overwrites the previous annotated image. Unless the company edits live in the collaborative editor, the photo entry in the report results also gains the annotated image key and the shapes JSON; with the collaborative editor on, only the image is stored and the returned key must be recorded by the client. Responds 400 when the image is missing or storage is unavailable, and 404 when there is no photo at that index. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "createInspectionPhotoUploadUrl",
@@ -4547,11 +4547,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the unit belongs to.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the unit belongs to."
           }
         }
       ],
@@ -4560,7 +4560,7 @@
       }
     },
     "summary": "Create a unit (Building / Floor / Unit) under an inspection",
-    "description": "Auto-generated placeholder for createInspectionUnits (POST /{id}/units, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Adds one node (building, floor or unit) to the inspection's unit tree and returns its id. The tree is at most three levels deep below the top, so a parent that is already at the deepest level is refused, and a name already used by a sibling under the same parent is refused; both come back as 400. The new node is sorted after its existing siblings. The inspection id is not looked up first, so an unknown id simply produces a node no inspection shows. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "createInspectionUnitsMove",
@@ -4577,22 +4577,22 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the unit belongs to (not checked against the unit by this route).",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the unit belongs to (not checked against the unit by this route)."
           }
         },
         {
           "name": "unitId",
           "in": "path",
           "required": true,
-          "description": "TODO describe unitId field for the OpenInspection MCP integration",
+          "description": "Unit to move.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe unitId field for the OpenInspection MCP integration"
+            "description": "Unit to move."
           }
         }
       ],
@@ -4601,7 +4601,7 @@
       }
     },
     "summary": "Reparent + reorder atomically (cycle-detected)",
-    "description": "Auto-generated placeholder for createInspectionUnitsMove (POST /{id}/units/{unitId}/move, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Moves a unit under a different parent (or to the top level) and sets its sort position in one step. Refused with 400 if the new parent is the unit itself or one of its descendants, since that would create a cycle. The three-level depth limit is not re-checked on a move, and the inspection id in the path is not verified against the unit. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "createInspectionVideoUpload",
@@ -4649,7 +4649,7 @@
       }
     },
     "summary": "Create an inspection from the 4-step NewInspectionWizard",
-    "description": "Auto-generated placeholder for createInspectionWizard (POST /wizard, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Creates an inspection from the new-inspection wizard payload (property, services, schedule and team) and returns the new inspection id. The signed-in user becomes the inspector and the scheduled date and start time are combined into the inspection date. The client is not collected here: the inspection is created with the placeholder client name Private Client and no contact details, so attach a client afterwards. The services list is validated but this route does not use it to create anything. Property type and commercial subtype (only honoured for commercial) are applied after creation. When team mode is on, the lead defaults to the signed-in user and the helpers are assigned; when it is off, any lead or helpers sent are ignored and the creator is the sole assignee. Counts against the company's plan quota. Unlike the plain create route it responds 200, not 201. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "createInspectorCredential",
@@ -6051,40 +6051,40 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection id."
           }
         },
         {
           "name": "itemId",
           "in": "path",
           "required": true,
-          "description": "TODO describe itemId field for the OpenInspection MCP integration",
+          "description": "Id of the checklist item whose photo list is edited, as it appears in the results data.",
           "schema": {
             "type": "string",
-            "description": "TODO describe itemId field for the OpenInspection MCP integration"
+            "description": "Id of the checklist item whose photo list is edited, as it appears in the results data."
           }
         },
         {
           "name": "photoIndex",
           "in": "path",
           "required": false,
-          "description": "TODO describe photoIndex field for the OpenInspection MCP integration",
+          "description": "Zero-based position of the photo within the item photo list. Integer, at least 0.",
           "schema": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "TODO describe photoIndex field for the OpenInspection MCP integration"
+            "description": "Zero-based position of the photo within the item photo list. Integer, at least 0."
           }
         }
       ],
       "body": null
     },
     "summary": "Authoritative delete of a photo from a result item",
-    "description": "Auto-generated placeholder for deleteInspectionItemsPhoto (DELETE /{id}/items/{itemId}/photos/{photoIndex}, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Removes one photo from a checklist item on the inspection's primary report, addressed by its position in that item's photo list. The entry is taken out of the stored results, and the underlying file is then deleted from photo storage on a best-effort basis (a storage failure is ignored, so the entry can disappear while the file lingers). Returns the storage key of the removed photo, or null if the entry had none. Because later photos shift down by one, repeating the same call removes a different photo and index values from before a delete are stale afterwards. Responds 404 when the inspection has no primary report or results, or the index is past the end of the item's photos. Does not write an audit record. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "deleteInspectionMediaPool",
@@ -6101,29 +6101,29 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the pool photo belongs to.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the pool photo belongs to."
           }
         },
         {
           "name": "poolId",
           "in": "path",
           "required": true,
-          "description": "TODO describe poolId field for the OpenInspection MCP integration",
+          "description": "Id of the media pool entry to delete.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe poolId field for the OpenInspection MCP integration"
+            "description": "Id of the media pool entry to delete."
           }
         }
       ],
       "body": null
     },
     "summary": "Delete a pool photo (cancel an upload)",
-    "description": "Auto-generated placeholder for deleteInspectionMediaPool (DELETE /{id}/media/pool/{poolId}, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Permanently deletes a photo from the inspection's media pool: both the pool entry and the stored image file (a failed file deletion is logged and ignored). Only unattached pool photos are addressed here; photos already attached to items are removed with the detach route or the item photo delete route. Refused with 409 while the photo is the report cover, so clear the cover first. Responds 404 if the pool entry is not found. Cannot be undone. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "deleteInspectionReport",
@@ -6207,29 +6207,29 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the unit belongs to (not checked against the unit by this route).",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the unit belongs to (not checked against the unit by this route)."
           }
         },
         {
           "name": "unitId",
           "in": "path",
           "required": true,
-          "description": "TODO describe unitId field for the OpenInspection MCP integration",
+          "description": "Unit to delete along with all of its descendants.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe unitId field for the OpenInspection MCP integration"
+            "description": "Unit to delete along with all of its descendants."
           }
         }
       ],
       "body": null
     },
     "summary": "Delete a unit (cascades to children)",
-    "description": "Auto-generated placeholder for deleteInspectionUnit (DELETE /{id}/units/{unitId}, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Deletes a unit together with every unit nested beneath it. Findings recorded against the deleted units are not removed by this route. The unit is looked up by its own id within the company only, so the inspection id in the path is not verified against it, and an unknown unit id still returns success. Cannot be undone. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "deleteInspectionVideo",
@@ -6767,22 +6767,22 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the item belongs to.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the item belongs to."
           }
         },
         {
           "name": "itemId",
           "in": "path",
           "required": true,
-          "description": "TODO describe itemId field for the OpenInspection MCP integration",
+          "description": "Id of the checklist item the photo is removed from.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe itemId field for the OpenInspection MCP integration"
+            "description": "Id of the checklist item the photo is removed from."
           }
         },
         {
@@ -6803,7 +6803,7 @@
       }
     },
     "summary": "Detach a photo from an inspection item (keeps the R2 object)",
-    "description": "Auto-generated placeholder for detachInspectionItemPhoto (POST /{id}/items/{itemId}/photos/{photoIndex}/detach, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Removes one photo from a checklist item's photo list without deleting the image file, so the file stays in storage. The photo is addressed by its position in the list and later photos shift down by one, so a repeated call removes a different photo. Unlike the item photo delete route this does not delete the file from storage. Responds 404 if the inspection has no results yet and 400 if the item has no photos; an index past the end is rejected. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "disableTotp",
@@ -7043,29 +7043,29 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the unit belongs to.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the unit belongs to."
           }
         },
         {
           "name": "unitId",
           "in": "path",
           "required": true,
-          "description": "TODO describe unitId field for the OpenInspection MCP integration",
+          "description": "Unit to copy.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe unitId field for the OpenInspection MCP integration"
+            "description": "Unit to copy."
           }
         }
       ],
       "body": null
     },
     "summary": "Duplicate a unit (clone attributes into a new empty sibling)",
-    "description": "Auto-generated placeholder for duplicateInspectionUnit (POST /{id}/units/{unitId}/duplicate, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Makes a copy of a unit as a new sibling and returns the new id. The copy keeps the original's kind, type, parent and stored attributes, gets a derived copy name that avoids sibling collisions, and is sorted last among its siblings. Findings entered against the original are not copied, so the new unit starts empty. Children of the unit are not duplicated. Refused with 400 when the unit does not exist or belongs to a different inspection. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "duplicateMessageTemplate",
@@ -13387,22 +13387,22 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection both items belong to.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection both items belong to."
           }
         },
         {
           "name": "itemId",
           "in": "path",
           "required": true,
-          "description": "TODO describe itemId field for the OpenInspection MCP integration",
+          "description": "Id of the source checklist item the photo is taken from.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe itemId field for the OpenInspection MCP integration"
+            "description": "Id of the source checklist item the photo is taken from."
           }
         },
         {
@@ -13423,7 +13423,7 @@
       }
     },
     "summary": "Move a photo from one inspection item to another",
-    "description": "Auto-generated placeholder for moveInspectionItemPhoto (POST /{id}/items/{itemId}/photos/{photoIndex}/move, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Moves one photo from a checklist item to the end of another item's photo list within the same inspection, keeping its annotated or cropped versions with it. The photo is addressed by its position in the source list, and later photos in that list shift down by one. Section ids are only needed when the items are addressed within a section. Responds 404 if the inspection has no results yet and 400 if the source item has no photos; an index past the end is rejected. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "patchAutomation",
@@ -15931,22 +15931,22 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the unit belongs to (not checked against the unit by this route).",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the unit belongs to (not checked against the unit by this route)."
           }
         },
         {
           "name": "unitId",
           "in": "path",
           "required": true,
-          "description": "TODO describe unitId field for the OpenInspection MCP integration",
+          "description": "Unit to rename or reorder.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe unitId field for the OpenInspection MCP integration"
+            "description": "Unit to rename or reorder."
           }
         }
       ],
@@ -15955,7 +15955,7 @@
       }
     },
     "summary": "Rename or re-sort a unit",
-    "description": "Auto-generated placeholder for patchInspectionUnit (PATCH /{id}/units/{unitId}, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Renames a unit or changes its sort position; fields left out are unchanged. Sibling-name uniqueness is not re-checked on rename. The unit is looked up by its own id within the company only, so the inspection id in the path is not verified against it, and an unknown unit id succeeds without changing anything. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "patchMyProfile",
@@ -17382,22 +17382,22 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the item belongs to.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the item belongs to."
           }
         },
         {
           "name": "itemId",
           "in": "path",
           "required": true,
-          "description": "TODO describe itemId field for the OpenInspection MCP integration",
+          "description": "Id of the checklist item whose photos are reordered.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe itemId field for the OpenInspection MCP integration"
+            "description": "Id of the checklist item whose photos are reordered."
           }
         }
       ],
@@ -17406,7 +17406,7 @@
       }
     },
     "summary": "Reorder an item's photos (array order = report order)",
-    "description": "Auto-generated placeholder for reorderInspectionItemPhotos (POST /{id}/items/{itemId}/photos/reorder, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Sets the order of one checklist item's photos, which is also their order in the report. Send the complete list of the item's current photo keys in the new order: the list must contain exactly the same keys, so photos cannot be added or dropped through it, and a mismatch is rejected. Only the order in the stored results changes. Responds 404 if the inspection has no results yet and 400 if the item has no photos. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "repairImportRunEntry",
@@ -18200,22 +18200,22 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the item belongs to.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the item belongs to."
           }
         },
         {
           "name": "itemId",
           "in": "path",
           "required": true,
-          "description": "TODO describe itemId field for the OpenInspection MCP integration",
+          "description": "Id of the checklist item whose photo is reverted.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe itemId field for the OpenInspection MCP integration"
+            "description": "Id of the checklist item whose photo is reverted."
           }
         },
         {
@@ -18236,7 +18236,7 @@
       }
     },
     "summary": "Revert a photo's edits to the original (drops annotations)",
-    "description": "Auto-generated placeholder for revertInspectionItemPhoto (POST /{id}/items/{itemId}/photos/{photoIndex}/revert, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Undoes edits on one checklist item photo, returning it to the original image. The photo's entry keeps only its source image key, so the annotated image reference, the stored annotation shapes and any other derived data on that entry are dropped from the results; the derived image files themselves are not deleted from storage. Safe to repeat. Responds 404 if the inspection has no results yet and 400 if the item has no photos; an index past the end is rejected. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "revokeAgent",
@@ -20096,22 +20096,22 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the media item belongs to.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the media item belongs to."
           }
         },
         {
           "name": "mediaId",
           "in": "path",
           "required": true,
-          "description": "TODO describe mediaId field for the OpenInspection MCP integration",
+          "description": "Id of the media pool item to annotate.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe mediaId field for the OpenInspection MCP integration"
+            "description": "Id of the media pool item to annotate."
           }
         }
       ],
@@ -20120,7 +20120,7 @@
       }
     },
     "summary": "Save PhotoStudio annotation overlay + caption",
-    "description": "Auto-generated placeholder for updateInspectionMediaAnnotation (PUT /{id}/media/{mediaId}/annotations, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Saves the annotation overlay and caption of one item in the inspection's media pool. This is a full replace: both annotations and caption are required and overwrite what was stored, so send an empty string for a value you want blank. The overlay is stored as opaque text and not interpreted by the server, and the caption is shown in published reports. Responds 404 if the media item is not in this inspection. Does not touch the image file. updatedAt in the response is the time of the call and is not stored. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "updateInspectionPrefs",
@@ -23124,18 +23124,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection id."
           }
         }
       ],
       "body": null
     },
     "summary": "Upgrade inspection template snapshot to current master version",
-    "description": "Auto-generated placeholder for upgradeInspection (POST /{id}/template/upgrade, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Brings the inspection's frozen copy of its template up to the current version of the master template it was created from. When the master has a newer version, its current schema replaces the inspection's snapshot and the snapshot version is updated, and an inspection.template_upgraded audit record is written. When the snapshot is already current nothing changes and from equals to. Results already entered are not touched by this route. Responds 400 if the inspection has no master template and 404 if the inspection or the master template no longer exists. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "uploadInspection",
@@ -23152,18 +23152,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the photo is stored under.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the photo is stored under."
           }
         }
       ],
       "body": null
     },
     "summary": "Upload inspection for current tenant",
-    "description": "Auto-generated placeholder for uploadInspection (POST /{id}/upload, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Uploads one photo file (multipart) to the inspection's photo storage and returns its storage key. This route only stores the file: it does not add the photo to any checklist item or to the media pool, so the client must record the returned key itself. itemId must be present but is not used to place the file, and targetType and customId are only validated and echoed back (customId is required when targetType is defect). Location data is stripped from the image where the image service is available. Each call stores a new file. Responds 400 when storage is unavailable or file or itemId is missing. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "uploadInspectorCredentialImage",

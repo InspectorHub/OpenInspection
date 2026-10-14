@@ -58,9 +58,9 @@ const syncRoutes = createApiRouter()
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({
-            id:         z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-            itemId:     z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
-            photoIndex: z.coerce.number().int().nonnegative().describe('TODO describe photoIndex field for the OpenInspection MCP integration'),
+            id:         z.string().trim().min(1).describe('Inspection id.'),
+            itemId:     z.string().describe('Id of the checklist item whose photo list is edited, as it appears in the results data.'),
+            photoIndex: z.coerce.number().int().nonnegative().describe('Zero-based position of the photo within the item photo list.'),
         }),
     },
     responses: {
@@ -77,7 +77,7 @@ const syncRoutes = createApiRouter()
         },
     },
     operationId: "deleteInspectionItemsPhoto",
-    description: "Auto-generated placeholder for deleteInspectionItemsPhoto (DELETE /{id}/items/{itemId}/photos/{photoIndex}, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Removes one photo from a checklist item on the inspection's primary report, addressed by its position in that item's photo list. The entry is taken out of the stored results, and the underlying file is then deleted from photo storage on a best-effort basis (a storage failure is ignored, so the entry can disappear while the file lingers). Returns the storage key of the removed photo, or null if the entry had none. Because later photos shift down by one, repeating the same call removes a different photo and index values from before a delete are stale afterwards. Responds 404 when the inspection has no primary report or results, or the index is past the end of the item's photos. Does not write an audit record. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' })), async (c) => {
     const { id, itemId, photoIndex } = c.req.valid('param');
     const tenantId = c.get('tenantId') as string;
@@ -118,8 +118,8 @@ const syncRoutes = createApiRouter()
     summary: 'Record inspector signature on an inspection (authenticated)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
-        body: { content: { 'application/json': { schema: InspectorSignatureSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection id.') }),
+        body: { content: { 'application/json': { schema: InspectorSignatureSchema.describe('The signature image and the time the inspector signed.') } } },
     },
     responses: {
         200: {
@@ -135,7 +135,7 @@ const syncRoutes = createApiRouter()
         },
     },
     operationId: "createInspectionInspectorSignature",
-    description: "Auto-generated placeholder for createInspectionInspectorSignature (POST /{id}/inspector-signature, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Stores the inspector's drawn signature image on the inspection's primary report. It is saved inside that report's results data, replacing any signature saved earlier, and a results row is created if the report has none yet. Safe to repeat: the last call wins. savedAt in the response simply echoes the signedAt the client sent, not a server time. Responds 404 if the inspection or its primary report is missing. Does not email anyone or write an audit record. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' })), async (c) => {
     const { id } = c.req.valid('param');
     const { signatureBase64, signedAt } = c.req.valid('json');
@@ -176,10 +176,10 @@ const syncRoutes = createApiRouter()
     tags: ["inspections"],
     summary: 'Upgrade inspection template snapshot to current master version',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('Inspection id.') }) },
     responses: { 200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ from: z.number().describe('TODO describe from field for the OpenInspection MCP integration'), to: z.number().describe('TODO describe to field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Upgraded' } },
     operationId: "upgradeInspection",
-    description: "Auto-generated placeholder for upgradeInspection (POST /{id}/template/upgrade, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Brings the inspection's frozen copy of its template up to the current version of the master template it was created from. When the master has a newer version, its current schema replaces the inspection's snapshot and the snapshot version is updated, and an inspection.template_upgraded audit record is written. When the snapshot is already current nothing changes and from equals to. Results already entered are not touched by this route. Responds 400 if the inspection has no master template and 404 if the inspection or the master template no longer exists. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' })), async (c) => {
     const { id } = c.req.valid('param');
     const tenantId = c.get('tenantId') as string;

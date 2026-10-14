@@ -5,8 +5,8 @@
 import { z } from '@hono/zod-openapi';
 
 export const UpdateMediaAnnotationsSchema = z.object({
-    annotations: z.string().max(8 * 1024, 'annotations must be <= 8 KB').describe('TODO describe annotations field for the OpenInspection MCP integration'),
-    caption:     z.string().max(200, 'caption must be <= 200 chars').describe('TODO describe caption field for the OpenInspection MCP integration'),
+    annotations: z.string().max(8 * 1024, 'annotations must be <= 8 KB').describe('Annotation overlay for the photo, as a JSON-encoded string the editor produced. Stored as is and not interpreted by the server.'),
+    caption:     z.string().max(200, 'caption must be <= 200 chars').describe('Caption shown with the photo in published reports.'),
 }).openapi('UpdateMediaAnnotations');
 
 // ── Plan 7 — video walk-through (Cloudflare Stream direct creator upload) ────

@@ -136,7 +136,7 @@ const cloneInspectionRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "Clone inspection for current tenant",
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection to copy.') }),
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {
@@ -150,7 +150,7 @@ const cloneInspectionRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "cloneInspection",
-    description: "Auto-generated placeholder for cloneInspection (POST /{id}/clone, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Creates a new inspection as a copy of an existing one. The copy gets a new id, today's date and time, status draft and payment status unpaid; every other column of the source record is carried over as stored, and the source's client and agent links and its lead and helper assignments are copied onto it. Findings, photos and reports are not copied by this route. Counts as one new inspection against the company's plan quota, and a quota-threshold notice may be sent when the limit is approached. Records an inspection.create audit entry noting the source id. Not idempotent: each call makes another copy. Responds 404 if the source is missing. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // -----------------------------------------------------------------------------
@@ -167,7 +167,7 @@ const createFromWizardRoute = createRoute(withMcpMetadata({
     summary:    'Create an inspection from the 4-step NewInspectionWizard',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        body: { content: { 'application/json': { schema: CreateInspectionFromWizardSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: CreateInspectionFromWizardSchema.describe('The wizard answers: property facts, requested services, schedule and team assignment.') } } },
     },
     responses: {
         200: {
@@ -180,7 +180,7 @@ const createFromWizardRoute = createRoute(withMcpMetadata({
         400: { description: 'Validation error' },
     },
     operationId: "createInspectionWizard",
-    description: "Auto-generated placeholder for createInspectionWizard (POST /wizard, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Creates an inspection from the new-inspection wizard payload (property, services, schedule and team) and returns the new inspection id. The signed-in user becomes the inspector and the scheduled date and start time are combined into the inspection date. The client is not collected here: the inspection is created with the placeholder client name Private Client and no contact details, so attach a client afterwards. The services list is validated but this route does not use it to create anything. Property type and commercial subtype (only honoured for commercial) are applied after creation. When team mode is on, the lead defaults to the signed-in user and the helpers are assigned; when it is off, any lead or helpers sent are ignored and the creator is the sole assignee. Counts against the company's plan quota. Unlike the plain create route it responds 200, not 201. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 

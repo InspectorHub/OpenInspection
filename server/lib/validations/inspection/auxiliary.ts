@@ -42,8 +42,8 @@ export const MediaPoolUploadResponseSchema = z.object({
 }).openapi('MediaPoolUploadResponse');
 
 export const MediaAttachRequestSchema = z.object({
-    poolId: z.string().min(1).describe('TODO describe poolId field for the OpenInspection MCP integration'),
-    itemId: z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
+    poolId: z.string().min(1).describe('Id of the media pool entry to attach. The entry is consumed by the attach.'),
+    itemId: z.string().min(1).describe('Id of the checklist item that receives the photo.'),
     sectionId: z.string().min(1).optional().describe('Section ID for composite finding key'),
 }).openapi('MediaAttachRequest');
 

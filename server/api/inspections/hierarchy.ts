@@ -28,15 +28,15 @@ const createUnitRoute = createRoute(withMcpMetadata({
     summary:    'Create a unit (Building / Floor / Unit) under an inspection',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
-        body: { content: { 'application/json': { schema: CreateUnitSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection the unit belongs to.') }),
+        body: { content: { 'application/json': { schema: CreateUnitSchema.describe('Where the new node sits in the tree (parent, or null for top level), what kind of node it is and its name.') } } },
     },
     responses: {
         200: { description: 'created', content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } } },
         400: { description: 'validation / depth / duplicate-name' },
     },
     operationId: "createInspectionUnits",
-    description: "Auto-generated placeholder for createInspectionUnits (POST /{id}/units, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Adds one node (building, floor or unit) to the inspection's unit tree and returns its id. The tree is at most three levels deep below the top, so a parent that is already at the deepest level is refused, and a name already used by a sibling under the same parent is refused; both come back as 400. The new node is sorted after its existing siblings. The inspection id is not looked up first, so an unknown id simply produces a node no inspection shows. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // Commercial PCA Phase U — bulk-create N units (floors×stacks / CSV paste) and
@@ -49,15 +49,15 @@ const bulkCreateUnitsRoute = createRoute(withMcpMetadata({
     summary:    'Bulk-create units under an inspection (floors×stacks or CSV)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
-        body: { content: { 'application/json': { schema: BulkCreateUnitsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection the units are added to.') }),
+        body: { content: { 'application/json': { schema: BulkCreateUnitsSchema.describe('Either a floors-by-stacks grid or CSV text, plus the optional parent node to create the units under.') } } },
     },
     responses: {
         200: { description: 'created', content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ ids: z.array(z.string()).describe('TODO describe ids field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } } },
         400: { description: 'validation' },
     },
     operationId: "bulkCreateInspectionUnits",
-    description: "Auto-generated placeholder for bulkCreateInspectionUnits (POST /{id}/units/bulk, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Creates many units at once under one parent (or at the top level) and returns their ids. Two input styles: a floors-by-stacks grid, or pasted CSV text, each expanded into labelled units. Every created node is a regular unit. Labels that collide with an existing sibling or repeat within the batch are skipped silently, so the returned ids can be fewer than requested, or empty. All rows are inserted together. Refused with 400 when the parent is already at the deepest allowed level or the input cannot be parsed. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const duplicateUnitRoute = createRoute(withMcpMetadata({
@@ -67,14 +67,14 @@ const duplicateUnitRoute = createRoute(withMcpMetadata({
     summary:    'Duplicate a unit (clone attributes into a new empty sibling)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'), unitId: z.string().min(1).describe('TODO describe unitId field for the OpenInspection MCP integration') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection the unit belongs to.'), unitId: z.string().min(1).describe('Unit to copy.') }),
     },
     responses: {
         200: { description: 'duplicated', content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } } },
         400: { description: 'unit not found' },
     },
     operationId: "duplicateInspectionUnit",
-    description: "Auto-generated placeholder for duplicateInspectionUnit (POST /{id}/units/{unitId}/duplicate, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Makes a copy of a unit as a new sibling and returns the new id. The copy keeps the original's kind, type, parent and stored attributes, gets a derived copy name that avoids sibling collisions, and is sorted last among its siblings. Findings entered against the original are not copied, so the new unit starts empty. Children of the unit are not duplicated. Refused with 400 when the unit does not exist or belongs to a different inspection. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // Commercial PCA Phase U (Batch C2a) — flip an inspection between tagged and
@@ -136,12 +136,12 @@ const updateUnitRoute = createRoute(withMcpMetadata({
     summary:    'Rename or re-sort a unit',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'), unitId: z.string().min(1).describe('TODO describe unitId field for the OpenInspection MCP integration') }),
-        body: { content: { 'application/json': { schema: UpdateUnitSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection the unit belongs to (not checked against the unit by this route).'), unitId: z.string().min(1).describe('Unit to rename or reorder.') }),
+        body: { content: { 'application/json': { schema: UpdateUnitSchema.describe('New name and or new sort position; omit a field to leave it as is.') } } },
     },
     responses: { 200: { description: 'ok', content: { 'application/json': { schema: SuccessResponseSchema } } } },
     operationId: "patchInspectionUnit",
-    description: "Auto-generated placeholder for patchInspectionUnit (PATCH /{id}/units/{unitId}, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Renames a unit or changes its sort position; fields left out are unchanged. Sibling-name uniqueness is not re-checked on rename. The unit is looked up by its own id within the company only, so the inspection id in the path is not verified against it, and an unknown unit id succeeds without changing anything. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const deleteUnitRoute = createRoute(withMcpMetadata({
@@ -150,10 +150,10 @@ const deleteUnitRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary:    'Delete a unit (cascades to children)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request:    { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'), unitId: z.string().min(1).describe('TODO describe unitId field for the OpenInspection MCP integration') }) },
+    request:    { params: z.object({ id: z.string().trim().min(1).describe('Inspection the unit belongs to (not checked against the unit by this route).'), unitId: z.string().min(1).describe('Unit to delete along with all of its descendants.') }) },
     responses:  { 200: { description: 'ok', content: { 'application/json': { schema: SuccessResponseSchema } } } },
     operationId: "deleteInspectionUnit",
-    description: "Auto-generated placeholder for deleteInspectionUnit (DELETE /{id}/units/{unitId}, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Deletes a unit together with every unit nested beneath it. Findings recorded against the deleted units are not removed by this route. The unit is looked up by its own id within the company only, so the inspection id in the path is not verified against it, and an unknown unit id still returns success. Cannot be undone. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const moveUnitRoute = createRoute(withMcpMetadata({
@@ -163,15 +163,15 @@ const moveUnitRoute = createRoute(withMcpMetadata({
     summary:    'Reparent + reorder atomically (cycle-detected)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'), unitId: z.string().min(1).describe('TODO describe unitId field for the OpenInspection MCP integration') }),
-        body: { content: { 'application/json': { schema: MoveUnitSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection the unit belongs to (not checked against the unit by this route).'), unitId: z.string().min(1).describe('Unit to move.') }),
+        body: { content: { 'application/json': { schema: MoveUnitSchema.describe('The new parent (null for top level) and the new sort position.') } } },
     },
     responses: {
         200: { description: 'ok', content: { 'application/json': { schema: SuccessResponseSchema } } },
         400: { description: 'cycle detected' },
     },
     operationId: "createInspectionUnitsMove",
-    description: "Auto-generated placeholder for createInspectionUnitsMove (POST /{id}/units/{unitId}/move, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Moves a unit under a different parent (or to the top level) and sets its sort position in one step. Refused with 400 if the new parent is the unit itself or one of its descendants, since that would create a cycle. The three-level depth limit is not re-checked on a move, and the inspection id in the path is not verified against the unit. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // -----------------------------------------------------------------------------
