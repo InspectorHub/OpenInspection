@@ -4,7 +4,7 @@
     "Counts sequential top-level awaits per route module. A PROXY for round-trip depth, not a measurement of it.",
     "Growth means someone added an await that waits on the one before it. If it does not depend on it, batch it."
   ],
-  "total": 219,
+  "total": 221,
   "files": {
     "app/routes/agent-layout.tsx": 1,
     "app/routes/agent/accept-terms.tsx": 4,
@@ -19,7 +19,7 @@
     "app/routes/calendar-dispatch.tsx": 5,
     "app/routes/calendar.tsx": 3,
     "app/routes/comments.tsx": 3,
-    "app/routes/contact-detail.tsx": 5,
+    "app/routes/contact-detail.tsx": 6,
     "app/routes/contacts.tsx": 3,
     "app/routes/forgot-password.tsx": 1,
     "app/routes/home.tsx": 1,
@@ -75,7 +75,7 @@
     "app/routes/settings-event-types.tsx": 1,
     "app/routes/settings-inspection-roles.tsx": 3,
     "app/routes/settings-inspection-types.tsx": 1,
-    "app/routes/settings-integrations-qbo.tsx": 3,
+    "app/routes/settings-integrations-qbo.tsx": 4,
     "app/routes/settings-integrations.tsx": 4,
     "app/routes/settings-profile.tsx": 5,
     "app/routes/settings-schedule.tsx": 4,

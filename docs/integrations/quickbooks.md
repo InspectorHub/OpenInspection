@@ -75,6 +75,38 @@ The reason is the webhook. It is a single unauthenticated endpoint shared by eve
 
 ---
 
+## Checking the Intuit app's keys
+
+**Settings → Integrations → QuickBooks Online → Your Intuit app → Check credentials** tells you whether the Client ID and Client Secret in force are a matching pair, without connecting anything. It posts an authorization-code exchange with a made-up code to Intuit's token endpoint: Intuit authenticates the client before it looks at the code, so a matching pair is answered with `invalid_grant` and a wrong ID or secret with `invalid_client`. Nothing is created or consumed either way.
+
+What the check does **not** tell you:
+
+- **Development or Production keys.** The token endpoint is shared by both and accepts both. A Development key set only reaches sandbox companies; see `QBO_ENV` above.
+- **Whether the Redirect URI is registered.** The made-up code fails before the redirect address is compared.
+
+Only an explicit `invalid_client` is reported as rejected. A timeout, a server error, a rate limit or an answer that is not Intuit's JSON is reported as "could not reach Intuit", because none of those says anything about the keys. The result carries a verdict and a time, never a credential. The check is limited to 10 requests per minute per company, and it is disabled while a field holds text that has not been saved yet, so it never reports on values the page is not using.
+
+---
+
+## Matching contacts to QuickBooks customers
+
+A contact is matched to a QuickBooks customer the first time it is synced: by the email address when one matches, otherwise a new customer is created. When that cannot work, you can match by hand.
+
+- **From an item that needs attention.** A contact that could not be sent shows **Match to a QuickBooks customer** on the QuickBooks settings page.
+- **From the contact's page.** Owners and managers see a **QuickBooks** card once QuickBooks is connected, with **Match to a QuickBooks customer**, or **Change match** and **Remove match** when the contact is already matched.
+
+The dialog searches active QuickBooks customers by display name, or by exact email when the text contains `@`. Searching happens when you press Enter or **Search** (at least two characters), not as you type, because searches are rate limited per company. A customer already matched to another contact is shown greyed out with that contact's name. An inactive customer cannot be matched.
+
+Things to know:
+
+- After a match, a contact's edits here update that QuickBooks customer's name, email and phone.
+- Invoices of that contact that failed for lack of a customer are sent again in the background: at most ten per match, one at a time, none started after twenty seconds. Paid and part-paid invoices are left alone. What is left over is sent the next time the contact is matched or the invoice is sent again.
+- **Remove match** changes nothing in QuickBooks. The next time the contact is synced, an existing customer with the same email is looked up first, and a new one is created if there is none.
+- Archiving a contact keeps its match, and the customer stays unavailable to other contacts. An archived contact cannot be matched or changed, but its match can be removed from its page. Deleting a contact for good removes its match.
+- Only owners and managers can match or remove a match.
+
+---
+
 ## What happens when a connection ends
 
 Two things end a connection, and both leave the same state behind: no connection, no entity mappings, no open sync errors.
