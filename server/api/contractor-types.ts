@@ -50,7 +50,7 @@ const createContractorTypeRoute = createRoute(withMcpMetadata({
     },
     operationId: "createContractorType",
     summary: "Create contractor type for current tenant",
-    description: "Auto-generated placeholder for createContractorType (POST /, contractor-types domain). TODO: replace with a real description sourced from the handler."
+    description: "Adds a contractor type (a trade label such as electrician) to the company's list, used to suggest who should perform a repair. Owner or manager only. New types have no canonical trade slug. Writes an audit entry (contractor_type.created). Returns the created type."
 }, { scopes: ['write'], tier: 'primary' }));
 
 /* ── PATCH /api/contractor-types/:id ──────────────────────────────────────── */
@@ -67,7 +67,7 @@ const updateContractorTypeRoute = createRoute(withMcpMetadata({
     },
     operationId: "updateContractorType",
     summary: "Update contractor type for current tenant",
-    description: "Auto-generated placeholder for updateContractorType (PATCH /{id}, contractor-types domain). TODO: replace with a real description sourced from the handler."
+    description: "Renames a contractor type or changes its sort order; send only the fields to change. Owner or manager only. Fails with not found when the id does not exist in this company. Writes an audit entry (contractor_type.updated). Returns the updated type."
 }, { scopes: ['write'], tier: 'primary' }));
 
 /* ── DELETE /api/contractor-types/:id ─────────────────────────────────────── */
@@ -81,7 +81,7 @@ const deleteContractorTypeRoute = createRoute(withMcpMetadata({
     },
     operationId: "deleteContractorType",
     summary: "Delete contractor type for current tenant",
-    description: "Auto-generated placeholder for deleteContractorType (DELETE /{id}, contractor-types domain). TODO: replace with a real description sourced from the handler."
+    description: "Permanently deletes a contractor type. Owner or manager only. Not blocked by references: recommendations that name this type keep a dangling id, and published reports are unaffected because they store the label. Use the preflight route first to count affected comments. Writes an audit entry (contractor_type.deleted)."
 }, { scopes: ['write'], tier: 'primary' }));
 
 /* ── GET /api/contractor-types/:id/preflight ──────────────────────────────── */

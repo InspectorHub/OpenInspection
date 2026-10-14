@@ -19,13 +19,13 @@ const ServiceSchema = z.object({
 }).openapi('Service');
 
 export const CreateServiceSchema = z.object({
-    name:            z.string().min(1).max(200).describe('TODO describe name field for the OpenInspection MCP integration'),
-    description:     z.string().max(1000).optional().describe('TODO describe description field for the OpenInspection MCP integration'),
-    price:           z.number().int().min(0).describe('TODO describe price field for the OpenInspection MCP integration'),
-    durationMinutes: z.number().int().min(0).optional().describe('TODO describe durationMinutes field for the OpenInspection MCP integration'),
-    templateId:      z.string().optional().describe('TODO describe templateId field for the OpenInspection MCP integration'),
-    agreementId:     z.string().optional().describe('TODO describe agreementId field for the OpenInspection MCP integration'),
-    sortOrder:       z.number().int().optional().describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
+    name:            z.string().min(1).max(200).describe('Service name shown in the catalog and on bookings, 1-200 characters.'),
+    description:     z.string().max(1000).optional().describe('Optional description of what the service covers, up to 1000 characters.'),
+    price:           z.number().int().min(0).describe('Price in integer cents (for example 45000 is 450.00 in the company currency).'),
+    durationMinutes: z.number().int().min(0).optional().describe('Expected duration in minutes.'),
+    templateId:      z.string().optional().describe('Id of the inspection template used for this service.'),
+    agreementId:     z.string().optional().describe('Id of the agreement the client signs for this service.'),
+    sortOrder:       z.number().int().optional().describe('Position in the catalog; lower values list first, ties by name. Defaults to 0.'),
     // Tier 2 of the booking deposit. Omitted or null = inherit the workspace
     // default; `{ type: 'none' }` = this service asks for no deposit even when
     // the workspace does. Those are different answers, which is why the column

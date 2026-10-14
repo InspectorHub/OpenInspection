@@ -38,7 +38,7 @@ const getRecommendationRoute = createRoute(withMcpMetadata({
     },
     operationId: "getRecommendation",
     summary: "Get recommendation for current tenant",
-    description: "Auto-generated placeholder for getRecommendation (GET /{id}, recommendations domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns one recommendation (a canned repair item with severity and repair scope) from the company library. Fails with not found when the id is unknown or belongs to an ordinary canned comment that has no repair summary. Owner, manager or inspector."
 }, { scopes: ['read'], tier: 'primary' }));
 
 /* ── POST /api/recommendations ────────────────────────────────────────────── */
@@ -52,7 +52,7 @@ const createRecommendationRoute = createRoute(withMcpMetadata({
     },
     operationId: "createRecommendation",
     summary: "Create recommendation for current tenant",
-    description: "Auto-generated placeholder for createRecommendation (POST /, recommendations domain). TODO: replace with a real description sourced from the handler."
+    description: "Adds a recommendation to the company library: a name, a severity, a repair-scope summary and optionally a category and suggested contractor type. Stored alongside the canned-comment library. Owner, manager or inspector. Writes an audit entry (recommendation.created). Returns the created recommendation."
 }, { scopes: ['write'], tier: 'primary' }));
 
 /* ── PUT /api/recommendations/:id ─────────────────────────────────────────── */
@@ -83,7 +83,7 @@ const deleteRecommendationRoute = createRoute(withMcpMetadata({
     },
     operationId: "deleteRecommendation",
     summary: "Delete recommendation for current tenant",
-    description: "Auto-generated placeholder for deleteRecommendation (DELETE /{id}, recommendations domain). TODO: replace with a real description sourced from the handler."
+    description: "Permanently deletes a recommendation from the company library. Owner, manager or inspector. Writes an audit entry (recommendation.deleted)."
 }, { scopes: ['write'], tier: 'primary' }));
 
 /* ── POST /api/recommendations/seed-defaults ──────────────────────────────── */

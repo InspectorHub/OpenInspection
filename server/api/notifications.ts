@@ -58,7 +58,7 @@ const listRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listNotifications",
-    description: "Auto-generated placeholder for listNotifications (GET /, notifications domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the calling user's own in-app notifications, newest first, within the current company. Archived ones are excluded unless includeArchived=1. Paged with a cursor: when meta.nextCursor is non-null, pass it as cursor to fetch the next page. Requires a signed-in user."
 }, { scopes: ['read'], tier: 'primary' }));
 
 // GET /unread-count
@@ -119,7 +119,7 @@ const archiveRoute = createRoute(withMcpMetadata({
     path: '/{id}',
     tags: ["notifications"],
     summary: 'Archive a notification (soft-delete from inbox)',
-    request: { params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().min(1).describe('Id of the notification to archive; must belong to the calling user.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: OkResponseSchema } },
@@ -128,7 +128,7 @@ const archiveRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "deleteNotification",
-    description: "Auto-generated placeholder for deleteNotification (DELETE /{id}, notifications domain). TODO: replace with a real description sourced from the handler."
+    description: "Archives one of the calling user's notifications so it no longer appears in the default list; it is not erased and can still be listed with includeArchived=1. Only the caller's own notifications are affected, and an unknown id is silently ignored (still returns ok)."
 }, { scopes: ['write'], tier: 'primary' }));
 
 const notificationsRoutes = createApiRouter()

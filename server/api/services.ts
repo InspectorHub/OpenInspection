@@ -23,7 +23,7 @@ export const servicesRoutes = createApiRouter()
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
         responses: { 200: { content: { 'application/json': { schema: ServiceListResponseSchema } }, description: 'OK' } },
         operationId: "listServices",
-        description: "Auto-generated placeholder for listServices (GET /, services domain). TODO: replace with a real description sourced from the handler."
+        description: "Lists the company's active services (the bookable catalog), ordered by sort order then name. Inactive (deleted) services are not returned. Price is in integer cents and is omitted from the response for callers without the financial capability. Owner, manager or inspector."
     }, { scopes: ['read'], tier: 'primary' })), async (c) => {
         const tenantId = c.get('tenantId');
         const rows = await c.var.services.service.listServices(tenantId);
@@ -117,7 +117,7 @@ export const servicesRoutes = createApiRouter()
         request: { body: { content: { 'application/json': { schema: CreateServiceSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
         responses: { 201: { content: { 'application/json': { schema: ServiceResponseSchema } }, description: 'Created' } },
         operationId: "createService",
-        description: "Auto-generated placeholder for createService (POST /, services domain). TODO: replace with a real description sourced from the handler."
+        description: "Creates an active service in the catalog. Owner or manager only. Price is integer cents; durationMinutes, template, agreement, sort order and a per-service deposit policy are optional. Returns the created service."
     }, { scopes: ['write'], tier: 'primary' })), async (c) => {
         const tenantId = c.get('tenantId');
         const data = c.req.valid('json');
@@ -282,10 +282,10 @@ export const servicesRoutes = createApiRouter()
         method: 'delete', path: '/{id}',
         tags: ["services"], summary: "Delete service for current tenant",
         middleware: [requireRole('owner', 'manager')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+        request: { params: z.object({ id: z.string().describe('Id of the service to deactivate.') }) },
         responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
         operationId: "deleteService",
-        description: "Auto-generated placeholder for deleteService (DELETE /{id}, services domain). TODO: replace with a real description sourced from the handler."
+        description: "Soft-deletes a service by marking it inactive: it disappears from the catalog list but existing inspections keep their snapshotted service lines. Owner or manager only. Fails with not found for an unknown id."
     }, { scopes: ['write'], tier: 'primary' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');

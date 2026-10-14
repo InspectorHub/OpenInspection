@@ -39,7 +39,7 @@ const listContactsRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listContacts",
-    description: "Auto-generated placeholder for listContacts (GET /, contacts domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the company's contacts (clients, agents and other parties) with the number of inspections each appears on and, for agents, how many they referred as buyer agent. Live contacts by default; pass archived=only for archived ones. Results are paged with limit and offset and are not explicitly ordered. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'primary' }));
 
 const getContactDetailRoute = createRoute(withMcpMetadata({
@@ -73,7 +73,7 @@ const createContactRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "createContact",
-    description: "Auto-generated placeholder for createContact (POST /, contacts domain). TODO: replace with a real description sourced from the handler."
+    description: "Creates a contact (client, agent or other party). Requires the manageContacts capability and the owner, manager or inspector role. Does not email the contact. When the QuickBooks integration is configured, the contact is also pushed to QuickBooks as a customer in the background. Returns the created contact."
 }, { scopes: ['write'], tier: 'primary', capability: 'manageContacts' }));
 
 const updateContactRoute = createRoute(withMcpMetadata({
@@ -110,7 +110,7 @@ const deleteContactRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "deleteContact",
-    description: "Auto-generated placeholder for deleteContact (DELETE /{id}, contacts domain). TODO: replace with a real description sourced from the handler."
+    description: "Removes a contact. A contact that no inspection references is deleted permanently; one that appears on any inspection is archived instead (restorable via the restore route) so past inspections keep their history. Archiving may also revoke that contact's live report links, if the company's archive-revokes-access setting is on. Requires the manageContacts capability."
 }, { scopes: ['write'], tier: 'primary', capability: 'manageContacts' }));
 
 /**

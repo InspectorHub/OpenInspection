@@ -1,10 +1,10 @@
 import { z } from '@hono/zod-openapi';
 
 export const ListNotificationsQuerySchema = z.object({
-    unread:           z.enum(['0', '1']).optional().describe('TODO describe unread field for the OpenInspection MCP integration'),
-    includeArchived:  z.enum(['0', '1']).optional().describe('TODO describe includeArchived field for the OpenInspection MCP integration'),
-    limit:            z.coerce.number().int().min(1).max(100).optional().describe('TODO describe limit field for the OpenInspection MCP integration'),
-    cursor:           z.string().datetime().optional().describe('TODO describe cursor field for the OpenInspection MCP integration'),
+    unread:           z.enum(['0', '1']).optional().describe('Pass 1 to return only unread notifications; 0 or omitted returns both read and unread.'),
+    includeArchived:  z.enum(['0', '1']).optional().describe('Pass 1 to include archived notifications; by default they are left out.'),
+    limit:            z.coerce.number().int().min(1).max(100).optional().describe('Maximum notifications per page, 1-100. Defaults to 50.'),
+    cursor:           z.string().datetime().optional().describe('ISO 8601 timestamp taken from meta.nextCursor of the previous page; returns notifications created before it.'),
 });
 
 export const MarkReadSchema = z.object({

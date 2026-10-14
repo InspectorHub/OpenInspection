@@ -6,12 +6,12 @@ import { createApiResponseSchema } from './shared.schema';
 import { ROLE_KINDS } from '../people/role-kinds';
 
 export const CreateContactSchema = z.object({
-    type: z.enum(ROLE_KINDS).default('client').openapi({ example: 'agent' }).describe('TODO describe type field for the OpenInspection MCP integration'),
-    name: z.string().min(1).max(100).openapi({ example: 'Jane Smith' }).describe('TODO describe name field for the OpenInspection MCP integration'),
-    email: z.string().email().optional().nullable().openapi({ example: 'jane@realty.com' }).describe('TODO describe email field for the OpenInspection MCP integration'),
-    phone: z.string().max(30).optional().nullable().openapi({ example: '(555) 987-6543' }).describe('TODO describe phone field for the OpenInspection MCP integration'),
-    agency: z.string().max(100).optional().nullable().openapi({ example: 'Sunrise Realty' }).describe('TODO describe agency field for the OpenInspection MCP integration'),
-    notes: z.string().max(500).optional().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
+    type: z.enum(ROLE_KINDS).default('client').openapi({ example: 'agent' }).describe('Kind of party: client, agent or other (attorney, coordinator and similar). Defaults to client.'),
+    name: z.string().min(1).max(100).openapi({ example: 'Jane Smith' }).describe('Contact\'s full name, 1-100 characters.'),
+    email: z.string().email().optional().nullable().openapi({ example: 'jane@realty.com' }).describe('Email address. Report links are addressed to it, and for agents it identifies the agent across companies and cannot be edited later.'),
+    phone: z.string().max(30).optional().nullable().openapi({ example: '(555) 987-6543' }).describe('Phone number as free text, up to 30 characters.'),
+    agency: z.string().max(100).optional().nullable().openapi({ example: 'Sunrise Realty' }).describe('Brokerage or company the contact works for, up to 100 characters.'),
+    notes: z.string().max(500).optional().nullable().describe('Private staff notes about the contact, up to 500 characters.'),
     // The language this contact asked to be addressed in. NULL is an ABSENCE
     // of a stated preference, never English — see `contacts.locale` in the
     // schema for why that distinction is the point of the column.
@@ -45,16 +45,16 @@ export const ContactResponseSchema = z.object({
 }).openapi('Contact');
 
 export const ContactListQuerySchema = z.object({
-    type: z.enum(ROLE_KINDS).optional().openapi({ example: 'agent' }).describe('TODO describe type field for the OpenInspection MCP integration'),
-    search: z.string().max(100).optional().describe('TODO describe search field for the OpenInspection MCP integration'),
+    type: z.enum(ROLE_KINDS).optional().openapi({ example: 'agent' }).describe('Return only contacts of this kind: client, agent or other.'),
+    search: z.string().max(100).optional().describe('Case-insensitive substring to match against the contact name only, up to 100 characters.'),
     // IA-120 — archive had a writer and no reader. `archivedAt` was set by the
     // Archive button and then filtered out of every query, with no way to list,
     // open or restore the row: a one-way door behind a control whose own copy
     // ("Removes them from your list") promises tidying, not deletion.
     archived: z.enum(['exclude', 'only']).default('exclude')
         .describe('Whether to return live contacts (default) or the archived ones.'),
-    limit: z.coerce.number().min(1).max(200).default(50).describe('TODO describe limit field for the OpenInspection MCP integration'),
-    offset: z.coerce.number().min(0).default(0).describe('TODO describe offset field for the OpenInspection MCP integration'),
+    limit: z.coerce.number().min(1).max(200).default(50).describe('Maximum contacts to return, 1-200. Defaults to 50.'),
+    offset: z.coerce.number().min(0).default(0).describe('Number of contacts to skip before returning results. Defaults to 0.'),
 }).openapi('ContactListQuery');
 
 // ─── IA-18 (#111) — contact detail page payload ─────────────────────────────

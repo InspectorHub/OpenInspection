@@ -11,20 +11,20 @@ import { PublicBrandSchema } from './public-brand.schema';
 export const INVOICE_ID = z.string().trim().min(1);
 
 const LineItemSchema = z.object({
-    description: z.string().min(1).max(200).describe('TODO describe description field for the OpenInspection MCP integration'),
-    amountCents: z.number().int().min(0).describe('TODO describe amountCents field for the OpenInspection MCP integration'),
+    description: z.string().min(1).max(200).describe('What the line charges for, 1-200 characters.'),
+    amountCents: z.number().int().min(0).describe('Amount in integer cents (for example 12500 is 125.00 in the company currency).'),
 });
 
 export const CreateInvoiceSchema = z.object({
-    inspectionId: z.string().trim().min(1).optional().nullable().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    inspectionId: z.string().trim().min(1).optional().nullable().describe('Inspection this invoice belongs to. When set, any deposit already held for the inspection is applied to the invoice.'),
     contactId: z.string().trim().min(1).optional().nullable()
         .describe('Contact this invoice bills. When omitted, resolved from clientEmail; a name is never used to match.'),
-    clientName: z.string().min(1).max(100).describe('TODO describe clientName field for the OpenInspection MCP integration'),
-    clientEmail: z.string().email().optional().nullable().describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
-    amountCents: z.number().int().min(0).describe('TODO describe amountCents field for the OpenInspection MCP integration'),
-    lineItems: z.array(LineItemSchema).default([]).describe('TODO describe lineItems field for the OpenInspection MCP integration'),
-    dueDate: z.string().date().optional().nullable().openapi({ example: '2026-05-15' }).describe('TODO describe dueDate field for the OpenInspection MCP integration'),
-    notes: z.string().max(500).optional().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
+    clientName: z.string().min(1).max(100).describe('Name of the person or business being billed, 1-100 characters.'),
+    clientEmail: z.string().email().optional().nullable().describe('Billing email address. Used to match an existing contact when contactId is omitted.'),
+    amountCents: z.number().int().min(0).describe('Amount in integer cents (for example 12500 is 125.00 in the company currency).'),
+    lineItems: z.array(LineItemSchema).default([]).describe('Itemised charges, each with a description and an amount in cents. Defaults to none; the invoice total is amountCents as given, not a sum of the lines.'),
+    dueDate: z.string().date().optional().nullable().openapi({ example: '2026-05-15' }).describe('Payment due date as YYYY-MM-DD.'),
+    notes: z.string().max(500).optional().nullable().describe('Free-text note stored on the invoice, up to 500 characters.'),
 }).openapi('CreateInvoice');
 
 /**

@@ -42,7 +42,7 @@ const listInvoicesRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listInvoices",
-    description: "Auto-generated placeholder for listInvoices (GET /, invoices domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists all of the company's invoices, newest first, including voided ones (status void). Amounts are integer cents. Requires the financial capability and the owner, manager or inspector role. Not paged."
 }, { scopes: ['read'], tier: 'primary', capability: 'financial' }));
 
 const createInvoiceRoute = createRoute(withMcpMetadata({
@@ -58,7 +58,7 @@ const createInvoiceRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "createInvoice",
-    description: "Auto-generated placeholder for createInvoice (POST /, invoices domain). TODO: replace with a real description sourced from the handler."
+    description: "Creates a draft invoice with a company-unique invoice number, in the company's configured currency (USD if unset). Owner or manager only. Does not email the client; use the request-payment route to send one. When inspectionId is given, any deposit already held for that inspection is applied to the invoice. Fires the invoice.created automation and, if QuickBooks is connected, pushes the invoice there in the background."
 }, { scopes: ['write'], tier: 'primary' }));
 
 const markSentRoute = createRoute(withMcpMetadata({
@@ -94,13 +94,13 @@ const deleteInvoiceRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["invoices"], summary: "Delete invoice for current tenant",
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: INVOICE_ID.describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: INVOICE_ID.describe('Id of the invoice to void.') }) },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }) } }, description: 'Deleted' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "deleteInvoice",
-    description: "Auto-generated placeholder for deleteInvoice (DELETE /{id}, invoices domain). TODO: replace with a real description sourced from the handler."
+    description: "Voids the invoice rather than erasing it: the row is kept for the audit trail and its status becomes void. Repeating the call is harmless. Owner or manager only. Re-syncs the linked inspection's payment gate and, if QuickBooks is connected, voids the invoice there in the background. Fails with not found for an unknown id."
 }, { scopes: ['write'], tier: 'primary' }));
 
 /**
