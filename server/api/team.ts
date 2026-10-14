@@ -8,6 +8,7 @@ import { PayrollExportSchema, PayrollRunResponseSchema } from '../lib/validation
 import { requireSeatAvailable } from '../features/seat-quota';
 import { inviteAcceptUrl } from '../lib/url';
 import { auditFromContext } from '../lib/audit';
+import { assertMayTouchOwner } from '../lib/auth/owner-guard';
 import {
     InviteMemberSchema,
     UpdateMemberSchema,
@@ -104,6 +105,7 @@ const inviteTeamMemberRoute = createRoute(withMcpMetadata({
             },
             description: 'Created',
         },
+        403: { description: 'Only an owner can invite someone as an owner' },
     },
     operationId: "inviteTeam",
     description: "Auto-generated placeholder for inviteTeam (POST /invite, team domain). TODO: replace with a real description sourced from the handler."
@@ -119,7 +121,7 @@ const updateTeamMemberRoute = createRoute(withMcpMetadata({
     path: '/members/{id}',
     tags: ["team"],
     summary: 'Update a team member\'s role or permissions',
-    description: 'Changes role and/or capability overrides for an active member. A role change also invalidates the member\'s sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats).',
+    description: 'Changes role and/or capability overrides for an active member. A role change also invalidates the member\'s sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Only an owner may change an owner or promote anyone to owner.',
     middleware: [requireRole('manager', 'owner')],
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('The member\'s user id.') }),
@@ -131,6 +133,7 @@ const updateTeamMemberRoute = createRoute(withMcpMetadata({
             description: 'Member updated',
         },
         400: { description: 'Last owner, self role-change, or agent role requested' },
+        403: { description: 'Caller is not an owner but the target is, or the new role is, owner' },
         404: { description: 'Member not found in this tenant' },
     },
     operationId: "updateTeamMember",
@@ -158,6 +161,7 @@ const removeTeamMemberRoute = createRoute(withMcpMetadata({
             },
             description: 'Member removed',
         },
+        403: { description: 'Caller is not an owner but the member is' },
     },
     operationId: "deleteTeamMember",
     description: "Auto-generated placeholder for deleteTeamMember (DELETE /members/{id}, team domain). TODO: replace with a real description sourced from the handler."
@@ -240,6 +244,10 @@ const teamRoutes = createApiRouter()
         const body = c.req.valid('json');
         const teamService = c.var.services.team;
 
+        // The invited role is copied onto the new user at accept time, so
+        // inviting as owner is minting an owner. Same rule as update/remove.
+        assertMayTouchOwner(c.get('userRole'), 'inspector', body.role);
+
         const { token, expiresAt } = await teamService.createInvite({
             tenantId,
             email: body.email,
@@ -294,6 +302,7 @@ const teamRoutes = createApiRouter()
             tenantId,
             userId: memberId,
             requesterId: user?.sub as string,
+            requesterRole: c.get('userRole'),
             ...(body.role ? { role: body.role } : {}),
             ...(body.permissionOverrides !== undefined ? { permissionOverrides: body.permissionOverrides } : {}),
         });
@@ -309,7 +318,7 @@ const teamRoutes = createApiRouter()
         const teamService = c.var.services.team;
         const authService = c.var.services.auth;
 
-        await teamService.removeMember(tenantId, memberId, requesterId);
+        await teamService.removeMember(tenantId, memberId, requesterId, c.get('userRole'));
 
         // Invalidate the deleted user's sessions so their cookie becomes invalid immediately
         await authService.invalidateUserSessions(memberId);

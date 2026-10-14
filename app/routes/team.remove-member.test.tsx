@@ -13,25 +13,28 @@ import { Outlet, createRoutesStub } from "react-router";
 
 import TeamPage from "~/routes/team";
 
-const member = (id: string, email: string) => ({
-    id, name: null, email, role: "inspector", status: "active", lastActiveAt: null,
+const member = (id: string, email: string, role = "inspector") => ({
+    id, name: null, email, role, status: "active", lastActiveAt: null,
     token: null, inviteLink: null, expiresAt: null, permissionOverrides: null, totpEnabled: false,
 });
 
 const ME = member("id-me", "Me@seed.test");
 const OTHER = member("id-other", "other@seed.test");
 
-function renderTeam(canManage: boolean) {
+function renderTeam(
+    canManage: boolean,
+    { isOwner = true, rows = [ME, OTHER], viewerEmail = "me@seed.test" as string | null } = {},
+) {
     const Stub = createRoutesStub([
         {
             id: "routes/auth-layout",
             Component: Outlet,
-            loader: () => ({ context: { user: { email: "me@seed.test" }, branding: {}, seatUsage: null } }),
+            loader: () => ({ context: { user: viewerEmail ? { email: viewerEmail } : {}, branding: {}, seatUsage: null } }),
             children: [
                 {
                     path: "/team",
                     Component: TeamPage,
-                    loader: () => ({ members: [ME, OTHER], canManage, isOwner: true, loadFailed: false }),
+                    loader: () => ({ members: rows, canManage, isOwner, loadFailed: false }),
                 },
             ],
         },
@@ -52,6 +55,29 @@ describe("/team — removing a member", () => {
 
     it("offers nothing to someone who cannot manage the team", async () => {
         renderTeam(false);
+        await screen.findByText(OTHER.email);
+        expect(removeButtons()).toHaveLength(0);
+    });
+
+    describe("owner rows", () => {
+        const OWNER_ROW = member("id-owner", "boss@seed.test", "owner");
+
+        it("hides Remove on an owner row from a viewer who is not an owner", async () => {
+            renderTeam(true, { isOwner: false, rows: [ME, OTHER, OWNER_ROW] });
+            await screen.findByText(OWNER_ROW.email);
+            // Only the inspector row: the API refuses a manager the removal of an owner.
+            expect(removeButtons()).toHaveLength(1);
+        });
+
+        it("offers Remove on an owner row to an owner", async () => {
+            renderTeam(true, { isOwner: true, rows: [ME, OTHER, OWNER_ROW] });
+            await screen.findByText(OWNER_ROW.email);
+            expect(removeButtons()).toHaveLength(2);
+        });
+    });
+
+    it("offers no Remove at all when the viewer's identity is unknown", async () => {
+        renderTeam(true, { viewerEmail: null });
         await screen.findByText(OTHER.email);
         expect(removeButtons()).toHaveLength(0);
     });

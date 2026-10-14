@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from '../shared.schema';
-import { ROLES } from '../../auth/roles';
+import { ROLES, ROLE } from '../../auth/roles';
 import { TOGGLEABLE, type Capability } from '../../auth/capabilities';
 
 /**
@@ -75,7 +75,10 @@ export function resolvedCapabilitySchema() {
  */
 export const InviteMemberSchema = z.object({
     email: z.string().email('Invalid email address').openapi({ example: 'new-user@example.com' }).describe('TODO describe email field for the OpenInspection MCP integration'),
-    role: z.enum(ROLES)
+    // Not `agent`: agents are granted access per inspection and are never team
+    // members (TeamService.updateMember refuses the same role for the same
+    // reason). Offering it here would be a second, contradictory way in.
+    role: z.enum([ROLE.OWNER, ROLE.MANAGER, ROLE.INSPECTOR])
         .default('inspector').openapi({ example: 'inspector' }).describe('TODO describe role field for the OpenInspection MCP integration'),
     // Role permission-template overrides (2026-06-13). Optional sparse map of
     // every toggleable capability. Only differing-from-template keys are sent;

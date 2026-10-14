@@ -19,6 +19,8 @@ import {
 import { Errors } from '../lib/errors';
 import { runErasure } from '../lib/compliance/erasure-orchestrator';
 import type { Role } from '../lib/auth/roles';
+import type { UserRole } from '../types/auth';
+import { assertMayTouchOwner } from '../lib/auth/owner-guard';
 
 import type { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
 import { safeTimestamp } from '../lib/date';
@@ -88,9 +90,11 @@ export class AdminService {
     }
 
     /**
-     * Creates a team invitation.
+     * Creates a team invitation. The invited role is copied onto the new user at
+     * accept time, so inviting as owner is minting an owner: only an owner may.
      */
-    async createInvite(tenantId: string, email: string, role: string) {
+    async createInvite(tenantId: string, email: string, role: string, requesterRole: UserRole) {
+        assertMayTouchOwner(requesterRole, 'inspector', role);
         const db = this.getDrizzle();
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         const inviteId = crypto.randomUUID();

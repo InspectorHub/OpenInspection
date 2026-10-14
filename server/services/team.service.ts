@@ -3,6 +3,7 @@ import { users, tenantInvites, tenants } from '../lib/db/schema';
 import { eq, and, isNull, ne } from 'drizzle-orm';
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import type { UserRole } from '../types/auth';
+import { assertMayTouchOwner } from '../lib/auth/owner-guard';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
@@ -234,6 +235,7 @@ export class TeamService {
         tenantId: string;
         userId: string;
         requesterId: string;
+        requesterRole: UserRole;
         role?: UserRole;
         permissionOverrides?: RequestedOverrides | null;
     }) {
@@ -246,6 +248,9 @@ export class TeamService {
         if (!user) throw Errors.NotFound('Member not found');
 
         const nextRole = params.role ?? (user.role as UserRole);
+
+        // Checked first so a refused caller learns nothing about the target.
+        assertMayTouchOwner(params.requesterRole, user.role, nextRole);
 
         // An agent is not a seat-holding team member: access is granted per
         // inspection by a token that works without an account at all. Letting
@@ -302,7 +307,7 @@ export class TeamService {
         return { id: userId, role: nextRole, permissionOverrides };
     }
 
-    async removeMember(tenantId: string, userId: string, requesterId: string) {
+    async removeMember(tenantId: string, userId: string, requesterId: string, requesterRole: UserRole) {
         if (userId === requesterId) {
             throw Errors.BadRequest('Cannot remove yourself');
         }
@@ -312,9 +317,9 @@ export class TeamService {
             .get();
         if (!user) throw Errors.NotFound('Member not found');
 
-        // A workspace with no owner cannot be administered by anyone. The
-        // endpoint is open to managers, so the requester is not necessarily
-        // the owner being removed; same rule as updateMember's role change.
+        assertMayTouchOwner(requesterRole, user.role, user.role);
+        // A workspace with no owner cannot be administered by anyone. Same
+        // rule as updateMember's role change (a backstop: only an owner gets here).
         if (user.role === 'owner') {
             const otherOwners = await db.select({ id: users.id }).from(users)
                 .where(and(

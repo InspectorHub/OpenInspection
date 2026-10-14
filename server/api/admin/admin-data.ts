@@ -54,7 +54,6 @@ const exportDataRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for exportTenant (GET /export, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-
 /**
  * POST /api/admin/invite
  */
@@ -82,6 +81,7 @@ const inviteMemberRoute = createRoute(withMcpMetadata({
             },
             description: 'Created',
         },
+        403: { description: 'Only an owner can invite someone as an owner' },
     },
     operationId: "inviteTenant",
     description: "Auto-generated placeholder for inviteTenant (POST /invite, admin domain). TODO: replace with a real description sourced from the handler."
@@ -278,7 +278,7 @@ const adminDataRoutes = createApiRouter()
         const body = c.req.valid('json');
 
         const adminService = c.var.services.admin;
-        const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role);
+        const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role, c.get('userRole'));
 
         const inviteLink = inviteAcceptUrl(c, inviteId);
 

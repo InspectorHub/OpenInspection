@@ -11,7 +11,7 @@ import { assertAdminOrForbidden, assertOwnerOrForbidden } from "~/lib/access";
  * the fail-closed default to be written differently, and a guard that fails
  * OPEN is invisible until somebody is standing on the wrong side of it.
  */
-async function resolveRole(
+export async function resolveRole(
   context: LoadContext,
   token: string,
 ): Promise<string | undefined> {

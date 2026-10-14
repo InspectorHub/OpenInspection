@@ -175,7 +175,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const team = new TeamService({} as any, outbox);
 
-        await team.removeMember('t1', 'u-victim', 'u-admin');
+        await team.removeMember('t1', 'u-victim', 'u-admin', 'owner');
 
         const rows = await testDb.select().from(syncOutbox).where(eq(syncOutbox.eventType, 'user.deleted')).all();
         expect(rows).toHaveLength(1);
