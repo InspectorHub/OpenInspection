@@ -26,7 +26,8 @@ import type { InspectionDocDO } from '../../../server/durable-objects/inspection
 import type { PhotoEntry } from '../../../server/lib/collab/results-doc.types';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { applyMigrations } from '../migration-replay';
-import { PACKAGE_MAX_AGE_DAYS, APPLIED_RECORD_RETENTION_DAYS, APPLIED_RECORD_SWEEP_BATCH } from '../../../server/lib/native/offline-package';
+import { PACKAGE_MAX_AGE_DAYS, PACKAGE_MAX_FUTURE_SKEW_DAYS, APPLIED_RECORD_RETENTION_DAYS, APPLIED_RECORD_SWEEP_BATCH } from '../../../server/lib/native/offline-package';
+import { fingerprint } from '../../../server/lib/idempotency/fingerprint';
 import { buildPackage, declareEntrySize, JPEG_BYTES, type PackageSpec } from '../../unit/helpers/offline-package-fixture';
 
 const migrationSql = import.meta.glob('../../../migrations/*.sql', {
@@ -297,6 +298,7 @@ describe('POST /api/client/import', () => {
         const base: PackageSpec = { tenantId: TENANT, exportedBy: author.id, inspections: [{ id, reportId: 'r' }], yjs: { [id]: deviceState('RR') } };
         const refused = await importPackage(manager.token, buildPackage(base));
         expect(refused.status).toBe(404);
+        expect(((await refused.json()) as { error: { details: { inspectionId: string } } }).error.details).toEqual({ inspectionId: id });
         const ok = await importPackage(manager.token, buildPackage({
             ...base,
             outbox: [{ idempotencyKey: fresh('k'), op: 'inspection.create', payload: { id, propertyAddress: '7 Now Created Rd', templateId: TEMPLATE } }],
@@ -418,6 +420,8 @@ describe('POST /api/client/import', () => {
         });
         const refused = await importPackage(importer.token, both);
         expect(refused.status, await refused.clone().text()).toBe(403);
+        // The refusal names the inspection, so a client can take it out of the package and send the rest.
+        expect(((await refused.json()) as { error: { details: { inspectionId: string } } }).error.details).toEqual({ inspectionId: theirs.id });
         // Nothing moved, for the inspection the importer COULD edit as well.
         expect(await addressOf(mine.id)).toBe('10 Mine Road, Town');
         expect(await ratingOf(mine)).toBeUndefined();
@@ -994,5 +998,248 @@ describe('POST /api/client/import', () => {
         expect(retry.status, await retry.clone().text()).toBe(200);
         expect((await body(retry)).data?.yjs).toEqual({ changed: 1, unchanged: 0 });
         expect(await ratingOf(insp)).toBe('RR');
+    });
+
+    // ── 10. Round-two review findings ─────────────────────────────────────────
+
+    it('refuses an entry that declares 10 bytes and carries a compressed stream far larger, as 400 before any write (positive control: the honest package)', async () => {
+        const id = fresh('insp-bomb');
+        const key = fresh('k');
+        const create = { idempotencyKey: key, op: 'inspection.create', payload: { id, propertyAddress: '8 Bomb Lane, Town', templateId: TEMPLATE } };
+        const honest = buildPackage({ tenantId: TENANT, exportedBy: author.id, inspections: [{ id, reportId: 'device-report' }], yjs: { [id]: new Uint8Array(16 * 1024 * 1024) }, outbox: [create] });
+        const bomb = declareEntrySize(honest, `yjs/${id}.bin`, 10);
+        expect(bomb.byteLength, 'the package is small on the wire').toBeLessThan(200 * 1024);
+
+        const started = performance.now();
+        const refused = await importPackage(manager.token, bomb);
+        const elapsed = performance.now() - started;
+        expect(refused.status, await refused.clone().text()).toBe(400);
+        expect(await refused.text()).toContain('compressed data');
+        expect(elapsed, 'refused from the directory, without inflating 16 MiB').toBeLessThan(2000);
+        expect(await addressOf(id)).toBeNull();
+        expect(await recordedCount(key)).toBe(0);
+        // Control: the same entry under a size an honest encoder could have produced from it is not refused for this reason.
+        // (It fails later, as a bad Yjs update, which is a different refusal.)
+        const lying = declareEntrySize(honest, `yjs/${id}.bin`, 60_000);
+        const later = await importPackage(manager.token, lying);
+        expect(await later.text()).not.toContain('compressed data');
+    });
+
+    it('imports more inspections than one D1 statement can bind: 120 with NATIVE_IMPORT_MAX_INSPECTIONS=150 (positive control: the same package at the default limit is refused with 422)', async () => {
+        const ids = Array.from({ length: 120 }, () => fresh('insp-many'));
+        const spec: PackageSpec = {
+            tenantId: TENANT, exportedBy: author.id,
+            inspections: ids.map((id) => ({ id, reportId: 'device-report' })),
+            yjs: Object.fromEntries(ids.map((id) => [id, deviceState('SAT')])),
+            outbox: ids.map((id) => ({ idempotencyKey: fresh('k'), op: 'inspection.create', payload: { id, propertyAddress: `${id} Road, Town`, templateId: TEMPLATE } })),
+        };
+        const zip = buildPackage(spec);
+        const defaults = await importPackage(manager.token, zip);
+        expect(defaults.status).toBe(422);
+
+        const before = await inspectionCount();
+        const res = await importPackage(manager.token, zip, { env: { NATIVE_IMPORT_MAX_INSPECTIONS: '150', NATIVE_IMPORT_MAX_OUTBOX: '150' } });
+        expect(res.status, await res.clone().text()).toBe(200);
+        expect((await body(res)).data).toMatchObject({ inspections: 120, outbox: { applied: 120, failed: [] }, yjs: { changed: 120 } });
+        expect(await inspectionCount()).toBe(before + 120);
+    }, 120_000);
+
+    it.each([
+        { label: 'more than a day ahead', aheadMs: 2 * 24 * 60 * 60 * 1000, status: 422 },
+        { label: 'just inside the allowed skew', aheadMs: 12 * 60 * 60 * 1000, status: 200 },
+    ])('a package whose exportedAt is $label answers $status (nothing is written when refused)', async ({ aheadMs, status }) => {
+        const id = fresh('insp-future');
+        const key = fresh('k');
+        const zip = buildPackage({
+            tenantId: TENANT, exportedBy: author.id, inspections: [{ id, reportId: 'device-report' }],
+            yjs: { [id]: deviceState('RR') }, manifest: { exportedAt: new Date(Date.now() + aheadMs).toISOString() },
+            outbox: [{ idempotencyKey: key, op: 'inspection.create', payload: { id, propertyAddress: '9 Future Court, Town', templateId: TEMPLATE } }],
+        });
+        const res = await importPackage(manager.token, zip);
+        expect(res.status, await res.clone().text()).toBe(status);
+        if (status === 422) {
+            const text = await res.text();
+            expect(text).toContain('PACKAGE_FROM_THE_FUTURE');
+            expect(text).toContain(String(PACKAGE_MAX_FUTURE_SKEW_DAYS));
+            expect(await addressOf(id)).toBeNull();
+            expect(await recordedCount(key)).toBe(0);
+        } else {
+            expect(await addressOf(id)).toBe('9 Future Court, Town');
+        }
+    });
+
+    it('treats a key held by a request still in flight as transient: the whole import stops and a retry applies it (positive control: a permanent refusal is still only reported)', async () => {
+        const insp = await createInspection(author);
+        const key = fresh('k');
+        const payload = { id: insp.id, propertyAddress: '77 Busy Street, Town' };
+        const zip = buildPackage(pkg({ exportedBy: author.id }, insp, { outbox: [{ idempotencyKey: key, op: 'inspection.update', payload }] }));
+
+        // Another request holds this very write's key, as a concurrent duplicate import would.
+        const { id, ...patch } = payload;
+        const fp = await fingerprint('PATCH', `/api/inspections/${id}`, patch);
+        const now = Date.now();
+        await b.DB.prepare('INSERT INTO idempotency_keys (tenant_id, key, fingerprint, state, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)')
+            .bind(TENANT, key, fp, 'in_flight', now, now + 60_000).run();
+
+        const busy = await importPackage(manager.token, zip);
+        expect(busy.status, await busy.clone().text()).toBe(409);
+        expect(await busy.text()).not.toContain('"failed"');
+        expect(await addressOf(insp.id)).toBe('1 Original Road, Anytown');
+        expect(await recordedCount(key)).toBe(0);
+
+        await b.DB.prepare('DELETE FROM idempotency_keys WHERE tenant_id = ? AND key = ?').bind(TENANT, key).run();
+        const retry = await importPackage(manager.token, zip);
+        expect(retry.status, await retry.clone().text()).toBe(200);
+        expect((await body(retry)).data?.outbox).toEqual({ applied: 1, skipped: 0, failed: [] });
+        expect(await addressOf(insp.id)).toBe('77 Busy Street, Town');
+    });
+
+    it('does not complete an inspection whose queued update was refused, and still completes another (positive control: the same complete after an accepted update)', async () => {
+        const blocked = await createInspection(author);
+        const fine = await createInspection(author, '2 Fine Road, Anytown');
+        const updateKey = fresh('k');
+        const completeKey = fresh('k');
+        const otherUpdateKey = fresh('k');
+        const otherCompleteKey = fresh('k');
+        const zip = buildPackage({
+            tenantId: TENANT, exportedBy: author.id,
+            inspections: [{ id: blocked.id, reportId: blocked.reportId }, { id: fine.id, reportId: fine.reportId }],
+            yjs: { [blocked.id]: deviceState('RR'), [fine.id]: deviceState('RR') },
+            outbox: [
+                { idempotencyKey: updateKey, op: 'inspection.update', payload: { id: blocked.id, propertyAddress: '' } },
+                { idempotencyKey: otherUpdateKey, op: 'inspection.update', payload: { id: fine.id, propertyAddress: '3 Fine Road, Anytown' } },
+                { idempotencyKey: completeKey, op: 'inspection.complete', payload: { id: blocked.id } },
+                { idempotencyKey: otherCompleteKey, op: 'inspection.complete', payload: { id: fine.id } },
+            ],
+        });
+        const statusOf = async (id: string) => (await b.DB.prepare('SELECT status FROM inspections WHERE id = ?').bind(id).first<{ status: string }>())?.status;
+        const before = await statusOf(blocked.id);
+
+        const res = await importPackage(manager.token, zip);
+        expect(res.status, await res.clone().text()).toBe(200);
+        const data = (await body(res)).data;
+        expect(data?.outbox.applied).toBe(2);
+        expect(data?.outbox.failed).toEqual([
+            { idempotencyKey: updateKey, op: 'inspection.update', inspectionId: blocked.id, status: 400 },
+            { idempotencyKey: completeKey, op: 'inspection.complete', inspectionId: blocked.id, status: 424, reason: 'blocked_by_failed_update' },
+        ]);
+        expect(await statusOf(blocked.id), 'the blocked inspection was not completed').toBe(before);
+        expect(await statusOf(fine.id)).not.toBe(before);
+        expect(await recordedCount(completeKey)).toBe(0);
+        expect(await recordedCount(otherCompleteKey)).toBe(1);
+        expect(await addressOf(fine.id)).toBe('3 Fine Road, Anytown');
+    });
+
+    // ── Client-chosen ids: replay of a half-written create, and who may see the replay ──
+
+    async function createWithId(by: Member, id: string, extra: Record<string, unknown> = {}): Promise<Response> {
+        return call('/api/inspections', {
+            method: 'POST', token: by.token, headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ id, propertyAddress: '21 Replay Road, Anytown', templateId: TEMPLATE, date: '2026-10-01T10:00:00.000Z', ...extra }),
+        });
+    }
+    const rowCount = async (table: 'reports' | 'inspection_results', id: string): Promise<number> =>
+        (await b.DB.prepare(`SELECT count(*) AS n FROM ${table} WHERE tenant_id = ? AND inspection_id = ?`).bind(TENANT, id).first<{ n: number }>())?.n ?? 0;
+    const ticketStatus = async (by: Member, id: string): Promise<number> =>
+        (await call(`/api/inspections/${id}/collab/ticket`, { method: 'POST', token: by.token })).status;
+
+    it.each([
+        ['reports', 'the primary report cannot be written', 404],
+        ['inspection_results', 'the results row cannot be written', 200],
+    ] as const)('repairs on a retry the inspection a client-id create left half-written when %s fails (%s), without duplicating anything', async (table, _what, openBefore) => {
+        const id = fresh('insp-half');
+        const trigger = `fail_${table}_${id.replace(/-/g, '_')}`;
+        await b.DB.exec(`CREATE TRIGGER ${trigger} BEFORE INSERT ON ${table} WHEN NEW.inspection_id = '${id}' BEGIN SELECT RAISE(ABORT, 'simulated outage'); END;`);
+        try {
+            const first = await createWithId(author, id);
+            expect(first.status, await first.clone().text()).toBeGreaterThanOrEqual(500);
+            expect(await addressOf(id), 'the inspection row was written before the failure').not.toBeNull();
+            expect(await ticketStatus(manager, id), 'without its primary report an inspection cannot be opened for editing').toBe(openBefore);
+            // With no report to name, the results row is written without a report id: the orphan the retry must adopt.
+            expect(await rowCount('inspection_results', id)).toBe(table === 'reports' ? 1 : 0);
+            expect(await ticketStatus(author, id), 'nor by its assignee, who is on no roster yet').toBe(403);
+        } finally {
+            await b.DB.exec(`DROP TRIGGER ${trigger}`);
+        }
+
+        const retry = await createWithId(author, id);
+        expect(retry.status, await retry.clone().text()).toBe(200);
+        expect(await rowCount('reports', id)).toBe(1);
+        expect(await rowCount('inspection_results', id)).toBe(1);
+        const results = await b.DB.prepare('SELECT report_id FROM inspection_results WHERE inspection_id = ?').bind(id).first<{ report_id: string | null }>();
+        const report = await b.DB.prepare('SELECT id FROM reports WHERE inspection_id = ?').bind(id).first<{ id: string }>();
+        expect(results?.report_id, 'the results row names the primary report').toBe(report?.id);
+        expect(await ticketStatus(author, id), 'the repaired inspection opens for its assignee').toBe(200);
+        expect(await ticketStatus(manager, id)).toBe(200);
+
+        // Control: a replay of a whole inspection writes nothing more.
+        const again = await createWithId(author, id);
+        expect(again.status).toBe(200);
+        expect(await rowCount('reports', id)).toBe(1);
+        expect(await rowCount('inspection_results', id)).toBe(1);
+    });
+
+    it('a normal create and its replays leave exactly one report and one results row', async () => {
+        const id = fresh('insp-whole');
+        expect((await createWithId(author, id)).status).toBe(201);
+        expect((await createWithId(author, id)).status).toBe(200);
+        expect((await createWithId(manager, id)).status).toBe(200);
+        expect(await rowCount('reports', id)).toBe(1);
+        expect(await rowCount('inspection_results', id)).toBe(1);
+    });
+
+    it('answers a replay with the inspection only to someone who may open it: the assignee and a manager get 200, an unassigned inspector gets 409 ID_CONFLICT and no fields', async () => {
+        const id = fresh('insp-private');
+        const stranger = await addMember('inspector');
+        expect((await createWithId(author, id, { propertyAddress: '404 Private Passage, Town' })).status).toBe(201);
+
+        const mine = await createWithId(author, id);
+        expect(mine.status, await mine.clone().text()).toBe(200);
+        expect(await mine.text()).toContain('404 Private Passage');
+        expect((await createWithId(manager, id)).status).toBe(200);
+
+        const refused = await createWithId(stranger, id);
+        expect(refused.status).toBe(409);
+        const text = await refused.text();
+        expect(text).toContain('ID_CONFLICT');
+        expect(text).not.toContain('Private Passage');
+        expect(text).not.toContain('propertyAddress');
+        // The same answer as for an id that exists in another workspace, so existence is not revealed.
+        const otherId = fresh('insp-foreign');
+        await b.DB.prepare('INSERT INTO inspections (id, tenant_id, property_address, status, date, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+            .bind(otherId, OTHER_TENANT, '1 Elsewhere Way', 'requested', '2026-10-01T10:00:00.000Z', Date.now()).run();
+        const foreign = await createWithId(stranger, otherId);
+        expect(foreign.status).toBe(409);
+        expect(JSON.parse(text)).toEqual(JSON.parse(await foreign.text()));
+    });
+
+    it('keeps the results object when a persist fails for a reason other than a deleted inspection (positive control: the retry then writes the row)', async () => {
+        const insp = await createInspection(author);
+        const res = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, insp)));
+        expect(res.status, await res.clone().text()).toBe(200);
+        const resultsRows = async (): Promise<number> => (await b.DB.prepare('SELECT count(*) AS n FROM inspection_results WHERE tenant_id = ? AND inspection_id = ?')
+            .bind(TENANT, insp.id).first<{ n: number }>())?.n ?? 0;
+
+        // The row is gone and the insert that would recreate it is refused, but the inspection is alive.
+        await b.DB.prepare('DELETE FROM inspection_results WHERE tenant_id = ? AND inspection_id = ?').bind(TENANT, insp.id).run();
+        const trigger = `refuse_results_${insp.id.replace(/-/g, '_')}`;
+        await b.DB.exec(`CREATE TRIGGER ${trigger} BEFORE INSERT ON inspection_results WHEN NEW.inspection_id = '${insp.id}' BEGIN SELECT RAISE(ABORT, 'simulated outage'); END;`);
+        try {
+            await runInDurableObject(stubFor(insp), async (instance: InspectionDocDO, state) => {
+                applyItemPatch((instance as unknown as { doc: Y.Doc }).doc, KEY, 'rating', 'SAT');
+                await expect((instance as unknown as { alarm(): Promise<void> }).alarm()).rejects.toThrow();
+                // Not abandoned: the document is still in the object's storage.
+                expect([...(await state.storage.list()).keys()].length).toBeGreaterThan(0);
+            });
+            expect(await resultsRows()).toBe(0);
+        } finally {
+            await b.DB.exec(`DROP TRIGGER ${trigger}`);
+        }
+
+        await runInDurableObject(stubFor(insp), async (instance: InspectionDocDO) => {
+            await (instance as unknown as { alarm(): Promise<void> }).alarm();
+        });
+        expect(await resultsRows(), 'the unchanged object persists once the outage is over').toBe(1);
+        expect(await ratingOf(insp)).toBe('SAT');
     });
 });

@@ -94,7 +94,9 @@ const NEVER_BLOCK_RULES: readonly NeverBlockRule[] = [
   { pattern: /^\/api\/public\/uploads\// },
   { pattern: /^\/api\/client\/(session|import|compat)$/ },
   { method: 'POST', pattern: /^\/api\/inspections$/ },
-  { method: 'PATCH', pattern: /^\/api\/inspections\/[^/]+$/ },
+  // `bulk` is a fixed route (PATCH /api/inspections/bulk), not an inspection id: a bulk update is not
+  // work captured on a device, so an outdated app does not get it past the version rule.
+  { method: 'PATCH', pattern: /^\/api\/inspections\/(?!bulk$)[^/]+$/ },
   { method: 'POST', pattern: /^\/api\/inspections\/[^/]+\/complete$/ },
 ];
 

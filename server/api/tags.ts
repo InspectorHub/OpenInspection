@@ -24,7 +24,7 @@ import {
 } from '../lib/validations/tag.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
-const IdParamSchema = z.object({ id: z.string().min(1).describe('Tag id.') });
+const IdParamSchema = z.object({ id: z.string().min(1).describe('Unique id of the tag.') });
 
 const InspectionItemTagParamsSchema = z.object({
     id:     z.string().min(1).describe('Inspection id.'),
@@ -34,10 +34,10 @@ const InspectionItemTagParamsSchema = z.object({
 const InspectionItemTagWithTagParamsSchema = z.object({
     id:     z.string().min(1).describe('Inspection id.'),
     itemId: z.string().min(1).describe('Checklist item id within the inspection.'),
-    tagId:  z.string().min(1).describe('Tag id.'),
+    tagId:  z.string().min(1).describe('Unique id of the tag.'),
 });
 
-const LinkBodySchema = z.object({ tagId: z.string().min(1).describe('Tag id.') }).strict();
+const LinkBodySchema = z.object({ tagId: z.string().min(1).describe('Unique id of the tag.') }).strict();
 
 const InspectionIdParamSchema = z.object({ id: z.string().min(1).describe('Inspection id.') });
 
@@ -51,7 +51,7 @@ const listTagsRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: TagListResponseSchema } }, description: 'List' },
     },
     operationId: "listTags",
-    description: "List the company tags, built-in and custom."
+    description: "List the company's tags: the built-in tags plus any custom tags."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /* ── POST /api/tags ───────────────────────────────────────────────────── */
@@ -65,7 +65,7 @@ const createTagRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: TagSingleResponseSchema } }, description: 'Created' },
     },
     operationId: "createTag",
-    description: "Auto-generated placeholder for createTag (POST /, tags domain). TODO: replace with a real description sourced from the handler."
+    description: "Create a custom tag for the company. The name must be unique among the company's tags; a duplicate is refused with a conflict."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /* ── PUT /api/tags/:id ────────────────────────────────────────────────── */
@@ -82,7 +82,7 @@ const replaceTagRoute = createRoute(withMcpMetadata({
     },
     operationId: "replaceTag",
     summary: "Replace tag for current tenant",
-    description: "Auto-generated placeholder for replaceTag (PUT /{id}, tags domain). TODO: replace with a real description sourced from the handler."
+    description: "Update a tag's name or colour. Built-in tags can change colour but not name, and a name already used by another tag is refused with a conflict."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /* ── GET /api/tags/:id/inspections ─────────────────────────────────────
@@ -110,7 +110,7 @@ const listTagInspectionsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listTagInspections",
-    description: "Auto-generated placeholder for listTagInspections (GET /{id}/inspections, tags domain). TODO: replace with a real description sourced from the handler."
+    description: "List the ids of the company's inspections that have at least one item carrying this tag. An unknown tag id is a not-found."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /* ── DELETE /api/tags/:id ─────────────────────────────────────────────── */
@@ -124,7 +124,7 @@ const deleteTagRoute = createRoute(withMcpMetadata({
     },
     operationId: "deleteTag",
     summary: "Delete tag for current tenant",
-    description: "Auto-generated placeholder for deleteTag (DELETE /{id}, tags domain). TODO: replace with a real description sourced from the handler."
+    description: "Delete a tag from the company, which also detaches it from every inspection item it was attached to. An unknown tag id is a not-found."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const tagsRoutes = createApiRouter()
@@ -186,7 +186,7 @@ const listInspectionItemTagsRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: TagListResponseSchema } }, description: 'Item tags' },
     },
     operationId: "listTagItemsTags",
-    description: "Auto-generated placeholder for listTagItemsTags (GET /{id}/items/{itemId}/tags, tags domain). TODO: replace with a real description sourced from the handler."
+    description: "List the tags attached to one checklist item of an inspection."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /* ── POST /api/inspections/:id/items/:itemId/tags ─────────────────────── */
@@ -203,7 +203,7 @@ const linkInspectionItemTagRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: TagLinkResponseSchema } }, description: 'Linked' },
     },
     operationId: "createTagItemsTags",
-    description: "Auto-generated placeholder for createTagItemsTags (POST /{id}/items/{itemId}/tags, tags domain). TODO: replace with a real description sourced from the handler."
+    description: "Attach one of the company's tags to a checklist item of an inspection. Attaching a tag that is already on the item changes nothing."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /* ── DELETE /api/inspections/:id/items/:itemId/tags/:tagId ────────────── */
@@ -217,7 +217,7 @@ const unlinkInspectionItemTagRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: TagUnlinkResponseSchema } }, description: 'Unlinked' },
     },
     operationId: "deleteTagItemsTag",
-    description: "Auto-generated placeholder for deleteTagItemsTag (DELETE /{id}/items/{itemId}/tags/{tagId}, tags domain). TODO: replace with a real description sourced from the handler."
+    description: "Detach a tag from a checklist item of an inspection. The tag itself stays available to the company."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /* ── GET /api/inspections/:id/tags ─────────────────────────────────────
@@ -237,7 +237,7 @@ const listInspectionTagMapRoute = createRoute(withMcpMetadata({
                     schema: z.object({
                         success: z.literal(true).describe('True when the request succeeded.'),
                         data:    z.record(z.string(), z.array(z.object({
-                            id:        z.string().describe('Tag id.'),
+                            id:        z.string().describe('Unique id of the tag.'),
                             name:      z.string().describe('Tag name.'),
                             color:     z.string().nullable().optional().describe('Colour token for the tag, or null.'),
                             isSeed:    z.boolean().describe('True for built-in tags that ship with the company.'),
@@ -250,7 +250,7 @@ const listInspectionTagMapRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listTagTags",
-    description: "Auto-generated placeholder for listTagTags (GET /{id}/tags, tags domain). TODO: replace with a real description sourced from the handler."
+    description: "Return, for one inspection, a map from each checklist item id to the tags attached to that item."
 }, { scopes: ['read'], tier: 'extended' }));
 
 export const inspectionTagRoutes = createApiRouter()

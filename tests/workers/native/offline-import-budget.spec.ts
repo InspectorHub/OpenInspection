@@ -183,7 +183,12 @@ function shapedPackage(shape: Shape, exportedBy: string): { zip: Uint8Array; ids
 
 interface ErrorBody { success: false; error: { code: string; details?: { limit: string; max: number; actual: number; limits: Record<string, number> } } }
 
-describe('offline import limits', () => {
+// Every test here imports a package of up to the default maximum (8 inspections, 20 queued
+// writes, 50 photos) through the whole middleware chain, the first of them on a cold start of
+// the in-memory worker, and the files of a full `test:workers` run compete for the same CPU.
+// Measured alone each test is a fraction of a second; under the whole suite the first one
+// came within a breath of the 5000 ms default, so the budget is stated rather than left to luck.
+describe('offline import limits', { timeout: 30_000 }, () => {
     let manager: Member;
 
     beforeAll(async () => {

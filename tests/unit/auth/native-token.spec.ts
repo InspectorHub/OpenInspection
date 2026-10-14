@@ -21,7 +21,7 @@ import { createTestDb, setupSchema } from '../db';
 import { toD1Binding } from '../helpers/d1-binding';
 import * as schema from '../../../server/lib/db/schema';
 import {
-  resolveNativeToken, looksLikeOpaqueOAuthToken, isNativeProps, NATIVE_SCOPE, type NativeProps,
+  resolveNativeToken, looksLikeOpaqueOAuthToken, isNativeProps, claimsNative, NATIVE_SCOPE, type NativeProps,
 } from '../../../server/lib/auth/native-token';
 import { MockKV } from '../mocks';
 import { createHarness, INSPECTOR_ID, TENANT_ID, type Harness } from '../helpers/tenant-email-harness';
@@ -78,6 +78,23 @@ describe('isNativeProps, grantedAt', () => {
   it('requires grantedAt to be a number', () => {
     expect(isNativeProps({ ...props, grantedAt: '0' })).toBe(false);
     expect(isNativeProps({ ...props, grantedAt: undefined })).toBe(false);
+  });
+});
+
+describe('claimsNative', () => {
+  it('is true for anything that says it is native, well-formed or not (where isNativeProps is false)', () => {
+    expect(claimsNative(props)).toBe(true);
+    const { grantedAt: _omitted, ...withoutGrantedAt } = props;
+    expect(isNativeProps(withoutGrantedAt)).toBe(false);
+    expect(claimsNative(withoutGrantedAt)).toBe(true);
+    expect(claimsNative({ kind: 'native' })).toBe(true);
+  });
+  it('is false for an MCP grant, for other kinds and for non-objects', () => {
+    expect(claimsNative({ userId: 'u', tenantId: 't', tenantSlug: 's', role: 'inspector', scopes: [] })).toBe(false);
+    expect(claimsNative({ kind: 'mcp' })).toBe(false);
+    expect(claimsNative(undefined)).toBe(false);
+    expect(claimsNative(null)).toBe(false);
+    expect(claimsNative('native')).toBe(false);
   });
 });
 

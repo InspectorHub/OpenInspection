@@ -32,7 +32,7 @@ import type { Context } from 'hono';
 import { and, eq, inArray } from 'drizzle-orm';
 import { AppError, ErrorCode, Errors } from '../lib/errors';
 import { enforceLimit, packageTooLarge, type ImportLimits } from '../lib/native/import-limits';
-import { applyOutbox, findDeletedCreates, sweepAppliedRecords, type OutboxFailure } from './offline-import-outbox';
+import { applyOutbox, findDeletedCreates, LOOKUP_CHUNK, sweepAppliedRecords, type OutboxFailure } from './offline-import-outbox';
 import { auditFromContext } from '../lib/audit';
 import { inspections } from '../lib/db/schema';
 import { getDrizzle } from '../lib/route-helpers';
@@ -46,7 +46,7 @@ import {
     MANIFEST_ENTRY, MEDIA_INDEX_ENTRY, OUTBOX_ENTRY, listPackage, mediaEntryName, readPackageEntries, readPackageEntry, verifyPackageEntries, yjsEntryName,
 } from '../lib/native/offline-zip';
 import {
-    MediaIndexSchema, OfflinePackageManifestSchema, OutboxSchema, PACKAGE_MAX_AGE_DAYS,
+    MediaIndexSchema, OfflinePackageManifestSchema, OutboxSchema, PACKAGE_MAX_AGE_DAYS, PACKAGE_MAX_FUTURE_SKEW_DAYS,
     type MediaIndex, type OfflinePackageManifest, type OutboxEntry,
 } from '../lib/native/offline-package';
 import type { HonoConfig } from '../types/hono';
@@ -84,14 +84,22 @@ function parseEntry(zip: Uint8Array, entries: ReadonlyMap<string, number>, name:
     }
 }
 
+/**
+ * Why an inspection in the package cannot be imported. The 403 and 404 carry
+ * `details.inspectionId`, so a client holding a package that one bad inspection
+ * keeps refusing can take that inspection out and send the rest (see the
+ * documentation on splitting a package).
+ */
 function refusal(auth: Extract<AuthResult, { ok: false }>, inspectionId: string): AppError {
     switch (auth.response.status) {
-        case 403: return Errors.Forbidden('You do not have edit access to every inspection in this package');
-        case 404: return Errors.NotFound(`Inspection ${inspectionId} cannot be opened for import`);
+        case 403: return new AppError(403, ErrorCode.FORBIDDEN, 'You do not have edit access to every inspection in this package', { inspectionId });
+        case 404: return new AppError(404, ErrorCode.NOT_FOUND, `Inspection ${inspectionId} cannot be opened for import`, { inspectionId });
         case 501: return Errors.ServiceUnavailable('Collaborative editing is unavailable');
         default: return Errors.Unauthorized();
     }
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** How many elements a parsed JSON value claims to hold, judged before any schema walks it. */
 const claimedLength = (raw: unknown): number => (Array.isArray(raw) ? raw.length : 0);
@@ -129,8 +137,16 @@ async function validate(c: Context<HonoConfig>, zip: Uint8Array, limits: ImportL
     if (manifest.tenantId !== tenantId) throw Errors.Forbidden('This package belongs to a different workspace');
 
     // A package this old is refused, which is what lets the applied-record sweep delete old records.
+    // One dated ahead of the clock is refused too: it would never age out.
     const ageMs = Date.now() - Date.parse(manifest.exportedAt);
-    if (ageMs > PACKAGE_MAX_AGE_DAYS * 24 * 60 * 60 * 1000) {
+    if (ageMs < -PACKAGE_MAX_FUTURE_SKEW_DAYS * DAY_MS) {
+        throw new AppError(
+            422, ErrorCode.PACKAGE_FROM_THE_FUTURE,
+            `This package says it was exported more than ${PACKAGE_MAX_FUTURE_SKEW_DAYS} day ahead of the server clock; check the date on the device that wrote it`,
+            { maxFutureSkewDays: PACKAGE_MAX_FUTURE_SKEW_DAYS },
+        );
+    }
+    if (ageMs > PACKAGE_MAX_AGE_DAYS * DAY_MS) {
         throw new AppError(
             422, ErrorCode.PACKAGE_EXPIRED,
             `This package was exported more than ${PACKAGE_MAX_AGE_DAYS} days ago and can no longer be imported`,
@@ -180,9 +196,13 @@ async function validate(c: Context<HonoConfig>, zip: Uint8Array, limits: ImportL
 
     // Which of the named inspections exist in THIS workspace.
     const ids = [...declared];
-    const found = await getDrizzle(c).select({ id: inspections.id }).from(inspections)
-        .where(and(eq(inspections.tenantId, tenantId), inArray(inspections.id, ids)));
-    const existing = new Set(found.map((r) => r.id));
+    const existing = new Set<string>();
+    // D1 binds at most 100 parameters per statement and the inspection limit can be raised past that.
+    for (let i = 0; i < ids.length; i += LOOKUP_CHUNK) {
+        const found = await getDrizzle(c).select({ id: inspections.id }).from(inspections)
+            .where(and(eq(inspections.tenantId, tenantId), inArray(inspections.id, ids.slice(i, i + LOOKUP_CHUNK))));
+        for (const r of found) existing.add(r.id);
+    }
 
     const creates = new Set(outbox.filter((e) => e.op === 'inspection.create').map((e) => e.payload.id));
 
@@ -201,7 +221,7 @@ async function validate(c: Context<HonoConfig>, zip: Uint8Array, limits: ImportL
         // a created inspection, its document can only land in that inspection's own report.
         const claimed = manifest.inspections.find((i) => i.id === id)?.reportId;
         if (!creates.has(id) && claimed !== auth.reportId) {
-            throw Errors.BadRequest(`Invalid offline package: inspection ${id} was exported from a different report`);
+            throw Errors.BadRequest(`Invalid offline package: inspection ${id} was exported from a different report`, { inspectionId: id });
         }
         identities.set(id, auth);
     }
@@ -224,7 +244,7 @@ async function validate(c: Context<HonoConfig>, zip: Uint8Array, limits: ImportL
     const created = new Set<string>();
     for (const id of ids) {
         if (existing.has(id)) continue;
-        if (!creates.has(id)) throw Errors.NotFound(`Inspection ${id} does not exist and the package does not create it`);
+        if (!creates.has(id)) throw new AppError(404, ErrorCode.NOT_FOUND, `Inspection ${id} does not exist and the package does not create it`, { inspectionId: id });
         created.add(id);
     }
     return { manifest, outbox, media, entries, identities, created };

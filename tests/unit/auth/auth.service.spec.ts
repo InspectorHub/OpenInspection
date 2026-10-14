@@ -17,6 +17,7 @@ vi.mock('drizzle-orm/d1', () => ({
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { withBatch } from '../helpers/d1-binding';
 import { LegalVersionService } from '../../../server/services/legal-version.service';
+import { CREDENTIAL_MARKER_TTL_S } from '../../../server/lib/auth/credential-marker';
 
 describe('AuthService', () => {
     let authService: AuthService;
@@ -305,11 +306,11 @@ describe('AuthService', () => {
         expect(updatedUser).toBeDefined();
         const [valid] = await verifyPassword('new-pass', updatedUser!.passwordHash);
         expect(valid).toBe(true);
-        // Reset should also write a pwchanged invalidation marker with a 90000s TTL.
+        // Reset should also write a pwchanged invalidation marker with the shared marker TTL.
         expect(mockKV.put).toHaveBeenCalledWith(
             'pwchanged:u-reset',
             expect.any(String),
-            expect.objectContaining({ expirationTtl: 90000 })
+            expect.objectContaining({ expirationTtl: CREDENTIAL_MARKER_TTL_S })
         );
     });
 

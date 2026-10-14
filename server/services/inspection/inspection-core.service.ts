@@ -8,7 +8,7 @@ import { PeopleService } from '../people.service';
 import { AppError, ErrorCode, Errors } from '../../lib/errors';
 import { safeISODate } from '../../lib/date';
 import { logger } from '../../lib/logger';
-import { createPrimaryReport } from '../../lib/inspection/reports';
+import { ensurePrimaryReportAndResults } from '../../lib/inspection/primary-report';
 import { writeInspectionServiceSnapshots, type ServiceSelection } from '../../lib/inspection/service-snapshot';
 import { computePreflightFromData } from '../../lib/preflight';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
@@ -336,27 +336,13 @@ export class InspectionCoreService extends InspectionSubService {
                 .set({ discountCodeId: persistedDiscountCodeId, discountAmount: persistedDiscountAmount })
                 .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
         }
-        // Before the results row, because that row has to NAME it: a NULL
-        // `report_id` is accepted silently and reads match a sibling document
-        // or none. See `lib/inspection/reports.ts`.
-        const primaryReportId = await createPrimaryReport(db, tenantId, id, data.templateId ?? null);
-        // Every inspection starts with a results row.
-        //
-        // The collaborative editor's Durable Object writes findings by UPDATEing
-        // this row, and an UPDATE that matches nothing changes nothing without
-        // complaining — so an inspection created without it accepted edits in
-        // the UI that never reached the database. The DO now inserts as a
-        // fallback, but the invariant belongs here, where the inspection is
-        // born: results exist for every inspection, empty until someone rates
-        // something.
-        await db.insert(inspectionResults).values({
-            id:           crypto.randomUUID(),
-            tenantId,
-            inspectionId: id,
-            reportId:     primaryReportId,
-            data:         {},
-            lastSyncedAt: createdAt,
-        });
+        // The primary report first, because the results row has to NAME it: a NULL `report_id` is
+        // accepted silently and reads match a sibling document or none (see `lib/inspection/reports.ts`).
+        // One idempotent function does both, and a replay of a client-id create calls it again.
+        const primaryReportId = await ensurePrimaryReportAndResults(db, tenantId, id, data.templateId ?? null, createdAt);
+        // An id the server minted cannot be retried, so a missing report stays the logged, non-fatal
+        // gap it always was. A client-chosen id can: failing here lets the retry add what is missing.
+        if (!primaryReportId && data.id) throw Errors.ServiceUnavailable('The inspection was saved but its report could not be created; retry the request');
         // DB-8: mirror assignment into inspection_inspectors link table.
         // Non-fatal — a sync failure must not roll back a committed inspection row.
         try {

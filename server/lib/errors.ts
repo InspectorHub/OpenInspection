@@ -85,6 +85,10 @@ export enum ErrorCode {
     // An offline package was exported longer ago than the import accepts (422).
     // Nothing was written. `details.maxAgeDays` carries the limit.
     PACKAGE_EXPIRED = 'PACKAGE_EXPIRED',
+    // An offline package claims to have been exported more than a day in the
+    // future (422): the device clock is wrong, and a package dated ahead would
+    // never age out. Nothing was written. `details.maxFutureSkewDays` carries the limit.
+    PACKAGE_FROM_THE_FUTURE = 'PACKAGE_FROM_THE_FUTURE',
 }
 
 /**

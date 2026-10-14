@@ -22,6 +22,7 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { oauthProviderEnabled } from '../lib/mcp/flag';
 import { auditFromContext } from '../lib/audit';
 import { Errors } from '../lib/errors';
+import { claimsNative } from '../lib/auth/native-token';
 import type { McpGrant } from '../lib/validations/mcp.schema';
 import { McpGrantListResponseSchema } from '../lib/validations/mcp.schema';
 import { SuccessResponseSchema } from '../lib/validations/shared.schema';
@@ -107,7 +108,7 @@ function mapGrant(g: RawGrant, extra?: { userId?: string; userEmail?: string; us
         id: g.id,
         clientId: g.clientId,
         clientName: ((g.metadata as { clientName?: string } | null)?.clientName) ?? null,
-        kind: (g.metadata as { kind?: string } | null)?.kind === 'native' ? 'native' : 'mcp',
+        kind: claimsNative(g.metadata) ? 'native' : 'mcp',
         scopes: g.scope,
         createdAt: g.createdAt,
         expiresAt: g.expiresAt ?? null,

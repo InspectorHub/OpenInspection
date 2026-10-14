@@ -6,7 +6,7 @@ import { tenantConfigs } from '../lib/db/schema';
 import { AppError, ErrorCode, Errors } from '../lib/errors';
 import { packageTooLarge, readImportLimits } from '../lib/native/import-limits';
 import { requireRole } from '../lib/middleware/rbac';
-import { readPackageBody } from '../lib/native/offline-zip';
+import { readBoundedBody } from '../lib/bounded-body';
 import { importOfflinePackage } from '../services/offline-import.service';
 import { getDrizzle } from '../lib/route-helpers';
 import { readVersionPolicy, SERVER_CONTRACT_VERSION } from '../lib/native/client-version';
@@ -46,7 +46,7 @@ const importOfflinePackageRoute = createRoute(withMcpMetadata({
         409: { description: 'PACKAGE_INSPECTION_DELETED: the package would create an inspection that an earlier import created and that has since been deleted; nothing was written' },
         411: { description: 'Content-Length is required' },
         413: { description: 'PACKAGE_TOO_LARGE or BAD_REQUEST: the package exceeds the byte limit; details.limits names the limits' },
-        422: { description: 'PACKAGE_TOO_LARGE: the package has more inspections, queued writes, photos or entries than this server imports at once; nothing was written. details names the limit and details.limits the sizes to split to. PACKAGE_EXPIRED: the package was exported more than details.maxAgeDays days ago; nothing was written' },
+        422: { description: 'PACKAGE_TOO_LARGE: the package has more inspections, queued writes, photos or entries than this server imports at once; nothing was written. details names the limit and details.limits the sizes to split to. PACKAGE_EXPIRED: the package was exported more than details.maxAgeDays days ago; nothing was written. PACKAGE_FROM_THE_FUTURE: the package says it was exported more than details.maxFutureSkewDays day ahead of the server clock; nothing was written' },
     },
 }, { scopes: ['write'], tier: 'excluded' }));
 
@@ -72,7 +72,7 @@ export const clientRoutes = createApiRouter()
     })
     .openapi(importOfflinePackageRoute, async (c) => {
         const limits = readImportLimits(c.env);
-        const body = await readPackageBody(c.req.raw, limits.compressedBytes);
+        const body = await readBoundedBody(c.req.raw, limits.compressedBytes, 400);
         if (!body.ok) {
             if (body.status === 413) {
                 const declared = Number(c.req.header('content-length'));

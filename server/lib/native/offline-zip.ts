@@ -16,9 +16,9 @@
  * An entry's size is checked EXACTLY, and the check does not trust fflate to do
  * it: fflate (0.8) writes into the output buffer it is handed and silently drops
  * anything past the end, so an entry whose directory understates its size comes
- * back truncated and looking valid. Entries are therefore inflated here, into a
- * buffer one byte larger than the declared size, and accepted only when exactly
- * the declared number of bytes came out. A stored (method 0) entry must have a
+ * back truncated and looking valid. Entries are therefore inflated here, counting
+ * every byte the stream produces, and accepted only when exactly the declared
+ * number of bytes came out. A stored (method 0) entry must have a
  * compressed length equal to its declared length. One entry that fails the check
  * refuses the whole package, and `verifyPackageEntries` runs it over every entry
  * during validation, before the import writes anything.
@@ -32,13 +32,36 @@
  * checks as every other photo write. A package is an export of the user's own
  * device, authenticated by their session, not a tamper-evident transfer.
  *
- * Residual cost: a hostile entry that declares a small size and inflates to far
- * more is rejected, but the inflate still has to run to the end of its stream to
- * find that out (the extra output is discarded, not stored, so memory stays
- * fixed). Its CPU is bounded by the compressed size, which the body cap bounds.
+ * CPU cost. fflate's one-shot inflate runs a whole deflate stream to its end
+ * before it returns, so a buffer of `declared + 1` bytes would bound the MEMORY of
+ * a stream that expands beyond its declaration but not the work: deflate
+ * compresses zeros about 1000:1, and a 256 MiB stream (262 KB on the wire) costs
+ * over a second of CPU to run to its end even when every byte past the buffer is
+ * discarded. The compressed size does not bound that either: an entry may
+ * declare as much as it carries and still expand a thousand-fold. Reading a
+ * package therefore bounds the work three ways, all before anything is written:
+ *
+ *  - the directory is judged without inflating: an entry's compressed length may
+ *    not exceed what a deflate encoder can legitimately produce for its declared
+ *    size (`maxCompressedFor`), and a stored entry's must equal its declared size;
+ *  - no two entries may share compressed bytes. The directory can point several
+ *    entries at one compressed run, which would repeat one stream once per entry;
+ *    every entry's data region, found from its local header, must be disjoint from
+ *    every other and lie inside the body;
+ *  - an entry is inflated incrementally and abandoned the moment its output passes
+ *    the declared size. The compressed input is fed in slices sized so that even
+ *    at the format's maximum expansion (1032:1) the output cannot pass the
+ *    remaining allowance by more than a small multiple, so the work an entry can
+ *    cost is a small constant times its declared size (plus a fixed slack of
+ *    about 130 KB), never a function of what its stream could expand to.
+ *
+ * The first two checks reject a directory that is already inconsistent; the third
+ * is what bounds CPU, because a stream that declares as much as it carries can
+ * still expand a thousand-fold. Summed over entries the declared sizes are capped
+ * by the unpacked-size limit (48 MiB by default).
  */
 
-import { inflateSync, unzipSync, type UnzipFileInfo } from 'fflate';
+import { Inflate, unzipSync, type UnzipFileInfo } from 'fflate';
 import { MAX_PHOTO_BYTES } from '../media/store-photo';
 import { MAX_IMPORT_BYTES } from '../../durable-objects/inspection-doc-import';
 import { DEFAULT_IMPORT_LIMITS, type ImportLimits, type LimitExceeded } from './import-limits';
@@ -119,7 +142,11 @@ export function listPackage(zip: Uint8Array, limits: Pick<ImportLimits, 'entries
     } catch {
         return { ok: false, reason: 'not a valid zip archive' };
     }
-    return refusal ? { ok: false, reason: refusal, ...(exceeded ? { exceeded } : {}) } : { ok: true, entries };
+    if (refusal) return { ok: false, reason: refusal, ...(exceeded ? { exceeded } : {}) };
+    // The listing above is fflate's reading of the directory. The checks that need each entry's
+    // data region (its extent, and that no two share bytes) use the reader every later step uses.
+    const directory = readDirectory(zip);
+    return directory.ok ? { ok: true, entries } : { ok: false, reason: directory.reason };
 }
 
 interface DirectoryEntry {
@@ -129,58 +156,126 @@ interface DirectoryEntry {
     dataStart: number;
 }
 
+type DirectoryRead = { ok: true; entries: Map<string, DirectoryEntry> } | { ok: false; reason: string };
+
 const EOCD_SIGNATURE = 0x06054b50;
 const CENTRAL_SIGNATURE = 0x02014b50;
 const LOCAL_SIGNATURE = 0x04034b50;
 const ZIP64_MARKER = 0xffffffff;
+const UNREADABLE: DirectoryRead = { ok: false, reason: 'not a valid zip archive' };
+
+/**
+ * The most compressed bytes a deflate encoder can honestly produce for `declared`
+ * bytes. Storing everything is the worst case (5 bytes of framing per 65535), so
+ * the declared size plus one byte in 256 plus a fixed allowance covers every real
+ * encoder. Anything longer is padding, or a stream that does not match its declaration.
+ */
+function maxCompressedFor(declared: number): number {
+    return declared + Math.ceil(declared / 256) + 128;
+}
 
 /**
  * The central directory, read the way `listPackage` read it (same end-of-central-
  * directory search, same entry order), so a name judged by the listing is the
- * name read here. Returns null for anything it cannot place with certainty,
- * including zip64 archives, which a package of this size never needs.
+ * name read here. Refuses what it cannot place with certainty, including zip64
+ * archives, which a package of this size never needs, and what could make the
+ * inflater do more work than the directory declares (see the file comment): a
+ * compressed length no encoder would produce for the declared size, and entries
+ * whose compressed bytes overlap or leave the body.
  */
-function readDirectory(zip: Uint8Array): Map<string, DirectoryEntry> | null {
-    if (zip.length < 22) return null;
+function readDirectory(zip: Uint8Array): DirectoryRead {
+    if (zip.length < 22) return UNREADABLE;
     const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
     let eocd = zip.length - 22;
     while (view.getUint32(eocd, true) !== EOCD_SIGNATURE) {
-        if (eocd === 0 || zip.length - eocd > 65558) return null;
+        if (eocd === 0 || zip.length - eocd > 65558) return UNREADABLE;
         eocd--;
     }
     const count = view.getUint16(eocd + 8, true);
     let at = view.getUint32(eocd + 16, true);
-    if (count === 0xffff || at === ZIP64_MARKER) return null;
+    if (count === 0xffff || at === ZIP64_MARKER) return UNREADABLE;
 
     const entries = new Map<string, DirectoryEntry>();
     for (let i = 0; i < count; i++) {
-        if (at + 46 > zip.length || view.getUint32(at, true) !== CENTRAL_SIGNATURE) return null;
+        if (at + 46 > zip.length || view.getUint32(at, true) !== CENTRAL_SIGNATURE) return UNREADABLE;
         const flags = view.getUint16(at + 8, true);
         const method = view.getUint16(at + 10, true);
         const compressedSize = view.getUint32(at + 20, true);
+        const originalSize = view.getUint32(at + 24, true);
         const nameLength = view.getUint16(at + 28, true);
         const extraLength = view.getUint16(at + 30, true);
         const commentLength = view.getUint16(at + 32, true);
         const localOffset = view.getUint32(at + 42, true);
-        if (compressedSize === ZIP64_MARKER || localOffset === ZIP64_MARKER || (flags & 1) !== 0) return null;
-        if (at + 46 + nameLength > zip.length) return null;
+        if (compressedSize === ZIP64_MARKER || originalSize === ZIP64_MARKER || localOffset === ZIP64_MARKER || (flags & 1) !== 0) return UNREADABLE;
+        if (at + 46 + nameLength > zip.length) return UNREADABLE;
         let name = '';
         for (let k = 0; k < nameLength; k++) name += String.fromCharCode(zip[at + 46 + k]!);
-        if (localOffset + 30 > zip.length || view.getUint32(localOffset, true) !== LOCAL_SIGNATURE) return null;
+        if (localOffset + 30 > zip.length || view.getUint32(localOffset, true) !== LOCAL_SIGNATURE) return UNREADABLE;
         const dataStart = localOffset + 30 + view.getUint16(localOffset + 26, true) + view.getUint16(localOffset + 28, true);
-        if (dataStart + compressedSize > zip.length) return null;
+        if (dataStart + compressedSize > zip.length) return UNREADABLE;
+        if (method === 0 && compressedSize !== originalSize) {
+            return { ok: false, reason: `entry ${name} is stored with a length that differs from its declared size` };
+        }
+        if (method === 8 && compressedSize > maxCompressedFor(originalSize)) {
+            return { ok: false, reason: `entry ${name} carries more compressed data than its declared size allows` };
+        }
         entries.set(name, { method, compressedSize, dataStart });
         at += 46 + nameLength + extraLength + commentLength;
     }
-    return entries;
+
+    // Data regions must be disjoint. Checked in order of position; an empty region cannot be shared.
+    const regions = [...entries].filter(([, e]) => e.compressedSize > 0).sort((x, y) => x[1].dataStart - y[1].dataStart);
+    for (let i = 1; i < regions.length; i++) {
+        const [, previous] = regions[i - 1]!;
+        const [name, current] = regions[i]!;
+        if (current.dataStart < previous.dataStart + previous.compressedSize) {
+            return { ok: false, reason: `entry ${name} shares compressed data with another entry` };
+        }
+    }
+    return { ok: true, entries };
 }
 
 /**
- * Inflate one entry into `out` (at least `declared + 1` bytes) and return how
- * many bytes it produced, or null when it is not exactly `declared` bytes. The
- * spare byte is what makes "too long" visible: fflate stops writing at the end
- * of the buffer it is given but keeps counting, so a stream that is longer than
- * declared fills the spare byte and reports `declared + 1`.
+ * Fewest compressed bytes fed to the inflater in one step, and the shift that
+ * sizes the rest: a step is `allowance >> SLICE_SHIFT` bytes, the allowance being
+ * what the entry may still produce. Deflate expands at most 1032:1, so one step
+ * can overshoot the allowance by about twice the allowance (1032 / 2^9) plus
+ * 1032 * MIN_SLICE (132 KB), and steps shrink with the allowance, so an entry
+ * takes a few thousand steps at most.
+ */
+const MIN_SLICE = 128;
+const SLICE_SHIFT = 9;
+
+/** Inflate a deflate stream into `out`, giving up as soon as it has produced more than `declared`. */
+function inflateBounded(data: Uint8Array, declared: number, out: Uint8Array): boolean {
+    let produced = 0;
+    let over = false;
+    const inflater = new Inflate((chunk) => {
+        if (over) return;
+        if (produced + chunk.byteLength > declared) {
+            over = true;
+            return;
+        }
+        out.set(chunk, produced);
+        produced += chunk.byteLength;
+    });
+    try {
+        for (let at = 0; at < data.length && !over;) {
+            const end = Math.min(data.length, at + Math.max(MIN_SLICE, (declared - produced) >> SLICE_SHIFT));
+            inflater.push(data.subarray(at, end), end === data.length);
+            at = end;
+        }
+    } catch {
+        return false;
+    }
+    return !over && produced === declared;
+}
+
+/**
+ * Inflate one entry into `out` (at least `declared` bytes) and return how many
+ * bytes it produced, or null when it is not exactly `declared` bytes. A stream
+ * longer than declared is abandoned the moment it passes the declaration (see
+ * `inflateBounded`), so it never costs more than the declaration allows.
  */
 function inflateExact(zip: Uint8Array, entry: DirectoryEntry | undefined, declared: number, out: Uint8Array): number | null {
     if (!entry) return null;
@@ -191,13 +286,9 @@ function inflateExact(zip: Uint8Array, entry: DirectoryEntry | undefined, declar
         return declared;
     }
     if (entry.method !== 8) return null;
+    if (data.length > maxCompressedFor(declared)) return null;
     if (data.length === 0) return declared === 0 ? 0 : null;
-    try {
-        const got = inflateSync(data, { out: out.subarray(0, declared + 1) });
-        return got.byteLength === declared ? declared : null;
-    } catch {
-        return null;
-    }
+    return inflateBounded(data, declared, out) ? declared : null;
 }
 
 /**
@@ -214,12 +305,12 @@ export function* readPackageEntries(
 ): Generator<[name: string, bytes: Uint8Array | null]> {
     const directory = readDirectory(zip);
     for (const [name, declared] of wanted) {
-        if (!directory) {
+        if (!directory.ok) {
             yield [name, null];
             continue;
         }
-        const out = new Uint8Array(declared + 1);
-        const length = inflateExact(zip, directory.get(name), declared, out);
+        const out = new Uint8Array(declared);
+        const length = inflateExact(zip, directory.entries.get(name), declared, out);
         yield [name, length === null ? null : out.subarray(0, length)];
     }
 }
@@ -239,56 +330,11 @@ export function readPackageEntry(zip: Uint8Array, name: string, declaredSize: nu
  */
 export function verifyPackageEntries(zip: Uint8Array, wanted: ReadonlyMap<string, number>): string | null {
     const directory = readDirectory(zip);
-    if (!directory) return wanted.keys().next().value ?? null;
+    if (!directory.ok) return wanted.keys().next().value ?? null;
     let scratch = new Uint8Array(0);
     for (const [name, declared] of wanted) {
-        if (scratch.length < declared + 1) scratch = new Uint8Array(declared + 1);
-        if (inflateExact(zip, directory.get(name), declared, scratch) === null) return name;
+        if (scratch.length < declared) scratch = new Uint8Array(declared);
+        if (inflateExact(zip, directory.entries.get(name), declared, scratch) === null) return name;
     }
     return null;
-}
-
-export type BoundedBody = { ok: true; bytes: Uint8Array } | { ok: false; status: 400 | 411 | 413 };
-
-/**
- * Read the whole request body, never holding more than has actually arrived.
- * The declared length is checked against the cap and against what the stream
- * delivers, but it is NOT used to size a buffer: a client that declares the
- * maximum and then sends nothing would otherwise pin that much memory per
- * request for as long as it cared to wait. Chunks are collected as they come and
- * joined once at the end. A body that does not match its declared length is
- * refused rather than truncated or padded, and nothing is read at all when the
- * declaration is missing, malformed or over the cap.
- */
-export async function readPackageBody(req: Request, limit: number): Promise<BoundedBody> {
-    const declared = req.headers.get('content-length');
-    if (declared === null) return { ok: false, status: 411 };
-    const length = Number(declared);
-    if (!/^\d+$/.test(declared) || !Number.isSafeInteger(length)) return { ok: false, status: 400 };
-    if (length > limit) return { ok: false, status: 413 };
-    if (!req.body) return length === 0 ? { ok: true, bytes: new Uint8Array(0) } : { ok: false, status: 400 };
-
-    const chunks: Uint8Array[] = [];
-    const reader = req.body.getReader();
-    let filled = 0;
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (filled + value.byteLength > length) {
-            await reader.cancel();
-            return { ok: false, status: 400 };
-        }
-        chunks.push(value);
-        filled += value.byteLength;
-    }
-    if (filled !== length) return { ok: false, status: 400 };
-    const bytes = new Uint8Array(length);
-    let at = 0;
-    for (const chunk of chunks) {
-        bytes.set(chunk, at);
-        at += chunk.byteLength;
-    }
-    // Drop the pieces now that they are joined, so the peak stays near one copy.
-    chunks.length = 0;
-    return { ok: true, bytes };
 }

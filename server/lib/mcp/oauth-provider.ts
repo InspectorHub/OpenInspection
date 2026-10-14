@@ -1,5 +1,5 @@
 import { OAuthError, OAuthProvider, getOAuthApi, type OAuthProviderOptions, type TokenExchangeCallbackResult } from '@cloudflare/workers-oauth-provider';
-import { currentNativeRole, isNativeProps, nativeGrantPredatesCredentialChange, nativeTokenExchange } from '../auth/native-token';
+import { claimsNative, currentNativeRole, isNativeProps, nativeGrantPredatesCredentialChange, nativeTokenExchange } from '../auth/native-token';
 import { InspectorMcp } from '../../durable-objects/inspector-mcp';
 import type { McpProps } from '../../durable-objects/inspector-mcp';
 import { mcpEnabled, nativeClientEnabled, oauthProviderEnabled } from './flag';
@@ -66,8 +66,9 @@ export function buildOAuthHandler(
         ): Response | Promise<Response> {
             // A native grant is a full session, not an MCP grant. It has no module
             // scopes, so it would reach the MCP server with nothing to call by
-            // accident; refuse it outright instead of relying on that.
-            if (isNativeProps(ctx.props)) {
+            // accident; refuse it outright instead of relying on that. Anything that
+            // CLAIMS to be native is refused, well-formed or not.
+            if (claimsNative(ctx.props)) {
                 return new Response(JSON.stringify({ error: 'forbidden' }), {
                     status: 403,
                     headers: { 'content-type': 'application/json' },
@@ -150,8 +151,10 @@ export function buildOAuthHandler(
             };
             const decision = nativeTokenExchange(opts.props, opts.grantType, Math.floor(Date.now() / 1000));
             if (!decision) {
+                // Claims to be native but is not a valid native grant: never an MCP grant by default.
+                if (claimsNative(opts.props)) return refuse('Native session cannot be verified');
                 // An MCP grant on a deployment where MCP is off (native-only mounts the provider).
-                if (!isNativeProps(opts.props) && !mcpEnabled(env)) return refuse('MCP is not enabled');
+                if (!mcpEnabled(env)) return refuse('MCP is not enabled');
                 return;
             }
             if (!nativeClientEnabled(env)) return refuse('Native clients are not enabled');

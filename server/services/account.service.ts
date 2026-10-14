@@ -12,6 +12,7 @@
  *    because auth checks the column.
  */
 import { eq } from 'drizzle-orm';
+import { CREDENTIAL_MARKER_TTL_S } from '../lib/auth/credential-marker';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users, contacts, inspections } from '../lib/db/schema';
 import { redactIdentityForExport, type WithheldField } from '../lib/compliance/account-export-manifest';
@@ -91,7 +92,7 @@ export async function softDeleteAccount(
     if (kv) {
         const ts = Math.floor(Date.now() / 1000).toString();
         try {
-            await kv.put(`pwchanged:${userId}`, ts, { expirationTtl: 90000 });
+            await kv.put(`pwchanged:${userId}`, ts, { expirationTtl: CREDENTIAL_MARKER_TTL_S });
         } catch (err) {
             logger.warn('Failed to write session-invalidation key after self-delete; outstanding tokens may remain valid until exp', {
                 userId,

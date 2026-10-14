@@ -298,7 +298,14 @@
                                   },
                                   "status": {
                                     "type": "integer",
-                                    "description": "HTTP status the target route refused it with"
+                                    "description": "HTTP status the target route refused it with, or 424 when it was not attempted because of reason"
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "blocked_by_failed_update"
+                                    ],
+                                    "description": "Present when the write was not attempted: blocked_by_failed_update means an earlier queued update to the same inspection was refused, and completing the inspection without it would finish work the device never delivered"
                                   }
                                 },
                                 "required": [
@@ -396,7 +403,7 @@
             "description": "PACKAGE_TOO_LARGE or BAD_REQUEST: the package exceeds the byte limit; details.limits names the limits"
           },
           "422": {
-            "description": "PACKAGE_TOO_LARGE: the package has more inspections, queued writes, photos or entries than this server imports at once; nothing was written. details names the limit and details.limits the sizes to split to. PACKAGE_EXPIRED: the package was exported more than details.maxAgeDays days ago; nothing was written"
+            "description": "PACKAGE_TOO_LARGE: the package has more inspections, queued writes, photos or entries than this server imports at once; nothing was written. details names the limit and details.limits the sizes to split to. PACKAGE_EXPIRED: the package was exported more than details.maxAgeDays days ago; nothing was written. PACKAGE_FROM_THE_FUTURE: the package says it was exported more than details.maxFutureSkewDays day ahead of the server clock; nothing was written"
           }
         }
       }
@@ -682,7 +689,7 @@
         },
         "responses": {
           "200": {
-            "description": "Replay of a create that named an id this workspace already holds; nothing new was created",
+            "description": "Replay of a create that named an inspection the caller may open (an owner or manager, or someone assigned to it); nothing new was created, and a report or results row an interrupted first attempt did not get to write is added",
             "content": {
               "application/json": {
                 "schema": {
@@ -818,7 +825,7 @@
             }
           },
           "409": {
-            "description": "ID_CONFLICT: the supplied id already belongs to a record outside this workspace"
+            "description": "ID_CONFLICT: the supplied id already belongs to a record the caller may not open: one outside this workspace, or an inspection in it the caller is not assigned to. The answer is the same for both, so it does not reveal which"
           }
         }
       }
@@ -2666,7 +2673,7 @@
         ],
         "summary": "List tags for the current tenant (seed + custom)",
         "operationId": "listTags",
-        "description": "List the company tags, built-in and custom.",
+        "description": "List the company's tags: the built-in tags plus any custom tags.",
         "responses": {
           "200": {
             "description": "List",

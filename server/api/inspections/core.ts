@@ -34,6 +34,7 @@ import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-hol
 import { getDrizzle } from '../../lib/route-helpers';
 import { patchRevisionReport } from './patch-revision-report';
 import { createInspectionRoute } from './core-create-route';
+import { completeReplayedCreate } from './create-replay';
 
 /**
  * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
@@ -339,12 +340,11 @@ const coreRoutes = createApiRouter()
         const service = c.var.services.inspection;
         const contactService = c.var.services.contact;
 
-        // A replay of a create that named its own id (an offline device coming
-        // back after the Idempotency-Key window): answer with the inspection
-        // that already exists and run none of the create's side effects again.
+        // A replay of a create that named its own id (an offline device after the Idempotency-Key window):
+        // answer with the existing inspection, none of the create's side effects run again (./create-replay).
         if (body.id) {
             const existing = await service.findInspectionById(tenantId, body.id);
-            if (existing) return c.json({ success: true, data: { inspection: existing } }, 200);
+            if (existing) return c.json({ success: true, data: { inspection: await completeReplayedCreate(c, existing) } }, 200);
         }
 
         const civilDate = String(body.date ?? '').slice(0, 10);
@@ -406,7 +406,7 @@ const coreRoutes = createApiRouter()
         } as Parameters<typeof service.createInspection>[1]);
         // A concurrent request with the same client id won the insert: this one is a
         // replay, so it answers like one and repeats none of the side effects below.
-        if (!created) return c.json({ success: true, data: { inspection } }, 200);
+        if (!created) return c.json({ success: true, data: { inspection: await completeReplayedCreate(c, inspection) } }, 200);
 
         // IA-1: Apply serviceSelections price overrides — replace null priceOverride
         // for any service whose id appears in serviceSelections with a set override.

@@ -70,6 +70,10 @@ export async function resolvePrimaryReportId(
  * `inspections` row, and throwing here would lose it over a row that a backfill
  * can add later.
  *
+ * `id` defaults to a fresh UUID. A caller that may run twice for one inspection at
+ * the same time (see `ensurePrimaryReportAndResults`) passes a fixed one, and a
+ * second insert of that id is then a no-op rather than a second primary report.
+ *
  * Returns the new report's id, or null when the insert failed. Callers need it:
  * the `inspection_results` row born alongside it must carry `report_id`, and a
  * results row left NULL is invisible rather than loud — `uq_results_report` is a
@@ -83,8 +87,8 @@ export async function createPrimaryReport(
     tenantId: string,
     inspectionId: string,
     templateId: string | null,
+    id: string = crypto.randomUUID(),
 ): Promise<string | null> {
-    const id = crypto.randomUUID();
     try {
         await db.insert(reports).values({
             id,
@@ -101,7 +105,7 @@ export async function createPrimaryReport(
             // same thing on both and they must not drift apart.
             status: REPORT_STATUS.IN_PROGRESS,
             createdAt: new Date(),
-        });
+        }).onConflictDoNothing();
         return id;
     } catch (err) {
         logger.error('primary report create failed', { inspectionId },

@@ -49,8 +49,13 @@ export interface OutboxFailure {
     idempotencyKey: string;
     op: OutboxEntry['op'];
     inspectionId: string;
-    /** HTTP status the target route answered. */
+    /** HTTP status the target route answered; 424 when the write was not attempted (see `reason`). */
     status: number;
+    /**
+     * Set when the write was not attempted. `blocked_by_failed_update`: an earlier update to
+     * the same inspection was refused, so completing it would finish work the device never delivered.
+     */
+    reason?: 'blocked_by_failed_update';
 }
 
 export interface OutboxResult {
@@ -60,7 +65,7 @@ export interface OutboxResult {
 }
 
 /** D1 allows 100 bound parameters per statement; leave room for the tenant id. */
-const LOOKUP_CHUNK = 80;
+export const LOOKUP_CHUNK = 80;
 
 /** The in-process request that replays one queued write with the caller's own credentials. */
 function outboxRequest(c: Context<HonoConfig>, entry: OutboxEntry): Request {
@@ -103,13 +108,29 @@ function executionContext(c: Context<HonoConfig>): ExecutionContext | undefined 
     try { return c.executionCtx; } catch { return undefined; }
 }
 
+/** The machine-readable error code of a JSON error answer, or undefined when there is none. */
+async function errorCodeOf(res: Response): Promise<string | undefined> {
+    try {
+        const body: unknown = await res.clone().json();
+        if (typeof body !== 'object' || body === null || !('error' in body)) return undefined;
+        const { error } = body;
+        return typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string' ? error.code : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 /**
  * A refusal that will answer the same way next time: the device sent something
  * the server will not accept. Rate limiting and timeouts are 4xx too, but they
  * are about the moment, not the entry, so they stop the request like a 5xx does.
+ * So does a key held by a request still in flight (409 IDEMPOTENCY_IN_FLIGHT):
+ * it says another request is running this very write, and the same entry answers
+ * differently once that request finishes.
  */
-function isPermanentRefusal(status: number): boolean {
-    return status >= 400 && status < 500 && status !== 408 && status !== 429;
+async function isPermanentRefusal(res: Response): Promise<boolean> {
+    if (res.status < 400 || res.status >= 500 || res.status === 408 || res.status === 429) return false;
+    return !(res.status === 409 && await errorCodeOf(res) === 'IDEMPOTENCY_IN_FLIGHT');
 }
 
 /**
@@ -162,8 +183,13 @@ export async function findDeletedCreates(
 /**
  * Replay `entries` in order. With `tolerateRefusals` a permanent 4xx from the
  * target route is reported in `failed` and the next entry still runs; without it,
- * and for every 5xx, 408 and 429 either way, the first refusal throws and the
- * whole request fails so that the client retries it.
+ * and for every 5xx, 408, 429 and in-flight idempotency key either way, the first
+ * refusal throws and the whole request fails so that the client retries it.
+ *
+ * An inspection whose update was refused is not completed by a later entry in the
+ * same replay: that entry is reported in `failed` as not attempted (424), because
+ * the completion would mark finished a record that is missing the device's change.
+ * Other inspections are unaffected.
  */
 export async function applyOutbox(
     c: Context<HonoConfig>,
@@ -182,17 +208,27 @@ export async function applyOutbox(
     // those) instead of resolving the token and re-reading the credential-change marker per entry.
     const replayEnv = isInProcessRequest(c.env) ? c.env : { ...c.env, [REQUEST_SCOPE]: createCredentialScope() };
 
+    // Inspections whose update the server refused in this replay.
+    const refusedUpdates = new Set<string>();
     for (const entry of entries) {
         if (already.has(entry)) {
             result.skipped++;
+            continue;
+        }
+        if (entry.op === 'inspection.complete' && refusedUpdates.has(entry.payload.id)) {
+            result.failed.push({
+                idempotencyKey: entry.idempotencyKey, op: entry.op, inspectionId: entry.payload.id,
+                status: 424, reason: 'blocked_by_failed_update',
+            });
             continue;
         }
         const res = await app.fetch(outboxRequest(c, entry), replayEnv, executionContext(c));
         if (!res.ok) {
             logger.warn('offline import: a queued write was refused', { op: entry.op, status: res.status });
             const details = { idempotencyKey: entry.idempotencyKey, op: entry.op, inspectionId: entry.payload.id, status: res.status };
-            if (opts.tolerateRefusals && isPermanentRefusal(res.status)) {
+            if (opts.tolerateRefusals && await isPermanentRefusal(res)) {
                 result.failed.push(details);
+                if (entry.op === 'inspection.update') refusedUpdates.add(entry.payload.id);
                 continue;
             }
             throw failureFor(res.status, `Queued write ${entry.idempotencyKey} (${entry.op}) was refused`, details);

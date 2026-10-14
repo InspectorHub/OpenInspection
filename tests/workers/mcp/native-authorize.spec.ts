@@ -34,6 +34,7 @@ const OTHER_USER = 'native-other-user';
 const GONE_USER = 'native-gone-user';
 const MULTI_USER = 'native-multi-user';
 const PW_USER = 'native-pw-user';
+const LEGACY_USER = 'native-legacy-user';
 const REDIRECT = 'io.example.fieldapp:/oauth/callback';
 const ORIGIN = 'https://x.test';
 
@@ -71,7 +72,13 @@ async function appOrConsent(req: Request, e: Record<string, unknown>, c: Executi
         const authReq: AuthRequest = await oauth.parseAuthRequest(req);
         const who = url.searchParams.get('as') ?? USER;
         let redirectTo: string;
-        if ((authReq.scope ?? []).includes('native')) {
+        if (url.searchParams.get('legacy') === '1') {
+            // A grant that says it is native but lacks a field a valid one carries (written before `grantedAt` existed).
+            ({ redirectTo } = await oauth.completeAuthorization({
+                request: authReq, userId: who, scope: authReq.scope ?? [], metadata: { clientName: 'Field App', kind: 'native' },
+                props: { kind: 'native', userId: who, tenantId: TENANT, role: 'inspector', lastUsedAt: Math.floor(Date.now() / 1000) }, // seed-lint-ok: grant props carry epoch seconds, not a timestamp_ms column
+            }));
+        } else if ((authReq.scope ?? []).includes('native')) {
             try {
                 redirectTo = await completeNativeAuthorization({
                     env: e as { NATIVE_CLIENT_ENABLED?: string },
@@ -183,7 +190,7 @@ describe('native client OAuth lifecycle (real provider)', () => {
         const now = Date.now();
         await b.DB.prepare('INSERT OR IGNORE INTO tenants (id, slug, created_at) VALUES (?, ?, ?)')
             .bind(TENANT, 'native', now).run();
-        for (const id of [USER, OTHER_USER, GONE_USER, MULTI_USER, PW_USER]) {
+        for (const id of [USER, OTHER_USER, GONE_USER, MULTI_USER, PW_USER, LEGACY_USER]) {
             await b.DB.prepare(
                 'INSERT OR IGNORE INTO users (id, tenant_id, email, password_hash, name, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
             ).bind(id, TENANT, `${id}@example.com`, 'x', id, 'inspector', now).run();
@@ -306,6 +313,28 @@ describe('native client OAuth lifecycle (real provider)', () => {
             body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
         })).then((r) => (r.status === 403 ? 'forbidden' : 'answered'), (e: unknown) => String(e));
         expect(reached === 'answered' || reached.includes('INSPECTOR_MCP')).toBe(true);
+    });
+
+    it('a grant that claims to be native but is not well-formed is refused at the token endpoint and revoked, never handed on as an MCP grant (positive control: a well-formed native grant exchanges)', async () => {
+        const clientId = await registerClient();
+        const before = await grantCount(LEGACY_USER);
+        const { verifier, challenge } = await pkcePair();
+        const authUrl = new URL(`${ORIGIN}/oauth/authorize`);
+        authUrl.search = new URLSearchParams({
+            response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, scope: 'native', state: 'st',
+            code_challenge: challenge, code_challenge_method: 'S256', as: LEGACY_USER, legacy: '1',
+        }).toString();
+        const authRes = await call(new Request(authUrl));
+        expect(authRes.status).toBe(302);
+        expect(await grantCount(LEGACY_USER)).toBe(before + 1);
+        const code = new URL(authRes.headers.get('Location')!).searchParams.get('code')!;
+        const exchanged = await token({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, client_id: clientId, code_verifier: verifier });
+        expect(exchanged.status).toBe(400);
+        expect(((await exchanged.json()) as { error: string }).error).toBe('invalid_grant');
+        expect(await grantCount(LEGACY_USER), 'the malformed grant is revoked').toBe(before);
+
+        const ok = await authorizeAndExchange(clientId, 'native', LEGACY_USER);
+        expect(ok.status).toBe(200);
     });
 
     it('revokeAllUserGrants cuts off every native grant of that user and leaves another user alone', async () => {

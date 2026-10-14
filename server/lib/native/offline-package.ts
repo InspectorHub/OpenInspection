@@ -62,6 +62,14 @@ const MAX_MEDIA_ENTRIES = IMPORT_LIMIT_CEILINGS.photos;
  */
 export const PACKAGE_MAX_AGE_DAYS = 400;
 
+/**
+ * How far ahead of the server's clock a manifest's `exportedAt` may be. A device
+ * whose clock runs fast writes a package that would otherwise never reach
+ * `PACKAGE_MAX_AGE_DAYS`, and its applied records outlive their sweep. A day
+ * covers ordinary clock skew and time zones.
+ */
+export const PACKAGE_MAX_FUTURE_SKEW_DAYS = 1;
+
 /** Applied records older than this are swept; the margin over the age limit covers clock skew. */
 export const APPLIED_RECORD_RETENTION_DAYS = PACKAGE_MAX_AGE_DAYS + 20;
 

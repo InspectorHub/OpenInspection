@@ -61,6 +61,17 @@ export function isNativeProps(p: unknown): p is NativeProps {
     && typeof o.grantedAt === 'number' && Number.isFinite(o.grantedAt);
 }
 
+/**
+ * True for any grant that says it is a native one, whether or not its props are
+ * well-formed (`isNativeProps`). The two answer different questions. A grant that
+ * fails `isNativeProps` because a field is missing is not an MCP grant: it must be
+ * refused, not handed to the MCP server on the strength of a type guard that was
+ * written to decide what a valid session is.
+ */
+export function claimsNative(p: unknown): boolean {
+  return typeof p === 'object' && p !== null && 'kind' in p && p.kind === 'native';
+}
+
 /** Opaque provider tokens are `userId:grantId:secret`; JWTs are dot-separated. */
 export function looksLikeOpaqueOAuthToken(token: string): boolean {
   return !token.includes('.') && token.split(':').length === 3;

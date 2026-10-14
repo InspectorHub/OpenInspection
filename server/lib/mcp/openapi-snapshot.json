@@ -5357,7 +5357,7 @@
       }
     },
     "summary": "Create a custom tag",
-    "description": "Auto-generated placeholder for createTag (POST /, tags domain). TODO: replace with a real description sourced from the handler."
+    "description": "Create a custom tag for the company. The name must be unique among the company's tags; a duplicate is refused with a conflict."
   },
   {
     "operationId": "createTagItemsTags",
@@ -5399,7 +5399,7 @@
           "tagId": {
             "type": "string",
             "minLength": 1,
-            "description": "Tag id."
+            "description": "Unique id of the tag."
           }
         },
         "required": [
@@ -5409,7 +5409,7 @@
       }
     },
     "summary": "Link a tag to an inspection item",
-    "description": "Auto-generated placeholder for createTagItemsTags (POST /{id}/items/{itemId}/tags, tags domain). TODO: replace with a real description sourced from the handler."
+    "description": "Attach one of the company's tags to a checklist item of an inspection. Attaching a tag that is already on the item changes nothing."
   },
   {
     "operationId": "createTenantAgreements",
@@ -6571,18 +6571,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Tag id.",
+          "description": "Unique id of the tag.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Tag id."
+            "description": "Unique id of the tag."
           }
         }
       ],
       "body": null
     },
     "summary": "Delete tag for current tenant",
-    "description": "Auto-generated placeholder for deleteTag (DELETE /{id}, tags domain). TODO: replace with a real description sourced from the handler."
+    "description": "Delete a tag from the company, which also detaches it from every inspection item it was attached to. An unknown tag id is a not-found."
   },
   {
     "operationId": "deleteTagItemsTag",
@@ -6621,18 +6621,18 @@
           "name": "tagId",
           "in": "path",
           "required": true,
-          "description": "Tag id.",
+          "description": "Unique id of the tag.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Tag id."
+            "description": "Unique id of the tag."
           }
         }
       ],
       "body": null
     },
     "summary": "Unlink a tag from an inspection item",
-    "description": "Auto-generated placeholder for deleteTagItemsTag (DELETE /{id}/items/{itemId}/tags/{tagId}, tags domain). TODO: replace with a real description sourced from the handler."
+    "description": "Detach a tag from a checklist item of an inspection. The tag itself stays available to the company."
   },
   {
     "operationId": "deleteTeamMember",
@@ -12516,18 +12516,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Tag id.",
+          "description": "Unique id of the tag.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Tag id."
+            "description": "Unique id of the tag."
           }
         }
       ],
       "body": null
     },
     "summary": "List inspections that have any item tagged with this tag",
-    "description": "Auto-generated placeholder for listTagInspections (GET /{id}/inspections, tags domain). TODO: replace with a real description sourced from the handler."
+    "description": "List the ids of the company's inspections that have at least one item carrying this tag. An unknown tag id is a not-found."
   },
   {
     "operationId": "listTagItemsTags",
@@ -12566,7 +12566,7 @@
       "body": null
     },
     "summary": "List tags linked to an inspection item",
-    "description": "Auto-generated placeholder for listTagItemsTags (GET /{id}/items/{itemId}/tags, tags domain). TODO: replace with a real description sourced from the handler."
+    "description": "List the tags attached to one checklist item of an inspection."
   },
   {
     "operationId": "listTags",
@@ -12582,7 +12582,7 @@
       "body": null
     },
     "summary": "List tags for the current tenant (seed + custom)",
-    "description": "List the company tags, built-in and custom."
+    "description": "List the company's tags: the built-in tags plus any custom tags."
   },
   {
     "operationId": "listTagTags",
@@ -12610,7 +12610,7 @@
       "body": null
     },
     "summary": "Map of itemId → tags for an inspection",
-    "description": "Auto-generated placeholder for listTagTags (GET /{id}/tags, tags domain). TODO: replace with a real description sourced from the handler."
+    "description": "Return, for one inspection, a map from each checklist item id to the tags attached to that item."
   },
   {
     "operationId": "listTeamMembers",
@@ -17758,11 +17758,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Tag id.",
+          "description": "Unique id of the tag.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Tag id."
+            "description": "Unique id of the tag."
           }
         }
       ],
@@ -17771,7 +17771,7 @@
       }
     },
     "summary": "Replace tag for current tenant",
-    "description": "Auto-generated placeholder for replaceTag (PUT /{id}, tags domain). TODO: replace with a real description sourced from the handler."
+    "description": "Update a tag's name or colour. Built-in tags can change colour but not name, and a name already used by another tag is refused with a conflict."
   },
   {
     "operationId": "requestAgentMagicLogin",

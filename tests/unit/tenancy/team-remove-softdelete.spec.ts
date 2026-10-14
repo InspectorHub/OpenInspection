@@ -35,6 +35,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { withBatch } from '../helpers/d1-binding';
 import { LegalVersionService } from '../../../server/services/legal-version.service';
+import { CREDENTIAL_MARKER_TTL_S } from '../../../server/lib/auth/credential-marker';
 
 const TENANT = '00000000-0000-0000-0000-0000000000d1';
 const ADMIN = '11111111-1111-1111-1111-1111111111d1';
@@ -139,7 +140,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         expect(kv.put).toHaveBeenCalledWith(
             `pwchanged:${MEMBER}`,
             expect.any(String),
-            expect.objectContaining({ expirationTtl: 90000 }),
+            expect.objectContaining({ expirationTtl: CREDENTIAL_MARKER_TTL_S }),
         );
     });
 
@@ -328,7 +329,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         expect(kv.put).toHaveBeenCalledWith(
             `pwchanged:${MEMBER}`,
             expect.any(String),
-            expect.objectContaining({ expirationTtl: 90000 }),
+            expect.objectContaining({ expirationTtl: CREDENTIAL_MARKER_TTL_S }),
         );
         const row = await testDb.select().from(schema.users).where(eq(schema.users.id, MEMBER)).get();
         expect(row!.deletedAt).not.toBeNull(); // the soft-delete itself still committed

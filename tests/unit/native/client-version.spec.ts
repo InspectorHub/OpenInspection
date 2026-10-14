@@ -83,6 +83,12 @@ describe('NEVER_BLOCK_RULES', () => {
     expect(blocked('GET', '/api/inspections/abc/complete')).toBe(true);
     expect(blocked('PATCH', '/api/inspections')).toBe(true);
   });
+  it('does not let a bulk update through: PATCH /api/inspections/bulk is a fixed route, not an inspection id (positive control: a real id)', () => {
+    expect(blocked('PATCH', '/api/inspections/bulk')).toBe(true);
+    expect(blocked('patch', '/api/inspections/bulk')).toBe(true);
+    expect(blocked('PATCH', '/api/inspections/bulk1')).toBe(false);
+    expect(blocked('PATCH', '/api/inspections/abc')).toBe(false);
+  });
   it('no longer lists the tenant presence socket (it has no ticket path for a WebView)', () => {
     expect(blocked('GET', '/api/tenant/presence/ws')).toBe(true);
   });

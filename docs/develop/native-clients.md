@@ -107,7 +107,7 @@ revoked on the events below. Either is enough to stop access.
 |---|---|
 | Member removed | Every OAuth grant the member holds is revoked; the token also fails the row check, and a refresh re-reads the row too. |
 | Member re-invited after removal | The reactivated account keeps its id, so every grant that id still holds is revoked when the invitation is accepted. |
-| Password change or reset | Grants are revoked. As a second line, the `pwchanged:{userId}` marker that cuts off web sessions is also read for a native token: a grant made before the marker is refused on use and on refresh (a grant made after it is unaffected). Like the web session check, no bound KV skips the comparison and a KV read that fails refuses the token. |
+| Password change or reset | Grants are revoked. As a second line, the `pwchanged:{userId}` marker that cuts off web sessions is also read for a native token: a grant made before the marker is refused on use and on refresh (a grant made after it is unaffected). The marker is kept for 100 days, longer than the 90-day idle limit, so it covers every grant that could still refresh; a grant left unused past the idle limit is refused by that rule anyway. Revocation remains the primary control and the marker is the fallback for when it failed. Like the web session check, no bound KV skips the comparison and a KV read that fails refuses the token. |
 | Role change | Grants are revoked, so no token keeps the old role. Between the change and the revocation the role used is the row's current role, never the one captured at consent. |
 | Role no longer native-capable (for example `agent`) | The token resolves to no identity. |
 | Account self-deletion | Grants are revoked. |
@@ -166,7 +166,9 @@ where the same path also serves reads, a method:
 - `GET /api/client/session`, `POST /api/client/import` and `GET /api/client/compat`;
 - the REST writes that hand over a captured inspection: `POST /api/inspections`
   (with the client's own id), `PATCH /api/inspections/{id}` and
-  `POST /api/inspections/{id}/complete`.
+  `POST /api/inspections/{id}/complete`. `PATCH /api/inspections/bulk` is a fixed
+  route, not an inspection id, and is not on the list: an outdated app cannot use
+  it to update inspections in bulk.
 
 The method matters: `GET /api/inspections` and `GET /api/inspections/{id}` are
 still refused with `426`, because an outdated app should hand its work over, not
@@ -190,7 +192,10 @@ else is ignored, not rejected.
 - **Throttled.** A row is rewritten at most once an hour, so a busy fleet costs
   about one D1 write per version per hour.
 - **Bounded.** A company holds at most 200 rows. Past that, new versions are not
-  recorded and existing ones are still refreshed.
+  recorded and existing ones are still refreshed. Any signed-in member can fill the
+  200 by sending invented versions, so the record can be crowded out; the only
+  thing at risk is the completeness of the "last seen" record, and nothing else
+  reads the table.
 - **Best effort.** A failed write is logged and never changes the response.
 - **Per company.** Rows carry `tenant_id` and are removed with the company on a
   purge.
@@ -234,8 +239,14 @@ referring to it by a name it chose. The id is not required to be a UUID.
 | Case | Answer |
 |---|---|
 | New id | `201`, the inspection is created. |
-| Id already belongs to an inspection in the same company | `200` with the existing inspection. None of the create's side effects run again, so a retry is safe. |
-| Id belongs to a record outside the company | `409` `ID_CONFLICT`. |
+| Id already belongs to an inspection in the same company that the caller may open (an owner or manager, or a member assigned to it) | `200` with the existing inspection. None of the create's side effects run again, so a retry is safe. |
+| Id belongs to a record outside the company, or to an inspection in it that the caller is not assigned to | `409` `ID_CONFLICT`, the same answer for both, with no inspection fields. |
+
+A create is several writes and cannot be one transaction. If the first attempt
+stopped after writing the inspection but before its primary report, results row or
+assignment, the request answers with an error, and the retry (a replay of the same
+id) adds exactly what is missing and writes nothing for what is already there. An
+inspection that was created whole is not touched by a replay.
 
 ---
 
@@ -344,6 +355,16 @@ Further rules:
   is listed in `outbox.failed` (`idempotencyKey`, `op`, `inspectionId` and the
   HTTP `status` it was refused with). The results and photos in the package are
   still imported; the listed entries need attention on the device.
+- **A refused update blocks the completion after it.** If a queued update to an
+  inspection is refused, a later `inspection.complete` for the same inspection is
+  not attempted: it is listed in `outbox.failed` with `status` `424` and
+  `reason` `blocked_by_failed_update`, because completing the inspection would
+  mark finished a record that lacks the device's change. Other inspections are
+  unaffected, and the entry stays retryable once the update is fixed.
+- **A busy key stops the request.** A queued write whose idempotency key is held
+  by a request that is still running (`409` `IDEMPOTENCY_IN_FLIGHT`, for example
+  the same package sent twice at once) is not reported as failed: the whole import
+  answers `409` and the client retries it, exactly as for a `5xx`.
 - **Imports are idempotent.** Sending the same package again is safe. A create is
   held by its client-chosen id; the 24-hour `Idempotency-Key` ledger replays a
   repeat inside its window; and the table `offline_import_applied` records every
@@ -360,12 +381,27 @@ Further rules:
   is at most 365), so an honest package is never turned away. `exportedAt` is the
   device's own claim: the limit protects against replaying a stale package by
   accident, not against a member who edits the manifest.
+- **Packages cannot be dated ahead.** A package whose `exportedAt` is more than
+  one day ahead of the server clock is refused with `422`
+  `PACKAGE_FROM_THE_FUTURE` (`details.maxFutureSkewDays`) and nothing is written.
+  A device clock set far ahead would otherwise produce a package that never
+  expires. The day covers ordinary clock skew and time zones; the fix is to
+  correct the device clock and export again.
 - **Every entry must hold the bytes it declares.** The zip directory states each
   entry's size; an entry that unpacks to more or fewer bytes than that refuses
   the whole package with `400` before anything is written. (The zip checksum is
   not verified: computing it over up to 48 MiB costs more CPU than the Free plan
   allows. JSON and Yjs entries must parse, and photos pass the same type and size
   checks as every other photo upload.)
+- **The work of reading a package follows its declared size.** Deflate can pack
+  zeros about a thousandfold, so a small body can describe a very large entry.
+  The directory is refused before anything is unpacked when an entry carries more
+  compressed data than its declared size could need, when a stored entry's length
+  differs from its declared size, or when two entries share compressed bytes. An
+  entry that passes is unpacked incrementally and abandoned as soon as it
+  produces more than it declared, so the CPU an entry can cost is a small
+  multiple of its declared size, which the unpacked-size limit bounds, and not of
+  what its stream could expand to.
 - **A deleted inspection stays deleted.** If a recorded create names an
   inspection that has since been deleted, the package is refused with `409`
   `PACKAGE_INSPECTION_DELETED` and nothing is written.
@@ -414,9 +450,14 @@ The largest default package (8 inspections, 20 queued writes, 50 photos) comes t
 796. Queued writes dominate because each is replayed as an ordinary request and
 pays the whole middleware chain.
 
-On the Cloudflare Workers Free plan, use the default small batches. Before raising
-a limit, check the platform's current CPU-time and subrequest limits for your
-plan against the estimate above.
+The defaults are sized from the subrequest count alone. **Their CPU time has not
+been measured on the platform**: the test runtime does not enforce a CPU limit, and
+an import of any size spends more than the 10 ms the Workers Free plan allows per
+invocation, so on that plan it relies on the platform's tolerance for short
+overruns, which is not a guarantee. Use the default small batches, send a large
+batch as several smaller packages, and before raising a limit check the
+platform's current CPU-time and subrequest limits for your plan against the
+estimate above.
 
 ### When a package is over a limit
 
@@ -431,6 +472,18 @@ A split package imports exactly like a whole one, because every step is
 idempotent. When splitting, keep each inspection's results, photos and queued
 writes in the same part, and send the part that carries an inspection's create
 first.
+
+### Splitting a package that one inspection keeps refusing
+
+A refusal about one inspection refuses the whole package, so a single bad entry
+can hold up every other inspection in it. The error names the inspection:
+`details.inspectionId` on a `403` (the importer cannot edit it) and a `404` (it
+does not exist and the package does not create it), on a `400` for an inspection
+exported from a different report, on `409` `PACKAGE_INSPECTION_DELETED` (which
+also lists `details.inspectionIds`), and on a failure while its results or photos
+were being applied. A client that gets one of these should write the inspection
+named into a package of its own, send the rest as a package without it, and keep
+the named one on the device for the person to resolve.
 
 ---
 

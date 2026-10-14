@@ -6,6 +6,7 @@ import { Errors } from '../lib/errors';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { logger } from '../lib/logger';
 import { revokeUserGrantsBestEffort } from '../lib/mcp/grants';
+import { CREDENTIAL_MARKER_TTL_S } from '../lib/auth/credential-marker';
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import { joinTeam as joinTeamImpl, type JoinTeamOptions } from './auth/join-team';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
@@ -49,7 +50,7 @@ export class AuthService {
         if (!this.kv) return;
         const ts = Math.floor(Date.now() / 1000).toString();
         try {
-            await this.kv.put(`pwchanged:${userId}`, ts, { expirationTtl: 90000 });
+            await this.kv.put(`pwchanged:${userId}`, ts, { expirationTtl: CREDENTIAL_MARKER_TTL_S });
         } catch (err) {
             logger.warn('Failed to write session-invalidation key; outstanding tokens may remain valid until exp', {
                 userId,

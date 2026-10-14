@@ -33,7 +33,7 @@ failing.
 | Key pattern | Written by | Read by | TTL |
 |---|---|---|---|
 | `global_tenant:{tenantId}` | Fixed-tenant resolver | Fixed-tenant resolver (every request) | 3600s |
-| `pwchanged:{userId}` | Password change/reset handlers | Auth middleware (JWT validation) | None |
+| `pwchanged:{userId}` | Password change/reset, member removal and account deletion | Auth middleware (JWT validation) and native token checks | 100 days (`CREDENTIAL_MARKER_TTL_S`; outlives the 90-day native idle limit) |
 | `pw_reset:{token}` | Password-reset request | Password-reset redeem | 3600s, one-time |
 | `agent_view_token:{token}` | Agent report-share link mint | The shared-report reader | 30 days |
 | `qbo_oauth_state:{state}` | QBO OAuth initiation | QBO OAuth callback | 600s |

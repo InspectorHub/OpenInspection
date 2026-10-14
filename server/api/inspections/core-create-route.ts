@@ -34,7 +34,7 @@ export const createInspectionRoute = createRoute(withMcpMetadata({
                     })),
                 },
             },
-            description: 'Replay of a create that named an id this workspace already holds; nothing new was created',
+            description: 'Replay of a create that named an inspection the caller may open (an owner or manager, or someone assigned to it); nothing new was created, and a report or results row an interrupted first attempt did not get to write is added',
         },
         201: {
             content: {
@@ -46,7 +46,7 @@ export const createInspectionRoute = createRoute(withMcpMetadata({
             },
             description: 'Created',
         },
-        409: { description: 'ID_CONFLICT: the supplied id already belongs to a record outside this workspace' },
+        409: { description: 'ID_CONFLICT: the supplied id already belongs to a record the caller may not open: one outside this workspace, or an inspection in it the caller is not assigned to. The answer is the same for both, so it does not reveal which' },
     },
     operationId: "createInspection"
 }, { scopes: ['write'], tier: 'primary' }));

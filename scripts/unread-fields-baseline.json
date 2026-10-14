@@ -135,10 +135,6 @@
     "kind": "invisible-read",
     "reason": "Serialised whole: `parkedFingerprint()` returns `JSON.stringify(fingerprint)` and the parking write stores that string in `parked_cmd_events.envelope`. The field IS recorded; nothing writes `.invalidFields` because the consumer is the serialiser."
   },
-  "server/services/account.service.ts#AccountExport.exportedAt": {
-    "kind": "wire-shape",
-    "reason": "Part of the portability export the data subject downloads — `AccountExportResponseSchema` declares it and `GET /api/account/export` returns it. Nothing here reads it back because the reader is the person who asked for their data."
-  },
   "server/services/account.service.ts#AccountExport.identityWithheld": {
     "kind": "wire-shape",
     "reason": "Part of the portability export the data subject downloads, and deliberately so: the columns held back travel WITH their reasons, because an export that is silently incomplete is the under-disclosure this response shape exists to prevent."

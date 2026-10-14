@@ -14,6 +14,7 @@
 import type { Context } from 'hono';
 import { MAX_IMPORT_BYTES } from '../../durable-objects/inspection-doc-import';
 import { auditFromContext } from '../audit';
+import { readBoundedBody } from '../bounded-body';
 import { CollabImportResultSchema } from '../validations/collab.schema';
 import { logger } from '../logger';
 import type { HonoConfig } from '../../types/hono';
@@ -24,44 +25,6 @@ export interface CollabImportTarget {
     reportId: string;
     userId: string;
     stub: { fetch(req: Request): Promise<Response> };
-}
-
-type BoundedBody = { ok: true; bytes: Uint8Array } | { ok: false; status: 400 | 411 | 413 };
-
-/**
- * Read the request body, refusing it as soon as it is known to exceed the limit.
- * The declared Content-Length is checked first so an honest oversized upload is
- * never read at all; the stream is then counted as it arrives so a client that
- * under-declares cannot make the worker buffer more than the limit.
- */
-async function readBoundedBody(req: Request, limit: number): Promise<BoundedBody> {
-    const declared = req.headers.get('content-length');
-    if (declared === null) return { ok: false, status: 411 };
-    const length = Number(declared);
-    if (!/^\d+$/.test(declared) || !Number.isSafeInteger(length)) return { ok: false, status: 400 };
-    if (length > limit) return { ok: false, status: 413 };
-    if (!req.body) return { ok: true, bytes: new Uint8Array(0) };
-
-    const reader = req.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        total += value.byteLength;
-        if (total > limit) {
-            await reader.cancel();
-            return { ok: false, status: 413 };
-        }
-        chunks.push(value);
-    }
-    const bytes = new Uint8Array(total);
-    let offset = 0;
-    for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.byteLength;
-    }
-    return { ok: true, bytes };
 }
 
 /** The verified identity the object is addressed with; only `authorizeCollab` may produce one. */
@@ -138,7 +101,7 @@ export async function importUpdateIntoDo(
 }
 
 export async function forwardCollabImport(c: Context<HonoConfig>, target: CollabImportTarget): Promise<Response> {
-    const body = await readBoundedBody(c.req.raw, MAX_IMPORT_BYTES);
+    const body = await readBoundedBody(c.req.raw, MAX_IMPORT_BYTES, 413);
     if (!body.ok) {
         const error = { 400: 'invalid content-length', 411: 'content-length required', 413: 'import too large' }[body.status];
         return c.json({ error }, body.status);

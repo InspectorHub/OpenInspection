@@ -10,10 +10,11 @@ import {
     PACKAGE_MAX_AGE_DAYS, APPLIED_RECORD_RETENTION_DAYS,
 } from '../../../server/lib/native/offline-package';
 import {
-    listPackage, readPackageEntry, readPackageEntries, verifyPackageEntries, readPackageBody, MAX_MEDIA_ENTRY_BYTES,
+    listPackage, readPackageEntry, readPackageEntries, verifyPackageEntries, MAX_MEDIA_ENTRY_BYTES,
 } from '../../../server/lib/native/offline-zip';
+import { readBoundedBody } from '../../../server/lib/bounded-body';
 import { DEFAULT_IMPORT_LIMITS, IMPORT_LIMIT_CEILINGS } from '../../../server/lib/native/import-limits';
-import { buildPackage, declareEntrySize } from '../helpers/offline-package-fixture';
+import { aliasEntryData, buildPackage, declareEntrySize } from '../helpers/offline-package-fixture';
 
 const MAX_PACKAGE_BYTES = DEFAULT_IMPORT_LIMITS.compressedBytes;
 
@@ -277,11 +278,19 @@ describe('offline package archive listing', () => {
             expect(readPackageEntry(honest, name, 1000)).toEqual(actual());
             expect(verifyPackageEntries(honest, new Map([[name, 1000]]))).toBeNull();
 
-            const lying = declareEntrySize(honest, name, 10);
-            const listing = listPackage(lying);
-            expect(listing.ok, 'the directory alone looks fine').toBe(true);
-            expect(readPackageEntry(lying, name, 10)).toBeNull();
-            expect(verifyPackageEntries(lying, new Map([[name, 10]]))).toBe(name);
+            // A lie that stays inside what an encoder could produce looks fine from the directory alone.
+            const lying = declareEntrySize(honest, name, 900);
+            expect(listPackage(lying).ok, 'the directory alone looks fine').toBe(true);
+            expect(readPackageEntry(lying, name, 900)).toBeNull();
+            expect(verifyPackageEntries(lying, new Map([[name, 900]]))).toBe(name);
+
+            // A larger lie carries more compressed data than its declaration could need: refused by the directory itself.
+            const absurd = declareEntrySize(honest, name, 10);
+            const listing = listPackage(absurd);
+            expect(listing.ok).toBe(false);
+            if (!listing.ok) expect(listing.reason).toContain(name);
+            expect(readPackageEntry(absurd, name, 10)).toBeNull();
+            expect(verifyPackageEntries(absurd, new Map([[name, 10]]))).toBe(name);
         });
 
         it('is refused when it is one byte over, and when it is stored', () => {
@@ -300,10 +309,97 @@ describe('offline package archive listing', () => {
         });
 
         it('reports the first bad entry among many accurate ones', () => {
-            const zip = declareEntrySize(zipSync({ 'yjs/a.bin': actual(), 'yjs/b.bin': actual(), 'yjs/c.bin': actual() }), 'yjs/b.bin', 5);
-            const wanted = new Map([['yjs/a.bin', 1000], ['yjs/b.bin', 5], ['yjs/c.bin', 1000]]);
+            const zip = declareEntrySize(zipSync({ 'yjs/a.bin': actual(), 'yjs/b.bin': actual(), 'yjs/c.bin': actual() }), 'yjs/b.bin', 900);
+            const wanted = new Map([['yjs/a.bin', 1000], ['yjs/b.bin', 900], ['yjs/c.bin', 1000]]);
             expect(verifyPackageEntries(zip, wanted)).toBe('yjs/b.bin');
             expect(verifyPackageEntries(zip, new Map([['yjs/a.bin', 1000], ['yjs/c.bin', 1000]]))).toBeNull();
+        });
+    });
+
+    describe('CPU spent on an entry is bounded by what it declares', () => {
+        const MIB = 1024 * 1024;
+        /** Wall time of `fn` in milliseconds. */
+        const timed = <T>(fn: () => T): { value: T; ms: number } => {
+            const start = performance.now();
+            const value = fn();
+            return { value, ms: performance.now() - start };
+        };
+
+        it('refuses an entry that declares 10 bytes and carries a 64 MiB zero stream, from the directory and at once (positive control: the honest entry)', () => {
+            const honest = zipSync({ 'yjs/insp-1.bin': [new Uint8Array(64 * MIB), { level: 9 }] });
+            expect(honest.byteLength, 'the bomb is small on the wire').toBeLessThan(200 * 1024);
+            const bomb = declareEntrySize(honest, 'yjs/insp-1.bin', 10);
+
+            const listed = timed(() => listPackage(bomb));
+            expect(listed.value.ok).toBe(false);
+            if (!listed.value.ok) expect(listed.value.reason).toMatch(/compressed data/);
+            expect(listed.ms, 'refused without inflating anything').toBeLessThan(100);
+            expect(timed(() => verifyPackageEntries(bomb, new Map([['yjs/insp-1.bin', 10]]))).ms).toBeLessThan(100);
+            expect(readPackageEntry(bomb, 'yjs/insp-1.bin', 10)).toBeNull();
+
+            // Control: the same stream declaring a size an encoder could have produced it from is not refused by the directory.
+            expect(listPackage(declareEntrySize(honest, 'yjs/insp-1.bin', 100_000)).ok).toBe(true);
+        });
+
+        it('stops inflating an entry that declares about what it carries but expands a thousand-fold (positive control: the directory accepts it)', () => {
+            // 128 MiB of zeros is ~130 KB compressed. Declaring 200 KB passes the directory checks,
+            // and only the inflater can find out how much the stream really holds.
+            const honest = zipSync({ 'yjs/insp-1.bin': [new Uint8Array(128 * MIB), { level: 9 }] });
+            expect(honest.byteLength).toBeLessThan(200 * 1024);
+            const bomb = declareEntrySize(honest, 'yjs/insp-1.bin', 200 * 1024);
+            const wanted = new Map([['yjs/insp-1.bin', 200 * 1024]]);
+            expect(listPackage(bomb).ok, 'the directory alone looks fine').toBe(true);
+
+            const verified = timed(() => verifyPackageEntries(bomb, wanted));
+            expect(verified.value).toBe('yjs/insp-1.bin');
+            expect(verified.ms, 'abandoned as soon as it passes its declaration').toBeLessThan(100);
+            const read = timed(() => readPackageEntry(bomb, 'yjs/insp-1.bin', 200 * 1024));
+            expect(read.value).toBeNull();
+            expect(read.ms).toBeLessThan(100);
+        });
+
+        it('still reads a legitimate entry that compresses about 1000:1 (declared size equals actual size)', () => {
+            const zeros = new Uint8Array(MIB);
+            const zip = zipSync({ 'yjs/insp-1.bin': [zeros, { level: 9 }] });
+            expect(zip.byteLength).toBeLessThan(MIB / 500);
+            expect(listPackage(zip).ok).toBe(true);
+            expect(verifyPackageEntries(zip, new Map([['yjs/insp-1.bin', MIB]]))).toBeNull();
+            const read = readPackageEntry(zip, 'yjs/insp-1.bin', MIB);
+            expect(read?.byteLength).toBe(MIB);
+            expect(read?.every((b) => b === 0)).toBe(true);
+        });
+
+        it('reads entries that do not compress at all (stored blocks) and a mix of both', () => {
+            const noise = Uint8Array.from({ length: 300_000 }, (_, i) => (i * 2654435761) >>> 24);
+            const zip = zipSync({ 'media/p1.jpg': noise, 'yjs/insp-1.bin': [noise, { level: 0 }], 'outbox.json': new TextEncoder().encode('[]') });
+            const listing = listPackage(zip);
+            expect(listing.ok).toBe(true);
+            if (!listing.ok) return;
+            expect(verifyPackageEntries(zip, listing.entries)).toBeNull();
+            expect(readPackageEntry(zip, 'media/p1.jpg', 300_000)).toEqual(noise);
+        });
+
+        it('refuses a stored entry whose length differs from its declaration, from the directory', () => {
+            const stored = zipSync({ 'yjs/insp-1.bin': [new Uint8Array(1000), { level: 0 }] });
+            expect(listPackage(stored).ok).toBe(true);
+            const listing = listPackage(declareEntrySize(stored, 'yjs/insp-1.bin', 999));
+            expect(listing.ok).toBe(false);
+            if (!listing.ok) expect(listing.reason).toMatch(/stored/);
+        });
+
+        it('refuses two entries that share compressed bytes (positive control: the same two entries apart)', () => {
+            const content = new Uint8Array(4000);
+            const apart = zipSync({ 'yjs/a.bin': [content, { level: 9 }], 'yjs/b.bin': [content, { level: 9 }] });
+            expect(listPackage(apart).ok).toBe(true);
+            expect(verifyPackageEntries(apart, new Map([['yjs/a.bin', 4000], ['yjs/b.bin', 4000]]))).toBeNull();
+
+            const shared = aliasEntryData(apart, 'yjs/b.bin', 'yjs/a.bin');
+            const listing = listPackage(shared);
+            expect(listing.ok).toBe(false);
+            if (!listing.ok) expect(listing.reason).toMatch(/shares compressed data/);
+            // The readers every later step uses refuse it too, not only the listing.
+            expect(verifyPackageEntries(shared, new Map([['yjs/b.bin', 4000]]))).toBe('yjs/b.bin');
+            expect(readPackageEntry(shared, 'yjs/b.bin', 4000)).toBeNull();
         });
     });
 
@@ -326,19 +422,19 @@ describe('offline package request body', () => {
     };
 
     it('reads a body whose length matches its declaration', async () => {
-        const out = await readPackageBody(req('3', new Uint8Array([1, 2, 3])), MAX_PACKAGE_BYTES);
+        const out = await readBoundedBody(req('3', new Uint8Array([1, 2, 3])), MAX_PACKAGE_BYTES, 400);
         expect(out).toEqual({ ok: true, bytes: new Uint8Array([1, 2, 3]) });
     });
 
     it('answers 411 without a declared length, 413 over the cap, 400 for a malformed or false one', async () => {
         const noLength = new Request('http://x/', { method: 'POST', body: new Uint8Array([1]) });
         noLength.headers.delete('content-length');
-        expect(await readPackageBody(noLength, MAX_PACKAGE_BYTES)).toEqual({ ok: false, status: 411 });
-        expect(await readPackageBody(req(String(MAX_PACKAGE_BYTES + 1), new Uint8Array([1])), MAX_PACKAGE_BYTES)).toEqual({ ok: false, status: 413 });
-        expect(await readPackageBody(req('12abc', new Uint8Array([1])), MAX_PACKAGE_BYTES)).toEqual({ ok: false, status: 400 });
+        expect(await readBoundedBody(noLength, MAX_PACKAGE_BYTES, 400)).toEqual({ ok: false, status: 411 });
+        expect(await readBoundedBody(req(String(MAX_PACKAGE_BYTES + 1), new Uint8Array([1])), MAX_PACKAGE_BYTES, 400)).toEqual({ ok: false, status: 413 });
+        expect(await readBoundedBody(req('12abc', new Uint8Array([1])), MAX_PACKAGE_BYTES, 400)).toEqual({ ok: false, status: 400 });
         // Declared shorter than sent, and declared longer than sent.
-        expect(await readPackageBody(req('2', new Uint8Array([1, 2, 3])), MAX_PACKAGE_BYTES)).toEqual({ ok: false, status: 400 });
-        expect(await readPackageBody(req('5', new Uint8Array([1, 2, 3])), MAX_PACKAGE_BYTES)).toEqual({ ok: false, status: 400 });
+        expect(await readBoundedBody(req('2', new Uint8Array([1, 2, 3])), MAX_PACKAGE_BYTES, 400)).toEqual({ ok: false, status: 400 });
+        expect(await readBoundedBody(req('5', new Uint8Array([1, 2, 3])), MAX_PACKAGE_BYTES, 400)).toEqual({ ok: false, status: 400 });
     });
 
     it('does not reserve memory for a declared length that never arrives', async () => {
@@ -356,7 +452,7 @@ describe('offline package request body', () => {
         const request = new Request('http://x/api/client/import', {
             method: 'POST', headers: { 'content-length': String(declared) }, body: slow, duplex: 'half',
         } as RequestInit);
-        expect(await readPackageBody(request, MAX_PACKAGE_BYTES)).toEqual({ ok: false, status: 400 });
+        expect(await readBoundedBody(request, MAX_PACKAGE_BYTES, 400)).toEqual({ ok: false, status: 400 });
         // A 16 MiB pre-allocation would show up as ~24 MiB here; three bytes of body must not.
         expect(arrayBuffersWhilePending - baseline).toBeLessThan(4 * 1024 * 1024);
     });
@@ -378,6 +474,6 @@ describe('offline package request body', () => {
         const request = new Request('http://x/api/client/import', {
             method: 'POST', headers: { 'content-length': '6' }, body: stream, duplex: 'half',
         } as RequestInit);
-        expect(await readPackageBody(request, MAX_PACKAGE_BYTES)).toEqual({ ok: true, bytes: new Uint8Array([1, 2, 3, 4, 5, 6]) });
+        expect(await readBoundedBody(request, MAX_PACKAGE_BYTES, 400)).toEqual({ ok: true, bytes: new Uint8Array([1, 2, 3, 4, 5, 6]) });
     });
 });

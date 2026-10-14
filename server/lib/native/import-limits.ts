@@ -33,6 +33,15 @@
  * under 800 (787 measured). That leaves about a fifth of the Free ceiling free for what the
  * estimate averages away (a queued write that touches more rows costs more).
  *
+ * What these defaults do NOT claim. They are sized from the subrequest count only.
+ * Nobody has measured the CPU time of an import on the platform: miniflare does not
+ * enforce a CPU limit, and the wall-clock figures the spec prints say nothing about it.
+ * On the Free plan, which allows 10 ms of CPU per invocation, even the smallest import
+ * spends more than that, and what keeps it working is the platform's tolerance for
+ * short overruns, which is not a guarantee. Treat the defaults as "will not exceed the
+ * subrequest ceiling", never as "has been shown to fit the CPU limit", and send a large
+ * batch as several smaller packages (each part imports on its own, see above).
+ *
  * Bytes are bounded separately and for a different reason. The package is held
  * in memory while its entries are read, so the byte limits protect the Worker's
  * memory, not its subrequest budget. The compressed and decompressed limits

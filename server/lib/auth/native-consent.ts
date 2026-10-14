@@ -2,7 +2,7 @@ import type { AuthRequest, OAuthHelpers } from '@cloudflare/workers-oauth-provid
 import { writeAuditLog } from '../audit';
 import { nativeClientEnabled } from '../mcp/flag';
 import { logger } from '../logger';
-import { NATIVE_SCOPE, isNativeRole, type NativeProps, type NativeRole } from './native-token';
+import { NATIVE_SCOPE, claimsNative, isNativeRole, type NativeProps, type NativeRole } from './native-token';
 import type { Role } from './roles';
 
 /**
@@ -30,7 +30,7 @@ async function trimNativeGrants(oauth: OAuthHelpers, userId: string): Promise<vo
     do {
       const page = await (cursor ? oauth.listUserGrants(userId, { cursor }) : oauth.listUserGrants(userId));
       for (const g of page.items) {
-        if ((g.metadata as { kind?: unknown } | null)?.kind === 'native') native.push({ id: g.id, createdAt: g.createdAt });
+        if (claimsNative(g.metadata)) native.push({ id: g.id, createdAt: g.createdAt });
       }
       cursor = page.cursor;
     } while (cursor);

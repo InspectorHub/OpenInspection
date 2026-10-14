@@ -9,6 +9,7 @@ import { logger } from '../lib/logger';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
 import { getCapabilities, TOGGLEABLE, type Capability, type PermissionOverrides } from '../lib/auth/capabilities';
 import { revokeAllUserGrants } from '../lib/mcp/grants';
+import { CREDENTIAL_MARKER_TTL_S } from '../lib/auth/credential-marker';
 import { resetMemberTwoFactor } from './team/reset-two-factor';
 
 /**
@@ -55,7 +56,7 @@ export class TeamService {
         if (!this.kv) return;
         const ts = Math.floor(Date.now() / 1000).toString();
         try {
-            await this.kv.put(`pwchanged:${userId}`, ts, { expirationTtl: 90000 });
+            await this.kv.put(`pwchanged:${userId}`, ts, { expirationTtl: CREDENTIAL_MARKER_TTL_S });
         } catch (err) {
             logger.warn('Failed to write session-invalidation key after member removal; outstanding tokens may remain valid until exp', {
                 userId,
