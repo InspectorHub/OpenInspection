@@ -45,77 +45,29 @@ export function resolveQboApiBase(qboEnv: string | undefined): string {
     return `${host}/v3/company`;
 }
 
+/**
+ * `QBO_ENV` when it names one of the two hosts, otherwise null. Exact match: a
+ * near miss ("Sandbox", " production ") is what `resolveQboApiBase` refuses, so
+ * the status must not claim an environment the API calls would reject.
+ */
+export function qboEnvironmentName(qboEnv: string | undefined): 'sandbox' | 'production' | null {
+    return qboEnv === 'sandbox' || qboEnv === 'production' ? qboEnv : null;
+}
+
 const QBO_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
 export const QBO_REVOKE_URL = 'https://developer.api.intuit.com/v2/oauth2/tokens/revoke';
 const MINOR_VERSION = '75';
 export const ACCESS_TOKEN_TTL_SEC = 3600;
 export const CDC_PAGE_SIZE = 1000;
 
-/** One invoice where QuickBooks and our ledger disagree, with BOTH figures. */
-export interface QBOPaymentDiscrepancy {
-    id: string;
-    invoiceId: string;
-    currency: string;
-    ledgerCents: number;
-    qboCents: number;
-}
-
-/**
- * One open row a human has to look at, as the settings page needs to read it.
- *
- * This replaced a bare `openErrors: number`. A count is not a report: every
- * defect this integration has produced ends up here, and for the whole life of
- * the feature the page rendered the number and the sentence "check the sync
- * error log for details" — pointing at a log that does not exist. Six failures
- * and one count are indistinguishable from one failure and a bad guess.
- *
- * `errorCode` travels with the row rather than being flattened into prose
- * because the kinds are not interchangeable: a failed push may be worth
- * retrying, a `VOIDED_IN_QBO` flag is an acknowledgement, and rendering both as
- * "error" is how the void flag would have gone unnoticed the same way.
- */
-export interface QBOSyncErrorSummary {
-    id: string;
-    /** 'invoice' | 'refund' | 'contact' — what the row is about. */
-    oiType: string;
-    /**
-     * The OI entity id. NOT always a real id: the bootstrap probe writes the
-     * sentinel 'bootstrap', so a consumer that links this somewhere must
-     * tolerate a miss rather than render a dead link.
-     */
-    oiId: string;
-    /** `SYNC_ERROR`, `QBO_VOIDED_IN_QBO`, … — decides how the row reads. */
-    errorCode: string;
-    /** Whatever the failure actually said. Never a status code on its own. */
-    message: string;
-    /** How many times this same row has been re-detected. */
-    retries: number;
-    /** Epoch SECONDS, matching every other instant on this object. */
-    lastSeenAt: number;
-}
-
-export interface QBOConnectionStatus {
-    realmId: string;
-    companyName: string | null;
-    lastSyncAt: number | null;
-    syncEnabled: boolean;
-    /**
-     * Every open row that is not a payment discrepancy — failed pushes and
-     * acknowledgements alike. Discrepancies are split out below because they
-     * carry two figures and are not a failure of anything.
-     */
-    openErrors: QBOSyncErrorSummary[];
-    paymentDiscrepancies: QBOPaymentDiscrepancy[];
-    /**
-     * Payments taken before an invoice existed. They are deliberately NOT sent
-     * to QuickBooks — see the settings copy — so the count is disclosed rather
-     * than the cash quietly under-reported. A count and not an amount: these
-     * rows predate the invoice that carries the currency, and inventing one
-     * would be a worse lie than saying less.
-     */
-    heldDepositCount: number;
-    refreshTokenExpiresAt: number;
-}
+export type {
+    QBOPaymentDiscrepancy,
+    QBOSyncErrorSummary,
+    QBOCredentialOrigin,
+    QBOCredentialSource,
+    QBOConnectionState,
+    QBOConnectionStatus,
+} from './status-types';
 
 export type QBOToken = {
     accessToken: string;

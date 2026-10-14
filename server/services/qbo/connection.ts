@@ -1,5 +1,5 @@
-import { eq, and, inArray, isNull } from 'drizzle-orm';
-import { qboConnections, qboSyncErrors } from '../../lib/db/schema/qbo';
+import { eq, and, count, inArray, isNull } from 'drizzle-orm';
+import { qboConnections, qboEntityMap, qboSyncErrors } from '../../lib/db/schema/qbo';
 import { invoices } from '../../lib/db/schema/invoice';
 import { orderPayments } from '../../lib/db/schema/order-payment';
 import { encryptToken } from '../../lib/qbo-crypto';
@@ -7,8 +7,9 @@ import { Errors } from '../../lib/errors';
 import { QBO_PAYMENT_DISCREPANCY, decodePaymentDiscrepancy } from '../../lib/qbo-discrepancy';
 import {
     ACCESS_TOKEN_TTL_SEC,
+    qboEnvironmentName,
     type Constructor,
-    type QBOConnectionStatus,
+    type QBOConnectionState,
     type QBOPaymentDiscrepancy,
     type QBOServiceBase,
 } from './api-base';
@@ -96,7 +97,7 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                 .where(and(eq(qboSyncErrors.id, errorId), eq(qboSyncErrors.tenantId, tenantId)));
         }
 
-        async getConnectionStatus(tenantId: string): Promise<QBOConnectionStatus | null> {
+        async getConnectionStatus(tenantId: string): Promise<QBOConnectionState | null> {
             const db = this.getDrizzle();
             const row = await db.select().from(qboConnections)
                 .where(eq(qboConnections.tenantId, tenantId)).get();
@@ -142,6 +143,18 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                     isNull(orderPayments.invoiceId),
                 )).all();
 
+            // What a disconnect would throw away, per kind. One grouped query;
+            // refund twins fall in neither bucket, and the tenant filter is the
+            // whole isolation story, so it is on the query and not on the result.
+            const mapCounts = await db.select({ oiType: qboEntityMap.oiType, n: count() })
+                .from(qboEntityMap)
+                .where(and(
+                    eq(qboEntityMap.tenantId, tenantId),
+                    inArray(qboEntityMap.oiType, ['contact', 'invoice']),
+                ))
+                .groupBy(qboEntityMap.oiType).all();
+            const matched = (oiType: string) => mapCounts.find((r) => r.oiType === oiType)?.n ?? 0;
+
             return {
                 realmId:               row.realmId,
                 companyName:           row.companyName,
@@ -171,6 +184,10 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                 paymentDiscrepancies,
                 heldDepositCount:      heldDeposits.length,
                 refreshTokenExpiresAt: Math.floor(row.refreshTokenExpiresAt.getTime() / 1000),
+                connectedAt:           Math.floor(row.createdAt.getTime() / 1000),
+                environment:           qboEnvironmentName(this.qboEnv),
+                mappedCustomers:       matched('contact'),
+                mappedInvoices:        matched('invoice'),
             };
         }
 

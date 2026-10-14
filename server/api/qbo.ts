@@ -8,6 +8,8 @@ import { logger } from '../lib/logger';
 import { checkRateLimit } from '../lib/rate-limit';
 import { fireAndForget } from '../lib/fire-and-forget';
 import { resyncInvoicesForContact } from '../services/qbo/resync';
+import { describeCredentialSource } from '../services/qbo/credential-source';
+import type { QBOConnectionStatus } from '../services/qbo/api-base';
 import { QBOCustomerSearchQuerySchema, QBOLinkCustomerBodySchema } from '../lib/validations/qbo.schema';
 
 const api = new Hono<HonoConfig>();
@@ -64,7 +66,15 @@ api.use('*', async (c, next) => {
 api.use('*', requireRole('owner', 'manager'));
 
 api.get('/status', async (c) => {
-    const status = await c.var.services.qbo.getConnectionStatus(c.get('tenantId'));
+    const state = await c.var.services.qbo.getConnectionStatus(c.get('tenantId'));
+    if (!state) return c.json({ success: true, data: null });
+    // Assembled here because only this request knows it: the service is built
+    // from the already-merged env, which no longer says which side a value
+    // came from. Origins only; the values never leave the server.
+    const status: QBOConnectionStatus = {
+        ...state,
+        credentialSource: describeCredentialSource(c.env, c.get('tenantSecretKeys') ?? []),
+    };
     return c.json({ success: true, data: status });
 });
 

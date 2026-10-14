@@ -25,10 +25,12 @@ vi.mock('../../../server/lib/secrets-cache', () => ({
 type MutableEnv = Record<string, unknown>;
 
 function fakeContext(env: MutableEnv) {
+    const vars = new Map<string, unknown>([['tenantId', 'tenant-a']]);
     const ctx = {
         env,
         req: { path: '/api/anything' },
-        get: (k: string) => (k === 'tenantId' ? 'tenant-a' : undefined),
+        get: (k: string) => vars.get(k),
+        set: (k: string, v: unknown) => { vars.set(k, v); },
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return ctx as any;
@@ -57,6 +59,20 @@ describe('integrationSecretsMiddleware does not mutate the env it is given', () 
         expect(c.env).not.toBe(original);
         expect(c.env.RESEND_API_KEY).toBe('re_tenant_a');
         expect(c.env.STRIPE_SECRET_KEY).toBe('sk_test_tenant_a');
+    });
+
+    it('records the names, and only the names, of the keys it filled from the stored values', async () => {
+        // The deployment already holds RESEND_API_KEY, so the stored one does not
+        // take its place; STRIPE_SECRET_KEY is tenant-owned and does. Positive
+        // control for the first: it is in the merged env, just not in the list.
+        const original: MutableEnv = { DB: {}, TENANT_CACHE: {}, JWT_SECRET: 'k', RESEND_API_KEY: 're_platform' };
+        const c = fakeContext(original);
+
+        await integrationSecretsMiddleware(c, async () => {});
+
+        expect(c.get('tenantSecretKeys')).toEqual(['STRIPE_SECRET_KEY']);
+        expect(c.env.RESEND_API_KEY).toBe('re_platform');
+        expect(JSON.stringify(c.get('tenantSecretKeys'))).not.toContain('sk_test_tenant_a');
     });
 
     it('keeps the bindings as the same references', async () => {

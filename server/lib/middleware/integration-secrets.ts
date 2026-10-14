@@ -50,7 +50,10 @@ const TENANT_OWNED_KEYS = new Set<string>([
 export function applyIntegrationSecrets(
     env: Record<string, string | undefined>,
     decrypted: Record<string, string | undefined>,
-): void {
+): string[] {
+    // Which keys took the tenant's stored value. A caller that needs to say
+    // where a setting came from reads this instead of re-deriving the rule.
+    const filled: string[] = [];
     for (const key of INTEGRATION_SECRET_KEYS) {
         const dbValue = decrypted[key];
         if (!dbValue) continue;
@@ -61,8 +64,10 @@ export function applyIntegrationSecrets(
         // platform env). Everyone else: env wins, DB is the self-host fallback.
         if (TENANT_OWNED_KEYS.has(key) || envEmpty) {
             env[key] = dbValue;
+            filled.push(key);
         }
     }
+    return filled;
 }
 
 export const integrationSecretsMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) => {
@@ -107,8 +112,11 @@ export const integrationSecretsMiddleware: MiddlewareHandler<HonoConfig> = async
             // stay the same references, only the string slots become per-request.
             const perRequest = { ...c.env };
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            applyIntegrationSecrets(perRequest as any, decrypted as Record<string, string | undefined>);
+            const filled = applyIntegrationSecrets(perRequest as any, decrypted as Record<string, string | undefined>);
             c.env = perRequest;
+            // Names only, never values: the merged env no longer says which
+            // side a setting came from, and the settings page has to.
+            c.set('tenantSecretKeys', filled);
         }
     } catch (err) {
         // Non-fatal: if decryption fails (key rotation, corrupt data),

@@ -306,6 +306,10 @@ type AppVariables = AuthVariables & {
     platformActor?: import('../lib/m2m-auth').PlatformActor;
     /** Present when the request carried a Turnstile token; resolves true once it verifies. */
     humanVerified?: import('../lib/email/outbound-cooling-window').HumanVerifier;
+    /** Names (never values) of the integration secrets `integrationSecretsMiddleware`
+     *  filled from the company's stored values. Absent when it did not run or the
+     *  company has none; every other secret in `c.env` is the deployment's. */
+    tenantSecretKeys?: readonly string[];
 };
 
 /**
