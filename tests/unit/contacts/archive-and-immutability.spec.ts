@@ -55,6 +55,22 @@ describe('ContactService archive + agent-email immutability', () => {
     expect(row?.archivedAt).toBeTruthy();
   });
 
+  it('hard-deleting a contact removes its QuickBooks match; archiving keeps it', async () => {
+    const match = (id: string, oiId: string) => ({
+      id, tenantId: T, oiType: 'contact', oiId, qboType: 'Customer', qboId: `qb-${id}`,
+      qboSyncToken: '0', syncedAt: new Date(),
+    });
+    await db.insert(schema.qboEntityMap).values([match('m-zero', AGENT_ZERO), match('m-ref', AGENT), match('m-client', CLIENT)]);
+
+    await svc.deleteContact(AGENT_ZERO, T);   // unreferenced -> hard delete
+    await svc.deleteContact(AGENT, T);        // referenced -> archive
+
+    const left = (await db.select().from(schema.qboEntityMap).all()).map((r) => r.id).sort();
+    // The hard-deleted contact's match is gone; the archived contact's stays
+    // (positive control), and so does an unrelated contact's.
+    expect(left).toEqual(['m-client', 'm-ref']);
+  });
+
   it('deleteContact HARD-deletes an UNREFERENCED contact (⑤)', async () => {
     await svc.deleteContact(AGENT_ZERO, T);   // on no inspection
     const row = await db.select().from(schema.contacts).where(eq(schema.contacts.id, AGENT_ZERO)).get();

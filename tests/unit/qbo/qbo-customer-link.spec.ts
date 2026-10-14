@@ -220,6 +220,26 @@ describe('linkExistingCustomer when another contact already holds the customer',
         expect(mapRows(TENANT)).toHaveLength(1);
     });
 
+    it('says whether the holder is archived, so the caller can point at the right place to undo it', async () => {
+        qboHas('58');
+        await svc.linkExistingCustomer(TENANT, 'contact-1', '58', ACTOR);
+        await db.update(schema.contacts).set({ archivedAt: T0 })
+            .where(eq(schema.contacts.id, 'contact-1')).run();
+
+        const archivedHolder = await thrownBy(() => svc.linkExistingCustomer(TENANT, 'contact-2', '58', ACTOR));
+
+        expect(archivedHolder.details).toMatchObject({ reason: 'qbo_customer_taken', holderArchived: true });
+    });
+
+    it('reports a live holder as not archived (positive control for the archived flag)', async () => {
+        qboHas('58');
+        await svc.linkExistingCustomer(TENANT, 'contact-1', '58', ACTOR);
+
+        const liveHolder = await thrownBy(() => svc.linkExistingCustomer(TENANT, 'contact-2', '58', ACTOR));
+
+        expect(liveHolder.details).toMatchObject({ holderArchived: false });
+    });
+
     it('is idempotent for the contact that already holds it (positive control)', async () => {
         qboHas('58');
         await svc.linkExistingCustomer(TENANT, 'contact-1', '58', ACTOR);

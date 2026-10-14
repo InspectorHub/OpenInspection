@@ -1,5 +1,6 @@
 import { QBOServiceBase } from './qbo/api-base';
 import { withConnection } from './qbo/connection';
+import { withCustomerSearch } from './qbo/customer-search';
 import { withBootstrap } from './qbo/bootstrap';
 import { withCustomerSync } from './qbo/customer-sync';
 import { withWebhook } from './qbo/webhook';
@@ -14,7 +15,7 @@ export class QBOService extends withCdc(
     withWebhook(
         withCustomerSync(
             withBootstrap(
-                withConnection(QBOServiceBase),
+                withCustomerSearch(withConnection(QBOServiceBase)),
             ),
         ),
     ),

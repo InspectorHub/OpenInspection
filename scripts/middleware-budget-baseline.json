@@ -6,8 +6,8 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 146,
-    "dollarMethods": 567,
+    "files": 147,
+    "dollarMethods": 565,
     "apiWorker": 9
   },
   "fanOut": {
@@ -54,6 +54,10 @@
     "app/lib/portal-notification-preferences.ts": {
       "dollarMethods": 4,
       "apiWorker": 1
+    },
+    "app/lib/qbo-api.server.ts": {
+      "dollarMethods": 0,
+      "apiWorker": 2
     },
     "app/lib/report-section-loader.ts": {
       "dollarMethods": 1,
@@ -496,7 +500,7 @@
       "apiWorker": 0
     },
     "app/routes/settings-compliance.tsx": {
-      "dollarMethods": 7,
+      "dollarMethods": 5,
       "apiWorker": 0
     },
     "app/routes/settings-connected-apps.tsx": {
@@ -537,7 +541,7 @@
     },
     "app/routes/settings-integrations-qbo.tsx": {
       "dollarMethods": 2,
-      "apiWorker": 2
+      "apiWorker": 0
     },
     "app/routes/settings-integrations.tsx": {
       "dollarMethods": 10,

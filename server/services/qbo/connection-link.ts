@@ -26,7 +26,7 @@ export interface ContactLink {
 
 /**
  * A contact id arrives from a request, so it is only ever believed once the row
- * is found under THIS workspace. A foreign id is "not found" -- the same answer
+ * is found under THIS company. A foreign id is "not found" -- the same answer
  * as one that never existed -- so the response cannot confirm that another
  * workspace has such a contact. `live` also refuses an archived contact: nothing
  * new should be pointed at a row the product no longer shows.
@@ -43,12 +43,14 @@ async function requireContact(db: Db, tenantId: string, contactId: string, live:
 
 /** The 409 for a customer another contact already holds -- naming that contact. */
 async function customerTaken(db: Db, tenantId: string, holderContactId: string) {
-    const holder = await db.select({ name: contacts.name }).from(contacts)
+    const holder = await db.select({ name: contacts.name, archivedAt: contacts.archivedAt }).from(contacts)
         .where(and(eq(contacts.id, holderContactId), eq(contacts.tenantId, tenantId))).get();
     const holderName = holder?.name ?? null;
     return Errors.Conflict(
-        `That QuickBooks customer is already linked to ${holderName ?? 'another contact'}`,
-        { reason: 'qbo_customer_taken', holderContactId, holderName },
+        `That QuickBooks customer is already matched to ${holderName ?? 'another contact'}`,
+        // `holderArchived` lets the caller say where the match can be undone: an
+        // archived contact is not listed, so its detail page is the only way in.
+        { reason: 'qbo_customer_taken', holderContactId, holderName, holderArchived: holder?.archivedAt != null },
     );
 }
 
@@ -101,7 +103,7 @@ async function auditUnlinked(
  * handler can only turn into a 500. The caller needs to tell four situations
  * apart, because each one asks the person to do something different.
  */
-function mapQboLookupFailure(err: unknown): unknown {
+export function mapQboLookupFailure(err: unknown): unknown {
     const message = err instanceof Error ? err.message : '';
     const status = (err as { status?: number } | null)?.status;
     if (message.startsWith('No QBO connection') || message.includes('reconnect required') || status === 401 || status === 403) {

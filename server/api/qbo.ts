@@ -4,7 +4,8 @@ import { getCookie } from 'hono/cookie';
 import { verifyJwt } from '../lib/jwt-keyring';
 import { requireRole } from '../lib/middleware/rbac';
 import { logger } from '../lib/logger';
-import { QBOLinkCustomerBodySchema } from '../lib/validations/qbo.schema';
+import { checkRateLimit } from '../lib/rate-limit';
+import { QBOCustomerSearchQuerySchema, QBOLinkCustomerBodySchema } from '../lib/validations/qbo.schema';
 
 const api = new Hono<HonoConfig>();
 
@@ -108,15 +109,74 @@ api.post('/errors/:id/dismiss', async (c) => {
     return c.json({ success: true });
 });
 
+/**
+ * Find the QuickBooks customer a contact should be matched to. Read-only, but
+ * every call is an Intuit API call made under this company's credentials, so it
+ * is rate limited per company (not per caller address) and the search text is
+ * bounded by the schema before any call is made.
+ */
+api.get('/customers', async (c) => {
+    const parsed = QBOCustomerSearchQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) return c.json({ success: false, error: { code: 'validation_error', message: 'Invalid query' } }, 400);
+    const tenantId = c.get('tenantId');
+    await checkRateLimit(c, 'qbo-customer-search', tenantId);
+    const found = await c.var.services.qbo.searchCustomers(tenantId, parsed.data.q, parsed.data.startPosition, parsed.data.limit);
+    // Spelled out field by field: the browser gets exactly these and nothing a
+    // future change to the service row might add.
+    const customers = found.customers.map((r) => ({
+        id: r.id,
+        displayName: r.displayName,
+        companyName: r.companyName,
+        email: r.email,
+        phone: r.phone,
+        active: r.active,
+        linkedContactId: r.linkedContactId,
+        linkedContactName: r.linkedContactName,
+    }));
+    return c.json({ success: true, data: { customers, nextStartPosition: found.nextStartPosition } });
+});
+
+api.get('/contacts/:contactId/link', async (c) => {
+    const link = await c.var.services.qbo.getContactLink(c.get('tenantId'), c.req.param('contactId'));
+    return c.json({
+        success: true,
+        data: {
+            linked: link.linked,
+            qboCustomerId: link.qboCustomerId,
+            displayName: link.displayName,
+            openErrorCount: link.openErrorCount,
+        },
+    });
+});
+
+// Safe to repeat: matching a contact to the customer it already holds rewrites
+// the same row and reports replacedQboCustomerId: null.
 api.post('/contacts/:contactId/link', async (c) => {
     const parsed = QBOLinkCustomerBodySchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ success: false, error: { code: 'validation_error', message: 'Invalid body' } }, 400);
     // The actor is recorded in the audit trail, so a request with no verified
-    // user behind it is refused rather than written as an anonymous link.
+    // user behind it is refused rather than written as an anonymous match.
     const actorUserId = c.get('user')?.sub;
     if (!actorUserId) return c.json({ success: false, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
-    await c.var.services.qbo.linkExistingCustomer(c.get('tenantId'), c.req.param('contactId'), parsed.data.qboCustomerId, actorUserId);
-    return c.json({ success: true });
+    const result = await c.var.services.qbo.linkExistingCustomer(c.get('tenantId'), c.req.param('contactId'), parsed.data.qboCustomerId, actorUserId);
+    return c.json({
+        success: true,
+        data: {
+            qboCustomerId: result.qboCustomerId,
+            displayName: result.displayName,
+            replacedQboCustomerId: result.replacedQboCustomerId,
+            resolvedErrorCount: result.resolvedErrorCount,
+        },
+    });
+});
+
+// Safe to repeat: removing a match that is already gone answers removed: false.
+// Nothing is sent to QuickBooks.
+api.delete('/contacts/:contactId/link', async (c) => {
+    const actorUserId = c.get('user')?.sub;
+    if (!actorUserId) return c.json({ success: false, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
+    const result = await c.var.services.qbo.unlinkCustomer(c.get('tenantId'), c.req.param('contactId'), actorUserId);
+    return c.json({ success: true, data: { removed: result.removed } });
 });
 
 export default api;

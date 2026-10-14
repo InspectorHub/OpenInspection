@@ -463,7 +463,7 @@ describe('linkExistingCustomer maps a contact onto a QuickBooks customer', () =>
         // Whoever picked the customer is the one who reads this message; it has
         // to say which contact already holds it.
         await expect(svc.linkExistingCustomer(TENANT, 'contact-2', '58', ACTOR))
-            .rejects.toThrow(/already linked to Alice Adams/i);
+            .rejects.toThrow(/already matched to Alice Adams/i);
         expect(db.select().from(schema.qboEntityMap).all()).toHaveLength(1);
     });
 
