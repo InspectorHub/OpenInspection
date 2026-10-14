@@ -1,8 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Form } from "react-router";
 import { SegmentedControl, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { SecretField } from "~/components/SecretField";
 import { QboRegistrationUrls } from "~/components/settings/QboRegistrationUrls";
+import {
+  QboCheckButton,
+  QboCheckResult,
+  qboCheckMissing,
+  useQboCredentialCheck,
+} from "~/components/settings/QboCredentialCheck";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 import type { QboEnvironment, QboRegistration } from "~/lib/qbo-settings-loader";
@@ -57,8 +63,8 @@ function BuiltInRow({ labelId, label, value, onOverride }: { labelId: string; la
 }
 
 function CredentialField({
-  name, label, hint, value, origin,
-}: { name: string; label: string; hint: string; value: string; origin: QBOCredentialOrigin }) {
+  name, label, hint, value, origin, onTyped,
+}: { name: string; label: string; hint: string; value: string; origin: QBOCredentialOrigin; onTyped: (typed: string) => void }) {
   const [overriding, setOverriding] = useState(false);
   const fromEnv = origin === "env";
   if (fromEnv && !overriding && !value) {
@@ -70,6 +76,7 @@ function CredentialField({
       label={label}
       value={value}
       hint={hint}
+      onChange={onTyped}
       {...(fromEnv
         ? { emptyPlaceholder: m.settings_qbo_env_provided(), emptyBadge: m.settings_qbo_env_provided_badge() }
         : {})}
@@ -171,13 +178,28 @@ export function QboCredentialsForm({
   defaultOpen?: boolean;
 }) {
   const latch = useSubmitLatch();
+  const check = useQboCredentialCheck();
+  const checkMissing = qboCheckMissing(credentialSource, registration);
   const [innerOpen, setInnerOpen] = useState(defaultOpen ?? qboNeedsSetup(credentialSource, environment));
   const isOpen = open ?? innerOpen;
   const setOpen = (next: boolean) => {
+    // Folding the section unmounts the inputs, and the text typed in them goes
+    // with them: what counts as pending has to go too.
+    if (!next) setTyped({});
     setInnerOpen(next);
     onOpenChange?.(next);
   };
   const [envChoice, setEnvChoice] = useState<QboEnvironment | "">("");
+  // What has been typed and not saved yet, by field. A save changes the stored
+  // values the loader hands back, which is when the edits stop being pending.
+  const [typed, setTyped] = useState<Record<string, string>>({});
+  // Picking the environment already in force changes nothing, so it is not pending.
+  const unsaved = (envChoice !== "" && envChoice !== environment) || Object.values(typed).some((v) => v.trim() !== "");
+  useEffect(() => {
+    setTyped({});
+    setEnvChoice("");
+  }, [secrets.QBO_CLIENT_ID, secrets.QBO_CLIENT_SECRET, secrets.QBO_WEBHOOK_SECRET, environment]);
+  const onTyped = (name: string) => (value: string) => setTyped((prev) => ({ ...prev, [name]: value }));
 
   return (
     <section
@@ -200,16 +222,21 @@ export function QboCredentialsForm({
             <span>{summarySentence(credentialSource)}</span>
           </p>
         </div>
-        <button
-          type="button"
-          aria-expanded={isOpen}
-          aria-controls="qbo-app-body"
-          onClick={() => setOpen(!isOpen)}
-          className="px-3 py-1.5 text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-md transition-colors"
-        >
-          {isOpen ? m.settings_qbo_app_hide() : m.settings_qbo_app_show()}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {!isOpen && <QboCheckButton missing={checkMissing} busy={check.busy} onRun={check.run} unsaved={unsaved} />}
+          <button
+            type="button"
+            aria-expanded={isOpen}
+            aria-controls="qbo-app-body"
+            onClick={() => setOpen(!isOpen)}
+            className="px-3 py-1.5 text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-md transition-colors"
+          >
+            {isOpen ? m.settings_qbo_app_hide() : m.settings_qbo_app_show()}
+          </button>
+        </div>
       </div>
+
+      {!isOpen && <QboCheckResult outcome={check.outcome} />}
 
       {isOpen && (
         <div id="qbo-app-body" className="space-y-6">
@@ -225,7 +252,7 @@ export function QboCredentialsForm({
             </a>
             .
           </p>
-          <Form method="post" className="space-y-4 max-w-xl" onSubmit={latch()}>
+          <Form method="post" className="space-y-4 max-w-xl" onChange={check.clear} onSubmit={latch(check.clear)}>
             <input type="hidden" name="intent" value="save-qbo-secrets" />
             <input type="hidden" name="QBO_ENV" value={envChoice} />
             <CredentialField
@@ -234,6 +261,7 @@ export function QboCredentialsForm({
               value={secrets.QBO_CLIENT_ID}
               hint={m.settings_qbo_client_id_hint()}
               origin={credentialSource.clientId}
+              onTyped={onTyped("QBO_CLIENT_ID")}
             />
             <CredentialField
               name="QBO_CLIENT_SECRET"
@@ -241,6 +269,7 @@ export function QboCredentialsForm({
               value={secrets.QBO_CLIENT_SECRET}
               hint={m.settings_qbo_client_secret_hint()}
               origin={credentialSource.clientSecret}
+              onTyped={onTyped("QBO_CLIENT_SECRET")}
             />
             <CredentialField
               name="QBO_WEBHOOK_SECRET"
@@ -248,14 +277,19 @@ export function QboCredentialsForm({
               value={secrets.QBO_WEBHOOK_SECRET}
               hint={m.settings_qbo_webhook_hint()}
               origin={credentialSource.webhookToken}
+              onTyped={onTyped("QBO_WEBHOOK_SECRET")}
             />
             <EnvironmentField
               known={environment}
               origin={credentialSource.environment}
               choice={envChoice}
-              onChoose={setEnvChoice}
+              onChoose={(e) => {
+                setEnvChoice(e);
+                check.clear();
+              }}
             />
-            <div className="flex justify-end pt-2 border-t border-ih-border">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-ih-border">
+              <QboCheckButton missing={checkMissing} busy={check.busy} onRun={check.run} unsaved={unsaved} />
               <button
                 type="submit"
                 {...pendingProps(saving)}
@@ -265,6 +299,7 @@ export function QboCredentialsForm({
               </button>
             </div>
           </Form>
+          <QboCheckResult outcome={check.outcome} />
 
           <div className="space-y-2">
             <h3 className="text-[14px] font-bold text-ih-fg-1">{m.settings_qbo_urls_heading()}</h3>

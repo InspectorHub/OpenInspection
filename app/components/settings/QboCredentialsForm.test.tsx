@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, within, act, waitFor } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 import { QboCredentialsForm, qboReadyToConnect } from "./QboCredentialsForm";
 import { buildRegistration } from "~/lib/qbo-settings-loader";
+import type { QboCheckOutcome } from "~/lib/qbo-credential-check";
 import type { QBOCredentialSource } from "../../../server/services/qbo/api-base";
 
 afterEach(cleanup);
@@ -135,6 +136,74 @@ describe("qboReadyToConnect", () => {
   });
 });
 
+describe("QboCredentialsForm - checking while edits are unsaved", () => {
+  const checkButton = () => screen.getByRole("button", { name: /check credentials/i });
+
+  it("is available when nothing has been typed (control for the cases below)", async () => {
+    view();
+    expect(await screen.findByRole("button", { name: /check credentials/i })).not.toBeDisabled();
+    expect(screen.queryByText(/Save your changes first/)).not.toBeInTheDocument();
+  });
+
+  it("is disabled, and says to save first, once a field has text that is not saved", async () => {
+    view();
+    fireEvent.click(await screen.findByRole("button", { name: "Show details" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Override" })[0]);
+    fireEvent.change(await screen.findByLabelText(/client id/i), { target: { value: "typed-but-not-saved" } });
+
+    expect(checkButton()).toBeDisabled();
+    expect(screen.getByText("Save your changes first, then check.")).toBeInTheDocument();
+  });
+
+  it("is available again when the typed text is cleared", async () => {
+    view();
+    fireEvent.click(await screen.findByRole("button", { name: "Show details" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Override" })[0]);
+    const field = await screen.findByLabelText(/client id/i);
+    fireEvent.focus(field);
+    fireEvent.change(field, { target: { value: "abc" } });
+    fireEvent.change(field, { target: { value: "" } });
+
+    expect(checkButton()).not.toBeDisabled();
+  });
+
+  it("is disabled after choosing an environment that has not been saved", async () => {
+    // Everything else is in place, so only the unsaved choice can be what disables it.
+    view({ credentialSource: { ...NONE, clientId: "tenant", clientSecret: "tenant" }, environment: null });
+    await screen.findByRole("radiogroup", { name: /intuit environment/i });
+    expect(screen.getByRole("button", { name: /check credentials/i })).not.toBeDisabled();
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: /intuit environment/i })).getByRole("radio", { name: /production/i }));
+
+    expect(screen.getByRole("button", { name: /check credentials/i })).toBeDisabled();
+  });
+
+  it("is available again after folding the section on text that was never saved", async () => {
+    view();
+    fireEvent.click(await screen.findByRole("button", { name: "Show details" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Override" })[0]);
+    fireEvent.change(await screen.findByLabelText(/client id/i), { target: { value: "typed-then-folded" } });
+    expect(checkButton()).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide details" }));
+
+    // The input is gone and its text with it, so nothing is pending any more.
+    expect(checkButton()).not.toBeDisabled();
+    expect(screen.queryByText(/Save your changes first/)).not.toBeInTheDocument();
+  });
+
+  it("does not count pressing the environment already in force as an edit", async () => {
+    view({ credentialSource: { ...NONE, clientId: "tenant", clientSecret: "tenant" }, environment: "sandbox" });
+    const group = await screen.findByRole("radiogroup", { name: /intuit environment/i });
+
+    fireEvent.click(within(group).getByRole("radio", { name: /sandbox/i }));
+    expect(screen.getByRole("button", { name: /check credentials/i })).not.toBeDisabled();
+
+    // Control: a different environment still is one.
+    fireEvent.click(within(group).getByRole("radio", { name: /production/i }));
+    expect(screen.getByRole("button", { name: /check credentials/i })).toBeDisabled();
+  });
+});
+
 describe("QboCredentialsForm - the Intuit environment", () => {
   const env = () => screen.getByRole("radiogroup", { name: /intuit environment/i });
   const hidden = (container: HTMLElement) => container.querySelector<HTMLInputElement>('input[type="hidden"][name="QBO_ENV"]');
@@ -211,5 +280,214 @@ describe("QboCredentialsForm - saving", () => {
     expect(toggle()).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(toggle());
     expect(toggle()).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+describe("QboCredentialsForm - Check credentials", () => {
+  const CHECKED_AT = 1760400000; // 2025-10-14, epoch seconds
+  const OVERPROMISE = /\bvalid\b|production[- ]ready|ready to connect/i;
+  // Opens the section on its own (the webhook token is missing) so the footer button shows.
+  const OPEN: QBOCredentialSource = { ...ALL_ENV, webhookToken: "missing" };
+  const check = () => screen.getByRole("button", { name: /^(Check credentials|Checking…)$/ });
+  const panelOf = (text: string | RegExp) => screen.getByText(text).closest("[role]") as HTMLElement;
+  const PAIRED: QboCheckOutcome = { kind: "paired", checkedAt: CHECKED_AT };
+
+  function viewCheck(
+    outcome: QboCheckOutcome,
+    over: Partial<React.ComponentProps<typeof QboCredentialsForm>> = {},
+  ) {
+    const posted: FormData[] = [];
+    const props: React.ComponentProps<typeof QboCredentialsForm> = {
+      secrets: NO_SECRETS,
+      credentialSource: ALL_ENV,
+      environment: "sandbox",
+      registration: buildRegistration("https://dev.example.com"),
+      saving: false,
+      ...over,
+    };
+    const Stub = createRoutesStub([
+      {
+        path: "/",
+        Component: () => <QboCredentialsForm {...props} />,
+        action: async ({ request }) => {
+          posted.push(await request.formData());
+          return { success: true, intent: "qbo-check-credentials", error: null, check: outcome };
+        },
+      },
+    ]);
+    render(<Stub initialEntries={["/"]} />);
+    return posted;
+  }
+
+  it("paired: says Intuit accepted them, in the success style, with BOTH limits and no over-promise", async () => {
+    const posted = viewCheck(PAIRED);
+    fireEvent.click(check());
+    await screen.findByText("Intuit accepted this Client ID and secret.");
+    const banner = panelOf("Intuit accepted this Client ID and secret.");
+    expect(banner.className).toContain("bg-ih-ok-bg");
+    expect(banner).toHaveTextContent("This does not show whether they are Development or Production keys. Sandbox companies need Development keys.");
+    expect(banner).toHaveTextContent("It does not check that the Redirect URI is registered in your Intuit app.");
+    expect(banner).toHaveTextContent(/Checked at .*2025/);
+    expect(banner.textContent).not.toMatch(OVERPROMISE);
+    // The request names the intent plus the guard's idempotency key, and no credential.
+    expect([...posted[0].keys()].sort()).toEqual(["idempotencyKey", "intent"]);
+    expect(posted[0].get("intent")).toBe("qbo-check-credentials");
+  });
+
+  it("rejected: danger style, the copy-again advice, and no over-promise either (control for paired)", async () => {
+    viewCheck({ kind: "rejected", checkedAt: CHECKED_AT });
+    fireEvent.click(check());
+    const text = "Intuit rejected this Client ID and secret. Copy them again from your app's Keys & credentials page.";
+    await screen.findByText(text);
+    const banner = panelOf(text);
+    expect(banner.className).toContain("bg-ih-bad-bg");
+    expect(banner.textContent).not.toMatch(OVERPROMISE);
+    expect(banner).not.toHaveTextContent("accepted");
+    expect(banner).not.toHaveTextContent("does not check that the Redirect URI");
+  });
+
+  it("unreachable: warning style, and never suggests the credentials are wrong", async () => {
+    viewCheck({ kind: "unreachable", checkedAt: CHECKED_AT });
+    fireEvent.click(check());
+    await screen.findByText("Could not reach Intuit. Try again in a minute.");
+    const banner = panelOf("Could not reach Intuit. Try again in a minute.");
+    expect(banner.className).toContain("bg-ih-watch-bg");
+    expect(banner.textContent).not.toMatch(/reject|wrong|incorrect|invalid|copy them|mismatch/i);
+    expect(banner.textContent).not.toMatch(OVERPROMISE);
+  });
+
+  it("says what the server declined for: rate limit, missing settings by name, no public address", async () => {
+    viewCheck({ kind: "rate_limited" });
+    fireEvent.click(check());
+    expect(await screen.findByText("Too many checks. Wait a minute and try again.")).toBeInTheDocument();
+    cleanup();
+
+    viewCheck({ kind: "credentials_missing", missing: ["QBO_CLIENT_ID", "QBO_CLIENT_SECRET"] });
+    fireEvent.click(check());
+    expect(await screen.findByText("These settings are not set yet: Client ID, Client secret.")).toBeInTheDocument();
+    cleanup();
+
+    viewCheck({ kind: "app_base_url_missing" });
+    fireEvent.click(check());
+    expect(await screen.findByText(/Set APP_BASE_URL and try again/)).toBeInTheDocument();
+    cleanup();
+
+    viewCheck({ kind: "failed" });
+    fireEvent.click(check());
+    const failed = await screen.findByText("The check could not run. Try again in a minute.");
+    expect(failed.textContent).not.toMatch(/reject|wrong|invalid/i);
+  });
+
+  it("is disabled, naming what is missing, while the Client ID, secret or public address is not set", async () => {
+    viewCheck(PAIRED, { credentialSource: { ...ALL_ENV, clientId: "missing" } });
+    expect(check()).toBeDisabled();
+    expect(screen.getByText("To check, first set: Client ID.")).toBeInTheDocument();
+    cleanup();
+
+    viewCheck(PAIRED, { credentialSource: NONE, registration: null, environment: null });
+    expect(check()).toBeDisabled();
+    expect(screen.getByText("To check, first set: Client ID, Client secret, Public address (APP_BASE_URL).")).toBeInTheDocument();
+  });
+
+  it("is enabled, with no missing-settings note, when everything is in place (control)", async () => {
+    viewCheck(PAIRED);
+    expect(check()).toBeEnabled();
+    expect(screen.queryByText(/To check, first set/)).not.toBeInTheDocument();
+  });
+
+  it("shows one button on the summary row when folded, and one beside Save credentials when open", async () => {
+    viewCheck(PAIRED);
+    expect(screen.getAllByRole("button", { name: "Check credentials" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Save credentials" })).not.toBeInTheDocument();
+    cleanup();
+
+    viewCheck(PAIRED, { credentialSource: OPEN });
+    expect(screen.getAllByRole("button", { name: "Check credentials" })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Save credentials" })).toBeInTheDocument();
+    // Secondary, so it does not compete with Save.
+    expect(check().className).not.toContain("bg-ih-primary ");
+  });
+
+  it("sends one request for two clicks in one frame", async () => {
+    const posted = viewCheck(PAIRED);
+    const button = check();
+    act(() => {
+      button.click();
+      button.click();
+    });
+    expect(await screen.findByText("Intuit accepted this Client ID and secret.")).toBeInTheDocument();
+    expect(posted).toHaveLength(1);
+    // A later, separate press still goes through.
+    fireEvent.click(check());
+    await waitFor(() => expect(posted).toHaveLength(2));
+  });
+
+  it("reads Checking… and is inert while a check runs", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => { release = r; });
+    const Stub = createRoutesStub([
+      {
+        path: "/",
+        Component: () => (
+          <QboCredentialsForm
+            secrets={NO_SECRETS} credentialSource={ALL_ENV} environment="sandbox"
+            registration={buildRegistration("https://dev.example.com")} saving={false}
+          />
+        ),
+        action: async () => {
+          await gate;
+          return { success: true, intent: "qbo-check-credentials", error: null, check: PAIRED };
+        },
+      },
+    ]);
+    render(<Stub initialEntries={["/"]} />);
+    fireEvent.click(check());
+    const busy = await screen.findByRole("button", { name: "Checking…" });
+    expect(busy).toHaveAttribute("aria-disabled", "true");
+    release();
+    expect(await screen.findByRole("button", { name: "Check credentials" })).not.toHaveAttribute("aria-disabled");
+  });
+
+  it("drops the result as soon as a credential field is edited (and keeps it before that)", async () => {
+    viewCheck(PAIRED, {
+      credentialSource: { ...OPEN, clientId: "tenant" },
+      secrets: { ...NO_SECRETS, QBO_CLIENT_ID: "AB7B••••••••xyz1" },
+    });
+    fireEvent.click(check());
+    await screen.findByText("Intuit accepted this Client ID and secret.");
+
+    const field = screen.getByLabelText(/client id/i);
+    fireEvent.focus(field);
+    fireEvent.change(field, { target: { value: "brand-new-id" } });
+    expect(screen.queryByText("Intuit accepted this Client ID and secret.")).not.toBeInTheDocument();
+
+    // The check reads what is saved, so it is not offered while there is text that is not.
+    expect(check()).toBeDisabled();
+    // With the text gone again, a fresh check shows a fresh answer.
+    fireEvent.change(field, { target: { value: "" } });
+    fireEvent.click(check());
+    expect(await screen.findByText("Intuit accepted this Client ID and secret.")).toBeInTheDocument();
+  });
+
+  it("drops the result when the environment is chosen", async () => {
+    viewCheck(PAIRED, { credentialSource: { ...NONE, clientId: "tenant", clientSecret: "tenant" }, environment: null });
+    fireEvent.click(check());
+    await screen.findByText("Intuit accepted this Client ID and secret.");
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: /intuit environment/i })).getByRole("radio", { name: "Production" }));
+    expect(screen.queryByText("Intuit accepted this Client ID and secret.")).not.toBeInTheDocument();
+  });
+
+  it("never prints a credential value in the result", async () => {
+    viewCheck(PAIRED, {
+      credentialSource: { ...OPEN, clientId: "tenant" },
+      secrets: { ...NO_SECRETS, QBO_CLIENT_ID: "AB7B••••••••xyz1" },
+    });
+    // Control: the stored value, masked, is on the page in its field.
+    expect(document.body.innerHTML).toContain("AB7B");
+    fireEvent.click(check());
+    await screen.findByText("Intuit accepted this Client ID and secret.");
+    const banner = panelOf("Intuit accepted this Client ID and secret.");
+    expect(banner.textContent).not.toContain("AB7B");
+    expect(banner.textContent).not.toContain("xyz1");
   });
 });

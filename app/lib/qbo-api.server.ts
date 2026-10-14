@@ -29,7 +29,9 @@ export async function qboApiFetch(
       method,
       headers: { Cookie: caller.cookie, Authorization: `Bearer ${caller.token}` },
     });
-    return env.API_WORKER ? env.API_WORKER.fetch(req) : fetch(req);
+    // Awaited so that a failed request lands in the catch below: returning the
+    // promise itself would hand the caller a rejection instead of `null`.
+    return await (env.API_WORKER ? env.API_WORKER.fetch(req) : fetch(req));
   } catch {
     return null;
   }

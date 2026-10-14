@@ -7,6 +7,7 @@ import type { Route } from "./+types/settings-integrations-qbo";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { qboApiFetch, qboCaller } from "~/lib/qbo-api.server";
+import { runCredentialCheck } from "~/lib/qbo-credential-check.server";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { getDeploymentProfile } from "../../server/lib/deployment-profile";
@@ -209,6 +210,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     // The id travels back so the page can drop exactly the row the server
     // closed, rather than re-deriving it from client state.
     return { success: true, intent, error: null, syncEnabled: undefined, errorId };
+  }
+
+  // Tests the credentials the server already holds. No body goes out and none
+  // comes back: the result is a small closed set, drawn by the credentials form.
+  if (intent === "qbo-check-credentials") {
+    const check = await runCredentialCheck(context, caller);
+    const answered = check.kind === "paired" || check.kind === "rejected" || check.kind === "unreachable";
+    return { success: answered, intent, error: null, syncEnabled: undefined, check };
   }
 
   if (intent === "qbo-sync" || intent === "qbo-pause" || intent === "qbo-disconnect") {

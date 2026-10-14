@@ -433,5 +433,20 @@
   "settings_qbo_action_failed_sync": "Could not start the sync. Try again.",
   "settings_qbo_action_failed_pause": "Could not change automatic sync. Try again.",
   "settings_qbo_action_failed_disconnect": "Could not disconnect from QuickBooks. Try again.",
-  "settings_qbo_action_failed_dismiss": "Could not dismiss this item. Try again."
+  "settings_qbo_action_failed_dismiss": "Could not dismiss this item. Try again.",
+  "settings_qbo_check_button": "Check credentials",
+  "settings_qbo_check_unsaved": "Save your changes first, then check.",
+  "settings_qbo_check_checking": "Checking…",
+  "settings_qbo_check_needs": "To check, first set: {list}.",
+  "settings_qbo_check_need_base_url": "Public address (APP_BASE_URL)",
+  "settings_qbo_check_paired": "Intuit accepted this Client ID and secret.",
+  "settings_qbo_check_paired_limit_keys": "This does not show whether they are Development or Production keys. Sandbox companies need Development keys.",
+  "settings_qbo_check_paired_limit_redirect": "It does not check that the Redirect URI is registered in your Intuit app.",
+  "settings_qbo_check_rejected": "Intuit rejected this Client ID and secret. Copy them again from your app's Keys & credentials page.",
+  "settings_qbo_check_unreachable": "Could not reach Intuit. Try again in a minute.",
+  "settings_qbo_check_rate_limited": "Too many checks. Wait a minute and try again.",
+  "settings_qbo_check_server_missing": "These settings are not set yet: {list}.",
+  "settings_qbo_check_no_base_url": "The public address of this server is not set, so the check cannot run. Set APP_BASE_URL and try again.",
+  "settings_qbo_check_failed": "The check could not run. Try again in a minute.",
+  "settings_qbo_check_at": "Checked at {time}"
 }

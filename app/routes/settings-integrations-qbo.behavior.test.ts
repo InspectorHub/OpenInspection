@@ -243,3 +243,69 @@ describe("QuickBooks settings route - the other actions", () => {
     expect(seen).toHaveLength(0);
   });
 });
+
+describe("QuickBooks settings route - check credentials", () => {
+  const CHECK = "POST /api/integrations/qbo/credentials/check";
+  const SECRET = "intuit-client-secret-value";
+  const answer = (status: number, body: unknown) => ({ [CHECK]: () => jsonResponse(status, body) });
+  const errorBody = (code: string, details?: unknown) => ({ success: false, error: { code, message: `server text for ${code}`, details } });
+
+  it.each(["paired", "rejected", "unreachable"] as const)("maps a 200 %s answer through with its time", async (kind) => {
+    routedFetch(answer(200, { success: true, data: { result: kind, environment: "sandbox", checkedAt: 1760400000 } }));
+    const result = await run({ intent: "qbo-check-credentials" });
+    expect(result).toMatchObject({ success: true, intent: "qbo-check-credentials", error: null, check: { kind, checkedAt: 1760400000 } });
+  });
+
+  it("sends a bodiless POST to the check path, and takes no credentials from the form", async () => {
+    const seen = routedFetch(answer(200, { data: { result: "paired", environment: null, checkedAt: 1 } }));
+    await run({ intent: "qbo-check-credentials", QBO_CLIENT_ID: "typed-id", QBO_CLIENT_SECRET: SECRET });
+    expect(seen).toEqual([{ method: "POST", path: "/api/integrations/qbo/credentials/check", body: null }]);
+  });
+
+  it("names the missing settings when the server declines for them, and drops anything it cannot name", async () => {
+    routedFetch(answer(400, errorBody("credentials_missing", ["QBO_CLIENT_SECRET", "SOMETHING_ELSE"])));
+    const result = await run({ intent: "qbo-check-credentials" });
+    expect(result).toMatchObject({ success: false, check: { kind: "credentials_missing", missing: ["QBO_CLIENT_SECRET"] } });
+    expect(JSON.stringify(result)).not.toContain("SOMETHING_ELSE");
+    expect(JSON.stringify(result)).not.toContain("server text");
+  });
+
+  it("reports a missing public address, a rate limit and a failure each as themselves", async () => {
+    routedFetch(answer(400, errorBody("app_base_url_missing")));
+    expect(await run({ intent: "qbo-check-credentials" })).toMatchObject({ success: false, check: { kind: "app_base_url_missing" } });
+
+    routedFetch(answer(429, errorBody("rate_limited")));
+    expect(await run({ intent: "qbo-check-credentials" })).toMatchObject({ success: false, check: { kind: "rate_limited" } });
+
+    // A 429 whose body is not JSON is still a rate limit.
+    routedFetch({ [CHECK]: () => jsonResponse(429, null) });
+    expect(await run({ intent: "qbo-check-credentials" })).toMatchObject({ check: { kind: "rate_limited" } });
+
+    for (const status of [401, 403, 500]) {
+      routedFetch(answer(status, errorBody("server_error")));
+      expect(await run({ intent: "qbo-check-credentials" })).toMatchObject({ success: false, check: { kind: "failed" } });
+    }
+  });
+
+  it("treats a network failure, and an answer it does not understand, as a failed check - never as a rejection", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("socket hang up"); }));
+    const down = await run({ intent: "qbo-check-credentials" });
+    expect(down).toMatchObject({ success: false, check: { kind: "failed" } });
+
+    routedFetch(answer(200, { success: true, data: { result: "maybe", checkedAt: 1 } }));
+    expect(await run({ intent: "qbo-check-credentials" })).toMatchObject({ check: { kind: "failed" } });
+    routedFetch(answer(200, { success: true, data: { result: "paired" } }));
+    expect(await run({ intent: "qbo-check-credentials" })).toMatchObject({ check: { kind: "failed" } });
+  });
+
+  it("returns no credential, whatever the server put in its answer", async () => {
+    routedFetch(answer(200, {
+      success: true,
+      data: { result: "rejected", environment: "sandbox", checkedAt: 5, clientSecret: SECRET, clientId: "leaky-id" },
+    }));
+    const result = await run({ intent: "qbo-check-credentials", QBO_CLIENT_SECRET: SECRET });
+    expect(result.check).toEqual({ kind: "rejected", checkedAt: 5 });
+    expect(JSON.stringify(result)).not.toContain(SECRET);
+    expect(JSON.stringify(result)).not.toContain("leaky-id");
+  });
+});

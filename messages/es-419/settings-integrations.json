@@ -433,5 +433,20 @@
   "settings_qbo_action_failed_sync": "No se pudo iniciar la sincronización. Inténtelo de nuevo.",
   "settings_qbo_action_failed_pause": "No se pudo cambiar la sincronización automática. Inténtelo de nuevo.",
   "settings_qbo_action_failed_disconnect": "No se pudo desconectar de QuickBooks. Inténtelo de nuevo.",
-  "settings_qbo_action_failed_dismiss": "No se pudo descartar este elemento. Inténtelo de nuevo."
+  "settings_qbo_action_failed_dismiss": "No se pudo descartar este elemento. Inténtelo de nuevo.",
+  "settings_qbo_check_button": "Comprobar las credenciales",
+  "settings_qbo_check_unsaved": "Guarde sus cambios primero y luego compruebe.",
+  "settings_qbo_check_checking": "Comprobando…",
+  "settings_qbo_check_needs": "Para comprobar, defina primero: {list}.",
+  "settings_qbo_check_need_base_url": "Dirección pública (APP_BASE_URL)",
+  "settings_qbo_check_paired": "Intuit aceptó este Client ID y este secreto.",
+  "settings_qbo_check_paired_limit_keys": "Esto no indica si son claves de Development o de Production. Las empresas de prueba (sandbox) necesitan claves de Development.",
+  "settings_qbo_check_paired_limit_redirect": "Tampoco comprueba que el Redirect URI esté registrado en su aplicación de Intuit.",
+  "settings_qbo_check_rejected": "Intuit rechazó este Client ID y este secreto. Cópielos de nuevo desde la página Keys & credentials de su aplicación.",
+  "settings_qbo_check_unreachable": "No se pudo contactar con Intuit. Inténtelo de nuevo en un minuto.",
+  "settings_qbo_check_rate_limited": "Demasiadas comprobaciones. Espere un minuto e inténtelo de nuevo.",
+  "settings_qbo_check_server_missing": "Estos ajustes aún no están definidos: {list}.",
+  "settings_qbo_check_no_base_url": "No se ha definido la dirección pública de este servidor, por lo que no se puede comprobar. Defina APP_BASE_URL e inténtelo de nuevo.",
+  "settings_qbo_check_failed": "No se pudo realizar la comprobación. Inténtelo de nuevo en un minuto.",
+  "settings_qbo_check_at": "Comprobado el {time}"
 }
