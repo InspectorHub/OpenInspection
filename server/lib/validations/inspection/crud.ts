@@ -267,8 +267,8 @@ export const CancelInspectionSchema = z.object({
 // Round-2 F1 — per-recipient delivery selection. Each recipient row chooses
 // zero-or-more channels. Empty `channels` means "skip this recipient".
 const PublishRecipientSchema = z.object({
-  contactId: z.string().nullable().describe('TODO describe contactId field for the OpenInspection MCP integration'),
-  channels:  z.array(z.enum(['email', 'text'])).default([]).describe('TODO describe channels field for the OpenInspection MCP integration'),
+  contactId: z.string().nullable().describe('Contact the report is addressed to; null for an ad-hoc recipient. Accepted but not used by the publish route.'),
+  channels:  z.array(z.enum(['email', 'text'])).default([]).describe('Channels to deliver through; empty skips the recipient. Accepted but not used by the publish route.'),
 }).openapi('PublishRecipient');
 
 // F79 — there are deliberately NO `notifyClient` / `notifyAgent` fields here.
@@ -280,22 +280,22 @@ const PublishRecipientSchema = z.object({
 // ignored — no 400, no contract break. Do not re-add them to give the UI
 // something to bind to; the UI now names the automation rules instead.
 export const PublishInspectionSchema = z.object({
-  theme: z.enum(['modern', 'classic', 'minimal']).default('modern').describe('TODO describe theme field for the OpenInspection MCP integration'),
-  requireSignature: z.boolean().default(false).describe('TODO describe requireSignature field for the OpenInspection MCP integration'),
-  requirePayment: z.boolean().default(false).describe('TODO describe requirePayment field for the OpenInspection MCP integration'),
+  theme: z.enum(['modern', 'classic', 'minimal']).default('modern').describe('Report theme. Accepted but not used: the publish route ignores it.'),
+  requireSignature: z.boolean().default(false).describe('Signature requirement flag. Accepted but not used: the publish route ignores it.'),
+  requirePayment: z.boolean().default(false).describe('Payment requirement flag. Accepted but not used: the publish route ignores it.'),
   // Round-2 F1 — multi-recipient publish modal payload. Optional because
   // legacy clients still post the flat shape above. When present, the
   // server uses this list to drive per-recipient delivery (email + text).
-  recipients: z.array(PublishRecipientSchema).optional().describe('TODO describe recipients field for the OpenInspection MCP integration'),
+  recipients: z.array(PublishRecipientSchema).optional().describe('Per-recipient delivery choices. Accepted but not used: who is notified is decided by the report.published automation rules.'),
   // Whether the modal sent a copy of the agreement alongside the report.
   // Stored only for audit/notification fan-out — does not change how the
   // report itself is built.
-  sendAgreementCopy: z.boolean().default(false).describe('TODO describe sendAgreementCopy field for the OpenInspection MCP integration'),
+  sendAgreementCopy: z.boolean().default(false).describe('Whether to send a copy of the agreement with the report. Accepted but not used by the publish route.'),
   // Design System 0520 subsystem D phase 9 — Republish summary.
   // Free-text "what changed" note attached to the new report_versions row
   // created by ReportVersionService.snapshotOnPublish during this publish.
   // Optional; max 500 chars. NULL on first publish.
-  summary: z.string().max(500).optional().describe('TODO describe summary field for the OpenInspection MCP integration'),
+  summary: z.string().max(500).optional().describe('Note on what changed, stored with the version snapshot this publish creates. Leave out on a first publish.'),
   // Which deliverable is being published. One order can carry several reports —
   // a standard inspection and a radon test — and they publish independently,
   // each with its own version chain. Omitted = the order's primary report,

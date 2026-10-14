@@ -138,7 +138,7 @@ const createTemplateRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: CreateTemplateSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: CreateTemplateSchema.describe('The new template: its name and checklist schema.'),
                 },
             },
         },
@@ -168,11 +168,11 @@ const updateTemplateRoute = createRoute(withMcpMetadata({
     tags: ["inspections", "templates"],
     summary: "Update inspection template for current tenant",
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Template to update.') }),
         body: {
             content: {
                 'application/json': {
-                    schema: UpdateTemplateSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: UpdateTemplateSchema.describe('The template fields to change; omitted fields are left as they are.'),
                 },
             },
         },
@@ -193,7 +193,7 @@ const updateTemplateRoute = createRoute(withMcpMetadata({
         403: { description: "Missing the 'templateEdit' capability, or the template produces an official form and is structurally read-only" },
     },
     operationId: "updateInspectionTemplate",
-    description: "Auto-generated placeholder for updateInspectionTemplate (PUT /templates/{id}, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Update a template's name, checklist schema or default report profile. Despite the PUT verb it is a partial update: only the fields sent change. The schema is validated, the property type columns are re-derived from it, the template version number goes up by one on every call even if nothing changed, and a template.update audit entry is written. Returns 404 for an unknown template and 403 when the template produces an official form supplied with the software (its structure is read-only; duplicate it instead) or the user lacks the template edit capability. Restricted to owners, managers and inspectors."
 }, { scopes: ['write'], tier: 'extended', capability: 'templateEdit' }));
 
 
@@ -206,7 +206,7 @@ const deleteTemplateRoute = createRoute(withMcpMetadata({
     tags: ["inspections", "templates"],
     summary: "Delete inspection template for current tenant",
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Template to delete.') }),
     },
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('templateDelete')],
     responses: {
@@ -222,7 +222,7 @@ const deleteTemplateRoute = createRoute(withMcpMetadata({
         409: { description: 'Another row still references this template' },
     },
     operationId: "deleteInspectionTemplate",
-    description: "Auto-generated placeholder for deleteInspectionTemplate (DELETE /templates/{id}, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Permanently delete a template and write a template.delete audit entry. Refused with 409 while anything still references it: an inspection created from it, a service that uses it as its default, a report generated from it, or a marketplace import whose local copy it is (remove the import first). Returns 404 for an unknown template and 403 without the template delete capability. Not reversible. Restricted to owners, managers and inspectors."
 }, { scopes: ['write'], tier: 'extended', capability: 'templateDelete' }));
 
 

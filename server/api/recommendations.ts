@@ -69,7 +69,7 @@ const replaceRecommendationRoute = createRoute(withMcpMetadata({
     },
     operationId: "replaceRecommendation",
     summary: "Replace recommendation for current tenant",
-    description: "Auto-generated placeholder for replaceRecommendation (PUT /{id}, recommendations domain). TODO: replace with a real description sourced from the handler."
+    description: "Update a recommendation in the company library. Despite the PUT verb it is a partial update: only the fields sent change. Returns 404 when the id is unknown or belongs to an ordinary canned comment with no repair summary. Writes a recommendation.updated audit entry and marks the entry as edited, since recommendations share storage with the canned-comment library. Owner, manager or inspector."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /* ── DELETE /api/recommendations/:id ──────────────────────────────────────── */
@@ -100,7 +100,7 @@ const seedDefaultsRecommendationRoute = createRoute(withMcpMetadata({
         }) } }, description: 'Bulk seed result' },
     },
     operationId: "seedDefaultsRecommendation",
-    description: "Auto-generated placeholder for seedDefaultsRecommendation (POST /seed-defaults, recommendations domain). TODO: replace with a real description sourced from the handler."
+    description: "Load the built-in starter set of recommendations into the company library. An entry whose category and name already exist as a recommendation is skipped, so repeating the call is safe and adds only what is missing; the response counts how many were inserted and skipped. Takes no body and writes no audit entry. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const recommendationsRoutes = createApiRouter()

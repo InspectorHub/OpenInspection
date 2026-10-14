@@ -21,7 +21,7 @@ import {
 } from '../lib/validations/rating-system.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
-const IdParamSchema = z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') });
+const IdParamSchema = z.object({ id: z.string().min(1).describe('Rating system id.') });
 
 /* ── GET /api/rating-systems ──────────────────────────────────────────── */
 const listRatingSystemsRoute = createRoute(withMcpMetadata({
@@ -55,13 +55,13 @@ const createRatingSystemRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["ratings"],
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { body: { content: { 'application/json': { schema: CreateRatingSystemSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: CreateRatingSystemSchema.describe('The new rating system: name, slug and its ordered levels.') } } } },
     responses: {
         200: { content: { 'application/json': { schema: RatingSystemSingleResponseSchema } }, description: 'Created' },
     },
     operationId: "createRatingSystem",
     summary: "Create rating system for current tenant",
-    description: "Auto-generated placeholder for createRatingSystem (POST /, ratings domain). TODO: replace with a real description sourced from the handler."
+    description: "Create a custom rating system, the set of levels (for example Satisfactory, Monitor, Defect) inspectors choose from when rating checklist items. The slug must be unique in the company (409 otherwise) and a system needs two to ten levels; level ids and order are assigned when left out. Setting isDefault clears the default flag on every other system. Writes a rating_system.created audit entry and answers 200 with the stored system. Each call creates another system. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /* ── POST /api/rating-systems/:id/clone ───────────────────────────────── */
@@ -71,14 +71,14 @@ const cloneRatingSystemRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager')] as const,
     request: {
         params: IdParamSchema,
-        body: { content: { 'application/json': { schema: CloneRatingSystemSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: CloneRatingSystemSchema.describe('Name, and optionally slug, for the copy.') } } },
     },
     responses: {
         200: { content: { 'application/json': { schema: RatingSystemSingleResponseSchema } }, description: 'Cloned' },
     },
     operationId: "cloneRatingSystem",
     summary: "Clone rating system for current tenant",
-    description: "Auto-generated placeholder for cloneRatingSystem (POST /{id}/clone, ratings domain). TODO: replace with a real description sourced from the handler."
+    description: "Copy a rating system, built-in or custom, into a new editable one; this is how a built-in system is customised, because those are read-only. The copy gets the given name, the given slug or one generated from the source slug, the source description and levels with fresh level ids, and is never the default. Returns 404 for an unknown source and 409 when the slug is taken. Writes a rating_system.cloned audit entry. Each call creates another copy. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /* ── PUT /api/rating-systems/:id ──────────────────────────────────────── */
@@ -88,14 +88,14 @@ const replaceRatingSystemRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager')] as const,
     request: {
         params: IdParamSchema,
-        body: { content: { 'application/json': { schema: UpdateRatingSystemSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: UpdateRatingSystemSchema.describe('The rating system fields to change; omitted fields are left as they are.') } } },
     },
     responses: {
         200: { content: { 'application/json': { schema: RatingSystemSingleResponseSchema } }, description: 'Updated' },
     },
     operationId: "replaceRatingSystem",
     summary: "Replace rating system for current tenant",
-    description: "Auto-generated placeholder for replaceRatingSystem (PUT /{id}, ratings domain). TODO: replace with a real description sourced from the handler."
+    description: "Update a custom rating system. Despite the PUT verb it is a partial update: only the fields sent change, and sending levels replaces the whole level list. Setting isDefault clears the default flag on every other system. Built-in systems are read-only (403; clone one first) and changing the slug to one already in use returns 409; 404 for an unknown id. Writes a rating_system.updated audit entry. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /* ── DELETE /api/rating-systems/:id ───────────────────────────────────── */
@@ -112,7 +112,7 @@ const deleteRatingSystemRoute = createRoute(withMcpMetadata({
     },
     operationId: "deleteRatingSystem",
     summary: "Delete rating system for current tenant",
-    description: "Auto-generated placeholder for deleteRatingSystem (DELETE /{id}, ratings domain). TODO: replace with a real description sourced from the handler."
+    description: "Permanently delete a custom rating system and write a rating_system.deleted audit entry. Built-in systems cannot be deleted (403), and a system that any template still uses is refused with 409 naming how many templates bind it. Returns 404 for an unknown id. Not reversible. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const ratingSystemsRoutes = createApiRouter()

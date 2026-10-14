@@ -1057,11 +1057,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the rating system. Must belong to the caller's company.",
+          "description": "Rating system id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the rating system. Must belong to the caller's company."
+            "description": "Rating system id."
           }
         }
       ],
@@ -1072,23 +1072,23 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 60,
-            "description": "TODO describe name field for the OpenInspection MCP integration"
+            "description": "Name of the new copy. 1-60 characters."
           },
           "slug": {
             "type": "string",
             "pattern": "^[a-z0-9-]{2,40}$",
-            "description": "TODO describe slug field for the OpenInspection MCP integration"
+            "description": "Slug of the new copy. Generated from the source slug when left out."
           }
         },
         "required": [
           "name"
         ],
         "additionalProperties": false,
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "Name, and optionally slug, for the copy."
       }
     },
     "summary": "Clone rating system for current tenant",
-    "description": "Auto-generated placeholder for cloneRatingSystem (POST /{id}/clone, ratings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Copy a rating system, built-in or custom, into a new editable one; this is how a built-in system is customised, because those are read-only. The copy gets the given name, the given slug or one generated from the source slug, the source description and levels with fresh level ids, and is never the default. Returns 404 for an unknown source and 409 when the slug is taken. Writes a rating_system.cloned audit entry. Each call creates another copy. Restricted to owners and managers."
   },
   {
     "operationId": "completeInspection",
@@ -1185,17 +1185,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection to confirm.",
           "schema": {
             "type": "string",
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection to confirm."
           }
         }
       ],
       "body": null
     },
     "summary": "Confirm inspection for current tenant",
-    "description": "Auto-generated placeholder for confirmInspection (POST /{id}/confirm, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers and inspectors."
   },
   {
     "operationId": "confirmSmsOptin",
@@ -1805,17 +1805,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection the agent view link is for.",
           "schema": {
             "type": "string",
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection the agent view link is for."
           }
         }
       ],
       "body": null
     },
     "summary": "Generate shareable agent view token",
-    "description": "Auto-generated placeholder for createInspectionAgentToken (POST /{id}/agent-token, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Mint a read-only agent view link for an inspection report. Stores a new token that expires after 30 days and returns it with the full report URL (?view=agent&token=...). Nothing is sent: the caller delivers the link. Every call mints a new token and earlier tokens keep working until they expire. Returns 404 for an unknown inspection. Restricted to owners, managers and inspectors."
   },
   {
     "operationId": "createInspectionAgreementRequest",
@@ -2227,11 +2227,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection whose report is sent.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection whose report is sent."
           }
         }
       ],
@@ -2287,17 +2287,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection whose report link is emailed to the buyer agent.",
           "schema": {
             "type": "string",
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection whose report link is emailed to the buyer agent."
           }
         }
       ],
       "body": null
     },
     "summary": "Email the report share link to the linked agent",
-    "description": "Auto-generated placeholder for createInspectionShareAgent (POST /{id}/share-agent, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Email the report link to the inspection's buyer agent. Mints a new agent view token (valid 30 days), builds the agent view URL and sends it to the email on the buyer agent contact, with the inspector's signature appended, then writes an inspection.share_agent audit entry. Returns 400 when no buyer agent is linked to the inspection or that contact has no email, 404 for an unknown inspection and 500 if the email fails to send. Each call sends another email with a new token. Restricted to owners, managers and inspectors."
   },
   {
     "operationId": "createInspectionTemplates",
@@ -2317,7 +2317,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 100,
-            "description": "TODO describe name field for the OpenInspection MCP integration"
+            "description": "Template name shown in template pickers. 1-100 characters."
           },
           "defaultProfileId": {
             "type": "string",
@@ -4492,14 +4492,14 @@
                 "additionalProperties": false
               }
             ],
-            "description": "TODO describe schema field for the OpenInspection MCP integration"
+            "description": "Template checklist definition in the v2 schema format, sent as an object or as a JSON string that is parsed and validated."
           }
         },
         "required": [
           "name",
           "schema"
         ],
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "The new template: its name and checklist schema."
       }
     },
     "summary": "Create inspection templates for current tenant",
@@ -4720,17 +4720,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the library. Must belong to the caller's company.",
+          "description": "Comment pack library that is already imported and has a newer version.",
           "schema": {
             "type": "string",
-            "description": "Id of the library. Must belong to the caller's company."
+            "description": "Comment pack library that is already imported and has a newer version."
           }
         }
       ],
       "body": null
     },
     "summary": "Update tenant library import to latest marketplace version (adds new rows)",
-    "description": "Auto-generated placeholder for createMarketplaceLibrariesUpdate (POST /libraries/{id}/update, marketplace domain). TODO: replace with a real description sourced from the handler."
+    "description": "Update an installed comment pack to its latest version in append mode: inserts the new release's comments as additional rows and does not delete or change the rows the earlier import created (use the replace route to swap them). Only comment packs are supported; template libraries are refused here. Records a library.marketplace.updated audit entry. Returns 400 when the library was never imported, was uninstalled, or is already on the latest version, and 404 for an unknown library. Restricted to owners and managers."
   },
   {
     "operationId": "createMarketplaceUpdate",
@@ -4747,17 +4747,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Marketplace template entry that is already imported and has a newer version.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Marketplace template entry that is already imported and has a newer version."
           }
         }
       ],
       "body": null
     },
     "summary": "Update tenant copy to latest marketplace version (creates new local copy)",
-    "description": "Auto-generated placeholder for createMarketplaceUpdate (POST /{id}/update, marketplace domain). TODO: replace with a real description sourced from the handler."
+    "description": "Update an installed marketplace template to its latest version. Does not edit the existing template: it creates a new local template named with a (vX.Y.Z) suffix, points the import record at it, and leaves the old template in place so existing inspections keep working (a statutory form's superseded copy is retired from the pickers, never deleted). Records a template.marketplace.updated audit entry. Returns 400 when the entry is not a template or statutory form, was never imported, was uninstalled, or is already on the latest version, and 404 for an unknown entry. Comment packs use the libraries update route instead. Needs the template import capability and the owner or manager role."
   },
   {
     "operationId": "createMessageInspection",
@@ -4960,11 +4960,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Published inspection whose report is being shared.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Published inspection whose report is being shared."
           }
         },
         {
@@ -4981,7 +4981,7 @@
       "body": null
     },
     "summary": "Mint a 30-day view-only share token (customer-initiated)",
-    "description": "Auto-generated placeholder for createPublicShareInspectionsShareToken (POST /inspections/{id}/share-token, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Public route behind the report viewer's Share button: mints a view-only link to a published report that expires after 30 days. No login is needed, but the caller must prove it can already see the report by passing its existing portal or agent-view access token in the token query parameter; without a valid token for this inspection the answer is 404, the same as for an unknown inspection. Returns 403 when the report has not been published. The result is a new token and the full report URL (?view=agent&token=...). Nothing is emailed, and every call mints another token while earlier ones keep working until they expire."
   },
   {
     "operationId": "createRatingSystem",
@@ -5001,22 +5001,22 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 60,
-            "description": "TODO describe name field for the OpenInspection MCP integration"
+            "description": "Display name of the rating system. 1-60 characters."
           },
           "slug": {
             "type": "string",
             "pattern": "^[a-z0-9-]{2,40}$",
-            "description": "TODO describe slug field for the OpenInspection MCP integration"
+            "description": "Unique identifier within the company, lowercase letters, digits and dashes."
           },
           "description": {
             "type": "string",
             "maxLength": 200,
-            "description": "TODO describe description field for the OpenInspection MCP integration"
+            "description": "Short explanation of when to use this rating system. Up to 200 characters."
           },
           "isDefault": {
             "type": "boolean",
             "default": false,
-            "description": "TODO describe isDefault field for the OpenInspection MCP integration"
+            "description": "Make this the company default; the flag is cleared on every other system. Defaults to false."
           },
           "levels": {
             "type": "array",
@@ -5027,24 +5027,24 @@
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 64,
-                  "description": "TODO describe id field for the OpenInspection MCP integration"
+                  "description": "Level id. Leave out to have the server assign one. 1-64 characters."
                 },
                 "abbreviation": {
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 8,
-                  "description": "TODO describe abbreviation field for the OpenInspection MCP integration"
+                  "description": "Short code shown on the rating button, for example Sat or D. 1-8 characters."
                 },
                 "label": {
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 40,
-                  "description": "TODO describe label field for the OpenInspection MCP integration"
+                  "description": "Full name of the rating level, for example Satisfactory. 1-40 characters."
                 },
                 "color": {
                   "type": "string",
                   "pattern": "^#[0-9a-fA-F]{6}$",
-                  "description": "TODO describe color field for the OpenInspection MCP integration"
+                  "description": "Level colour as a six digit hex value such as #aabbcc."
                 },
                 "severity": {
                   "type": "string",
@@ -5054,27 +5054,27 @@
                     "significant",
                     "minor"
                   ],
-                  "description": "TODO describe severity field for the OpenInspection MCP integration"
+                  "description": "Severity this level stands for, shared with canned comments. One of: good, marginal, significant, minor."
                 },
                 "isDefect": {
                   "type": "boolean",
                   "default": false,
-                  "description": "TODO describe isDefect field for the OpenInspection MCP integration"
+                  "description": "Whether this level counts as a defect. Defaults to false."
                 },
                 "pausesAdvance": {
                   "type": "boolean",
-                  "description": "TODO describe pausesAdvance field for the OpenInspection MCP integration"
+                  "description": "When true the editor stays on the item and moves focus to its notes after this level is applied, instead of auto-advancing."
                 },
                 "hotkey": {
                   "type": "string",
                   "pattern": "^[0-9a-zA-Z]?$",
-                  "description": "TODO describe hotkey field for the OpenInspection MCP integration"
+                  "description": "Single keyboard key that selects this level in the inspection editor; empty for none."
                 },
                 "order": {
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 20,
-                  "description": "TODO describe order field for the OpenInspection MCP integration"
+                  "description": "Display position of the level. Defaults to its position in the submitted list. Integer between 0 and 20."
                 }
               },
               "required": [
@@ -5087,7 +5087,7 @@
             },
             "minItems": 2,
             "maxItems": 10,
-            "description": "TODO describe levels field for the OpenInspection MCP integration"
+            "description": "Ordered rating levels inspectors choose from. Updating replaces the whole list. 2-10 items."
           }
         },
         "required": [
@@ -5096,11 +5096,11 @@
           "levels"
         ],
         "additionalProperties": false,
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "The new rating system: name, slug and its ordered levels."
       }
     },
     "summary": "Create rating system for current tenant",
-    "description": "Auto-generated placeholder for createRatingSystem (POST /, ratings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Create a custom rating system, the set of levels (for example Satisfactory, Monitor, Defect) inspectors choose from when rating checklist items. The slug must be unique in the company (409 otherwise) and a system needs two to ten levels; level ids and order are assigned when left out. Setting isDefault clears the default flag on every other system. Writes a rating_system.created audit entry and answers 200 with the stored system. Each call creates another system. Restricted to owners and managers."
   },
   {
     "operationId": "createRecommendation",
@@ -5310,7 +5310,7 @@
       }
     },
     "summary": "Create service discount codes",
-    "description": "Auto-generated placeholder for createServiceDiscountCodes (POST /discount-codes, services domain). TODO: replace with a real description sourced from the handler."
+    "description": "Create a discount code for the company. The code is stored in upper case, starts active with zero uses, and can carry a use limit and an expiry time. The response is only a success flag, so list the codes to read back the new id. Nothing is written to the audit log and each call creates another code. Restricted to owners and managers."
   },
   {
     "operationId": "createServicePayRule",
@@ -6179,18 +6179,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the template. Must belong to the caller's company.",
+          "description": "Template to delete.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the template. Must belong to the caller's company."
+            "description": "Template to delete."
           }
         }
       ],
       "body": null
     },
     "summary": "Delete inspection template for current tenant",
-    "description": "Auto-generated placeholder for deleteInspectionTemplate (DELETE /templates/{id}, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Permanently delete a template and write a template.delete audit entry. Refused with 409 while anything still references it: an inspection created from it, a service that uses it as its default, a report generated from it, or a marketplace import whose local copy it is (remove the import first). Returns 404 for an unknown template and 403 without the template delete capability. Not reversible. Restricted to owners, managers and inspectors."
   },
   {
     "operationId": "deleteInspectionUnit",
@@ -6396,18 +6396,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the rating system. Must belong to the caller's company.",
+          "description": "Rating system id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the rating system. Must belong to the caller's company."
+            "description": "Rating system id."
           }
         }
       ],
       "body": null
     },
     "summary": "Delete rating system for current tenant",
-    "description": "Auto-generated placeholder for deleteRatingSystem (DELETE /{id}, ratings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Permanently delete a custom rating system and write a rating_system.deleted audit entry. Built-in systems cannot be deleted (403), and a system that any template still uses is refused with 409 naming how many templates bind it. Returns 404 for an unknown id. Not reversible. Restricted to owners and managers."
   },
   {
     "operationId": "deleteRecommendation",
@@ -6507,17 +6507,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the discount code. Must belong to the caller's company.",
+          "description": "Discount code to delete.",
           "schema": {
             "type": "string",
-            "description": "Id of the discount code. Must belong to the caller's company."
+            "description": "Discount code to delete."
           }
         }
       ],
       "body": null
     },
     "summary": "Delete service discount code",
-    "description": "Auto-generated placeholder for deleteServiceDiscountCode (DELETE /discount-codes/{id}, services domain). TODO: replace with a real description sourced from the handler."
+    "description": "Permanently delete a discount code (a hard delete, unlike deleting a service). To stop a code being accepted while keeping its record, update it with active false instead. Returns 404 for an unknown code and nothing is written to the audit log. Restricted to owners and managers."
   },
   {
     "operationId": "deleteServicePayRule",
@@ -6649,18 +6649,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the member. Must belong to the caller's company.",
+          "description": "User id of the member to remove.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the member. Must belong to the caller's company."
+            "description": "User id of the member to remove."
           }
         }
       ],
       "body": null
     },
     "summary": "Remove a team member",
-    "description": "Auto-generated placeholder for deleteTeamMember (DELETE /members/{id}, team domain). TODO: replace with a real description sourced from the handler."
+    "description": "Remove a member from the team. The user is soft-deleted rather than erased, so inspections attributed to them and their report history stay intact, and the same email can be invited again later. Their live sessions and any MCP access grants are revoked immediately, and a user.deleted event is queued for the sync outbox when one is configured. Returns 400 when you try to remove yourself or the last owner, 404 for an unknown or already removed member, and 403 when the target is an owner and the caller is not. Restricted to owners and managers."
   },
   {
     "operationId": "deleteTenantAgreement",
@@ -9088,11 +9088,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the rating system. Must belong to the caller's company.",
+          "description": "Rating system id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the rating system. Must belong to the caller's company."
+            "description": "Rating system id."
           }
         }
       ],
@@ -9850,17 +9850,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Marketplace catalogue entry to import.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Marketplace catalogue entry to import."
           }
         }
       ],
       "body": null
     },
     "summary": "Import marketplace template as tenant copy",
-    "description": "Auto-generated placeholder for importMarketplace (POST /{id}/import, marketplace domain). TODO: replace with a real description sourced from the handler."
+    "description": "Install a marketplace catalogue entry into the company. A template or statutory form entry becomes one new local template (returned as localTemplateId); a comment pack becomes a set of canned comments and returns localTemplateId null. The kind is read from the entry, and a template schema that is not valid v2 is refused. Idempotent: importing something already installed returns what the first import produced and creates nothing; an entry that was uninstalled is reinstalled. Returns 404 for an unknown entry. Same handler as the libraries import route. Needs the template import capability and the owner or manager role."
   },
   {
     "operationId": "importOfflinePackage",
@@ -10033,13 +10033,13 @@
             "$ref": "#/components/schemas/InviteMember"
           },
           {
-            "description": "TODO describe schema field for the OpenInspection MCP integration"
+            "description": "Who to invite, the role they get and whether to email the invitation."
           }
         ]
       }
     },
     "summary": "Invite a new team member",
-    "description": "Auto-generated placeholder for inviteTeam (POST /invite, team domain). TODO: replace with a real description sourced from the handler."
+    "description": "Invite a person to join the team. Creates a pending invite that expires after 7 days and returns its accept link and expiry. The invitation email is sent unless notify is false, in which case nothing is sent and the caller must deliver the returned inviteLink. Role and the optional permissionOverrides are stored on the invite and applied when it is accepted; only an owner may invite someone as an owner (403). Returns 409 when the email already belongs to an active member and is refused when no seat is free under the seat limit, when one applies. Writes a user.invite audit entry. Each call creates another invite. Restricted to owners and managers."
   },
   {
     "operationId": "inviteTenant",
@@ -13199,7 +13199,7 @@
       "body": null
     },
     "summary": "Mark every unread notification as read",
-    "description": "Auto-generated placeholder for markAllReadNotification (POST /mark-all-read, notifications domain). TODO: replace with a real description sourced from the handler."
+    "description": "Mark every unread notification of the calling user in the current company as read, archived ones included. Other users' notifications are not affected. Idempotent, a repeat changes nothing. Available to any signed-in user."
   },
   {
     "operationId": "markOnboardingFlag",
@@ -13316,17 +13316,17 @@
             },
             "minItems": 1,
             "maxItems": 100,
-            "description": "TODO describe ids field for the OpenInspection MCP integration"
+            "description": "Ids of the notifications to mark as read. 1-100 items."
           }
         },
         "required": [
           "ids"
         ],
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "The notifications to mark as read."
       }
     },
     "summary": "Mark a list of notifications as read",
-    "description": "Auto-generated placeholder for markReadNotification (POST /mark-read, notifications domain). TODO: replace with a real description sourced from the handler."
+    "description": "Mark the listed notifications as read by stamping their read time. Only the calling user's own notifications are touched: ids that belong to someone else, do not exist or are already read are skipped silently, and the call still answers ok. Idempotent, a repeat changes nothing. Available to any signed-in user."
   },
   {
     "operationId": "markSentInvoice",
@@ -13343,18 +13343,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the invoice. Must belong to the caller's company.",
+          "description": "Invoice to mark as sent.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the invoice. Must belong to the caller's company."
+            "description": "Invoice to mark as sent."
           }
         }
       ],
       "body": null
     },
     "summary": "Mark invoice as sent",
-    "description": "Auto-generated placeholder for markSentInvoice (POST /{id}/mark-sent, invoices domain). TODO: replace with a real description sourced from the handler."
+    "description": "Record that an invoice has been sent by stamping its sent time with the current time, which moves a draft to sent (an invoice that is already paid, partly paid or void keeps that status). Nothing is emailed to the client; use the request-payment route to send one. When QuickBooks is configured for the deployment the invoice is also upserted into QuickBooks in the background. Returns 404 for an unknown invoice. Repeating the call restamps the sent time. Restricted to owners and managers."
   },
   {
     "operationId": "migrateFindingKeys",
@@ -16876,10 +16876,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection whose report is published.",
           "schema": {
             "type": "string",
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection whose report is published."
           }
         }
       ],
@@ -16888,7 +16888,7 @@
       }
     },
     "summary": "Publish inspection for current tenant",
-    "description": "Auto-generated placeholder for publishInspection (POST /{id}/publish, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version. Requires the publish capability on top of the owner, manager or inspector role."
   },
   {
     "operationId": "putInspectorServiceOrigin",
@@ -16997,17 +16997,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Inspection whose report PDFs are re-rendered.",
           "schema": {
             "type": "string",
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Inspection whose report PDFs are re-rendered."
           }
         }
       ],
       "body": null
     },
     "summary": "Refresh PDF renders (Summary + Full)",
-    "description": "Auto-generated placeholder for refreshInspection (POST /{id}/pdf/refresh, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Force a fresh render of both report PDFs (Summary and Full) for an inspection. Marks both as queued, answers 202 immediately and renders in the background, replacing the stored PDF for the current version rather than an archived one; poll the PDF download route for the result. Returns 403 when the PDF pipeline is switched off for the company (Settings, Reports). The inspection id is not checked for existence. Safe to repeat, each call just queues another render. Restricted to owners, managers and inspectors."
   },
   {
     "operationId": "refreshInspectionPaySplits",
@@ -17559,7 +17559,7 @@
             "description": "Delete rows the tenant rewrote too. Default false keeps them."
           }
         },
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "Replace options; the body may be omitted to keep rows the company rewrote."
       }
     },
     "summary": "Replace tenant library import (swaps prior rows for the new pack)",
@@ -17580,11 +17580,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the rating system. Must belong to the caller's company.",
+          "description": "Rating system id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the rating system. Must belong to the caller's company."
+            "description": "Rating system id."
           }
         }
       ],
@@ -17595,22 +17595,22 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 60,
-            "description": "TODO describe name field for the OpenInspection MCP integration"
+            "description": "Display name of the rating system. 1-60 characters."
           },
           "slug": {
             "type": "string",
             "pattern": "^[a-z0-9-]{2,40}$",
-            "description": "TODO describe slug field for the OpenInspection MCP integration"
+            "description": "Unique identifier within the company, lowercase letters, digits and dashes."
           },
           "description": {
             "type": "string",
             "maxLength": 200,
-            "description": "TODO describe description field for the OpenInspection MCP integration"
+            "description": "Short explanation of when to use this rating system. Up to 200 characters."
           },
           "isDefault": {
             "type": "boolean",
             "default": false,
-            "description": "TODO describe isDefault field for the OpenInspection MCP integration"
+            "description": "Make this the company default; the flag is cleared on every other system. Defaults to false."
           },
           "levels": {
             "type": "array",
@@ -17621,24 +17621,24 @@
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 64,
-                  "description": "TODO describe id field for the OpenInspection MCP integration"
+                  "description": "Level id. Leave out to have the server assign one. 1-64 characters."
                 },
                 "abbreviation": {
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 8,
-                  "description": "TODO describe abbreviation field for the OpenInspection MCP integration"
+                  "description": "Short code shown on the rating button, for example Sat or D. 1-8 characters."
                 },
                 "label": {
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 40,
-                  "description": "TODO describe label field for the OpenInspection MCP integration"
+                  "description": "Full name of the rating level, for example Satisfactory. 1-40 characters."
                 },
                 "color": {
                   "type": "string",
                   "pattern": "^#[0-9a-fA-F]{6}$",
-                  "description": "TODO describe color field for the OpenInspection MCP integration"
+                  "description": "Level colour as a six digit hex value such as #aabbcc."
                 },
                 "severity": {
                   "type": "string",
@@ -17648,27 +17648,27 @@
                     "significant",
                     "minor"
                   ],
-                  "description": "TODO describe severity field for the OpenInspection MCP integration"
+                  "description": "Severity this level stands for, shared with canned comments. One of: good, marginal, significant, minor."
                 },
                 "isDefect": {
                   "type": "boolean",
                   "default": false,
-                  "description": "TODO describe isDefect field for the OpenInspection MCP integration"
+                  "description": "Whether this level counts as a defect. Defaults to false."
                 },
                 "pausesAdvance": {
                   "type": "boolean",
-                  "description": "TODO describe pausesAdvance field for the OpenInspection MCP integration"
+                  "description": "When true the editor stays on the item and moves focus to its notes after this level is applied, instead of auto-advancing."
                 },
                 "hotkey": {
                   "type": "string",
                   "pattern": "^[0-9a-zA-Z]?$",
-                  "description": "TODO describe hotkey field for the OpenInspection MCP integration"
+                  "description": "Single keyboard key that selects this level in the inspection editor; empty for none."
                 },
                 "order": {
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 20,
-                  "description": "TODO describe order field for the OpenInspection MCP integration"
+                  "description": "Display position of the level. Defaults to its position in the submitted list. Integer between 0 and 20."
                 }
               },
               "required": [
@@ -17681,15 +17681,15 @@
             },
             "minItems": 2,
             "maxItems": 10,
-            "description": "TODO describe levels field for the OpenInspection MCP integration"
+            "description": "Ordered rating levels inspectors choose from. Updating replaces the whole list. 2-10 items."
           }
         },
         "additionalProperties": false,
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "The rating system fields to change; omitted fields are left as they are."
       }
     },
     "summary": "Replace rating system for current tenant",
-    "description": "Auto-generated placeholder for replaceRatingSystem (PUT /{id}, ratings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Update a custom rating system. Despite the PUT verb it is a partial update: only the fields sent change, and sending levels replaces the whole level list. Setting isDefault clears the default flag on every other system. Built-in systems are read-only (403; clone one first) and changing the slug to one already in use returns 409; 404 for an unknown id. Writes a rating_system.updated audit entry. Restricted to owners and managers."
   },
   {
     "operationId": "replaceRecommendation",
@@ -17719,7 +17719,7 @@
       }
     },
     "summary": "Replace recommendation for current tenant",
-    "description": "Auto-generated placeholder for replaceRecommendation (PUT /{id}, recommendations domain). TODO: replace with a real description sourced from the handler."
+    "description": "Update a recommendation in the company library. Despite the PUT verb it is a partial update: only the fields sent change. Returns 404 when the id is unknown or belongs to an ordinary canned comment with no repair summary. Writes a recommendation.updated audit entry and marks the entry as edited, since recommendations share storage with the canned-comment library. Owner, manager or inspector."
   },
   {
     "operationId": "replaceService",
@@ -17736,10 +17736,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the service. Must belong to the caller's company.",
+          "description": "Service to update.",
           "schema": {
             "type": "string",
-            "description": "Id of the service. Must belong to the caller's company."
+            "description": "Service to update."
           }
         }
       ],
@@ -17748,7 +17748,7 @@
       }
     },
     "summary": "Replace service for current tenant",
-    "description": "Auto-generated placeholder for replaceService (PUT /{id}, services domain). TODO: replace with a real description sourced from the handler."
+    "description": "Update a catalog service. Despite the PUT verb it is a partial update: only the fields sent change, and the updated service is returned. Sending active true reactivates a service that was deleted. Returns 404 for an unknown id. Nothing is written to the audit log. Restricted to owners and managers."
   },
   {
     "operationId": "replaceTag",
@@ -18567,7 +18567,7 @@
       "body": null
     },
     "summary": "Bulk-insert the default 80 recommendations (idempotent — skips entries with matching name+category)",
-    "description": "Auto-generated placeholder for seedDefaultsRecommendation (POST /seed-defaults, recommendations domain). TODO: replace with a real description sourced from the handler."
+    "description": "Load the built-in starter set of recommendations into the company library. An entry whose category and name already exist as a recommendation is skipped, so repeating the call is safe and adds only what is missing; the response counts how many were inserted and skipped. Takes no body and writes no audit entry. Restricted to owners and managers."
   },
   {
     "operationId": "seedInspectionComplianceDocReview",
@@ -20329,11 +20329,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the template. Must belong to the caller's company.",
+          "description": "Template to update.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the template. Must belong to the caller's company."
+            "description": "Template to update."
           }
         }
       ],
@@ -20344,7 +20344,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 100,
-            "description": "TODO describe name field for the OpenInspection MCP integration"
+            "description": "Template name shown in template pickers. 1-100 characters."
           },
           "defaultProfileId": {
             "type": "string",
@@ -22519,14 +22519,14 @@
                 "additionalProperties": false
               }
             ],
-            "description": "TODO describe schema field for the OpenInspection MCP integration"
+            "description": "Template checklist definition in the v2 schema format, sent as an object or as a JSON string that is parsed and validated."
           }
         },
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "The template fields to change; omitted fields are left as they are."
       }
     },
     "summary": "Update inspection template for current tenant",
-    "description": "Auto-generated placeholder for updateInspectionTemplate (PUT /templates/{id}, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Update a template's name, checklist schema or default report profile. Despite the PUT verb it is a partial update: only the fields sent change. The schema is validated, the property type columns are re-derived from it, the template version number goes up by one on every call even if nothing changed, and a template.update audit entry is written. Returns 404 for an unknown template and 403 when the template produces an official form supplied with the software (its structure is read-only; duplicate it instead) or the user lacks the template edit capability. Restricted to owners, managers and inspectors."
   },
   {
     "operationId": "updateInspectorCredential",
@@ -22856,10 +22856,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the discount code. Must belong to the caller's company.",
+          "description": "Discount code to update.",
           "schema": {
             "type": "string",
-            "description": "Id of the discount code. Must belong to the caller's company."
+            "description": "Discount code to update."
           }
         }
       ],
@@ -22868,7 +22868,7 @@
       }
     },
     "summary": "Update service discount code",
-    "description": "Auto-generated placeholder for updateServiceDiscountCode (PUT /discount-codes/{id}, services domain). TODO: replace with a real description sourced from the handler."
+    "description": "Update a discount code. Despite the PUT verb it is a partial update: only the fields sent change, and the updated code is returned. Setting active false retires a code without deleting it, null maxUses or expiresAt removes that limit, and the use count cannot be edited. The code text is stored as sent, unlike create which upper-cases it. Returns 404 for an unknown code. Restricted to owners and managers."
   },
   {
     "operationId": "updateServicePayRule",
@@ -23339,7 +23339,7 @@
       }
     },
     "summary": "Validate service for current tenant",
-    "description": "Auto-generated placeholder for validateService (POST /discount/validate, services domain). TODO: replace with a real description sourced from the handler."
+    "description": "Check a discount code against an order subtotal and report what it would take off. Despite the POST verb this is read-only: it does not redeem the code or change its use count. Only active codes are considered and matching ignores case. A code that is unknown, expired or out of uses still answers 200, with valid false, a zero discountAmount and a message; a valid code returns its id and the amount in cents (a fixed code is capped at the subtotal, a percent code is rounded down). Available to owners, managers and inspectors."
   },
   {
     "operationId": "viewConciergeConfirm",

@@ -70,7 +70,7 @@ const marketplaceRoutes = createApiRouter()
     // half -- owner/manager hold templateImport by default, so the practical
     // effect is confined to a workspace that has deliberately revoked it.
     middleware: [requireRole('owner', 'manager'), requireCapability('templateImport')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().describe('Marketplace catalogue entry to import.') }) },
     responses: {
         201: {
             content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ localTemplateId: z.string().nullable().describe('Local template id for a 1:1 kind; null for a 1:N kind, which produces row_count rows rather than one') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
@@ -80,7 +80,7 @@ const marketplaceRoutes = createApiRouter()
         404: { description: 'Not found' },
     },
     operationId: "importMarketplace",
-    description: "Auto-generated placeholder for importMarketplace (POST /{id}/import, marketplace domain). TODO: replace with a real description sourced from the handler."
+    description: "Install a marketplace catalogue entry into the company. A template or statutory form entry becomes one new local template (returned as localTemplateId); a comment pack becomes a set of canned comments and returns localTemplateId null. The kind is read from the entry, and a template schema that is not valid v2 is refused. Idempotent: importing something already installed returns what the first import produced and creates nothing; an entry that was uninstalled is reinstalled. Returns 404 for an unknown entry. Same handler as the libraries import route. Needs the template import capability and the owner or manager role."
 }, { scopes: ['write'], tier: 'extended', capability: 'templateImport' })), async (c) => {
     const { id } = c.req.valid('param');
     try {
@@ -123,7 +123,7 @@ const marketplaceRoutes = createApiRouter()
     // Scheme 2 mints a SECOND local template row, so "update to latest" is a
     // template import by any measure that matters here (#307).
     middleware: [requireRole('owner', 'manager'), requireCapability('templateImport')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().describe('Marketplace template entry that is already imported and has a newer version.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
@@ -142,7 +142,7 @@ const marketplaceRoutes = createApiRouter()
         404: { description: 'Not found' },
     },
     operationId: "createMarketplaceUpdate",
-    description: "Auto-generated placeholder for createMarketplaceUpdate (POST /{id}/update, marketplace domain). TODO: replace with a real description sourced from the handler."
+    description: "Update an installed marketplace template to its latest version. Does not edit the existing template: it creates a new local template named with a (vX.Y.Z) suffix, points the import record at it, and leaves the old template in place so existing inspections keep working (a statutory form's superseded copy is retired from the pickers, never deleted). Records a template.marketplace.updated audit entry. Returns 400 when the entry is not a template or statutory form, was never imported, was uninstalled, or is already on the latest version, and 404 for an unknown entry. Comment packs use the libraries update route instead. Needs the template import capability and the owner or manager role."
 }, { scopes: ['write'], tier: 'extended', capability: 'templateImport' })), async (c) => {
     const { id } = c.req.valid('param');
     try {
@@ -181,14 +181,14 @@ const marketplaceRoutes = createApiRouter()
     // enumerating grep was `insert(templates)` and this path writes
     // `insert(templates as any)`, which that pattern does not match.
     middleware: [requireRole('owner', 'manager'), requireCapability('templateImport')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().describe('Marketplace library to install.') }) },
     responses: {
         201: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ kind: z.enum(['comments', 'templates', 'statutory']).describe('Which shape the import produced'), rowCount: z.number().describe('Rows created for a 1:N kind; 0 for a 1:1 kind'), localEntityId: z.string().nullable().describe('Local row id for a 1:1 kind; null for a 1:N kind') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Imported' },
         403: { description: "Missing the 'templateImport' capability" },
         404: { description: 'Not found' },
     },
     operationId: "importMarketplace",
-    description: "Auto-generated placeholder for importMarketplace (POST /libraries/{id}/import, marketplace domain). TODO: replace with a real description sourced from the handler."
+    description: "Install a marketplace library into the company, whatever its kind: a comment pack creates canned comments (rowCount rows), a template or statutory form creates one local template. Runs the same import as the catalogue import route, so it is idempotent (a library already installed returns its earlier result and creates nothing) and reinstalls one that was uninstalled. Returns 404 for an unknown library; any other failure is returned as a 500 with code import_failed and the error detail. Needs the template import capability and the owner or manager role."
 }, { scopes: ['write'], tier: 'extended', capability: 'templateImport' })), async (c) => {
     const { id } = c.req.valid('param');
     try {
@@ -215,7 +215,7 @@ const marketplaceRoutes = createApiRouter()
     // kind other than 'comments' outright, so this path cannot reach the
     // `templates` table. Said here so the next auditor does not re-derive it.
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().describe('Comment pack library that is already imported and has a newer version.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
@@ -232,7 +232,7 @@ const marketplaceRoutes = createApiRouter()
         404: { description: 'Not found' },
     },
     operationId: "createMarketplaceLibrariesUpdate",
-    description: "Auto-generated placeholder for createMarketplaceLibrariesUpdate (POST /libraries/{id}/update, marketplace domain). TODO: replace with a real description sourced from the handler."
+    description: "Update an installed comment pack to its latest version in append mode: inserts the new release's comments as additional rows and does not delete or change the rows the earlier import created (use the replace route to swap them). Only comment packs are supported; template libraries are refused here. Records a library.marketplace.updated audit entry. Returns 400 when the library was never imported, was uninstalled, or is already on the latest version, and 404 for an unknown library. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' })), async (c) => {
     const { id } = c.req.valid('param');
     try {
@@ -302,7 +302,7 @@ const marketplaceRoutes = createApiRouter()
         body: {
             content: {
                 'application/json': {
-                    schema: LibraryReplaceBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: LibraryReplaceBodySchema.describe('Replace options; the body may be omitted to keep rows the company rewrote.'),
                 },
             },
             required: false,

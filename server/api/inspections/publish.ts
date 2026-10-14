@@ -191,11 +191,11 @@ const publishRoute = createRoute(withMcpMetadata({
     // ("requires review") is 403'd here.
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish')] as const,
     request: {
-        params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }),
+        params: z.object({ id: z.string().describe('Inspection whose report is published.') }),
         body: {
             content: {
                 'application/json': {
-                    schema: PublishInspectionSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: PublishInspectionSchema.describe('Which report to publish and the optional republish note and translation request.'),
                 },
             },
         },
@@ -211,7 +211,7 @@ const publishRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "publishInspection",
-    description: "Auto-generated placeholder for publishInspection (POST /{id}/publish, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version. Requires the publish capability on top of the owner, manager or inspector role."
 }, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
@@ -344,10 +344,10 @@ const publishRoutes = createApiRouter()
         method: 'post', path: '/{id}/confirm',
         tags: ["inspections"], summary: "Confirm inspection for current tenant",
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+        request: { params: z.object({ id: z.string().describe('Inspection to confirm.') }) },
         responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Confirmed' } },
         operationId: "confirmInspection",
-        description: "Auto-generated placeholder for confirmInspection (POST /{id}/confirm, inspections domain). TODO: replace with a real description sourced from the handler."
+        description: "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers and inspectors."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');

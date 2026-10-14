@@ -8,7 +8,7 @@ export const ListNotificationsQuerySchema = z.object({
 });
 
 export const MarkReadSchema = z.object({
-    ids: z.array(z.string().min(1)).min(1).max(100).describe('TODO describe ids field for the OpenInspection MCP integration'),
+    ids: z.array(z.string().min(1)).min(1).max(100).describe('Ids of the notifications to mark as read.'),
 });
 
 const NotificationDtoSchema = z.object({

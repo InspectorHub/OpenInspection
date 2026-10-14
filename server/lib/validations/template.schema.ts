@@ -355,7 +355,7 @@ export const TemplateSchemaV2Schema = z.object({
  * — string form is parsed and re-validated to give a clean error path.
  */
 export const CreateTemplateSchema = z.object({
-    name: z.string().min(1, 'Template name is required').max(100).describe('TODO describe name field for the OpenInspection MCP integration'),
+    name: z.string().min(1, 'Template name is required').max(100).describe('Template name shown in template pickers.'),
     defaultProfileId: z.string().nullable().optional().describe('Default report appearance profile id for inspections from this template; null inherits the tenant default'),
     schema: z.union([
         z.string().transform((s, ctx) => {
@@ -367,7 +367,7 @@ export const CreateTemplateSchema = z.object({
             }
         }).pipe(TemplateSchemaV2Schema),
         TemplateSchemaV2Schema,
-    ]).describe('TODO describe schema field for the OpenInspection MCP integration'),
+    ]).describe('Template checklist definition in the v2 schema format, sent as an object or as a JSON string that is parsed and validated.'),
 });
 
 /**

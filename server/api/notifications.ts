@@ -84,7 +84,7 @@ const markReadRoute = createRoute(withMcpMetadata({
     path: '/mark-read',
     tags: ["notifications"],
     summary: 'Mark a list of notifications as read',
-    request: { body: { content: { 'application/json': { schema: MarkReadSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: MarkReadSchema.describe('The notifications to mark as read.') } } } },
     responses: {
         200: {
             content: { 'application/json': { schema: OkResponseSchema } },
@@ -93,7 +93,7 @@ const markReadRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "markReadNotification",
-    description: "Auto-generated placeholder for markReadNotification (POST /mark-read, notifications domain). TODO: replace with a real description sourced from the handler."
+    description: "Mark the listed notifications as read by stamping their read time. Only the calling user's own notifications are touched: ids that belong to someone else, do not exist or are already read are skipped silently, and the call still answers ok. Idempotent, a repeat changes nothing. Available to any signed-in user."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // POST /mark-all-read
@@ -110,7 +110,7 @@ const markAllRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "markAllReadNotification",
-    description: "Auto-generated placeholder for markAllReadNotification (POST /mark-all-read, notifications domain). TODO: replace with a real description sourced from the handler."
+    description: "Mark every unread notification of the calling user in the current company as read, archived ones included. Other users' notifications are not affected. Idempotent, a repeat changes nothing. Available to any signed-in user."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // DELETE /{id} — archive (soft-delete)

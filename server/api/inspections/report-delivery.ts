@@ -43,7 +43,7 @@ const sendReportPdfRoute = createRoute(withMcpMetadata({
     summary: 'Send the inspection report to one or more role-keyed recipients',
     middleware: [requireRole('owner', 'manager', 'inspector')],
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection whose report is sent.') }),
         body: {
             content: {
                 'application/json': { schema: SendReportSchema },
@@ -205,7 +205,7 @@ const refreshPdfRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Refresh PDF renders (Summary + Full)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().describe('Inspection whose report PDFs are re-rendered.') }) },
     responses: {
         202: {
             content: { 'application/json': { schema: createApiResponseSchema(z.object({
@@ -217,7 +217,7 @@ const refreshPdfRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "refreshInspection",
-    description: "Auto-generated placeholder for refreshInspection (POST /{id}/pdf/refresh, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Force a fresh render of both report PDFs (Summary and Full) for an inspection. Marks both as queued, answers 202 immediately and renders in the background, replacing the stored PDF for the current version rather than an archived one; poll the PDF download route for the result. Returns 403 when the PDF pipeline is switched off for the company (Settings, Reports). The inspection id is not checked for existence. Safe to repeat, each call just queues another render. Restricted to owners, managers and inspectors."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // ── Commercial PCA Phase W Task 4 — .docx export status + download ─────────
@@ -534,7 +534,7 @@ const reportDeliveryRoutes = createApiRouter()
         tags: ["inspections"],
         summary: 'Generate shareable agent view token',
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+        request: { params: z.object({ id: z.string().describe('Inspection the agent view link is for.') }) },
         responses: {
             200: {
                 content: { 'application/json': { schema: createApiResponseSchema(z.object({ token: z.string().describe('TODO describe token field for the OpenInspection MCP integration'), url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') })) } },
@@ -542,7 +542,7 @@ const reportDeliveryRoutes = createApiRouter()
             },
         },
         operationId: "createInspectionAgentToken",
-        description: "Auto-generated placeholder for createInspectionAgentToken (POST /{id}/agent-token, inspections domain). TODO: replace with a real description sourced from the handler."
+        description: "Mint a read-only agent view link for an inspection report. Stores a new token that expires after 30 days and returns it with the full report URL (?view=agent&token=...). Nothing is sent: the caller delivers the link. Every call mints a new token and earlier tokens keep working until they expire. Returns 404 for an unknown inspection. Restricted to owners, managers and inspectors."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId') as string;
         const { id } = c.req.valid('param');
@@ -556,7 +556,7 @@ const reportDeliveryRoutes = createApiRouter()
         tags: ["inspections"],
         summary: 'Email the report share link to the linked agent',
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+        request: { params: z.object({ id: z.string().describe('Inspection whose report link is emailed to the buyer agent.') }) },
         responses: {
             200: {
                 content: { 'application/json': { schema: createApiResponseSchema(z.object({ sentTo: z.string().describe('TODO describe sentTo field for the OpenInspection MCP integration') })) } },
@@ -564,7 +564,7 @@ const reportDeliveryRoutes = createApiRouter()
             },
         },
         operationId: "createInspectionShareAgent",
-        description: "Auto-generated placeholder for createInspectionShareAgent (POST /{id}/share-agent, inspections domain). TODO: replace with a real description sourced from the handler."
+        description: "Email the report link to the inspection's buyer agent. Mints a new agent view token (valid 30 days), builds the agent view URL and sends it to the email on the buyer agent contact, with the inspector's signature appended, then writes an inspection.share_agent audit entry. Returns 400 when no buyer agent is linked to the inspection or that contact has no email, 404 for an unknown inspection and 500 if the email fails to send. Each call sends another email with a new token. Restricted to owners, managers and inspectors."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');

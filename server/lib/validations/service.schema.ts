@@ -35,24 +35,24 @@ export const CreateServiceSchema = z.object({
 }).openapi('CreateService');
 
 export const UpdateServiceSchema = CreateServiceSchema.partial().extend({
-    active: z.boolean().optional().describe('TODO describe active field for the OpenInspection MCP integration'),
+    active: z.boolean().optional().describe('Whether the service is active in the catalog; false hides it as a delete does, true brings a deleted service back.'),
 }).openapi('UpdateService');
 
 export const CreateDiscountCodeSchema = z.object({
-    code:      z.string().min(1).max(50).describe('TODO describe code field for the OpenInspection MCP integration'),
-    type:      z.enum(['fixed', 'percent']).describe('TODO describe type field for the OpenInspection MCP integration'),
-    value:     z.number().int().min(1).describe('TODO describe value field for the OpenInspection MCP integration'),
-    maxUses:   z.number().int().min(1).optional().describe('TODO describe maxUses field for the OpenInspection MCP integration'),
-    expiresAt: z.string().datetime().optional().describe('TODO describe expiresAt field for the OpenInspection MCP integration'),
+    code:      z.string().min(1).max(50).describe('Code the client enters; stored in upper case and matched case-insensitively.'),
+    type:      z.enum(['fixed', 'percent']).describe('Whether value is an amount off in cents (fixed) or a percentage off the subtotal (percent).'),
+    value:     z.number().int().min(1).describe('Discount size: cents for a fixed code, percentage points for a percent code.'),
+    maxUses:   z.number().int().min(1).optional().describe('Number of redemptions allowed; leave out for unlimited.'),
+    expiresAt: z.string().datetime().optional().describe('ISO 8601 time after which the code stops validating; leave out for no expiry.'),
 }).openapi('CreateDiscountCode');
 
 export const UpdateDiscountCodeSchema = z.object({
-    code:      z.string().min(1).max(50).optional().describe('TODO describe code field for the OpenInspection MCP integration'),
-    type:      z.enum(['fixed', 'percent']).optional().describe('TODO describe type field for the OpenInspection MCP integration'),
-    value:     z.number().int().min(0).optional().describe('TODO describe value field for the OpenInspection MCP integration'),
-    maxUses:   z.number().int().min(0).nullable().optional().describe('TODO describe maxUses field for the OpenInspection MCP integration'),
-    expiresAt: z.string().nullable().optional().describe('TODO describe expiresAt field for the OpenInspection MCP integration'),
-    active:    z.boolean().optional().describe('TODO describe active field for the OpenInspection MCP integration'),
+    code:      z.string().min(1).max(50).optional().describe('New code text; stored exactly as sent, without the upper-casing applied on create.'),
+    type:      z.enum(['fixed', 'percent']).optional().describe('Whether value is an amount off in cents (fixed) or a percentage off the subtotal (percent).'),
+    value:     z.number().int().min(0).optional().describe('Discount size: cents for a fixed code, percentage points for a percent code.'),
+    maxUses:   z.number().int().min(0).nullable().optional().describe('Number of redemptions allowed; null removes the cap.'),
+    expiresAt: z.string().nullable().optional().describe('ISO 8601 expiry time; null removes the expiry.'),
+    active:    z.boolean().optional().describe('Whether the code can be redeemed; false stops it validating without deleting it.'),
 }).openapi('UpdateDiscountCode');
 
 // The row as it goes over the wire. `GET /api/services/discount-codes` and
@@ -76,8 +76,8 @@ export const DiscountCodeListResponseSchema = createApiResponseSchema(z.array(Di
 export const DiscountCodeResponseSchema     = createApiResponseSchema(DiscountCodeSchema);
 
 export const ValidateDiscountSchema = z.object({
-    code:     z.string().min(1).describe('TODO describe code field for the OpenInspection MCP integration'),
-    subtotal: z.number().int().min(0).describe('TODO describe subtotal field for the OpenInspection MCP integration'),
+    code:     z.string().min(1).describe('Discount code to check, matched case-insensitively.'),
+    subtotal: z.number().int().min(0).describe('Order subtotal in cents that the discount is computed against.'),
 }).openapi('ValidateDiscount');
 
 export const ValidateDiscountResponseSchema = z.object({

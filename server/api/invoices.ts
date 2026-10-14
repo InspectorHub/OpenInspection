@@ -65,13 +65,13 @@ const markSentRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/mark-sent',
     tags: ["invoices"], summary: 'Mark invoice as sent',
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: INVOICE_ID.describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: INVOICE_ID.describe('Invoice to mark as sent.') }) },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }) } }, description: 'Success' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "markSentInvoice",
-    description: "Auto-generated placeholder for markSentInvoice (POST /{id}/mark-sent, invoices domain). TODO: replace with a real description sourced from the handler."
+    description: "Record that an invoice has been sent by stamping its sent time with the current time, which moves a draft to sent (an invoice that is already paid, partly paid or void keeps that status). Nothing is emailed to the client; use the request-payment route to send one. When QuickBooks is configured for the deployment the invoice is also upserted into QuickBooks in the background. Returns 404 for an unknown invoice. Repeating the call restamps the sent time. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const markPaidRoute = createRoute(withMcpMetadata({
