@@ -18,7 +18,7 @@ type Db = ReturnType<QBOServiceBase['getDrizzle']>;
 export const RESYNC_INVOICE_LIMIT = 10;
 
 /** Stop starting new pushes after this long; the rest are counted as remaining. */
-export const RESYNC_BUDGET_MS = 20_000;
+const RESYNC_BUDGET_MS = 20_000;
 
 /** A ceiling on what a caller may ask for, so a bad argument cannot lift the cap. */
 const RESYNC_INVOICE_CEILING = 50;
