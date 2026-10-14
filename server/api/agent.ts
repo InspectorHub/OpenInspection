@@ -121,7 +121,7 @@ const updateProfileRoute = createRoute(withMcpMetadata({
     tags: ["agents"],
     summary: 'Update agent profile (slug + notification prefs)',
     request: {
-        body: { content: { 'application/json': { schema: AgentProfilePatchSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: AgentProfilePatchSchema.describe('The profile fields to change; omitted fields are left as they are') } } },
     },
     responses: {
         200: {
@@ -135,7 +135,7 @@ const updateProfileRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "createAgentProfile",
-    description: "Auto-generated placeholder for createAgentProfile (POST /profile, agents domain). TODO: replace with a real description sourced from the handler."
+    description: "Update the signed-in agent's own profile: public slug, display name and personal display timezone. Despite the POST verb this is a partial update: only the fields sent are written, and sending none changes nothing. The slug is lower-cased and must be unique among agent accounts (409 when taken). A timezone must be a valid IANA id, and an empty string clears it so each company's timezone applies again. Agent accounts only; it always edits the caller's own account. Idempotent."
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**
@@ -177,7 +177,7 @@ const conciergeBookRoute = createRoute(withMcpMetadata({
     tags: ["agents"],
     summary: 'Agent submits a concierge booking on behalf of a client',
     request: {
-        body: { content: { 'application/json': { schema: ConciergeBookSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: ConciergeBookSchema.describe('The company, the property, the client and the requested date for the booking') } } },
     },
     responses: {
         200: {
@@ -191,7 +191,7 @@ const conciergeBookRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "createAgentConciergeBook",
-    description: "Auto-generated placeholder for createAgentConciergeBook (POST /concierge-book, agents domain). TODO: replace with a real description sourced from the handler."
+    description: "Book an inspection on behalf of a client, as a linked agent. Creates an inspection in the requested state with price 0 (or the total of the attached services), a payment status of unpaid, and records the client and the agent against it; any quota the company has on new inspections is consumed. The caller is identified from the session, never from the body, and must be an active linked agent of the named company (403 otherwise). If the company reviews agent bookings, the inspector gets a review email and the status is awaiting_inspector; a named inspector is required unless the agent was invited by one. Otherwise the client is emailed a confirmation link at once and the status is awaiting_client. Not idempotent: each call creates another inspection. Agent accounts only."
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**

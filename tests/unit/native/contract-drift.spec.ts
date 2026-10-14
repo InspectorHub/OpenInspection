@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app } from '../../../server/index';
+import { buildOpenApiDocument } from '../../../server/lib/openapi/build-document';
 import { buildNativeContract, serializeNativeContract } from '../../helpers/native-contract-document';
 import { NATIVE_CONTRACT, type NativeContractEntry } from '../../../scripts/lib/native-contract-registry';
 
@@ -18,7 +19,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONTRACT_PATH = resolve(__dirname, '../../../contracts/native-contract.openapi.json');
 
 function liveDocument() {
-    return app.getOpenAPIDocument({
+    return buildOpenApiDocument(app, {
         openapi: '3.0.0',
         info: { version: 'native-contract', title: 'OpenInspection Native Contract' },
     });

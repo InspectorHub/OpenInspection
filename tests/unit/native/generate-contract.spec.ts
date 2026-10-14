@@ -11,6 +11,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app } from '../../../server/index';
+import { buildOpenApiDocument } from '../../../server/lib/openapi/build-document';
 import { buildNativeContract, serializeNativeContract } from '../../helpers/native-contract-document';
 import { NATIVE_CONTRACT } from '../../../scripts/lib/native-contract-registry';
 
@@ -22,7 +23,7 @@ describe.runIf(process.env['GENERATE_NATIVE_CONTRACT'] === 'true')(
     { timeout: 30_000 },
     () => {
         it('writes native-contract.openapi.json', () => {
-            const doc = app.getOpenAPIDocument({
+            const doc = buildOpenApiDocument(app, {
                 openapi: '3.0.0',
                 info: { version: 'native-contract', title: 'OpenInspection Native Contract' },
             });

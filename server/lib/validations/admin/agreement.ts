@@ -30,8 +30,8 @@ const SIGNATURE_DATA_URI = new RegExp(
  * Validation schema for creating/updating agreements.
  */
 export const AgreementSchema = z.object({
-    name: z.string().min(1, 'Name is required').max(100).openapi({ example: 'Standard Service Agreement' }).describe('TODO describe name field for the OpenInspection MCP integration'),
-    content: z.string().min(1, 'Content is required').openapi({ example: 'This agreement governs...' }).describe('TODO describe content field for the OpenInspection MCP integration'),
+    name: z.string().min(1, 'Name is required').max(100).openapi({ example: 'Standard Service Agreement' }).describe('Template name shown in the agreement list and when choosing what to send (1-100 characters)'),
+    content: z.string().min(1, 'Content is required').openapi({ example: 'This agreement governs...' }).describe('Agreement body as HTML. It is sanitised to the agreement HTML allowlist when saved, so scripts, links and images are dropped'),
 }).openapi('Agreement');
 
 export const AgreementListResponseSchema = createApiResponseSchema(z.array(z.object({
@@ -53,7 +53,7 @@ const SignerInputSchema = z.object({
 }).openapi('AgreementSignerInput');
 
 export const SendAgreementSchema = z.object({
-    agreementId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe agreementId field for the OpenInspection MCP integration'),
+    agreementId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Agreement template to send; must belong to this company. Used only when the inspection has no open signing request, since an open request keeps the template snapshot it was created with'),
     // Recipient email for a single-signer send; normalised to a one-signer envelope.
     // Omit when `signers` is provided. Gated by the refine below so exactly one
     // of the two recipient fields is always satisfiable.

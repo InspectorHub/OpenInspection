@@ -41,13 +41,13 @@ const CancellationPolicySchema = z.object({
  * Validation schema for the branding configuration update.
  */
 export const UpdateBrandingSchema = z.object({
-    companyName: z.string().min(1, 'Company name is required').max(50).optional().openapi({ example: 'My Inspection Pro' }).describe('TODO describe companyName field for the OpenInspection MCP integration'),
+    companyName: z.string().min(1, 'Company name is required').max(50).optional().openapi({ example: 'My Inspection Pro' }).describe('Trading name shown to clients on reports, emails and booking pages (1-50 characters)'),
     // `max(120)` rather than companyName's `max(50)`: registered entity names
     // are longer than brands ("Acme Home Inspections of Greater Cincinnati, LLC").
     legalName: z.string().max(120).nullable().optional().openapi({ example: 'Acme Holdings LLC' }).describe('Registered legal entity name, as it appears on the licence. Distinct from companyName (the trading brand). Blank means "same as the company name" and is the correct answer for a sole proprietor. Appears on agreements, signature certificates, invoices and the TCPA disclosure.'),
-    primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color').optional().openapi({ example: '#4f46e5' }).describe('TODO describe primaryColor field for the OpenInspection MCP integration'),
-    supportEmail: z.string().email('Invalid email address').optional().openapi({ example: 'support@example.com' }).describe('TODO describe supportEmail field for the OpenInspection MCP integration'),
-    billingUrl: z.string().url('Invalid URL').or(z.literal('')).optional().openapi({ example: 'https://example.com/billing' }).describe('TODO describe billingUrl field for the OpenInspection MCP integration'),
+    primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color').optional().openapi({ example: '#4f46e5' }).describe('Brand colour as a six-digit hex value with a leading #, for example #4f46e5'),
+    supportEmail: z.string().email('Invalid email address').optional().openapi({ example: 'support@example.com' }).describe('Support email address shown to clients for questions about their inspection'),
+    billingUrl: z.string().url('Invalid URL').or(z.literal('')).optional().openapi({ example: 'https://example.com/billing' }).describe('URL of the company billing page; an empty string clears it'),
     defaultProfileId: z.string().optional().openapi({ example: 'signature' }).describe('Default report appearance profile id (built-in: signature|meridian|terra)'),
     // Sprint 3 S3-2 — gate the customer-driven "Generate repair request"
     // export link on the published report. This is the ONLY repair-feature
@@ -55,21 +55,21 @@ export const UpdateBrandingSchema = z.object({
     // (`tenant_configs.is_repair_list_enabled`) was removed from this schema,
     // which is what drains the column — `WRITABLE_TENANT_CONFIG_COLUMNS` is
     // derived from these shapes, so an absent field is a refused write.
-    enableCustomerRepairExport: z.boolean().optional().openapi({ example: true }).describe('TODO describe enableCustomerRepairExport field for the OpenInspection MCP integration'),
+    enableCustomerRepairExport: z.boolean().optional().openapi({ example: true }).describe('Whether clients may generate a repair request from the published report. When false, that export is refused'),
     // Round-2 backlog #10 — tenant-wide default for the per-inspection
     // paywall introduced in Sprint 1 D-7 (ReportGatePage). When true, every
     // newly created inspection inherits paymentRequired=true. Per-inspection
     // override remains the source of truth at gate time.
-    blockUnpaid: z.boolean().optional().openapi({ example: false }).describe('TODO describe blockUnpaid field for the OpenInspection MCP integration'),
+    blockUnpaid: z.boolean().optional().openapi({ example: false }).describe('Company default for new inspections: when true, each newly created inspection is marked payment-required. A per-inspection setting still overrides it, and existing inspections are not changed'),
     // Round-2 backlog #10 — tenant-wide default for the per-inspection
     // agreement gate. When true, every newly created inspection inherits
     // agreementRequired=true.
-    blockUnsignedAgreement: z.boolean().optional().openapi({ example: false }).describe('TODO describe blockUnsignedAgreement field for the OpenInspection MCP integration'),
+    blockUnsignedAgreement: z.boolean().optional().openapi({ example: false }).describe('Company default for new inspections: when true, each newly created inspection is marked agreement-required. A per-inspection setting still overrides it, and existing inspections are not changed'),
     // Round-2 backlog G3 (Spectora §4.1) — extra referral-source labels the
     // tenant wants on the inspection settings dropdown. The seed list of
     // seven values (Realtor / Past Client / …) is hardcoded; this array
     // appends to it. Trimmed entries; max 32 to keep the dropdown usable.
-    customReferralSources: z.array(z.string().min(1).max(50)).max(32).optional().openapi({ example: ['Magazine ad', 'Trade show'] }).describe('TODO describe customReferralSources field for the OpenInspection MCP integration'),
+    customReferralSources: z.array(z.string().min(1).max(50)).max(32).optional().openapi({ example: ['Magazine ad', 'Trade show'] }).describe('Extra referral-source labels appended to the built-in list in the inspection referral dropdown. Up to 32 labels of 1-50 characters'),
     // #275 — quick-insert phrases the client can tap into a repair-request note.
     // The caps are LAYOUT constraints, not policy: these render as a wrapping row
     // of inline buttons directly under a 2-row textarea, so a paragraph-length
@@ -78,7 +78,7 @@ export const UpdateBrandingSchema = z.object({
     // buttons off (NULL means "never configured", which shows the defaults).
     repairQuickPhrases: z.array(z.string().min(1).max(40)).max(8).optional().openapi({ example: ['Repair requested', 'Replacement requested'] }).describe('Quick-insert phrases offered under the repair-request note field. Empty array = show no buttons; omit the field to leave the stored list unchanged.'),
     // Workers Paid PDF pipeline opt-in. Default OFF.
-    enablePdfPipeline: z.boolean().optional().openapi({ example: false }).describe('TODO describe enablePdfPipeline field for the OpenInspection MCP integration'),
+    enablePdfPipeline: z.boolean().optional().openapi({ example: false }).describe('Whether report PDFs are rendered by the server-side Browser Run pipeline. Leave false unless that binding is provisioned'),
     // Report PDF print-layout settings. companyAddress is shown
     // in the PDF footer/header; the three booleans gate footer / page-number /
     // inspector-license rendering. All default ON when unset.
@@ -214,7 +214,7 @@ export const TeamDefaultsSchema = z.object({
  * Validates the account ID matches Stripe's `acct_*` format.
  */
 export const StripeConnectAccountSchema = z.object({
-    accountId: z.string().regex(/^acct_[a-zA-Z0-9]{10,}$/, 'Invalid Stripe account ID — must look like acct_xxxxx').openapi({ example: 'acct_1AbCdEfGhIjKlMnO' }).describe('TODO describe accountId field for the OpenInspection MCP integration'),
+    accountId: z.string().regex(/^acct_[a-zA-Z0-9]{10,}$/, 'Invalid Stripe account ID — must look like acct_xxxxx').openapi({ example: 'acct_1AbCdEfGhIjKlMnO' }).describe('Stripe Connect account id in the form acct_ followed by at least 10 letters or digits. Must be the company\'s own Stripe account'),
 }).openapi('StripeConnectAccount');
 
 /**
@@ -268,9 +268,9 @@ export const BrandingResponseSchema = createApiResponseSchema(z.object({
 
 // handoff-decisions §1 — attention thresholds (in hours, 1..720 = 30 days max)
 export const AttentionThresholdsSchema = z.object({
-    agreement_unsigned_h: z.number().int().min(1).max(720).describe('TODO describe agreement_unsigned_h field for the OpenInspection MCP integration'),
-    invoice_overdue_h:    z.number().int().min(1).max(720).describe('TODO describe invoice_overdue_h field for the OpenInspection MCP integration'),
-    report_unpublished_h: z.number().int().min(1).max(720).describe('TODO describe report_unpublished_h field for the OpenInspection MCP integration'),
+    agreement_unsigned_h: z.number().int().min(1).max(720).describe('Hours after an inspection is created without a signed agreement before it appears in Needs Attention (1-720)'),
+    invoice_overdue_h:    z.number().int().min(1).max(720).describe('Hours past its due date that an unpaid, unvoided invoice may go before its inspection appears in Needs Attention (1-720)'),
+    report_unpublished_h: z.number().int().min(1).max(720).describe('Hours after creation before a completed inspection whose report is not yet published appears in Needs Attention (1-720)'),
 }).openapi('AttentionThresholds');
 
 export const AttentionThresholdsResponseSchema = z.object({

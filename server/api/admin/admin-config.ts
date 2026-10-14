@@ -24,9 +24,9 @@ import { getDrizzle } from '../../lib/route-helpers';
 // ─── Integration Config & Secrets ────────────────────────────────────────────
 
 export const IntegrationConfigSchema = z.object({ // closed on purpose: features/plan-quota/ai-caps.ts
-    appBaseUrl: z.string().optional().describe('TODO describe appBaseUrl field for the OpenInspection MCP integration'),
-    turnstileSiteKey: z.string().optional().describe('TODO describe turnstileSiteKey field for the OpenInspection MCP integration'),
-    googleClientId: z.string().optional().describe('TODO describe googleClientId field for the OpenInspection MCP integration'),
+    appBaseUrl: z.string().optional().describe('Application base URL recorded in the company integration settings. Stored as given, without URL validation; an empty string removes the stored value'),
+    turnstileSiteKey: z.string().optional().describe('Turnstile site key (the public half of the key pair) recorded in the company integration settings. Never put the secret key here; an empty string removes the stored value'),
+    googleClientId: z.string().optional().describe('Google OAuth client id recorded in the company integration settings. The client secret does not belong here; an empty string removes the stored value'),
     streamCustomerSubdomain: z.string().optional().describe('Cloudflare Stream customer subdomain for self-host Stream video backend (e.g. customer.cloudflarestream.com).'),
 }).openapi('IntegrationConfig');
 
@@ -57,12 +57,12 @@ const updateIntegrationConfigRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Save non-sensitive integration config (plaintext)',
     middleware: [requireRole('owner')],
-    request: { body: { content: { 'application/json': { schema: IntegrationConfigSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: IntegrationConfigSchema.describe('Integration settings to merge into the stored set; keys left out are kept') } } } },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }) } }, description: 'Saved' },
     },
     operationId: "createTenantConfig",
-    description: "Auto-generated placeholder for createTenantConfig (POST /config, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Save the company's non-sensitive integration settings (appBaseUrl, turnstileSiteKey, googleClientId, streamCustomerSubdomain). The body is merged into what is stored: keys that are sent overwrite, keys that are left out are kept, and a key sent as an empty string is removed. The values are stored as plaintext, so secrets never go through this route. The change is audit-logged. Idempotent for the same body. Restricted to the owner."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -91,7 +91,7 @@ const setWidgetOriginsRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Replace widget allowed-origin list',
     middleware: [requireRole('owner', 'manager')],
-    request: { body: { content: { 'application/json': { schema: z.object({ origins: z.array(z.string().min(1)).max(50).describe('TODO describe origins field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: z.object({ origins: z.array(z.string().min(1)).max(50).describe('Complete list of allowed origins, at most 50. Each must be an http or https origin and may contain at most one * wildcard (for example https://*.example.com)') }).describe('The full replacement origin allowlist; an empty list clears it') } } } },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ origins: z.array(z.string()).describe('TODO describe origins field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
@@ -100,7 +100,7 @@ const setWidgetOriginsRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "updateTenantWidgetOrigin",
-    description: "Auto-generated placeholder for updateTenantWidgetOrigin (PUT /widget/origins, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Replace the company's allowlist of website origins that may embed the booking widget. The submitted list becomes the whole list, so entries that are not resent are removed. Every entry is validated first (http or https only, at most one wildcard) and nothing is saved if any entry is invalid. Idempotent for the same list. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 // --- Stripe Connect (inspector-facing) ---
@@ -128,7 +128,7 @@ const setStripeConnectRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Set the tenant Stripe Connect account ID',
     middleware: [requireRole('owner', 'manager')],
-    request: { body: { content: { 'application/json': { schema: StripeConnectAccountSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: StripeConnectAccountSchema.describe('The Stripe account to link to this company') } } } },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ accountId: z.string().describe('TODO describe accountId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
@@ -137,7 +137,7 @@ const setStripeConnectRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "updateTenantStripeConnect",
-    description: "Auto-generated placeholder for updateTenantStripeConnect (PUT /stripe-connect, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Link the company to a Stripe Connect account by its acct_ id, replacing any account already linked. The integrations list then reports Stripe as connected. Only the id format is checked; this call does not contact Stripe to confirm the account exists or has finished onboarding. The change is audit-logged. Idempotent for the same id. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 const deleteStripeConnectRoute = createRoute(withMcpMetadata({
@@ -154,7 +154,7 @@ const deleteStripeConnectRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "deleteTenantStripeConnect",
-    description: "Auto-generated placeholder for deleteTenantStripeConnect (DELETE /stripe-connect, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Unlink the company's Stripe Connect account by clearing the stored acct_ id. Nothing is changed in Stripe itself, and invoices that already exist are not edited. The change is audit-logged. Idempotent: clearing an already-empty link succeeds. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 // --- Earnings Summary ---

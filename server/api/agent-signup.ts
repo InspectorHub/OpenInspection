@@ -19,10 +19,10 @@ import { getDrizzle } from '../lib/route-helpers';
  */
 const SignupBodySchema = z
     .object({
-        email: z.string().email().describe('TODO describe email field for the OpenInspection MCP integration'),
-        password: z.string().min(12).max(120).describe('TODO describe password field for the OpenInspection MCP integration'),
-        name: z.string().min(2).max(120).describe('TODO describe name field for the OpenInspection MCP integration'),
-        turnstileToken: z.string().optional().describe('TODO describe turnstileToken field for the OpenInspection MCP integration'),
+        email: z.string().email().describe('Email address for the new agent account. Becomes the sign-in name; an address that already has an account is refused with 409'),
+        password: z.string().min(12).max(120).describe('Account password, 12-120 characters'),
+        name: z.string().min(2).max(120).describe('The agent\'s full name, 2-120 characters'),
+        turnstileToken: z.string().optional().describe('Token from the Turnstile bot challenge shown on the signup page. Required where the deployment enforces the challenge; verified server-side'),
         // Legacy optional field — tenant Privacy/Terms are configured in Settings,
         // not via Worker env. SaaS agents accept portal Terms at registration.
         // REQUIRED now, and it is the tick and only the tick. The version and
@@ -87,9 +87,16 @@ const signupRoute = createRoute(withMcpMetadata({
     path: '/',
     tags: ["agents"],
     summary: "Create agent for current tenant",
-    description: "Auto-generated placeholder for createAgent (POST /, agents domain). TODO: replace with a real description sourced from the handler.",
+    description: "Self-serve signup for a real-estate agent. Public: no session is needed. Creates an agent account that "
+        + "belongs to no single company, records acceptance of the agent terms currently in force (version, content "
+        + "hash, time, IP and country are taken from the server, never from the caller), links the account to every "
+        + "company that already holds this email as an agent contact, and signs the new agent in with a 24-hour "
+        + "session cookie. Refused with 400 when the bot challenge is missing or fails, when the deployment has "
+        + "published no agent terms, when shownContentHash no longer matches the terms in force, or when "
+        + "termsAccepted is not true. An email that already has an account returns 409. Not idempotent: a repeat "
+        + "with the same email is a 409.",
     request: {
-        body: { content: { 'application/json': { schema: SignupBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: SignupBodySchema.describe('The new agent\'s details and their acceptance of the agent terms') } } },
     },
     responses: {
         200: {

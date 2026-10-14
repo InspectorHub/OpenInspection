@@ -46,7 +46,7 @@ const updateBrandingRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: UpdateBrandingSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: UpdateBrandingSchema.describe('Only the branding and company settings to change; omitted settings are left as they are'),
                 },
             },
         },
@@ -77,7 +77,15 @@ const updateBrandingRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "createTenantBranding",
-    description: "Auto-generated placeholder for createTenantBranding (POST /branding, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Update the company's branding and company-wide settings: name, legal name, colour, support email, "
+        + "report appearance and PDF layout, timezone, locale, date and time format, currency, new-inspection gate "
+        + "defaults, cancellation policy, booking deposit, repair quick phrases and referral sources. Despite the "
+        + "POST verb this is a partial update: only the fields sent are written. Changing the currency while "
+        + "invoices already exist is refused with 409 CURRENCY_CHANGE_NEEDS_CONFIRM, which reports the invoice "
+        + "count, until the call is repeated with confirmCurrencyChange true; existing invoices keep the currency "
+        + "they were billed in. A cancellation policy that charges a fee is refused unless a cancellation clause "
+        + "has been attested for the current version of an agreement template (attestCancellationClause, applied "
+        + "in the same call before the policy). Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -95,8 +103,8 @@ const uploadLogoRoute = createRoute(withMcpMetadata({
             content: {
                 'multipart/form-data': {
                     schema: z.object({
-                        logo: z.any().openapi({ type: 'string', format: 'binary' }).describe('TODO describe logo field for the OpenInspection MCP integration'),
-                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                        logo: z.any().openapi({ type: 'string', format: 'binary' }).describe('Logo image file: PNG, SVG, JPEG or WebP, at most 2,000,000 bytes'),
+                    }).describe('Multipart form carrying the logo file'),
                 },
             },
         },
@@ -112,7 +120,11 @@ const uploadLogoRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "createTenantBrandingLogo",
-    description: "Auto-generated placeholder for createTenantBrandingLogo (POST /branding/logo, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Upload the company logo as a multipart form with a logo file (PNG, SVG, JPEG or WebP, at most "
+        + "2,000,000 bytes; anything else is a 400). The file is stored in object storage under a new key each time "
+        + "and the company logo URL is switched to it immediately; the previous file is not deleted. The response "
+        + "returns the new logoUrl, a path on this deployment. Not idempotent: each call stores another file. "
+        + "Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 

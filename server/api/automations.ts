@@ -22,11 +22,16 @@ const listRoute = createRoute(withMcpMetadata({
 const createAutomationRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/', tags: ["automations"],
     middleware: [requireRole('owner', 'manager')],
-    request: { body: { content: { 'application/json': { schema: CreateAutomationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: CreateAutomationSchema.describe('The new rule: its trigger, recipients, delay, channels and templates') } } } },
     responses: { 201: { content: { 'application/json': { schema: createApiResponseSchema(AutomationSchema) } }, description: 'Created' } },
     operationId: "createAutomation",
     summary: "Create automation for current tenant",
-    description: "Auto-generated placeholder for createAutomation (POST /, automations domain). TODO: replace with a real description sourced from the handler."
+    description: "Create a messaging automation rule that sends an email, SMS or in-app notice when a trigger event "
+        + "happens, after an optional delay in minutes. The rule is created active and is never a default rule. "
+        + "Channels default to email, and the delay defaults to 0. A rule aimed at a role must name the role "
+        + "profile in recipientRoleProfileId, and any other recipient kind must leave it out. The message wording "
+        + "comes from the referenced message templates, not from the rule. Not idempotent: each call creates "
+        + "another rule. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // GET /api/automations/logs/recent — Spec 3C, tenant-wide activity feed
@@ -34,7 +39,7 @@ const createAutomationRoute = createRoute(withMcpMetadata({
 const getRecentLogsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/logs/recent', tags: ["automations"],
     middleware: [requireRole('owner', 'manager')],
-    request: { query: z.object({ limit: z.coerce.number().int().min(1).max(200).optional().describe('TODO describe limit field for the OpenInspection MCP integration') }) },
+    request: { query: z.object({ limit: z.coerce.number().int().min(1).max(200).optional().describe('Maximum number of log entries to return, 1-200. Defaults to 50') }) },
     responses: { 200: { content: { 'application/json': { schema: AutomationLogListResponseSchema } }, description: 'Recent automation logs' } },
     operationId: "listAutomationLogsRecent",
     summary: "List automation logs recent",
@@ -52,24 +57,30 @@ const updateRoute = createRoute(withMcpMetadata({
     method: 'patch', path: '/{id}', tags: ["automations"],
     middleware: [requireRole('owner', 'manager')],
     request: {
-        params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }),
-        body: { content: { 'application/json': { schema: UpdateAutomationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().describe('Id of the automation rule to change; must belong to this company') }),
+        body: { content: { 'application/json': { schema: UpdateAutomationSchema.describe('The rule fields to change; omitted fields are left as they are') } } },
     },
     responses: { 200: { content: { 'application/json': { schema: createApiResponseSchema(AutomationSchema) } }, description: 'Updated' } },
     operationId: "patchAutomation",
     summary: "Patch automation for current tenant",
-    description: "Auto-generated placeholder for patchAutomation (PATCH /{id}, automations domain). TODO: replace with a real description sourced from the handler."
+    description: "Change an automation rule. Only the fields sent are written. Sending conditions as null removes all "
+        + "send-time gates, and channels, if sent, replaces the whole channel list. This is also how a rule is "
+        + "switched off or on (active). Default rules can be edited. Unlike create, an update does not re-check "
+        + "that recipientRoleProfileId matches recipientKind, so send them together. Returns 404 when the id is "
+        + "not a rule in this company. Idempotent. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // DELETE /api/automations/:id
 const deleteRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}', tags: ["automations"],
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().describe('Id of the automation rule to delete; must belong to this company') }) },
     responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
     operationId: "deleteAutomation",
     summary: "Delete automation for current tenant",
-    description: "Auto-generated placeholder for deleteAutomation (DELETE /{id}, automations domain). TODO: replace with a real description sourced from the handler."
+    description: "Permanently delete an automation rule. Default rules cannot be deleted (403); switch them off with "
+        + "an update instead. Returns 404 when the id is not a rule in this company, so repeating the call fails "
+        + "the second time. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const automationsRoutes = createApiRouter()

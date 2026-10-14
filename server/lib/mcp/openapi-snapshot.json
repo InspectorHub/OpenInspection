@@ -78,7 +78,7 @@
             "minLength": 6,
             "maxLength": 20,
             "example": "123456",
-            "description": "Six-digit TOTP code from the authenticator app, or an 8-char recovery code."
+            "description": "Six-digit TOTP code from the authenticator app, or an 8-char recovery code. 6-20 characters."
           }
         },
         "required": [
@@ -199,7 +199,7 @@
           "index": {
             "type": "integer",
             "minimum": 0,
-            "description": "Position, 0-based. Must be at or past the group capacity."
+            "description": "Position, 0-based. Must be at or past the group capacity. Integer, at least 0."
           },
           "fields": {
             "type": "object",
@@ -315,7 +315,7 @@
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Requested repair credit in integer cents."
+            "description": "Requested repair credit in integer cents. Integer cents, at least 0."
           },
           "note": {
             "type": "string",
@@ -464,7 +464,7 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 999,
-                    "description": "How many units from now the links stop working."
+                    "description": "How many units from now the links stop working. Integer between 1 and 999."
                   },
                   "unit": {
                     "type": "string",
@@ -508,11 +508,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -564,11 +564,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -655,11 +655,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -758,11 +758,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -821,7 +821,7 @@
               "sms",
               "in_app"
             ],
-            "description": "Limit to one channel (a column)."
+            "description": "Limit to one channel (a column). One of: email, sms, in_app."
           },
           "classId": {
             "type": "string",
@@ -878,7 +878,7 @@
               "sms",
               "in_app"
             ],
-            "description": "Limit to one channel (a column). Omit with classId for everything."
+            "description": "Limit to one channel (a column). Omit with classId for everything. One of: email, sms, in_app."
           },
           "classId": {
             "type": "string",
@@ -1029,11 +1029,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -1057,11 +1057,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the rating system. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the rating system. Must belong to the caller's company."
           }
         }
       ],
@@ -1134,14 +1134,14 @@
             "type": "string",
             "minLength": 10,
             "example": "eyJhbGciOiJI...",
-            "description": "Short-lived 2FA challenge JWT issued by /login when the account has TOTP enabled."
+            "description": "Short-lived 2FA challenge JWT issued by /login when the account has TOTP enabled. At least 10 characters."
           },
           "code": {
             "type": "string",
             "minLength": 6,
             "maxLength": 20,
             "example": "123456",
-            "description": "Six-digit TOTP code from the authenticator app, or an 8-char recovery code."
+            "description": "Six-digit TOTP code from the authenticator app, or an 8-char recovery code. 6-20 characters."
           }
         },
         "required": [
@@ -1168,7 +1168,7 @@
       }
     },
     "summary": "Client redeems a concierge magic-link token",
-    "description": "Auto-generated placeholder for confirmConcierge (POST /confirm, bookings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Redeem the emailed confirmation link for a booking an agent placed on a client's behalf. Public: the single-use token is the only credential. Sets the inspection to confirmed, clears its awaiting-client state, marks the token used, and notifies the agent who booked it. The response carries a redirect: to the agreement signing page when the inspection requires a signed agreement (an agreement request is found or created for it), otherwise to the report page. If no agreement template exists the redirect falls back to the report page. 404 for an unknown token, 400 for an expired token or a cancelled inspection, and 409 once the token has been used, so a repeat call fails."
   },
   {
     "operationId": "confirmInspection",
@@ -1185,10 +1185,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -1260,7 +1260,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 500,
-            "description": "Why the exported amount is being corrected."
+            "description": "Why the exported amount is being corrected. 1-500 characters."
           }
         },
         "required": [
@@ -1345,7 +1345,7 @@
       }
     },
     "summary": "Create agent for current tenant",
-    "description": "Auto-generated placeholder for createAgent (POST /, agents domain). TODO: replace with a real description sourced from the handler."
+    "description": "Self-serve signup for a real-estate agent. Public: no session is needed. Creates an agent account that belongs to no single company, records acceptance of the agent terms currently in force (version, content hash, time, IP and country are taken from the server, never from the caller), links the account to every company that already holds this email as an agent contact, and signs the new agent in with a 24-hour session cookie. Refused with 400 when the bot challenge is missing or fails, when the deployment has published no agent terms, when shownContentHash no longer matches the terms in force, or when termsAccepted is not true. An email that already has an account returns 409. Not idempotent: a repeat with the same email is a 409."
   },
   {
     "operationId": "createAgentConciergeBook",
@@ -1363,7 +1363,7 @@
       }
     },
     "summary": "Agent submits a concierge booking on behalf of a client",
-    "description": "Auto-generated placeholder for createAgentConciergeBook (POST /concierge-book, agents domain). TODO: replace with a real description sourced from the handler."
+    "description": "Book an inspection on behalf of a client, as a linked agent. Creates an inspection in the requested state with price 0 (or the total of the attached services), a payment status of unpaid, and records the client and the agent against it; any quota the company has on new inspections is consumed. The caller is identified from the session, never from the body, and must be an active linked agent of the named company (403 otherwise). If the company reviews agent bookings, the inspector gets a review email and the status is awaiting_inspector; a named inspector is required unless the agent was invited by one. Otherwise the client is emailed a confirmation link at once and the status is awaiting_client. Not idempotent: each call creates another inspection. Agent accounts only."
   },
   {
     "operationId": "createAgentProfile",
@@ -1381,7 +1381,7 @@
       }
     },
     "summary": "Update agent profile (slug + notification prefs)",
-    "description": "Auto-generated placeholder for createAgentProfile (POST /profile, agents domain). TODO: replace with a real description sourced from the handler."
+    "description": "Update the signed-in agent's own profile: public slug, display name and personal display timezone. Despite the POST verb this is a partial update: only the fields sent are written, and sending none changes nothing. The slug is lower-cased and must be unique among agent accounts (409 when taken). A timezone must be a valid IANA id, and an empty string clears it so each company's timezone applies again. Agent accounts only; it always edits the caller's own account. Idempotent."
   },
   {
     "operationId": "createAiAutoSummary",
@@ -1399,7 +1399,7 @@
       }
     },
     "summary": "Create ai auto summary",
-    "description": "Auto-generated placeholder for createAiAutoSummary (POST /auto-summary, ai domain). TODO: replace with a real description sourced from the handler."
+    "description": "Generate a short summary of an inspection's defects with the configured AI provider. Only the inspector's notes on items rated Defect are sent to the model (an item with no note is sent as 'No description provided'); item names, addresses and client details are not. When the inspection has no results or no defects, a fixed 'no significant defects' sentence is returned without calling the model and aiCallId is null. Otherwise aiCallId identifies the recorded AI call, which a human review can cite. The inspection must belong to this company. Fails when AI is not configured or the workspace's AI allowance is spent. Nothing is saved to the inspection, and each call is a fresh model call. Open to owners, managers and inspectors."
   },
   {
     "operationId": "createAiCommentAssist",
@@ -1435,7 +1435,7 @@
       }
     },
     "summary": "Rewrite a canned comment with AI assistance",
-    "description": "Auto-generated placeholder for createAiCommentEdit (POST /comment/edit, ai domain). TODO: replace with a real description sourced from the handler."
+    "description": "Rewrite one inspection comment according to a free-form instruction (for example shorten it, or add location detail), using the item, section and tab it belongs to as context. Returns the rewritten text and the id of the AI call that produced it, which is null only for the local development mock. Nothing is saved: the caller decides whether to replace the original. Fails when AI is not configured, and is rate-limited per caller. Each call is a fresh model call. Open to owners, managers and inspectors."
   },
   {
     "operationId": "createAiContentReview",
@@ -1471,7 +1471,7 @@
       }
     },
     "summary": "Suggest professional comments for a form item",
-    "description": "Auto-generated placeholder for createAiSuggestComment (POST /suggest-comment, ai domain). TODO: replace with a real description sourced from the handler."
+    "description": "Ask the AI provider for up to three suggested report comments for one inspection item, given its name, section and optionally its rating, the year built and the square footage. Returns the suggestions as text plus the id of the AI call. If the model's answer cannot be read, or the model call fails, the result is an empty suggestion list rather than an error; a missing AI configuration or a spent AI allowance is still an error. Nothing is saved. Open to owners, managers and inspectors."
   },
   {
     "operationId": "createAutomation",
@@ -1489,7 +1489,7 @@
       }
     },
     "summary": "Create automation for current tenant",
-    "description": "Auto-generated placeholder for createAutomation (POST /, automations domain). TODO: replace with a real description sourced from the handler."
+    "description": "Create a messaging automation rule that sends an email, SMS or in-app notice when a trigger event happens, after an optional delay in minutes. The rule is created active and is never a default rule. Channels default to email, and the delay defaults to 0. A rule aimed at a role must name the role profile in recipientRoleProfileId, and any other recipient kind must leave it out. The message wording comes from the referenced message templates, not from the rule. Not idempotent: each call creates another rule. Restricted to owners and managers."
   },
   {
     "operationId": "createAvailabilityOverride",
@@ -1524,11 +1524,11 @@
           "name": "token",
           "in": "path",
           "required": true,
-          "description": "TODO describe token field for the OpenInspection MCP integration",
+          "description": "Signer token from the personal signing link the signer was emailed",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe token field for the OpenInspection MCP integration"
+            "description": "Signer token from the personal signing link the signer was emailed"
           }
         }
       ],
@@ -1538,27 +1538,27 @@
           "signatureBase64": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe signatureBase64 field for the OpenInspection MCP integration"
+            "description": "The drawn signature as a base64-encoded image, optionally with a data:image/...;base64, prefix. It is stored on the signer record and a SHA-256 hash of the image bytes is written to the signing audit trail"
           },
           "onBehalfOf": {
             "type": "string",
             "maxLength": 200,
-            "description": "Client name an authorized agent is signing on behalf of"
+            "description": "Client name an authorized agent is signing on behalf of. Up to 200 characters."
           },
           "onBehalfDisclaimer": {
             "type": "string",
             "maxLength": 2000,
-            "description": "Authorized-agent disclaimer text shown at sign time"
+            "description": "Authorized-agent disclaimer text shown at sign time. Up to 2000 characters."
           }
         },
         "required": [
           "signatureBase64"
         ],
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "The signature and, when signing for someone else, who for"
       }
     },
     "summary": "Submit client signature (public, token-gated)",
-    "description": "Auto-generated placeholder for createBookingAgreementsSign (POST /agreements/:token/sign, bookings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Record a remote signature for one signer of an agreement, identified by the token in their personal signing link. Public: the token is the only credential. The signature is refused with 400 unless the signing audit trail already shows this signer was presented this exact agreement text, which happens when they open it through the get-agreement route. It also writes a signer.signed entry to that trail with IP, country, user agent and a hash of the signature image, stores the signature, and fires the per-signature automation trigger. When this signature completes the envelope under its completion policy, the completion pipeline runs exactly once (audit entry, verification token, completion workflow, admin notification, completion automation and confirmation email). The signer is also emailed a receipt with a verification link, except when their signature completed the envelope and they are the envelope's client, who gets the completion email instead. A signer who declined or whose request expired gets 409, and an unknown token gets 404. Repeating the call for a signer who already signed does not change the stored signature, but it can still append another audit entry and resend the receipt."
   },
   {
     "operationId": "createBookingBook",
@@ -1576,7 +1576,7 @@
       }
     },
     "summary": "Submit a new booking",
-    "description": "Auto-generated placeholder for createBookingBook (POST /book, bookings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Submit a public online booking for a company, identified by its slug in the body. Public and rate-limited: no sign-in is needed. Where the deployment enforces the bot challenge, a valid turnstileToken is required (403 otherwise), and a submission from an embedded widget (?embed=1) must come from an origin on the company's widget allowlist. The booking is refused with 409 when online booking is not set up or open, no inspector serves the area, or the requested date and window have no free slot; a named inspector who is unavailable is refused rather than replaced. On success it creates an inspection request holding one inspection per selected service (or a single inspection when no services are sent), in the requested state and unpaid, assigned to the chosen or auto-selected inspector, and consumes any new-inspection quota. It then records the client and any referring agent, snapshots the deposit owed, emails the client a confirmation, pushes the appointment to the inspector's connected calendar, and fires the booking-received automation; the last three happen after the response is sent. The response gives the inspection and request ids and depositRequiredCents (integer cents, 0 when none). Not idempotent: each call creates another booking."
   },
   {
     "operationId": "createBookingDepositIntent",
@@ -1626,7 +1626,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "description": "Short label shown on the calendar block"
+            "description": "Short label shown on the calendar block. 1-200 characters."
           },
           "date": {
             "type": "string",
@@ -1648,13 +1648,13 @@
           "allDay": {
             "type": "boolean",
             "default": false,
-            "description": "When true, the block covers the full civil date"
+            "description": "When true, the block covers the full civil date. Defaults to false."
           },
           "notes": {
             "type": "string",
             "nullable": true,
             "maxLength": 2000,
-            "description": "Optional free-text notes for the calendar block"
+            "description": "Optional free-text notes for the calendar block. Up to 2000 characters."
           }
         },
         "required": [
@@ -1805,10 +1805,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -1881,7 +1881,7 @@
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Phase F instance index within the building."
+            "description": "Phase F instance index within the building. Integer, at least 0."
           },
           "unitId": {
             "type": "string",
@@ -1914,7 +1914,7 @@
               "replace",
               "further_study"
             ],
-            "description": "Remedial action for this line item."
+            "description": "Remedial action for this line item. One of: repair, replace, further_study."
           },
           "costMethod": {
             "type": "string",
@@ -1922,13 +1922,13 @@
               "unit",
               "lump_sum"
             ],
-            "description": "Whether the cost is quantity x unit cost or a flat lump sum."
+            "description": "Whether the cost is quantity x unit cost or a flat lump sum. One of: unit, lump_sum."
           },
           "quantity": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Unit-method quantity (null for lump_sum)."
+            "description": "Unit-method quantity (null for lump_sum). Integer, at least 0."
           },
           "uom": {
             "type": "string",
@@ -1939,31 +1939,31 @@
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Per-unit cost in integer cents (unit method only)."
+            "description": "Per-unit cost in integer cents (unit method only). Integer cents, at least 0."
           },
           "lumpSumCents": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Flat total cost in integer cents (lump_sum method only)."
+            "description": "Flat total cost in integer cents (lump_sum method only). Integer cents, at least 0."
           },
           "eul": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Expected Useful Life in years, for the reserve schedule."
+            "description": "Expected Useful Life in years, for the reserve schedule. Integer, at least 0."
           },
           "effAge": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Effective Age in years, for the reserve schedule."
+            "description": "Effective Age in years, for the reserve schedule. Integer, at least 0."
           },
           "rul": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Remaining Useful Life in years, for the reserve schedule."
+            "description": "Remaining Useful Life in years, for the reserve schedule. Integer, at least 0."
           },
           "suggestedRemedy": {
             "type": "string",
@@ -1976,7 +1976,7 @@
               "short_term",
               "long_term"
             ],
-            "description": "Deferred maintenance vs. capital reserve bucket."
+            "description": "Deferred maintenance vs. capital reserve bucket. One of: immediate, short_term, long_term."
           },
           "sectionRef": {
             "type": "string",
@@ -1990,7 +1990,7 @@
           },
           "sortOrder": {
             "type": "integer",
-            "description": "Display order within the bucket."
+            "description": "Display order within the bucket. Integer."
           }
         },
         "required": [
@@ -2048,11 +2048,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -2078,10 +2078,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -2158,7 +2158,7 @@
       }
     },
     "summary": "Create inspection request with N sub-inspections",
-    "description": "Auto-generated placeholder for createInspectionRequest (POST /, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Create an inspection request: one client, property and schedule, with 1-10 inspections under it, each from its own template. Every referenced template must belong to this company (400 otherwise). Each inspection is created in the requested state, unpaid, at the sent price (default 0), with a copy of its template, and all take the request's address, date and optional inspector. The client is matched or created as a contact and recorded against each inspection. Any new-inspection quota is consumed once for the whole batch before anything is written. The request starts as pending. Sends no email. Not idempotent: each call creates a new request. Restricted to owners and managers."
   },
   {
     "operationId": "createInspectionRequestInspections",
@@ -2175,11 +2175,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection request to add an inspection to; must belong to this company",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection request to add an inspection to; must belong to this company"
           }
         }
       ],
@@ -2189,28 +2189,28 @@
           "templateId": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe templateId field for the OpenInspection MCP integration"
+            "description": "Id of the inspection template the new inspection uses; must belong to this company. The template is copied onto the inspection"
           },
           "price": {
             "type": "integer",
             "minimum": 0,
-            "description": "TODO describe price field for the OpenInspection MCP integration"
+            "description": "Price for the new inspection in integer cents (for example 45000 is 450.00 in the company currency); defaults to 0"
           },
           "notes": {
             "type": "string",
             "nullable": true,
             "maxLength": 500,
-            "description": "TODO describe notes field for the OpenInspection MCP integration"
+            "description": "Notes for the new inspection, up to 500 characters"
           }
         },
         "required": [
           "templateId"
         ],
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "The template, price and notes of the inspection to add"
       }
     },
     "summary": "Add a sub-inspection to an existing request",
-    "description": "Auto-generated placeholder for createInspectionRequestInspections (POST /{id}/inspections, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Add one more inspection to an existing inspection request. The new inspection copies its template, takes the request's address and date, starts in the requested state, unpaid, at the sent price (default 0), and the request's client is recorded against it. It has no inspector assigned. Consumes any new-inspection quota. 404 when the request is not in this company, and 400 when the template is not. The route does not enforce the 10-inspection limit that applies at creation. Not idempotent: each call adds another inspection. Restricted to owners and managers."
   },
   {
     "operationId": "createInspectionSendReportPdf",
@@ -2227,11 +2227,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -2287,10 +2287,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -4547,11 +4547,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -4577,11 +4577,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -4669,17 +4669,17 @@
             "type": "string",
             "maxLength": 120,
             "default": "",
-            "description": "Human-readable credential label shown on reports, e.g. \"InterNACHI Certified Professional Inspector\"."
+            "description": "Human-readable credential label shown on reports, e.g. \"InterNACHI Certified Professional Inspector\". Up to 120 characters. Defaults to \"\"."
           },
           "memberNumber": {
             "type": "string",
             "nullable": true,
             "maxLength": 60,
-            "description": "Optional membership or license number displayed alongside the credential label."
+            "description": "Optional membership or license number displayed alongside the credential label. Up to 60 characters."
           },
           "sortOrder": {
             "type": "integer",
-            "description": "Display order for this credential within the inspector list (ascending)."
+            "description": "Display order for this credential within the inspector list (ascending). Integer."
           }
         }
       }
@@ -4720,10 +4720,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the library. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the library. Must belong to the caller's company."
           }
         }
       ],
@@ -4788,7 +4788,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 5000,
-            "description": "Message body text."
+            "description": "Message body text. 1-5000 characters."
           },
           "attachments": {
             "type": "array",
@@ -4830,7 +4830,7 @@
               ]
             },
             "maxItems": 5,
-            "description": "Up to 5 previously-uploaded attachments."
+            "description": "Up to 5 previously-uploaded attachments. Up to 5 items."
           },
           "contactId": {
             "type": "string",
@@ -4864,7 +4864,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "description": "Display name for the template (max 200 chars)."
+            "description": "Display name for the template (max 200 chars). 1-200 characters."
           },
           "channel": {
             "type": "string",
@@ -4873,7 +4873,7 @@
               "sms",
               "in_app"
             ],
-            "description": "Delivery channel: email or sms."
+            "description": "Delivery channel: email or sms. One of: email, sms, in_app."
           },
           "subject": {
             "type": "string",
@@ -4899,7 +4899,7 @@
               "en",
               "es-419"
             ],
-            "description": "Language variant this template is written in. Variants of one template share name + channel. Defaults to en."
+            "description": "Language variant this template is written in. Variants of one template share name + channel. Defaults to en. One of: en, es-419."
           }
         },
         "required": [
@@ -5214,7 +5214,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 80,
-            "description": "Tenant-editable display label for the new role profile, e.g. \"Property Manager\"."
+            "description": "Tenant-editable display label for the new role profile, e.g. \"Property Manager\". 1-80 characters."
           },
           "kind": {
             "type": "string",
@@ -5260,7 +5260,7 @@
                   "read",
                   "readwrite"
                 ],
-                "description": "Access to the buyer's repair list, resolved against the tenant policy by taking the stricter of the two."
+                "description": "Access to the buyer's repair list, resolved against the tenant policy by taking the stricter of the two. One of: off, read, readwrite."
               }
             },
             "description": "Per-profile overrides layered on the kind baseline."
@@ -5427,7 +5427,7 @@
       }
     },
     "summary": "Create tenant agreements for current tenant",
-    "description": "Auto-generated placeholder for createTenantAgreements (POST /agreements, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Create an agreement template. The body is sanitised to the agreement HTML allowlist before it is stored, and the template starts at version 1. Creating a template sends nothing and revokes nothing; it only becomes a signing request when it is sent for an inspection. Restricted to owners and managers."
   },
   {
     "operationId": "createTenantAuditLogs",
@@ -5448,7 +5448,7 @@
             "enum": [
               "inspection.sync_conflict_resolved"
             ],
-            "description": "The audit action to record. Constrained to the actions an inspector-driven request may write."
+            "description": "The audit action to record. Constrained to the actions an inspector-driven request may write. One of: inspection.sync_conflict_resolved."
           },
           "resourceType": {
             "type": "string",
@@ -5490,7 +5490,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "description": "Id of the entity the action touched."
+            "description": "Id of the entity the action touched. 1-128 characters."
           },
           "detail": {
             "type": "object",
@@ -5509,7 +5509,7 @@
       }
     },
     "summary": "Record an inspector-driven audit event",
-    "description": "Auto-generated placeholder for createTenantAuditLogs (POST /audit-logs, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Append one client-reported event to the company audit log. The only action accepted is inspection.sync_conflict_resolved, which the offline editor reports when an inspector resolves a sync conflict; every other audit action is written by the server itself and cannot be forged here. The entity family must be one of the known families, and detail is free-form metadata that is redacted by value shape when written. Each call appends a new entry; repeating it records the event again. Open to owners, managers and inspectors."
   },
   {
     "operationId": "createTenantBranding",
@@ -5527,7 +5527,7 @@
       }
     },
     "summary": "Create tenant branding for current tenant",
-    "description": "Auto-generated placeholder for createTenantBranding (POST /branding, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Update the company's branding and company-wide settings: name, legal name, colour, support email, report appearance and PDF layout, timezone, locale, date and time format, currency, new-inspection gate defaults, cancellation policy, booking deposit, repair quick phrases and referral sources. Despite the POST verb this is a partial update: only the fields sent are written. Changing the currency while invoices already exist is refused with 409 CURRENCY_CHANGE_NEEDS_CONFIRM, which reports the invoice count, until the call is repeated with confirmCurrencyChange true; existing invoices keep the currency they were billed in. A cancellation policy that charges a fee is refused unless a cancellation clause has been attested for the current version of an agreement template (attestCancellationClause, applied in the same call before the policy). Restricted to owners and managers."
   },
   {
     "operationId": "createTenantBrandingLogo",
@@ -5543,7 +5543,7 @@
       "body": null
     },
     "summary": "Create tenant branding logo",
-    "description": "Auto-generated placeholder for createTenantBrandingLogo (POST /branding/logo, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Upload the company logo as a multipart form with a logo file (PNG, SVG, JPEG or WebP, at most 2,000,000 bytes; anything else is a 400). The file is stored in object storage under a new key each time and the company logo URL is switched to it immediately; the previous file is not deleted. The response returns the new logoUrl, a path on this deployment. Not idempotent: each call stores another file. Restricted to owners and managers."
   },
   {
     "operationId": "createTenantComments",
@@ -5561,7 +5561,7 @@
       }
     },
     "summary": "Create a comment library entry",
-    "description": "Auto-generated placeholder for createTenantComments (POST /comments, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Add a canned comment to the company library. The entry is company-authored: it has no marketplace library link, and itemLabel in the body is not stored on create. The write is recorded in the audit log. Always creates a new entry; nothing is deduplicated. Restricted to owners and managers."
   },
   {
     "operationId": "createTenantConfig",
@@ -5580,13 +5580,13 @@
             "$ref": "#/components/schemas/IntegrationConfig"
           },
           {
-            "description": "TODO describe schema field for the OpenInspection MCP integration"
+            "description": "Integration settings to merge into the stored set; keys left out are kept"
           }
         ]
       }
     },
     "summary": "Save non-sensitive integration config (plaintext)",
-    "description": "Auto-generated placeholder for createTenantConfig (POST /config, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Save the company's non-sensitive integration settings (appBaseUrl, turnstileSiteKey, googleClientId, streamCustomerSubdomain). The body is merged into what is stored: keys that are sent overwrite, keys that are left out are kept, and a key sent as an empty string is removed. The values are stored as plaintext, so secrets never go through this route. The change is audit-logged. Idempotent for the same body. Restricted to the owner."
   },
   {
     "operationId": "createWidgetEvent",
@@ -5662,12 +5662,12 @@
           "name": "photoIndex",
           "in": "path",
           "required": false,
-          "description": "Index into the item/defect photos array",
+          "description": "Index into the item/defect photos array. Integer, at least 0.",
           "schema": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Index into the item/defect photos array"
+            "description": "Index into the item/defect photos array. Integer, at least 0."
           }
         }
       ],
@@ -5707,11 +5707,11 @@
           "name": "token",
           "in": "path",
           "required": true,
-          "description": "TODO describe token field for the OpenInspection MCP integration",
+          "description": "Signer token from the personal signing link the signer was emailed",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe token field for the OpenInspection MCP integration"
+            "description": "Signer token from the personal signing link the signer was emailed"
           }
         }
       ],
@@ -5721,14 +5721,14 @@
           "reason": {
             "type": "string",
             "maxLength": 500,
-            "description": "TODO describe reason field for the OpenInspection MCP integration"
+            "description": "Why the signer is declining, up to 500 characters. Recorded in the signing audit trail, and kept on the envelope when this decline makes the whole envelope declined"
           }
         },
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "Optional reason for declining"
       }
     },
     "summary": "Decline agreement (public, token-gated)",
-    "description": "Auto-generated placeholder for declineBooking (POST /agreements/:token/decline, bookings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Decline an agreement as one signer, identified by the token in their personal signing link. Public: the token is the only credential. Marks that signer declined, writes a signer.declined entry (with reason, IP, country and user agent) to the signing audit trail, and recomputes the envelope status under its completion policy. The agreement-declined automation fires only when the whole envelope ends up declined. A signer who already signed or whose request expired gets 409; declining again after a decline succeeds without further change to the signer's status. 404 for an unknown token."
   },
   {
     "operationId": "declineTenantImport",
@@ -5763,17 +5763,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the automation rule to delete; must belong to this company",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the automation rule to delete; must belong to this company"
           }
         }
       ],
       "body": null
     },
     "summary": "Delete automation for current tenant",
-    "description": "Auto-generated placeholder for deleteAutomation (DELETE /{id}, automations domain). TODO: replace with a real description sourced from the handler."
+    "description": "Permanently delete an automation rule. Default rules cannot be deleted (403); switch them off with an update instead. Returns 404 when the id is not a rule in this company, so repeating the call fails the second time. Restricted to owners and managers."
   },
   {
     "operationId": "deleteAvailabilityOverride",
@@ -6051,11 +6051,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -6101,11 +6101,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -6179,11 +6179,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the template. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the template. Must belong to the caller's company."
           }
         }
       ],
@@ -6207,11 +6207,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -6396,11 +6396,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the rating system. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the rating system. Must belong to the caller's company."
           }
         }
       ],
@@ -6507,10 +6507,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the discount code. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the discount code. Must belong to the caller's company."
           }
         }
       ],
@@ -6649,11 +6649,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the member. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the member. Must belong to the caller's company."
           }
         }
       ],
@@ -6677,11 +6677,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the agreement. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the agreement. Must belong to the caller's company."
           }
         }
       ],
@@ -6705,18 +6705,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the library comment to delete; must belong to this company",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the library comment to delete; must belong to this company"
           }
         }
       ],
       "body": null
     },
     "summary": "Delete a comment library entry",
-    "description": "Auto-generated placeholder for deleteTenantComment (DELETE /comments/{id}, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Permanently delete one canned comment from the company library and record the deletion in the audit log. Returns 404 when the id does not exist in this company, so repeating the call fails the second time. Restricted to owners and managers."
   },
   {
     "operationId": "deleteTenantData",
@@ -6734,7 +6734,7 @@
       }
     },
     "summary": "Delete tenant data for current tenant",
-    "description": "Auto-generated placeholder for deleteTenantData (DELETE /data, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Erase a client's personal data, found by email address, from this company (a data-subject erasure request). Irreversible. Signed agreements are kept as evidence: their personal details are anonymised in place while the signature, signing times and signing audit trail remain. Agreements nobody has signed are deleted, and the client's contact record is deleted. Erasure is recorded in an append-only erasure log. The response reports the outcome status (completed, partially_completed, refused or held) with counts of rows anonymised, deleted and retained; a status other than completed means some data was kept or a step failed, so read the decisions before telling anyone it is done. Restricted to owners and managers."
   },
   {
     "operationId": "deleteTenantStripeConnect",
@@ -6750,7 +6750,7 @@
       "body": null
     },
     "summary": "Disconnect the tenant Stripe Connect account",
-    "description": "Auto-generated placeholder for deleteTenantStripeConnect (DELETE /stripe-connect, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Unlink the company's Stripe Connect account by clearing the stored acct_ id. Nothing is changed in Stripe itself, and invoices that already exist are not edited. The change is audit-logged. Idempotent: clearing an already-empty link succeeds. Restricted to owners and managers."
   },
   {
     "operationId": "detachInspectionItemPhoto",
@@ -6767,11 +6767,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -6789,12 +6789,12 @@
           "name": "photoIndex",
           "in": "path",
           "required": false,
-          "description": "Index of the photo within the item's photos[] array",
+          "description": "Index of the photo within the item's photos[] array. Integer, at least 0.",
           "schema": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Index of the photo within the item's photos[] array"
+            "description": "Index of the photo within the item's photos[] array. Integer, at least 0."
           }
         }
       ],
@@ -6828,7 +6828,7 @@
             "minLength": 6,
             "maxLength": 20,
             "example": "123456",
-            "description": "Current TOTP code or recovery code, proving possession of the second factor."
+            "description": "Current TOTP code or recovery code, proving possession of the second factor. 6-20 characters."
           }
         },
         "required": [
@@ -7043,11 +7043,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -7221,11 +7221,11 @@
         "properties": {
           "fromMs": {
             "type": "integer",
-            "description": "Epoch ms of the first instant in the payroll period, inclusive."
+            "description": "Epoch ms of the first instant in the payroll period, inclusive. Integer."
           },
           "toMs": {
             "type": "integer",
-            "description": "Epoch ms of the last instant in the payroll period, inclusive."
+            "description": "Epoch ms of the last instant in the payroll period, inclusive. Integer."
           }
         },
         "required": [
@@ -7549,7 +7549,7 @@
           "name": "reason",
           "in": "query",
           "required": true,
-          "description": "The reason that would be recorded; it decides the outcome.",
+          "description": "The reason that would be recorded; it decides the outcome. One of: client_cancelled, no_show, weather, inspector_unavailable, property_unavailable, rescheduled, other.",
           "schema": {
             "type": "string",
             "enum": [
@@ -7561,7 +7561,7 @@
               "rescheduled",
               "other"
             ],
-            "description": "The reason that would be recorded; it decides the outcome."
+            "description": "The reason that would be recorded; it decides the outcome. One of: client_cancelled, no_show, weather, inspector_unavailable, property_unavailable, rescheduled, other."
           }
         }
       ],
@@ -7585,7 +7585,7 @@
           "name": "platform",
           "in": "query",
           "required": true,
-          "description": "Native client platform identifier",
+          "description": "Native client platform identifier. One of: ios, android, windows.",
           "schema": {
             "type": "string",
             "enum": [
@@ -7593,7 +7593,7 @@
               "android",
               "windows"
             ],
-            "description": "Native client platform identifier"
+            "description": "Native client platform identifier. One of: ios, android, windows."
           }
         }
       ],
@@ -7771,13 +7771,13 @@
           "name": "limit",
           "in": "query",
           "required": false,
-          "description": "Maximum number of history rows to return, newest first.",
+          "description": "Maximum number of history rows to return, newest first. Integer between 1 and 100. Defaults to 20.",
           "schema": {
             "type": "integer",
             "minimum": 1,
             "maximum": 100,
             "default": 20,
-            "description": "Maximum number of history rows to return, newest first."
+            "description": "Maximum number of history rows to return, newest first. Integer between 1 and 100. Defaults to 20."
           }
         }
       ],
@@ -7812,23 +7812,23 @@
           "name": "page",
           "in": "query",
           "required": false,
-          "description": "Which page of entries needing attention to return",
+          "description": "Which page of entries needing attention to return. Integer, at least 1.",
           "schema": {
             "type": "integer",
             "minimum": 1,
-            "description": "Which page of entries needing attention to return"
+            "description": "Which page of entries needing attention to return. Integer, at least 1."
           }
         },
         {
           "name": "pageSize",
           "in": "query",
           "required": false,
-          "description": "How many entries needing attention per page",
+          "description": "How many entries needing attention per page. Integer between 1 and 100.",
           "schema": {
             "type": "integer",
             "minimum": 1,
             "maximum": 100,
-            "description": "How many entries needing attention per page"
+            "description": "How many entries needing attention per page. Integer between 1 and 100."
           }
         }
       ],
@@ -7892,13 +7892,13 @@
           "name": "markRead",
           "in": "query",
           "required": false,
-          "description": "When set, marks every counterparty-authored message on the inspection read — the caller is DISPLAYING the merged Messages view, where all threads are visible at once. A poll refreshing a closed block must omit it.",
+          "description": "When set, marks every counterparty-authored message on the inspection read — the caller is DISPLAYING the merged Messages view, where all threads are visible at once. A poll refreshing a closed block must omit it. One of: 1.",
           "schema": {
             "type": "string",
             "enum": [
               "1"
             ],
-            "description": "When set, marks every counterparty-authored message on the inspection read — the caller is DISPLAYING the merged Messages view, where all threads are visible at once. A poll refreshing a closed block must omit it."
+            "description": "When set, marks every counterparty-authored message on the inspection read — the caller is DISPLAYING the merged Messages view, where all threads are visible at once. A poll refreshing a closed block must omit it. One of: 1."
           }
         }
       ],
@@ -8165,11 +8165,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection request. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection request. Must belong to the caller's company."
           }
         }
       ],
@@ -8333,10 +8333,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the template. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the template. Must belong to the caller's company."
           }
         }
       ],
@@ -8360,11 +8360,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -8713,14 +8713,14 @@
           "name": "doc",
           "in": "path",
           "required": true,
-          "description": "Which legal document",
+          "description": "Which legal document. One of: privacy, terms.",
           "schema": {
             "type": "string",
             "enum": [
               "privacy",
               "terms"
             ],
-            "description": "Which legal document"
+            "description": "Which legal document. One of: privacy, terms."
           }
         }
       ],
@@ -8862,14 +8862,14 @@
           "name": "type",
           "in": "query",
           "required": false,
-          "description": "Report variant. Defaults to full.",
+          "description": "Report variant. Defaults to full. One of: summary, full.",
           "schema": {
             "type": "string",
             "enum": [
               "summary",
               "full"
             ],
-            "description": "Report variant. Defaults to full."
+            "description": "Report variant. Defaults to full. One of: summary, full."
           }
         }
       ],
@@ -9088,11 +9088,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the rating system. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the rating system. Must belong to the caller's company."
           }
         }
       ],
@@ -9584,10 +9584,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the request. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the request. Must belong to the caller's company."
           }
         }
       ],
@@ -9694,13 +9694,13 @@
           "name": "propertyZip",
           "in": "query",
           "required": false,
-          "description": "Property ZIP. Restricts the union to inspectors whose service area covers it; omitted means the geographic filter cannot run.",
+          "description": "Property ZIP. Restricts the union to inspectors whose service area covers it; omitted means the geographic filter cannot run. 3-10 characters.",
           "schema": {
             "type": "string",
             "minLength": 3,
             "maxLength": 10,
             "example": "78701",
-            "description": "Property ZIP. Restricts the union to inspectors whose service area covers it; omitted means the geographic filter cannot run."
+            "description": "Property ZIP. Restricts the union to inspectors whose service area covers it; omitted means the geographic filter cannot run. 3-10 characters."
           }
         }
       ],
@@ -9785,7 +9785,7 @@
           },
           "disclosureVersion": {
             "type": "integer",
-            "description": "Ignored for an agent: implied consent has nothing to disclose."
+            "description": "Ignored for an agent: implied consent has nothing to disclose. Integer."
           }
         }
       }
@@ -9809,7 +9809,7 @@
         "properties": {
           "disclosureVersion": {
             "type": "integer",
-            "description": "Required for an express grant; ignored for an implied resume."
+            "description": "Required for an express grant; ignored for an implied resume. Integer."
           }
         }
       }
@@ -9930,14 +9930,14 @@
             "type": "string",
             "minLength": 2,
             "example": "Acme Inspections",
-            "description": "Inspection company name — shown on reports and booking pages as the tenant brand."
+            "description": "Inspection company name — shown on reports and booking pages as the tenant brand. At least 2 characters."
           },
           "adminName": {
             "type": "string",
             "minLength": 2,
             "maxLength": 120,
             "example": "Mike Reynolds",
-            "description": "Display name for the first inspector account — used on report headers and booking pages."
+            "description": "Display name for the first inspector account — used on report headers and booking pages. 2-120 characters."
           },
           "email": {
             "type": "string",
@@ -10028,7 +10028,14 @@
     "inputSchema": {
       "parameters": [],
       "body": {
-        "$ref": "#/components/schemas/InviteMember"
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InviteMember"
+          },
+          {
+            "description": "TODO describe schema field for the OpenInspection MCP integration"
+          }
+        ]
       }
     },
     "summary": "Invite a new team member",
@@ -10050,7 +10057,7 @@
       }
     },
     "summary": "Invite tenant for current tenant",
-    "description": "Auto-generated placeholder for inviteTenant (POST /invite, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Invite a person to join the company team. Creates a pending invite that expires after 7 days and emails the recipient the accept link (the email is sent in the background; if it is refused or fails, the invite still exists and the call still succeeds, so deliver the returned inviteLink yourself when in doubt). Only an owner may invite someone as an owner (403 otherwise). The body also lists notify and permissionOverrides, but this route does not apply either: it always sends the email and grants the plain role. Each call creates a new invite; repeating an email creates another. Restricted to owners and managers."
   },
   {
     "operationId": "issueCollabTicket",
@@ -10110,7 +10117,7 @@
             "minLength": 1,
             "maxLength": 120,
             "example": "Jamie Rivera",
-            "description": "Display name the joining member types on the accept form. Optional; stored on the new user when present."
+            "description": "Display name the joining member types on the accept form. Optional; stored on the new user when present. 1-120 characters."
           }
         },
         "required": [
@@ -10377,12 +10384,12 @@
           "name": "limit",
           "in": "query",
           "required": false,
-          "description": "TODO describe limit field for the OpenInspection MCP integration",
+          "description": "Maximum number of log entries to return, 1-200. Defaults to 50. Integer between 1 and 200.",
           "schema": {
             "type": "integer",
             "minimum": 1,
             "maximum": 200,
-            "description": "TODO describe limit field for the OpenInspection MCP integration"
+            "description": "Maximum number of log entries to return, 1-200. Defaults to 50. Integer between 1 and 200."
           }
         }
       ],
@@ -10626,7 +10633,7 @@
               {
                 "type": "string",
                 "format": "date-time",
-                "description": "ISO-8601 instant with timezone offset"
+                "description": "ISO-8601 instant with timezone offset. ISO 8601 date-time."
               }
             ],
             "description": "Range start as a civil date or ISO instant"
@@ -10647,7 +10654,7 @@
               {
                 "type": "string",
                 "format": "date-time",
-                "description": "ISO-8601 instant with timezone offset"
+                "description": "ISO-8601 instant with timezone offset. ISO 8601 date-time."
               }
             ],
             "description": "Range end as a civil date or ISO instant"
@@ -10696,25 +10703,25 @@
           "name": "limit",
           "in": "query",
           "required": false,
-          "description": "Maximum number of ledger rows to return, newest first.",
+          "description": "Maximum number of ledger rows to return, newest first. Integer between 1 and 200. Defaults to 50.",
           "schema": {
             "type": "integer",
             "minimum": 1,
             "maximum": 200,
             "default": 50,
-            "description": "Maximum number of ledger rows to return, newest first."
+            "description": "Maximum number of ledger rows to return, newest first. Integer between 1 and 200. Defaults to 50."
           }
         },
         {
           "name": "before",
           "in": "query",
           "required": false,
-          "description": "Epoch-ms exclusive upper bound; pass the previous page nextBefore to page back.",
+          "description": "Epoch-ms exclusive upper bound; pass the previous page nextBefore to page back. Integer, greater than 0.",
           "schema": {
             "type": "integer",
             "minimum": 0,
             "exclusiveMinimum": true,
-            "description": "Epoch-ms exclusive upper bound; pass the previous page nextBefore to page back."
+            "description": "Epoch-ms exclusive upper bound; pass the previous page nextBefore to page back. Integer, greater than 0."
           }
         }
       ],
@@ -10809,7 +10816,7 @@
           "name": "archived",
           "in": "query",
           "required": false,
-          "description": "Whether to return live contacts (default) or the archived ones.",
+          "description": "Whether to return live contacts (default) or the archived ones. One of: exclude, only. Defaults to exclude.",
           "schema": {
             "type": "string",
             "enum": [
@@ -10817,7 +10824,7 @@
               "only"
             ],
             "default": "exclude",
-            "description": "Whether to return live contacts (default) or the archived ones."
+            "description": "Whether to return live contacts (default) or the archived ones. One of: exclude, only. Defaults to exclude."
           }
         },
         {
@@ -10883,12 +10890,12 @@
           "name": "year",
           "in": "query",
           "required": false,
-          "description": "Limit to a civil year; omit to return all custom holidays",
+          "description": "Limit to a civil year; omit to return all custom holidays. Integer between 2000 and 2100.",
           "schema": {
             "type": "integer",
             "minimum": 2000,
             "maximum": 2100,
-            "description": "Limit to a civil year; omit to return all custom holidays"
+            "description": "Limit to a civil year; omit to return all custom holidays. Integer between 2000 and 2100."
           }
         }
       ],
@@ -10960,12 +10967,12 @@
           "name": "limit",
           "in": "query",
           "required": false,
-          "description": "How many runs to return, newest first",
+          "description": "How many runs to return, newest first. Integer between 1 and 100.",
           "schema": {
             "type": "integer",
             "minimum": 1,
             "maximum": 100,
-            "description": "How many runs to return, newest first"
+            "description": "How many runs to return, newest first. Integer between 1 and 100."
           }
         }
       ],
@@ -11032,11 +11039,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -11088,10 +11095,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -11157,11 +11164,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -11185,11 +11192,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -11213,10 +11220,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -11240,11 +11247,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -11268,10 +11275,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -11466,7 +11473,7 @@
           "name": "status",
           "in": "query",
           "required": false,
-          "description": "Return only inspections in this lifecycle status.",
+          "description": "Return only inspections in this lifecycle status. One of: requested, scheduled, confirmed, completed, cancelled.",
           "schema": {
             "type": "string",
             "enum": [
@@ -11477,7 +11484,7 @@
               "cancelled"
             ],
             "example": "completed",
-            "description": "Return only inspections in this lifecycle status."
+            "description": "Return only inspections in this lifecycle status. One of: requested, scheduled, confirmed, completed, cancelled."
           }
         },
         {
@@ -11531,7 +11538,7 @@
           "name": "tab",
           "in": "query",
           "required": false,
-          "description": "Named filter over the list: date buckets, or needs_confirmation / awaiting_report.",
+          "description": "Named filter over the list: date buckets, or needs_confirmation / awaiting_report. One of: all, today, upcoming, past, needs_confirmation, awaiting_report.",
           "schema": {
             "type": "string",
             "enum": [
@@ -11543,7 +11550,7 @@
               "awaiting_report"
             ],
             "example": "today",
-            "description": "Named filter over the list: date buckets, or needs_confirmation / awaiting_report."
+            "description": "Named filter over the list: date buckets, or needs_confirmation / awaiting_report. One of: all, today, upcoming, past, needs_confirmation, awaiting_report."
           }
         }
       ],
@@ -11567,23 +11574,23 @@
           "name": "page",
           "in": "query",
           "required": false,
-          "description": "1-indexed page number for paginated results",
+          "description": "1-indexed page number for paginated results. Integer, at least 1. Defaults to 1.",
           "schema": {
             "type": "integer",
             "minimum": 1,
             "default": 1,
-            "description": "1-indexed page number for paginated results"
+            "description": "1-indexed page number for paginated results. Integer, at least 1. Defaults to 1."
           }
         },
         {
           "name": "pageSize",
           "in": "query",
           "required": false,
-          "description": "Number of results per page (one of 12, 25, 50, 100)",
+          "description": "Number of results per page (one of 12, 25, 50, 100). Integer. Defaults to 50.",
           "schema": {
             "type": "integer",
             "default": 50,
-            "description": "Number of results per page (one of 12, 25, 50, 100)"
+            "description": "Number of results per page (one of 12, 25, 50, 100). Integer. Defaults to 50."
           }
         },
         {
@@ -11689,11 +11696,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -11717,11 +11724,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -11980,23 +11987,23 @@
           "name": "page",
           "in": "query",
           "required": false,
-          "description": "1-indexed page number for paginated results",
+          "description": "1-indexed page number for paginated results. Integer, at least 1. Defaults to 1.",
           "schema": {
             "type": "integer",
             "minimum": 1,
             "default": 1,
-            "description": "1-indexed page number for paginated results"
+            "description": "1-indexed page number for paginated results. Integer, at least 1. Defaults to 1."
           }
         },
         {
           "name": "pageSize",
           "in": "query",
           "required": false,
-          "description": "Number of results per page (one of 12, 25, 50, 100)",
+          "description": "Number of results per page (one of 12, 25, 50, 100). Integer. Defaults to 50.",
           "schema": {
             "type": "integer",
             "default": 50,
-            "description": "Number of results per page (one of 12, 25, 50, 100)"
+            "description": "Number of results per page (one of 12, 25, 50, 100). Integer. Defaults to 50."
           }
         },
         {
@@ -12013,7 +12020,7 @@
           "name": "kind",
           "in": "query",
           "required": false,
-          "description": "Filter the catalogue to one kind of importable content",
+          "description": "Filter the catalogue to one kind of importable content. One of: comments, templates, statutory.",
           "schema": {
             "type": "string",
             "enum": [
@@ -12021,14 +12028,14 @@
               "templates",
               "statutory"
             ],
-            "description": "Filter the catalogue to one kind of importable content"
+            "description": "Filter the catalogue to one kind of importable content. One of: comments, templates, statutory."
           }
         },
         {
           "name": "propertyType",
           "in": "query",
           "required": false,
-          "description": "Filter templates by the property type they are written for",
+          "description": "Filter templates by the property type they are written for. One of: single-family, multi-unit, commercial.",
           "schema": {
             "type": "string",
             "enum": [
@@ -12036,31 +12043,31 @@
               "multi-unit",
               "commercial"
             ],
-            "description": "Filter templates by the property type they are written for"
+            "description": "Filter templates by the property type they are written for. One of: single-family, multi-unit, commercial."
           }
         },
         {
           "name": "jurisdiction",
           "in": "query",
           "required": false,
-          "description": "Filter by a jurisdiction's form standard, e.g. trec",
+          "description": "Filter by a jurisdiction's form standard, e.g. trec. 1-64 characters.",
           "schema": {
             "type": "string",
             "minLength": 1,
             "maxLength": 64,
-            "description": "Filter by a jurisdiction's form standard, e.g. trec"
+            "description": "Filter by a jurisdiction's form standard, e.g. trec. 1-64 characters."
           }
         },
         {
           "name": "inspectionKind",
           "in": "query",
           "required": false,
-          "description": "Filter by inspection kind, e.g. new_construction",
+          "description": "Filter by inspection kind, e.g. new_construction. 1-64 characters.",
           "schema": {
             "type": "string",
             "minLength": 1,
             "maxLength": 64,
-            "description": "Filter by inspection kind, e.g. new_construction"
+            "description": "Filter by inspection kind, e.g. new_construction. 1-64 characters."
           }
         }
       ],
@@ -12184,26 +12191,26 @@
           "name": "includeArchived",
           "in": "query",
           "required": false,
-          "description": "Pass 1 to include archived notifications; by default they are left out.",
+          "description": "Pass 1 to include archived notifications; by default they are left out. One of: 0, 1.",
           "schema": {
             "type": "string",
             "enum": [
               "0",
               "1"
             ],
-            "description": "Pass 1 to include archived notifications; by default they are left out."
+            "description": "Pass 1 to include archived notifications; by default they are left out. One of: 0, 1."
           }
         },
         {
           "name": "limit",
           "in": "query",
           "required": false,
-          "description": "Maximum notifications per page, 1-100. Defaults to 50.",
+          "description": "Maximum notifications per page, 1-100. Defaults to 50. Integer between 1 and 100.",
           "schema": {
             "type": "integer",
             "minimum": 1,
             "maximum": 100,
-            "description": "Maximum notifications per page, 1-100. Defaults to 50."
+            "description": "Maximum notifications per page, 1-100. Defaults to 50. Integer between 1 and 100."
           }
         },
         {
@@ -12307,7 +12314,7 @@
           "name": "severity",
           "in": "query",
           "required": false,
-          "description": "Return only recommendations of this severity.",
+          "description": "Return only recommendations of this severity. One of: good, marginal, significant, minor.",
           "schema": {
             "type": "string",
             "enum": [
@@ -12316,7 +12323,7 @@
               "significant",
               "minor"
             ],
-            "description": "Return only recommendations of this severity."
+            "description": "Return only recommendations of this severity. One of: good, marginal, significant, minor."
           }
         }
       ],
@@ -12675,10 +12682,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the request. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the request. Must belong to the caller's company."
           }
         }
       ],
@@ -12818,7 +12825,7 @@
           "name": "severity",
           "in": "query",
           "required": false,
-          "description": "Filter by the single severity vocabulary shared with rating levels.",
+          "description": "Filter by the single severity vocabulary shared with rating levels. One of: good, marginal, significant, minor.",
           "schema": {
             "type": "string",
             "enum": [
@@ -12828,7 +12835,7 @@
               "minor"
             ],
             "example": "significant",
-            "description": "Filter by the single severity vocabulary shared with rating levels."
+            "description": "Filter by the single severity vocabulary shared with rating levels. One of: good, marginal, significant, minor."
           }
         },
         {
@@ -12847,24 +12854,24 @@
           "name": "sectionId",
           "in": "query",
           "required": false,
-          "description": "Filter by section ID (matches within the section_ids JSON array)",
+          "description": "Filter by section ID (matches within the section_ids JSON array). Up to 64 characters.",
           "schema": {
             "type": "string",
             "maxLength": 64,
             "example": "roof-general",
-            "description": "Filter by section ID (matches within the section_ids JSON array)"
+            "description": "Filter by section ID (matches within the section_ids JSON array). Up to 64 characters."
           }
         },
         {
           "name": "triggerCode",
           "in": "query",
           "required": false,
-          "description": "Filter by trigger code",
+          "description": "Filter by trigger code. Up to 64 characters.",
           "schema": {
             "type": "string",
             "maxLength": 64,
             "example": "NI",
-            "description": "Filter by trigger code"
+            "description": "Filter by trigger code. Up to 64 characters."
           }
         },
         {
@@ -12882,7 +12889,7 @@
           "name": "sort",
           "in": "query",
           "required": false,
-          "description": "Sort order for results: relevance, recent, created, frequent, or alpha",
+          "description": "Sort order for results: relevance, recent, created, frequent, or alpha. Defaults to relevance.",
           "schema": {
             "type": "string",
             "enum": [
@@ -12893,14 +12900,14 @@
               "alpha"
             ],
             "default": "relevance",
-            "description": "Sort order for results: relevance, recent, created, frequent, or alpha"
+            "description": "Sort order for results: relevance, recent, created, frequent, or alpha. Defaults to relevance."
           }
         },
         {
           "name": "filterMode",
           "in": "query",
           "required": false,
-          "description": "Filter mode: auto narrows to the inspection context, all shows everything",
+          "description": "Filter mode: auto narrows to the inspection context, all shows everything. Defaults to all.",
           "schema": {
             "type": "string",
             "enum": [
@@ -12908,41 +12915,41 @@
               "all"
             ],
             "default": "all",
-            "description": "Filter mode: auto narrows to the inspection context, all shows everything"
+            "description": "Filter mode: auto narrows to the inspection context, all shows everything. Defaults to all."
           }
         },
         {
           "name": "itemLabel",
           "in": "query",
           "required": false,
-          "description": "Inspection item label used to narrow results when filterMode is auto",
+          "description": "Inspection item label used to narrow results when filterMode is auto. Up to 120 characters.",
           "schema": {
             "type": "string",
             "maxLength": 120,
-            "description": "Inspection item label used to narrow results when filterMode is auto"
+            "description": "Inspection item label used to narrow results when filterMode is auto. Up to 120 characters."
           }
         },
         {
           "name": "page",
           "in": "query",
           "required": false,
-          "description": "1-indexed page number for paginated results",
+          "description": "1-indexed page number for paginated results. Integer, at least 1. Defaults to 1.",
           "schema": {
             "type": "integer",
             "minimum": 1,
             "default": 1,
-            "description": "1-indexed page number for paginated results"
+            "description": "1-indexed page number for paginated results. Integer, at least 1. Defaults to 1."
           }
         },
         {
           "name": "pageSize",
           "in": "query",
           "required": false,
-          "description": "Number of results per page (one of 12, 25, 50, 100)",
+          "description": "Number of results per page (one of 12, 25, 50, 100). Integer. Defaults to 50.",
           "schema": {
             "type": "integer",
             "default": 50,
-            "description": "Number of results per page (one of 12, 25, 50, 100)"
+            "description": "Number of results per page (one of 12, 25, 50, 100). Integer. Defaults to 50."
           }
         }
       ],
@@ -13170,7 +13177,7 @@
               "minLength": 1
             },
             "maxItems": 200,
-            "description": "Notice ids to mark read. Omit to mark every unread notice read."
+            "description": "Notice ids to mark read. Omit to mark every unread notice read. Up to 200 items."
           }
         }
       }
@@ -13211,7 +13218,7 @@
             "enum": [
               "checklistDismissed"
             ],
-            "description": "The onboarding flag to mark as true."
+            "description": "The onboarding flag to mark as true. One of: checklistDismissed."
           }
         },
         "required": [
@@ -13240,7 +13247,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 64,
-            "description": "Onboarding-step identifier (e.g. \"dashboard.welcome\", \"templates.tour\")."
+            "description": "Onboarding-step identifier (e.g. \"dashboard.welcome\", \"templates.tour\"). 1-64 characters."
           },
           "completed": {
             "type": "boolean",
@@ -13336,11 +13343,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the invoice. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the invoice. Must belong to the caller's company."
           }
         }
       ],
@@ -13380,11 +13387,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -13402,12 +13409,12 @@
           "name": "photoIndex",
           "in": "path",
           "required": false,
-          "description": "Index of the photo within the source item's photos[] array",
+          "description": "Index of the photo within the source item's photos[] array. Integer, at least 0.",
           "schema": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Index of the photo within the source item's photos[] array"
+            "description": "Index of the photo within the source item's photos[] array. Integer, at least 0."
           }
         }
       ],
@@ -13433,10 +13440,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the automation rule to change; must belong to this company",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the automation rule to change; must belong to this company"
           }
         }
       ],
@@ -13445,7 +13452,7 @@
       }
     },
     "summary": "Patch automation for current tenant",
-    "description": "Auto-generated placeholder for patchAutomation (PATCH /{id}, automations domain). TODO: replace with a real description sourced from the handler."
+    "description": "Change an automation rule. Only the fields sent are written. Sending conditions as null removes all send-time gates, and channels, if sent, replaces the whole channel list. This is also how a rule is switched off or on (active). Default rules can be edited. Unlike create, an update does not re-check that recipientRoleProfileId matches recipientKind, so send them together. Returns 404 when the id is not a rule in this company. Idempotent. Restricted to owners and managers."
   },
   {
     "operationId": "patchBookingRouting",
@@ -13655,11 +13662,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -15924,11 +15931,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -15967,12 +15974,12 @@
           "name": {
             "type": "string",
             "maxLength": 100,
-            "description": "Display name shown on reports and the booking page"
+            "description": "Display name shown on reports and the booking page. Up to 100 characters."
           },
           "phone": {
             "type": "string",
             "maxLength": 30,
-            "description": "Contact phone number for the inspector profile"
+            "description": "Contact phone number for the inspector profile. Up to 30 characters."
           },
           "signatureEnabled": {
             "type": "boolean",
@@ -16008,7 +16015,7 @@
           "statutoryLicenseType": {
             "type": "string",
             "maxLength": 120,
-            "description": "State licence class printed on a statutory form. NOT an association certification — that is an inspector credential."
+            "description": "State licence class printed on a statutory form. NOT an association certification — that is an inspector credential. Up to 120 characters."
           },
           "statutoryQualification": {
             "type": "string",
@@ -16021,7 +16028,7 @@
               "professional_architect",
               "other_recognized_by_insurer"
             ],
-            "description": "Statutory qualification category the signer declares, from the authority's own closed list. A different axis from the licence class."
+            "description": "Statutory qualification category the signer declares, from the authority's own closed list. A different axis from the licence class. One of: , home_inspector, building_code_inspector, contractor, professional_engineer, professional_architect, other_recognized_by_insurer."
           }
         }
       }
@@ -16046,13 +16053,13 @@
             "$ref": "#/components/schemas/AttentionThresholds"
           },
           {
-            "description": "TODO describe schema field for the OpenInspection MCP integration"
+            "description": "All three thresholds, in hours"
           }
         ]
       }
     },
     "summary": "Patch tenant attention threshold",
-    "description": "Auto-generated placeholder for patchTenantAttentionThreshold (PATCH /attention-thresholds, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Set the hour thresholds that put an inspection into the dashboard's Needs Attention list: no signed agreement, an unpaid invoice past its due date, a completed inspection with an unpublished report. Despite the PATCH verb this replaces the whole setting, so all three values are required in every call. The change is audit-logged. Idempotent. Restricted to owners and managers."
   },
   {
     "operationId": "patchTenantDashboardColumn",
@@ -16070,7 +16077,7 @@
       }
     },
     "summary": "Update tenant default dashboard column prefs",
-    "description": "Auto-generated placeholder for patchTenantDashboardColumn (PATCH /dashboard-columns, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Replace the company's default set of inspection dashboard columns. The submitted list is normalised before it is stored: unknown ids and duplicates are dropped, columns that can never be hidden are added back, and the result is ordered as the dashboard orders its columns. The response returns the list that was actually stored. Individual users can still override the default on their own device. The change is audit-logged. Idempotent. Restricted to owners and managers."
   },
   {
     "operationId": "patchTenantTenantConfig",
@@ -16088,7 +16095,7 @@
       }
     },
     "summary": "Patch a small allowlist of tenant_configs columns",
-    "description": "Auto-generated placeholder for patchTenantTenantConfig (PATCH /tenant-config, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Change any of a fixed set of company settings: booking behaviour (concierge review, unsigned-agreement blocking, inspector choice, slot grid, holiday and double-booking policies), retention periods for agreements and report PDFs, report-open counting, the native client's offline limit, SMS and email provider choices, the review link, company phone, video backend, and the privacy and terms source. Only the fields sent are written; sending none changes nothing. Empty strings clear reviewUrl, companyPhone and the custom URLs. Setting legalMode to custom is refused unless both custom URLs end up present. A deployment without managed SMS compliance forces smsMode to own whatever was submitted; where it exists, platform is rejected. Turning the holiday catalog on from off also applies default holiday policies unless they are sent. A changed privacy or terms body is also recorded as a new published version. The change is audit-logged. Restricted to owners and managers."
   },
   {
     "operationId": "portalArchiveNotice",
@@ -16165,7 +16172,7 @@
               "sms",
               "in_app"
             ],
-            "description": "Limit to one channel (a column)."
+            "description": "Limit to one channel (a column). One of: email, sms, in_app."
           },
           "classId": {
             "type": "string",
@@ -16275,7 +16282,7 @@
         "properties": {
           "disclosureVersion": {
             "type": "integer",
-            "description": "The version of the disclosure that was on screen when they agreed."
+            "description": "The version of the disclosure that was on screen when they agreed. Integer."
           }
         },
         "required": [
@@ -16436,7 +16443,7 @@
               "minLength": 1
             },
             "maxItems": 200,
-            "description": "Notice ids to mark read. Omit to mark every unread notice read."
+            "description": "Notice ids to mark read. Omit to mark every unread notice read. Up to 200 items."
           }
         }
       }
@@ -16619,7 +16626,7 @@
               "sms",
               "in_app"
             ],
-            "description": "Which channel this choice applies to."
+            "description": "Which channel this choice applies to. One of: email, sms, in_app."
           },
           "enabled": {
             "type": "boolean",
@@ -16716,12 +16723,12 @@
           "name": "year",
           "in": "query",
           "required": true,
-          "description": "Civil year to preview",
+          "description": "Civil year to preview. Integer between 2000 and 2100.",
           "schema": {
             "type": "integer",
             "minimum": 2000,
             "maximum": 2100,
-            "description": "Civil year to preview"
+            "description": "Civil year to preview. Integer between 2000 and 2100."
           }
         }
       ],
@@ -16807,7 +16814,7 @@
               "sms",
               "in_app"
             ],
-            "description": "Delivery channel for the preview: email or sms."
+            "description": "Delivery channel for the preview: email or sms. One of: email, sms, in_app."
           },
           "subject": {
             "type": "string",
@@ -16869,10 +16876,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -16990,10 +16997,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -17053,7 +17060,7 @@
             "minLength": 6,
             "maxLength": 20,
             "example": "123456",
-            "description": "Current TOTP code or recovery code, proving possession of the second factor."
+            "description": "Current TOTP code or recovery code, proving possession of the second factor. 6-20 characters."
           }
         },
         "required": [
@@ -17185,14 +17192,14 @@
           "name": "role",
           "in": "path",
           "required": true,
-          "description": "Sign-off role to remove",
+          "description": "Sign-off role to remove. One of: field_observer, pcr_reviewer.",
           "schema": {
             "type": "string",
             "enum": [
               "field_observer",
               "pcr_reviewer"
             ],
-            "description": "Sign-off role to remove"
+            "description": "Sign-off role to remove. One of: field_observer, pcr_reviewer."
           }
         }
       ],
@@ -17358,7 +17365,7 @@
       }
     },
     "summary": "Reorder contractor types (persist the supplied id order as sortOrder)",
-    "description": "Auto-generated placeholder for reorderContractorTypes (POST /reorder, contractor-types domain). TODO: replace with a real description sourced from the handler."
+    "description": "Set the display order of contractor types. The listed ids take sortOrder 0, 1, 2 and so on, in the order given. Ids that are not in this company are skipped without an error, and contractor types left out of the list keep their old sortOrder, so send the complete list to get a clean order. Idempotent. Owner or manager only."
   },
   {
     "operationId": "reorderInspectionItemPhotos",
@@ -17375,11 +17382,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -17470,7 +17477,7 @@
       }
     },
     "summary": "Replace contact for current tenant",
-    "description": "Auto-generated placeholder for replaceContact (PUT /{id}, contacts domain). TODO: replace with a real description sourced from the handler."
+    "description": "Update a contact's details. Despite the PUT verb this is a partial update: only fields present in the body are written, and sending a nullable field (email, phone, agency, notes, locale) as null clears it. The email of an agent contact is frozen and a new value is silently ignored, because it identifies the agent across companies; to change it, archive the contact and create a new one. Requires the manageContacts capability and the owner, manager or inspector role. Does not email the contact. When the QuickBooks integration is configured, the change is also pushed to QuickBooks in the background. Returns the updated contact, or 404 when the id is not in this company. Idempotent."
   },
   {
     "operationId": "replaceInspectionRequest",
@@ -17487,11 +17494,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection request to update; must belong to this company",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection request to update; must belong to this company"
           }
         }
       ],
@@ -17500,7 +17507,7 @@
       }
     },
     "summary": "Replace inspection request for current tenant",
-    "description": "Auto-generated placeholder for replaceInspectionRequest (PUT /{id}, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Update the top-level fields of an inspection request: client details, property address, schedule, notes and status. Despite the PUT verb this is a partial update, and sending a nullable field as null clears it. It edits the request record only: the inspections under it are not changed, so edit those through the inspection routes. Sends no email. Returns the request with its inspections, or 404 when the id is not in this company. Idempotent. Restricted to owners and managers."
   },
   {
     "operationId": "replaceInspectorServiceAreas",
@@ -17573,11 +17580,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the rating system. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the rating system. Must belong to the caller's company."
           }
         }
       ],
@@ -17729,10 +17736,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the service. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the service. Must belong to the caller's company."
           }
         }
       ],
@@ -18193,11 +18200,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -18215,12 +18222,12 @@
           "name": "photoIndex",
           "in": "path",
           "required": false,
-          "description": "Index of the photo within the item's photos[] array",
+          "description": "Index of the photo within the item's photos[] array. Integer, at least 0.",
           "schema": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Index of the photo within the item's photos[] array"
+            "description": "Index of the photo within the item's photos[] array. Integer, at least 0."
           }
         }
       ],
@@ -18246,18 +18253,18 @@
           "name": "linkId",
           "in": "path",
           "required": true,
-          "description": "TODO describe linkId field for the OpenInspection MCP integration",
+          "description": "Id of the partner-agent link to revoke, as returned in the id field of the link list. It is the agent's contact id and must belong to this company",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe linkId field for the OpenInspection MCP integration"
+            "description": "Id of the partner-agent link to revoke, as returned in the id field of the link list. It is the agent's contact id and must belong to this company"
           }
         }
       ],
       "body": null
     },
     "summary": "Revoke a partner-agent link",
-    "description": "Auto-generated placeholder for revokeAgent (POST /{linkId}/revoke, agents domain). TODO: replace with a real description sourced from the handler."
+    "description": "Withdraw a linked agent's access to this company's inspections in the agent portal. The link is the agent's contact record; revoking stamps it as revoked and keeps the history of who held it. The contact itself is not archived, so the person stays usable as an agent on existing inspections, and the agent's account is not deleted. A revoked agent can no longer book through this company on their own account. Returns 404 when the id is not a contact in this company. Calling it again succeeds and refreshes the revocation time. Open to owners, managers and inspectors."
   },
   {
     "operationId": "revokeContactAccess",
@@ -18412,7 +18419,7 @@
               "sms",
               "in_app"
             ],
-            "description": "Which channel this choice applies to."
+            "description": "Which channel this choice applies to. One of: email, sms, in_app."
           },
           "enabled": {
             "type": "boolean",
@@ -18619,7 +18626,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 5000,
-            "description": "Message text."
+            "description": "Message text. 1-5000 characters."
           },
           "inspectionId": {
             "type": "string",
@@ -18650,7 +18657,7 @@
       }
     },
     "summary": "Send an agreement signing request to a client",
-    "description": "Auto-generated placeholder for sendTenant (POST /agreements/send, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Send an agreement for signature on one inspection. Recipients are either a single clientEmail or an explicit signers list (up to 10). An inspection holds one live signing request: if one is already pending, sent or viewed, it is reused and any newly named signers are added to it instead of a second request being created. Otherwise a request is created from a snapshot of the chosen template. Each signer who has not yet signed or declined is emailed their own signing link, and the request is recorded in the signing audit trail. A signer whose email fails to deliver is marked delivery_failed in the response; a workspace-wide refusal (suppressed recipient, unverified sender domain, quota) fails the whole call. The response lists the request id and each signer's status; it never contains the signing links."
   },
   {
     "operationId": "serveAgentInspectionPhoto",
@@ -18881,13 +18888,13 @@
           "amountCents": {
             "type": "integer",
             "minimum": 0,
-            "description": "The agreed pay for this inspector on this line, in integer cents."
+            "description": "The agreed pay for this inspector on this line, in integer cents. Integer cents, at least 0."
           },
           "reason": {
             "type": "string",
             "minLength": 1,
             "maxLength": 500,
-            "description": "Why the amount was changed, kept for payout disputes."
+            "description": "Why the amount was changed, kept for payout disputes. 1-500 characters."
           }
         },
         "required": [
@@ -18938,7 +18945,7 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 999,
-                    "description": "How many units from now the links stop working."
+                    "description": "How many units from now the links stop working. Integer between 1 and 999."
                   },
                   "unit": {
                     "type": "string",
@@ -19202,7 +19209,7 @@
               "field_observer",
               "pcr_reviewer"
             ],
-            "description": "Sign-off role: the field observer who performed the walk-through, or the PCR reviewer exercising responsible control."
+            "description": "Sign-off role: the field observer who performed the walk-through, or the PCR reviewer exercising responsible control. One of: field_observer, pcr_reviewer."
           },
           "personId": {
             "type": "string",
@@ -19284,11 +19291,11 @@
           "name": "code",
           "in": "query",
           "required": true,
-          "description": "One-time SSO handoff code minted by the portal at POST /api/platform/sso-handoff. Single-use, expires after 60 seconds, deleted from KV on successful consume.",
+          "description": "One-time SSO handoff code minted by the portal at POST /api/platform/sso-handoff. Single-use, expires after 60 seconds, deleted from KV on successful consume. At least 8 characters.",
           "schema": {
             "type": "string",
             "minLength": 8,
-            "description": "One-time SSO handoff code minted by the portal at POST /api/platform/sso-handoff. Single-use, expires after 60 seconds, deleted from KV on successful consume."
+            "description": "One-time SSO handoff code minted by the portal at POST /api/platform/sso-handoff. Single-use, expires after 60 seconds, deleted from KV on successful consume. At least 8 characters."
           }
         },
         {
@@ -19372,7 +19379,7 @@
               "clear"
             ],
             "default": "remap",
-            "description": "How to handle existing ratings: remap by severity bucket or clear them"
+            "description": "How to handle existing ratings: remap by severity bucket or clear them. Defaults to remap."
           }
         },
         "required": [
@@ -19484,7 +19491,7 @@
               "sms",
               "in_app"
             ],
-            "description": "Delivery channel for the test send: email or sms."
+            "description": "Delivery channel for the test send: email or sms. One of: email, sms, in_app."
           },
           "subject": {
             "type": "string",
@@ -19666,7 +19673,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 500,
-            "description": "Why this report is being released before the agreement or payment gate is satisfied."
+            "description": "Why this report is being released before the agreement or payment gate is satisfied. 1-500 characters."
           }
         },
         "required": [
@@ -19771,7 +19778,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "description": "Short label shown on the calendar block"
+            "description": "Short label shown on the calendar block. 1-200 characters."
           },
           "date": {
             "type": "string",
@@ -19798,7 +19805,7 @@
             "type": "string",
             "nullable": true,
             "maxLength": 2000,
-            "description": "Optional free-text notes for the calendar block"
+            "description": "Optional free-text notes for the calendar block. Up to 2000 characters."
           }
         }
       }
@@ -19957,7 +19964,7 @@
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Phase F instance index within the building."
+            "description": "Phase F instance index within the building. Integer, at least 0."
           },
           "unitId": {
             "type": "string",
@@ -19990,7 +19997,7 @@
               "replace",
               "further_study"
             ],
-            "description": "Remedial action for this line item."
+            "description": "Remedial action for this line item. One of: repair, replace, further_study."
           },
           "costMethod": {
             "type": "string",
@@ -19998,13 +20005,13 @@
               "unit",
               "lump_sum"
             ],
-            "description": "Whether the cost is quantity x unit cost or a flat lump sum."
+            "description": "Whether the cost is quantity x unit cost or a flat lump sum. One of: unit, lump_sum."
           },
           "quantity": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Unit-method quantity (null for lump_sum)."
+            "description": "Unit-method quantity (null for lump_sum). Integer, at least 0."
           },
           "uom": {
             "type": "string",
@@ -20015,31 +20022,31 @@
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Per-unit cost in integer cents (unit method only)."
+            "description": "Per-unit cost in integer cents (unit method only). Integer cents, at least 0."
           },
           "lumpSumCents": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Flat total cost in integer cents (lump_sum method only)."
+            "description": "Flat total cost in integer cents (lump_sum method only). Integer cents, at least 0."
           },
           "eul": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Expected Useful Life in years, for the reserve schedule."
+            "description": "Expected Useful Life in years, for the reserve schedule. Integer, at least 0."
           },
           "effAge": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Effective Age in years, for the reserve schedule."
+            "description": "Effective Age in years, for the reserve schedule. Integer, at least 0."
           },
           "rul": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
-            "description": "Remaining Useful Life in years, for the reserve schedule."
+            "description": "Remaining Useful Life in years, for the reserve schedule. Integer, at least 0."
           },
           "suggestedRemedy": {
             "type": "string",
@@ -20052,7 +20059,7 @@
               "short_term",
               "long_term"
             ],
-            "description": "Deferred maintenance vs. capital reserve bucket."
+            "description": "Deferred maintenance vs. capital reserve bucket. One of: immediate, short_term, long_term."
           },
           "sectionRef": {
             "type": "string",
@@ -20066,7 +20073,7 @@
           },
           "sortOrder": {
             "type": "integer",
-            "description": "Display order within the bucket."
+            "description": "Display order within the bucket. Integer."
           }
         }
       }
@@ -20089,11 +20096,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         },
         {
@@ -20171,7 +20178,7 @@
             "type": "string",
             "minLength": 2,
             "maxLength": 20,
-            "description": "BCP-47 target locale, e.g. es-419."
+            "description": "BCP-47 target locale, e.g. es-419. 2-20 characters."
           },
           "reportId": {
             "type": "string",
@@ -20263,43 +20270,43 @@
             "type": "string",
             "nullable": true,
             "maxLength": 120,
-            "description": "The second signer FL OIR-B1-1802 page 5 prints. Empty clears it."
+            "description": "The second signer FL OIR-B1-1802 page 5 prints. Empty clears it. Up to 120 characters."
           },
           "ownerName": {
             "type": "string",
             "nullable": true,
             "maxLength": 120,
-            "description": "The property OWNER, who is frequently not the client. Empty clears it."
+            "description": "The property OWNER, who is frequently not the client. Empty clears it. Up to 120 characters."
           },
           "ownerEmail": {
             "type": "string",
             "nullable": true,
             "maxLength": 200,
-            "description": "The owner's email. Empty clears it."
+            "description": "The owner's email. Empty clears it. Up to 200 characters."
           },
           "ownerMailingAddress": {
             "type": "string",
             "nullable": true,
             "maxLength": 300,
-            "description": "Where the owner receives post, which may not be the property. Empty clears it."
+            "description": "Where the owner receives post, which may not be the property. Empty clears it. Up to 300 characters."
           },
           "ownerHomePhone": {
             "type": "string",
             "nullable": true,
             "maxLength": 40,
-            "description": "The owner's home number. The form prints three separate boxes."
+            "description": "The owner's home number. The form prints three separate boxes. Up to 40 characters."
           },
           "ownerWorkPhone": {
             "type": "string",
             "nullable": true,
             "maxLength": 40,
-            "description": "The owner's work number."
+            "description": "The owner's work number. Up to 40 characters."
           },
           "ownerCellPhone": {
             "type": "string",
             "nullable": true,
             "maxLength": 40,
-            "description": "The owner's mobile number."
+            "description": "The owner's mobile number. Up to 40 characters."
           }
         }
       }
@@ -20322,11 +20329,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the template. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the template. Must belong to the caller's company."
           }
         }
       ],
@@ -22550,17 +22557,17 @@
           "label": {
             "type": "string",
             "maxLength": 120,
-            "description": "Human-readable credential label shown on reports, e.g. \"InterNACHI Certified Professional Inspector\"."
+            "description": "Human-readable credential label shown on reports, e.g. \"InterNACHI Certified Professional Inspector\". Up to 120 characters."
           },
           "memberNumber": {
             "type": "string",
             "nullable": true,
             "maxLength": 60,
-            "description": "Optional membership or license number displayed alongside the credential label."
+            "description": "Optional membership or license number displayed alongside the credential label. Up to 60 characters."
           },
           "sortOrder": {
             "type": "integer",
-            "description": "Display order for this credential within the inspector list (ascending)."
+            "description": "Display order for this credential within the inspector list (ascending). Integer."
           }
         }
       }
@@ -22597,13 +22604,13 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "description": "Updated display name (max 200 chars)."
+            "description": "Updated display name (max 200 chars). 1-200 characters."
           },
           "subject": {
             "type": "string",
             "nullable": true,
             "maxLength": 500,
-            "description": "Updated email subject line (email channel only)."
+            "description": "Updated email subject line (email channel only). Up to 500 characters."
           },
           "body": {
             "type": "string",
@@ -22640,12 +22647,12 @@
           "name": {
             "type": "string",
             "maxLength": 100,
-            "description": "Display name shown on dashboards, reports, and booking pages."
+            "description": "Display name shown on dashboards, reports, and booking pages. Up to 100 characters."
           },
           "phone": {
             "type": "string",
             "maxLength": 30,
-            "description": "Contact phone number; included on reports if set."
+            "description": "Contact phone number; included on reports if set. Up to 30 characters."
           }
         },
         "description": "TODO describe schema field for the OpenInspection MCP integration"
@@ -22722,7 +22729,7 @@
           "requestedCreditCents": {
             "type": "integer",
             "minimum": 0,
-            "description": "Requested repair credit in integer cents."
+            "description": "Requested repair credit in integer cents. Integer cents, at least 0."
           },
           "note": {
             "type": "string",
@@ -22730,7 +22737,7 @@
           },
           "sortOrder": {
             "type": "integer",
-            "description": "Display order of this item in the list."
+            "description": "Display order of this item in the list. Integer."
           },
           "repairActionTag": {
             "type": "string",
@@ -22780,7 +22787,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 80,
-            "description": "Updated display label for the role profile."
+            "description": "Updated display label for the role profile. 1-80 characters."
           },
           "emailTemplateId": {
             "type": "string",
@@ -22823,7 +22830,7 @@
                   "read",
                   "readwrite"
                 ],
-                "description": "Access to the buyer's repair list, resolved against the tenant policy by taking the stricter of the two."
+                "description": "Access to the buyer's repair list, resolved against the tenant policy by taking the stricter of the two. One of: off, read, readwrite."
               }
             },
             "description": "Per-profile overrides layered on the kind baseline."
@@ -22849,10 +22856,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the discount code. Must belong to the caller's company.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the discount code. Must belong to the caller's company."
           }
         }
       ],
@@ -22972,11 +22979,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the agreement. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the agreement. Must belong to the caller's company."
           }
         }
       ],
@@ -22988,13 +22995,13 @@
             "minLength": 1,
             "maxLength": 100,
             "example": "Standard Service Agreement",
-            "description": "TODO describe name field for the OpenInspection MCP integration"
+            "description": "Template name shown in the agreement list and when choosing what to send (1-100 characters)"
           },
           "content": {
             "type": "string",
             "minLength": 1,
             "example": "This agreement governs...",
-            "description": "TODO describe content field for the OpenInspection MCP integration"
+            "description": "Agreement body as HTML. It is sanitised to the agreement HTML allowlist when saved, so scripts, links and images are dropped"
           }
         },
         "description": "TODO describe schema field for the OpenInspection MCP integration"
@@ -23018,11 +23025,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the library comment to update; must belong to this company",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the library comment to update; must belong to this company"
           }
         }
       ],
@@ -23031,7 +23038,7 @@
       }
     },
     "summary": "Update a comment library entry",
-    "description": "Auto-generated placeholder for updateTenantComment (PUT /comments/{id}, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Replace a canned comment's fields. This is a full replace, not a patch: text is required, and category, severity and section are cleared to null when omitted. Only repairSummary and recommendedContractorTypeId are left untouched when omitted. The edited-at marker is set and the change is audit-logged. Returns 404 when the id is not in this company. Restricted to owners and managers."
   },
   {
     "operationId": "updateTenantStripeConnect",
@@ -23049,7 +23056,7 @@
       }
     },
     "summary": "Set the tenant Stripe Connect account ID",
-    "description": "Auto-generated placeholder for updateTenantStripeConnect (PUT /stripe-connect, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Link the company to a Stripe Connect account by its acct_ id, replacing any account already linked. The integrations list then reports Stripe as connected. Only the id format is checked; this call does not contact Stripe to confirm the account exists or has finished onboarding. The change is audit-logged. Idempotent for the same id. Restricted to owners and managers."
   },
   {
     "operationId": "updateTenantWidgetOrigin",
@@ -23072,17 +23079,17 @@
               "minLength": 1
             },
             "maxItems": 50,
-            "description": "TODO describe origins field for the OpenInspection MCP integration"
+            "description": "Complete list of allowed origins, at most 50. Each must be an http or https origin and may contain at most one * wildcard (for example https://*.example.com). Up to 50 items."
           }
         },
         "required": [
           "origins"
         ],
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "The full replacement origin allowlist; an empty list clears it"
       }
     },
     "summary": "Replace widget allowed-origin list",
-    "description": "Auto-generated placeholder for updateTenantWidgetOrigin (PUT /widget/origins, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Replace the company's allowlist of website origins that may embed the booking widget. The submitted list becomes the whole list, so entries that are not resent are removed. Every entry is validated first (http or https only, at most one wildcard) and nothing is saved if any entry is invalid. Idempotent for the same list. Restricted to owners and managers."
   },
   {
     "operationId": "updateWeeklyAvailability",
@@ -23117,11 +23124,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -23145,11 +23152,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Id of the inspection. Must belong to the caller's company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Id of the inspection. Must belong to the caller's company."
           }
         }
       ],
@@ -23347,12 +23354,12 @@
           "name": "token",
           "in": "query",
           "required": true,
-          "description": "Concierge magic-link token from the emailed confirm URL; identifies the booking to display.",
+          "description": "Concierge magic-link token from the emailed confirm URL; identifies the booking to display. 8-128 characters.",
           "schema": {
             "type": "string",
             "minLength": 8,
             "maxLength": 128,
-            "description": "Concierge magic-link token from the emailed confirm URL; identifies the booking to display."
+            "description": "Concierge magic-link token from the emailed confirm URL; identifies the booking to display. 8-128 characters."
           }
         }
       ],

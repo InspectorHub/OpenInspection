@@ -14,10 +14,10 @@ import { z } from '@hono/zod-openapi';
 const SeverityFieldSchema = z.enum(['good', 'marginal', 'significant', 'minor']);
 
 export const CommentSchema = z.object({
-    text: z.string().min(1).max(1000).openapi({ example: 'Evidence of previous repair was observed.' }).describe('TODO describe text field for the OpenInspection MCP integration'),
-    category: z.string().max(50).optional().nullable().openapi({ example: 'Roofing' }).describe('TODO describe category field for the OpenInspection MCP integration'),
+    text: z.string().min(1).max(1000).openapi({ example: 'Evidence of previous repair was observed.' }).describe('The reusable comment wording inserted into a report (1-1000 characters)'),
+    category: z.string().max(50).optional().nullable().openapi({ example: 'Roofing' }).describe('Free-text grouping label for the library, up to 50 characters; null for none'),
     severity: SeverityFieldSchema.optional().nullable().openapi({ example: 'significant' }).describe('The single severity vocabulary shared with rating levels.'),
-    section: z.string().max(64).optional().nullable().openapi({ example: 'Roof' }).describe('TODO describe section field for the OpenInspection MCP integration'),
+    section: z.string().max(64).optional().nullable().openapi({ example: 'Roof' }).describe('Report section the comment belongs to, as free text up to 64 characters (for example Roof); null for none'),
     // Comments Library Upgrade — canonical single item label drives sort/filter.
     itemLabel: z.string().max(120).optional().nullable().openapi({ example: 'Roof Covering' }),
     repairSummary: z.string().max(2000).optional().nullable().describe('Repair recommendation summary (defect comments only). Scope of work, never a price.'),
@@ -25,10 +25,10 @@ export const CommentSchema = z.object({
 }).openapi('Comment');
 
 export const UpdateCommentSchema = z.object({
-    text: z.string().min(1).max(1000).openapi({ example: 'Evidence of previous repair was observed.' }).describe('TODO describe text field for the OpenInspection MCP integration'),
-    category: z.string().max(50).nullable().optional().openapi({ example: 'Roofing' }).describe('TODO describe category field for the OpenInspection MCP integration'),
+    text: z.string().min(1).max(1000).openapi({ example: 'Evidence of previous repair was observed.' }).describe('The reusable comment wording (1-1000 characters). Required on every update'),
+    category: z.string().max(50).nullable().optional().openapi({ example: 'Roofing' }).describe('Free-text grouping label, up to 50 characters. Omitting it or sending null clears the stored value'),
     severity: SeverityFieldSchema.nullable().optional().openapi({ example: 'significant' }).describe('The single severity vocabulary shared with rating levels.'),
-    section: z.string().max(64).nullable().optional().openapi({ example: 'Roof' }).describe('TODO describe section field for the OpenInspection MCP integration'),
+    section: z.string().max(64).nullable().optional().openapi({ example: 'Roof' }).describe('Report section, as free text up to 64 characters. Omitting it or sending null clears the stored value'),
     itemLabel: z.string().max(120).optional().nullable(),
     repairSummary: z.string().max(2000).optional().nullable().describe('Repair recommendation summary (defect comments only). Scope of work, never a price.'),
     recommendedContractorTypeId: z.string().optional().nullable().describe('Soft ref to contractor_types.id.'),

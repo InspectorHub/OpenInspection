@@ -113,7 +113,10 @@ const reorderContractorTypesRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('True when the request succeeded.'), data: z.object({ reordered: z.literal(true).describe('True when the new order was saved.') }).describe('Response payload.') }) } }, description: 'Reordered' },
     },
     operationId: "reorderContractorTypes",
-    description: "Auto-generated placeholder for reorderContractorTypes (POST /reorder, contractor-types domain). TODO: replace with a real description sourced from the handler."
+    description: "Set the display order of contractor types. The listed ids take sortOrder 0, 1, 2 and so on, in the "
+        + "order given. Ids that are not in this company are skipped without an error, and contractor types left "
+        + "out of the list keep their old sortOrder, so send the complete list to get a clean order. Idempotent. "
+        + "Owner or manager only."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const contractorTypesRoutes = createApiRouter()

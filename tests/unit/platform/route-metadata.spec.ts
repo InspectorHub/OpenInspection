@@ -9,6 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { app } from '../../../server/index';
+import { buildOpenApiDocument } from '../../../server/lib/openapi/build-document';
 import {
     VALID_TAGS,
     VALID_SECONDARY_TAGS,
@@ -51,7 +52,7 @@ function moduleOf(path: string): string {
 }
 
 function getOpenApiDoc() {
-    return app.getOpenAPIDocument({
+    return buildOpenApiDocument(app, {
         openapi: '3.0.0',
         info: { version: 'test', title: 'OpenInspection Core API' },
     });

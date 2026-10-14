@@ -65,7 +65,7 @@ const updateAttentionThresholdsRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: "Patch tenant attention threshold",
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { body: { content: { 'application/json': { schema: AttentionThresholdsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: AttentionThresholdsSchema.describe('All three thresholds, in hours') } } } },
     responses: {
         200: {
             content: { 'application/json': { schema: AttentionThresholdsResponseSchema } },
@@ -73,7 +73,7 @@ const updateAttentionThresholdsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "patchTenantAttentionThreshold",
-    description: "Auto-generated placeholder for patchTenantAttentionThreshold (PATCH /attention-thresholds, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Set the hour thresholds that put an inspection into the dashboard's Needs Attention list: no signed agreement, an unpaid invoice past its due date, a completed inspection with an unpublished report. Despite the PATCH verb this replaces the whole setting, so all three values are required in every call. The change is audit-logged. Idempotent. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -109,7 +109,7 @@ const updateDashboardColumnsRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Update tenant default dashboard column prefs',
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { body: { content: { 'application/json': { schema: DashboardColumnPrefsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: DashboardColumnPrefsSchema.describe('The company default set of visible dashboard columns') } } } },
     responses: {
         200: {
             content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema } },
@@ -117,7 +117,7 @@ const updateDashboardColumnsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "patchTenantDashboardColumn",
-    description: "Auto-generated placeholder for patchTenantDashboardColumn (PATCH /dashboard-columns, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Replace the company's default set of inspection dashboard columns. The submitted list is normalised before it is stored: unknown ids and duplicates are dropped, columns that can never be hidden are added back, and the result is ordered as the dashboard orders its columns. The response returns the list that was actually stored. Individual users can still override the default on their own device. The change is audit-logged. Idempotent. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -195,7 +195,7 @@ const tenantConfigPatchRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Patch a small allowlist of tenant_configs columns',
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { body: { content: { 'application/json': { schema: TenantConfigPatchSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: TenantConfigPatchSchema.describe('Only the settings to change; omitted settings are left as they are') } } } },
     responses: {
         200: {
             content: { 'application/json': { schema: TenantConfigPatchResponseSchema } },
@@ -203,7 +203,7 @@ const tenantConfigPatchRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "patchTenantTenantConfig",
-    description: "Auto-generated placeholder for patchTenantTenantConfig (PATCH /tenant-config, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Change any of a fixed set of company settings: booking behaviour (concierge review, unsigned-agreement blocking, inspector choice, slot grid, holiday and double-booking policies), retention periods for agreements and report PDFs, report-open counting, the native client's offline limit, SMS and email provider choices, the review link, company phone, video backend, and the privacy and terms source. Only the fields sent are written; sending none changes nothing. Empty strings clear reviewUrl, companyPhone and the custom URLs. Setting legalMode to custom is refused unless both custom URLs end up present. A deployment without managed SMS compliance forces smsMode to own whatever was submitted; where it exists, platform is rejected. Turning the holiday catalog on from off also applies default holiday policies unless they are sent. A changed privacy or terms body is also recorded as a new published version. The change is audit-logged. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 

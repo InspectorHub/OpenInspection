@@ -51,14 +51,14 @@ export const AutomationSchema = z.object({
 }).openapi('Automation');
 
 const CreateAutomationBase = z.object({
-    name:            z.string().min(1).max(200).describe('TODO describe name field for the OpenInspection MCP integration'),
-    trigger:         z.enum(AUTOMATION_TRIGGERS).describe('TODO describe trigger field for the OpenInspection MCP integration'),
+    name:            z.string().min(1).max(200).describe('Display name of the rule, 1-200 characters'),
+    trigger:         z.enum(AUTOMATION_TRIGGERS).describe('Event that starts the rule, for example report.published or agreement.signed'),
     recipientKind:   z.enum(RECIPIENT_KINDS).describe("Who this rule sends to: 'role' (see recipientRoleProfileId), 'inspector', 'all', or 'staff' (the workspace's owners + managers)."),
     recipientRoleProfileId: z.string().nullish().describe("The contact_role_profiles.id targeted when recipientKind is 'role'; omit/null otherwise."),
     // No `.default(0)` on the base — same `.partial()` injection hazard as `channels`: it would
     // reset a tenant's configured delay to 0 on every partial PATCH that omits it (the service
     // spreads `...rest` into the patch). Create re-adds the default below.
-    delayMinutes:    z.number().int().min(0).describe('TODO describe delayMinutes field for the OpenInspection MCP integration'),
+    delayMinutes:    z.number().int().min(0).describe('Minutes to wait after the trigger before sending; 0 sends immediately'),
     conditions:      ConditionsSchema.nullish().describe('Send-time gates; null/omitted = none.'),
     // Track L (D2) — at least one delivery channel. NOTE: no `.default()` on the base field —
     // Zod's `.partial()` keeps the default and would inject `channels: ['email']` on every
@@ -77,7 +77,7 @@ export const CreateAutomationSchema = CreateAutomationBase
     .extend({
         // Create-only defaults (kept off the base so `.partial()` doesn't inject them on Update).
         delayMinutes: z.number().int().min(0).default(0)
-            .describe('TODO describe delayMinutes field for the OpenInspection MCP integration'),
+            .describe('Minutes to wait after the trigger before sending; 0 (the default) sends immediately'),
         channels: z.array(z.enum(AUTOMATION_CHANNELS)).min(1).default(['email'])
             .describe('At least one delivery channel.'),
     })
@@ -109,7 +109,7 @@ export const UpdateAutomationSchema = CreateAutomationBase.partial().extend({
     // absent from parsed output and the service's key-presence gate never rewrites it.
     channels: z.array(z.enum(AUTOMATION_CHANNELS)).min(1).optional()
         .describe('At least one delivery channel.'),
-    active: z.boolean().optional().describe('TODO describe active field for the OpenInspection MCP integration'),
+    active: z.boolean().optional().describe('Whether the rule is switched on. False pauses it without deleting it'),
 }).openapi('UpdateAutomation');
 
 const AutomationLogSchema = z.object({

@@ -64,7 +64,7 @@ const listLinksRoute = createRoute(withMcpMetadata({
 // --- A2: POST /api/agents/<linkId>/revoke ---
 
 const RevokeParamsSchema = z.object({
-    linkId: z.string().min(1).describe('TODO describe linkId field for the OpenInspection MCP integration'),
+    linkId: z.string().min(1).describe('Id of the partner-agent link to revoke, as returned in the id field of the link list. It is the agent\'s contact id and must belong to this company'),
 }).openapi('AgentLinkRevokeParams');
 
 const RevokeResponseSchema = z
@@ -79,7 +79,12 @@ const revokeRoute = createRoute(withMcpMetadata({
     path: '/{linkId}/revoke',
     tags: ["agents"],
     summary: 'Revoke a partner-agent link',
-    description: "Auto-generated placeholder for revokeAgent (POST /{linkId}/revoke, agents domain). TODO: replace with a real description sourced from the handler.",
+    description: "Withdraw a linked agent's access to this company's inspections in the agent portal. The link is the "
+        + "agent's contact record; revoking stamps it as revoked and keeps the history of who held it. The contact "
+        + "itself is not archived, so the person stays usable as an agent on existing inspections, and the "
+        + "agent's account is not deleted. A revoked agent can no longer book through this company on their own "
+        + "account. Returns 404 when the id is not a contact in this company. Calling it again succeeds and "
+        + "refreshes the revocation time. Open to owners, managers and inspectors.",
     request: { params: RevokeParamsSchema },
     responses: {
         200: {

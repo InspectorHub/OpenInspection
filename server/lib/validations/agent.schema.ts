@@ -41,8 +41,8 @@ export const LeaderboardResponseSchema = createApiResponseSchema(
 // Agent Accounts A2 — POST /api/agent/profile body. All fields optional;
 // caller sends only the field(s) they want to update.
 export const AgentProfilePatchSchema = z.object({
-    slug:             z.string().min(3).max(32).regex(/^[a-z0-9][a-z0-9-]+[a-z0-9]$/).optional().describe('TODO describe slug field for the OpenInspection MCP integration'),
-    name:             z.string().min(1).max(120).optional().describe('TODO describe name field for the OpenInspection MCP integration'),
+    slug:             z.string().min(3).max(32).regex(/^[a-z0-9][a-z0-9-]+[a-z0-9]$/).optional().describe('Public handle, 3-32 characters of lower-case letters, digits and hyphens, starting and ending with a letter or digit. Must be unique among agent accounts'),
+    name:             z.string().min(1).max(120).optional().describe('Display name, 1-120 characters'),
     // Personal display-timezone override (IANA id). Empty string clears it, so
     // referral dates fall back to each inspecting company's timezone. Validated
     // against the runtime Intl database in the service (isValidTimeZone).
@@ -73,21 +73,21 @@ export const AgentProfileResponseSchema = createApiResponseSchema(
 // the client (default mode) or notifies the inspector for review (per-tenant
 // reviewer mode).
 export const ConciergeBookSchema = z.object({
-    tenantId:           z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+    tenantId:           z.string().trim().min(1).describe('Id of the company to book with. The agent must be actively linked to it'),
     // Naming an inspector is optional — a hold with nobody assigned is normal
     // when the agent takes whoever is free. A booking form knows the inspector's
     // user id; the tenant's own tooling knows the contact id.
     inspectorUserId:    z.string().min(1).optional().describe('Inspector user id, as published on the company booking profile.'),
     inspectorContactId: z.string().min(1).optional().describe('Inspector contact id, as used by the tenant contact list.'),
     services:           z.array(z.object({ serviceId: z.string().min(1) })).optional().describe('Services the agent requested; snapshotted onto the hold.'),
-    date:               z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Date must be ISO YYYY-MM-DD').describe('TODO describe date field for the OpenInspection MCP integration'),
-    timeSlot:           z.string().min(1).max(20).describe('TODO describe timeSlot field for the OpenInspection MCP integration'),
-    propertyAddress:    z.string().min(3).max(500).describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
-    clientName:         z.string().min(1).max(200).describe('TODO describe clientName field for the OpenInspection MCP integration'),
-    clientEmail:        z.string().email().describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
-    clientPhone:        z.string().max(40).optional().describe('TODO describe clientPhone field for the OpenInspection MCP integration'),
-    agreementRequired:  z.boolean().default(true).describe('TODO describe agreementRequired field for the OpenInspection MCP integration'),
-    paymentRequired:    z.boolean().default(false).describe('TODO describe paymentRequired field for the OpenInspection MCP integration'),
+    date:               z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Date must be ISO YYYY-MM-DD').describe('Requested inspection date as YYYY-MM-DD'),
+    timeSlot:           z.string().min(1).max(20).describe('Requested time slot label, up to 20 characters. Required, but the booking stores only the date, not this value'),
+    propertyAddress:    z.string().min(3).max(500).describe('Address of the property to inspect, 3-500 characters'),
+    clientName:         z.string().min(1).max(200).describe('Name of the client the inspection is for'),
+    clientEmail:        z.string().email().describe('Client email address. The client confirmation link is sent here, and the client contact is matched or created by it'),
+    clientPhone:        z.string().max(40).optional().describe('Client phone number, up to 40 characters'),
+    agreementRequired:  z.boolean().default(true).describe('Whether the new inspection requires a signed agreement. Defaults to true'),
+    paymentRequired:    z.boolean().default(false).describe('Whether the new inspection requires payment. Defaults to false'),
 }).openapi('ConciergeBook');
 
 export const ConciergeBookResponseSchema = createApiResponseSchema(

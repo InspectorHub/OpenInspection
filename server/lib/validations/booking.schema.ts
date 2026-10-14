@@ -63,7 +63,7 @@ export const PublicBookingSchema = z.object({
     // public tenant identifier, resolved server-side exactly like the
     // GET /book/:tenant/:slug page data.
     tenant: z.string().min(1, 'Tenant is required').openapi({ example: 'acme-inspections' }).describe('Tenant slug from the booking page URL; resolved server-side to the tenant id.'),
-    address: z.string().min(5, 'Address is too short').openapi({ example: '123 Main St, City, ST 12345' }).describe('TODO describe address field for the OpenInspection MCP integration'),
+    address: z.string().min(5, 'Address is too short').openapi({ example: '123 Main St, City, ST 12345' }).describe('Property address to inspect, free text of at least 5 characters'),
     // The structured half of the address, present when the visitor picked a
     // suggestion from the public autocomplete instead of typing free text.
     //
@@ -78,8 +78,8 @@ export const PublicBookingSchema = z.object({
         .describe('ZIP hint from the selected autocomplete suggestion. Re-resolved server-side when a placeId is supplied.'),
     addressPlaceId: z.string().trim().min(8).max(200).optional().openapi({ example: 'ChIJxxx' })
         .describe('Google place id of the selected suggestion. Resolved server-side to the property coordinates used by `closest` routing.'),
-    clientName: z.string().min(1, 'Client name is required').openapi({ example: 'John Doe' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
-    clientEmail: z.string().email('Invalid email address').openapi({ example: 'john@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
+    clientName: z.string().min(1, 'Client name is required').openapi({ example: 'John Doe' }).describe('Name of the client booking the inspection'),
+    clientEmail: z.string().email('Invalid email address').openapi({ example: 'john@example.com' }).describe('Client email address. The confirmation email goes here, and the client contact is matched or created by it'),
     // F42 — the bounds are enforced by the two object-level refinements below,
     // not here: a `.refine()` on the field would wrap it in a ZodEffects, and
     // this object is registered with `.openapi('PublicBooking')` for the MCP
@@ -87,29 +87,29 @@ export const PublicBookingSchema = z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)')
         .openapi({ example: '2026-04-15' })
         .describe('Requested inspection date, YYYY-MM-DD. Must not be in the past, and must be within two years.'),
-    timeSlot: z.enum(['morning', 'afternoon', 'all-day', 'custom']).openapi({ example: 'morning' }).describe('TODO describe timeSlot field for the OpenInspection MCP integration'),
-    customTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().openapi({ example: '13:30' }).describe('TODO describe customTime field for the OpenInspection MCP integration'),
+    timeSlot: z.enum(['morning', 'afternoon', 'all-day', 'custom']).openapi({ example: 'morning' }).describe('Requested window: morning (8:00-12:00), afternoon (12:00-16:00), all-day (8:00-17:00) or custom, which needs customTime. Any free slot inside the window satisfies it'),
+    customTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().openapi({ example: '13:30' }).describe('Requested start time as HH:mm in the company\'s timezone. Required when timeSlot is custom'),
     // IA-26 — optional. Omit for company-level auto-assign (the server picks the
     // first available qualified inspector). Supply to target a specific inspector
     // (per-inspector deep link / allowInspectorChoice dropdown). If supplied and
     // the inspector is unavailable or belongs to a different tenant the request
     // is rejected; the server will NOT silently reassign to a free inspector.
     inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Optional inspector id. Omit for company-level auto-assign; supply to target a specific inspector (deep link / inspector-choice flow).'),
-    turnstileToken: z.string().optional().openapi({ example: '0.xtoken...' }).describe('TODO describe turnstileToken field for the OpenInspection MCP integration'),
+    turnstileToken: z.string().optional().openapi({ example: '0.xtoken...' }).describe('Token from the Turnstile bot challenge on the booking page. Required where the deployment enforces the challenge; verified server-side'),
     // Sprint 2 S2-2 — Multi-inspection per request. Customer can pick multiple
     // services in a single visit. When omitted (legacy single-service flow),
     // the server still creates a one-inspection request to keep the data model
     // uniform. `serviceIds` are tenant Service entries; their templateId is
     // resolved server-side.
     services: z.array(z.object({
-        serviceId: z.string().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe serviceId field for the OpenInspection MCP integration'),
+        serviceId: z.string().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Id of a service offered by this company; each service creates its own inspection, and a service with no template is refused'),
     })).min(1).max(10).optional().openapi({ description: 'Optional list of services to book in one visit (1-10)' }),
     // UC-A-1 — agent referral attribution. The `?ref=<agentSlug>` query param
     // on /book/<inspectorSlug> flows through the form as a hidden field. Server
     // resolves the slug to a global agent user, finds their active link to
     // this tenant, and persists the linked inspectorContactId on
     // inspections.referredByAgentId.
-    agentRefSlug: z.string().min(2).max(64).optional().openapi({ example: 'jane-tester' }).describe('TODO describe agentRefSlug field for the OpenInspection MCP integration'),
+    agentRefSlug: z.string().min(2).max(64).optional().openapi({ example: 'jane-tester' }).describe('Slug of the referring agent, from the ?ref= link on the booking page. When the agent is actively linked to this company the inspection is attributed to them; otherwise it is ignored'),
     // Track L (D6, path A) — unchecked SMS opt-in. When true, the submit records a
     // `granted` SMS consent event (captured_via=booking_form) for the client contact.
     smsOptin: z.boolean().optional().openapi({ example: false }).describe('Client self-book SMS opt-in (TCPA consent). When true, records a granted consent event.'),

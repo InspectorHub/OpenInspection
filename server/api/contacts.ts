@@ -83,7 +83,7 @@ const updateContactRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('manageContacts')],
     request: {
         params: z.object({ id: CONTACT_ID.describe('Contact id.') }),
-        body: { content: { 'application/json': { schema: UpdateContactSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: UpdateContactSchema.describe('The contact fields to change; omitted fields are left as they are') } } },
     },
     responses: {
         200: {
@@ -93,7 +93,13 @@ const updateContactRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "replaceContact",
-    description: "Auto-generated placeholder for replaceContact (PUT /{id}, contacts domain). TODO: replace with a real description sourced from the handler."
+    description: "Update a contact's details. Despite the PUT verb this is a partial update: only fields present in the "
+        + "body are written, and sending a nullable field (email, phone, agency, notes, locale) as null clears it. "
+        + "The email of an agent contact is frozen and a new value is silently ignored, because it identifies the "
+        + "agent across companies; to change it, archive the contact and create a new one. Requires the "
+        + "manageContacts capability and the owner, manager or inspector role. Does not email the contact. When "
+        + "the QuickBooks integration is configured, the change is also pushed to QuickBooks in the background. "
+        + "Returns the updated contact, or 404 when the id is not in this company. Idempotent."
 }, { scopes: ['write'], tier: 'extended', capability: 'manageContacts' }));
 
 const deleteContactRoute = createRoute(withMcpMetadata({

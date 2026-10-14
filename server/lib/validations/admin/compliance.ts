@@ -74,12 +74,12 @@ export function resolvedCapabilitySchema() {
  * Validation schema for inviting a new team member.
  */
 export const InviteMemberSchema = z.object({
-    email: z.string().email('Invalid email address').openapi({ example: 'new-user@example.com' }).describe('TODO describe email field for the OpenInspection MCP integration'),
+    email: z.string().email('Invalid email address').openapi({ example: 'new-user@example.com' }).describe('Email address the invitation is sent to'),
     // Not `agent`: agents are granted access per inspection and are never team
     // members (TeamService.updateMember refuses the same role for the same
     // reason). Offering it here would be a second, contradictory way in.
     role: z.enum([ROLE.OWNER, ROLE.MANAGER, ROLE.INSPECTOR])
-        .default('inspector').openapi({ example: 'inspector' }).describe('TODO describe role field for the OpenInspection MCP integration'),
+        .default('inspector').openapi({ example: 'inspector' }).describe('Role the new member gets: owner, manager or inspector (default inspector). Only an owner may invite an owner. Agents are never invited as team members'),
     // Role permission-template overrides (2026-06-13). Optional sparse map of
     // every toggleable capability. Only differing-from-template keys are sent;
     // TeamService stores the diff (or null when nothing differs) and it is
@@ -117,7 +117,7 @@ export const UpdateMemberSchema = z.object({
  * Validation schema for the GDPA data erasure request.
  */
 export const DataErasureSchema = z.object({
-    clientEmail: z.string().email('Invalid email address').openapi({ example: 'client-to-delete@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
+    clientEmail: z.string().email('Invalid email address').openapi({ example: 'client-to-delete@example.com' }).describe('Email address of the client (data subject) to erase; matched against this company\'s contact records'),
 }).openapi('DataErasure');
 
 /**

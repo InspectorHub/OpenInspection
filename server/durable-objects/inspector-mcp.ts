@@ -107,7 +107,8 @@ function makeExecutionContext(): ExecutionContext {
  * workers/app.ts and identity-bridge.callApiAsUser). */
 async function getComponentSchemas(): Promise<Record<string, unknown>> {
     const { app } = await import('../index');
-    const doc = app.getOpenAPIDocument(OPENAPI_DOC_CONFIG) as {
+    const { buildOpenApiDocument } = await import('../lib/openapi/build-document');
+    const doc = buildOpenApiDocument(app, OPENAPI_DOC_CONFIG) as {
         components?: { schemas?: Record<string, unknown> };
     };
     return doc.components?.schemas ?? {};

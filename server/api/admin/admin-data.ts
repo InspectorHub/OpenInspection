@@ -67,7 +67,7 @@ const inviteMemberRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: InviteMemberSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: InviteMemberSchema.describe('Who to invite and with which role'),
                 },
             },
         },
@@ -84,7 +84,7 @@ const inviteMemberRoute = createRoute(withMcpMetadata({
         403: { description: 'Only an owner can invite someone as an owner' },
     },
     operationId: "inviteTenant",
-    description: "Auto-generated placeholder for inviteTenant (POST /invite, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Invite a person to join the company team. Creates a pending invite that expires after 7 days and emails the recipient the accept link (the email is sent in the background; if it is refused or fails, the invite still exists and the call still succeeds, so deliver the returned inviteLink yourself when in doubt). Only an owner may invite someone as an owner (403 otherwise). The body also lists notify and permissionOverrides, but this route does not apply either: it always sends the email and grants the plain role. Each call creates a new invite; repeating an email creates another. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -180,7 +180,7 @@ const postAuditLogRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "createTenantAuditLogs",
-    description: "Auto-generated placeholder for createTenantAuditLogs (POST /audit-logs, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Append one client-reported event to the company audit log. The only action accepted is inspection.sync_conflict_resolved, which the offline editor reports when an inspector resolves a sync conflict; every other audit action is written by the server itself and cannot be forged here. The entity family must be one of the known families, and detail is free-form metadata that is redacted by value shape when written. Each call appends a new entry; repeating it records the event again. Open to owners, managers and inspectors."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -197,7 +197,7 @@ const eraseDataRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: DataErasureSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: DataErasureSchema.describe('The client whose personal data is to be erased'),
                 },
             },
         },
@@ -213,7 +213,7 @@ const eraseDataRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "deleteTenantData",
-    description: "Auto-generated placeholder for deleteTenantData (DELETE /data, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Erase a client's personal data, found by email address, from this company (a data-subject erasure request). Irreversible. Signed agreements are kept as evidence: their personal details are anonymised in place while the signature, signing times and signing audit trail remain. Agreements nobody has signed are deleted, and the client's contact record is deleted. Erasure is recorded in an append-only erasure log. The response reports the outcome status (completed, partially_completed, refused or held) with counts of rows anonymised, deleted and retained; a status other than completed means some data was kept or a step failed, so read the decisions before telling anyone it is done. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 

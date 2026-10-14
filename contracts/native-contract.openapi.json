@@ -131,10 +131,10 @@
                 "android",
                 "windows"
               ],
-              "description": "Native client platform identifier"
+              "description": "Native client platform identifier. One of: ios, android, windows."
             },
             "required": true,
-            "description": "Native client platform identifier",
+            "description": "Native client platform identifier. One of: ios, android, windows.",
             "name": "platform",
             "in": "query"
           }
@@ -584,10 +584,10 @@
                 "cancelled"
               ],
               "example": "completed",
-              "description": "Return only inspections in this lifecycle status."
+              "description": "Return only inspections in this lifecycle status. One of: requested, scheduled, confirmed, completed, cancelled."
             },
             "required": false,
-            "description": "Return only inspections in this lifecycle status.",
+            "description": "Return only inspections in this lifecycle status. One of: requested, scheduled, confirmed, completed, cancelled.",
             "name": "status",
             "in": "query"
           },
@@ -650,10 +650,10 @@
                 "awaiting_report"
               ],
               "example": "today",
-              "description": "Named filter over the list: date buckets, or needs_confirmation / awaiting_report."
+              "description": "Named filter over the list: date buckets, or needs_confirmation / awaiting_report. One of: all, today, upcoming, past, needs_confirmation, awaiting_report."
             },
             "required": false,
-            "description": "Named filter over the list: date buckets, or needs_confirmation / awaiting_report.",
+            "description": "Named filter over the list: date buckets, or needs_confirmation / awaiting_report. One of: all, today, upcoming, past, needs_confirmation, awaiting_report.",
             "name": "tab",
             "in": "query"
           }
@@ -1565,7 +1565,7 @@
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Phase F instance index within the building."
+                    "description": "Phase F instance index within the building. Integer, at least 0."
                   },
                   "unitId": {
                     "type": "string",
@@ -1598,7 +1598,7 @@
                       "replace",
                       "further_study"
                     ],
-                    "description": "Remedial action for this line item."
+                    "description": "Remedial action for this line item. One of: repair, replace, further_study."
                   },
                   "costMethod": {
                     "type": "string",
@@ -1606,13 +1606,13 @@
                       "unit",
                       "lump_sum"
                     ],
-                    "description": "Whether the cost is quantity x unit cost or a flat lump sum."
+                    "description": "Whether the cost is quantity x unit cost or a flat lump sum. One of: unit, lump_sum."
                   },
                   "quantity": {
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Unit-method quantity (null for lump_sum)."
+                    "description": "Unit-method quantity (null for lump_sum). Integer, at least 0."
                   },
                   "uom": {
                     "type": "string",
@@ -1623,31 +1623,31 @@
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Per-unit cost in integer cents (unit method only)."
+                    "description": "Per-unit cost in integer cents (unit method only). Integer cents, at least 0."
                   },
                   "lumpSumCents": {
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Flat total cost in integer cents (lump_sum method only)."
+                    "description": "Flat total cost in integer cents (lump_sum method only). Integer cents, at least 0."
                   },
                   "eul": {
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Expected Useful Life in years, for the reserve schedule."
+                    "description": "Expected Useful Life in years, for the reserve schedule. Integer, at least 0."
                   },
                   "effAge": {
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Effective Age in years, for the reserve schedule."
+                    "description": "Effective Age in years, for the reserve schedule. Integer, at least 0."
                   },
                   "rul": {
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Remaining Useful Life in years, for the reserve schedule."
+                    "description": "Remaining Useful Life in years, for the reserve schedule. Integer, at least 0."
                   },
                   "suggestedRemedy": {
                     "type": "string",
@@ -1660,7 +1660,7 @@
                       "short_term",
                       "long_term"
                     ],
-                    "description": "Deferred maintenance vs. capital reserve bucket."
+                    "description": "Deferred maintenance vs. capital reserve bucket. One of: immediate, short_term, long_term."
                   },
                   "sectionRef": {
                     "type": "string",
@@ -1674,7 +1674,7 @@
                   },
                   "sortOrder": {
                     "type": "integer",
-                    "description": "Display order within the bucket."
+                    "description": "Display order within the bucket. Integer."
                   }
                 },
                 "required": [
@@ -1823,7 +1823,7 @@
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Phase F instance index within the building."
+                    "description": "Phase F instance index within the building. Integer, at least 0."
                   },
                   "unitId": {
                     "type": "string",
@@ -1856,7 +1856,7 @@
                       "replace",
                       "further_study"
                     ],
-                    "description": "Remedial action for this line item."
+                    "description": "Remedial action for this line item. One of: repair, replace, further_study."
                   },
                   "costMethod": {
                     "type": "string",
@@ -1864,13 +1864,13 @@
                       "unit",
                       "lump_sum"
                     ],
-                    "description": "Whether the cost is quantity x unit cost or a flat lump sum."
+                    "description": "Whether the cost is quantity x unit cost or a flat lump sum. One of: unit, lump_sum."
                   },
                   "quantity": {
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Unit-method quantity (null for lump_sum)."
+                    "description": "Unit-method quantity (null for lump_sum). Integer, at least 0."
                   },
                   "uom": {
                     "type": "string",
@@ -1881,31 +1881,31 @@
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Per-unit cost in integer cents (unit method only)."
+                    "description": "Per-unit cost in integer cents (unit method only). Integer cents, at least 0."
                   },
                   "lumpSumCents": {
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Flat total cost in integer cents (lump_sum method only)."
+                    "description": "Flat total cost in integer cents (lump_sum method only). Integer cents, at least 0."
                   },
                   "eul": {
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Expected Useful Life in years, for the reserve schedule."
+                    "description": "Expected Useful Life in years, for the reserve schedule. Integer, at least 0."
                   },
                   "effAge": {
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Effective Age in years, for the reserve schedule."
+                    "description": "Effective Age in years, for the reserve schedule. Integer, at least 0."
                   },
                   "rul": {
                     "type": "integer",
                     "nullable": true,
                     "minimum": 0,
-                    "description": "Remaining Useful Life in years, for the reserve schedule."
+                    "description": "Remaining Useful Life in years, for the reserve schedule. Integer, at least 0."
                   },
                   "suggestedRemedy": {
                     "type": "string",
@@ -1918,7 +1918,7 @@
                       "short_term",
                       "long_term"
                     ],
-                    "description": "Deferred maintenance vs. capital reserve bucket."
+                    "description": "Deferred maintenance vs. capital reserve bucket. One of: immediate, short_term, long_term."
                   },
                   "sectionRef": {
                     "type": "string",
@@ -1932,7 +1932,7 @@
                   },
                   "sortOrder": {
                     "type": "integer",
-                    "description": "Display order within the bucket."
+                    "description": "Display order within the bucket. Integer."
                   }
                 }
               }
@@ -2647,10 +2647,10 @@
                 "significant",
                 "minor"
               ],
-              "description": "Return only recommendations of this severity."
+              "description": "Return only recommendations of this severity. One of: good, marginal, significant, minor."
             },
             "required": false,
-            "description": "Return only recommendations of this severity.",
+            "description": "Return only recommendations of this severity. One of: good, marginal, significant, minor.",
             "name": "severity",
             "in": "query"
           }
@@ -2960,7 +2960,7 @@
             "nullable": true,
             "maxLength": 30,
             "example": "(555) 123-4567",
-            "description": "Client phone number."
+            "description": "Client phone number. Up to 30 characters."
           },
           "templateId": {
             "type": "string",
@@ -2999,37 +2999,37 @@
             "nullable": true,
             "minLength": 1,
             "maxLength": 200,
-            "description": "Place identifier returned by the address autocomplete that supplied the geocoded fields."
+            "description": "Place identifier returned by the address autocomplete that supplied the geocoded fields. 1-200 characters."
           },
           "addressStreet": {
             "type": "string",
             "nullable": true,
             "maxLength": 200,
-            "description": "Street line of the geocoded address."
+            "description": "Street line of the geocoded address. Up to 200 characters."
           },
           "addressCity": {
             "type": "string",
             "nullable": true,
             "maxLength": 100,
-            "description": "City of the geocoded address."
+            "description": "City of the geocoded address. Up to 100 characters."
           },
           "addressState": {
             "type": "string",
             "nullable": true,
             "maxLength": 10,
-            "description": "State or region code of the geocoded address."
+            "description": "State or region code of the geocoded address. Up to 10 characters."
           },
           "addressZip": {
             "type": "string",
             "nullable": true,
             "maxLength": 20,
-            "description": "Postal code of the geocoded address."
+            "description": "Postal code of the geocoded address. Up to 20 characters."
           },
           "addressCounty": {
             "type": "string",
             "nullable": true,
             "maxLength": 100,
-            "description": "County of the geocoded address."
+            "description": "County of the geocoded address. Up to 100 characters."
           },
           "addressLat": {
             "type": "number",
@@ -3055,7 +3055,7 @@
               null
             ],
             "example": "commercial",
-            "description": "What kind of property is being inspected. Decides report tier, PCA block, Building Profile preset and the per-unit editor surface. Omit for unclassified."
+            "description": "What kind of property is being inspected. Decides report tier, PCA block, Building Profile preset and the per-unit editor surface. Omit for unclassified. One of: single_family, multi_unit, commercial."
           },
           "serviceIds": {
             "type": "array",
@@ -3076,7 +3076,7 @@
                 "priceOverrideCents": {
                   "type": "integer",
                   "minimum": 0,
-                  "description": "Per-line price override in cents. Omit to use the catalog price."
+                  "description": "Per-line price override in cents. Omit to use the catalog price. Integer cents, at least 0."
                 }
               },
               "required": [
@@ -3139,12 +3139,12 @@
           "discountAmount": {
             "type": "integer",
             "nullable": true,
-            "description": "Discount applied to the job, in cents, or null."
+            "description": "Discount applied to the job, in cents, or null. Integer."
           },
           "price": {
             "type": "integer",
             "minimum": 0,
-            "description": "Inspection price in cents."
+            "description": "Inspection price in cents. Integer, at least 0."
           },
           "paymentRequired": {
             "type": "boolean",
@@ -3169,7 +3169,7 @@
           "caption": {
             "type": "string",
             "maxLength": 200,
-            "description": "Optional caption to remember for the clip once uploaded"
+            "description": "Optional caption to remember for the clip once uploaded. Up to 200 characters."
           },
           "itemId": {
             "type": "string",
@@ -3356,7 +3356,7 @@
               "image/png",
               "image/heic"
             ],
-            "description": "Content type of the photo that will be uploaded to the returned URL"
+            "description": "Content type of the photo that will be uploaded to the returned URL. One of: image/jpeg, image/png, image/heic."
           }
         },
         "required": [
@@ -3832,7 +3832,7 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Poster timestamp as a fraction of duration (0..1)"
+            "description": "Poster timestamp as a fraction of duration (0..1). Between 0 and 1."
           }
         },
         "required": [
@@ -3994,7 +3994,7 @@
             "type": "integer",
             "minimum": 0,
             "example": 450,
-            "description": "Inspection price in cents."
+            "description": "Inspection price in cents. Integer, at least 0."
           },
           "status": {
             "type": "string",
@@ -4006,7 +4006,7 @@
               "cancelled"
             ],
             "example": "completed",
-            "description": "New lifecycle status of the inspection."
+            "description": "New lifecycle status of the inspection. One of: requested, scheduled, confirmed, completed, cancelled."
           },
           "paymentRequired": {
             "type": "boolean",
@@ -4028,7 +4028,7 @@
               null
             ],
             "example": "commercial",
-            "description": "Reclassify the property. Decides report tier, PCA block, Building Profile preset and the per-unit editor surface. Moving off commercial hides commercial data without deleting it; null clears the classification."
+            "description": "Reclassify the property. Decides report tier, PCA block, Building Profile preset and the per-unit editor surface. Moving off commercial hides commercial data without deleting it; null clears the classification. One of: single_family, multi_unit, commercial."
           },
           "yearBuilt": {
             "type": "integer",
@@ -4036,14 +4036,14 @@
             "minimum": 1800,
             "maximum": 2100,
             "example": 1990,
-            "description": "Year the property was built, from 1800 to 2100; null clears it."
+            "description": "Year the property was built, from 1800 to 2100; null clears it. Integer between 1800 and 2100."
           },
           "sqft": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
             "example": 1800,
-            "description": "Floor area in square feet; null clears it."
+            "description": "Floor area in square feet; null clears it. Integer, at least 0."
           },
           "foundationType": {
             "type": "string",
@@ -4055,14 +4055,14 @@
               "other",
               null
             ],
-            "description": "Foundation type of the property; null clears it."
+            "description": "Foundation type of the property; null clears it. One of: basement, slab, crawlspace, other."
           },
           "bedrooms": {
             "type": "integer",
             "nullable": true,
             "minimum": 0,
             "example": 3,
-            "description": "Number of bedrooms; null clears it."
+            "description": "Number of bedrooms; null clears it. Integer, at least 0."
           },
           "bathrooms": {
             "type": "number",
@@ -4070,26 +4070,26 @@
             "minimum": 0,
             "maximum": 20,
             "example": 2.5,
-            "description": "Number of bathrooms, halves allowed; null clears it."
+            "description": "Number of bathrooms, halves allowed; null clears it. Between 0 and 20."
           },
           "lotSize": {
             "type": "string",
             "nullable": true,
             "maxLength": 50,
             "example": "0.25 acres",
-            "description": "Free-text lot size, for example 0.25 acres; null clears it."
+            "description": "Free-text lot size, for example 0.25 acres; null clears it. Up to 50 characters."
           },
           "unit": {
             "type": "string",
             "nullable": true,
             "maxLength": 50,
-            "description": "Unit or suite identifier within the property; null clears it."
+            "description": "Unit or suite identifier within the property; null clears it. Up to 50 characters."
           },
           "county": {
             "type": "string",
             "nullable": true,
             "maxLength": 100,
-            "description": "County of the property; null clears it."
+            "description": "County of the property; null clears it. Up to 100 characters."
           },
           "closingDate": {
             "type": "string",
@@ -4103,14 +4103,14 @@
             "nullable": true,
             "maxLength": 64,
             "example": "REF-2026-0142",
-            "description": "External order or reference number for the job; null clears it."
+            "description": "External order or reference number for the job; null clears it. Up to 64 characters."
           },
           "referralSource": {
             "type": "string",
             "nullable": true,
             "maxLength": 100,
             "example": "Realtor",
-            "description": "Free-text label for the referral channel; null clears it."
+            "description": "Free-text label for the referral channel; null clears it. Up to 100 characters."
           },
           "referredByContactId": {
             "type": "string",
@@ -4132,7 +4132,7 @@
               null
             ],
             "example": "inline",
-            "description": "Per-inspection credential badge layout override; NULL inherits the profile"
+            "description": "Per-inspection credential badge layout override; NULL inherits the profile. One of: strip, inline."
           },
           "reportPhotoColumns": {
             "type": "integer",
@@ -4140,7 +4140,7 @@
             "minimum": 1,
             "maximum": 4,
             "example": 2,
-            "description": "Per-inspection report photo grid columns (1-4); NULL inherits the profile"
+            "description": "Per-inspection report photo grid columns (1-4); NULL inherits the profile. Integer between 1 and 4."
           },
           "coverPhotoId": {
             "type": "string",
@@ -4159,7 +4159,7 @@
               "both",
               null
             ],
-            "description": "Per-inspection override of which defect fields the publish gate requires; null inherits the tenant default."
+            "description": "Per-inspection override of which defect fields the publish gate requires; null inherits the tenant default. One of: none, location, trade, both."
           },
           "autoSignOnPublish": {
             "type": "boolean",
@@ -4178,7 +4178,7 @@
             "nullable": true,
             "minimum": 0,
             "example": 9000,
-            "description": "Deposit owed on this order, in integer cents. Setting it marks the order as operator-overridden; null clears the override."
+            "description": "Deposit owed on this order, in integer cents. Setting it marks the order as operator-overridden; null clears the override. Integer cents, at least 0."
           }
         }
       },

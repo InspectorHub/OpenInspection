@@ -529,7 +529,7 @@ let openApiDocument: ReturnType<typeof app.getOpenAPIDocument> | undefined;
 app.get('/doc', async (c) => {
     // Before the build. Refusing after it pays the CPU, then withholds it.
     await checkRateLimit(c, 'openapi-doc');
-    openApiDocument ??= app.getOpenAPIDocument(OPENAPI_CONFIG);
+    openApiDocument ??= (await import('./lib/openapi/build-document')).buildOpenApiDocument(app, OPENAPI_CONFIG);
     c.header('Cache-Control', 'public, max-age=3600');
     return c.json(openApiDocument);
 });
