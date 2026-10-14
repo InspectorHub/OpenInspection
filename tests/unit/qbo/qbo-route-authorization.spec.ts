@@ -273,3 +273,28 @@ describe('QBO customer match routes', () => {
         expect((await call('owner', '/customers?q=smith', 'GET', undefined, open)).status).toBe(200);
     });
 });
+
+describe('QBO router accepts the session token either way', () => {
+    // The page that follows Intuit's cross-site redirect has no usable cookie
+    // (the session cookie is SameSite=Strict), so it sends the token as a Bearer
+    // credential. Authentication here has to honour both, as the global
+    // middleware in front of it does.
+    const callWith = (headers: Record<string, string>) => buildApp('owner').request(
+        '/api/integrations/qbo/status', { method: 'GET', headers }, {},
+    );
+
+    it('admits a request that carries only a Bearer token', async () => {
+        const res = await callWith({ Authorization: 'Bearer stub' });
+        expect(res.status).toBe(200);
+    });
+
+    it('still admits a request that carries only the cookie (positive control)', async () => {
+        const res = await callWith({ Cookie: '__Host-inspector_token=stub' });
+        expect(res.status).toBe(200);
+    });
+
+    it('refuses a request that carries neither', async () => {
+        const res = await callWith({});
+        expect(res.status).toBe(401);
+    });
+});

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { HonoConfig } from '../types/hono';
 import { getCookie } from 'hono/cookie';
 import { verifyJwt } from '../lib/jwt-keyring';
+import { bearerToken } from '../lib/auth-helpers';
 import { requireRole } from '../lib/middleware/rbac';
 import { logger } from '../lib/logger';
 import { checkRateLimit } from '../lib/rate-limit';
@@ -16,7 +17,10 @@ const api = new Hono<HonoConfig>();
 // present, so we enforce auth here and respond 401 (not redirect) so the
 // fetch caller sees a structured failure.
 api.use('*', async (c, next) => {
-    const token = getCookie(c, '__Host-inspector_token') ?? getCookie(c, 'inspector_token');
+    // A Bearer token is honoured as well as the cookie, as the global middleware
+    // in front of this router does: the settings page reached through Intuit's
+    // cross-site redirect has no usable cookie and sends the token this way.
+    const token = bearerToken(c) ?? getCookie(c, '__Host-inspector_token') ?? getCookie(c, 'inspector_token');
     if (!token) return c.json({ success: false, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
     try {
         const keyring = await c.var.keyringPromise!;
