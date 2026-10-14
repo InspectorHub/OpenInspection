@@ -18,7 +18,7 @@ import { createHarness, type Harness } from '../helpers/tenant-email-harness';
 import {
     NATIVE_NON_OPENAPI_CONTRACT,
     type NativeNonOpenApiEntry,
-} from '../../../server/lib/native/contract-registry';
+} from '../../../scripts/lib/native-contract-registry';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../../..');

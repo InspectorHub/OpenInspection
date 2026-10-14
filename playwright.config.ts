@@ -294,7 +294,7 @@ export default defineConfig({
         { name: 'auth-two-factor', testMatch: 'auth-two-factor.spec.ts', dependencies: ['api'] },
         // Invites a throwaway member off the shared admin and removes them through
         // the Team page; never touches the admin or the seeded inspector.
-        { name: 'team-remove-member', testMatch: 'team-remove-member.spec.ts', dependencies: ['api'] },
+        { name: 'team-remove-member', testMatch: 'team-remove-member.spec.ts', dependencies: ['api', 'auth-two-factor'] },
         // Both run the setup wizard. They used to send their own company names
         // ("Branding Corp", "Timezone Corp"), which meant whichever reached
         // /api/auth/setup first named the tenant for the whole run.

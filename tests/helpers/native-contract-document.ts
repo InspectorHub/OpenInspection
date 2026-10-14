@@ -9,7 +9,7 @@
  * Nothing here reads a secret or an environment: the document describes paths,
  * methods and schemas only, because `contracts/` is published with the source.
  */
-import { NATIVE_CONTRACT, type NativeContractEntry } from './contract-registry';
+import { NATIVE_CONTRACT, type NativeContractEntry } from '../../scripts/lib/native-contract-registry';
 
 export interface NativeContractBuild {
     contract: Record<string, unknown>;

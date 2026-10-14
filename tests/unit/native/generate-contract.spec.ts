@@ -11,8 +11,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app } from '../../../server/index';
-import { buildNativeContract, serializeNativeContract } from '../../../server/lib/native/contract-document';
-import { NATIVE_CONTRACT } from '../../../server/lib/native/contract-registry';
+import { buildNativeContract, serializeNativeContract } from '../../helpers/native-contract-document';
+import { NATIVE_CONTRACT } from '../../../scripts/lib/native-contract-registry';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONTRACT_PATH = resolve(__dirname, '../../../contracts/native-contract.openapi.json');
