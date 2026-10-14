@@ -64,7 +64,7 @@ async function addMember(role: Member['role']): Promise<Member> {
     await b.DB.prepare('INSERT INTO users (id, tenant_id, email, password_hash, name, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .bind(id, TENANT, `${id}@example.test`, 'x', id, role, Date.now()).run();
     const token = `u:g:${id}`;
-    grants.set(token, { kind: 'native', userId: id, tenantId: TENANT, role, lastUsedAt: 0 });
+    grants.set(token, { kind: 'native', userId: id, tenantId: TENANT, role, lastUsedAt: 0, grantedAt: 0 });
     return { id, token, role };
 }
 

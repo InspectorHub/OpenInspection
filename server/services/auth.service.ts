@@ -167,7 +167,7 @@ export class AuthService {
      * documented at the implementation in `auth/join-team.ts`.
      */
     async joinTeam(token: string, password: string, opts: JoinTeamOptions) {
-        return joinTeamImpl({ db: this.db, outbox: this.outbox }, token, password, opts);
+        return joinTeamImpl({ db: this.db, outbox: this.outbox, oauth: this.oauth }, token, password, opts);
     }
 
     /**

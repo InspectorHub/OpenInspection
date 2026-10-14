@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { nativeTokenExchange, NATIVE_IDLE_LIMIT_S, type NativeProps } from '../../../server/lib/auth/native-token';
 
 const NOW = 1_800_000_000;
-const props = (lastUsedAt: number): NativeProps => ({ kind: 'native', userId: 'u', tenantId: 't', role: 'inspector', lastUsedAt });
+const props = (lastUsedAt: number): NativeProps => ({ kind: 'native', userId: 'u', tenantId: 't', role: 'inspector', lastUsedAt, grantedAt: 1_700_000_000 });
 
 describe('nativeTokenExchange', () => {
   it('code exchange: 1h access, refresh token without fixed expiry, stamps lastUsedAt', () => {

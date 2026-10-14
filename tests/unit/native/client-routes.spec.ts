@@ -13,7 +13,7 @@ import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { createHarness, INSPECTOR_ID, TENANT_ID, type Harness } from '../helpers/tenant-email-harness';
 
 const nativeProps: NativeProps = {
-  kind: 'native', userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'inspector', lastUsedAt: 0,
+  kind: 'native', userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'inspector', lastUsedAt: 0, grantedAt: 0,
 };
 
 const provider = {
@@ -92,6 +92,22 @@ describe('native version handshake (real app)', () => {
     expect(sync.status, await sync.clone().text()).not.toBe(426);
     expect(sync.headers.get('X-Client-Upgrade')).toBe('required');
     expect((await call('/api/inspections', OLD)).status).toBe(426);
+  });
+
+  it('does not 426 an old app on the REST writes that hand over captured work, while the reads on the same paths still do', async () => {
+    const id = '00000000-0000-4000-8000-0000000000c1';
+    const json = (method: string) => ({ init: { method, body: '{}' } });
+    const headers = { ...OLD, 'content-type': 'application/json' };
+    // Whatever the route answers to an empty body (a validation error is fine), it is not the version rule.
+    for (const [method, path] of [['POST', '/api/inspections'], ['PATCH', `/api/inspections/${id}`], ['POST', `/api/inspections/${id}/complete`]] as const) {
+      const res = await call(path, headers, json(method));
+      expect(res.status, `${method} ${path}: ${await res.clone().text()}`).not.toBe(426);
+      expect(res.headers.get('X-Client-Upgrade')).toBe('required');
+    }
+    // Controls: the version rule is live for this caller on the reads and on the other verbs.
+    expect((await call('/api/inspections', OLD)).status).toBe(426);
+    expect((await call(`/api/inspections/${id}`, OLD)).status).toBe(426);
+    expect((await call(`/api/inspections/${id}`, headers, json('DELETE'))).status).toBe(426);
   });
 
   it('does not 426 an old app on the offline import path, while a sibling POST under the same inspection still does', async () => {

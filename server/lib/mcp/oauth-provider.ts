@@ -1,8 +1,8 @@
 import { OAuthError, OAuthProvider, getOAuthApi, type OAuthProviderOptions, type TokenExchangeCallbackResult } from '@cloudflare/workers-oauth-provider';
-import { isNativeProps, nativeTokenExchange } from '../auth/native-token';
+import { currentNativeRole, isNativeProps, nativeGrantPredatesCredentialChange, nativeTokenExchange } from '../auth/native-token';
 import { InspectorMcp } from '../../durable-objects/inspector-mcp';
 import type { McpProps } from '../../durable-objects/inspector-mcp';
-import { nativeClientEnabled, oauthProviderEnabled } from './flag';
+import { mcpEnabled, nativeClientEnabled, oauthProviderEnabled } from './flag';
 import { assertCompanySlugMatches, slugFromMcpPath, stripMcpSlugPrefix } from './identity-bridge';
 import { getDeploymentProfile, type ProfileEnv } from '../deployment-profile';
 
@@ -19,7 +19,7 @@ type FetchFn = (req: Request, env: any, ctx: ExecutionContext) => Response | Pro
  * worker-configuration.d.ts; regenerate with `wrangler types` once OAUTH_KV /
  * INSPECTOR_MCP are confirmed provisioned to update the global Env type.
  */
-type McpFlagEnv = { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string } & ProfileEnv;
+type McpFlagEnv = { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string; DB?: D1Database; TENANT_CACHE?: KVNamespace } & ProfileEnv;
 
 /**
  * Wraps `appFetch` with an OAuthProvider when MCP or native clients are enabled.
@@ -70,6 +70,16 @@ export function buildOAuthHandler(
             if (isNativeProps(ctx.props)) {
                 return new Response(JSON.stringify({ error: 'forbidden' }), {
                     status: 403,
+                    headers: { 'content-type': 'application/json' },
+                });
+            }
+            // The provider is also mounted for native clients alone. With MCP off
+            // there is no MCP surface: answer as if /mcp were not mounted, even to
+            // a token minted while it was on or obtained through the open
+            // registration endpoint.
+            if (!mcpEnabled(env)) {
+                return new Response(JSON.stringify({ error: 'not_found' }), {
+                    status: 404,
                     headers: { 'content-type': 'application/json' },
                 });
             }
@@ -130,18 +140,29 @@ export function buildOAuthHandler(
         // grant, then throws OAuthError so the client gets 400 invalid_grant;
         // any other thrown error would surface as a 500.
         tokenExchangeCallback: async (opts): Promise<TokenExchangeCallbackResult | void> => {
-            const decision = nativeTokenExchange(opts.props, opts.grantType, Math.floor(Date.now() / 1000));
-            if (!decision) return;
-            // A grant outlives the switch that allowed it: with native clients turned
-            // off, revoke instead of letting refreshes keep it alive and keep
-            // resetting its idle clock.
-            const off = !nativeClientEnabled(env);
-            if (off || decision.kind === 'deny') {
+            // Every refusal revokes the grant first, so a grant cannot outlive the
+            // switch, the membership or the credential that allowed it, then
+            // throws OAuthError so the client gets 400 invalid_grant; any other
+            // thrown error would surface as a 500.
+            const refuse = async (description: string): Promise<never> => {
                 await getOAuthApi(options, env).revokeGrant(opts.grantId, opts.userId);
-                throw new OAuthError('invalid_grant', {
-                    description: off ? 'Native clients are not enabled' : 'Refresh token unused for too long',
-                });
+                throw new OAuthError('invalid_grant', { description });
+            };
+            const decision = nativeTokenExchange(opts.props, opts.grantType, Math.floor(Date.now() / 1000));
+            if (!decision) {
+                // An MCP grant on a deployment where MCP is off (native-only mounts the provider).
+                if (!isNativeProps(opts.props) && !mcpEnabled(env)) return refuse('MCP is not enabled');
+                return;
             }
+            if (!nativeClientEnabled(env)) return refuse('Native clients are not enabled');
+            if (decision.kind === 'deny') return refuse('Refresh token unused for too long');
+            // Re-check the member on every exchange: a revocation that failed when
+            // they were removed, or when their password changed, must not leave a
+            // refresh token that keeps minting access tokens.
+            const props = opts.props;
+            if (!isNativeProps(props) || !env.DB) return refuse('Native session cannot be verified');
+            if (!await currentNativeRole(env.DB, props.userId, props.tenantId)) return refuse('Member is no longer active');
+            if (await nativeGrantPredatesCredentialChange(env, props)) return refuse('Credentials changed since sign-in');
             // The provider tests for the PRESENCE of `refreshTokenTTL` on a code exchange, so the
             // native result carries it as an explicit undefined (no fixed expiry). The library types
             // it as `number`, which `exactOptionalPropertyTypes` will not widen; Object.assign copies

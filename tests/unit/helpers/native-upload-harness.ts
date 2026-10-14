@@ -16,7 +16,7 @@ export const OTHER_TENANT_INSPECTION_ID = '44444444-0000-4000-8000-0000000000ee'
 export const NATIVE_TOKEN = 'u:g:s';
 
 const nativeProps: NativeProps = {
-    kind: 'native', userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'inspector', lastUsedAt: 0,
+    kind: 'native', userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'inspector', lastUsedAt: 0, grantedAt: 0,
 };
 
 const provider = {

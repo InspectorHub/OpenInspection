@@ -2,12 +2,13 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, isNull } from 'drizzle-orm';
 import { users } from '../db/schema';
 import { nativeClientEnabled } from '../mcp/flag';
+import { memoOnce } from '../request-scope';
 
 /** The scope a native client requests and the consent page grants. */
 export const NATIVE_SCOPE = 'native';
 
 const NATIVE_ROLES = ['owner', 'manager', 'inspector'] as const;
-type NativeRole = (typeof NATIVE_ROLES)[number];
+export type NativeRole = (typeof NATIVE_ROLES)[number];
 
 /** Grant props written by the consent page for a native client. */
 export interface NativeProps {
@@ -17,6 +18,12 @@ export interface NativeProps {
   role: NativeRole;
   /** Epoch seconds of the last successful token exchange; drives the sliding idle limit. */
   lastUsedAt: number;
+  /**
+   * Epoch seconds when the member consented. Never moves on refresh. A
+   * `pwchanged:{userId}` marker newer than this ends the grant, and a grant
+   * made after the marker (the member signed in again) is unaffected.
+   */
+  grantedAt: number;
 }
 
 /**
@@ -36,9 +43,10 @@ export interface NativeTokenEnv {
   DB: D1Database;
   OAUTH_PROVIDER?: TokenUnwrapper;
   NATIVE_CLIENT_ENABLED?: string;
+  TENANT_CACHE?: KVNamespace;
 }
 
-function isNativeRole(role: string): role is NativeRole {
+export function isNativeRole(role: string): role is NativeRole {
   return (NATIVE_ROLES as readonly string[]).includes(role);
 }
 
@@ -49,7 +57,8 @@ export function isNativeProps(p: unknown): p is NativeProps {
     && typeof o.userId === 'string' && o.userId.length > 0
     && typeof o.tenantId === 'string' && o.tenantId.length > 0
     && typeof o.role === 'string' && (NATIVE_ROLES as readonly string[]).includes(o.role)
-    && typeof o.lastUsedAt === 'number' && Number.isFinite(o.lastUsedAt);
+    && typeof o.lastUsedAt === 'number' && Number.isFinite(o.lastUsedAt)
+    && typeof o.grantedAt === 'number' && Number.isFinite(o.grantedAt);
 }
 
 /** Opaque provider tokens are `userId:grantId:secret`; JWTs are dot-separated. */
@@ -70,6 +79,31 @@ export async function currentNativeRole(db: D1Database, userId: string, tenantId
     .get();
   if (!row || !isNativeRole(row.role)) return null;
   return row.role;
+}
+
+/**
+ * True when a credential change or removal (`pwchanged:{userId}`) happened after
+ * the grant was made. Web sessions read the same marker; an OAuth token never
+ * did, so grant revocation was the only control and a failed revocation left
+ * the grant alive. Semantics match the session check: no KV bound skips it, a
+ * KV read that throws fails closed (the session path answers 401 in that case).
+ */
+export async function nativeGrantPredatesCredentialChange(
+  env: { TENANT_CACHE?: KVNamespace },
+  props: Pick<NativeProps, 'userId' | 'grantedAt'>,
+): Promise<boolean> {
+  const kv = env.TENANT_CACHE;
+  if (!kv) return false;
+  try {
+    // The same memo key the session check uses, so one in-process fan-out (an
+    // import replaying its queued writes) reads the marker once, not per call.
+    const raw = await memoOnce(env, `pwchanged:${props.userId}`, () => kv.get(`pwchanged:${props.userId}`));
+    if (!raw) return false;
+    const changedAt = parseInt(raw, 10);
+    return !Number.isFinite(changedAt) || props.grantedAt < changedAt;
+  } catch {
+    return true;
+  }
 }
 
 /**
@@ -94,6 +128,7 @@ export async function resolveNativeToken(env: NativeTokenEnv, token: string): Pr
   if (!isNativeProps(props)) return null;
   const role = await currentNativeRole(env.DB, props.userId, props.tenantId);
   if (!role) return null;
+  if (await nativeGrantPredatesCredentialChange(env, props)) return null;
   return { ...props, role };
 }
 

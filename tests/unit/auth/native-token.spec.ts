@@ -23,12 +23,13 @@ import * as schema from '../../../server/lib/db/schema';
 import {
   resolveNativeToken, looksLikeOpaqueOAuthToken, isNativeProps, NATIVE_SCOPE, type NativeProps,
 } from '../../../server/lib/auth/native-token';
+import { MockKV } from '../mocks';
 import { createHarness, INSPECTOR_ID, TENANT_ID, type Harness } from '../helpers/tenant-email-harness';
 
 const TENANT = '00000000-0000-4000-8000-0000000000aa';
 const USER = '00000000-0000-4000-8000-0000000000bb';
 const ON = { NATIVE_CLIENT_ENABLED: 'true' };
-const props: NativeProps = { kind: 'native', userId: USER, tenantId: TENANT, role: 'inspector', lastUsedAt: 0 };
+const props: NativeProps = { kind: 'native', userId: USER, tenantId: TENANT, role: 'inspector', lastUsedAt: 0, grantedAt: 0 };
 
 /** `tokenScope` is the access token's own scope; it defaults to the grant's. */
 type GrantMap = Record<string, { scope: string[]; props: unknown; tokenScope?: string[] } | null>;
@@ -70,6 +71,42 @@ describe('isNativeProps', () => {
     expect(isNativeProps(props)).toBe(true);
     expect(isNativeProps({ ...props, lastUsedAt: '0' })).toBe(false);
     expect(isNativeProps({ ...props, lastUsedAt: undefined })).toBe(false);
+  });
+});
+
+describe('isNativeProps, grantedAt', () => {
+  it('requires grantedAt to be a number', () => {
+    expect(isNativeProps({ ...props, grantedAt: '0' })).toBe(false);
+    expect(isNativeProps({ ...props, grantedAt: undefined })).toBe(false);
+  });
+});
+
+describe('resolveNativeToken and the pwchanged marker', () => {
+  const NOW = Math.floor(Date.now() / 1000);
+  async function resolveWith(marker: string | null, grantedAt: number, kvThrows = false) {
+    const DB = await unitEnv();
+    const kv = new MockKV();
+    if (marker !== null) await kv.put(`pwchanged:${USER}`, marker);
+    if (kvThrows) kv.get.mockRejectedValue(new Error('kv down'));
+    const OAUTH_PROVIDER = provider({ 'u:g:s': { scope: [NATIVE_SCOPE], props: { ...props, grantedAt } } });
+    return resolveNativeToken({ DB, OAUTH_PROVIDER, TENANT_CACHE: kv as unknown as KVNamespace, ...ON }, 'u:g:s');
+  }
+  it('refuses a grant made before the credential change', async () => {
+    expect(await resolveWith(String(NOW), NOW - 600)).toBeNull();
+  });
+  it('accepts a grant made after the credential change (the member signed in again)', async () => {
+    expect((await resolveWith(String(NOW - 600), NOW))?.userId).toBe(USER);
+  });
+  it('accepts any grant when no marker exists', async () => {
+    expect((await resolveWith(null, NOW - 600))?.userId).toBe(USER);
+  });
+  it('fails closed when the marker cannot be read, like the session path', async () => {
+    expect(await resolveWith(null, NOW, true)).toBeNull();
+  });
+  it('skips the check when no KV is bound, like the session path', async () => {
+    const DB = await unitEnv();
+    const OAUTH_PROVIDER = provider({ 'u:g:s': { scope: [NATIVE_SCOPE], props } });
+    expect((await resolveNativeToken({ DB, OAUTH_PROVIDER, ...ON }, 'u:g:s'))?.userId).toBe(USER);
   });
 });
 
@@ -141,7 +178,7 @@ describe('GET /api/session/context with an OAuth access token (real app)', () =>
   afterEach(() => { h?.close(); h = undefined; });
 
   const nativeProps: NativeProps = {
-    kind: 'native', userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'inspector', lastUsedAt: 0,
+    kind: 'native', userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'inspector', lastUsedAt: 0, grantedAt: 0,
   };
 
   async function get(harness: Harness, grants: GrantMap, token: string): Promise<Response> {
@@ -209,7 +246,7 @@ describe('SaaS tenant isolation guard with a native token', () => {
 
   const OTHER_TENANT = '11111111-0000-4000-8000-0000000000ff';
   const nativeProps: NativeProps = {
-    kind: 'native', userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'inspector', lastUsedAt: 0,
+    kind: 'native', userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'inspector', lastUsedAt: 0, grantedAt: 0,
   };
 
   /**

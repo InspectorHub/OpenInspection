@@ -195,8 +195,9 @@ export default function SettingsHub() {
   const owner = isOwnerRole(session?.user?.role);
   // Billing tile is SaaS-only — surface it when this deployment bills tenants.
   const showBilling = session?.deployment?.hasBilling ?? session?.branding?.isSaas ?? false;
-  // MCP tile is only shown when the MCP feature flag is on for this deployment.
-  const showMcp = session?.deployment?.mcpEnabled ?? false;
+  // The Connected applications tile is shown when either OAuth consumer (remote MCP,
+  // native clients) is on for this deployment; the grant routes serve both.
+  const showConnectedApps = session?.deployment?.connectedAppsEnabled ?? false;
 
   return (
     <div className="space-y-2">
@@ -208,7 +209,7 @@ export default function SettingsHub() {
           <div className={HUB_GRID_CLASS}>
             {group.tiles
               .filter((t) => t.to !== "/settings/billing" || showBilling)
-              .filter((t) => t.to !== "/settings/connected-apps" || showMcp)
+              .filter((t) => t.to !== "/settings/connected-apps" || showConnectedApps)
               .filter((t) => t.to !== "/settings/statutory-forms" || owner)
               .map((tile) => (
                 <HubCard

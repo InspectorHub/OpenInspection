@@ -68,6 +68,15 @@ describe('photo upload URL (real app)', () => {
         expect(b.key).toBe(a.key);
     });
 
+    it('answers 404 once native clients are switched off, even for a token minted while they were on', async () => {
+        const { url } = await mintUrl();
+        const off = await u!.call(url, { method: 'POST', body: filePart('image/jpeg') }, { auth: null, env: { NATIVE_CLIENT_ENABLED: 'false' } });
+        expect(off.status).toBe(404);
+        expect(u!.r2.store.size).toBe(0);
+        // Control: the same URL is accepted with the switch on.
+        expect((await u!.call(url, { method: 'POST', body: filePart('image/jpeg') }, { auth: null })).status).toBe(200);
+    });
+
     it('refuses a tampered token and an expired token with 401, and stores nothing', async () => {
         const { url } = await mintUrl();
         // Flip a character in the middle of the signature: the last one of a base64url

@@ -29,7 +29,7 @@ const ALSO_MINE = 'insp-ticket-also-mine';
 const NOT_MINE = 'insp-ticket-other-tenant';
 
 function propsFor(userId: string, tenantId: string): NativeProps {
-  return { kind: 'native', userId, tenantId, role: 'inspector', lastUsedAt: 0 };
+  return { kind: 'native', userId, tenantId, role: 'inspector', lastUsedAt: 0, grantedAt: 0 };
 }
 const PROPS: Record<string, NativeProps> = {
   'u:g:s': propsFor(INSPECTOR_ID, TENANT_ID),

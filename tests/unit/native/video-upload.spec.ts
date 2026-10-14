@@ -75,6 +75,16 @@ describe('video upload (real app)', () => {
             expect(u!.r2.store.get(key)?.bytes.length).toBe(3);
         });
 
+        it('answers 404 once native clients are switched off, even for a token minted while they were on', async () => {
+            const out = await create();
+            const url = pathOf(out.uploadURL);
+            const off = await u!.call(url, { method: 'POST', body: filePart('video/mp4', MP4) }, { auth: null, env: { NATIVE_CLIENT_ENABLED: 'false' } });
+            expect(off.status).toBe(404);
+            expect(u!.r2.store.size).toBe(0);
+            // Control: the same URL is accepted with the switch on.
+            expect((await u!.call(url, { method: 'POST', body: filePart('video/mp4', MP4) }, { auth: null })).status).toBe(200);
+        });
+
         it('refuses a tampered or expired token with 401 and stores nothing', async () => {
             const out = await create();
             const url = pathOf(out.uploadURL);

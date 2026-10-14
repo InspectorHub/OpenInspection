@@ -35,7 +35,10 @@ describe('native non-OpenAPI contract', () => {
     async function status(method: string, path: string): Promise<number> {
         h ??= await createHarness('standalone');
         const exec = makeExecutionContext({ label: 'native-contract' });
-        const res = await app.request(path, { method: method.toUpperCase() }, h.env, exec.ctx);
+        // The token-only upload routes answer 404 while native clients are off, so "routed" is
+        // asked of a deployment that opted in. The control path below stays 404 either way.
+        const env = { ...h.env, NATIVE_CLIENT_ENABLED: 'true' } as typeof h.env;
+        const res = await app.request(path, { method: method.toUpperCase() }, env, exec.ctx);
         await exec.settle();
         return res.status;
     }

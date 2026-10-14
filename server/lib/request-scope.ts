@@ -5,8 +5,10 @@
  * one of them — so the same JWT was verified 16 times and the same tenant
  * config read 15 times. This is where that work is shared.
  *
- * SECURITY: the scope reaches middleware only through the env that
- * `workers/app.ts` hands to the in-process self-binding. External HTTP
+ * SECURITY: the scope reaches middleware only through an env that server code
+ * builds itself: `workers/app.ts` for the in-process self-binding, and the
+ * offline import for its replays (credential lookups only, see
+ * `createCredentialScope`). External HTTP
  * requests go through `toApi`, which passes the plain `c.env`, so `memoOnce`
  * falls through to the factory and per-request verification is unchanged.
  * Memoisation is unreachable from outside BY CONSTRUCTION, not by a flag.
@@ -37,6 +39,27 @@ export function createRequestScope(): RequestScope {
             const p = fn();
             entries.set(key, p);
             return p;
+        },
+    };
+}
+
+/** Keys a credential scope shares: who the bearer is, and whether a credential change cut it off. */
+const CREDENTIAL_KEY = /^(native|pwchanged):/;
+
+/**
+ * A scope that shares ONLY credential lookups, for a request that calls the API
+ * on its own behalf several times with the one bearer it was given (an offline
+ * import replaying its queued writes). Without it every replay resolves the same
+ * token and re-reads the same marker; with it they are resolved once. Anything
+ * else falls through to its factory, so nothing a replay writes can be served
+ * stale to the next one. Like the page-render scope it is attached by server
+ * code to the env it hands to the in-process call; a client cannot supply it.
+ */
+export function createCredentialScope(): RequestScope {
+    const inner = createRequestScope();
+    return {
+        once<T>(key: string, fn: () => Promise<T>): Promise<T> {
+            return CREDENTIAL_KEY.test(key) ? inner.once(key, fn) : fn();
         },
     };
 }

@@ -17,9 +17,9 @@ import { m } from "~/paraglide/messages";
 import { cloudflareContext, getCloudflareEnv } from "~/lib/load-context";
 import { writeAuditLog } from "../../../server/lib/audit";
 import { getDeploymentProfile } from "../../../server/lib/deployment-profile";
-import { nativeClientEnabled } from "../../../server/lib/mcp/flag";
+import { mcpEnabled, nativeClientEnabled } from "../../../server/lib/mcp/flag";
 import type { WorkerEnv } from "../../../workers/env";
-import { completeNativeAuthorization, hasNativePkce, isNativeAuthRequest, isNativeRedirectUri, nativeRedirectDisplay } from "../../../server/lib/auth/native-consent";
+import { assertNativeRoleAllowed, completeNativeAuthorization, hasNativePkce, isNativeAuthRequest, isNativeRedirectUri, nativeRedirectDisplay } from "../../../server/lib/auth/native-consent";
 
 export function meta() {
   return [{ title: m.oauth_authorize_meta_title() }];
@@ -32,6 +32,7 @@ export function meta() {
 interface AuthorizeEnv {
   OAUTH_PROVIDER?: OAuthHelpers;
   NATIVE_CLIENT_ENABLED?: string;
+  MCP_ENABLED?: string;
 }
 
 /** Resolved end-user identity backing an OAuth grant. */
@@ -160,6 +161,12 @@ export async function loader({ request, url, context }: Route.LoaderArgs) {
   // look-alike app holding the same scheme cannot redeem the code (400).
   const native = isNativeAuthRequest(authReq.scope);
   if (native && !nativeClientEnabled(env)) throw new Response("Not Found", { status: 404 });
+  // The provider is mounted for native clients alone as well; an MCP grant is
+  // only offered where MCP itself is on.
+  if (!native && !mcpEnabled(env)) throw new Response("Not Found", { status: 404 });
+  // Same check, same function as the action: do not show a consent page the
+  // action would refuse.
+  if (native) assertNativeRoleAllowed(identity.role);
   if (native && (!isNativeRedirectUri(authReq.redirectUri) || !hasNativePkce(authReq))) {
     throw new Response("Bad Request", { status: 400 });
   }
@@ -202,6 +209,11 @@ export async function action({ request, url, context }: Route.ActionArgs) {
   // resolve the REGISTERED client once and validate against it.
   const client = await env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
   const clientName = client?.clientName?.trim() || m.oauth_authorize_client_fallback();
+
+  // Same switch as the loader: an MCP authorization is dead where MCP is off.
+  if (!isNativeAuthRequest(authReq.scope) && !mcpEnabled(env)) {
+    throw new Response("Not Found", { status: 404 });
+  }
 
   // Cancel => bounce back to the client's redirect_uri with an OAuth error
   // (RFC 6749 §4.1.2.1) — but ONLY if that redirect_uri is registered to the

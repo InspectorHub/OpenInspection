@@ -27,13 +27,23 @@ The switch is **off by default**, and off means closed rather than quiet:
   native client;
 - a native access token presented to `/api/*` is rejected (on `/mcp` a native
   grant is always refused with `403`, whatever the switch says);
-- a one-time WebSocket ticket (section 7) is rejected.
+- a one-time WebSocket ticket (section 7) is rejected;
+- the token-only upload routes (section 8) answer `404`.
 
 Everything else behaves exactly as it did. The OAuth provider is mounted when
 either `MCP_ENABLED` or `NATIVE_CLIENT_ENABLED` is set (`oauthProviderEnabled` in
-`server/lib/mcp/flag.ts`); enabling one never enables the other, and an MCP grant
-can never be used as a native session or the reverse (see the `native` scope
-below).
+`server/lib/mcp/flag.ts`), but the two switches stay independent:
+
+- With only `NATIVE_CLIENT_ENABLED`, the MCP surface is off. The consent page
+  answers `404` to an authorization that asks for MCP scopes, the token endpoint
+  refuses an MCP grant (`400 invalid_grant`, and the grant is revoked), and
+  `/mcp` answers `404` even to a token issued while MCP was on. Client
+  registration is open on any deployment that mounts the provider, so this is
+  what stops a registered client from being turned into an MCP token.
+- With only `MCP_ENABLED`, a native authorization, exchange or refresh is refused
+  as described above.
+- An MCP grant can never be used as a native session or the reverse (see the
+  `native` scope below).
 
 Deploy order matters when you upgrade: apply the migrations **before** the new
 code (section 14).
@@ -50,12 +60,43 @@ whatever else the client asked for.
 | Rule | Detail |
 |---|---|
 | Flow | Authorization code with PKCE. **`S256` is required**: a request without a challenge, or with `plain`, is refused. |
-| Redirect URI | Only a **private-use scheme containing a dot** (reverse-domain form, for example `io.example.app:/callback`) or an **IP-literal loopback** (`http://127.0.0.1` or `http://[::1]`). `https`, the hostname `localhost` and remote `http` are refused. The dot requirement excludes every scheme a browser treats as active content (`javascript`, `data`, `file`, ...). |
+| Redirect URI | Only a **private-use scheme containing a dot** (reverse-domain form, for example `io.example.app:/callback`) or an **IP-literal loopback** (`http://127.0.0.1` or `http://[::1]`). `https`, the hostname `localhost` and remote `http` are refused. The dot requirement excludes every scheme a browser treats as active content (`javascript`, `data`, `file`, ...). See "Redirect URIs" below. |
 | Consent screen | Shows the app name, the scheme the code will be delivered to (or "this computer" for a loopback redirect), and an "unverified app" label. Client registration is open, so the name is whatever the client claimed. |
-| Roles | `owner`, `manager` and `inspector`. The `agent` role is refused before any grant exists. |
+| Roles | `owner`, `manager` and `inspector`. The `agent` role is refused before any grant exists, and before the consent page is shown. |
 | Access token | Opaque, **1 hour**. |
 | Refresh token | No fixed expiry, but a grant **unused for 90 days** is refused and revoked. The 90 days slide: each successful exchange moves the clock. |
 | Transport | The client sends the token as `Authorization: Bearer`. No cookie is involved. |
+| Scope | There is one scope, `native`, and it is not narrower than a web session. See "What a native token can do" below. |
+
+### What a native token can do
+
+A native access token is equivalent to a full web session for the member it was
+issued to. It reaches every `/api/*` route that member's role reaches, including
+team management, password and two-factor changes. There is no narrower scope,
+and that is by design: the app is the product's own client, not a third party.
+This is why the consent screen names the app, the redirect target and an
+"unverified app" label, and why the redirect rules below are strict.
+
+### Redirect URIs
+
+Version 1 accepts only a dotted private-use scheme and an IP-literal loopback.
+**An `https` callback (a universal link or app link) is not supported**: with open
+dynamic registration, an `https` redirect would let anyone register a client whose
+code is delivered to a web origin they control, so allowing it would need an
+operator-maintained allowlist. Android uses a private scheme instead.
+
+### Grants are not bound to a device
+
+A grant belongs to a member and a client id, not to a device. Authorizing again
+under the same client id does **not** revoke the member's earlier grant, so a
+second phone, or a reinstall, does not sign the first one out. Register one
+client per installation (`POST /oauth/register` is cheap) so the member's list of
+connected apps shows each device as its own row and one can be revoked alone.
+
+To keep abandoned installs from piling up, each member keeps at most
+`NATIVE_GRANTS_PER_USER_MAX` (10) native grants: when a new one would exceed it,
+the oldest by creation time are revoked. This is best effort and never undoes the
+sign-in that triggered it. The member's MCP grants are never touched.
 
 ### What ends a session
 
@@ -64,16 +105,20 @@ revoked on the events below. Either is enough to stop access.
 
 | Event | Effect |
 |---|---|
-| Member removed | Every OAuth grant the member holds is revoked; the token also fails the row check. |
-| Password change or reset | Grants are revoked (the session-invalidation marker that cuts off web sessions is never read by an OAuth token, so grants are cut directly). |
+| Member removed | Every OAuth grant the member holds is revoked; the token also fails the row check, and a refresh re-reads the row too. |
+| Member re-invited after removal | The reactivated account keeps its id, so every grant that id still holds is revoked when the invitation is accepted. |
+| Password change or reset | Grants are revoked. As a second line, the `pwchanged:{userId}` marker that cuts off web sessions is also read for a native token: a grant made before the marker is refused on use and on refresh (a grant made after it is unaffected). Like the web session check, no bound KV skips the comparison and a KV read that fails refuses the token. |
 | Role change | Grants are revoked, so no token keeps the old role. Between the change and the revocation the role used is the row's current role, never the one captured at consent. |
 | Role no longer native-capable (for example `agent`) | The token resolves to no identity. |
 | Account self-deletion | Grants are revoked. |
 | `NATIVE_CLIENT_ENABLED` turned off | Every native token and ticket is refused immediately. |
 
-Consent is written to the audit log as `native.grant.created`. With the switch
-off, a refresh attempt also revokes the grant it was made with, so a grant cannot
-outlive the switch that allowed it.
+Consent is written to the audit log as `native.grant.created`. A refresh that is
+refused for any of the reasons above also revokes the grant it was made with, so a
+grant cannot outlive the switch, the membership or the credential that allowed it.
+The refresh re-reads the member's row and the marker before it issues a token, so
+a revocation that failed when the member was removed cannot be bypassed by
+refreshing.
 
 ---
 
@@ -110,17 +155,56 @@ sent version is below the corresponding threshold. A browser can read it because
 it is in `Access-Control-Expose-Headers` for the native origins.
 
 **`426`** (`CLIENT_UPGRADE_REQUIRED`) is returned only when the status is
-`required` **and** the path is not in `NEVER_BLOCK_PATHS`
+`required` **and** the call is not in `NEVER_BLOCK_RULES`
 (`server/lib/native/client-version.ts`). Work captured on a device must always be
-deliverable, so these paths are never blocked by version:
+deliverable, so any version may still make these calls. A rule names a path and,
+where the same path also serves reads, a method:
 
-- the collab socket, collab import and ticket routes, and the presence sockets;
+- the collab socket, collab import and ticket routes, and the inspection presence
+  socket;
 - the media upload-URL and video upload routes, and `/api/public/uploads/*`;
-- `GET /api/client/session`, `POST /api/client/import` and `GET /api/client/compat`.
+- `GET /api/client/session`, `POST /api/client/import` and `GET /api/client/compat`;
+- the REST writes that hand over a captured inspection: `POST /api/inspections`
+  (with the client's own id), `PATCH /api/inspections/{id}` and
+  `POST /api/inspections/{id}/complete`.
+
+The method matters: `GET /api/inspections` and `GET /api/inspections/{id}` are
+still refused with `426`, because an outdated app should hand its work over, not
+pull current data. The tenant-wide presence socket (`/api/tenant/presence/ws`) is
+not listed: it has no ticket route, so a WebView cannot open it.
 
 **`GET /api/client/compat?platform=<platform>`** is public, so a client can call
 it before signing in. It returns `minSupported`, `recommended`, `downloadUrl`
 (each possibly `null`) and `serverContractVersion`.
+
+### Which versions are still in use
+
+Retiring an old version is only safe once nothing runs it, so the server records
+when each version was last seen. `GET /api/client/session`, which the app calls on
+every start and refresh, upserts one row of the table `native_client_seen`
+(`tenant_id`, `platform`, `client_version`, `first_seen_at`, `last_seen_at`) when
+the request carries a valid `X-Client-Platform` and an `X-Client-Version` of up to
+three dotted numbers (at most 32 characters; `1.4` is stored as `1.4.0`). Anything
+else is ignored, not rejected.
+
+- **Throttled.** A row is rewritten at most once an hour, so a busy fleet costs
+  about one D1 write per version per hour.
+- **Bounded.** A company holds at most 200 rows. Past that, new versions are not
+  recorded and existing ones are still refreshed.
+- **Best effort.** A failed write is logged and never changes the response.
+- **Per company.** Rows carry `tenant_id` and are removed with the company on a
+  purge.
+
+To see what is still in use:
+
+```sql
+SELECT platform, client_version, datetime(last_seen_at / 1000, 'unixepoch') AS last_seen
+FROM native_client_seen
+ORDER BY platform, last_seen_at DESC;
+```
+
+Raise `NATIVE_MIN_VERSION_<PLATFORM>` above a version only after its `last_seen`
+is older than your longest offline allowance (`offline_max_days`).
 
 ---
 
@@ -195,6 +279,9 @@ not use one.
 
 Rules the upload route applies, in order:
 
+- With `NATIVE_CLIENT_ENABLED` off the route answers `404`, even for a token that
+  was minted while it was on and has not expired. (The web editor is never handed
+  this URL; it uploads through its session.)
 - A photo token is refused by the video route and the reverse; a tampered or
   expired token is `401`.
 - Before reading any bytes it re-checks that the inspection still exists and that
@@ -412,10 +499,11 @@ The native surface adds two forward-only migrations:
 | Migration | Adds |
 |---|---|
 | `0001_offline_max_days.sql` | `tenant_configs.offline_max_days` (integer, default 30) |
-| `0002_offline_import_applied.sql` | The `offline_import_applied` table and its `(tenant_id, applied_at)` index |
+| `0002_offline_import_applied.sql` | The `offline_import_applied` table and its `(tenant_id, applied_at)` index, and the `native_client_seen` table |
 
 **Apply migrations before deploying the new code.** The new code reads
-`offline_max_days` on the session route and writes `offline_import_applied` on
+`offline_max_days` on the session route, writes `native_client_seen` there too (a
+failed write is logged and ignored), and writes `offline_import_applied` on
 import; running it against a database that has not been migrated fails those
 routes. With the flag off, nothing else changes. See
 [`../operate/upgrade.md`](../operate/upgrade.md) for the upgrade procedure.

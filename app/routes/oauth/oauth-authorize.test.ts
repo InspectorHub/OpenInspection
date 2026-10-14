@@ -180,7 +180,7 @@ interface Parsed {
   codeChallengeMethod?: string;
 }
 
-function harness(opts: { native?: boolean; parsed: Parsed }) {
+function harness(opts: { native?: boolean; mcp?: boolean; parsed: Parsed }) {
   const completeAuthorization = vi.fn(async (_o: { scope: string[]; props: Record<string, unknown> }) => ({
     redirectTo: `${opts.parsed.redirectUri}?code=abc`,
   }));
@@ -189,7 +189,13 @@ function harness(opts: { native?: boolean; parsed: Parsed }) {
     lookupClient: vi.fn(async () => ({ clientId: "c1", clientName: "Field App", redirectUris: [opts.parsed.redirectUri] })),
     completeAuthorization,
   };
-  const env = { APP_MODE: "standalone", OAUTH_PROVIDER: provider, ...(opts.native ? { NATIVE_CLIENT_ENABLED: "true" } : {}) };
+  // MCP is on unless a test says otherwise, as it is on any deployment that serves an MCP grant.
+  const env = {
+    APP_MODE: "standalone",
+    OAUTH_PROVIDER: provider,
+    ...(opts.mcp === false ? {} : { MCP_ENABLED: "true" }),
+    ...(opts.native ? { NATIVE_CLIENT_ENABLED: "true" } : {}),
+  };
   return { provider, completeAuthorization, context: createLoadContext(env) };
 }
 
@@ -218,6 +224,34 @@ describe("authorize loader, native branch (the real loader)", () => {
     const mcp = harness({ parsed: { clientId: "c1", scope: ["read:inspections"], redirectUri: "https://claude.ai/cb" } });
     const data = await loader(getArgs(mcp.context, "read:inspections"));
     expect(data.native).toBe(false);
+  });
+
+  it("native-only deployment: an MCP-scope authorization page is 404, the native one is served", async () => {
+    const mcpParsed: Parsed = { clientId: "c1", scope: ["read:inspections"], redirectUri: "https://claude.ai/cb" };
+    const nativeOnly = harness({ native: true, mcp: false, parsed: mcpParsed });
+    const refused = await loader(getArgs(nativeOnly.context, "read:inspections")).catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(Response);
+    expect((refused as Response).status).toBe(404);
+    // Control: the same deployment serves a native authorization.
+    const ok = harness({ native: true, mcp: false, parsed: good });
+    expect((await loader(getArgs(ok.context, "native"))).native).toBe(true);
+  });
+
+  it("refuses an agent before showing the consent page, as the action does", async () => {
+    sessionGet.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { user: { role: "agent" }, branding: { tenantSlug: "acme" } } }),
+    });
+    const h = harness({ native: true, parsed: good });
+    const err = await loader(getArgs(h.context, "native")).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Response);
+    expect((err as Response).status).toBe(403);
+    // Control: an inspector gets the page.
+    sessionGet.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { user: { role: "inspector" }, branding: { tenantSlug: "acme" } } }),
+    });
+    expect((await loader(getArgs(h.context, "native"))).native).toBe(true);
   });
 
   it("is 400 for a redirect that is not a private scheme or loopback", async () => {
@@ -284,6 +318,18 @@ describe("authorize action, native branch (the real action)", () => {
     expect((e2 as Response).status).toBe(400);
     expect(off.completeAuthorization).not.toHaveBeenCalled();
     expect(noPkce.completeAuthorization).not.toHaveBeenCalled();
+  });
+
+  it("native-only deployment: an MCP-scope authorization is 404 and grants nothing; native still completes", async () => {
+    const mcp = { ...base, scope: ["read:inspections"], codeChallenge: undefined, codeChallengeMethod: undefined };
+    const h = harness({ native: true, mcp: false, parsed: mcp });
+    const refused = await action(post(h.context, mcp)).catch((e: unknown) => e);
+    expect((refused as Response).status).toBe(404);
+    expect(h.completeAuthorization).not.toHaveBeenCalled();
+    // Control: the same deployment completes a native authorization.
+    const ok = harness({ native: true, mcp: false, parsed: base });
+    expect(((await action(post(ok.context, base))) as Response).status).toBe(302);
+    expect(ok.completeAuthorization).toHaveBeenCalledTimes(1);
   });
 
   it("control: an MCP request still takes the module-scope path", async () => {

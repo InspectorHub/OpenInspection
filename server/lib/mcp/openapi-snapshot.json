@@ -7616,7 +7616,7 @@
       "body": null
     },
     "summary": "Get the signed-in native client session",
-    "description": "Returns the identity behind a native access token and the tenant offline access limit, which the device uses to decide when to lock local data."
+    "description": "Returns the identity behind a native access token and the tenant offline access limit, which the device uses to decide when to lock local data. When the request carries X-Client-Platform and X-Client-Version, the server also notes that this version was seen."
   },
   {
     "operationId": "getCommunicationConfig",

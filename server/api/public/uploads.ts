@@ -36,6 +36,7 @@ import { verifyUploadToken, type UploadTokenClaims } from '../../lib/video-uploa
 import { inspections } from '../../lib/db/schema';
 import { getDrizzle } from '../../lib/route-helpers';
 import { currentNativeRole } from '../../lib/auth/native-token';
+import { nativeClientEnabled } from '../../lib/mcp/flag';
 import { r2Keys } from '../../lib/r2-keys';
 import { logger } from '../../lib/logger';
 import { imagesBinding } from '../../lib/media/serve-photo';
@@ -77,6 +78,13 @@ async function readFile(c: Context<HonoConfig>): Promise<File | null> {
 }
 
 export const publicUploadsRoutes = new Hono<HonoConfig>()
+    // These routes exist for native clients only (the web editor is handed its
+    // session URL). A token minted while the switch was on outlives it by up to
+    // 24 hours, so the switch is checked here, not only when the URL is minted.
+    .use('/uploads/*', async (c, next) => {
+        if (!nativeClientEnabled(c.env)) return c.json({ error: 'Not found' }, 404);
+        return next();
+    })
     .post('/uploads/photo', async (c) => {
         const claims = await verifyUploadToken(c.req.query('token') ?? '', c.env.JWT_SECRET, 'photo');
         if (!claims || !claims.userId || !isSignedPhotoExt(claims.ext)) return c.json(INVALID_TOKEN, 401);

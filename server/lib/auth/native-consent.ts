@@ -1,8 +1,50 @@
 import type { AuthRequest, OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import { writeAuditLog } from '../audit';
 import { nativeClientEnabled } from '../mcp/flag';
-import { NATIVE_SCOPE, type NativeProps } from './native-token';
+import { logger } from '../logger';
+import { NATIVE_SCOPE, isNativeRole, type NativeProps, type NativeRole } from './native-token';
 import type { Role } from './roles';
+
+/**
+ * Most native grants one member keeps. Grants are not bound to a device, so a
+ * lost phone or a reinstall leaves its grant behind; past this count the oldest
+ * are revoked as a new one is made. Generous enough for several real devices.
+ */
+export const NATIVE_GRANTS_PER_USER_MAX = 10;
+
+/** The native app is for owners, managers and inspectors; anyone else is refused. */
+export function assertNativeRoleAllowed(role: string): asserts role is NativeRole {
+  if (!isNativeRole(role)) throw new Response('Forbidden', { status: 403 });
+}
+
+/**
+ * Keep a member's native grants at or under the cap by revoking the oldest.
+ * Best effort: a provider failure is logged and never undoes the grant the
+ * member just made. Only grants labelled native are counted or touched, so a
+ * member's MCP grants are never swept up.
+ */
+async function trimNativeGrants(oauth: OAuthHelpers, userId: string): Promise<void> {
+  try {
+    const native: { id: string; createdAt: number }[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await (cursor ? oauth.listUserGrants(userId, { cursor }) : oauth.listUserGrants(userId));
+      for (const g of page.items) {
+        if ((g.metadata as { kind?: unknown } | null)?.kind === 'native') native.push({ id: g.id, createdAt: g.createdAt });
+      }
+      cursor = page.cursor;
+    } while (cursor);
+    const excess = native.length - NATIVE_GRANTS_PER_USER_MAX;
+    if (excess <= 0) return;
+    native.sort((a, b) => a.createdAt - b.createdAt);
+    await Promise.all(native.slice(0, excess).map((g) => oauth.revokeGrant(g.id, userId)));
+  } catch (err) {
+    logger.warn('Failed to trim native grants; the member keeps more than the cap until the next sign-in', {
+      userId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 /** True when the authorization request asks for the native client scope. */
 export function isNativeAuthRequest(scope: readonly string[] | undefined): boolean {
@@ -88,13 +130,15 @@ export async function completeNativeAuthorization(input: NativeConsentInput): Pr
   if (!nativeClientEnabled(env)) throw new Response('Not Found', { status: 404 });
   if (!isNativeRedirectUri(authReq.redirectUri)) throw new Response('Bad Request', { status: 400 });
   if (!hasNativePkce(authReq)) throw new Response('Bad Request', { status: 400 });
-  if (identity.role === 'agent') throw new Response('Forbidden', { status: 403 });
+  assertNativeRoleAllowed(identity.role);
+  const nowSec = Math.floor(Date.now() / 1000);
   const props: NativeProps = {
     kind: 'native',
     userId: identity.userId,
     tenantId: identity.tenantId,
     role: identity.role,
-    lastUsedAt: Math.floor(Date.now() / 1000),
+    lastUsedAt: nowSec,
+    grantedAt: nowSec,
   };
   const { redirectTo } = await oauth.completeAuthorization({
     request: authReq,
@@ -102,7 +146,12 @@ export async function completeNativeAuthorization(input: NativeConsentInput): Pr
     scope: [NATIVE_SCOPE],
     metadata: { clientName, kind: 'native' },
     props,
+    // Grants are not bound to a device. The default would revoke the member's
+    // older grant for the same client_id, so a second phone signing in under a
+    // shared client_id would sign the first one out.
+    revokeExistingGrants: false,
   });
+  await trimNativeGrants(oauth, identity.userId);
   // Same shape and reasoning as mcp.grant.created: a React Router action has no
   // Hono context, so the tenant and actor are the identity already proven, and
   // waitUntil keeps the insert alive past the redirect response.

@@ -27,6 +27,7 @@ import { MockKV } from '../mocks';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
 // Route every drizzle(d1) call inside the services under test to the
 // in-memory SQLite test DB (the established pattern in this suite).
@@ -186,6 +187,37 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
 
         const { activeUsers } = await team.getMembers(TENANT);
         expect(activeUsers.map(u => u.id).sort()).toEqual([ADMIN, MEMBER].sort());
+    });
+
+    it('reactivation on re-invite retires every OAuth grant the reused id still holds and no other', async () => {
+        const grants = new Map<string, string>([['g-member', MEMBER], ['g-admin', ADMIN]]);
+        const oauth = {
+            listUserGrants: vi.fn(async (userId: string) => ({ items: [...grants].filter(([, o]) => o === userId).map(([id]) => ({ id })) })),
+            revokeGrant: vi.fn(async (grantId: string) => { grants.delete(grantId); }),
+        } as unknown as OAuthHelpers;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, undefined, kv as any);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const auth = new AuthService({} as any, kv as any, undefined, oauth);
+
+        await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
+        // The removal's own revocation failed: the grant is still there.
+        grants.set('g-member', MEMBER);
+        const invite = await team.createInvite({ tenantId: TENANT, email: MEMBER_EMAIL, role: 'inspector' });
+        await auth.joinTeam(invite.token, 'new-password-123', { seatQuota: SEAT_QUOTA_UNENFORCED });
+
+        expect([...grants.keys()]).toEqual(['g-admin']);
+    });
+
+    it('a first-time join holds no grants, so no revocation is attempted', async () => {
+        const oauth = { listUserGrants: vi.fn(), revokeGrant: vi.fn() } as unknown as OAuthHelpers;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, undefined, kv as any);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const auth = new AuthService({} as any, kv as any, undefined, oauth);
+        const invite = await team.createInvite({ tenantId: TENANT, email: 'brand-new@acme.test', role: 'inspector' });
+        await auth.joinTeam(invite.token, 'new-password-123', { seatQuota: SEAT_QUOTA_UNENFORCED });
+        expect(oauth.listUserGrants).not.toHaveBeenCalled();
     });
 
     it('reactivation on re-invite resets TOTP enrollment to never-enrolled defaults', async () => {

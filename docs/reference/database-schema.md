@@ -9,8 +9,8 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 110 |
-| Columns | 1272 |
+| Tables | 111 |
+| Columns | 1277 |
 | Indexes (excluding primary keys) | 184 |
 | Database foreign keys (all legacy, frozen) | 51 |
 | Columns carrying a source comment | 615 (48%) |
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants`
 
-That is 13 of 110. If a table you just added appears here,
+That is 13 of 111. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 207 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 209 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -1661,6 +1661,22 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_migration_rows_batch_status` (batch_id, status)
 - `idx_migration_rows_tenant` (tenant_id)
+
+---
+
+## `native_client_seen`
+
+<sub>server/lib/db/schema/native-client-seen.ts · 5 columns · primary key `tenant_id, platform, client_version`</sub>
+
+> Which native app versions a company's devices have been seen running, and when. An installed binary cannot be recalled, so retiring an old version safely means knowing nothing still runs it.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `tenant_id` | text | PK NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `platform` | text | PK NN |  | `ios, android, windows` |  |
+| `client_version` | text | PK NN |  |  |  |
+| `first_seen_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `last_seen_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 
 ---
 

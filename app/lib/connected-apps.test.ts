@@ -105,6 +105,17 @@ const SAMPLE_GRANT = {
     scopes: ['read:inspections', 'write:inspections'],
     createdAt: 1_700_000_000,
     expiresAt: null,
+    kind: 'mcp' as const,
+};
+
+const NATIVE_GRANT = {
+    id: 'g3',
+    clientId: 'field-app',
+    clientName: 'Field App',
+    scopes: ['native'],
+    createdAt: 1_700_000_200,
+    expiresAt: null,
+    kind: 'native' as const,
 };
 
 const ADMIN_GRANT = {
@@ -114,6 +125,7 @@ const ADMIN_GRANT = {
     scopes: ['read:inspections'],
     createdAt: 1_700_000_100,
     expiresAt: 1_800_000_000,
+    kind: 'mcp' as const,
     userId: 'u2',
     userEmail: 'bob@example.com',
     userRole: 'inspector',
@@ -149,9 +161,9 @@ beforeEach(() => {
     getAllGrants.mockReset().mockResolvedValue(jsonRes({ data: [ADMIN_GRANT] }));
     deleteGrant.mockReset().mockResolvedValue(jsonRes({ success: true }));
     getSessionContext.mockReset().mockResolvedValue(
-        jsonRes({ data: { user: { role: 'inspector' }, branding: { isSaas: false }, deployment: { mcpEnabled: true } } }),
+        jsonRes({ data: { user: { role: 'inspector' }, branding: { isSaas: false }, deployment: { mcpEnabled: true, connectedAppsEnabled: true } } }),
     );
-    vi.mocked(useLoaderData).mockReturnValue({ mcpEnabled: true, self: [SAMPLE_GRANT], all: null, role: 'inspector', isSaas: false } as never);
+    vi.mocked(useLoaderData).mockReturnValue({ connectedAppsEnabled: true, self: [SAMPLE_GRANT], all: null, role: 'inspector', isSaas: false } as never);
     vi.mocked(useSessionContext).mockReturnValue({
         user: {
             role: 'inspector', name: 'Alice', email: 'alice@example.com', initials: 'A',
@@ -160,7 +172,7 @@ beforeEach(() => {
         },
         branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC',
                 defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h', holidayRegion: null },
-        deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true, videoBackendManaged: false, hasManagedCompliance: false, hasAssistedMigration: false },
+        deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true, connectedAppsEnabled: true, videoBackendManaged: false, hasManagedCompliance: false, hasAssistedMigration: false },
         seatUsage: null, outboundCoolingWindow: null,
     });
 });
@@ -195,7 +207,7 @@ describe('settings-connected-apps loader', () => {
             sessionContext: {
                 context: {
                     $get: vi.fn().mockResolvedValue(
-                        jsonRes({ data: { user: { role: 'owner' }, branding: { isSaas: false }, deployment: { mcpEnabled: true } } }),
+                        jsonRes({ data: { user: { role: 'owner' }, branding: { isSaas: false }, deployment: { mcpEnabled: true, connectedAppsEnabled: true } } }),
                     ),
                 },
             },
@@ -289,7 +301,7 @@ describe('SettingsConnectedApps component render', () => {
             isSaas: false,
         } as never);
         const html = renderToStaticMarkup(createElement(SettingsConnectedApps));
-        expect(html).not.toContain('Tenant-wide');
+        expect(html).not.toContain('Company-wide');
     });
 
     it('renders the tenant-wide section for an owner with all-grants data', () => {
@@ -307,11 +319,11 @@ describe('SettingsConnectedApps component render', () => {
             },
             branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null, defaultTimezone: 'UTC',
                 defaultLocale: 'en-US', currency: 'USD', dateFormat: 'us', timeFormat: '12h', holidayRegion: null },
-            deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true, videoBackendManaged: false, hasManagedCompliance: false, hasAssistedMigration: false },
+            deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true, connectedAppsEnabled: true, videoBackendManaged: false, hasManagedCompliance: false, hasAssistedMigration: false },
             seatUsage: null, outboundCoolingWindow: null,
         });
         const html = renderToStaticMarkup(createElement(SettingsConnectedApps));
-        expect(html).toContain('Tenant-wide');
+        expect(html).toContain('Company-wide');
         expect(html).toContain('bob@example.com');
     });
 
@@ -387,16 +399,16 @@ describe('SettingsConnectedApps component render', () => {
         expect(routeSource()).toMatch(/<ConfirmDialog\b/);
     });
 
-    it('renders the feature-off empty state when loader returns mcpEnabled=false', () => {
+    it('renders the feature-off empty state when loader returns connectedAppsEnabled=false', () => {
         vi.mocked(useLoaderData).mockReturnValue({
-            mcpEnabled: false,
+            connectedAppsEnabled: false,
             self: [],
             all: null,
             role: 'inspector',
             isSaas: false,
         } as never);
         const html = renderToStaticMarkup(createElement(SettingsConnectedApps));
-        expect(html).toContain('MCP is not enabled');
+        expect(html).toContain('Connected applications are not enabled');
         // Grants UI must NOT be rendered.
         expect(html).not.toContain('Your applications');
     });
@@ -405,16 +417,45 @@ describe('SettingsConnectedApps component render', () => {
 // ─── Loader feature-off test ──────────────────────────────────────────────────
 
 describe('settings-connected-apps loader (feature-off)', () => {
-    it('returns mcpEnabled=false and empty grants when deployment.mcpEnabled is false', async () => {
+    it('returns connectedAppsEnabled=false and empty grants when neither MCP nor native clients are on', async () => {
         getSessionContext.mockResolvedValue(
-            jsonRes({ data: { user: { role: 'inspector' }, branding: { isSaas: false }, deployment: { mcpEnabled: false } } }),
+            jsonRes({ data: { user: { role: 'inspector' }, branding: { isSaas: false }, deployment: { mcpEnabled: false, connectedAppsEnabled: false } } }),
         );
         const data = await loader(loaderArgs());
-        expect(data.mcpEnabled).toBe(false);
+        expect(data.connectedAppsEnabled).toBe(false);
         expect(data.self).toEqual([]);
         expect(data.all).toBeNull();
         // No grants fetches should happen.
         expect(getSelfGrants).not.toHaveBeenCalled();
         expect(getAllGrants).not.toHaveBeenCalled();
+    });
+});
+
+// ─── Native-only deployment ───────────────────────────────────────────────────
+
+describe('settings-connected-apps with native clients on and MCP off', () => {
+    it('loads the grants instead of short-circuiting on the MCP switch', async () => {
+        getSessionContext.mockResolvedValue(
+            jsonRes({ data: { user: { role: 'inspector' }, branding: { isSaas: false }, deployment: { mcpEnabled: false, connectedAppsEnabled: true } } }),
+        );
+        getSelfGrants.mockResolvedValue(jsonRes({ data: [NATIVE_GRANT] }));
+        const data = await loader(loaderArgs());
+        expect(data.connectedAppsEnabled).toBe(true);
+        expect(data.self).toEqual([NATIVE_GRANT]);
+        expect(getSelfGrants).toHaveBeenCalledTimes(1);
+    });
+
+    it('labels each row by kind: a native app and an MCP client are told apart', () => {
+        vi.mocked(useLoaderData).mockReturnValue({
+            connectedAppsEnabled: true, self: [NATIVE_GRANT, SAMPLE_GRANT], all: null, role: 'inspector', isSaas: false, loadFailed: false,
+        } as never);
+        const html = renderToStaticMarkup(createElement(SettingsConnectedApps));
+        const kinds = [...html.matchAll(/data-testid="grant-kind"[^>]*>([^<]*)</g)].map((m) => m[1]);
+        expect(kinds).toEqual(['Native app', 'MCP client']);
+        // A native grant carries no module scopes: it says what it is rather than "No modules".
+        expect(html).toContain('Same access as your signed-in account');
+        expect(html).not.toContain('No modules');
+        expect(html).toContain('Field App');
+        expect(html).toContain('Claude');
     });
 });

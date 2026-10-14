@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  compareSemver, upgradeStatus, readVersionPolicy, NEVER_BLOCK_PATHS,
+  compareSemver, upgradeStatus, readVersionPolicy, isNeverBlocked,
 } from '../../../server/lib/native/client-version';
 
 describe('compareSemver', () => {
@@ -47,36 +47,54 @@ describe('readVersionPolicy', () => {
   });
 });
 
-describe('NEVER_BLOCK_PATHS', () => {
-  const blocked = (p: string) => !NEVER_BLOCK_PATHS.some((r) => r.test(p));
-  it('lets sync, upload and import through', () => {
-    expect(blocked('/api/inspections/abc/collab/ws')).toBe(false);
-    expect(blocked('/api/inspections/abc/collab/import')).toBe(false);
-    expect(blocked('/api/inspections/abc/media/upload-url')).toBe(false);
-    expect(blocked('/api/client/import')).toBe(false);
-    expect(blocked('/api/client/session')).toBe(false);
-    expect(blocked('/api/client/compat')).toBe(false);
+describe('NEVER_BLOCK_RULES', () => {
+  const blocked = (method: string, p: string) => !isNeverBlocked(method, p);
+  it('lets sync, upload and import through, whatever the method', () => {
+    for (const method of ['GET', 'POST']) {
+      expect(blocked(method, '/api/inspections/abc/collab/ws')).toBe(false);
+      expect(blocked(method, '/api/inspections/abc/collab/import')).toBe(false);
+      expect(blocked(method, '/api/inspections/abc/media/upload-url')).toBe(false);
+      expect(blocked(method, '/api/client/import')).toBe(false);
+      expect(blocked(method, '/api/client/session')).toBe(false);
+      expect(blocked(method, '/api/client/compat')).toBe(false);
+    }
   });
-  it('lets the ticket, presence and video upload calls through', () => {
-    expect(blocked('/api/inspections/abc/collab/ticket')).toBe(false);
-    expect(blocked('/api/inspections/abc/presence/ws')).toBe(false);
-    expect(blocked('/api/tenant/presence/ws')).toBe(false);
-    expect(blocked('/api/inspections/abc/media/video/create-upload')).toBe(false);
-    expect(blocked('/api/inspections/abc/media/video/finalize')).toBe(false);
-    expect(blocked('/api/inspections/abc/media/video/r2-upload')).toBe(false);
-    expect(blocked('/api/inspections/abc/media/video/r2-upload-poster')).toBe(false);
-    expect(blocked('/api/public/uploads/photo')).toBe(false);
-    expect(blocked('/api/public/uploads/video')).toBe(false);
+  it('lets the ticket, the inspection presence socket and video upload calls through', () => {
+    expect(blocked('POST', '/api/inspections/abc/collab/ticket')).toBe(false);
+    expect(blocked('GET', '/api/inspections/abc/presence/ws')).toBe(false);
+    expect(blocked('POST', '/api/inspections/abc/media/video/create-upload')).toBe(false);
+    expect(blocked('POST', '/api/inspections/abc/media/video/finalize')).toBe(false);
+    expect(blocked('POST', '/api/inspections/abc/media/video/r2-upload')).toBe(false);
+    expect(blocked('POST', '/api/inspections/abc/media/video/r2-upload-poster')).toBe(false);
+    expect(blocked('POST', '/api/public/uploads/photo')).toBe(false);
+    expect(blocked('POST', '/api/public/uploads/video')).toBe(false);
+  });
+  it('lets the three REST writes that hand over a captured inspection through, by method', () => {
+    expect(blocked('POST', '/api/inspections')).toBe(false);
+    expect(blocked('PATCH', '/api/inspections/abc')).toBe(false);
+    expect(blocked('POST', '/api/inspections/abc/complete')).toBe(false);
+    expect(blocked('post', '/api/inspections')).toBe(false);
+  });
+  it('still blocks the reads and every other verb on those same paths', () => {
+    expect(blocked('GET', '/api/inspections')).toBe(true);
+    expect(blocked('GET', '/api/inspections/abc')).toBe(true);
+    expect(blocked('DELETE', '/api/inspections/abc')).toBe(true);
+    expect(blocked('PUT', '/api/inspections/abc')).toBe(true);
+    expect(blocked('GET', '/api/inspections/abc/complete')).toBe(true);
+    expect(blocked('PATCH', '/api/inspections')).toBe(true);
+  });
+  it('no longer lists the tenant presence socket (it has no ticket path for a WebView)', () => {
+    expect(blocked('GET', '/api/tenant/presence/ws')).toBe(true);
   });
   it('still blocks neighbouring paths that are not part of capture or sync', () => {
-    expect(blocked('/api/inspections/abc/media/video')).toBe(true);
-    expect(blocked('/api/inspections/abc/media/video/delete')).toBe(true);
-    expect(blocked('/api/inspections/abc/collab/ticket/extra')).toBe(true);
-    expect(blocked('/api/tenant/settings')).toBe(true);
+    expect(blocked('POST', '/api/inspections/abc/media/video')).toBe(true);
+    expect(blocked('POST', '/api/inspections/abc/media/video/delete')).toBe(true);
+    expect(blocked('POST', '/api/inspections/abc/collab/ticket/extra')).toBe(true);
+    expect(blocked('GET', '/api/tenant/settings')).toBe(true);
+    expect(blocked('POST', '/api/inspections/abc/other')).toBe(true);
   });
   it('blocks everything else', () => {
-    expect(blocked('/api/inspections')).toBe(true);
-    expect(blocked('/api/inspections/abc')).toBe(true);
-    expect(blocked('/api/client/other')).toBe(true);
+    expect(blocked('GET', '/api/client/other')).toBe(true);
+    expect(blocked('POST', '/api/inspections/abc')).toBe(true);
   });
 });

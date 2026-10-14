@@ -15,7 +15,7 @@ import { NATIVE_APP_ORIGINS, nativeCorsHeaders } from '../../../server/lib/nativ
 import { createHarness, INSPECTOR_ID, TENANT_ID, type Harness } from '../helpers/tenant-email-harness';
 
 const nativeProps: NativeProps = {
-  kind: 'native', userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'inspector', lastUsedAt: 0,
+  kind: 'native', userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'inspector', lastUsedAt: 0, grantedAt: 0,
 };
 const provider = {
   unwrapToken: async (t: string) => (t === 'u:g:s'

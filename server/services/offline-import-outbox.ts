@@ -40,6 +40,7 @@ import { and, eq, inArray, lt, sql } from 'drizzle-orm';
 import { Errors, type AppError } from '../lib/errors';
 import { offlineImportApplied } from '../lib/db/schema';
 import { getDrizzle } from '../lib/route-helpers';
+import { createCredentialScope, isInProcessRequest, REQUEST_SCOPE } from '../lib/request-scope';
 import { logger } from '../lib/logger';
 import { APPLIED_RECORD_RETENTION_DAYS, APPLIED_RECORD_SWEEP_BATCH, type OutboxEntry } from '../lib/native/offline-package';
 import type { HonoConfig } from '../types/hono';
@@ -177,13 +178,16 @@ export async function applyOutbox(
 
     const already = await recordedEntries(c, tenantId, entries);
     const { app } = await import('../index');
+    // Every replay carries the same bearer. Share the credential lookups across them (and only
+    // those) instead of resolving the token and re-reading the credential-change marker per entry.
+    const replayEnv = isInProcessRequest(c.env) ? c.env : { ...c.env, [REQUEST_SCOPE]: createCredentialScope() };
 
     for (const entry of entries) {
         if (already.has(entry)) {
             result.skipped++;
             continue;
         }
-        const res = await app.fetch(outboxRequest(c, entry), c.env, executionContext(c));
+        const res = await app.fetch(outboxRequest(c, entry), replayEnv, executionContext(c));
         if (!res.ok) {
             logger.warn('offline import: a queued write was refused', { op: entry.op, status: res.status });
             const details = { idempotencyKey: entry.idempotencyKey, op: entry.op, inspectionId: entry.payload.id, status: res.status };

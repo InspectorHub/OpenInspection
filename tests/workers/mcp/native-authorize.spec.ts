@@ -18,7 +18,7 @@ import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import type { AuthRequest, OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import app from '../../../server/index';
 import { buildOAuthHandler } from '../../../server/lib/mcp/oauth-provider';
-import { completeNativeAuthorization } from '../../../server/lib/auth/native-consent';
+import { completeNativeAuthorization, NATIVE_GRANTS_PER_USER_MAX } from '../../../server/lib/auth/native-consent';
 import { revokeAllUserGrants } from '../../../server/lib/mcp/grants';
 import { NATIVE_IDLE_LIMIT_S } from '../../../server/lib/auth/native-token';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
@@ -31,6 +31,9 @@ const migrationSql = import.meta.glob('../../../migrations/*.sql', {
 const TENANT = 'native-tenant';
 const USER = 'native-user';
 const OTHER_USER = 'native-other-user';
+const GONE_USER = 'native-gone-user';
+const MULTI_USER = 'native-multi-user';
+const PW_USER = 'native-pw-user';
 const REDIRECT = 'io.example.fieldapp:/oauth/callback';
 const ORIGIN = 'https://x.test';
 
@@ -130,7 +133,7 @@ async function registerClient(via: Call = call): Promise<string> {
     return ((await res.json()) as { client_id: string }).client_id;
 }
 
-const token = (form: Record<string, string>) => call(new Request(`${ORIGIN}/oauth/token`, {
+const token = (form: Record<string, string>, via: Call = call) => via(new Request(`${ORIGIN}/oauth/token`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams(form).toString(),
@@ -148,16 +151,22 @@ async function authorize(clientId: string, scope: string, via: Call, as = USER) 
 }
 
 /** Authorize with PKCE and exchange the code. Returns the raw token response. */
-async function authorizeAndExchange(clientId: string, scope: string, as = USER) {
-    const { authRes, verifier } = await authorize(clientId, scope, call, as);
+async function authorizeAndExchange(clientId: string, scope: string, as = USER, via: Call = call) {
+    const { authRes, verifier } = await authorize(clientId, scope, via, as);
     expect(authRes.status).toBe(302);
     const code = new URL(authRes.headers.get('Location')!).searchParams.get('code');
     expect(code).toBeTruthy();
-    return token({ grant_type: 'authorization_code', code: code!, redirect_uri: REDIRECT, client_id: clientId, code_verifier: verifier });
+    return token({ grant_type: 'authorization_code', code: code!, redirect_uri: REDIRECT, client_id: clientId, code_verifier: verifier }, via);
 }
 
 const sessionContext = (accessToken: string, via: Call = call) => via(new Request(`${ORIGIN}/api/session/context`, {
     headers: { Authorization: `Bearer ${accessToken}` },
+}));
+
+const mcpCall = (accessToken: string, via: Call) => via(new Request(`${ORIGIN}/mcp`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
 }));
 
 const grantCount = async (user = USER) =>
@@ -165,13 +174,16 @@ const grantCount = async (user = USER) =>
 
 interface Tokens { access_token: string; refresh_token?: string; expires_in: number }
 
+const refreshWith = (via: Call, clientId: string, t: Tokens) =>
+    token({ grant_type: 'refresh_token', refresh_token: t.refresh_token!, client_id: clientId }, via);
+
 describe('native client OAuth lifecycle (real provider)', () => {
     beforeAll(async () => {
         await replayMigrations(b.DB, migrationSql);
         const now = Date.now();
         await b.DB.prepare('INSERT OR IGNORE INTO tenants (id, slug, created_at) VALUES (?, ?, ?)')
             .bind(TENANT, 'native', now).run();
-        for (const id of [USER, OTHER_USER]) {
+        for (const id of [USER, OTHER_USER, GONE_USER, MULTI_USER, PW_USER]) {
             await b.DB.prepare(
                 'INSERT OR IGNORE INTO users (id, tenant_id, email, password_hash, name, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
             ).bind(id, TENANT, `${id}@example.com`, 'x', id, 'inspector', now).run();
@@ -311,6 +323,128 @@ describe('native client OAuth lifecycle (real provider)', () => {
         expect(await grantCount(OTHER_USER)).toBe(1);
     });
 
+    describe('the two switches are independent', () => {
+        it('with only native clients on, an MCP grant is refused at the token endpoint; with MCP on it exchanges', async () => {
+            const via = callIn(nativeOnlyEnv);
+            const clientId = await registerClient(via);
+            const before = await grantCount(OTHER_USER);
+            const refused = await authorizeAndExchange(clientId, 'read:inspections', OTHER_USER, via);
+            expect(refused.status).toBe(400);
+            expect(((await refused.json()) as { error: string }).error).toBe('invalid_grant');
+            // The refused grant was revoked rather than left behind.
+            expect(await grantCount(OTHER_USER)).toBe(before);
+            // Control: the same request on a deployment with MCP on is served.
+            expect((await authorizeAndExchange(clientId, 'read:inspections', OTHER_USER)).status).toBe(200);
+            await call(new Request(`${ORIGIN}/__test/revoke-all?user=${OTHER_USER}`));
+        });
+
+        it('with only native clients on, an MCP token minted while MCP was on is 404 at /mcp and cannot refresh', async () => {
+            const clientId = await registerClient();
+            const before = await grantCount(OTHER_USER);
+            const mcp = (await (await authorizeAndExchange(clientId, 'read:inspections', OTHER_USER)).json()) as Tokens;
+            expect(await grantCount(OTHER_USER)).toBe(before + 1);
+            const nativeOnly = callIn(nativeOnlyEnv);
+            expect((await mcpCall(mcp.access_token, nativeOnly)).status).toBe(404);
+            const refreshed = await refreshWith(nativeOnly, clientId, mcp);
+            expect(refreshed.status).toBe(400);
+            expect(((await refreshed.json()) as { error: string }).error).toBe('invalid_grant');
+            expect(await grantCount(OTHER_USER)).toBe(before);
+        });
+
+        it('with only native clients on, a native session works while /mcp stays 404; with MCP on the MCP token reaches the server', async () => {
+            const nativeOnly = callIn(nativeOnlyEnv);
+            const mcp = (await (await authorizeAndExchange(await registerClient(), 'read:inspections', MULTI_USER)).json()) as Tokens;
+            const nativeTok = (await (await authorizeAndExchange(await registerClient(nativeOnly), 'native', USER, nativeOnly)).json()) as Tokens;
+            expect((await mcpCall(mcp.access_token, nativeOnly)).status).toBe(404);
+            expect((await sessionContext(nativeTok.access_token, nativeOnly)).status).toBe(200);
+            // Control: with MCP on the guard lets the MCP token through (this project has no MCP Durable Object).
+            const reached = await mcpCall(mcp.access_token, call).then((r) => (r.status === 404 ? 'not-found' : 'answered'), (e: unknown) => String(e));
+            expect(reached === 'answered' || reached.includes('INSPECTOR_MCP')).toBe(true);
+            await call(new Request(`${ORIGIN}/__test/revoke-all?user=${MULTI_USER}`));
+        });
+
+        it('with both on, an MCP grant and a native grant work side by side', async () => {
+            const nativeTok = (await (await authorizeAndExchange(await registerClient(), 'native', OTHER_USER)).json()) as Tokens;
+            const mcpTok = (await (await authorizeAndExchange(await registerClient(), 'read:inspections', OTHER_USER)).json()) as Tokens;
+            expect((await sessionContext(nativeTok.access_token)).status).toBe(200);
+            expect(mcpTok.access_token).toBeTruthy();
+            expect((await mcpCall(nativeTok.access_token, call)).status).toBe(403);
+            await call(new Request(`${ORIGIN}/__test/revoke-all?user=${OTHER_USER}`));
+        });
+    });
+
+    describe('refresh re-checks the member and the credential', () => {
+        it('a removed member whose grant revocation failed cannot refresh: 400 invalid_grant and the grant is revoked', async () => {
+            const clientId = await registerClient();
+            const t = (await (await authorizeAndExchange(clientId, 'native', GONE_USER)).json()) as Tokens;
+            // Control: while the member is active the refresh works.
+            const ok = await refreshWith(call, clientId, t);
+            expect(ok.status).toBe(200);
+            const fresh = (await ok.json()) as Tokens;
+            // Soft-delete the member and leave the grant in place (a failed revocation).
+            await b.DB.prepare('UPDATE users SET deleted_at = ? WHERE id = ?').bind(Date.now(), GONE_USER).run();
+            try {
+                expect(await grantCount(GONE_USER)).toBe(1);
+                const refused = await refreshWith(call, clientId, fresh);
+                expect(refused.status).toBe(400);
+                expect(((await refused.json()) as { error: string }).error).toBe('invalid_grant');
+                expect(await grantCount(GONE_USER)).toBe(0);
+            } finally {
+                await b.DB.prepare('UPDATE users SET deleted_at = NULL WHERE id = ?').bind(GONE_USER).run();
+            }
+        });
+
+        it('a credential change after the grant (revocation failed) ends the access token and the refresh; an older marker changes nothing', async () => {
+            const kv = testEnv.TENANT_CACHE as KVNamespace;
+            const clientId = await registerClient();
+            const t = (await (await authorizeAndExchange(clientId, 'native', PW_USER)).json()) as Tokens;
+            const now = Math.floor(Date.now() / 1000); // seed-lint-ok: the pwchanged KV marker is epoch seconds, not a timestamp_ms column
+            // Control: a marker from BEFORE the grant (the member signed in again afterwards) changes nothing.
+            await kv.put(`pwchanged:${PW_USER}`, String(now - 600));
+            expect((await sessionContext(t.access_token)).status).toBe(200);
+            // A marker after the grant: both the access token and the refresh are refused.
+            await kv.put(`pwchanged:${PW_USER}`, String(now + 600));
+            try {
+                expect((await sessionContext(t.access_token)).status).toBe(401);
+                const refused = await refreshWith(call, clientId, t);
+                expect(refused.status).toBe(400);
+                expect(((await refused.json()) as { error: string }).error).toBe('invalid_grant');
+                expect(await grantCount(PW_USER)).toBe(0);
+            } finally {
+                await kv.delete(`pwchanged:${PW_USER}`);
+            }
+        });
+    });
+
+    describe('grants are not bound to a device', () => {
+        it('a second authorization under the same client_id leaves the first grant and its tokens valid', async () => {
+            const clientId = await registerClient();
+            const first = (await (await authorizeAndExchange(clientId, 'native', MULTI_USER)).json()) as Tokens;
+            const second = (await (await authorizeAndExchange(clientId, 'native', MULTI_USER)).json()) as Tokens;
+            expect(await grantCount(MULTI_USER)).toBe(2);
+            expect((await sessionContext(first.access_token)).status).toBe(200);
+            expect((await sessionContext(second.access_token)).status).toBe(200);
+            expect((await refreshWith(call, clientId, first)).status).toBe(200);
+            await call(new Request(`${ORIGIN}/__test/revoke-all?user=${MULTI_USER}`));
+        });
+
+        it('past the per-member cap the oldest grant is revoked and the newest keeps working', async () => {
+            const clientId = await registerClient();
+            const issued: Tokens[] = [];
+            for (let i = 0; i < NATIVE_GRANTS_PER_USER_MAX + 1; i++) {
+                issued.push((await (await authorizeAndExchange(clientId, 'native', MULTI_USER)).json()) as Tokens);
+                // Creation time is in whole seconds; space the grants so "oldest" is unambiguous.
+                vi.useFakeTimers({ toFake: ['Date'] });
+                vi.setSystemTime(Date.now() + 2000);
+            }
+            vi.useRealTimers();
+            expect(await grantCount(MULTI_USER)).toBe(NATIVE_GRANTS_PER_USER_MAX);
+            expect((await sessionContext(issued[0]!.access_token)).status).toBe(401);
+            expect((await sessionContext(issued[NATIVE_GRANTS_PER_USER_MAX]!.access_token)).status).toBe(200);
+            await call(new Request(`${ORIGIN}/__test/revoke-all?user=${MULTI_USER}`));
+        });
+    });
+
     describe('managing grants from the web session', () => {
         interface GrantRow { id: string; kind: string; clientName: string | null }
 
@@ -334,9 +468,10 @@ describe('native client OAuth lifecycle (real provider)', () => {
             const via = callIn(nativeOnlyEnv);
 
             const rows = await listed(via, USER);
-            const nativeRow = rows.find((r) => r.kind === 'native');
+            // Opaque tokens are userId:grantId:secret. Grants are no longer replaced per client, so pick this test's own.
+            const nativeRow = rows.find((r) => r.id === mine.access_token.split(':')[1]);
             const mcpRow = rows.find((r) => r.kind === 'mcp');
-            expect(nativeRow, 'the native grant is listed and labelled').toBeDefined();
+            expect(nativeRow?.kind, 'the native grant is listed and labelled').toBe('native');
             expect(mcpRow, 'an MCP grant is still labelled mcp').toBeDefined();
             expect(rows).toHaveLength(await grantCount(USER));
             const theirRows = await listed(via, OTHER_USER);

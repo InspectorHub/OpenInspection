@@ -73,20 +73,51 @@ export function upgradeStatus(version: string | undefined, policy: VersionPolicy
   return null;
 }
 
+/** One call a client below the minimum version may still make. No `method` means any method. */
+interface NeverBlockRule {
+  method?: string;
+  pattern: RegExp;
+}
+
 /**
- * Paths a client below the minimum version may still call. Work captured on a
- * device must always be deliverable, so sync, upload and import never 426.
+ * Calls a client below the minimum version may still make. Work captured on a
+ * device must always be deliverable, so sync, upload and import never 426, and
+ * neither do the three REST writes that hand over a captured inspection: create
+ * (with the client's own id), update and complete. Those are listed by method,
+ * because the same paths also serve reads, and an outdated app has no business
+ * pulling current data.
  */
-export const NEVER_BLOCK_PATHS: readonly RegExp[] = [
-  /^\/api\/inspections\/[^/]+\/collab\/(ws|import|ticket)$/,
-  /^\/api\/inspections\/[^/]+\/presence\/ws$/,
-  /^\/api\/tenant\/presence\/ws$/,
-  /^\/api\/inspections\/[^/]+\/media\/(upload-url|video\/(create-upload|finalize|r2-upload|r2-upload-poster))$/,
-  /^\/api\/public\/uploads\//,
-  /^\/api\/client\/(session|import|compat)$/,
+const NEVER_BLOCK_RULES: readonly NeverBlockRule[] = [
+  { pattern: /^\/api\/inspections\/[^/]+\/collab\/(ws|import|ticket)$/ },
+  { pattern: /^\/api\/inspections\/[^/]+\/presence\/ws$/ },
+  { pattern: /^\/api\/inspections\/[^/]+\/media\/(upload-url|video\/(create-upload|finalize|r2-upload|r2-upload-poster))$/ },
+  { pattern: /^\/api\/public\/uploads\// },
+  { pattern: /^\/api\/client\/(session|import|compat)$/ },
+  { method: 'POST', pattern: /^\/api\/inspections$/ },
+  { method: 'PATCH', pattern: /^\/api\/inspections\/[^/]+$/ },
+  { method: 'POST', pattern: /^\/api\/inspections\/[^/]+\/complete$/ },
 ];
 
-function isClientPlatform(v: string | undefined): v is ClientPlatform {
+/** True when the call may proceed whatever the app version. */
+export function isNeverBlocked(method: string, path: string): boolean {
+  return NEVER_BLOCK_RULES.some((r) => (!r.method || r.method === method.toUpperCase()) && r.pattern.test(path));
+}
+
+/** Longest version string `normalizeClientVersion` accepts. */
+const MAX_VERSION_LENGTH = 32;
+
+/**
+ * A client-sent version in its stored form, or null when it is not up to three
+ * dotted numbers (or is absurdly long). `1.4` becomes `1.4.0`, so one release is
+ * one row however the app spells it.
+ */
+export function normalizeClientVersion(v: string | undefined): string | null {
+  if (!v || v.length > MAX_VERSION_LENGTH) return null;
+  const p = parts(v);
+  return p ? p.join('.') : null;
+}
+
+export function isClientPlatform(v: string | undefined): v is ClientPlatform {
   return !!v && (CLIENT_PLATFORMS as readonly string[]).includes(v);
 }
 
@@ -97,7 +128,7 @@ export function enforceClientVersion(c: Context<HonoConfig>): void {
   const status = upgradeStatus(c.req.header('X-Client-Version'), readVersionPolicy(c.env, platform));
   if (!status) return;
   c.header('X-Client-Upgrade', status);
-  if (status === 'required' && !NEVER_BLOCK_PATHS.some((r) => r.test(c.req.path))) {
+  if (status === 'required' && !isNeverBlocked(c.req.method, c.req.path)) {
     throw new AppError(426, ErrorCode.CLIENT_UPGRADE_REQUIRED, 'This app version is no longer supported. Please update.');
   }
 }

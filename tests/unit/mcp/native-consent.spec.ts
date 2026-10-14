@@ -5,7 +5,7 @@ const writeAuditLog = vi.fn();
 vi.mock('../../../server/lib/audit', () => ({ writeAuditLog: (p: unknown) => writeAuditLog(p) }));
 
 import {
-  isNativeAuthRequest, isNativeRedirectUri, completeNativeAuthorization, hasNativePkce, nativeRedirectDisplay,
+  isNativeAuthRequest, isNativeRedirectUri, completeNativeAuthorization, NATIVE_GRANTS_PER_USER_MAX, hasNativePkce, nativeRedirectDisplay,
 } from '../../../server/lib/auth/native-consent';
 
 const authReq = (scope: string[]): AuthRequest => ({
@@ -31,9 +31,16 @@ describe('nativeRedirectDisplay', () => {
   });
 });
 
-function oauth() {
-  const completeAuthorization = vi.fn(async (_opts: { scope: string[]; props: Record<string, unknown> }) => ({ redirectTo: 'io.example.app:/cb?code=abc' }));
-  return { helpers: { completeAuthorization } as unknown as OAuthHelpers, completeAuthorization };
+interface FakeGrant { id: string; createdAt: number; metadata: { kind?: string; clientName?: string } }
+
+function oauth(existing: FakeGrant[] = []) {
+  const completeAuthorization = vi.fn(async (_opts: { scope: string[]; props: Record<string, unknown>; revokeExistingGrants?: boolean }) => ({ redirectTo: 'io.example.app:/cb?code=abc' }));
+  const listUserGrants = vi.fn(async () => ({ items: existing }));
+  const revokeGrant = vi.fn(async (_grantId: string, _userId: string) => undefined);
+  return {
+    helpers: { completeAuthorization, listUserGrants, revokeGrant } as unknown as OAuthHelpers,
+    completeAuthorization, listUserGrants, revokeGrant,
+  };
 }
 
 const base = { db: {} as D1Database, clientName: 'Field App', ctx: undefined, env: { NATIVE_CLIENT_ENABLED: 'true' } };
@@ -88,6 +95,7 @@ describe('completeNativeAuthorization', () => {
     expect(arg?.scope).toEqual(['native']);
     expect(arg?.props).toMatchObject({ kind: 'native', userId: 'u1', tenantId: 't1', role: 'inspector' });
     expect(typeof arg?.props.lastUsedAt).toBe('number');
+    expect(typeof arg?.props.grantedAt).toBe('number');
     expect(writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
       action: 'native.grant.created', tenantId: 't1', userId: 'u1', metadata: { clientId: 'c1' },
     }));
@@ -148,6 +156,39 @@ describe('completeNativeAuthorization', () => {
     // Control: the S256 request is granted.
     await completeNativeAuthorization({ ...base, oauth: helpers, authReq: authReq(['native']), identity });
     expect(completeAuthorization).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not revoke the other grants of the member for the same client, so a second device keeps its session', async () => {
+    const { helpers, completeAuthorization, revokeGrant } = oauth([{ id: 'g-first', createdAt: 1, metadata: { kind: 'native' } }]);
+    await completeNativeAuthorization({
+      ...base, oauth: helpers, authReq: authReq(['native']),
+      identity: { userId: 'u1', tenantId: 't1', role: 'inspector' },
+    });
+    expect(completeAuthorization.mock.calls[0]?.[0].revokeExistingGrants).toBe(false);
+    expect(revokeGrant).not.toHaveBeenCalled();
+  });
+
+  it('past the per-member cap, revokes the oldest native grants only and never an MCP grant', async () => {
+    const native = Array.from({ length: NATIVE_GRANTS_PER_USER_MAX + 2 }, (_, i): FakeGrant => ({ id: `n${i}`, createdAt: 100 + i, metadata: { kind: 'native' } }));
+    const mcp: FakeGrant = { id: 'mcp-old', createdAt: 1, metadata: { clientName: 'MCP' } };
+    const { helpers, revokeGrant } = oauth([mcp, ...native.slice().reverse()]);
+    await completeNativeAuthorization({
+      ...base, oauth: helpers, authReq: authReq(['native']),
+      identity: { userId: 'u1', tenantId: 't1', role: 'inspector' },
+    });
+    expect(revokeGrant.mock.calls.map((c) => c[0]).sort()).toEqual(['n0', 'n1']);
+    expect(revokeGrant.mock.calls.every((c) => c[1] === 'u1')).toBe(true);
+  });
+
+  it('at the cap exactly, revokes nothing; a failing provider never undoes the grant', async () => {
+    const atCap = Array.from({ length: NATIVE_GRANTS_PER_USER_MAX }, (_, i): FakeGrant => ({ id: `n${i}`, createdAt: i, metadata: { kind: 'native' } }));
+    const a = oauth(atCap);
+    await completeNativeAuthorization({ ...base, oauth: a.helpers, authReq: authReq(['native']), identity: { userId: 'u1', tenantId: 't1', role: 'inspector' } });
+    expect(a.revokeGrant).not.toHaveBeenCalled();
+    const broken = oauth();
+    broken.listUserGrants.mockRejectedValue(new Error('kv down'));
+    const redirectTo = await completeNativeAuthorization({ ...base, oauth: broken.helpers, authReq: authReq(['native']), identity: { userId: 'u1', tenantId: 't1', role: 'inspector' } });
+    expect(redirectTo).toBe('io.example.app:/cb?code=abc');
   });
 
   it('refuses the agent role with 403 and creates no grant and no audit row', async () => {

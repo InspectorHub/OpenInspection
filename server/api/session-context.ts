@@ -13,7 +13,7 @@ import {
 } from '../lib/session/display-prefs';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
-import { mcpEnabled } from '../lib/mcp/flag';
+import { mcpEnabled, oauthProviderEnabled } from '../lib/mcp/flag';
 import { coerceOverrides, getCapabilities, type CapabilitySet } from '../lib/auth/capabilities';
 import { isRole } from '../lib/auth/roles';
 import type { DeploymentProfile } from '../lib/deployment-profile';
@@ -36,13 +36,17 @@ import type { DeploymentProfile } from '../lib/deployment-profile';
  */
 export function deploymentPayload(
     profile: DeploymentProfile,
-    env: { MCP_ENABLED?: string },
+    env: { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string },
 ) {
     return {
         mode: profile.mode || 'standalone',
         hasBilling: profile.hasBilling || false,
         hasSeatQuota: profile.hasSeatQuota || false,
         mcpEnabled: mcpEnabled(env),
+        // The OAuth provider is mounted for MCP or native clients, and the grant list
+        // and revoke routes serve either. The Connected applications page keys off
+        // this, not off `mcpEnabled`, which stays the MCP switch alone.
+        connectedAppsEnabled: oauthProviderEnabled(env),
         videoBackendManaged: profile.videoBackendManaged || false,
         hasManagedCompliance: profile.hasManagedCompliance || false,
         // The BOOLEAN only, never the three import caps beside it on the
@@ -367,7 +371,7 @@ const sessionContextRoutes = createApiRouter()
                     dateFormat: userDateFormat,
                     timeFormat: userTimeFormat,
                 },
-                deployment: deploymentPayload(profile, c.env as { MCP_ENABLED?: string }),
+                deployment: deploymentPayload(profile, c.env as { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string }),
                 seatUsage,
                 videoProvider,
                 outboundCoolingWindow,

@@ -10,6 +10,7 @@ import { readPackageBody } from '../lib/native/offline-zip';
 import { importOfflinePackage } from '../services/offline-import.service';
 import { getDrizzle } from '../lib/route-helpers';
 import { readVersionPolicy, SERVER_CONTRACT_VERSION } from '../lib/native/client-version';
+import { recordNativeClientSeen } from '../services/native-client-seen';
 import {
     ClientCompatQuerySchema, ClientCompatResponseSchema, ClientSessionResponseSchema, ImportOfflinePackageResponseSchema,
 } from '../lib/validations/client.schema';
@@ -28,7 +29,7 @@ const getClientCompatRoute = createRoute(withMcpMetadata({
 const getClientSessionRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/session', operationId: 'getClientSession', tags: ['client'],
     summary: 'Get the signed-in native client session',
-    description: 'Returns the identity behind a native access token and the tenant offline access limit, which the device uses to decide when to lock local data.',
+    description: 'Returns the identity behind a native access token and the tenant offline access limit, which the device uses to decide when to lock local data. When the request carries X-Client-Platform and X-Client-Version, the server also notes that this version was seen.',
     responses: { 200: { description: 'Native session', content: { 'application/json': { schema: ClientSessionResponseSchema } } } },
 }, { scopes: ['read'], tier: 'excluded' }));
 
@@ -59,8 +60,12 @@ export const clientRoutes = createApiRouter()
         const user = c.get('user');
         const tenantId = c.get('tenantId');
         if (!c.get('nativeClient') || !user || !tenantId) throw Errors.Unauthorized('Native session required');
-        const row = await getDrizzle(c).select({ days: tenantConfigs.offlineMaxDays })
+        const db = getDrizzle(c);
+        const row = await db.select({ days: tenantConfigs.offlineMaxDays })
             .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+        // The app calls this on every start and refresh, which makes it the place to learn which
+        // versions are still in use. Throttled and bounded inside; never fails the response.
+        await recordNativeClientSeen(db, tenantId, c.req.header('X-Client-Platform'), c.req.header('X-Client-Version'));
         return c.json({ success: true as const, data: {
             userId: user.sub, tenantId, role: user.role, offlineMaxDays: row?.days ?? DEFAULT_OFFLINE_MAX_DAYS,
         } }, 200);

@@ -171,6 +171,21 @@ describe('the deployment payload carries every capability the chrome gates on', 
             .not.toBe(SAAS_PROFILE.hasAssistedMigration);
     });
 
+    it('ships connectedAppsEnabled for either OAuth consumer and leaves mcpEnabled as the MCP switch alone', () => {
+        const cases: [Record<string, string>, boolean, boolean][] = [
+            [{}, false, false],
+            [{ MCP_ENABLED: 'true' }, true, true],
+            [{ NATIVE_CLIENT_ENABLED: 'true' }, false, true],
+            [{ MCP_ENABLED: 'true', NATIVE_CLIENT_ENABLED: 'true' }, true, true],
+            [{ MCP_ENABLED: '0', NATIVE_CLIENT_ENABLED: 'false' }, false, false],
+        ];
+        for (const [env, mcp, apps] of cases) {
+            const shipped = deploymentPayload(STANDALONE_PROFILE, env);
+            expect(shipped.mcpEnabled, JSON.stringify(env)).toBe(mcp);
+            expect(shipped.connectedAppsEnabled, JSON.stringify(env)).toBe(apps);
+        }
+    });
+
     it('does NOT ship the server-only fields of the profile', () => {
         // The positive control for the assertion above. Without it, "ship
         // everything" passes — and that would put `fixedTenantId` and the portal

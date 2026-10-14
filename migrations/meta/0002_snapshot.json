@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "cf82e438-229d-464a-b051-196eeeef0210",
+  "id": "3e0090de-9c85-42d7-aa01-9daab867ffa9",
   "prevId": "cb36bfc5-f3ba-4bcd-8d5a-a37797b68599",
   "tables": {
     "agent_terms_acceptances": {
@@ -6655,6 +6655,60 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "native_client_seen": {
+      "name": "native_client_seen",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "client_version": {
+          "name": "client_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "native_client_seen_tenant_id_platform_client_version_pk": {
+          "columns": [
+            "tenant_id",
+            "platform",
+            "client_version"
+          ],
+          "name": "native_client_seen_tenant_id_platform_client_version_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
