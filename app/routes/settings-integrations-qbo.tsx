@@ -5,7 +5,7 @@ import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-integrations-qbo";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { getApiUrl } from "~/lib/api.server";
+import { qboApiFetch, qboCaller } from "~/lib/qbo-api.server";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { getDeploymentProfile } from "../../server/lib/deployment-profile";
@@ -81,32 +81,13 @@ export function meta() {
   return [{ title: m.settings_qbo_meta_title() }];
 }
 
-async function qboApiFetch(
-  context: Route.LoaderArgs["context"],
-  cookie: string,
-  path: string,
-  method = "GET",
-): Promise<Response | null> {
-  try {
-    const env = getCloudflareEnv(context);
-    const apiBase = getApiUrl(context);
-    const req = new Request(`${apiBase}/api/integrations/qbo${path}`, {
-      method,
-      headers: { Cookie: cookie },
-    });
-    return env.API_WORKER ? env.API_WORKER.fetch(req) : fetch(req);
-  } catch {
-    return null;
-  }
-}
-
 export async function loader({ request, context }: Route.LoaderArgs): Promise<QboLoaderData> {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  const cookie = request.headers.get("Cookie") ?? "";
+  const caller = qboCaller(request, token);
 
   const [qboRes, secretsRes] = await Promise.all([
-    qboApiFetch(context, cookie, "/status"),
+    qboApiFetch(context, caller, "/status"),
     api.secrets.secrets.$get().catch(() => null),
   ]);
 
@@ -153,7 +134,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
   const fd = await request.formData();
   const intent = fd.get("intent") as string | null;
-  const cookie = request.headers.get("Cookie") ?? "";
+  const caller = qboCaller(request, token);
 
   if (intent === "save-qbo-secrets") {
     const body: Record<string, string> = {};
@@ -188,7 +169,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return { success: false, intent, error: m.settings_unknown_action(), syncEnabled: undefined };
     }
     const res = await qboApiFetch(
-      context, cookie, `/errors/${encodeURIComponent(errorId)}/dismiss`, "POST",
+      context, caller, `/errors/${encodeURIComponent(errorId)}/dismiss`, "POST",
     );
     if (!res?.ok) return { success: false, intent, error: m.settings_qbo_action_failed({ intent }), syncEnabled: undefined, errorId: undefined };
     // The id travels back so the page can drop exactly the row the server
@@ -198,7 +179,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "qbo-sync" || intent === "qbo-pause" || intent === "qbo-disconnect") {
     const path = intent === "qbo-sync" ? "/sync" : intent === "qbo-pause" ? "/pause" : "/disconnect";
-    const res = await qboApiFetch(context, cookie, path, "POST");
+    const res = await qboApiFetch(context, caller, path, "POST");
     if (!res?.ok) return { success: false, intent, error: m.settings_qbo_action_failed({ intent }), syncEnabled: undefined };
 
     if (intent === "qbo-pause") {
