@@ -612,33 +612,33 @@
           "name": "q",
           "in": "query",
           "required": true,
-          "description": "TODO describe q field for the OpenInspection MCP integration",
+          "description": "Partial street address typed so far. 2-200 characters.",
           "schema": {
             "type": "string",
             "minLength": 2,
             "maxLength": 200,
             "example": "1005 S Gay",
-            "description": "TODO describe q field for the OpenInspection MCP integration"
+            "description": "Partial street address typed so far. 2-200 characters."
           }
         },
         {
           "name": "session",
           "in": "query",
           "required": true,
-          "description": "TODO describe session field for the OpenInspection MCP integration",
+          "description": "Client-generated session token (for example a UUID) created when the address field opens and reused for every autocomplete call and the final details call of that lookup. 8-128 characters.",
           "schema": {
             "type": "string",
             "minLength": 8,
             "maxLength": 128,
             "example": "550e8400-e29b-41d4-a716-446655440099",
-            "description": "TODO describe session field for the OpenInspection MCP integration"
+            "description": "Client-generated session token (for example a UUID) created when the address field opens and reused for every autocomplete call and the final details call of that lookup. 8-128 characters."
           }
         }
       ],
       "body": null
     },
     "summary": "Address autocomplete (Google Places proxy)",
-    "description": "Auto-generated placeholder for autocompletePlace (GET /autocomplete, bookings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Authenticated proxy to Google Places address autocomplete, restricted to US addresses. Returns suggestions with placeId, description, mainText and secondaryText; meta.cached says whether the list came from the one hour cache, which is keyed on the lowercased query text alone. Pass the same session token on every keystroke and on the final details call so Google bills the sequence as one session. Fails with 400 when the deployment has no Google Places key or Google errors. The route applies no role check of its own beyond a signed-in session."
   },
   {
     "operationId": "autofillInspection",
@@ -1327,7 +1327,7 @@
       "body": null
     },
     "summary": "Get inspection tab counts",
-    "description": "Auto-generated placeholder for countsInspection (GET /counts, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns six counts across all of the company's inspections for the list tabs: all; today (scheduled date is today, UTC); upcoming (dated after today and not completed or cancelled); past (dated before today, or completed or cancelled); needsConfirmation (status scheduled or requested); awaitingReport (completed with the report not yet published). Cancelled inspections are counted in all and past. The tab counts overlap, so they do not sum to all. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "createAgent",
@@ -5608,24 +5608,24 @@
               "success",
               "error"
             ],
-            "description": "TODO describe event field for the OpenInspection MCP integration"
+            "description": "What happened in the widget: it was viewed, the form was submitted, the booking succeeded, or the widget hit an error. One of: view, submit, success, error."
           },
           "metadata": {
             "type": "object",
             "additionalProperties": {
               "nullable": true
             },
-            "description": "TODO describe metadata field for the OpenInspection MCP integration"
+            "description": "Free-form details about the event, stored with it as sent. Optional."
           }
         },
         "required": [
           "event"
         ],
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "description": "The widget event to record, with optional free-form details."
       }
     },
     "summary": "Record an embeddable widget event (public, no JWT)",
-    "description": "Auto-generated placeholder for createWidgetEvent (POST /event, webhooks domain). TODO: replace with a real description sourced from the handler."
+    "description": "Public, unauthenticated beacon that the embedded booking widget calls from a visitor's browser to report what happened in the widget. The company is resolved from the request's tenant context, and the event is recorded as a widget.<event> entry in that company's audit log only when the request's Origin header matches the company's widget origin allowlist. Anything else (no company, no Origin header, empty allowlist, origin not on the list) is dropped silently and still answers 200 with success true, so a 200 does not prove the event was stored. The submitted metadata is stored as sent, together with the origin. Not idempotent: each accepted call adds an entry."
   },
   {
     "operationId": "cropInspectionItemPhoto",
@@ -5690,7 +5690,7 @@
       "body": null
     },
     "summary": "Bucketed inspections for dashboard",
-    "description": "Auto-generated placeholder for dashboardInspection (GET /dashboard, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the inspection dashboard in one response, as buckets of inspections for the whole company (not filtered to the caller): needsAttention, today, thisWeek (after today through 7 days ahead), later (beyond 7 days, capped at the first 50, with laterTotal giving the full count), recentReports (completed with a published report) and cancelled (cancelled in the last 30 days judged by creation time, at most 20). The today, thisWeek and later buckets exclude cancelled inspections. Each row carries defect counts, agent name and status flags. Also returns conciergePending, the number of agent bookings awaiting inspector approval (0 if that lookup fails), and defectAggregate. needsAttention uses the company's attention thresholds (see the attention thresholds route). Dates are compared as UTC calendar days. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "declineBooking",
@@ -7251,7 +7251,7 @@
       "body": null
     },
     "summary": "Export tenant for current tenant",
-    "description": "Auto-generated placeholder for exportTenant (GET /export, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns a full JSON export of the company's data in one response: every inspection, template and agreement template row, all inspection results, and the agreement signing requests with their per-signer records. Signing-request token columns are deliberately left out, so signing links cannot be rebuilt from the export. Not paginated, so the response can be very large. Side effect: each call writes a data.export entry to the audit log. Restricted to owners and managers."
   },
   {
     "operationId": "finalizeInspectionVideo",
@@ -7298,20 +7298,20 @@
           "name": "q",
           "in": "query",
           "required": true,
-          "description": "TODO describe q field for the OpenInspection MCP integration",
+          "description": "Partial street address typed so far. Fewer than 3 characters returns an empty suggestion list. 1-200 characters.",
           "schema": {
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
             "example": "1005 S Gay",
-            "description": "TODO describe q field for the OpenInspection MCP integration"
+            "description": "Partial street address typed so far. Fewer than 3 characters returns an empty suggestion list. 1-200 characters."
           }
         }
       ],
       "body": null
     },
     "summary": "Address autocomplete proxy (public, rate-limited)",
-    "description": "Auto-generated placeholder for geocodeBooking (GET /geocode, bookings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Public, unauthenticated address autocomplete for the booking page, proxying Google Places so the API key never reaches the browser. Returns at most 5 US address suggestions (label, line1, and best-effort city, state and ZIP split from the suggestion text, plus a placeId). Queries shorter than 3 characters return an empty list without calling Google. When the deployment has no Places key, or Google fails or answers unexpectedly, the call still returns 200 with an empty list and a reason of NO_API_KEY or UPSTREAM_ERROR in meta, so a client should fall back to free-text address entry. Rate-limited with the booking limiter."
   },
   {
     "operationId": "geocodeCompanyAddress",
@@ -7370,7 +7370,7 @@
       "body": null
     },
     "summary": "Get agent profile (slug + notification prefs)",
-    "description": "Auto-generated placeholder for getAgentProfile (GET /profile, agents domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the signed-in agent's own profile: name, email, public slug and personal display timezone (each null when unset). Always reads the caller's own account, never another agent's; 404 if the account is missing. Agent accounts only. Read-only."
   },
   {
     "operationId": "getAgentReportContext",
@@ -7435,11 +7435,11 @@
           "name": "inspectorId",
           "in": "path",
           "required": true,
-          "description": "TODO describe inspectorId field for the OpenInspection MCP integration",
+          "description": "Id of the inspector whose availability to read, as listed by the public inspectors route.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe inspectorId field for the OpenInspection MCP integration"
+            "description": "Id of the inspector whose availability to read, as listed by the public inspectors route."
           }
         },
         {
@@ -7458,27 +7458,27 @@
           "name": "start",
           "in": "query",
           "required": false,
-          "description": "TODO describe start field for the OpenInspection MCP integration",
+          "description": "First date of the range, YYYY-MM-DD. Defaults to today (UTC).",
           "schema": {
             "type": "string",
-            "description": "TODO describe start field for the OpenInspection MCP integration"
+            "description": "First date of the range, YYYY-MM-DD. Defaults to today (UTC)."
           }
         },
         {
           "name": "end",
           "in": "query",
           "required": false,
-          "description": "TODO describe end field for the OpenInspection MCP integration",
+          "description": "Last date of the range, YYYY-MM-DD. Defaults to 14 days after today (UTC).",
           "schema": {
             "type": "string",
-            "description": "TODO describe end field for the OpenInspection MCP integration"
+            "description": "Last date of the range, YYYY-MM-DD. Defaults to 14 days after today (UTC)."
           }
         }
       ],
       "body": null
     },
     "summary": "Get booking availability for current tenant",
-    "description": "Auto-generated placeholder for getBookingAvailability (GET /availability/{inspectorId}, bookings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Public, unauthenticated, rate-limited read of one inspector's raw availability for a date range: their recurring weekly availability rows, the date-specific overrides inside the range, and the dates of inspections already assigned to them as lead inspector (bookedSlots). It does not compute free time slots; use the company slots route for that. The tenant is resolved from the slug query parameter and 404s if unknown. The range defaults to today through 14 days ahead (UTC)."
   },
   {
     "operationId": "getBookingCheckout",
@@ -8165,18 +8165,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection request. Must belong to the caller's company.",
+          "description": "Id of the inspection request to fetch; must belong to this company.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection request. Must belong to the caller's company."
+            "description": "Id of the inspection request to fetch; must belong to this company."
           }
         }
       ],
       "body": null
     },
     "summary": "Get inspection request for current tenant",
-    "description": "Auto-generated placeholder for getInspectionRequest (GET /{id}, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns one inspection request with its inspections, each with the inspection's template name. Returns 404 when the id is not a request of this company. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "getInspectionRequestByInspection",
@@ -8193,18 +8193,18 @@
           "name": "inspectionId",
           "in": "path",
           "required": true,
-          "description": "TODO describe inspectionId field for the OpenInspection MCP integration",
+          "description": "Id of an inspection in this company whose parent request to look up.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe inspectionId field for the OpenInspection MCP integration"
+            "description": "Id of an inspection in this company whose parent request to look up."
           }
         }
       ],
       "body": null
     },
     "summary": "Get parent request by inspection id",
-    "description": "Auto-generated placeholder for getInspectionRequestByInspection (GET /by-inspection/{inspectionId}, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Finds the parent request of an inspection, with all of its inspections, so a caller can show sibling inspections from the same booking. Returns 200 with request null (not 404) when the inspection has no parent request, which is the case for inspections created singly, or when the inspection id does not exist in this company. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "getInspectionStatutoryCoverage",
@@ -8360,29 +8360,29 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Id of the inspection whose published versions to read.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Id of the inspection whose published versions to read."
           }
         },
         {
           "name": "n",
           "in": "path",
           "required": true,
-          "description": "TODO describe n field for the OpenInspection MCP integration",
+          "description": "Version number to fetch, as listed by the versions route.",
           "schema": {
             "type": "string",
             "pattern": "^\\d+$",
-            "description": "TODO describe n field for the OpenInspection MCP integration"
+            "description": "Version number to fetch, as listed by the versions route."
           }
         }
       ],
       "body": null
     },
     "summary": "Get full snapshot for a specific version",
-    "description": "Auto-generated placeholder for getInspectionVersion (GET /{id}/versions/{n}, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the full frozen snapshot captured when version n was published: the inspection record, its results data, its units, the inspectors credited at the time and the resolved report style. Reads the stored copy, so later edits to the live inspection do not change it. Returns 404 when no such version exists for the inspection in this company. Read-only. Available to owner, manager, inspector and agent roles."
   },
   {
     "operationId": "getIntegrationSecrets",
@@ -9099,7 +9099,7 @@
       "body": null
     },
     "summary": "Get rating system for current tenant",
-    "description": "Auto-generated placeholder for getRatingSystem (GET /{id}, ratings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns one rating system of the company with its levels, whether built-in or custom. Returns 404 when the id is not a rating system of this company. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "getRecommendation",
@@ -9584,17 +9584,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the request. Must belong to the caller's company.",
+          "description": "Id of the signing request (the id returned by the signing requests list).",
           "schema": {
             "type": "string",
-            "description": "Id of the request. Must belong to the caller's company."
+            "description": "Id of the signing request (the id returned by the signing requests list)."
           }
         }
       ],
       "body": null
     },
     "summary": "Get a signing request with full audit trail",
-    "description": "Auto-generated placeholder for getTenantAgreementsRequest (GET /agreements/requests/{id}, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns one signing request with everything needed to review its evidence: the stored request record, the agreement template's id and name (null if the template is gone), the full tamper-evident audit event chain in chronological order (hash, previous hash, signature, signing-key fingerprint), and chainValid / chainReason from re-verifying that chain on this call. Returns 404 when the id is not a signing request of this company. Read-only. Restricted to owners and managers."
   },
   {
     "operationId": "getTenantAgreementsRequestSignerLink",
@@ -10144,7 +10144,7 @@
       "body": null
     },
     "summary": "Leaderboard agent for current tenant",
-    "description": "Auto-generated placeholder for leaderboardAgent (GET /leaderboard, agents domain). TODO: replace with a real description sourced from the handler."
+    "description": "Ranks referral sources by how many of the company's inspections each referred, most first, with the contact's name, agency and email and the total. Counts every inspection of the company with a referring contact, with no date window and no status or archive filter; inspections without a referrer are left out. Not paginated. Read-only. Available to owner, manager, inspector and agent roles."
   },
   {
     "operationId": "listAgentInspectors",
@@ -10176,7 +10176,7 @@
       "body": null
     },
     "summary": "List partner-agent links for the current tenant",
-    "description": "Auto-generated placeholder for listAgentLinks (GET /links, agents domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists the company's partner-agent links: agent contacts that are bound to an agent account, with the agent's account name and email, an active or revoked status, and when the link was created and (if applicable) revoked. Revoked links are included. Ordinary agent contacts with no account are not links and are not listed. Newest link first, not paginated. The link id is the contact id used by the revoke route. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listAgentMyRepairItems",
@@ -10220,7 +10220,7 @@
       "body": null
     },
     "summary": "List agent my reports",
-    "description": "Auto-generated placeholder for listAgentMyReports (GET /my-reports, agents domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists the company's inspections on which a given agent contact is seated in a role that shows in the agent portal, as full inspection rows, with the agentId that was used. agentId is a contact id and defaults to the caller's own user id when omitted. Not paginated or explicitly ordered, and archived inspections are not filtered out. The handler itself only admits the manager role (owners and agents get 403), even though the operation is tagged with the agent scope. Read-only."
   },
   {
     "operationId": "listAgentNotices",
@@ -10354,20 +10354,20 @@
           "name": "months",
           "in": "query",
           "required": false,
-          "description": "TODO describe months field for the OpenInspection MCP integration",
+          "description": "How many calendar months to return, counting back from and including the current month. Integer between 1 and 36. Defaults to 12.",
           "schema": {
             "type": "integer",
             "minimum": 1,
             "maximum": 36,
             "default": 12,
-            "description": "TODO describe months field for the OpenInspection MCP integration"
+            "description": "How many calendar months to return, counting back from and including the current month. Integer between 1 and 36. Defaults to 12."
           }
         }
       ],
       "body": null
     },
     "summary": "Inspection count per month for the last N months",
-    "description": "Auto-generated placeholder for listAnalyticGrowth (GET /growth, metrics domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the number of inspections created in each of the last N calendar months (UTC), oldest first, as {ym, count} buckets. The current month is the last bucket and months with no inspections appear with a count of 0. Counts every inspection of the company by creation time, with no status or archive filter. Read-only."
   },
   {
     "operationId": "listAutomationLogsRecent",
@@ -10396,7 +10396,7 @@
       "body": null
     },
     "summary": "List automation logs recent",
-    "description": "Auto-generated placeholder for listAutomationLogsRecent (GET /logs/recent, automations domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the company-wide activity log of automation sends, newest scheduled send first (by sendAt), up to limit entries (default 50, no paging). Each entry is a raw log row for one send attempt, across all automation rules. Read-only. Restricted to owners and managers."
   },
   {
     "operationId": "listAutomations",
@@ -10412,7 +10412,7 @@
       "body": null
     },
     "summary": "List automations for current tenant",
-    "description": "Auto-generated placeholder for listAutomations (GET /, automations domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists all of the company's messaging automation rules, defaults included, with each rule's trigger, recipients, channels, delay and active flag. Not paginated or filtered. Side effect: before listing, any built-in default rules missing from the company are created (and the platform SMS disclosure record is created if none exists), so the first call on a new company writes rows. Restricted to owners and managers."
   },
   {
     "operationId": "listAvailabilityOverrides",
@@ -10456,7 +10456,7 @@
       "body": null
     },
     "summary": "Get tenant seat-quota summary (permanent + guests + cap)",
-    "description": "Auto-generated placeholder for listBillingSummary (GET /summary, invoices domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the company's seat summary: its tier, the user cap (maxUsers, 1 when unset), and seatsUsed, which counts current non-removed members and excludes invitations not yet accepted. permanent mirrors seatsUsed and guests is always 0, kept only for response shape. When the deployment has a billing portal configured, portalUrl points to its billing page; otherwise it is omitted. Read-only and never contacts a payment provider. The route applies no role check of its own beyond a signed-in session. Returns 404 if the company record is missing."
   },
   {
     "operationId": "listBookingAgreements",
@@ -10473,18 +10473,18 @@
           "name": "token",
           "in": "path",
           "required": true,
-          "description": "TODO describe token field for the OpenInspection MCP integration",
+          "description": "Signer link token from the signing link emailed to that signer.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe token field for the OpenInspection MCP integration"
+            "description": "Signer link token from the signing link emailed to that signer."
           }
         }
       ],
       "body": null
     },
     "summary": "Get agreement for signing (public, token-gated)",
-    "description": "Auto-generated placeholder for listBookingAgreements (GET /agreements/:token, bookings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Public, unauthenticated route gated by a signer's link token. Returns the agreement as presented to that signer: the pinned content snapshot (never the live template), agreement name, client name, the signer's name, role and status, signature progress across the envelope, and its completion policy. Returns 404 for an unknown token. Despite being a GET it writes: opening the agreement marks that signer as viewed (idempotent, and may roll the envelope status forward), pins the content snapshot on the first view of an unpinned request, and appends a signer.presented entry to the signing audit chain (best-effort; a failed append does not block the read)."
   },
   {
     "operationId": "listBookingInspectors",
@@ -10500,7 +10500,7 @@
       "body": null
     },
     "summary": "List booking inspectors for current tenant",
-    "description": "Auto-generated placeholder for listBookingInspectors (GET /inspectors, bookings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Public, unauthenticated list of the company's inspectors for the booking page's inspector-choice dropdown: id and display name (null when the user has no name) for every user with the inspector role. The company comes from the request's tenant context (host or slug), not a parameter. Not paginated; no email or other contact details are returned. Read-only."
   },
   {
     "operationId": "listBookingServices",
@@ -10516,7 +10516,7 @@
       "body": null
     },
     "summary": "List active services for public booking",
-    "description": "Auto-generated placeholder for listBookingServices (GET /services, bookings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Public, unauthenticated list of the services a client can pick on the booking page: only services that are active and have an inspection template attached. Each has id, name, description (nullable), price in integer cents, and durationMinutes (nullable). Internal service settings are not exposed. The company comes from the request's tenant context. Not paginated. Read-only."
   },
   {
     "operationId": "listCalendarBlocks",
@@ -11022,7 +11022,7 @@
       "body": null
     },
     "summary": "List inspection inspectors for current tenant",
-    "description": "Auto-generated placeholder for listInspectionInspectors (GET /inspectors, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists every user account of the company, not only users with the inspector role, for assignee pickers: id, email, role, creation time, and whether a calendar is connected and when it last synced. Owners, managers and inspectors are all included; pending invitations are not. Not paginated. Read-only. Available to owner, manager and inspector roles, so inspectors can see colleagues' email addresses."
   },
   {
     "operationId": "listInspectionMedia",
@@ -11039,18 +11039,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Id of the inspection whose photos to list.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Id of the inspection whose photos to list."
           }
         }
       ],
       "body": null
     },
     "summary": "Media Center — all attached + pool photos",
-    "description": "Auto-generated placeholder for listInspectionMedia (GET /{id}/media, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the photo library of one inspection in two lists. attached holds photos already placed on checklist items or defects, each with its item and section labels (taken from the inspection's own template snapshot, falling back to the item id when there is none), photoIndex, an annotated flag and the original key to revert to. pool holds loose photos uploaded to the inspection but not yet attached to any item, with upload time and optional taken-at time. Not paginated. Returns 404 when the inspection is not in this company. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listInspectionPaySplits",
@@ -11095,17 +11095,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Id of the inspection whose report PDF to download.",
           "schema": {
             "type": "string",
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Id of the inspection whose report PDF to download."
           }
         },
         {
           "name": "type",
           "in": "query",
           "required": false,
-          "description": "TODO describe type field for the OpenInspection MCP integration",
+          "description": "Which PDF to download: summary or the full report. Defaults to full.",
           "schema": {
             "type": "string",
             "enum": [
@@ -11113,14 +11113,14 @@
               "full"
             ],
             "default": "full",
-            "description": "TODO describe type field for the OpenInspection MCP integration"
+            "description": "Which PDF to download: summary or the full report. Defaults to full."
           }
         }
       ],
       "body": null
     },
     "summary": "Download report PDF (Summary or Full)",
-    "description": "Auto-generated placeholder for listInspectionPdf (GET /{id}/pdf, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Downloads the inspection's report PDF as an attachment, either the full report (default) or the summary. Always renders the current content: a stored render is reused when the report content is unchanged, otherwise it is rendered on demand, so a first call can be slow; frozen per-version PDFs are not served here. Returns 503 when the deployment has no PDF rendering or storage configured, 404 when the inspection is not in this company or the stored file is missing. Responses are marked private with a 5 minute cache lifetime. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listInspectionPeople",
@@ -11164,18 +11164,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Id of the inspection to check before publishing.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Id of the inspection to check before publishing."
           }
         }
       ],
       "body": null
     },
     "summary": "Compute Publish pre-flight gates (rated / facts / cover / agreement)",
-    "description": "Auto-generated placeholder for listInspectionPreflight (GET /{id}/preflight, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Computes the checks that gate publishing a report, from the inspection's current data, without changing anything: allRated and unratedCount (every result item has a rating or a value; false when there are no items), propertyFactsComplete and missingFacts (year_built, sqft, foundation, bedrooms and bathrooms must all be filled in), coverPhotoSet, agreementSigned, and noOpenFields with openFieldCount (unfilled [PLACEHOLDER]-style fields left in item notes). Advisory only: this route does not publish or block anything. Returns 404 when the inspection is not in this company. The route applies no role check of its own beyond a signed-in session."
   },
   {
     "operationId": "listInspectionPropertyFacts",
@@ -11220,17 +11220,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Id of the inspection whose eligible recipients to list.",
           "schema": {
             "type": "string",
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Id of the inspection whose eligible recipients to list."
           }
         }
       ],
       "body": null
     },
     "summary": "List the recipients eligible for the Publish modal",
-    "description": "Auto-generated placeholder for listInspectionRecipients (GET /{id}/recipients, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists the people the Publish dialog can send the report to for one inspection: the client, the buyer's agent and the listing agent, as {contactId, name, role (client, agent_buyer or agent_listing), email, phone}. People in other roles (such as co-clients or attorneys) and people with neither an email nor a phone are left out. Returns 404 when the inspection is not in this company. Read-only; sends nothing. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listInspectionRecommendations",
@@ -11247,18 +11247,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Id of the inspection whose attached recommendations to aggregate.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Id of the inspection whose attached recommendations to aggregate."
           }
         }
       ],
       "body": null
     },
     "summary": "Aggregate all attached recommendations + totals for repair list",
-    "description": "Auto-generated placeholder for listInspectionRecommendations (GET /{id}/recommendations, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Flattens every repair item (recommendation) attached to the inspection's findings into one list, with each item's recommendation id, summary, contractor type, attach time, the finding it is attached to, and the stored low and high estimates (null when none), plus totals: the count and the sums of the low and high estimates. The same recommendation attached to the same finding is listed once; attached to two findings it is listed twice. Unlike the repair list this includes every attached recommendation and ignores whether the related defect is marked included. Not paginated. An inspection with no results, or an id not in this company, returns an empty list with zero totals rather than 404. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listInspectionRepairList",
@@ -11275,17 +11275,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Id of the inspection whose repair list to return.",
           "schema": {
             "type": "string",
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Id of the inspection whose repair list to return."
           }
         }
       ],
       "body": null
     },
     "summary": "Get aggregated repair list (defects-only punch list)",
-    "description": "Auto-generated placeholder for listInspectionRepairList (GET /{id}/repair-list, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the inspection's repair list: a flat list of every defect marked as included in the report, both defects picked from the template's canned comments and custom ones the inspector added, each with section and item, comment, location, category (safety, recommendation or maintenance), recommendation, photos and a source flag (canned or custom). Defects marked as not included are omitted. totals gives the overall count and a count per category; no repair costs are published. Custom defects carry no photos in this list. Returns 404 when the inspection is not in this company. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listInspectionReportData",
@@ -11329,7 +11329,7 @@
           "name": "status",
           "in": "query",
           "required": false,
-          "description": "TODO describe status field for the OpenInspection MCP integration",
+          "description": "Return only requests in this status. One of: pending, confirmed, in_progress, completed, cancelled.",
           "schema": {
             "type": "string",
             "enum": [
@@ -11339,60 +11339,60 @@
               "completed",
               "cancelled"
             ],
-            "description": "TODO describe status field for the OpenInspection MCP integration"
+            "description": "Return only requests in this status. One of: pending, confirmed, in_progress, completed, cancelled."
           }
         },
         {
           "name": "from",
           "in": "query",
           "required": false,
-          "description": "TODO describe from field for the OpenInspection MCP integration",
+          "description": "Earliest scheduled date to include (inclusive). Any date or ISO 8601 timestamp string that the JavaScript Date parser accepts.",
           "schema": {
             "type": "string",
-            "description": "TODO describe from field for the OpenInspection MCP integration"
+            "description": "Earliest scheduled date to include (inclusive). Any date or ISO 8601 timestamp string that the JavaScript Date parser accepts."
           }
         },
         {
           "name": "to",
           "in": "query",
           "required": false,
-          "description": "TODO describe to field for the OpenInspection MCP integration",
+          "description": "Latest scheduled date to include (inclusive). Same format as from. A bare date is read as the start of that day in UTC.",
           "schema": {
             "type": "string",
-            "description": "TODO describe to field for the OpenInspection MCP integration"
+            "description": "Latest scheduled date to include (inclusive). Same format as from. A bare date is read as the start of that day in UTC."
           }
         },
         {
           "name": "limit",
           "in": "query",
           "required": false,
-          "description": "TODO describe limit field for the OpenInspection MCP integration",
+          "description": "Maximum number of requests to return in one page. Between 1 and 200. Defaults to 50.",
           "schema": {
             "type": "number",
             "minimum": 1,
             "maximum": 200,
             "default": 50,
-            "description": "TODO describe limit field for the OpenInspection MCP integration"
+            "description": "Maximum number of requests to return in one page. Between 1 and 200. Defaults to 50."
           }
         },
         {
           "name": "offset",
           "in": "query",
           "required": false,
-          "description": "TODO describe offset field for the OpenInspection MCP integration",
+          "description": "Number of requests to skip before the page starts, for paging. At least 0. Defaults to 0.",
           "schema": {
             "type": "number",
             "nullable": true,
             "minimum": 0,
             "default": 0,
-            "description": "TODO describe offset field for the OpenInspection MCP integration"
+            "description": "Number of requests to skip before the page starts, for paging. At least 0. Defaults to 0."
           }
         }
       ],
       "body": null
     },
     "summary": "List inspection requests for current tenant",
-    "description": "Auto-generated placeholder for listInspectionRequests (GET /, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists the company's inspection requests (a client, property and schedule with the inspections grouped under it), each with its inspections and their template names. Newest scheduled date first, paged with limit and offset. Filter by status and by a scheduled-date range (from and to, both inclusive). Note that total in the response is the number of requests on this page, not the count across all pages. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listInspectionResults",
@@ -11696,18 +11696,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Id of the inspection whose published versions to list.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Id of the inspection whose published versions to list."
           }
         }
       ],
       "body": null
     },
     "summary": "List published versions for an inspection",
-    "description": "Auto-generated placeholder for listInspectionVersions (GET /{id}/versions, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists the published report versions of an inspection, newest version first, each with its version number, publish time (Unix seconds), the user id that published it and the optional publish summary. Only metadata is returned, not the snapshot content; use the single-version route for that. The list is filtered by inspection, not by report, so an inspection with several reports lists versions of all of them. Not paginated. Read-only. Available to owner, manager, inspector and agent roles."
   },
   {
     "operationId": "listInspectionVersionsDiff",
@@ -11724,40 +11724,40 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the inspection. Must belong to the caller's company.",
+          "description": "Id of the inspection whose published versions to compare.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Id of the inspection. Must belong to the caller's company."
+            "description": "Id of the inspection whose published versions to compare."
           }
         },
         {
           "name": "n",
           "in": "path",
           "required": true,
-          "description": "TODO describe n field for the OpenInspection MCP integration",
+          "description": "Version number to compare, as listed by the versions route; this is the newer side of the diff.",
           "schema": {
             "type": "string",
             "pattern": "^\\d+$",
-            "description": "TODO describe n field for the OpenInspection MCP integration"
+            "description": "Version number to compare, as listed by the versions route; this is the newer side of the diff."
           }
         },
         {
           "name": "from",
           "in": "query",
           "required": true,
-          "description": "TODO describe from field for the OpenInspection MCP integration",
+          "description": "Version number to compare against, as listed by the versions route; this is the baseline side of the diff.",
           "schema": {
             "type": "string",
             "pattern": "^\\d+$",
-            "description": "TODO describe from field for the OpenInspection MCP integration"
+            "description": "Version number to compare against, as listed by the versions route; this is the baseline side of the diff."
           }
         }
       ],
       "body": null
     },
     "summary": "Diff version :n against ?from=<version>",
-    "description": "Auto-generated placeholder for listInspectionVersionsDiff (GET /{id}/versions/{n}/diff, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Compares two published versions of an inspection and returns the differences between the snapshot named by the from query parameter and version n in the path. Returns 404 if either version does not exist for the inspection in this company. Computed on demand from the stored snapshots and nothing is written. Read-only. Available to owner, manager, inspector and agent roles."
   },
   {
     "operationId": "listInspectorCredentials",
@@ -11895,50 +11895,50 @@
           "name": "templateId",
           "in": "query",
           "required": false,
-          "description": "TODO describe templateId field for the OpenInspection MCP integration",
+          "description": "Return only events for this local template id. Meant to be used instead of libraryId, not together with it.",
           "schema": {
             "type": "string",
-            "description": "TODO describe templateId field for the OpenInspection MCP integration"
+            "description": "Return only events for this local template id. Meant to be used instead of libraryId, not together with it."
           }
         },
         {
           "name": "libraryId",
           "in": "query",
           "required": false,
-          "description": "TODO describe libraryId field for the OpenInspection MCP integration",
+          "description": "Return only events for this marketplace library (catalogue entry) id. Meant to be used instead of templateId, not together with it.",
           "schema": {
             "type": "string",
-            "description": "TODO describe libraryId field for the OpenInspection MCP integration"
+            "description": "Return only events for this marketplace library (catalogue entry) id. Meant to be used instead of templateId, not together with it."
           }
         },
         {
           "name": "page",
           "in": "query",
           "required": false,
-          "description": "TODO describe page field for the OpenInspection MCP integration",
+          "description": "1-indexed page number. Defaults to 1. Integer, at least 1.",
           "schema": {
             "type": "integer",
             "minimum": 1,
-            "description": "TODO describe page field for the OpenInspection MCP integration"
+            "description": "1-indexed page number. Defaults to 1. Integer, at least 1."
           }
         },
         {
           "name": "pageSize",
           "in": "query",
           "required": false,
-          "description": "TODO describe pageSize field for the OpenInspection MCP integration",
+          "description": "Events per page. Defaults to 20. Integer between 1 and 100.",
           "schema": {
             "type": "integer",
             "minimum": 1,
             "maximum": 100,
-            "description": "TODO describe pageSize field for the OpenInspection MCP integration"
+            "description": "Events per page. Defaults to 20. Integer between 1 and 100."
           }
         }
       ],
       "body": null
     },
     "summary": "List per-import history events",
-    "description": "Auto-generated placeholder for listMarketplaceImportsHistory (GET /imports/history, marketplace domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists the company's marketplace import history events, newest first, paged with page and pageSize (default page 1, 20 per page; the response carries hasMore rather than a total). Each event records the action (such as install, update, replace or uninstall), source and target versions, the number of rows affected, extra metadata, creation time and the user who did it. Filter by templateId or libraryId to see one item's history. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listMarketplaceLibraries",
@@ -11955,7 +11955,7 @@
           "name": "kind",
           "in": "query",
           "required": false,
-          "description": "TODO describe kind field for the OpenInspection MCP integration",
+          "description": "Return only entries of this kind. Omit to list every kind. One of: comments, templates, statutory.",
           "schema": {
             "type": "string",
             "enum": [
@@ -11963,14 +11963,14 @@
               "templates",
               "statutory"
             ],
-            "description": "TODO describe kind field for the OpenInspection MCP integration"
+            "description": "Return only entries of this kind. Omit to list every kind. One of: comments, templates, statutory."
           }
         }
       ],
       "body": null
     },
     "summary": "List marketplace catalogue entries (comment packs, templates)",
-    "description": "Auto-generated placeholder for listMarketplaceLibraries (GET /libraries, marketplace domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists the marketplace catalogue (comment packs, templates and statutory forms) as one unpaginated array, up to 1000 entries, optionally narrowed to one kind. Delisted entries are not shown. Featured entries come first, then by download count. Each entry carries the company's own install state: importedSemver is the installed version (null if not installed or uninstalled) and hasUpdate says a newer version exists. The pack content itself is not returned, only itemCount and the description. The paginated catalogue route offers search and further filters. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listMarketplaces",
@@ -12245,33 +12245,33 @@
           "name": "placeId",
           "in": "query",
           "required": true,
-          "description": "TODO describe placeId field for the OpenInspection MCP integration",
+          "description": "Google place id of the chosen suggestion, as returned by the autocomplete route. 8-200 characters.",
           "schema": {
             "type": "string",
             "minLength": 8,
             "maxLength": 200,
             "example": "ChIJxxx",
-            "description": "TODO describe placeId field for the OpenInspection MCP integration"
+            "description": "Google place id of the chosen suggestion, as returned by the autocomplete route. 8-200 characters."
           }
         },
         {
           "name": "session",
           "in": "query",
           "required": true,
-          "description": "TODO describe session field for the OpenInspection MCP integration",
+          "description": "The same session token used for the autocomplete calls that led to this selection. 8-128 characters.",
           "schema": {
             "type": "string",
             "minLength": 8,
             "maxLength": 128,
             "example": "550e8400-e29b-41d4-a716-446655440099",
-            "description": "TODO describe session field for the OpenInspection MCP integration"
+            "description": "The same session token used for the autocomplete calls that led to this selection. 8-128 characters."
           }
         }
       ],
       "body": null
     },
     "summary": "Address details (Google Places Details proxy)",
-    "description": "Auto-generated placeholder for listPlaceDetails (GET /details, bookings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Authenticated proxy that resolves one Google Places placeId (from the autocomplete route) to a structured address: formatted address, street, city, state, ZIP, county (each nullable) and latitude and longitude. meta.cached says whether it came from the 60 day cache keyed by placeId. Pass the same session token used for the autocomplete calls. Fails with 400 when the deployment has no Google Places key or Google cannot resolve the place. The route applies no role check of its own beyond a signed-in session."
   },
   {
     "operationId": "listRatingSystems",
@@ -12287,7 +12287,7 @@
       "body": null
     },
     "summary": "List rating systems for the current tenant (seed + custom)",
-    "description": "Auto-generated placeholder for listRatingSystems (GET /, ratings domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists all of the company's rating systems, the built-in read-only ones and its own custom ones, each with its levels. Sorted with the default system first, then built-in before custom, then by name. Not paginated. Side effect: the built-in default systems are created for the company first if they do not exist yet, so the first call on a new company writes rows. Read-only otherwise. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listRecommendations",
@@ -12406,7 +12406,7 @@
       "body": null
     },
     "summary": "List service discount codes",
-    "description": "Auto-generated placeholder for listServiceDiscountCodes (GET /discount-codes, services domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listServicePayRules",
@@ -12464,33 +12464,33 @@
           "name": "value",
           "in": "query",
           "required": true,
-          "description": "TODO describe value field for the OpenInspection MCP integration",
+          "description": "The slug to test, as the user typed it. 1-64 characters.",
           "schema": {
             "type": "string",
             "minLength": 1,
             "maxLength": 64,
-            "description": "TODO describe value field for the OpenInspection MCP integration"
+            "description": "The slug to test, as the user typed it. 1-64 characters."
           }
         },
         {
           "name": "namespace",
           "in": "query",
           "required": false,
-          "description": "TODO describe namespace field for the OpenInspection MCP integration",
+          "description": "Which slug space to check: inspector (the default) is scoped to one company, agent is shared across all agent accounts.",
           "schema": {
             "type": "string",
             "enum": [
               "inspector",
               "agent"
             ],
-            "description": "TODO describe namespace field for the OpenInspection MCP integration"
+            "description": "Which slug space to check: inspector (the default) is scoped to one company, agent is shared across all agent accounts."
           }
         }
       ],
       "body": null
     },
     "summary": "Check whether a booking slug is available",
-    "description": "Auto-generated placeholder for listSlugCheckSlug (GET /check/slug, profile domain). TODO: replace with a real description sourced from the handler."
+    "description": "Public, unauthenticated check of whether a booking slug can be claimed. Returns available true, or false with a reason: reserved (on the reserved list), taken (another user already has it), or invalid (no company could be resolved from the request). For a taken slug in the inspector namespace, up to 3 alternative suggestions are included. The inspector namespace (default) checks within the company resolved from the request's tenant context; the agent namespace checks across all agent accounts, with no company needed, and the value is lower-cased first. Read-only; it does not reserve the slug."
   },
   {
     "operationId": "listStatutoryFormSources",
@@ -12633,7 +12633,7 @@
       "body": null
     },
     "summary": "List team members and pending invites",
-    "description": "Auto-generated placeholder for listTeamMembers (GET /members, team domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists the company's team: members (non-removed users) with id, name, email, role, permission overrides, whether two-factor sign-in is enabled (the flag only, never secrets), creation time and last active time; the pending invitations, each with its accept link (so anyone who can call this can see those links); and maxUsers, the seat cap (3 when the company has none recorded). Accepted, expired or cancelled invitations are not listed. Not paginated. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listTenantAgreements",
@@ -12649,7 +12649,7 @@
       "body": null
     },
     "summary": "List tenant agreements for current tenant",
-    "description": "Auto-generated placeholder for listTenantAgreements (GET /agreements, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists every agreement template the company has created, each with its full body, version number and creation time. Not paginated and not explicitly ordered. These are the reusable templates, not the signing requests sent from them (see the agreement requests route). Restricted to owners and managers."
   },
   {
     "operationId": "listTenantAgreementsRequests",
@@ -12665,7 +12665,7 @@
       "body": null
     },
     "summary": "List signing requests for tenant",
-    "description": "Auto-generated placeholder for listTenantAgreementsRequests (GET /agreements/requests, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists the company's agreement signing requests, newest first, capped at the 200 most recent (no paging or filters). Each row has the client name and email, the linked inspection and agreement template name, status, created/sent/viewed/signed timestamps, and signersTotal / signersSigned counts for multi-signer requests. Includes requests in every status. Read-only. Restricted to owners and managers."
   },
   {
     "operationId": "listTenantAgreementsRequestsAuditTrail",
@@ -12682,17 +12682,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Id of the request. Must belong to the caller's company.",
+          "description": "Id of the signing request whose audit trail to download (the id returned by the signing requests list).",
           "schema": {
             "type": "string",
-            "description": "Id of the request. Must belong to the caller's company."
+            "description": "Id of the signing request whose audit trail to download (the id returned by the signing requests list)."
           }
         }
       ],
       "body": null
     },
     "summary": "Download audit trail JSON for legal evidence",
-    "description": "Auto-generated placeholder for listTenantAgreementsRequestsAuditTrail (GET /agreements/requests/{id}/audit-trail, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Downloads one signing request's audit trail as a JSON file attachment (audit-trail-<first 8 id characters>.json), suitable for keeping as evidence. It carries the envelope id, client name and email, status, the company's Ed25519 public key and fingerprint, every audit event with its hash chain and signature, and an exportedAt timestamp. Unlike the detail route it does not re-verify the chain. Returns 404 when the id is not a signing request of this company. Read-only. Restricted to owners and managers."
   },
   {
     "operationId": "listTenantAgreementsRequestSigners",
@@ -12735,7 +12735,7 @@
       "body": null
     },
     "summary": "List tenant attention thresholds",
-    "description": "Auto-generated placeholder for listTenantAttentionThresholds (GET /attention-thresholds, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the three hour thresholds (agreement_unsigned_h, invoice_overdue_h, report_unpublished_h) that decide when an inspection lands in the dashboard's Needs Attention list. When the company has never saved them, the defaults of 72 hours each are returned. Read-only. Restricted to owners and managers."
   },
   {
     "operationId": "listTenantAuditLogs",
@@ -12752,47 +12752,47 @@
           "name": "limit",
           "in": "query",
           "required": false,
-          "description": "TODO describe limit field for the OpenInspection MCP integration",
+          "description": "Number of log entries per page, sent as a numeric string. Defaults to 50 when omitted.",
           "schema": {
             "type": "string",
-            "description": "TODO describe limit field for the OpenInspection MCP integration"
+            "description": "Number of log entries per page, sent as a numeric string. Defaults to 50 when omitted."
           }
         },
         {
           "name": "cursor",
           "in": "query",
           "required": false,
-          "description": "TODO describe cursor field for the OpenInspection MCP integration",
+          "description": "Opaque paging token: the nextCursor value from the previous response. A value that is not a valid token is rejected with 400.",
           "schema": {
             "type": "string",
-            "description": "TODO describe cursor field for the OpenInspection MCP integration"
+            "description": "Opaque paging token: the nextCursor value from the previous response. A value that is not a valid token is rejected with 400."
           }
         },
         {
           "name": "action",
           "in": "query",
           "required": false,
-          "description": "TODO describe action field for the OpenInspection MCP integration",
+          "description": "Return only entries whose action matches this value exactly, for example inspection.create.",
           "schema": {
             "type": "string",
-            "description": "TODO describe action field for the OpenInspection MCP integration"
+            "description": "Return only entries whose action matches this value exactly, for example inspection.create."
           }
         },
         {
           "name": "entityType",
           "in": "query",
           "required": false,
-          "description": "TODO describe entityType field for the OpenInspection MCP integration",
+          "description": "Return only entries for this entity type, matched exactly, for example audit_log.",
           "schema": {
             "type": "string",
-            "description": "TODO describe entityType field for the OpenInspection MCP integration"
+            "description": "Return only entries for this entity type, matched exactly, for example audit_log."
           }
         }
       ],
       "body": null
     },
     "summary": "List tenant audit logs",
-    "description": "Auto-generated placeholder for listTenantAuditLogs (GET /audit-logs, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the company's audit log, newest first, one page at a time. Pass the nextCursor from a response back as cursor to read the next page; hasMore says whether another page exists. action and entityType filter by exact match. Side effect: each call writes an audit.view entry to the audit log itself. Restricted to owners and managers."
   },
   {
     "operationId": "listTenantBranding",
@@ -12808,7 +12808,7 @@
       "body": null
     },
     "summary": "List tenant branding for current tenant",
-    "description": "Auto-generated placeholder for listTenantBranding (GET /branding, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the company's branding and company settings: name, primary color, support email, logo URL, billing URL, default timezone and locale, currency, date and time formats, plus the other stored company settings. Unset values fall back to the deployment defaults (or UTC, en-US, USD, us date format, 12h time). Also includes a cancellationClause summary of whether the cancellation-fee clause is currently attested (current), has ever been attested, and for which agreement, so a client can show the same state the cancellation-fee gate uses. Read-only. Restricted to owners and managers."
   },
   {
     "operationId": "listTenantComments",
@@ -12842,12 +12842,12 @@
           "name": "section",
           "in": "query",
           "required": false,
-          "description": "TODO describe section field for the OpenInspection MCP integration",
+          "description": "Section name to match exactly. Only applied when filterMode is auto; ignored when filterMode is all. Up to 64 characters.",
           "schema": {
             "type": "string",
             "maxLength": 64,
             "example": "Roof",
-            "description": "TODO describe section field for the OpenInspection MCP integration"
+            "description": "Section name to match exactly. Only applied when filterMode is auto; ignored when filterMode is all. Up to 64 characters."
           }
         },
         {
@@ -12878,11 +12878,11 @@
           "name": "search",
           "in": "query",
           "required": false,
-          "description": "TODO describe search field for the OpenInspection MCP integration",
+          "description": "Free-text search over comment text and curated search keywords (case-insensitive substring). Ignored unless at least 2 characters after trimming. Up to 200 characters.",
           "schema": {
             "type": "string",
             "maxLength": 200,
-            "description": "TODO describe search field for the OpenInspection MCP integration"
+            "description": "Free-text search over comment text and curated search keywords (case-insensitive substring). Ignored unless at least 2 characters after trimming. Up to 200 characters."
           }
         },
         {
@@ -12956,7 +12956,7 @@
       "body": null
     },
     "summary": "List comment library entries",
-    "description": "Auto-generated placeholder for listTenantComments (GET /comments, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Pages through the company's canned-comment library. Each entry carries the calling user's own usage count and last-used time (0 and null when they have never used it). Sorted by sort (default relevance: severity, then newest first); paginated with page and pageSize, and meta carries the total. Severity, sectionId and triggerCode always filter; section and itemLabel only filter when filterMode is auto. Read-only; available to owner, manager and inspector roles."
   },
   {
     "operationId": "listTenantConfig",
@@ -12972,7 +12972,7 @@
       "body": null
     },
     "summary": "Get integration config and masked secrets",
-    "description": "Auto-generated placeholder for listTenantConfig (GET /config, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the company's stored non-sensitive integration settings (appBaseUrl, turnstileSiteKey, googleClientId, streamCustomerSubdomain) as saved; keys never set are absent. The secrets field is always an empty object because the legacy secret store is retired; secrets are not readable through this route. Read-only. Restricted to the owner."
   },
   {
     "operationId": "listTenantDashboardColumns",
@@ -12988,7 +12988,7 @@
       "body": null
     },
     "summary": "Get tenant default dashboard column prefs",
-    "description": "Auto-generated placeholder for listTenantDashboardColumns (GET /dashboard-columns, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the company's default list of visible inspection dashboard column ids, normalised the same way as on write. A company that has never set one gets the built-in default columns. Individual users may override it on their own device. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listTenantEarningsSummary",
@@ -13004,7 +13004,7 @@
       "body": null
     },
     "summary": "Get aggregated invoice earnings (paid/pending/count)",
-    "description": "Auto-generated placeholder for listTenantEarningsSummary (GET /earnings-summary, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns all-time invoice totals for the company, with amounts in integer cents: paid is the sum of paid invoices, pending is the sum of invoices that were sent but not yet paid, and count is the number of paid invoices. Voided invoices are excluded from all three, and invoices never sent (drafts) are not counted as pending. There is no date window or filter. Read-only. Restricted to owners and managers."
   },
   {
     "operationId": "listTenantIcsToken",
@@ -13020,7 +13020,7 @@
       "body": null
     },
     "summary": "List tenant ics token",
-    "description": "Auto-generated placeholder for listTenantIcsToken (GET /ics-token, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the company-wide calendar subscription URL (/api/ics/<token>) that a calendar app can subscribe to. Despite being a GET, it has a side effect on first use: if the company has no calendar token yet, one is generated and saved, and later calls return the same URL. It never rotates an existing token. Anyone holding the URL can read the feed, so treat it as a secret. Restricted to owners and managers."
   },
   {
     "operationId": "listTenantMembers",
@@ -13036,7 +13036,7 @@
       "body": null
     },
     "summary": "List tenant members for current tenant",
-    "description": "Auto-generated placeholder for listTenantMembers (GET /members, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Lists the company's user accounts with id, email, role and creation time, plus whether each has a calendar connected and when it last synced. Pending invitations are not included; the invite route and the team members route cover those. Not paginated. Read-only. Restricted to owners and managers."
   },
   {
     "operationId": "listTenantStripeConnect",
@@ -13052,7 +13052,7 @@
       "body": null
     },
     "summary": "Get the tenant Stripe Connect account ID",
-    "description": "Auto-generated placeholder for listTenantStripeConnect (GET /stripe-connect, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the Stripe Connect account id (acct_...) linked to the company, or null when none is linked. Reads the stored id only and does not contact Stripe. Read-only. Restricted to owners and managers."
   },
   {
     "operationId": "listTenantWidgetOrigins",
@@ -13068,7 +13068,7 @@
       "body": null
     },
     "summary": "Get current widget allowed-origin list",
-    "description": "Auto-generated placeholder for listTenantWidgetOrigins (GET /widget/origins, admin domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the company's allowlist of website origins that may embed the booking widget, as saved by the replace-list route. An empty array when none has been set. Not paginated. Read-only. Restricted to owners and managers."
   },
   {
     "operationId": "loginWithPassword",
@@ -19741,7 +19741,7 @@
       "body": null
     },
     "summary": "Count unread notifications for current user",
-    "description": "Auto-generated placeholder for unreadCountNotification (GET /unread-count, notifications domain). TODO: replace with a real description sourced from the handler."
+    "description": "Returns the number of the calling user's own notifications in the current company that are unread and not archived, as data.count. Cheap enough for badge polling; other users' notifications are never counted. Read-only. Requires a signed-in user."
   },
   {
     "operationId": "updateCalendarBlock",

@@ -33,7 +33,7 @@ const listRatingSystemsRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: RatingSystemListResponseSchema } }, description: 'List' },
     },
     operationId: "listRatingSystems",
-    description: "Auto-generated placeholder for listRatingSystems (GET /, ratings domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists all of the company's rating systems, the built-in read-only ones and its own custom ones, each with its levels. Sorted with the default system first, then built-in before custom, then by name. Not paginated. Side effect: the built-in default systems are created for the company first if they do not exist yet, so the first call on a new company writes rows. Read-only otherwise. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /* ── GET /api/rating-systems/:id ──────────────────────────────────────── */
@@ -47,7 +47,7 @@ const getRatingSystemRoute = createRoute(withMcpMetadata({
     },
     operationId: "getRatingSystem",
     summary: "Get rating system for current tenant",
-    description: "Auto-generated placeholder for getRatingSystem (GET /{id}, ratings domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns one rating system of the company with its levels, whether built-in or custom. Returns 404 when the id is not a rating system of this company. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /* ── POST /api/rating-systems ─────────────────────────────────────────── */

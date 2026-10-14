@@ -258,12 +258,12 @@ const aggregateRecommendationsRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Aggregate all attached recommendations + totals for repair list',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection whose attached recommendations to aggregate.') }) },
     responses: {
         200: { content: { 'application/json': { schema: AggregatedRecommendationsResponseSchema } }, description: 'Aggregated recommendations' },
     },
     operationId: "listInspectionRecommendations",
-    description: "Auto-generated placeholder for listInspectionRecommendations (GET /{id}/recommendations, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Flattens every repair item (recommendation) attached to the inspection's findings into one list, with each item's recommendation id, summary, contractor type, attach time, the finding it is attached to, and the stored low and high estimates (null when none), plus totals: the count and the sums of the low and high estimates. The same recommendation attached to the same finding is listed once; attached to two findings it is listed twice. Unlike the repair list this includes every attached recommendation and ignores whether the related defect is marked included. Not paginated. An inspection with no results, or an id not in this company, returns an empty list with zero totals rather than 404. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // Design System 0520 subsystem E P1.3 — Publish pre-flight gates.
@@ -272,13 +272,13 @@ const preflightRoute = createRoute(withMcpMetadata({
     path:    '/{id}/preflight',
     tags: ["inspections"],
     summary: 'Compute Publish pre-flight gates (rated / facts / cover / agreement)',
-    request: { params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().min(1).describe('Id of the inspection to check before publishing.') }) },
     responses: {
         200: { description: 'ok' },
         404: { description: 'inspection not found in this tenant' },
     },
     operationId: "listInspectionPreflight",
-    description: "Auto-generated placeholder for listInspectionPreflight (GET /{id}/preflight, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Computes the checks that gate publishing a report, from the inspection's current data, without changing anything: allRated and unratedCount (every result item has a rating or a value; false when there are no items), propertyFactsComplete and missingFacts (year_built, sqft, foundation, bedrooms and bathrooms must all be filled in), coverPhotoSet, agreementSigned, and noOpenFields with openFieldCount (unfilled [PLACEHOLDER]-style fields left in item notes). Advisory only: this route does not publish or block anything. Returns 404 when the inspection is not in this company. The route applies no role check of its own beyond a signed-in session."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // -----------------------------------------------------------------------------

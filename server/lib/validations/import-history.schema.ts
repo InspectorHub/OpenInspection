@@ -7,10 +7,10 @@ import { z } from '@hono/zod-openapi';
  * list all events for the tenant. Pagination via simple page/pageSize.
  */
 export const ImportHistoryQuerySchema = z.object({
-    templateId: z.string().optional().describe('TODO describe templateId field for the OpenInspection MCP integration'),
-    libraryId:  z.string().optional().describe('TODO describe libraryId field for the OpenInspection MCP integration'),
-    page:       z.coerce.number().int().min(1).optional().describe('TODO describe page field for the OpenInspection MCP integration'),
-    pageSize:   z.coerce.number().int().min(1).max(100).optional().describe('TODO describe pageSize field for the OpenInspection MCP integration'),
+    templateId: z.string().optional().describe('Return only events for this local template id. Meant to be used instead of libraryId, not together with it.'),
+    libraryId:  z.string().optional().describe('Return only events for this marketplace library (catalogue entry) id. Meant to be used instead of templateId, not together with it.'),
+    page:       z.coerce.number().int().min(1).optional().describe('1-indexed page number. Defaults to 1.'),
+    pageSize:   z.coerce.number().int().min(1).max(100).optional().describe('Events per page. Defaults to 20.'),
 });
 
 // Shape of a single import-history event row returned by the service. Declared

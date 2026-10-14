@@ -37,7 +37,7 @@ const listRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listInspectionRequests",
-    description: "Auto-generated placeholder for listInspectionRequests (GET /, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the company's inspection requests (a client, property and schedule with the inspections grouped under it), each with its inspections and their template names. Newest scheduled date first, paged with limit and offset. Filter by status and by a scheduled-date range (from and to, both inclusive). Note that total in the response is the number of requests on this page, not the count across all pages. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const detailRoute = createRoute(withMcpMetadata({
@@ -45,7 +45,7 @@ const detailRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "Get inspection request for current tenant",
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().min(1).describe('Id of the inspection request to fetch; must belong to this company.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: InspectionRequestDetailResponseSchema } },
@@ -54,7 +54,7 @@ const detailRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "getInspectionRequest",
-    description: "Auto-generated placeholder for getInspectionRequest (GET /{id}, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns one inspection request with its inspections, each with the inspection's template name. Returns 404 when the id is not a request of this company. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // Sprint 2 S2-2 — resolve the parent request for an inspection.
@@ -67,7 +67,7 @@ const byInspectionRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Get parent request by inspection id',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ inspectionId: z.string().min(1).describe('TODO describe inspectionId field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ inspectionId: z.string().min(1).describe('Id of an inspection in this company whose parent request to look up.') }) },
     responses: {
         200: {
             content: {
@@ -83,7 +83,7 @@ const byInspectionRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "getInspectionRequestByInspection",
-    description: "Auto-generated placeholder for getInspectionRequestByInspection (GET /by-inspection/{inspectionId}, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Finds the parent request of an inspection, with all of its inspections, so a caller can show sibling inspections from the same booking. Returns 200 with request null (not 404) when the inspection has no parent request, which is the case for inspections created singly, or when the inspection id does not exist in this company. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const createReqRoute = createRoute(withMcpMetadata({

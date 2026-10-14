@@ -29,7 +29,7 @@ const getBrandingRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listTenantBranding",
-    description: "Auto-generated placeholder for listTenantBranding (GET /branding, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the company's branding and company settings: name, primary color, support email, logo URL, billing URL, default timezone and locale, currency, date and time formats, plus the other stored company settings. Unset values fall back to the deployment defaults (or UTC, en-US, USD, us date format, 12h time). Also includes a cancellationClause summary of whether the cancellation-fee clause is currently attested (current), has ever been attested, and for which agreement, so a client can show the same state the cancellation-fee gate uses. Read-only. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 

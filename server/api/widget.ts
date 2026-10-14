@@ -13,9 +13,9 @@ const recordEventRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        event: z.enum(['view', 'submit', 'success', 'error']).describe('TODO describe event field for the OpenInspection MCP integration'),
-                        metadata: z.record(z.string(), z.unknown()).optional().describe('TODO describe metadata field for the OpenInspection MCP integration'),
-                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                        event: z.enum(['view', 'submit', 'success', 'error']).describe('What happened in the widget: it was viewed, the form was submitted, the booking succeeded, or the widget hit an error.'),
+                        metadata: z.record(z.string(), z.unknown()).optional().describe('Free-form details about the event, stored with it as sent. Optional.'),
+                    }).describe('The widget event to record, with optional free-form details.'),
                 },
             },
         },
@@ -31,7 +31,7 @@ const recordEventRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "createWidgetEvent",
-    description: "Auto-generated placeholder for createWidgetEvent (POST /event, webhooks domain). TODO: replace with a real description sourced from the handler."
+    description: "Public, unauthenticated beacon that the embedded booking widget calls from a visitor's browser to report what happened in the widget. The company is resolved from the request's tenant context, and the event is recorded as a widget.<event> entry in that company's audit log only when the request's Origin header matches the company's widget origin allowlist. Anything else (no company, no Origin header, empty allowlist, origin not on the list) is dropped silently and still answers 200 with success true, so a 200 does not prove the event was stored. The submitted metadata is stored as sent, together with the origin. Not idempotent: each accepted call adds an entry."
 }, { scopes: [], tier: 'excluded' }));
 
 const widgetRoutes = createApiRouter()

@@ -48,7 +48,7 @@ const listLinksRoute = createRoute(withMcpMetadata({
     path: '/links',
     tags: ["agents"],
     summary: 'List partner-agent links for the current tenant',
-    description: "Auto-generated placeholder for listAgentLinks (GET /links, agents domain). TODO: replace with a real description sourced from the handler.",
+    description: "Lists the company's partner-agent links: agent contacts that are bound to an agent account, with the agent's account name and email, an active or revoked status, and when the link was created and (if applicable) revoked. Revoked links are included. Ordinary agent contacts with no account are not links and are not listed. Newest link first, not paginated. The link id is the contact id used by the revoke route. Read-only. Available to owner, manager and inspector roles.",
     responses: {
         200: {
             content: { 'application/json': { schema: ListLinksResponseSchema } },

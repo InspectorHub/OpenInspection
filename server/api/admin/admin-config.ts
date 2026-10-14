@@ -47,7 +47,7 @@ const getConfigRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listTenantConfig",
-    description: "Auto-generated placeholder for listTenantConfig (GET /config, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the company's stored non-sensitive integration settings (appBaseUrl, turnstileSiteKey, googleClientId, streamCustomerSubdomain) as saved; keys never set are absent. The secrets field is always an empty object because the legacy secret store is retired; secrets are not readable through this route. Read-only. Restricted to the owner."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -82,7 +82,7 @@ const getWidgetOriginsRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listTenantWidgetOrigins",
-    description: "Auto-generated placeholder for listTenantWidgetOrigins (GET /widget/origins, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the company's allowlist of website origins that may embed the booking widget, as saved by the replace-list route. An empty array when none has been set. Not paginated. Read-only. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 const setWidgetOriginsRoute = createRoute(withMcpMetadata({
@@ -119,7 +119,7 @@ const getStripeConnectRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listTenantStripeConnect",
-    description: "Auto-generated placeholder for listTenantStripeConnect (GET /stripe-connect, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the Stripe Connect account id (acct_...) linked to the company, or null when none is linked. Reads the stored id only and does not contact Stripe. Read-only. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 const setStripeConnectRoute = createRoute(withMcpMetadata({
@@ -184,7 +184,7 @@ const getEarningsSummaryRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listTenantEarningsSummary",
-    description: "Auto-generated placeholder for listTenantEarningsSummary (GET /earnings-summary, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns all-time invoice totals for the company, with amounts in integer cents: paid is the sum of paid invoices, pending is the sum of invoices that were sent but not yet paid, and count is the number of paid invoices. Voided invoices are excluded from all three, and invoices never sent (drafts) are not counted as pending. There is no date window or filter. Read-only. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 // --- ICS Subscription Token ---
@@ -210,7 +210,7 @@ const icsTokenRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listTenantIcsToken",
-    description: "Auto-generated placeholder for listTenantIcsToken (GET /ics-token, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the company-wide calendar subscription URL (/api/ics/<token>) that a calendar app can subscribe to. Despite being a GET, it has a side effect on first use: if the company has no calendar token yet, one is generated and saved, and later calls return the same URL. It never rotates an existing token. Anyone holding the URL can read the feed, so treat it as a secret. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 

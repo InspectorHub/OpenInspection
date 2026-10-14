@@ -69,7 +69,7 @@ export const servicesRoutes = createApiRouter()
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
         responses: { 200: { content: { 'application/json': { schema: DiscountCodeListResponseSchema } }, description: 'OK' } },
         operationId: "listServiceDiscountCodes",
-        description: "Auto-generated placeholder for listServiceDiscountCodes (GET /discount-codes, services domain). TODO: replace with a real description sourced from the handler."
+        description: "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owner, manager and inspector roles."
     }, { scopes: ['read'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId');
         const rows = await c.var.services.service.listDiscountCodes(tenantId);

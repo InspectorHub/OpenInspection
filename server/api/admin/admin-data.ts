@@ -51,7 +51,7 @@ const exportDataRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "exportTenant",
-    description: "Auto-generated placeholder for exportTenant (GET /export, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns a full JSON export of the company's data in one response: every inspection, template and agreement template row, all inspection results, and the agreement signing requests with their per-signer records. Signing-request token columns are deliberately left out, so signing links cannot be rebuilt from the export. Not paginated, so the response can be very large. Side effect: each call writes a data.export entry to the audit log. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 /**
@@ -110,7 +110,7 @@ const listMembersRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listTenantMembers",
-    description: "Auto-generated placeholder for listTenantMembers (GET /members, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the company's user accounts with id, email, role and creation time, plus whether each has a calendar connected and when it last synced. Pending invitations are not included; the invite route and the team members route cover those. Not paginated. Read-only. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -125,10 +125,10 @@ const getAuditLogsRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager')],
     request: {
         query: z.object({
-            limit: z.string().optional().describe('TODO describe limit field for the OpenInspection MCP integration'),
-            cursor: z.string().optional().describe('TODO describe cursor field for the OpenInspection MCP integration'),
-            action: z.string().optional().describe('TODO describe action field for the OpenInspection MCP integration'),
-            entityType: z.string().optional().describe('TODO describe entityType field for the OpenInspection MCP integration'),
+            limit: z.string().optional().describe('Number of log entries per page, sent as a numeric string. Defaults to 50 when omitted.'),
+            cursor: z.string().optional().describe('Opaque paging token: the nextCursor value from the previous response. A value that is not a valid token is rejected with 400.'),
+            action: z.string().optional().describe('Return only entries whose action matches this value exactly, for example inspection.create.'),
+            entityType: z.string().optional().describe('Return only entries for this entity type, matched exactly, for example audit_log.'),
         }),
     },
     responses: {
@@ -142,7 +142,7 @@ const getAuditLogsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listTenantAuditLogs",
-    description: "Auto-generated placeholder for listTenantAuditLogs (GET /audit-logs, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the company's audit log, newest first, one page at a time. Pass the nextCursor from a response back as cursor to read the next page; hasMore says whether another page exists. action and entityType filter by exact match. Side effect: each call writes an audit.view entry to the audit log itself. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 

@@ -51,7 +51,7 @@ const listAgreementsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listTenantAgreements",
-    description: "Auto-generated placeholder for listTenantAgreements (GET /agreements, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists every agreement template the company has created, each with its full body, version number and creation time. Not paginated and not explicitly ordered. These are the reusable templates, not the signing requests sent from them (see the agreement requests route). Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 

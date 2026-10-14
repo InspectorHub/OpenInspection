@@ -33,7 +33,7 @@ const getAgreementByTokenRoute = createRoute(withMcpMetadata({
     path: '/agreements/:token',
     tags: ["bookings", "public"],
     summary: 'Get agreement for signing (public, token-gated)',
-    request: { params: z.object({ token: z.string().min(1).describe('TODO describe token field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ token: z.string().min(1).describe('Signer link token from the signing link emailed to that signer.') }) },
     responses: {
         200: {
             content: {
@@ -50,7 +50,7 @@ const getAgreementByTokenRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listBookingAgreements",
-    description: "Auto-generated placeholder for listBookingAgreements (GET /agreements/:token, bookings domain). TODO: replace with a real description sourced from the handler."
+    description: "Public, unauthenticated route gated by a signer's link token. Returns the agreement as presented to that signer: the pinned content snapshot (never the live template), agreement name, client name, the signer's name, role and status, signature progress across the envelope, and its completion policy. Returns 404 for an unknown token. Despite being a GET it writes: opening the agreement marks that signer as viewed (idempotent, and may roll the envelope status forward), pins the content snapshot on the first view of an unpinned request, and appends a signer.presented entry to the signing audit chain (best-effort; a failed append does not block the read)."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**

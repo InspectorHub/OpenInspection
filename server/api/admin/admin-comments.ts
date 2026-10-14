@@ -67,7 +67,9 @@ const listCommentsRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listTenantComments",
-    description: "Auto-generated placeholder for listTenantComments (GET /comments, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Pages through the company's canned-comment library. Each entry carries the calling user's own usage count and last-used time (0 and null when they have never used it). "
+        + "Sorted by sort (default relevance: severity, then newest first); paginated with page and pageSize, and meta carries the total. "
+        + "Severity, sectionId and triggerCode always filter; section and itemLabel only filter when filterMode is auto. Read-only; available to owner, manager and inspector roles."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 

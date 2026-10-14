@@ -18,10 +18,10 @@ const growthRoute = createRoute(withMcpMetadata({
     path:    '/growth',
     tags: ["metrics"],
     summary: 'Inspection count per month for the last N months',
-    request: { query: z.object({ months: z.coerce.number().int().min(1).max(36).default(12).describe('TODO describe months field for the OpenInspection MCP integration') }) },
+    request: { query: z.object({ months: z.coerce.number().int().min(1).max(36).default(12).describe('How many calendar months to return, counting back from and including the current month.') }) },
     responses: { 200: { description: 'ok' } },
     operationId: "listAnalyticGrowth",
-    description: "Auto-generated placeholder for listAnalyticGrowth (GET /growth, metrics domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the number of inspections created in each of the last N calendar months (UTC), oldest first, as {ym, count} buckets. The current month is the last bucket and months with no inspections appear with a count of 0. Counts every inspection of the company by creation time, with no status or archive filter. Read-only."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const heatmapRoute = createRoute(withMcpMetadata({

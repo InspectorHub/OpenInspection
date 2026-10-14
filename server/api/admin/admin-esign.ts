@@ -33,7 +33,7 @@ const listSigningRequestsRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(z.unknown()).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'OK' },
     },
     operationId: "listTenantAgreementsRequests",
-    description: "Auto-generated placeholder for listTenantAgreementsRequests (GET /agreements/requests, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the company's agreement signing requests, newest first, capped at the 200 most recent (no paging or filters). Each row has the client name and email, the linked inspection and agreement template name, status, created/sent/viewed/signed timestamps, and signersTotal / signersSigned counts for multi-signer requests. Includes requests in every status. Read-only. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 const getSigningRequestDetailRoute = createRoute(withMcpMetadata({
@@ -42,13 +42,13 @@ const getSigningRequestDetailRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Get a signing request with full audit trail',
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().describe('Id of the signing request (the id returned by the signing requests list).') }) },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.unknown().describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'OK' },
         404: { content: { 'application/json': { schema: z.object({ success: z.literal(false).describe('TODO describe success field for the OpenInspection MCP integration'), error: z.unknown().describe('TODO describe error field for the OpenInspection MCP integration') }) } }, description: 'Not found' },
     },
     operationId: "getTenantAgreementsRequest",
-    description: "Auto-generated placeholder for getTenantAgreementsRequest (GET /agreements/requests/{id}, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns one signing request with everything needed to review its evidence: the stored request record, the agreement template's id and name (null if the template is gone), the full tamper-evident audit event chain in chronological order (hash, previous hash, signature, signing-key fingerprint), and chainValid / chainReason from re-verifying that chain on this call. Returns 404 when the id is not a signing request of this company. Read-only. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 const downloadAuditTrailRoute = createRoute(withMcpMetadata({
@@ -57,12 +57,12 @@ const downloadAuditTrailRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Download audit trail JSON for legal evidence',
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().describe('Id of the signing request whose audit trail to download (the id returned by the signing requests list).') }) },
     responses: {
         200: { content: { 'application/json': { schema: z.unknown() } }, description: 'Audit JSON download' },
     },
     operationId: "listTenantAgreementsRequestsAuditTrail",
-    description: "Auto-generated placeholder for listTenantAgreementsRequestsAuditTrail (GET /agreements/requests/{id}/audit-trail, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Downloads one signing request's audit trail as a JSON file attachment (audit-trail-<first 8 id characters>.json), suitable for keeping as evidence. It carries the envelope id, client name and email, status, the company's Ed25519 public key and fingerprint, every audit event with its hash chain and signature, and an exportedAt timestamp. Unlike the detail route it does not re-verify the chain. Returns 404 when the id is not a signing request of this company. Read-only. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 // --- Track I-a Task 9 — per-signer admin views (multi-signer envelope) ---

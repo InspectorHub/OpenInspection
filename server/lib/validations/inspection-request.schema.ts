@@ -45,11 +45,11 @@ export const UpdateInspectionRequestSchema = z.object({
 }).openapi('UpdateInspectionRequest');
 
 export const InspectionRequestListQuerySchema = z.object({
-    status: z.enum(['pending', 'confirmed', 'in_progress', 'completed', 'cancelled']).optional().describe('TODO describe status field for the OpenInspection MCP integration'),
-    from:   z.string().optional().describe('TODO describe from field for the OpenInspection MCP integration'),
-    to:     z.string().optional().describe('TODO describe to field for the OpenInspection MCP integration'),
-    limit:  z.coerce.number().min(1).max(200).default(50).describe('TODO describe limit field for the OpenInspection MCP integration'),
-    offset: z.coerce.number().min(0).default(0).describe('TODO describe offset field for the OpenInspection MCP integration'),
+    status: z.enum(['pending', 'confirmed', 'in_progress', 'completed', 'cancelled']).optional().describe('Return only requests in this status.'),
+    from:   z.string().optional().describe('Earliest scheduled date to include (inclusive). Any date or ISO 8601 timestamp string that the JavaScript Date parser accepts.'),
+    to:     z.string().optional().describe('Latest scheduled date to include (inclusive). Same format as from. A bare date is read as the start of that day in UTC.'),
+    limit:  z.coerce.number().min(1).max(200).default(50).describe('Maximum number of requests to return in one page.'),
+    offset: z.coerce.number().min(0).default(0).describe('Number of requests to skip before the page starts, for paging.'),
 }).openapi('InspectionRequestListQuery');
 
 const SubInspectionResponseSchema = z.object({

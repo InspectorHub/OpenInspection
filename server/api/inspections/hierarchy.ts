@@ -187,10 +187,10 @@ const listVersionsRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary:    'List published versions for an inspection',
     middleware: [requireRole('owner', 'manager', 'inspector', 'agent')] as const,
-    request:    { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request:    { params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection whose published versions to list.') }) },
     responses:  { 200: { description: 'ok' } },
     operationId: "listInspectionVersions",
-    description: "Auto-generated placeholder for listInspectionVersions (GET /{id}/versions, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the published report versions of an inspection, newest version first, each with its version number, publish time (Unix seconds), the user id that published it and the optional publish summary. Only metadata is returned, not the snapshot content; use the single-version route for that. The list is filtered by inspection, not by report, so an inspection with several reports lists versions of all of them. Not paginated. Read-only. Available to owner, manager, inspector and agent roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const getVersionRoute = createRoute(withMcpMetadata({
@@ -199,10 +199,10 @@ const getVersionRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary:    'Get full snapshot for a specific version',
     middleware: [requireRole('owner', 'manager', 'inspector', 'agent')] as const,
-    request:    { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'), n: z.string().regex(/^\d+$/).describe('TODO describe n field for the OpenInspection MCP integration') }) },
+    request:    { params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection whose published versions to read.'), n: z.string().regex(/^\d+$/).describe('Version number to fetch, as listed by the versions route.') }) },
     responses:  { 200: { description: 'ok' }, 404: { description: 'not found' } },
     operationId: "getInspectionVersion",
-    description: "Auto-generated placeholder for getInspectionVersion (GET /{id}/versions/{n}, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the full frozen snapshot captured when version n was published: the inspection record, its results data, its units, the inspectors credited at the time and the resolved report style. Reads the stored copy, so later edits to the live inspection do not change it. Returns 404 when no such version exists for the inspection in this company. Read-only. Available to owner, manager, inspector and agent roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const diffVersionRoute = createRoute(withMcpMetadata({
@@ -212,12 +212,12 @@ const diffVersionRoute = createRoute(withMcpMetadata({
     summary:    'Diff version :n against ?from=<version>',
     middleware: [requireRole('owner', 'manager', 'inspector', 'agent')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'), n: z.string().regex(/^\d+$/).describe('TODO describe n field for the OpenInspection MCP integration') }),
-        query:  z.object({ from: z.string().regex(/^\d+$/).describe('TODO describe from field for the OpenInspection MCP integration') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection whose published versions to compare.'), n: z.string().regex(/^\d+$/).describe('Version number to compare, as listed by the versions route; this is the newer side of the diff.') }),
+        query:  z.object({ from: z.string().regex(/^\d+$/).describe('Version number to compare against, as listed by the versions route; this is the baseline side of the diff.') }),
     },
     responses: { 200: { description: 'ok' }, 404: { description: 'one of the versions not found' } },
     operationId: "listInspectionVersionsDiff",
-    description: "Auto-generated placeholder for listInspectionVersionsDiff (GET /{id}/versions/{n}/diff, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Compares two published versions of an inspection and returns the differences between the snapshot named by the from query parameter and version n in the path. Returns 404 if either version does not exist for the inspection in this company. Computed on demand from the stored snapshots and nothing is written. Read-only. Available to owner, manager, inspector and agent roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 

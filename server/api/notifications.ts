@@ -75,7 +75,7 @@ const unreadCountRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "unreadCountNotification",
-    description: "Auto-generated placeholder for unreadCountNotification (GET /unread-count, notifications domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the number of the calling user's own notifications in the current company that are unread and not archived, as data.count. Cheap enough for badge polling; other users' notifications are never counted. Read-only. Requires a signed-in user."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // POST /mark-read

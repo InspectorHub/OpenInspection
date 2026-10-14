@@ -136,7 +136,7 @@ const getRepairListRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Get aggregated repair list (defects-only punch list)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().describe('Id of the inspection whose repair list to return.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: createApiResponseSchema(RepairListResponseSchema) } },
@@ -144,7 +144,7 @@ const getRepairListRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listInspectionRepairList",
-    description: "Auto-generated placeholder for listInspectionRepairList (GET /{id}/repair-list, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the inspection's repair list: a flat list of every defect marked as included in the report, both defects picked from the template's canned comments and custom ones the inspector added, each with section and item, comment, location, category (safety, recommendation or maintenance), recommendation, photos and a source flag (canned or custom). Defects marked as not included are omitted. totals gives the overall count and a count per category; no repair costs are published. Custom defects carry no photos in this list. Returns 404 when the inspection is not in this company. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -158,7 +158,7 @@ const recipientsRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'List the recipients eligible for the Publish modal',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().describe('Id of the inspection whose eligible recipients to list.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: InspectionRecipientsResponseSchema } },
@@ -166,7 +166,7 @@ const recipientsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listInspectionRecipients",
-    description: "Auto-generated placeholder for listInspectionRecipients (GET /{id}/recipients, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the people the Publish dialog can send the report to for one inspection: the client, the buyer's agent and the listing agent, as {contactId, name, role (client, agent_buyer or agent_listing), email, phone}. People in other roles (such as co-clients or attorneys) and people with neither an email nor a phone are left out. Returns 404 when the inspection is not in this company. Read-only; sends nothing. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -302,8 +302,8 @@ const downloadPdfRoute = createRoute(withMcpMetadata({
     summary: 'Download report PDF (Summary or Full)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }),
-        query: z.object({ type: z.enum(['summary', 'full']).default('full').describe('TODO describe type field for the OpenInspection MCP integration') }),
+        params: z.object({ id: z.string().describe('Id of the inspection whose report PDF to download.') }),
+        query: z.object({ type: z.enum(['summary', 'full']).default('full').describe('Which PDF to download: summary or the full report.') }),
     },
     responses: {
         200: {
@@ -312,7 +312,7 @@ const downloadPdfRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listInspectionPdf",
-    description: "Auto-generated placeholder for listInspectionPdf (GET /{id}/pdf, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Downloads the inspection's report PDF as an attachment, either the full report (default) or the summary. Always renders the current content: a stored render is reused when the report content is unchanged, otherwise it is rendered on demand, so a first call can be slow; frozen per-version PDFs are not served here. Returns 503 when the deployment has no PDF rendering or storage configured, 404 when the inspection is not in this company or the stored file is missing. Responses are marked private with a 5 minute cache lifetime. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 

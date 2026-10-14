@@ -54,7 +54,7 @@ const getReportsRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listAgentMyReports",
-    description: "Auto-generated placeholder for listAgentMyReports (GET /my-reports, agents domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the company's inspections on which a given agent contact is seated in a role that shows in the agent portal, as full inspection rows, with the agentId that was used. agentId is a contact id and defaults to the caller's own user id when omitted. Not paginated or explicitly ordered, and archived inspections are not filtered out. The handler itself only admits the manager role (owners and agents get 403), even though the operation is tagged with the agent scope. Read-only."
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**
@@ -106,7 +106,7 @@ const getLeaderboardRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "leaderboardAgent",
-    description: "Auto-generated placeholder for leaderboardAgent (GET /leaderboard, agents domain). TODO: replace with a real description sourced from the handler."
+    description: "Ranks referral sources by how many of the company's inspections each referred, most first, with the contact's name, agency and email and the total. Counts every inspection of the company with a referring contact, with no date window and no status or archive filter; inspections without a referrer are left out. Not paginated. Read-only. Available to owner, manager, inspector and agent roles."
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**
@@ -161,7 +161,7 @@ const getProfileRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "getAgentProfile",
-    description: "Auto-generated placeholder for getAgentProfile (GET /profile, agents domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the signed-in agent's own profile: name, email, public slug and personal display timezone (each null when unset). Always reads the caller's own account, never another agent's; 404 if the account is missing. Agent accounts only. Read-only."
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**

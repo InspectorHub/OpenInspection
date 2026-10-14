@@ -15,7 +15,7 @@ const listRoute = createRoute(withMcpMetadata({
     responses: { 200: { content: { 'application/json': { schema: AutomationListResponseSchema } }, description: 'List' } },
     operationId: "listAutomations",
     summary: "List automations for current tenant",
-    description: "Auto-generated placeholder for listAutomations (GET /, automations domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists all of the company's messaging automation rules, defaults included, with each rule's trigger, recipients, channels, delay and active flag. Not paginated or filtered. Side effect: before listing, any built-in default rules missing from the company are created (and the platform SMS disclosure record is created if none exists), so the first call on a new company writes rows. Restricted to owners and managers."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // POST /api/automations
@@ -43,7 +43,7 @@ const getRecentLogsRoute = createRoute(withMcpMetadata({
     responses: { 200: { content: { 'application/json': { schema: AutomationLogListResponseSchema } }, description: 'Recent automation logs' } },
     operationId: "listAutomationLogsRecent",
     summary: "List automation logs recent",
-    description: "Auto-generated placeholder for listAutomationLogsRecent (GET /logs/recent, automations domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the company-wide activity log of automation sends, newest scheduled send first (by sendAt), up to limit entries (default 50, no paging). Each entry is a raw log row for one send attempt, across all automation rules. Read-only. Restricted to owners and managers."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // The per-inspection logs route (`GET /logs/{inspectionId}`) is RETIRED: it

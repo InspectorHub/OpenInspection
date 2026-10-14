@@ -114,7 +114,7 @@ const mediaCenterRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Media Center — all attached + pool photos',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }) },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection whose photos to list.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: createApiResponseSchema(MediaCenterResponseSchema) } },
@@ -122,7 +122,7 @@ const mediaCenterRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listInspectionMedia",
-    description: "Auto-generated placeholder for listInspectionMedia (GET /{id}/media, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the photo library of one inspection in two lists. attached holds photos already placed on checklist items or defects, each with its item and section labels (taken from the inspection's own template snapshot, falling back to the item id when there is none), photoIndex, an annotated flag and the original key to revert to. pool holds loose photos uploaded to the inspection but not yet attached to any item, with upload time and optional taken-at time. Not paginated. Returns 404 when the inspection is not in this company. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const mediaUploadRoute = createRoute(withMcpMetadata({

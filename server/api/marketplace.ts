@@ -100,13 +100,13 @@ const marketplaceRoutes = createApiRouter()
     summary: 'List marketplace catalogue entries (comment packs, templates)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        query: z.object({ kind: z.enum(MARKETPLACE_KINDS).optional().describe('TODO describe kind field for the OpenInspection MCP integration') }),
+        query: z.object({ kind: z.enum(MARKETPLACE_KINDS).optional().describe('Return only entries of this kind. Omit to list every kind.') }),
     },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(z.any()).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'OK' },
     },
     operationId: "listMarketplaceLibraries",
-    description: "Auto-generated placeholder for listMarketplaceLibraries (GET /libraries, marketplace domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the marketplace catalogue (comment packs, templates and statutory forms) as one unpaginated array, up to 1000 entries, optionally narrowed to one kind. Delisted entries are not shown. Featured entries come first, then by download count. Each entry carries the company's own install state: importedSemver is the installed version (null if not installed or uninstalled) and hasUpdate says a newer version exists. The pack content itself is not returned, only itemCount and the description. The paginated catalogue route offers search and further filters. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' })), async (c) => {
     const q = c.req.valid('query');
     const data = await c.var.services.marketplace.listLibraries(q.kind ? { kind: q.kind } : {});
@@ -365,7 +365,7 @@ const marketplaceRoutes = createApiRouter()
     method: 'get', path: '/imports/history',
     tags: ["marketplace"],
     summary: 'List per-import history events',
-    description: "Auto-generated placeholder for listMarketplaceImportsHistory (GET /imports/history, marketplace domain). TODO: replace with a real description sourced from the handler.",
+    description: "Lists the company's marketplace import history events, newest first, paged with page and pageSize (default page 1, 20 per page; the response carries hasMore rather than a total). Each event records the action (such as install, update, replace or uninstall), source and target versions, the number of rows affected, extra metadata, creation time and the user who did it. Filter by templateId or libraryId to see one item's history. Read-only. Available to owner, manager and inspector roles.",
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { query: ImportHistoryQuerySchema },
     responses: {

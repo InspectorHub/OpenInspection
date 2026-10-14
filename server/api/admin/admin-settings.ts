@@ -55,7 +55,7 @@ const getAttentionThresholdsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listTenantAttentionThresholds",
-    description: "Auto-generated placeholder for listTenantAttentionThresholds (GET /attention-thresholds, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the three hour thresholds (agreement_unsigned_h, invoice_overdue_h, report_unpublished_h) that decide when an inspection lands in the dashboard's Needs Attention list. When the company has never saved them, the defaults of 72 hours each are returned. Read-only. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -99,7 +99,7 @@ const getDashboardColumnsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listTenantDashboardColumns",
-    description: "Auto-generated placeholder for listTenantDashboardColumns (GET /dashboard-columns, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the company's default list of visible inspection dashboard column ids, normalised the same way as on write. A company that has never set one gets the built-in default columns. Individual users may override it on their own device. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
