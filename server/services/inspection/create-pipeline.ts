@@ -25,7 +25,7 @@
 
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { contactRoleProfiles, inspectionInspectors, inspectionServices } from '../../lib/db/schema';
+import { contactRoleProfiles, inspectionInspectors, inspectionPeople, inspectionServices } from '../../lib/db/schema';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { Errors } from '../../lib/errors';
 import { ensurePrimaryReportAndResults } from '../../lib/inspection/primary-report';
@@ -131,11 +131,20 @@ async function hasServiceLines(db: Db, tenantId: string, inspectionId: string): 
     return rows.length > 0;
 }
 
-async function linkPeople(db: Db, d1: D1Database, tenantId: string, input: CreatePipelineInput, clientContactId: string | null): Promise<void> {
+/**
+ * A repeat only fills the roles nobody holds yet. The first attempt's body is the one on record, so a
+ * replay that names someone else must not hand the primary seat over; a role it did not reach is added.
+ */
+async function linkPeople(
+    db: Db, d1: D1Database, tenantId: string, input: CreatePipelineInput, clientContactId: string | null, fresh: boolean,
+): Promise<void> {
     const roleRows = await db.select({ id: contactRoleProfiles.id, key: contactRoleProfiles.key })
         .from(contactRoleProfiles)
         .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
     const roleIdByKey = new Map(roleRows.map(r => [r.key, r.id]));
+    const held = fresh ? [] : await db.select({ roleProfileId: inspectionPeople.roleProfileId }).from(inspectionPeople)
+        .where(and(eq(inspectionPeople.tenantId, tenantId), eq(inspectionPeople.inspectionId, input.inspectionId)));
+    const heldRoles = new Set(held.map(r => r.roleProfileId));
     const people = new PeopleService({ DB: d1 });
     const links: Array<[string | null, string | undefined]> = [
         [clientContactId,       roleIdByKey.get('client')],
@@ -143,7 +152,7 @@ async function linkPeople(db: Db, d1: D1Database, tenantId: string, input: Creat
         [input.listingAgentId,  roleIdByKey.get('listing_agent')],
     ];
     for (const [contactId, roleProfileId] of links) {
-        if (contactId && roleProfileId) await people.addPerson(tenantId, input.inspectionId, contactId, roleProfileId);
+        if (contactId && roleProfileId && !heldRoles.has(roleProfileId)) await people.addPerson(tenantId, input.inspectionId, contactId, roleProfileId);
     }
 }
 
@@ -192,7 +201,7 @@ export async function runCreatePipeline(
 
     // Mirror the primary client, buyer's agent and listing agent into inspection_people. This is the
     // ONLY place WHO is persisted. A server-minted id must not roll back a committed inspection for it.
-    await step(strict, 'inspection-people write from inspection create failed', id, () => linkPeople(db, d1, tenantId, input, clientContactId));
+    await step(strict, 'inspection-people write from inspection create failed', id, () => linkPeople(db, d1, tenantId, input, clientContactId, opts.fresh === true));
 
     // The service lines, the tier-2 money authority, carry any per-line price override with them. A
     // repeat must not double the price: it finds the lines and skips, and two runs at once insert the

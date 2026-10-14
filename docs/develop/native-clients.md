@@ -247,14 +247,15 @@ client-chosen id the writes after the inspection row run in a fixed order whose
 **last step is the primary report**, so "the report exists" means "the create
 finished". If the first attempt stopped before that, it answers with an error
 (a `5xx`) and the retry, a replay of the same id, finishes the job from the
-replay's own request body. The steps, each safe to run twice:
+replay's own request body. What the first attempt already wrote stands, and the
+new body only supplies the steps that are missing. The steps, each safe to run twice:
 
 | Step | A repeat |
 |---|---|
 | Roster entry for the inspector | Added only to an inspection nobody is assigned to, so it never undoes a reassignment. |
 | Automation notices (`inspection.created`) | Carry a deterministic dedup key, so the notices an earlier attempt wrote are not written again. |
-| Client contact | Matched by email (or name) and reused. Two runs at the very same moment can each add it, as two simultaneous creates for one client always could. |
-| People links (client, buyer's agent, listing agent) | Unique per inspection, contact and role. |
+| Client contact | Matched by email and reused, whatever the contact's type and however the address is cased, so a broker who is also a client is linked as the client rather than duplicated; a client with no email is matched by name. Two runs at the very same moment resolve to the one contact when there is an email; with a name only, they can each add one, as two simultaneous creates for one client always could. |
+| People links (client, buyer's agent, listing agent) | Unique per inspection, contact and role. A role that already has someone is left as the first attempt wrote it, so a replay with a different body never changes the primary client; only a role that is still empty is filled. |
 | Service lines and their price overrides | Written only while the inspection has none, under ids derived from the inspection and the service, so the amounts are never doubled. |
 | `inspection.create` audit entry | Written under an id derived from the inspection, so there is one. |
 | Primary report and results row | Added only if missing. |
