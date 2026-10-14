@@ -21,6 +21,7 @@
  */
 
 import { z } from '@hono/zod-openapi';
+import { IMPORT_LIMIT_CEILINGS } from './import-limits';
 
 const OFFLINE_PACKAGE_FORMAT = 'openinspection-offline-package';
 
@@ -36,10 +37,16 @@ const IdSchema = z.string().regex(OFFLINE_ID_PATTERN);
 /** An idempotency key travels in a header, so it is limited to header-safe characters. */
 const IdempotencyKeySchema = z.string().regex(/^[A-Za-z0-9_.:-]{1,128}$/);
 
-/** Most inspections, queued writes and media entries one package may carry. */
-const MAX_PACKAGE_INSPECTIONS = 200;
-const MAX_OUTBOX_ENTRIES = 500;
-const MAX_MEDIA_ENTRIES = 1500;
+/**
+ * Most inspections, queued writes and media entries any package may carry. These
+ * are the absolute ceilings; the limit an import enforces is the deployment's own
+ * (`readImportLimits`), which is never above them and is checked first, so a
+ * package that is merely over the configured limit gets 422 PACKAGE_TOO_LARGE
+ * rather than a format error.
+ */
+const MAX_PACKAGE_INSPECTIONS = IMPORT_LIMIT_CEILINGS.inspections;
+const MAX_OUTBOX_ENTRIES = IMPORT_LIMIT_CEILINGS.outbox;
+const MAX_MEDIA_ENTRIES = IMPORT_LIMIT_CEILINGS.photos;
 
 export const OfflinePackageManifestSchema = z.object({
     format: z.literal(OFFLINE_PACKAGE_FORMAT),

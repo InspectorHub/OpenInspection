@@ -4,6 +4,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { tenantConfigs } from '../lib/db/schema';
 import { AppError, ErrorCode, Errors } from '../lib/errors';
+import { packageTooLarge, readImportLimits } from '../lib/native/import-limits';
 import { requireRole } from '../lib/middleware/rbac';
 import { readPackageBody } from '../lib/native/offline-zip';
 import { importOfflinePackage } from '../services/offline-import.service';
@@ -43,7 +44,8 @@ const importOfflinePackageRoute = createRoute(withMcpMetadata({
         403: { description: 'The package belongs to another workspace, or the caller cannot edit one of its inspections' },
         409: { description: 'PACKAGE_INSPECTION_DELETED: the package would create an inspection that an earlier import created and that has since been deleted; nothing was written' },
         411: { description: 'Content-Length is required' },
-        413: { description: 'The package exceeds the size limit' },
+        413: { description: 'PACKAGE_TOO_LARGE or BAD_REQUEST: the package exceeds the byte limit; details.limits names the limits' },
+        422: { description: 'PACKAGE_TOO_LARGE: the package has more inspections, queued writes, photos or entries than this server imports at once; nothing was written. details names the limit and details.limits the sizes to split to' },
     },
 }, { scopes: ['write'], tier: 'excluded' }));
 
@@ -64,11 +66,16 @@ export const clientRoutes = createApiRouter()
         } }, 200);
     })
     .openapi(importOfflinePackageRoute, async (c) => {
-        const body = await readPackageBody(c.req.raw);
+        const limits = readImportLimits(c.env);
+        const body = await readPackageBody(c.req.raw, limits.compressedBytes);
         if (!body.ok) {
-            const message = { 400: 'Invalid Content-Length or body', 411: 'Content-Length is required', 413: 'Offline package is too large' }[body.status];
+            if (body.status === 413) {
+                const declared = Number(c.req.header('content-length'));
+                throw packageTooLarge({ limit: 'compressedBytes', max: limits.compressedBytes, actual: declared }, limits);
+            }
+            const message = { 400: 'Invalid Content-Length or body', 411: 'Content-Length is required' }[body.status];
             throw new AppError(body.status, ErrorCode.BAD_REQUEST, message);
         }
-        const data = await importOfflinePackage(c, body.bytes);
+        const data = await importOfflinePackage(c, body.bytes, limits);
         return c.json({ success: true as const, data }, 200);
     });

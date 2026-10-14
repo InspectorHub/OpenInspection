@@ -22,31 +22,17 @@
 import { unzipSync, type UnzipFileInfo } from 'fflate';
 import { MAX_PHOTO_BYTES } from '../media/store-photo';
 import { MAX_IMPORT_BYTES } from '../../durable-objects/inspection-doc-import';
+import { DEFAULT_IMPORT_LIMITS, type ImportLimits, type LimitExceeded } from './import-limits';
 import { OFFLINE_ID_PATTERN } from './offline-package';
 
 const MIB = 1024 * 1024;
 
-/**
- * Largest request body accepted. Kept well under the Worker's memory because the
- * package is held in full while its entries are read; photos are already
- * compressed images, so this bounds the photo payload too. A bigger package
- * should be split into several, each of which imports on its own.
- */
-export const MAX_PACKAGE_BYTES = 24 * MIB;
-/** Most entries one package may hold (one manifest, one outbox, one media index, plus yjs and media). */
-export const MAX_PACKAGE_ENTRIES = 2000;
 /** Largest decompressed JSON entry (manifest, outbox, media index). */
 const MAX_JSON_ENTRY_BYTES = 5 * MIB;
 /** Largest decompressed Yjs update: the limit the document object itself enforces. */
 const MAX_YJS_ENTRY_BYTES = MAX_IMPORT_BYTES;
 /** Largest decompressed photo: the limit every photo write path enforces. */
 export const MAX_MEDIA_ENTRY_BYTES = MAX_PHOTO_BYTES;
-/**
- * Sum of every entry's declared decompressed size. Three times the compressed cap:
- * it bounds the total work an import may be asked to do, while the one-entry-at-a
- * -time reading below is what bounds memory.
- */
-const MAX_PACKAGE_UNCOMPRESSED_BYTES = 72 * MIB;
 
 export const MANIFEST_ENTRY = 'manifest.json';
 export const OUTBOX_ENTRY = 'outbox.json';
@@ -69,7 +55,7 @@ export function mediaEntryName(pendingId: string, ext: string): string {
 
 export type PackageListing =
     | { ok: true; entries: ReadonlyMap<string, number> }
-    | { ok: false; reason: string };
+    | { ok: false; reason: string; exceeded?: LimitExceeded };
 
 function entryLimit(name: string): number {
     if (name.startsWith('yjs/')) return MAX_YJS_ENTRY_BYTES;
@@ -82,21 +68,30 @@ function entryLimit(name: string): number {
  * records each entry and returns false, so a compression bomb is rejected on the
  * size it declares, before a single byte of it is produced.
  */
-export function listPackage(zip: Uint8Array): PackageListing {
+export function listPackage(zip: Uint8Array, limits: Pick<ImportLimits, 'entries' | 'uncompressedBytes'> = DEFAULT_IMPORT_LIMITS): PackageListing {
     const entries = new Map<string, number>();
     let refusal: string | null = null;
+    let exceeded: LimitExceeded | undefined;
     let total = 0;
+    let seen = 0;
     const note = (info: UnzipFileInfo): false => {
+        // Counted even after a refusal so the report can say how many there were.
+        seen++;
+        if (exceeded?.limit === 'entries') exceeded.actual = seen;
         if (refusal) return false;
-        if (entries.size >= MAX_PACKAGE_ENTRIES) refusal = 'too many entries';
-        else if (entries.has(info.name)) refusal = 'duplicate entry name';
+        if (seen > limits.entries) {
+            refusal = 'too many entries';
+            exceeded = { limit: 'entries', max: limits.entries, actual: seen };
+        } else if (entries.has(info.name)) refusal = 'duplicate entry name';
         else if (!ALLOWED_ENTRY.test(info.name)) refusal = 'unexpected entry name';
         else if (info.compression !== 0 && info.compression !== 8) refusal = 'unsupported compression';
         else if (info.originalSize > entryLimit(info.name)) refusal = `entry too large: ${info.name}`;
         else {
             total += info.originalSize;
-            if (total > MAX_PACKAGE_UNCOMPRESSED_BYTES) refusal = 'package too large once unpacked';
-            else entries.set(info.name, info.originalSize);
+            if (total > limits.uncompressedBytes) {
+                refusal = 'package too large once unpacked';
+                exceeded = { limit: 'uncompressedBytes', max: limits.uncompressedBytes, actual: total };
+            } else entries.set(info.name, info.originalSize);
         }
         return false;
     };
@@ -105,7 +100,7 @@ export function listPackage(zip: Uint8Array): PackageListing {
     } catch {
         return { ok: false, reason: 'not a valid zip archive' };
     }
-    return refusal ? { ok: false, reason: refusal } : { ok: true, entries };
+    return refusal ? { ok: false, reason: refusal, ...(exceeded ? { exceeded } : {}) } : { ok: true, entries };
 }
 
 /** Most declared bytes one inflate pass holds at once; see `readPackageEntries`. */
@@ -169,7 +164,7 @@ export type BoundedBody = { ok: true; bytes: Uint8Array } | { ok: false; status:
  * refused rather than truncated or padded, and nothing is read at all when the
  * declaration is missing, malformed or over the cap.
  */
-export async function readPackageBody(req: Request, limit: number = MAX_PACKAGE_BYTES): Promise<BoundedBody> {
+export async function readPackageBody(req: Request, limit: number): Promise<BoundedBody> {
     const declared = req.headers.get('content-length');
     if (declared === null) return { ok: false, status: 411 };
     const length = Number(declared);

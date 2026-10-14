@@ -9,9 +9,12 @@ import {
     OfflinePackageManifestSchema, OutboxEntrySchema, OutboxSchema, MediaIndexSchema, OFFLINE_ID_PATTERN,
 } from '../../../server/lib/native/offline-package';
 import {
-    listPackage, readPackageEntry, readPackageEntries, readPackageBody, MAX_PACKAGE_BYTES, MAX_MEDIA_ENTRY_BYTES, MAX_PACKAGE_ENTRIES,
+    listPackage, readPackageEntry, readPackageEntries, readPackageBody, MAX_MEDIA_ENTRY_BYTES,
 } from '../../../server/lib/native/offline-zip';
+import { DEFAULT_IMPORT_LIMITS, IMPORT_LIMIT_CEILINGS } from '../../../server/lib/native/import-limits';
 import { buildPackage } from '../helpers/offline-package-fixture';
+
+const MAX_PACKAGE_BYTES = DEFAULT_IMPORT_LIMITS.compressedBytes;
 
 // Counts inflate passes. Every pass re-reads the zip's whole central directory, so the count is
 // the cost of reading a package's entries, independent of how fast the machine is.
@@ -186,12 +189,27 @@ describe('offline package archive listing', () => {
         for (let i = 0; i < 9; i++) files[`media/p${i}.jpg`] = new Uint8Array(MAX_MEDIA_ENTRY_BYTES - 1024);
         const listing = listPackage(zipSync(files, { level: 9 }));
         expect(listing.ok).toBe(false);
-        if (!listing.ok) expect(listing.reason).toMatch(/unpacked/);
+        if (!listing.ok) {
+            expect(listing.reason).toMatch(/unpacked/);
+            expect(listing.exceeded).toMatchObject({ limit: 'uncompressedBytes', max: DEFAULT_IMPORT_LIMITS.uncompressedBytes });
+        }
     });
 
-    it('refuses too many entries', () => {
+    it('refuses more entries than the limit, reports how many there were, and accepts exactly the limit', () => {
+        const limits = { entries: 20, uncompressedBytes: DEFAULT_IMPORT_LIMITS.uncompressedBytes };
         const files: Record<string, Uint8Array> = {};
-        for (let i = 0; i < MAX_PACKAGE_ENTRIES + 1; i++) files[`yjs/i${i}.bin`] = new Uint8Array(1);
+        for (let i = 0; i < 20; i++) files[`yjs/i${i}.bin`] = new Uint8Array(1);
+        expect(listPackage(zipSync(files), limits).ok).toBe(true);
+        files['yjs/i20.bin'] = new Uint8Array(1);
+        files['yjs/i21.bin'] = new Uint8Array(1);
+        const listing = listPackage(zipSync(files), limits);
+        expect(listing.ok).toBe(false);
+        if (!listing.ok) expect(listing.exceeded).toEqual({ limit: 'entries', max: 20, actual: 22 });
+    });
+
+    it('refuses more entries than the default limit when none is given', () => {
+        const files: Record<string, Uint8Array> = {};
+        for (let i = 0; i < DEFAULT_IMPORT_LIMITS.entries + 1; i++) files[`yjs/i${i}.bin`] = new Uint8Array(1);
         expect(listPackage(zipSync(files)).ok).toBe(false);
     });
 
@@ -206,7 +224,8 @@ describe('offline package archive listing', () => {
         const files: Record<string, Uint8Array> = { 'manifest.json': new Uint8Array([123, 125]) };
         for (let i = 0; i < 1500; i++) files[`media/p${i}.jpg`] = new Uint8Array([i % 251, 1, 2]);
         const zip = zipSync(files);
-        const listing = listPackage(zip);
+        // Reading cost is the point here, so the listing runs at the largest limits an operator can set.
+        const listing = listPackage(zip, IMPORT_LIMIT_CEILINGS);
         expect(listing.ok).toBe(true);
         if (!listing.ok) return;
         const wanted = new Map([...listing.entries].filter(([name]) => name.startsWith('media/')));
@@ -259,19 +278,19 @@ describe('offline package request body', () => {
     };
 
     it('reads a body whose length matches its declaration', async () => {
-        const out = await readPackageBody(req('3', new Uint8Array([1, 2, 3])));
+        const out = await readPackageBody(req('3', new Uint8Array([1, 2, 3])), MAX_PACKAGE_BYTES);
         expect(out).toEqual({ ok: true, bytes: new Uint8Array([1, 2, 3]) });
     });
 
     it('answers 411 without a declared length, 413 over the cap, 400 for a malformed or false one', async () => {
         const noLength = new Request('http://x/', { method: 'POST', body: new Uint8Array([1]) });
         noLength.headers.delete('content-length');
-        expect(await readPackageBody(noLength)).toEqual({ ok: false, status: 411 });
-        expect(await readPackageBody(req(String(MAX_PACKAGE_BYTES + 1), new Uint8Array([1])))).toEqual({ ok: false, status: 413 });
-        expect(await readPackageBody(req('12abc', new Uint8Array([1])))).toEqual({ ok: false, status: 400 });
+        expect(await readPackageBody(noLength, MAX_PACKAGE_BYTES)).toEqual({ ok: false, status: 411 });
+        expect(await readPackageBody(req(String(MAX_PACKAGE_BYTES + 1), new Uint8Array([1])), MAX_PACKAGE_BYTES)).toEqual({ ok: false, status: 413 });
+        expect(await readPackageBody(req('12abc', new Uint8Array([1])), MAX_PACKAGE_BYTES)).toEqual({ ok: false, status: 400 });
         // Declared shorter than sent, and declared longer than sent.
-        expect(await readPackageBody(req('2', new Uint8Array([1, 2, 3])))).toEqual({ ok: false, status: 400 });
-        expect(await readPackageBody(req('5', new Uint8Array([1, 2, 3])))).toEqual({ ok: false, status: 400 });
+        expect(await readPackageBody(req('2', new Uint8Array([1, 2, 3])), MAX_PACKAGE_BYTES)).toEqual({ ok: false, status: 400 });
+        expect(await readPackageBody(req('5', new Uint8Array([1, 2, 3])), MAX_PACKAGE_BYTES)).toEqual({ ok: false, status: 400 });
     });
 
     it('does not reserve memory for a declared length that never arrives', async () => {
@@ -289,8 +308,8 @@ describe('offline package request body', () => {
         const request = new Request('http://x/api/client/import', {
             method: 'POST', headers: { 'content-length': String(declared) }, body: slow, duplex: 'half',
         } as RequestInit);
-        expect(await readPackageBody(request)).toEqual({ ok: false, status: 400 });
-        // A 24 MiB pre-allocation would show up as ~24 MiB here; three bytes of body must not.
+        expect(await readPackageBody(request, MAX_PACKAGE_BYTES)).toEqual({ ok: false, status: 400 });
+        // A 16 MiB pre-allocation would show up as ~24 MiB here; three bytes of body must not.
         expect(arrayBuffersWhilePending - baseline).toBeLessThan(4 * 1024 * 1024);
     });
 
@@ -300,7 +319,7 @@ describe('offline package request body', () => {
         held[held.length - 1] = 1; // keep the buffer live and touched until the measurement
         const grown = process.memoryUsage().arrayBuffers - baseline;
         expect(held[held.length - 1]).toBe(1);
-        expect(grown, 'the measurement must be able to see a 24 MiB buffer').toBeGreaterThan(4 * 1024 * 1024);
+        expect(grown, 'the measurement must be able to see a 16 MiB buffer').toBeGreaterThan(4 * 1024 * 1024);
     });
 
     it('reads a body delivered in several chunks (positive control for the chunked path)', async () => {
@@ -311,6 +330,6 @@ describe('offline package request body', () => {
         const request = new Request('http://x/api/client/import', {
             method: 'POST', headers: { 'content-length': '6' }, body: stream, duplex: 'half',
         } as RequestInit);
-        expect(await readPackageBody(request)).toEqual({ ok: true, bytes: new Uint8Array([1, 2, 3, 4, 5, 6]) });
+        expect(await readPackageBody(request, MAX_PACKAGE_BYTES)).toEqual({ ok: true, bytes: new Uint8Array([1, 2, 3, 4, 5, 6]) });
     });
 });

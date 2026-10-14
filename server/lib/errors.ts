@@ -77,6 +77,11 @@ export enum ErrorCode {
     // again would bring the deleted inspection back, so the whole package is
     // refused. `details.inspectionId` names the inspection.
     PACKAGE_INSPECTION_DELETED = 'PACKAGE_INSPECTION_DELETED',
+    // An offline package is larger than this deployment's import limits (too many
+    // inspections, queued writes, photos or entries: 422; too many bytes: 413).
+    // Nothing was written. `details` names the limit and carries the limits a
+    // client needs to split the package into parts that fit.
+    PACKAGE_TOO_LARGE = 'PACKAGE_TOO_LARGE',
 }
 
 /**

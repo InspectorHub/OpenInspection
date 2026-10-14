@@ -1,6 +1,11 @@
 /**
  * Importing an offline package on behalf of the signed-in member.
  *
+ * The package is first measured against this deployment's import limits
+ * (`lib/native/import-limits.ts`): a package over a count limit is refused with
+ * 422 PACKAGE_TOO_LARGE from the archive directory or the first parsed entry,
+ * before anything is validated further or written.
+ *
  * Two phases, and the line between them is the point:
  *
  *  1. VALIDATE: reads and checks, writes nothing. The archive is judged from its
@@ -26,6 +31,7 @@
 import type { Context } from 'hono';
 import { and, eq, inArray } from 'drizzle-orm';
 import { AppError, ErrorCode, Errors } from '../lib/errors';
+import { enforceLimit, packageTooLarge, type ImportLimits } from '../lib/native/import-limits';
 import { applyOutbox, findDeletedCreates, type OutboxFailure } from './offline-import-outbox';
 import { auditFromContext } from '../lib/audit';
 import { inspections } from '../lib/db/schema';
@@ -87,27 +93,48 @@ function refusal(auth: Extract<AuthResult, { ok: false }>, inspectionId: string)
     }
 }
 
+/** How many elements a parsed JSON value claims to hold, judged before any schema walks it. */
+const claimedLength = (raw: unknown): number => (Array.isArray(raw) ? raw.length : 0);
+
 /** Phase 1. Reads only. */
-async function validate(c: Context<HonoConfig>, zip: Uint8Array): Promise<ImportPlan> {
+async function validate(c: Context<HonoConfig>, zip: Uint8Array, limits: ImportLimits): Promise<ImportPlan> {
     const tenantId = c.get('tenantId');
     if (!tenantId) throw Errors.Unauthorized();
 
-    const listing = listPackage(zip);
-    if (!listing.ok) throw Errors.BadRequest(`Invalid offline package: ${listing.reason}`);
+    const listing = listPackage(zip, limits);
+    if (!listing.ok) {
+        if (listing.exceeded) throw packageTooLarge(listing.exceeded, limits);
+        throw Errors.BadRequest(`Invalid offline package: ${listing.reason}`);
+    }
     const { entries } = listing;
+
+    // Counts the archive directory already proves, judged before any entry is inflated.
+    let yjsCount = 0;
+    let photoCount = 0;
+    for (const name of entries.keys()) {
+        if (name.startsWith('yjs/')) yjsCount++;
+        else if (name.startsWith('media/') && name !== MEDIA_INDEX_ENTRY) photoCount++;
+    }
+    enforceLimit(limits, 'inspections', yjsCount);
+    enforceLimit(limits, 'photos', photoCount);
 
     const rawManifest = parseEntry(zip, entries, MANIFEST_ENTRY);
     const manifestParse = OfflinePackageManifestSchema.safeParse(rawManifest);
     if (!manifestParse.success) throw Errors.BadRequest('Invalid offline package: manifest is not a version 1 manifest');
     const manifest = manifestParse.data;
+    enforceLimit(limits, 'inspections', manifest.inspections.length);
 
     // The tenant is the session's. A package from another workspace is refused
     // before its other entries are even parsed.
     if (manifest.tenantId !== tenantId) throw Errors.Forbidden('This package belongs to a different workspace');
 
-    const outboxParse = OutboxSchema.safeParse(parseEntry(zip, entries, OUTBOX_ENTRY) ?? []);
+    const rawOutbox = parseEntry(zip, entries, OUTBOX_ENTRY) ?? [];
+    enforceLimit(limits, 'outbox', claimedLength(rawOutbox));
+    const outboxParse = OutboxSchema.safeParse(rawOutbox);
     if (!outboxParse.success) throw Errors.BadRequest('Invalid offline package: outbox is invalid');
-    const mediaParse = MediaIndexSchema.safeParse(parseEntry(zip, entries, MEDIA_INDEX_ENTRY) ?? []);
+    const rawMedia = parseEntry(zip, entries, MEDIA_INDEX_ENTRY) ?? [];
+    enforceLimit(limits, 'photos', claimedLength(rawMedia));
+    const mediaParse = MediaIndexSchema.safeParse(rawMedia);
     if (!mediaParse.success) throw Errors.BadRequest('Invalid offline package: media index is invalid');
     const outbox = outboxParse.data;
     const media = mediaParse.data;
@@ -221,11 +248,11 @@ function doFailure(status: number, inspectionId: string, reason: string, what: s
     return Errors.ServiceUnavailable(message, details);
 }
 
-export async function importOfflinePackage(c: Context<HonoConfig>, zip: Uint8Array): Promise<OfflineImportResult> {
+export async function importOfflinePackage(c: Context<HonoConfig>, zip: Uint8Array, limits: ImportLimits): Promise<OfflineImportResult> {
     const tenantId = c.get('tenantId');
     if (!tenantId) throw Errors.Unauthorized();
 
-    const plan = await validate(c, zip);
+    const plan = await validate(c, zip, limits);
 
     // ---- phase 2: writes -------------------------------------------------
     // Order matters. The creates come first because everything after them needs

@@ -88,13 +88,13 @@ describe('AdminService', () => {
     it('refuses a manager inviting an owner and writes no invite row', async () => {
         await expect(adminService.createInvite('t1', 'boss@example.com', 'owner', 'manager'))
             .rejects.toMatchObject({ status: 403 });
-        const rows = await testDb.select().from(tenantInvites).where(eq(tenantInvites.email as any, 'boss@example.com'));
+        const rows = await testDb.select().from(tenantInvites).where(eq(tenantInvites.email, 'boss@example.com'));
         expect(rows).toHaveLength(0);
     });
 
     it('CONTROL - an owner may invite an owner', async () => {
         const result = await adminService.createInvite('t1', 'boss2@example.com', 'owner', 'owner');
-        const invite = await testDb.select().from(tenantInvites).where(eq(tenantInvites.id as any, result.inviteId)).get();
+        const invite = await testDb.select().from(tenantInvites).where(eq(tenantInvites.id, result.inviteId)).get();
         expect(invite!.role).toBe('owner');
     });
 
