@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
 import type { HonoConfig } from '../../../server/types/hono';
 import type { UserRole } from '../../../server/types/auth';
@@ -271,6 +271,33 @@ describe('QBO customer match routes', () => {
 
         const open = { RATE_LIMITER: { limit: vi.fn(async () => ({ success: true })) } };
         expect((await call('owner', '/customers?q=smith', 'GET', undefined, open)).status).toBe(200);
+    });
+});
+
+describe('QBO credential check route authorization', () => {
+    const env = {
+        QBO_CLIENT_ID: 'auth-spec-id', QBO_CLIENT_SECRET: 'auth-spec-secret',
+        QBO_ENV: 'sandbox', APP_BASE_URL: 'https://oi.example.test',
+    };
+    const intuit = vi.fn(async () => new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 }));
+
+    beforeEach(() => {
+        intuit.mockClear();
+        vi.stubGlobal('fetch', intuit);
+    });
+    afterEach(() => { vi.unstubAllGlobals(); });
+
+    it('refuses an inspector, an agent and a caller with no role before anything reaches Intuit', async () => {
+        expect((await call('inspector', '/credentials/check', 'POST', undefined, env)).status).toBe(403);
+        expect((await call('agent', '/credentials/check', 'POST', undefined, env)).status).toBe(403);
+        expect((await call(undefined, '/credentials/check', 'POST', undefined, env)).status).toBe(401);
+        expect(intuit).not.toHaveBeenCalled();
+    });
+
+    it('admits owner and manager (positive control)', async () => {
+        expect((await call('owner', '/credentials/check', 'POST', undefined, env)).status).toBe(200);
+        expect((await call('manager', '/credentials/check', 'POST', undefined, env)).status).toBe(200);
+        expect(intuit).toHaveBeenCalledTimes(2);
     });
 });
 

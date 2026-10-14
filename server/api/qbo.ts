@@ -9,7 +9,9 @@ import { checkRateLimit } from '../lib/rate-limit';
 import { fireAndForget } from '../lib/fire-and-forget';
 import { resyncInvoicesForContact } from '../services/qbo/resync';
 import { describeCredentialSource } from '../services/qbo/credential-source';
-import type { QBOConnectionStatus } from '../services/qbo/api-base';
+import { checkIntuitCredentials } from '../services/qbo/credential-check';
+import { qboRedirectUri } from '../lib/qbo-oauth-paths';
+import { qboEnvironmentName, type QBOConnectionStatus } from '../services/qbo/api-base';
 import { QBOCustomerSearchQuerySchema, QBOLinkCustomerBodySchema } from '../lib/validations/qbo.schema';
 
 const api = new Hono<HonoConfig>();
@@ -150,6 +152,45 @@ api.get('/customers', async (c) => {
         linkedContactName: r.linkedContactName,
     }));
     return c.json({ success: true, data: { customers, nextStartPosition: found.nextStartPosition } });
+});
+
+/**
+ * Are the Client ID and Client Secret this deployment will use a matching pair
+ * for one Intuit app? Nothing is connected or stored.
+ *
+ * The credentials are whatever `c.env` holds: the request middleware has
+ * already merged a company's stored values into it for the keys the deployment
+ * left empty, so this is the same environment-first, company-fallback answer the
+ * connect flow uses. They are never read from the request, and the response
+ * carries the verdict only.
+ */
+api.post('/credentials/check', async (c) => {
+    const missing = (['QBO_CLIENT_ID', 'QBO_CLIENT_SECRET'] as const).filter((k) => !c.env[k]);
+    if (missing.length > 0) {
+        return c.json({ success: false, error: { code: 'credentials_missing', message: 'Client ID and Client Secret are both required', details: missing } }, 400);
+    }
+    if (!c.env.APP_BASE_URL) {
+        return c.json({ success: false, error: { code: 'app_base_url_missing', message: 'APP_BASE_URL is not set' } }, 400);
+    }
+    // Each check is a call to Intuit under this company's app. The shared limiter
+    // allows 10 per minute per key; keyed by company, not caller address.
+    await checkRateLimit(c, 'qbo-credential-check', c.get('tenantId'));
+    const { result } = await checkIntuitCredentials(
+        { fetch: (input, init) => fetch(input, init) },
+        {
+            clientId: c.env.QBO_CLIENT_ID!,
+            clientSecret: c.env.QBO_CLIENT_SECRET!,
+            redirectUri: qboRedirectUri(c.env.APP_BASE_URL),
+        },
+    );
+    return c.json({
+        success: true,
+        data: {
+            result,
+            environment: qboEnvironmentName(c.env.QBO_ENV),
+            checkedAt: Math.floor(Date.now() / 1000),
+        },
+    });
 });
 
 api.get('/contacts/:contactId/link', async (c) => {
