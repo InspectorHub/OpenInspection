@@ -111,7 +111,11 @@ api.post('/errors/:id/dismiss', async (c) => {
 api.post('/contacts/:contactId/link', async (c) => {
     const parsed = QBOLinkCustomerBodySchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ success: false, error: { code: 'validation_error', message: 'Invalid body' } }, 400);
-    await c.var.services.qbo.linkExistingCustomer(c.get('tenantId'), c.req.param('contactId'), parsed.data.qboCustomerId);
+    // The actor is recorded in the audit trail, so a request with no verified
+    // user behind it is refused rather than written as an anonymous link.
+    const actorUserId = c.get('user')?.sub;
+    if (!actorUserId) return c.json({ success: false, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
+    await c.var.services.qbo.linkExistingCustomer(c.get('tenantId'), c.req.param('contactId'), parsed.data.qboCustomerId, actorUserId);
     return c.json({ success: true });
 });
 

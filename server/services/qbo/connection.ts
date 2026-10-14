@@ -1,5 +1,5 @@
 import { eq, and, inArray, isNull } from 'drizzle-orm';
-import { qboConnections, qboEntityMap, qboSyncErrors } from '../../lib/db/schema/qbo';
+import { qboConnections, qboSyncErrors } from '../../lib/db/schema/qbo';
 import { invoices } from '../../lib/db/schema/invoice';
 import { orderPayments } from '../../lib/db/schema/order-payment';
 import { encryptToken } from '../../lib/qbo-crypto';
@@ -13,9 +13,10 @@ import {
     type QBOServiceBase,
 } from './api-base';
 import { withToken } from './token';
+import { withCustomerLink } from './connection-link';
 
 export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
-    return class extends withToken(Base) {
+    return class extends withCustomerLink(withToken(Base)) {
         async saveConnection(input: {
             tenantId: string;
             realmId: string;
@@ -181,61 +182,6 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
             // These two used to delete different sets of rows, and the drift was
             // invisible because each looked complete on its own.
             await this.retireConnection(tenantId);
-        }
-
-        async linkExistingCustomer(tenantId: string, contactId: string, qboCustomerId: string): Promise<void> {
-            const db = this.getDrizzle();
-
-            // The reverse unique index (tenant, qboType, qboId) is NOT the
-            // conflict target below, so a second contact pointed at the same
-            // customer used to surface as a raw `UNIQUE constraint failed`.
-            // Whoever picked the customer reads this; it has to name the holder.
-            const takenBy = await db.select().from(qboEntityMap).where(and(
-                eq(qboEntityMap.tenantId, tenantId),
-                eq(qboEntityMap.qboType, 'Customer'),
-                eq(qboEntityMap.qboId, qboCustomerId),
-            )).get();
-            if (takenBy && takenBy.oiId !== contactId) {
-                // 409, not 500: the caller picked a customer someone else holds,
-                // which is a decision to revisit rather than a fault to report.
-                // A readable message that still arrives as a server error tells
-                // the operator the product broke when it did not.
-                throw Errors.Conflict(
-                    `QuickBooks customer ${qboCustomerId} is already linked to contact ${takenBy.oiId}`,
-                );
-            }
-
-            // Ask QuickBooks where this customer currently stands rather than
-            // assuming. '0' is only true of a customer never edited, and on a
-            // re-point the row kept the PREVIOUS customer's counter — either way
-            // the next update sends a token for the wrong entity and 400s.
-            //
-            // This makes linking able to fail on an API error, which it could
-            // not before. That is the intended trade: a mapping carrying an
-            // invented token fails later instead, on an invoice push, where
-            // nothing points back at the link that caused it.
-            const fetched = await this.apiCall<{ Customer: { Id: string; SyncToken: string } }>(
-                tenantId, 'GET', `customer/${qboCustomerId}`,
-            );
-
-            const now = new Date();
-            await db.insert(qboEntityMap).values({
-                id:           crypto.randomUUID(),
-                tenantId,
-                oiType:       'contact',
-                oiId:         contactId,
-                qboType:      'Customer',
-                qboId:        qboCustomerId,
-                qboSyncToken: fetched.Customer.SyncToken,
-                syncedAt:     now,
-            }).onConflictDoUpdate({
-                target: [qboEntityMap.tenantId, qboEntityMap.oiType, qboEntityMap.oiId],
-                set:    {
-                    qboId:        qboCustomerId,
-                    qboSyncToken: fetched.Customer.SyncToken,
-                    syncedAt:     now,
-                },
-            });
         }
     };
 }

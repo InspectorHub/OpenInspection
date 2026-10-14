@@ -27,7 +27,7 @@
  */
 export const AUDIT_FAMILIES = [
     'agent', 'agreement_request', 'audit_log', 'bulk_export', 'client', 'comment',
-    'contact_role_profile', 'contractor_type', 'credential', 'defect_category',
+    'contact', 'contact_role_profile', 'contractor_type', 'credential', 'defect_category',
     'import', 'inspection', 'inspection_item', 'inspection_results',
     'inspector_service_areas', 'library', 'mcp_grant', 'migration_batch',
     'migration_row', 'rating_system',

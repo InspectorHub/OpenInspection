@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 111 |
-| Columns | 1277 |
+| Columns | 1278 |
 | Indexes (excluding primary keys) | 184 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 615 (48%) |
+| Columns carrying a source comment | 616 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -1904,7 +1904,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `qbo_entity_map`
 
-<sub>server/lib/db/schema/qbo.ts · 8 columns · primary key `id`</sub>
+<sub>server/lib/db/schema/qbo.ts · 9 columns · primary key `id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -1916,6 +1916,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `qbo_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
 | `qbo_sync_token` | text | NN |  |  | QuickBooks' optimistic-concurrency counter for the mapped entity, not an id: it changes on every remote edit. |
 | `synced_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `qbo_display_name` | text |  |  |  | Display-only snapshot of the QuickBooks customer's name, written when a contact is linked by hand. |
 
 **Indexes**
 

@@ -58,6 +58,10 @@ export const qboEntityMap = sqliteTable('qbo_entity_map', {
     // the invoice push refetches and retries (up to 3 attempts).
     qboSyncToken: text('qbo_sync_token').notNull(),
     syncedAt:     integer('synced_at', { mode: 'timestamp_ms' }).notNull(),
+    // Display-only snapshot of the QuickBooks customer's name, written when a
+    // contact is linked by hand. Never used for matching (a name is not an
+    // identity key here); NULL for rows the automatic sync created.
+    qboDisplayName: text('qbo_display_name'),
 }, (t) => [
     uniqueIndex('idx_qbo_entity_map_qbo').on(t.tenantId, t.qboType, t.qboId),
     uniqueIndex('idx_qbo_entity_map_oi').on(t.tenantId, t.oiType, t.oiId),

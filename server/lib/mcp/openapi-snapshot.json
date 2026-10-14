@@ -5459,6 +5459,7 @@
               "bulk_export",
               "client",
               "comment",
+              "contact",
               "contact_role_profile",
               "contractor_type",
               "credential",
