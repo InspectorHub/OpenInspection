@@ -189,7 +189,7 @@ const mediaPoolDeleteRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Pool photo deleted',
         },
     },
@@ -214,7 +214,7 @@ const itemPhotosReorderRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Photos reordered',
         },
     },
@@ -240,7 +240,7 @@ const itemPhotoDetachRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Photo detached',
         },
     },
@@ -266,7 +266,7 @@ const itemPhotoRevertRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Photo reverted',
         },
     },
@@ -292,7 +292,7 @@ const itemPhotoMoveRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Photo moved',
         },
     },
@@ -317,7 +317,7 @@ const approveConciergeRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Approved',
         },
         404: { description: 'Inspection not found in this tenant' },

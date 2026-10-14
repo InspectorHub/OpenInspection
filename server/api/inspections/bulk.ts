@@ -83,7 +83,7 @@ const listInspectionsRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: InspectionListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: InspectionListResponseSchema,
                 },
             },
             description: 'Success',

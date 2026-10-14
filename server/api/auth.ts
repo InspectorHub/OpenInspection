@@ -76,7 +76,7 @@ const changePasswordRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: {
-                'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: SuccessResponseSchema }
             },
             description: 'Password updated'
         },
@@ -162,7 +162,7 @@ const forgotPasswordRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: {
-                'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: SuccessResponseSchema }
             },
             description: 'Reset email sent (if user exists)'
         },
@@ -192,7 +192,7 @@ const resetPasswordRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: {
-                'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: SuccessResponseSchema }
             },
             description: 'Password reset successful'
         }

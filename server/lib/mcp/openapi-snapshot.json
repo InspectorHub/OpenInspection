@@ -1105,11 +1105,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Inspection id."
           }
         }
       ],
@@ -1417,7 +1417,7 @@
       }
     },
     "summary": "Create ai comment assist",
-    "description": "Auto-generated placeholder for createAiCommentAssist (POST /comment-assist, ai domain). TODO: replace with a real description sourced from the handler."
+    "description": "Rewrite a rough inspector note as clear report prose. Returns the rewritten text and the id of the AI call record that produced it."
   },
   {
     "operationId": "createAiCommentEdit",
@@ -5374,22 +5374,22 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Inspection id."
           }
         },
         {
           "name": "itemId",
           "in": "path",
           "required": true,
-          "description": "TODO describe itemId field for the OpenInspection MCP integration",
+          "description": "Checklist item id within the inspection.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe itemId field for the OpenInspection MCP integration"
+            "description": "Checklist item id within the inspection."
           }
         }
       ],
@@ -5399,14 +5399,13 @@
           "tagId": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe tagId field for the OpenInspection MCP integration"
+            "description": "Tag id."
           }
         },
         "required": [
           "tagId"
         ],
-        "additionalProperties": false,
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "additionalProperties": false
       }
     },
     "summary": "Link a tag to an inspection item",
@@ -5875,11 +5874,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Contractor type id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Contractor type id."
           }
         }
       ],
@@ -5986,12 +5985,12 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
             "minLength": 1,
             "example": "550e8400-e29b-41d4-a716-446655440000",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Inspection id."
           }
         }
       ],
@@ -6425,11 +6424,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Recommendation id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Recommendation id."
           }
         }
       ],
@@ -6572,11 +6571,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Tag id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Tag id."
           }
         }
       ],
@@ -6600,33 +6599,33 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Inspection id."
           }
         },
         {
           "name": "itemId",
           "in": "path",
           "required": true,
-          "description": "TODO describe itemId field for the OpenInspection MCP integration",
+          "description": "Checklist item id within the inspection.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe itemId field for the OpenInspection MCP integration"
+            "description": "Checklist item id within the inspection."
           }
         },
         {
           "name": "tagId",
           "in": "path",
           "required": true,
-          "description": "TODO describe tagId field for the OpenInspection MCP integration",
+          "description": "Tag id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe tagId field for the OpenInspection MCP integration"
+            "description": "Tag id."
           }
         }
       ],
@@ -7853,12 +7852,12 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
             "minLength": 1,
             "example": "550e8400-e29b-41d4-a716-446655440000",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Inspection id."
           }
         }
       ],
@@ -9117,11 +9116,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Recommendation id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Recommendation id."
           }
         }
       ],
@@ -10867,7 +10866,7 @@
       "body": null
     },
     "summary": "List contractor types for current tenant",
-    "description": "Auto-generated placeholder for listContractorTypes (GET /, contractor-types domain). TODO: replace with a real description sourced from the handler."
+    "description": "List the contractor types configured for the company."
   },
   {
     "operationId": "listCustomHolidays",
@@ -11296,17 +11295,17 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Inspection id."
           }
         }
       ],
       "body": null
     },
     "summary": "Get structured report data",
-    "description": "Auto-generated placeholder for listInspectionReportData (GET /{id}/report-data, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Return the structured report payload of an inspection: header facts, rating levels, rating counts and sections with their items."
   },
   {
     "operationId": "listInspectionRequests",
@@ -11403,11 +11402,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Inspection id."
           }
         },
         {
@@ -11425,7 +11424,7 @@
       "body": null
     },
     "summary": "List inspection results for current tenant",
-    "description": "Auto-generated placeholder for listInspectionResults (GET /{id}/results, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "Return the saved findings of an inspection as a map keyed by item id. Pass scope to read the slice for one unit."
   },
   {
     "operationId": "listInspections",
@@ -11442,32 +11441,32 @@
           "name": "limit",
           "in": "query",
           "required": false,
-          "description": "TODO describe limit field for the OpenInspection MCP integration",
+          "description": "Maximum number of inspections to return (1-100, default 20).",
           "schema": {
             "type": "number",
             "minimum": 1,
             "maximum": 100,
             "default": 20,
             "example": 20,
-            "description": "TODO describe limit field for the OpenInspection MCP integration"
+            "description": "Maximum number of inspections to return (1-100, default 20)."
           }
         },
         {
           "name": "cursor",
           "in": "query",
           "required": false,
-          "description": "TODO describe cursor field for the OpenInspection MCP integration",
+          "description": "Opaque pagination cursor from the previous page; omit for the first page.",
           "schema": {
             "type": "string",
             "example": "eyJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9",
-            "description": "TODO describe cursor field for the OpenInspection MCP integration"
+            "description": "Opaque pagination cursor from the previous page; omit for the first page."
           }
         },
         {
           "name": "status",
           "in": "query",
           "required": false,
-          "description": "TODO describe status field for the OpenInspection MCP integration",
+          "description": "Return only inspections in this lifecycle status.",
           "schema": {
             "type": "string",
             "enum": [
@@ -11478,54 +11477,54 @@
               "cancelled"
             ],
             "example": "completed",
-            "description": "TODO describe status field for the OpenInspection MCP integration"
+            "description": "Return only inspections in this lifecycle status."
           }
         },
         {
           "name": "search",
           "in": "query",
           "required": false,
-          "description": "TODO describe search field for the OpenInspection MCP integration",
+          "description": "Case-insensitive text matched against the property address and the primary client name.",
           "schema": {
             "type": "string",
             "example": "123 Main",
-            "description": "TODO describe search field for the OpenInspection MCP integration"
+            "description": "Case-insensitive text matched against the property address and the primary client name."
           }
         },
         {
           "name": "inspectorId",
           "in": "query",
           "required": false,
-          "description": "TODO describe inspectorId field for the OpenInspection MCP integration",
+          "description": "Return only inspections assigned to this inspector (users.id).",
           "schema": {
             "type": "string",
             "minLength": 1,
             "example": "550e8400-e29b-41d4-a716-446655440001",
-            "description": "TODO describe inspectorId field for the OpenInspection MCP integration"
+            "description": "Return only inspections assigned to this inspector (users.id)."
           }
         },
         {
           "name": "dateFrom",
           "in": "query",
           "required": false,
-          "description": "TODO describe dateFrom field for the OpenInspection MCP integration",
+          "description": "Earliest inspection date to include (YYYY-MM-DD).",
           "schema": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
             "example": "2024-01-01",
-            "description": "TODO describe dateFrom field for the OpenInspection MCP integration"
+            "description": "Earliest inspection date to include (YYYY-MM-DD)."
           }
         },
         {
           "name": "dateTo",
           "in": "query",
           "required": false,
-          "description": "TODO describe dateTo field for the OpenInspection MCP integration",
+          "description": "Latest inspection date to include (YYYY-MM-DD).",
           "schema": {
             "type": "string",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
             "example": "2024-12-31",
-            "description": "TODO describe dateTo field for the OpenInspection MCP integration"
+            "description": "Latest inspection date to include (YYYY-MM-DD)."
           }
         },
         {
@@ -11662,18 +11661,18 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Inspection id."
           }
         }
       ],
       "body": null
     },
     "summary": "List units for an inspection (flat — client builds tree)",
-    "description": "Auto-generated placeholder for listInspectionUnits (GET /{id}/units, inspections domain). TODO: replace with a real description sourced from the handler."
+    "description": "List the units of an inspection as a flat list; the client assembles the tree."
   },
   {
     "operationId": "listInspectionVersions",
@@ -12298,17 +12297,17 @@
           "name": "category",
           "in": "query",
           "required": false,
-          "description": "TODO describe category field for the OpenInspection MCP integration",
+          "description": "Return only recommendations in this category.",
           "schema": {
             "type": "string",
-            "description": "TODO describe category field for the OpenInspection MCP integration"
+            "description": "Return only recommendations in this category."
           }
         },
         {
           "name": "severity",
           "in": "query",
           "required": false,
-          "description": "TODO describe severity field for the OpenInspection MCP integration",
+          "description": "Return only recommendations of this severity.",
           "schema": {
             "type": "string",
             "enum": [
@@ -12317,14 +12316,14 @@
               "significant",
               "minor"
             ],
-            "description": "TODO describe severity field for the OpenInspection MCP integration"
+            "description": "Return only recommendations of this severity."
           }
         }
       ],
       "body": null
     },
     "summary": "List recommendations (filter: category, severity)",
-    "description": "Auto-generated placeholder for listRecommendations (GET /, recommendations domain). TODO: replace with a real description sourced from the handler."
+    "description": "List the company recommendation library, optionally filtered by category or severity."
   },
   {
     "operationId": "listRecurringAvailability",
@@ -12517,11 +12516,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Tag id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Tag id."
           }
         }
       ],
@@ -12545,22 +12544,22 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Inspection id."
           }
         },
         {
           "name": "itemId",
           "in": "path",
           "required": true,
-          "description": "TODO describe itemId field for the OpenInspection MCP integration",
+          "description": "Checklist item id within the inspection.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe itemId field for the OpenInspection MCP integration"
+            "description": "Checklist item id within the inspection."
           }
         }
       ],
@@ -12583,7 +12582,7 @@
       "body": null
     },
     "summary": "List tags for the current tenant (seed + custom)",
-    "description": "Auto-generated placeholder for listTags (GET /, tags domain). TODO: replace with a real description sourced from the handler."
+    "description": "List the company tags, built-in and custom."
   },
   {
     "operationId": "listTagTags",
@@ -12600,11 +12599,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Inspection id."
           }
         }
       ],
@@ -13481,12 +13480,12 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Inspection id.",
           "schema": {
             "type": "string",
             "minLength": 1,
             "example": "550e8400-e29b-41d4-a716-446655440000",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Inspection id."
           }
         }
       ],
@@ -17700,11 +17699,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Recommendation id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Recommendation id."
           }
         }
       ],
@@ -17759,11 +17758,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Tag id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Tag id."
           }
         }
       ],
@@ -19840,11 +19839,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Contractor type id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "description": "Contractor type id."
           }
         }
       ],

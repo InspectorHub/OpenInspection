@@ -190,7 +190,6 @@ export const SCRIPT_GATES = [
     // rebase, and after a push it is not fixable at all. Measured at 0.67s over
     // 3,605 files.
     { key: 'privatereview', label: 'No private-review references', script: 'check-no-private-review-refs.mjs', fix: 'npm run lint:private-review', rung: PRECOMMIT },
-
     // ---- PUSH rung -------------------------------------------------------
     // The 33 gates `npm run lint` used to chain with `&&`. Generated from
     // package.json rather than retyped, and pinned by the spec against that
@@ -310,6 +309,7 @@ export const SCRIPT_GATES = [
     // the same reason as the doc-link gate beside it: it reads every markdown
     // file in the repo, and a bare hosted path is introduced by prose that is
     // usually written across several commits before anyone pushes it.
+    { key: 'nativecontract', label: 'lint:native-contract', script: 'check-native-contract.mjs', fix: 'npm run lint:native-contract', rung: PUSH },
     { key: 'noportalroutes', label: 'lint:no-portal-routes', script: 'check-no-portal-routes.mjs', fix: 'npm run lint:no-portal-routes', rung: PUSH },
     { key: 'schemadoc', label: 'lint:schema-doc', script: 'gen-schema-doc.mjs', fix: 'npm run lint:schema-doc', rung: PUSH, args: ['--check'] },
     { key: 'verificationcopy', label: 'lint:verification-copy', script: 'check-verification-copy.mjs', fix: 'npm run lint:verification-copy', rung: PUSH },

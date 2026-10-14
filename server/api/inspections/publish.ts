@@ -37,14 +37,14 @@ const completeInspectionRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "Complete inspection for current tenant",
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection id.') }),
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: SuccessResponseSchema,
                 },
             },
             description: 'Success',
@@ -345,7 +345,7 @@ const publishRoutes = createApiRouter()
         tags: ["inspections"], summary: "Confirm inspection for current tenant",
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
         request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
-        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Confirmed' } },
+        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Confirmed' } },
         operationId: "confirmInspection",
         description: "Auto-generated placeholder for confirmInspection (POST /{id}/confirm, inspections domain). TODO: replace with a real description sourced from the handler."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {

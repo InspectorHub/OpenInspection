@@ -68,7 +68,7 @@ const totpVerifyRoute = createRoute(withMcpMetadata({
     tags: ['auth'],
     request: { body: { content: { 'application/json': { schema: TotpVerifySchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: '2FA enabled' },
+        200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: '2FA enabled' },
         400: { description: 'Invalid code or no pending secret' },
         401: { description: 'Unauthorized' },
     }
@@ -83,7 +83,7 @@ const totpDisableRoute = createRoute(withMcpMetadata({
     tags: ['auth'],
     request: { body: { content: { 'application/json': { schema: TotpDisableSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: '2FA disabled' },
+        200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: '2FA disabled' },
         400: { description: 'Invalid input' },
         401: { description: 'Unauthorized — wrong password or code' },
     }

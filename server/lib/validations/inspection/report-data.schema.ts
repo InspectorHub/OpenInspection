@@ -11,15 +11,15 @@
 import { z } from '@hono/zod-openapi';
 
 const ReportItemSchema = z.object({
-  id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-  label: z.string().describe('TODO describe label field for the OpenInspection MCP integration'),
-  rating: z.string().nullable().describe('TODO describe rating field for the OpenInspection MCP integration'),
-  ratingColor: z.string().describe('TODO describe ratingColor field for the OpenInspection MCP integration'),
-  ratingLabel: z.string().nullable().describe('TODO describe ratingLabel field for the OpenInspection MCP integration'),
-  severityBucket: z.enum(['satisfactory', 'monitor', 'defect', 'other']).describe('TODO describe severityBucket field for the OpenInspection MCP integration'),
-  notes: z.string().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
-  photos: z.array(z.object({ key: z.string().describe('TODO describe key field for the OpenInspection MCP integration'), url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') })).describe('TODO describe photos field for the OpenInspection MCP integration'),
-  recommendation: z.string().nullable().optional().describe('TODO describe recommendation field for the OpenInspection MCP integration'),
+  id: z.string().describe('Item id.'),
+  label: z.string().describe('Item label as shown in the report.'),
+  rating: z.string().nullable().describe('Rating level id chosen for the item, or null when unrated.'),
+  ratingColor: z.string().describe('Display colour of the chosen rating level.'),
+  ratingLabel: z.string().nullable().describe('Display label of the chosen rating level, or null when unrated.'),
+  severityBucket: z.enum(['satisfactory', 'monitor', 'defect', 'other']).describe('Report grouping the rating falls into.'),
+  notes: z.string().nullable().describe('Inspector notes for the item, or null.'),
+  photos: z.array(z.object({ key: z.string().describe('Storage key of the photo.'), url: z.string().describe('Download URL of the photo.') })).describe('Photos attached to the item.'),
+  recommendation: z.string().nullable().optional().describe('Recommendation text attached to the item, if any.'),
   // No item-level estimateMin / estimateMax: the "Estimated cost" badge they
   // fed is gone. The `repairItems[]` pair below is a LEGACY READ — findings
   // written before repair pricing was withdrawn still hold the snapshot, and it
@@ -33,21 +33,21 @@ const ReportItemSchema = z.object({
 }).openapi('ReportItem');
 
 const ReportSectionSchema = z.object({
-  id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-  title: z.string().describe('TODO describe title field for the OpenInspection MCP integration'),
-  icon: z.string().nullable().optional().describe('TODO describe icon field for the OpenInspection MCP integration'),
-  defectCount: z.number().describe('TODO describe defectCount field for the OpenInspection MCP integration'),
-  items: z.array(ReportItemSchema).describe('TODO describe items field for the OpenInspection MCP integration'),
+  id: z.string().describe('Section id.'),
+  title: z.string().describe('Section title.'),
+  icon: z.string().nullable().optional().describe('Icon name for the section, or null.'),
+  defectCount: z.number().describe('Number of items in the section rated as defects.'),
+  items: z.array(ReportItemSchema).describe('Items in the section.'),
 }).openapi('ReportSection');
 
 export const ReportDataResponseSchema = z.object({
   inspection: z.object({
-    id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-    propertyAddress: z.string().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
-    date: z.string().describe('TODO describe date field for the OpenInspection MCP integration'),
-    status: z.string().describe('TODO describe status field for the OpenInspection MCP integration'),
-    inspectorName: z.string().nullable().describe('TODO describe inspectorName field for the OpenInspection MCP integration'),
-  }).describe('TODO describe inspection field for the OpenInspection MCP integration'),
+    id: z.string().describe('Inspection id.'),
+    propertyAddress: z.string().describe('Street address of the inspected property.'),
+    date: z.string().describe('Inspection date.'),
+    status: z.string().describe('Lifecycle status of the inspection.'),
+    inspectorName: z.string().nullable().describe('Name of the inspector, or null.'),
+  }).describe('Header facts about the inspection.'),
   styleProfile: z.object({
     id: z.string(),
     name: z.string(),
@@ -63,18 +63,18 @@ export const ReportDataResponseSchema = z.object({
     imageUrl: z.string().nullable(),
   })).describe('Inspector self-asserted credentials snapshotted into the report (Spec B)'),
   stats: z.object({
-    total: z.number().describe('TODO describe total field for the OpenInspection MCP integration'),
-    satisfactory: z.number().describe('TODO describe satisfactory field for the OpenInspection MCP integration'),
-    monitor: z.number().describe('TODO describe monitor field for the OpenInspection MCP integration'),
-    defect: z.number().describe('TODO describe defect field for the OpenInspection MCP integration'),
-  }).describe('TODO describe stats field for the OpenInspection MCP integration'),
-  sections: z.array(ReportSectionSchema).describe('TODO describe sections field for the OpenInspection MCP integration'),
+    total: z.number().describe('Total number of rated items.'),
+    satisfactory: z.number().describe('Number of items rated satisfactory.'),
+    monitor: z.number().describe('Number of items rated for monitoring.'),
+    defect: z.number().describe('Number of items rated as defects.'),
+  }).describe('Rating counts across the whole report.'),
+  sections: z.array(ReportSectionSchema).describe('Report sections in display order.'),
   ratingLevels: z.array(z.object({
-    id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-    label: z.string().describe('TODO describe label field for the OpenInspection MCP integration'),
-    abbreviation: z.string().describe('TODO describe abbreviation field for the OpenInspection MCP integration'),
-    color: z.string().describe('TODO describe color field for the OpenInspection MCP integration'),
-    severity: z.string().describe('TODO describe severity field for the OpenInspection MCP integration'),
-    isDefect: z.boolean().describe('TODO describe isDefect field for the OpenInspection MCP integration'),
-  })).describe('TODO describe ratingLevels field for the OpenInspection MCP integration'),
+    id: z.string().describe('Rating level id.'),
+    label: z.string().describe('Rating level label.'),
+    abbreviation: z.string().describe('Short form of the rating label.'),
+    color: z.string().describe('Display colour of the rating level.'),
+    severity: z.string().describe('Severity class of the rating level.'),
+    isDefect: z.boolean().describe('True when items with this rating count as defects.'),
+  })).describe('Rating levels available to the report, in display order.'),
 }).openapi('ReportData');

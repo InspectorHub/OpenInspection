@@ -175,7 +175,7 @@ const postAuditLogRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Recorded',
         },
     },

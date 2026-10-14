@@ -157,7 +157,7 @@ const deleteOverrideRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: SuccessResponseSchema,
                 },
             },
             description: 'Success',

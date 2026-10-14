@@ -143,7 +143,7 @@ const getResultsRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "List inspection results for current tenant",
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection id.') }),
         // Commercial PCA Phase U (Batch C-lazy) — OPTIONAL per-unit read-slice:
         // present ⇒ only that scope's findings (unit id, or '_default' common);
         // omitted ⇒ full map, backward compatible for every existing caller.
@@ -156,7 +156,7 @@ const getResultsRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: createApiResponseSchema(z.object({
-                        results: z.record(z.string(), z.unknown()).describe('TODO describe results field for the OpenInspection MCP integration'),
+                        results: z.record(z.string(), z.unknown()).describe('Saved findings keyed by item id.'),
                         // The `inspection_results` PRIMARY KEY, which the map itself
                         // does not carry. An `ai_content_reviews` row cites the row
                         // that received model-assisted text, and the editor is where
@@ -177,7 +177,7 @@ const getResultsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listInspectionResults",
-    description: "Auto-generated placeholder for listInspectionResults (GET /{id}/results, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Return the saved findings of an inspection as a map keyed by item id. Pass scope to read the slice for one unit."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**

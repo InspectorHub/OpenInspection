@@ -5,15 +5,15 @@ import { createApiResponseSchema } from './shared.schema';
  * Input for the comment assistance request.
  */
 export const CommentAssistSchema = z.object({
-    text: z.string().min(1, 'Text is required').openapi({ example: 'Roof is bad' }).describe('TODO describe text field for the OpenInspection MCP integration'),
-    context: z.string().optional().openapi({ example: 'Roof inspection' }).describe('TODO describe context field for the OpenInspection MCP integration'),
+    text: z.string().min(1, 'Text is required').openapi({ example: 'Roof is bad' }).describe('Rough inspector note to rewrite.'),
+    context: z.string().optional().openapi({ example: 'Roof inspection' }).describe('Optional description of what is being inspected, to guide the rewrite.'),
 }).openapi('CommentAssistRequest');
 
 /**
  * Input for the automatic summary request.
  */
 export const AutoSummarySchema = z.object({
-    inspectionId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    inspectionId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Id of the inspection to summarise.'),
 }).openapi('AutoSummaryRequest');
 
 /**
@@ -42,7 +42,7 @@ export const AutoSummarySchema = z.object({
  * Response for the comment assistance.
  */
 export const CommentAssistResponseSchema = createApiResponseSchema(z.object({
-    text: z.string().openapi({ example: 'The roof covering shows signs of significant wear and deterioration.' }).describe('TODO describe text field for the OpenInspection MCP integration'),
+    text: z.string().openapi({ example: 'The roof covering shows signs of significant wear and deterioration.' }).describe('The rewritten, report-ready comment.'),
     aiCallId: z.string().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('The ai_call_provenance row id for this call — what a content-review record cites.'),
 })).openapi('CommentAssistResponse');
 
@@ -50,7 +50,7 @@ export const CommentAssistResponseSchema = createApiResponseSchema(z.object({
  * Response for the automatic summary.
  */
 export const AutoSummaryResponseSchema = createApiResponseSchema(z.object({
-    summary: z.string().openapi({ example: 'The inspection revealed critical defects in the roofing and plumbing systems.' }).describe('TODO describe summary field for the OpenInspection MCP integration'),
+    summary: z.string().openapi({ example: 'The inspection revealed critical defects in the roofing and plumbing systems.' }).describe('The generated summary of the inspection.'),
     aiCallId: z.string().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('The ai_call_provenance row id, or null when the summary is the system "no defects observed" literal rather than model output.'),
 })).openapi('AutoSummaryResponse');
 

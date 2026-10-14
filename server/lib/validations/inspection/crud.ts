@@ -8,12 +8,12 @@ import { INSPECTION_PROPERTY_TYPES } from '../../inspection-property-type';
  * Core Inspection Schema (Output)
  */
 export const InspectionSchema = z.object({
-    id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
-    propertyAddress: z.string().openapi({ example: '123 Main St, Anytown' }).describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
-    clientName: z.string().nullable().openapi({ example: 'John Doe' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
-    clientEmail: z.string().email().nullable().openapi({ example: 'john@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
-    status: z.enum(INSPECTION_STATUSES).openapi({ example: 'requested' }).describe('TODO describe status field for the OpenInspection MCP integration'),
-    date: z.string().openapi({ example: '2024-03-20' }).describe('TODO describe date field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspection id.'),
+    propertyAddress: z.string().openapi({ example: '123 Main St, Anytown' }).describe('Street address of the inspected property.'),
+    clientName: z.string().nullable().openapi({ example: 'John Doe' }).describe('Name of the primary client, or null when none is recorded.'),
+    clientEmail: z.string().email().nullable().openapi({ example: 'john@example.com' }).describe('Email address of the primary client, or null when none is recorded.'),
+    status: z.enum(INSPECTION_STATUSES).openapi({ example: 'requested' }).describe('Lifecycle status of the inspection.'),
+    date: z.string().openapi({ example: '2024-03-20' }).describe('Scheduled inspection date.'),
     // A plain string, like `templateId` beside it and like the write schema
     // below: `users.id` is a `text` column and seeded, imported and
     // portal-synced rows need not be UUIDs. Response schemas are not validated
@@ -22,21 +22,21 @@ export const InspectionSchema = z.object({
     // contract, and a client generating a model from it would be handed a
     // constraint the database does not enforce and the PATCH does not require.
     inspectorId: z.string().min(1).nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('Assigned inspector (users.id).'),
-    templateId: z.string().min(1).nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('TODO describe templateId field for the OpenInspection MCP integration'),
-    createdAt: z.string().datetime().openapi({ example: '2024-03-20T10:00:00Z' }).describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    templateId: z.string().min(1).nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('Id of the template the inspection is built from, or null when none is attached.'),
+    createdAt: z.string().datetime().openapi({ example: '2024-03-20T10:00:00Z' }).describe('When the inspection record was created (ISO 8601).'),
 }).openapi('Inspection');
 
 /**
  * Validation schema for list filtering and pagination.
  */
 export const InspectionListQuerySchema = z.object({
-    limit: z.coerce.number().min(1).max(100).default(20).openapi({ example: 20 }).describe('TODO describe limit field for the OpenInspection MCP integration'),
-    cursor: z.string().optional().openapi({ example: 'eyJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9' }).describe('TODO describe cursor field for the OpenInspection MCP integration'),
-    status: z.enum(INSPECTION_STATUSES).optional().openapi({ example: 'completed' }).describe('TODO describe status field for the OpenInspection MCP integration'),
-    search: z.string().optional().openapi({ example: '123 Main' }).describe('TODO describe search field for the OpenInspection MCP integration'),
-    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().openapi({ example: '2024-01-01' }).describe('TODO describe dateFrom field for the OpenInspection MCP integration'),
-    dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().openapi({ example: '2024-12-31' }).describe('TODO describe dateTo field for the OpenInspection MCP integration'),
+    limit: z.coerce.number().min(1).max(100).default(20).openapi({ example: 20 }).describe('Maximum number of inspections to return (1-100, default 20).'),
+    cursor: z.string().optional().openapi({ example: 'eyJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9' }).describe('Opaque pagination cursor from the previous page; omit for the first page.'),
+    status: z.enum(INSPECTION_STATUSES).optional().openapi({ example: 'completed' }).describe('Return only inspections in this lifecycle status.'),
+    search: z.string().optional().openapi({ example: '123 Main' }).describe('Case-insensitive text matched against the property address and the primary client name.'),
+    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('Return only inspections assigned to this inspector (users.id).'),
+    dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().openapi({ example: '2024-01-01' }).describe('Earliest inspection date to include (YYYY-MM-DD).'),
+    dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().openapi({ example: '2024-12-31' }).describe('Latest inspection date to include (YYYY-MM-DD).'),
     // One filter vocabulary across the API and the workspace: a filter is named
     // for what it selects, never for a status value whose meaning it does not
     // share (`awaiting_report` is not the report status `in_progress`).
@@ -50,8 +50,8 @@ export const CreateInspectionSchema = z.object({
     id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, 'Use 1-64 letters, digits, hyphens or underscores').optional()
         .openapi({ example: '550e8400-e29b-41d4-a716-446655440000' })
         .describe('Client-generated identifier (opaque, safe characters only); repeating a create with the same id returns the existing inspection'),
-    propertyAddress: z.string().min(5, 'Property address is too short').openapi({ example: '123 Main St, Anytown' }).describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
-    clientName: z.string().min(1, 'Client name is required').default('Private Client').openapi({ example: 'John Doe' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
+    propertyAddress: z.string().min(5, 'Property address is too short').openapi({ example: '123 Main St, Anytown' }).describe('Street address of the property to inspect (at least 5 characters).'),
+    clientName: z.string().min(1, 'Client name is required').default('Private Client').openapi({ example: 'John Doe' }).describe('Client name; defaults to Private Client when omitted.'),
     // iter-1 production bug #1 — the dashboard's New Inspection modal posts
     // `clientEmail: ""` when the inspector skips the field. The previous
     // chain `.email().optional().nullable()` rejected the empty string with
@@ -60,24 +60,24 @@ export const CreateInspectionSchema = z.object({
     clientEmail: z.union([z.string().email('Invalid email address'), z.literal(''), z.null()])
         .optional()
         .transform((v) => (v === '' || v === undefined ? null : v))
-        .openapi({ example: 'john@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
-    clientPhone: z.string().max(30).optional().nullable().openapi({ example: '(555) 123-4567' }).describe('TODO describe clientPhone field for the OpenInspection MCP integration'),
-    templateId: z.string().min(1, 'Template is required').openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('TODO describe templateId field for the OpenInspection MCP integration'),
-    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    date: z.string().datetime().optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('TODO describe date field for the OpenInspection MCP integration'),
-    referredByAgentId: z.string().trim().min(1).optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440003' }).describe('TODO describe referredByAgentId field for the OpenInspection MCP integration'),
+        .openapi({ example: 'john@example.com' }).describe('Client email address; an empty string is treated as no email.'),
+    clientPhone: z.string().max(30).optional().nullable().openapi({ example: '(555) 123-4567' }).describe('Client phone number.'),
+    templateId: z.string().min(1, 'Template is required').openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('Id of the inspection template to build the inspection from.'),
+    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('Inspector (users.id) to assign to the inspection.'),
+    date: z.string().datetime().optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('Scheduled date and time as an ISO 8601 datetime.'),
+    referredByAgentId: z.string().trim().min(1).optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440003' }).describe('Contact id of the agent who referred the job.'),
     // R7-09: Buyer's Agent — separate from listing agent. Input-only DTO field;
     // mirrored into inspection_people (listing_agent role), not an inspections column (dropped, Task 13).
-    sellingAgentId: z.string().trim().min(1).optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440004' }).describe('TODO describe sellingAgentId field for the OpenInspection MCP integration'),
+    sellingAgentId: z.string().trim().min(1).optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440004' }).describe('Contact id of the selling-side agent; recorded as a person on the inspection rather than as an inspection column.'),
     // Spec 5D — geocoded address fields (set when client picked from Places autocomplete).
-    addressPlaceId: z.string().min(1).max(200).optional().nullable().describe('TODO describe addressPlaceId field for the OpenInspection MCP integration'),
-    addressStreet:  z.string().max(200).optional().nullable().describe('TODO describe addressStreet field for the OpenInspection MCP integration'),
-    addressCity:    z.string().max(100).optional().nullable().describe('TODO describe addressCity field for the OpenInspection MCP integration'),
-    addressState:   z.string().max(10).optional().nullable().describe('TODO describe addressState field for the OpenInspection MCP integration'),
-    addressZip:     z.string().max(20).optional().nullable().describe('TODO describe addressZip field for the OpenInspection MCP integration'),
-    addressCounty:  z.string().max(100).optional().nullable().describe('TODO describe addressCounty field for the OpenInspection MCP integration'),
-    addressLat:     z.number().min(-90).max(90).optional().nullable().describe('TODO describe addressLat field for the OpenInspection MCP integration'),
-    addressLng:     z.number().min(-180).max(180).optional().nullable().describe('TODO describe addressLng field for the OpenInspection MCP integration'),
+    addressPlaceId: z.string().min(1).max(200).optional().nullable().describe('Place identifier returned by the address autocomplete that supplied the geocoded fields.'),
+    addressStreet:  z.string().max(200).optional().nullable().describe('Street line of the geocoded address.'),
+    addressCity:    z.string().max(100).optional().nullable().describe('City of the geocoded address.'),
+    addressState:   z.string().max(10).optional().nullable().describe('State or region code of the geocoded address.'),
+    addressZip:     z.string().max(20).optional().nullable().describe('Postal code of the geocoded address.'),
+    addressCounty:  z.string().max(100).optional().nullable().describe('County of the geocoded address.'),
+    addressLat:     z.number().min(-90).max(90).optional().nullable().describe('Latitude of the geocoded address, from -90 to 90.'),
+    addressLng:     z.number().min(-180).max(180).optional().nullable().describe('Longitude of the geocoded address, from -180 to 180.'),
     // The wizard's step-1 property type. Intake is the only moment the engine
     // learns whether this job is a house, a multi-unit building or a commercial
     // property, and the answer decides what the report becomes: resolveReportTier,
@@ -109,21 +109,21 @@ export const CreateInspectionSchema = z.object({
         name:  z.string().min(1).describe('Agent full name.'),
         email: z.string().email().optional().describe('Agent email — used to deduplicate against the contacts table.'),
     }).optional().describe('IA-1: When present, upserts a contact row of type=agent and links it as referred_by_agent_id.'),
-    discountCodeId: z.string().nullable().optional().describe('TODO describe discountCodeId field for the OpenInspection MCP integration'),
-    discountAmount: z.number().int().nullable().optional().describe('TODO describe discountAmount field for the OpenInspection MCP integration'),
-    price:          z.number().int().min(0).optional().describe('TODO describe price field for the OpenInspection MCP integration'),
+    discountCodeId: z.string().nullable().optional().describe('Id of the discount code applied to the job, or null.'),
+    discountAmount: z.number().int().nullable().optional().describe('Discount applied to the job, in cents, or null.'),
+    price:          z.number().int().min(0).optional().describe('Inspection price in cents.'),
     // Round-2 backlog #10 — explicit override of tenant gating policy.
     // When omitted, createInspection inherits from tenant_configs.block_unpaid
     // / block_unsigned_agreement. When provided, this caller-level value wins.
-    paymentRequired:   z.boolean().optional().openapi({ example: false }).describe('TODO describe paymentRequired field for the OpenInspection MCP integration'),
-    agreementRequired: z.boolean().optional().openapi({ example: false }).describe('TODO describe agreementRequired field for the OpenInspection MCP integration'),
+    paymentRequired:   z.boolean().optional().openapi({ example: false }).describe('Overrides the company policy: when true the inspection is gated on payment. Omit to inherit the company setting.'),
+    agreementRequired: z.boolean().optional().openapi({ example: false }).describe('Overrides the company policy: when true the inspection is gated on a signed agreement. Omit to inherit the company setting.'),
 }).openapi('CreateInspection');
 
 /**
  * Validation schema for patching inspection metadata.
  */
 export const UpdateInspectionSchema = z.object({
-    propertyAddress: z.string().min(5).optional().openapi({ example: '123 Main St, Anytown' }).describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
+    propertyAddress: z.string().min(5).optional().openapi({ example: '123 Main St, Anytown' }).describe('New street address of the property (at least 5 characters).'),
     // Task 13 — clientName/clientEmail removed. They mapped 1:1 to the now-dropped
     // inspections.client_name/client_email columns and the app never sends them
     // through this PATCH (client identity is managed via inspection_people /
@@ -155,10 +155,10 @@ export const UpdateInspectionSchema = z.object({
     //     was dropped before it ever reached the API, so an assignment could
     //     be changed but never cleared.
     inspectorId: z.string().min(1).nullable().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('Assigned inspector (users.id) — must be a member of the caller\'s tenant; null unassigns.'),
-    price: z.number().int().min(0).optional().openapi({ example: 450 }).describe('TODO describe price field for the OpenInspection MCP integration'),
-    status: z.enum(INSPECTION_STATUSES).optional().openapi({ example: 'completed' }).describe('TODO describe status field for the OpenInspection MCP integration'),
-    paymentRequired:   z.boolean().optional().openapi({ example: false }).describe('TODO describe paymentRequired field for the OpenInspection MCP integration'),
-    agreementRequired: z.boolean().optional().openapi({ example: false }).describe('TODO describe agreementRequired field for the OpenInspection MCP integration'),
+    price: z.number().int().min(0).optional().openapi({ example: 450 }).describe('Inspection price in cents.'),
+    status: z.enum(INSPECTION_STATUSES).optional().openapi({ example: 'completed' }).describe('New lifecycle status of the inspection.'),
+    paymentRequired:   z.boolean().optional().openapi({ example: false }).describe('When true the inspection is gated on payment.'),
+    agreementRequired: z.boolean().optional().openapi({ example: false }).describe('When true the inspection is gated on a signed agreement.'),
     // Reclassification. The create path sets this at intake; this is the only
     // way to correct it afterwards, and the only way an inspection that predates
     // intake capture can reach the commercial surface at all.
@@ -174,25 +174,25 @@ export const UpdateInspectionSchema = z.object({
     propertyType:   z.enum(INSPECTION_PROPERTY_TYPES).nullable().optional()
         .openapi({ example: 'commercial' })
         .describe('Reclassify the property. Decides report tier, PCA block, Building Profile preset and the per-unit editor surface. Moving off commercial hides commercial data without deleting it; null clears the classification.'),
-    yearBuilt:      z.number().int().min(1800).max(2100).nullable().optional().openapi({ example: 1990 }).describe('TODO describe yearBuilt field for the OpenInspection MCP integration'),
-    sqft:           z.number().int().min(0).nullable().optional().openapi({ example: 1800 }).describe('TODO describe sqft field for the OpenInspection MCP integration'),
-    foundationType: z.enum(['basement', 'slab', 'crawlspace', 'other']).nullable().optional().describe('TODO describe foundationType field for the OpenInspection MCP integration'),
-    bedrooms:       z.number().int().min(0).nullable().optional().openapi({ example: 3 }).describe('TODO describe bedrooms field for the OpenInspection MCP integration'),
-    bathrooms:      z.number().min(0).max(20).nullable().optional().openapi({ example: 2.5 }).describe('TODO describe bathrooms field for the OpenInspection MCP integration'),
+    yearBuilt:      z.number().int().min(1800).max(2100).nullable().optional().openapi({ example: 1990 }).describe('Year the property was built, from 1800 to 2100; null clears it.'),
+    sqft:           z.number().int().min(0).nullable().optional().openapi({ example: 1800 }).describe('Floor area in square feet; null clears it.'),
+    foundationType: z.enum(['basement', 'slab', 'crawlspace', 'other']).nullable().optional().describe('Foundation type of the property; null clears it.'),
+    bedrooms:       z.number().int().min(0).nullable().optional().openapi({ example: 3 }).describe('Number of bedrooms; null clears it.'),
+    bathrooms:      z.number().min(0).max(20).nullable().optional().openapi({ example: 2.5 }).describe('Number of bathrooms, halves allowed; null clears it.'),
     // Round-2 backlog G1 — free-text lot size ("0.25 acres", "10,000 sqft").
-    lotSize:        z.string().max(50).nullable().optional().openapi({ example: '0.25 acres' }).describe('TODO describe lotSize field for the OpenInspection MCP integration'),
-    unit:           z.string().max(50).nullable().optional().describe('TODO describe unit field for the OpenInspection MCP integration'),
-    county:         z.string().max(100).nullable().optional().describe('TODO describe county field for the OpenInspection MCP integration'),
+    lotSize:        z.string().max(50).nullable().optional().openapi({ example: '0.25 acres' }).describe('Free-text lot size, for example 0.25 acres; null clears it.'),
+    unit:           z.string().max(50).nullable().optional().describe('Unit or suite identifier within the property; null clears it.'),
+    county:         z.string().max(100).nullable().optional().describe('County of the property; null clears it.'),
     // Round-2 backlog G2 (Spectora §7.10) — when does the buyer close on
     // the property. Used for follow-up CRM signals. ISO YYYY-MM-DD.
-    closingDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date (YYYY-MM-DD)').nullable().optional().openapi({ example: '2026-07-15' }).describe('TODO describe closingDate field for the OpenInspection MCP integration'),
+    closingDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date (YYYY-MM-DD)').nullable().optional().openapi({ example: '2026-07-15' }).describe('Closing date of the property sale (YYYY-MM-DD); null clears it.'),
     // Round-2 backlog G3 (Spectora §4.1) — free-text Order ID for ISN-style
     // integrations. Surfaced in PMS exports.
-    referenceNumber:        z.string().max(64).nullable().optional().openapi({ example: 'REF-2026-0142' }).describe('TODO describe referenceNumber field for the OpenInspection MCP integration'),
+    referenceNumber:        z.string().max(64).nullable().optional().openapi({ example: 'REF-2026-0142' }).describe('External order or reference number for the job; null clears it.'),
     // Round-2 backlog G3 — referral source label. Free-text so the seed
     // list ("Realtor", "Past Client", ...) plus tenant custom values both
     // round-trip without a separate enum.
-    referralSource: z.string().max(100).nullable().optional().openapi({ example: 'Realtor' }).describe('TODO describe referralSource field for the OpenInspection MCP integration'),
+    referralSource: z.string().max(100).nullable().optional().openapi({ example: 'Realtor' }).describe('Free-text label for the referral channel; null clears it.'),
     // Task 8 (two-layer role model) — WHO sent us the job, distinct from the
     // channel above. Any contact, not only agent-kind ones.
     referredByContactId: z.string().nullable().optional().describe('Contact who referred this job. Any contact, not only agents; distinct from referral_source, which is the channel.'),

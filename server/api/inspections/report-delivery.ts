@@ -72,7 +72,7 @@ const getReportDataRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Get structured report data',
     request: {
-        params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().describe('Inspection id.') }),
     },
     responses: {
         200: {
@@ -85,7 +85,7 @@ const getReportDataRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listInspectionReportData",
-    description: "Auto-generated placeholder for listInspectionReportData (GET /{id}/report-data, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Return the structured report payload of an inspection: header facts, rating levels, rating counts and sections with their items."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**

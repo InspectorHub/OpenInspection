@@ -19,12 +19,12 @@ const listRecommendationsRoute = createRoute(withMcpMetadata({
     tags: ["recommendations"],
     summary: 'List recommendations (filter: category, severity)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { query: ListRecommendationsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
+    request: { query: ListRecommendationsQuerySchema },
     responses: {
-        200: { content: { 'application/json': { schema: RecommendationListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'List' },
+        200: { content: { 'application/json': { schema: RecommendationListResponseSchema } }, description: 'List' },
     },
     operationId: "listRecommendations",
-    description: "Auto-generated placeholder for listRecommendations (GET /, recommendations domain). TODO: replace with a real description sourced from the handler."
+    description: "List the company recommendation library, optionally filtered by category or severity."
 }, { scopes: ['read'], tier: 'primary' }));
 
 /* ── GET /api/recommendations/:id ─────────────────────────────────────────── */
@@ -32,9 +32,9 @@ const getRecommendationRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}',
     tags: ["recommendations"],
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('Recommendation id.') }) },
     responses: {
-        200: { content: { 'application/json': { schema: RecommendationResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Single recommendation' },
+        200: { content: { 'application/json': { schema: RecommendationResponseSchema } }, description: 'Single recommendation' },
     },
     operationId: "getRecommendation",
     summary: "Get recommendation for current tenant",
@@ -46,9 +46,9 @@ const createRecommendationRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["recommendations"],
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { body: { content: { 'application/json': { schema: CreateRecommendationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: CreateRecommendationSchema } } } },
     responses: {
-        200: { content: { 'application/json': { schema: RecommendationResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' },
+        200: { content: { 'application/json': { schema: RecommendationResponseSchema } }, description: 'Created' },
     },
     operationId: "createRecommendation",
     summary: "Create recommendation for current tenant",
@@ -61,11 +61,11 @@ const replaceRecommendationRoute = createRoute(withMcpMetadata({
     tags: ["recommendations"],
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: UpdateRecommendationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().trim().min(1).describe('Recommendation id.') }),
+        body: { content: { 'application/json': { schema: UpdateRecommendationSchema } } },
     },
     responses: {
-        200: { content: { 'application/json': { schema: RecommendationResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Updated' },
+        200: { content: { 'application/json': { schema: RecommendationResponseSchema } }, description: 'Updated' },
     },
     operationId: "replaceRecommendation",
     summary: "Replace recommendation for current tenant",
@@ -77,9 +77,9 @@ const deleteRecommendationRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["recommendations"],
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('Recommendation id.') }) },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ deleted: z.literal(true).describe('TODO describe deleted field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Deleted' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('True when the request succeeded.'), data: z.object({ deleted: z.literal(true).describe('True when the recommendation was deleted.') }).describe('Response payload.') }) } }, description: 'Deleted' },
     },
     operationId: "deleteRecommendation",
     summary: "Delete recommendation for current tenant",
@@ -95,8 +95,8 @@ const seedDefaultsRecommendationRoute = createRoute(withMcpMetadata({
     request: {},
     responses: {
         200: { content: { 'application/json': { schema: z.object({
-            success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-            data: z.object({ inserted: z.number().describe('TODO describe inserted field for the OpenInspection MCP integration'), skipped: z.number().describe('TODO describe skipped field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+            success: z.literal(true).describe('True when the request succeeded.'),
+            data: z.object({ inserted: z.number().describe('Number of default recommendations added.'), skipped: z.number().describe('Number of default recommendations skipped because they already exist.') }).describe('Response payload.'),
         }) } }, description: 'Bulk seed result' },
     },
     operationId: "seedDefaultsRecommendation",

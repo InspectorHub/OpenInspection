@@ -30,7 +30,7 @@ const skipSetupRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: {
-                'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: SuccessResponseSchema }
             },
             description: 'Onboarding marked as skipped'
         },
@@ -151,7 +151,7 @@ const updateProfileRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Profile updated'
         },
         401: { description: 'Unauthorized' }
@@ -168,7 +168,7 @@ const logoutRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: {
-                'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: SuccessResponseSchema }
             },
             description: 'Logout successful'
         }

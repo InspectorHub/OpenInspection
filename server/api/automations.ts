@@ -66,7 +66,7 @@ const deleteRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}', tags: ["automations"],
     middleware: [requireRole('owner', 'manager')],
     request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
-    responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Deleted' } },
+    responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
     operationId: "deleteAutomation",
     summary: "Delete automation for current tenant",
     description: "Auto-generated placeholder for deleteAutomation (DELETE /{id}, automations domain). TODO: replace with a real description sourced from the handler."

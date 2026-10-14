@@ -1,0 +1,4329 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "OpenInspection Native Contract",
+    "version": "native-contract"
+  },
+  "paths": {
+    "/api/admin/defect-categories": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List defect categories for current tenant, seeding defaults on first read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "listDefectCategories",
+        "description": "List the tenant defect categories, seeding maintenance/recommendation/safety on first read.",
+        "responses": {
+          "200": {
+            "description": "List",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ],
+                      "description": "Always true on success."
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DefectCategory"
+                      },
+                      "description": "Tenant defect categories, sorted by sortOrder."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/comment-assist": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Create ai comment assist",
+        "operationId": "createAiCommentAssist",
+        "description": "Rewrite a rough inspector note as clear report prose. Returns the rewritten text and the id of the AI call record that produced it.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentAssistRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentAssistResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/reviews": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Record a human review of AI-assisted content",
+        "operationId": "createAiContentReview",
+        "description": "Record that a named user reviewed the output of one AI call attached to one artifact. Idempotent on (person, artifact, call): a retry is a no-op, and a second REVIEWER is a second row rather than a duplicate.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiContentReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The review is on file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiContentReviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/client/compat": {
+      "get": {
+        "operationId": "getClientCompat",
+        "tags": [
+          "client"
+        ],
+        "summary": "Get native client version compatibility policy",
+        "description": "Returns the minimum supported and recommended native app versions for a platform, where to download updates, and the server contract version. Public: a client calls it before signing in.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "windows"
+              ],
+              "description": "Native client platform identifier"
+            },
+            "required": true,
+            "description": "Native client platform identifier",
+            "name": "platform",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Compatibility policy for the platform",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "minSupported": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Lowest app version still allowed to edit"
+                        },
+                        "recommended": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Version the app should prompt users to install"
+                        },
+                        "downloadUrl": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Where a sideloaded build can be downloaded"
+                        },
+                        "serverContractVersion": {
+                          "type": "integer",
+                          "description": "Native API contract version this server implements"
+                        }
+                      },
+                      "required": [
+                        "minSupported",
+                        "recommended",
+                        "downloadUrl",
+                        "serverContractVersion"
+                      ],
+                      "description": "Response payload"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/client/import": {
+      "post": {
+        "operationId": "importOfflinePackage",
+        "tags": [
+          "client"
+        ],
+        "summary": "Import an exported offline data package",
+        "description": "Imports a zip written by a native device that could not sync, on behalf of the signed-in member. The whole package is validated and every inspection in it is authorized for the caller before anything is written, so a package that names one inspection the caller may not edit changes nothing. Importing the same package again is safe and reports its queued writes as skipped. Requires a Content-Length header.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/zip": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Package imported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "inspections": {
+                          "type": "integer",
+                          "description": "Inspections the package covered"
+                        },
+                        "photos": {
+                          "type": "integer",
+                          "description": "Photos written to storage"
+                        },
+                        "outbox": {
+                          "type": "object",
+                          "properties": {
+                            "applied": {
+                              "type": "integer",
+                              "description": "Queued writes executed by this import"
+                            },
+                            "skipped": {
+                              "type": "integer",
+                              "description": "Queued writes that had already been applied"
+                            },
+                            "failed": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "idempotencyKey": {
+                                    "type": "string"
+                                  },
+                                  "op": {
+                                    "type": "string",
+                                    "enum": [
+                                      "inspection.create",
+                                      "inspection.update",
+                                      "inspection.complete"
+                                    ]
+                                  },
+                                  "inspectionId": {
+                                    "type": "string"
+                                  },
+                                  "status": {
+                                    "type": "integer",
+                                    "description": "HTTP status the target route refused it with"
+                                  }
+                                },
+                                "required": [
+                                  "idempotencyKey",
+                                  "op",
+                                  "inspectionId",
+                                  "status"
+                                ]
+                              },
+                              "description": "Queued writes the server refused. The results and photos in the package were still imported; these entries need attention on the device."
+                            }
+                          },
+                          "required": [
+                            "applied",
+                            "skipped",
+                            "failed"
+                          ]
+                        },
+                        "yjs": {
+                          "type": "object",
+                          "properties": {
+                            "changed": {
+                              "type": "integer",
+                              "description": "Inspections whose results changed"
+                            },
+                            "unchanged": {
+                              "type": "integer",
+                              "description": "Inspections whose results were already up to date"
+                            }
+                          },
+                          "required": [
+                            "changed",
+                            "unchanged"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "inspections",
+                        "photos",
+                        "outbox",
+                        "yjs"
+                      ],
+                      "description": "Response payload"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The package is malformed, or names something outside its manifest"
+          },
+          "403": {
+            "description": "The package belongs to another workspace, or the caller cannot edit one of its inspections"
+          },
+          "409": {
+            "description": "PACKAGE_INSPECTION_DELETED: the package would create an inspection that an earlier import created and that has since been deleted; nothing was written"
+          },
+          "411": {
+            "description": "Content-Length is required"
+          },
+          "413": {
+            "description": "PACKAGE_TOO_LARGE or BAD_REQUEST: the package exceeds the byte limit; details.limits names the limits"
+          },
+          "422": {
+            "description": "PACKAGE_TOO_LARGE: the package has more inspections, queued writes, photos or entries than this server imports at once; nothing was written. details names the limit and details.limits the sizes to split to"
+          }
+        }
+      }
+    },
+    "/api/client/session": {
+      "get": {
+        "operationId": "getClientSession",
+        "tags": [
+          "client"
+        ],
+        "summary": "Get the signed-in native client session",
+        "description": "Returns the identity behind a native access token and the tenant offline access limit, which the device uses to decide when to lock local data.",
+        "responses": {
+          "200": {
+            "description": "Native session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "userId": {
+                          "type": "string",
+                          "description": "Signed-in user identifier"
+                        },
+                        "tenantId": {
+                          "type": "string",
+                          "description": "Tenant the session belongs to"
+                        },
+                        "role": {
+                          "type": "string",
+                          "description": "Role of the signed-in user"
+                        },
+                        "offlineMaxDays": {
+                          "type": "integer",
+                          "description": "Days the device may stay offline before locking"
+                        }
+                      },
+                      "required": [
+                        "userId",
+                        "tenantId",
+                        "role",
+                        "offlineMaxDays"
+                      ],
+                      "description": "Response payload"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contractor-types": {
+      "get": {
+        "tags": [
+          "contractor-types"
+        ],
+        "summary": "List contractor types for current tenant",
+        "operationId": "listContractorTypes",
+        "description": "List the contractor types configured for the company.",
+        "responses": {
+          "200": {
+            "description": "List",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ],
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ContractorType"
+                      },
+                      "description": "Response payload."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspections": {
+      "get": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "List inspections for current tenant",
+        "description": "Retrieve a paginated list of inspections with optional filtering.",
+        "operationId": "listInspections",
+        "parameters": [
+          {
+            "schema": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "description": "Maximum number of inspections to return (1-100, default 20)."
+            },
+            "required": false,
+            "description": "Maximum number of inspections to return (1-100, default 20).",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "eyJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9",
+              "description": "Opaque pagination cursor from the previous page; omit for the first page."
+            },
+            "required": false,
+            "description": "Opaque pagination cursor from the previous page; omit for the first page.",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "requested",
+                "scheduled",
+                "confirmed",
+                "completed",
+                "cancelled"
+              ],
+              "example": "completed",
+              "description": "Return only inspections in this lifecycle status."
+            },
+            "required": false,
+            "description": "Return only inspections in this lifecycle status.",
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "123 Main",
+              "description": "Case-insensitive text matched against the property address and the primary client name."
+            },
+            "required": false,
+            "description": "Case-insensitive text matched against the property address and the primary client name.",
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "550e8400-e29b-41d4-a716-446655440001",
+              "description": "Return only inspections assigned to this inspector (users.id)."
+            },
+            "required": false,
+            "description": "Return only inspections assigned to this inspector (users.id).",
+            "name": "inspectorId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "example": "2024-01-01",
+              "description": "Earliest inspection date to include (YYYY-MM-DD)."
+            },
+            "required": false,
+            "description": "Earliest inspection date to include (YYYY-MM-DD).",
+            "name": "dateFrom",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "example": "2024-12-31",
+              "description": "Latest inspection date to include (YYYY-MM-DD)."
+            },
+            "required": false,
+            "description": "Latest inspection date to include (YYYY-MM-DD).",
+            "name": "dateTo",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "today",
+                "upcoming",
+                "past",
+                "needs_confirmation",
+                "awaiting_report"
+              ],
+              "example": "today",
+              "description": "Named filter over the list: date buckets, or needs_confirmation / awaiting_report."
+            },
+            "required": false,
+            "description": "Named filter over the list: date buckets, or needs_confirmation / awaiting_report.",
+            "name": "tab",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InspectionListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Create inspection for current tenant",
+        "description": "Initialize a new inspection for a property. (POST /, inspections domain).",
+        "operationId": "createInspection",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInspection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replay of a create that named an id this workspace already holds; nothing new was created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "inspection": {
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/Inspection"
+                            },
+                            {
+                              "description": "The inspection that already exists under the supplied id."
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "inspection"
+                      ],
+                      "description": "Response payload"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "inspection": {
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/Inspection"
+                            },
+                            {
+                              "description": "The created, or already existing, inspection"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "inspection"
+                      ],
+                      "description": "Response payload"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ID_CONFLICT: the supplied id already belongs to a record outside this workspace"
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}": {
+      "get": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Get inspection for current tenant",
+        "description": "Retrieve detailed information about a single inspection.",
+        "operationId": "getInspection",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "550e8400-e29b-41d4-a716-446655440000",
+              "description": "Inspection id."
+            },
+            "required": true,
+            "description": "Inspection id.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "inspection": {
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/Inspection"
+                            },
+                            {
+                              "description": "The inspection record."
+                            }
+                          ]
+                        },
+                        "template": {
+                          "nullable": true,
+                          "description": "The associated template schema"
+                        }
+                      },
+                      "required": [
+                        "inspection"
+                      ],
+                      "description": "Response payload"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Inspection not found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Patch inspection for current tenant",
+        "description": "Partially update an inspection record. (PATCH /{id}, inspections domain).",
+        "operationId": "patchInspection",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "550e8400-e29b-41d4-a716-446655440000",
+              "description": "Inspection id."
+            },
+            "required": true,
+            "description": "Inspection id.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInspection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "revisionStatus": {
+                              "nullable": true,
+                              "description": "How the inspection's new date sits against the statutory revision its template produces"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A refused patch: a dangling soft reference (DB-16); status:cancelled, which only POST /{id}/cancel may write (#78); or any status change on an already-cancelled inspection, which only POST /{id}/uncancel may make (#81)"
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/collab/ticket": {
+      "post": {
+        "operationId": "issueCollabTicket",
+        "tags": [
+          "client"
+        ],
+        "summary": "Issue a one-time WebSocket ticket",
+        "description": "Exchanges the signed-in native client identity for a single-use ticket, valid for sixty seconds and for one inspection, which authenticates the collab or presence WebSocket upgrade through the ticket query parameter because a WebView socket cannot send an Authorization header.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection the one-time WebSocket ticket is issued for"
+            },
+            "required": true,
+            "description": "Inspection the one-time WebSocket ticket is issued for",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One-time ticket",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ticket": {
+                          "type": "string",
+                          "description": "Opaque one-time ticket to pass as the ticket query parameter of the WebSocket URL"
+                        },
+                        "expiresIn": {
+                          "type": "integer",
+                          "description": "Seconds the ticket stays valid"
+                        }
+                      },
+                      "required": [
+                        "ticket",
+                        "expiresIn"
+                      ],
+                      "description": "Response payload"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/complete": {
+      "post": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Complete inspection for current tenant",
+        "operationId": "completeInspection",
+        "description": "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection id."
+            },
+            "required": true,
+            "description": "Inspection id.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The inspection is cancelled. Bring it back with POST /{id}/uncancel first (#81)."
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/compliance": {
+      "get": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Get inspection compliance artifacts",
+        "operationId": "getInspectionCompliance",
+        "description": "Returns the ASTM E2018 compliance artifacts for the inspection — dual sign-off attestations, the Pre-Survey Questionnaire, the Document Review checklist, and the derived conformance verdict computed from all three plus the Deviations store.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Inspection identifier"
+            },
+            "required": true,
+            "description": "Inspection identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dual sign-offs, PSQ, document review checklist, and the derived ASTM E2018 conformance verdict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "reportSignoffs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "tenantId": {
+                                "type": "string"
+                              },
+                              "inspectionId": {
+                                "type": "string"
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "field_observer",
+                                  "pcr_reviewer"
+                                ]
+                              },
+                              "personId": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "license": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "qualificationsRef": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "signedAt": {
+                                "type": "number",
+                                "description": "Unix epoch milliseconds."
+                              },
+                              "signatureRef": {
+                                "type": "string",
+                                "description": "base64url Ed25519 signature over the canonical attestation payload."
+                              },
+                              "dualRole": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "tenantId",
+                              "inspectionId",
+                              "role",
+                              "personId",
+                              "name",
+                              "license",
+                              "qualificationsRef",
+                              "signedAt",
+                              "signatureRef",
+                              "dualRole"
+                            ]
+                          }
+                        },
+                        "psq": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "tenantId": {
+                              "type": "string"
+                            },
+                            "inspectionId": {
+                              "type": "string"
+                            },
+                            "responses": {
+                              "type": "object",
+                              "nullable": true,
+                              "additionalProperties": {
+                                "nullable": true
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "sent",
+                                "received",
+                                "declined"
+                              ]
+                            },
+                            "shareToken": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "sentAt": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "receivedAt": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "updatedAt": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "tenantId",
+                            "inspectionId",
+                            "responses",
+                            "status",
+                            "shareToken",
+                            "sentAt",
+                            "receivedAt",
+                            "updatedAt"
+                          ]
+                        },
+                        "documentReview": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "tenantId": {
+                                "type": "string"
+                              },
+                              "inspectionId": {
+                                "type": "string"
+                              },
+                              "documentKey": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "requested": {
+                                "type": "boolean"
+                              },
+                              "received": {
+                                "type": "boolean"
+                              },
+                              "reviewed": {
+                                "type": "boolean"
+                              },
+                              "na": {
+                                "type": "boolean"
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "sortOrder": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "tenantId",
+                              "inspectionId",
+                              "documentKey",
+                              "label",
+                              "requested",
+                              "received",
+                              "reviewed",
+                              "na",
+                              "notes",
+                              "sortOrder"
+                            ]
+                          }
+                        },
+                        "conformance": {
+                          "type": "object",
+                          "properties": {
+                            "standard": {
+                              "type": "string",
+                              "enum": [
+                                "E2018-24"
+                              ]
+                            },
+                            "conforms": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "standard",
+                            "conforms"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "reportSignoffs",
+                        "psq",
+                        "documentReview",
+                        "conformance"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/cost-items": {
+      "get": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "List cost items for an inspection",
+        "operationId": "listInspectionCostItems",
+        "description": "List every commercial PCA cost line item recorded for the inspection, in display order, for the editor panel and downstream export routes.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Inspection identifier"
+            },
+            "required": true,
+            "description": "Inspection identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The tenant-scoped cost items recorded for this inspection, sorted by sortOrder, plus the tenant reserve-schedule flag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "system": {
+                            "type": "string"
+                          },
+                          "component": {
+                            "type": "string"
+                          },
+                          "location": {
+                            "type": "string"
+                          },
+                          "action": {
+                            "type": "string",
+                            "enum": [
+                              "repair",
+                              "replace",
+                              "further_study"
+                            ]
+                          },
+                          "costMethod": {
+                            "type": "string",
+                            "enum": [
+                              "unit",
+                              "lump_sum"
+                            ]
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "uom": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "unitCostCents": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "lumpSumCents": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "eul": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "effAge": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "rul": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "suggestedRemedy": {
+                            "type": "string"
+                          },
+                          "bucket": {
+                            "type": "string",
+                            "enum": [
+                              "immediate",
+                              "short_term",
+                              "long_term"
+                            ]
+                          },
+                          "sectionRef": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "photoRef": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "sortOrder": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "system",
+                          "component",
+                          "location",
+                          "action",
+                          "costMethod",
+                          "quantity",
+                          "uom",
+                          "unitCostCents",
+                          "lumpSumCents",
+                          "eul",
+                          "effAge",
+                          "rul",
+                          "suggestedRemedy",
+                          "bucket",
+                          "sectionRef",
+                          "photoRef",
+                          "sortOrder"
+                        ]
+                      }
+                    },
+                    "reserveEnabled": {
+                      "type": "boolean",
+                      "description": "Whether the tenant has the EUL/EFF AGE/RUL reserve schedule enabled."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data",
+                    "reserveEnabled"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Create a cost item for an inspection",
+        "operationId": "createInspectionCostItem",
+        "description": "Create a new commercial PCA cost line item on the inspection. When findingKey is set and no explicit cost/remedy is given, the line is best-effort seeded from the finding's recommendation snapshot.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Inspection identifier"
+            },
+            "required": true,
+            "description": "Inspection identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "buildingId": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Phase F building/instance scope soft-ref."
+                  },
+                  "instanceIndex": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Phase F instance index within the building."
+                  },
+                  "unitId": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Phase U per-unit scope soft-ref; null = common/tagged scope."
+                  },
+                  "findingKey": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Originating finding key (unitId:sectionId:itemId), if linked."
+                  },
+                  "system": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "ASTM system grouping, e.g. \"roof\"."
+                  },
+                  "component": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Component within the system, e.g. \"membrane\"."
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "Tagged-mode scope location label."
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "repair",
+                      "replace",
+                      "further_study"
+                    ],
+                    "description": "Remedial action for this line item."
+                  },
+                  "costMethod": {
+                    "type": "string",
+                    "enum": [
+                      "unit",
+                      "lump_sum"
+                    ],
+                    "description": "Whether the cost is quantity x unit cost or a flat lump sum."
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Unit-method quantity (null for lump_sum)."
+                  },
+                  "uom": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Unit of measure for the quantity, e.g. \"sf\"."
+                  },
+                  "unitCostCents": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Per-unit cost in integer cents (unit method only)."
+                  },
+                  "lumpSumCents": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Flat total cost in integer cents (lump_sum method only)."
+                  },
+                  "eul": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Expected Useful Life in years, for the reserve schedule."
+                  },
+                  "effAge": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Effective Age in years, for the reserve schedule."
+                  },
+                  "rul": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Remaining Useful Life in years, for the reserve schedule."
+                  },
+                  "suggestedRemedy": {
+                    "type": "string",
+                    "description": "Free-text remedy description shown on the report line."
+                  },
+                  "bucket": {
+                    "type": "string",
+                    "enum": [
+                      "immediate",
+                      "short_term",
+                      "long_term"
+                    ],
+                    "description": "Deferred maintenance vs. capital reserve bucket."
+                  },
+                  "sectionRef": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Report section anchor this line item cross-references."
+                  },
+                  "photoRef": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Photo key this line item cross-references."
+                  },
+                  "sortOrder": {
+                    "type": "integer",
+                    "description": "Display order within the bucket."
+                  }
+                },
+                "required": [
+                  "system",
+                  "component",
+                  "action",
+                  "costMethod",
+                  "bucket"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The newly created cost item id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/cost-items/{itemId}": {
+      "delete": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Delete an inspection cost item",
+        "operationId": "deleteInspectionCostItem",
+        "description": "Delete a commercial PCA cost line item, tenant-scoped. Removing an item never touches the finding it was linked from.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Inspection identifier"
+            },
+            "required": true,
+            "description": "Inspection identifier",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Cost item identifier"
+            },
+            "required": true,
+            "description": "Cost item identifier",
+            "name": "itemId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete acknowledged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Update an existing inspection cost item",
+        "operationId": "updateInspectionCostItem",
+        "description": "Patch any subset of fields on an existing commercial PCA cost line item, tenant-scoped and restricted to the inspection it already belongs to.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Inspection identifier"
+            },
+            "required": true,
+            "description": "Inspection identifier",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Cost item identifier"
+            },
+            "required": true,
+            "description": "Cost item identifier",
+            "name": "itemId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "buildingId": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Phase F building/instance scope soft-ref."
+                  },
+                  "instanceIndex": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Phase F instance index within the building."
+                  },
+                  "unitId": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Phase U per-unit scope soft-ref; null = common/tagged scope."
+                  },
+                  "findingKey": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Originating finding key (unitId:sectionId:itemId), if linked."
+                  },
+                  "system": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "ASTM system grouping, e.g. \"roof\"."
+                  },
+                  "component": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Component within the system, e.g. \"membrane\"."
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "Tagged-mode scope location label."
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "repair",
+                      "replace",
+                      "further_study"
+                    ],
+                    "description": "Remedial action for this line item."
+                  },
+                  "costMethod": {
+                    "type": "string",
+                    "enum": [
+                      "unit",
+                      "lump_sum"
+                    ],
+                    "description": "Whether the cost is quantity x unit cost or a flat lump sum."
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Unit-method quantity (null for lump_sum)."
+                  },
+                  "uom": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Unit of measure for the quantity, e.g. \"sf\"."
+                  },
+                  "unitCostCents": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Per-unit cost in integer cents (unit method only)."
+                  },
+                  "lumpSumCents": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Flat total cost in integer cents (lump_sum method only)."
+                  },
+                  "eul": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Expected Useful Life in years, for the reserve schedule."
+                  },
+                  "effAge": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Effective Age in years, for the reserve schedule."
+                  },
+                  "rul": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "description": "Remaining Useful Life in years, for the reserve schedule."
+                  },
+                  "suggestedRemedy": {
+                    "type": "string",
+                    "description": "Free-text remedy description shown on the report line."
+                  },
+                  "bucket": {
+                    "type": "string",
+                    "enum": [
+                      "immediate",
+                      "short_term",
+                      "long_term"
+                    ],
+                    "description": "Deferred maintenance vs. capital reserve bucket."
+                  },
+                  "sectionRef": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Report section anchor this line item cross-references."
+                  },
+                  "photoRef": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Photo key this line item cross-references."
+                  },
+                  "sortOrder": {
+                    "type": "integer",
+                    "description": "Display order within the bucket."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update acknowledged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/media/upload-url": {
+      "post": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Mint a signed photo upload URL",
+        "operationId": "createInspectionPhotoUploadUrl",
+        "description": "Mint a signed, 24-hour photo upload URL for a native client. The URL needs no Authorization header, so a background upload survives an expired access token. The same pendingId always maps to the same storage key.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection the photo belongs to"
+            },
+            "required": true,
+            "description": "Inspection the photo belongs to",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoUploadUrlRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed upload URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PhotoUploadUrlResponse"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The caller is not a signed-in native client"
+          },
+          "404": {
+            "description": "Inspection not found in this workspace"
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/media/video/create-upload": {
+      "post": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Mint a video upload URL (Stream or R2 backend)",
+        "operationId": "createInspectionVideoUpload",
+        "description": "Mint a one-shot video upload URL. For paid tenants (SaaS) or stream-mode self-host, returns a Cloudflare Stream direct-creator-upload URL; otherwise returns a worker-proxied R2 upload URL.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection id"
+            },
+            "required": true,
+            "description": "Inspection id",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVideoUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload URL minted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/VideoCreateUploadResponse"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/media/video/finalize": {
+      "post": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Finalize a video upload — insert the media-pool row (idempotent)",
+        "operationId": "finalizeInspectionVideo",
+        "description": "Insert an inspection_media_pool video row after the upload completes. Idempotent. Body is a discriminated VideoRef (stream or r2).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection id"
+            },
+            "required": true,
+            "description": "Inspection id",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VideoRef"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pool video row created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/VideoFinalizeResponse"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/media/video/poster": {
+      "post": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Set a video poster frame (Stream-only: thumbnailTimestampPct as a 0..1 fraction)",
+        "operationId": "setInspectionVideoPoster",
+        "description": "Set the Cloudflare Stream poster frame and persist posterPct on the pool row. Stream-only — R2 videos use the r2-upload-poster route.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection id"
+            },
+            "required": true,
+            "description": "Inspection id",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPoster"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Poster set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/media/video/{streamUid}": {
+      "delete": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Delete a walk-through video from the backend + drop the pool row",
+        "operationId": "deleteInspectionVideo",
+        "description": "Delete a video from the active backend (Cloudflare Stream or R2) and remove its media-pool row. Pass the Stream UID for Stream videos or the mediaId for R2 videos.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection id"
+            },
+            "required": true,
+            "description": "Inspection id",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stream UID (Stream) or mediaId (R2)"
+            },
+            "required": true,
+            "description": "Stream UID (Stream) or mediaId (R2)",
+            "name": "streamUid",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Video deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/report-data": {
+      "get": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Get structured report data",
+        "operationId": "listInspectionReportData",
+        "description": "Return the structured report payload of an inspection: header facts, rating levels, rating counts and sections with their items.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Inspection id."
+            },
+            "required": true,
+            "description": "Inspection id.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ReportData"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/results": {
+      "get": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "List inspection results for current tenant",
+        "operationId": "listInspectionResults",
+        "description": "Return the saved findings of an inspection as a map keyed by item id. Pass scope to read the slice for one unit.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection id."
+            },
+            "required": true,
+            "description": "Inspection id.",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Optional per-unit scope to slice the results map (unit id, or \"_default\" for the common scope). Omit for the full map."
+            },
+            "required": false,
+            "description": "Optional per-unit scope to slice the results map (unit id, or \"_default\" for the common scope). Omit for the full map.",
+            "name": "scope",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "results": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          },
+                          "description": "Saved findings keyed by item id."
+                        },
+                        "resultId": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Primary key of the inspection_results row backing this map, or null for legacy inspections that have none yet."
+                        }
+                      },
+                      "required": [
+                        "results",
+                        "resultId"
+                      ],
+                      "description": "Response payload"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/statutory-details": {
+      "get": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "The inspection-level answers this inspection's statutory form asks for",
+        "description": "Every field is null until somebody fills it in; null is a normal answer.",
+        "operationId": "getInspectionStatutoryDetails",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection ID"
+            },
+            "required": true,
+            "description": "Inspection ID",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What has been recorded"
+          },
+          "404": {
+            "description": "No such inspection, or its template declares no statutory form"
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/statutory-form/coverage": {
+      "get": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Which fields this inspection still owes its statutory form",
+        "description": "Names the required fields that have no answer yet, each tagged with when it could first have been answered. Requires no published report. `null` when the template declares no form, which is the ordinary case.",
+        "operationId": "getInspectionStatutoryCoverage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection ID"
+            },
+            "required": true,
+            "description": "Inspection ID",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The coverage, or null when this inspection produces no form"
+          },
+          "404": {
+            "description": "No such inspection for this workspace"
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/unit-progress": {
+      "get": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Per-unit rated/total progress summary (server-computed, no full map)",
+        "operationId": "listInspectionUnitProgress",
+        "description": "Returns { units: [{ unitId, rated, total }], commonRated, total } for an inspection. `total` is the template item count; `rated` counts each scope's findings that carry a truthy rating. Computed server-side from one results row to avoid shipping the full results map to the client.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection id whose per-unit progress is summarized"
+            },
+            "required": true,
+            "description": "Inspection id whose per-unit progress is summarized",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/units": {
+      "get": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "List units for an inspection (flat — client builds tree)",
+        "operationId": "listInspectionUnits",
+        "description": "List the units of an inspection as a flat list; the client assembles the tree.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection id."
+            },
+            "required": true,
+            "description": "Inspection id.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/api/recommendations": {
+      "get": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "List recommendations (filter: category, severity)",
+        "operationId": "listRecommendations",
+        "description": "List the company recommendation library, optionally filtered by category or severity.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Return only recommendations in this category."
+            },
+            "required": false,
+            "description": "Return only recommendations in this category.",
+            "name": "category",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "good",
+                "marginal",
+                "significant",
+                "minor"
+              ],
+              "description": "Return only recommendations of this severity."
+            },
+            "required": false,
+            "description": "Return only recommendations of this severity.",
+            "name": "severity",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags": {
+      "get": {
+        "tags": [
+          "tags"
+        ],
+        "summary": "List tags for the current tenant (seed + custom)",
+        "operationId": "listTags",
+        "description": "List the company tags, built-in and custom.",
+        "responses": {
+          "200": {
+            "description": "List",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AiContentReviewRequest": {
+        "type": "object",
+        "properties": {
+          "artifactType": {
+            "type": "string",
+            "enum": [
+              "inspection_result",
+              "report"
+            ],
+            "example": "inspection_result",
+            "description": "Which table holds the row that received the text: 'inspection_result' for per-item prose (inspection_results.data), 'report' for the inspector's report-level narrative (reports.inspector_narrative)."
+          },
+          "artifactId": {
+            "type": "string",
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "Primary key of the row that received the text."
+          },
+          "aiCallId": {
+            "type": "string",
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "The ai_call_provenance row id this review is about."
+          }
+        },
+        "required": [
+          "artifactType",
+          "artifactId",
+          "aiCallId"
+        ]
+      },
+      "AiContentReviewResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "True when the request succeeded."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "reviewed": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ],
+                "example": true,
+                "description": "The review is on file. True for both a fresh record and a retry."
+              }
+            },
+            "required": [
+              "reviewed"
+            ],
+            "description": "Response payload"
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "example": "Error message",
+                "description": "Human-readable description of the error."
+              },
+              "code": {
+                "type": "string",
+                "example": "ERROR_CODE",
+                "description": "Stable machine-readable error code."
+              },
+              "details": {
+                "nullable": true,
+                "description": "Optional structured context for the error, such as per-field validation failures."
+              }
+            },
+            "required": [
+              "message",
+              "code"
+            ],
+            "description": "Error detail; present only when the request failed."
+          },
+          "meta": {
+            "nullable": true,
+            "description": "Optional response metadata, such as pagination information."
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "CommentAssistRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "example": "Roof is bad",
+            "description": "Rough inspector note to rewrite."
+          },
+          "context": {
+            "type": "string",
+            "example": "Roof inspection",
+            "description": "Optional description of what is being inspected, to guide the rewrite."
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "CommentAssistResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "True when the request succeeded."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "example": "The roof covering shows signs of significant wear and deterioration.",
+                "description": "The rewritten, report-ready comment."
+              },
+              "aiCallId": {
+                "type": "string",
+                "example": "550e8400-e29b-41d4-a716-446655440000",
+                "description": "The ai_call_provenance row id for this call — what a content-review record cites."
+              }
+            },
+            "required": [
+              "text",
+              "aiCallId"
+            ],
+            "description": "Response payload"
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "example": "Error message",
+                "description": "Human-readable description of the error."
+              },
+              "code": {
+                "type": "string",
+                "example": "ERROR_CODE",
+                "description": "Stable machine-readable error code."
+              },
+              "details": {
+                "nullable": true,
+                "description": "Optional structured context for the error, such as per-field validation failures."
+              }
+            },
+            "required": [
+              "message",
+              "code"
+            ],
+            "description": "Error detail; present only when the request failed."
+          },
+          "meta": {
+            "nullable": true,
+            "description": "Optional response metadata, such as pagination information."
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ContractorType": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Contractor type id."
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Owning tenant."
+          },
+          "name": {
+            "type": "string",
+            "description": "Label."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Display order."
+          },
+          "tradeSlug": {
+            "type": "string",
+            "nullable": true,
+            "description": "Canonical DEFECT_TRADES slug this type maps to, or null for a tenant-created type with no counterpart in the vocabulary. Stable across renames — it is what survives a tenant renaming the display label."
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "description": "Creation time."
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "name",
+          "sortOrder",
+          "tradeSlug",
+          "createdAt"
+        ]
+      },
+      "CreateInspection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "example": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "Client-generated identifier (opaque, safe characters only); repeating a create with the same id returns the existing inspection"
+          },
+          "propertyAddress": {
+            "type": "string",
+            "minLength": 5,
+            "example": "123 Main St, Anytown",
+            "description": "Street address of the property to inspect (at least 5 characters)."
+          },
+          "clientName": {
+            "type": "string",
+            "minLength": 1,
+            "default": "Private Client",
+            "example": "John Doe",
+            "description": "Client name; defaults to Private Client when omitted."
+          },
+          "clientEmail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  ""
+                ]
+              },
+              {
+                "nullable": true
+              }
+            ],
+            "example": "john@example.com",
+            "description": "Client email address; an empty string is treated as no email."
+          },
+          "clientPhone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30,
+            "example": "(555) 123-4567",
+            "description": "Client phone number."
+          },
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440002",
+            "description": "Id of the inspection template to build the inspection from."
+          },
+          "inspectorId": {
+            "type": "string",
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440001",
+            "description": "Inspector (users.id) to assign to the inspection."
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-03-20T10:00:00Z",
+            "description": "Scheduled date and time as an ISO 8601 datetime."
+          },
+          "referredByAgentId": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440003",
+            "description": "Contact id of the agent who referred the job."
+          },
+          "sellingAgentId": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440004",
+            "description": "Contact id of the selling-side agent; recorded as a person on the inspection rather than as an inspection column."
+          },
+          "addressPlaceId": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Place identifier returned by the address autocomplete that supplied the geocoded fields."
+          },
+          "addressStreet": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "description": "Street line of the geocoded address."
+          },
+          "addressCity": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 100,
+            "description": "City of the geocoded address."
+          },
+          "addressState": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10,
+            "description": "State or region code of the geocoded address."
+          },
+          "addressZip": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20,
+            "description": "Postal code of the geocoded address."
+          },
+          "addressCounty": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 100,
+            "description": "County of the geocoded address."
+          },
+          "addressLat": {
+            "type": "number",
+            "nullable": true,
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude of the geocoded address, from -90 to 90."
+          },
+          "addressLng": {
+            "type": "number",
+            "nullable": true,
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude of the geocoded address, from -180 to 180."
+          },
+          "propertyType": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "single_family",
+              "multi_unit",
+              "commercial",
+              null
+            ],
+            "example": "commercial",
+            "description": "What kind of property is being inspected. Decides report tier, PCA block, Building Profile preset and the per-unit editor surface. Omit for unclassified."
+          },
+          "serviceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Legacy flat service-id list. Kept for backward compat. When serviceSelections is also present, serviceSelections takes precedence for per-row price overrides; any serviceId listed here but absent from serviceSelections is linked without a priceOverride."
+          },
+          "serviceSelections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "serviceId": {
+                  "type": "string",
+                  "description": "Service catalog id to link to the inspection."
+                },
+                "priceOverrideCents": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Per-line price override in cents. Omit to use the catalog price."
+                }
+              },
+              "required": [
+                "serviceId"
+              ]
+            },
+            "description": "IA-1: Richer service list that carries optional per-row price overrides. Superset of serviceIds."
+          },
+          "client": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Client full name."
+              },
+              "email": {
+                "type": "string",
+                "format": "email",
+                "description": "Client email — used to deduplicate against the contacts table."
+              },
+              "phone": {
+                "type": "string",
+                "description": "Client phone number."
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "description": "IA-1: When present, upserts a contact row and links it as client_contact_id."
+          },
+          "agentContactId": {
+            "type": "string",
+            "description": "IA-1: Existing contacts.id to link as referred_by_agent_id."
+          },
+          "newAgent": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Agent full name."
+              },
+              "email": {
+                "type": "string",
+                "format": "email",
+                "description": "Agent email — used to deduplicate against the contacts table."
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "description": "IA-1: When present, upserts a contact row of type=agent and links it as referred_by_agent_id."
+          },
+          "discountCodeId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Id of the discount code applied to the job, or null."
+          },
+          "discountAmount": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Discount applied to the job, in cents, or null."
+          },
+          "price": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Inspection price in cents."
+          },
+          "paymentRequired": {
+            "type": "boolean",
+            "example": false,
+            "description": "Overrides the company policy: when true the inspection is gated on payment. Omit to inherit the company setting."
+          },
+          "agreementRequired": {
+            "type": "boolean",
+            "example": false,
+            "description": "Overrides the company policy: when true the inspection is gated on a signed agreement. Omit to inherit the company setting."
+          }
+        },
+        "required": [
+          "propertyAddress",
+          "templateId"
+        ],
+        "description": "Inspection details; an optional client-generated id makes a repeated create return the existing inspection"
+      },
+      "CreateVideoUpload": {
+        "type": "object",
+        "properties": {
+          "caption": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Optional caption to remember for the clip once uploaded"
+          },
+          "itemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional inspection item id remembering placement intent"
+          }
+        }
+      },
+      "DefectCategory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Defect category id."
+          },
+          "name": {
+            "type": "string",
+            "description": "Category label."
+          },
+          "color": {
+            "type": "string",
+            "description": "Swatch color."
+          },
+          "drivesSummary": {
+            "type": "boolean",
+            "description": "Whether defects in this category count toward the report Summary."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Display order."
+          },
+          "isSeed": {
+            "type": "boolean",
+            "description": "True for the built-in maintenance/recommendation/safety rows (not user-deletable)."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "drivesSummary",
+          "sortOrder",
+          "isSeed"
+        ]
+      },
+      "Inspection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "Inspection id."
+          },
+          "propertyAddress": {
+            "type": "string",
+            "example": "123 Main St, Anytown",
+            "description": "Street address of the inspected property."
+          },
+          "clientName": {
+            "type": "string",
+            "nullable": true,
+            "example": "John Doe",
+            "description": "Name of the primary client, or null when none is recorded."
+          },
+          "clientEmail": {
+            "type": "string",
+            "nullable": true,
+            "format": "email",
+            "example": "john@example.com",
+            "description": "Email address of the primary client, or null when none is recorded."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "requested",
+              "scheduled",
+              "confirmed",
+              "completed",
+              "cancelled"
+            ],
+            "example": "requested",
+            "description": "Lifecycle status of the inspection."
+          },
+          "date": {
+            "type": "string",
+            "example": "2024-03-20",
+            "description": "Scheduled inspection date."
+          },
+          "inspectorId": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440001",
+            "description": "Assigned inspector (users.id)."
+          },
+          "templateId": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440002",
+            "description": "Id of the template the inspection is built from, or null when none is attached."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-03-20T10:00:00Z",
+            "description": "When the inspection record was created (ISO 8601)."
+          }
+        },
+        "required": [
+          "id",
+          "propertyAddress",
+          "clientName",
+          "clientEmail",
+          "status",
+          "date",
+          "inspectorId",
+          "templateId",
+          "createdAt"
+        ]
+      },
+      "InspectionListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "True when the request succeeded."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Inspection"
+            },
+            "description": "Response payload"
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "example": "Error message",
+                "description": "Human-readable description of the error."
+              },
+              "code": {
+                "type": "string",
+                "example": "ERROR_CODE",
+                "description": "Stable machine-readable error code."
+              },
+              "details": {
+                "nullable": true,
+                "description": "Optional structured context for the error, such as per-field validation failures."
+              }
+            },
+            "required": [
+              "message",
+              "code"
+            ],
+            "description": "Error detail; present only when the request failed."
+          },
+          "meta": {
+            "nullable": true,
+            "description": "Optional response metadata, such as pagination information."
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "PhotoUploadUrlRequest": {
+        "type": "object",
+        "properties": {
+          "pendingId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "description": "Client-generated media id; repeating the request with the same id yields the same storage key"
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/heic"
+            ],
+            "description": "Content type of the photo that will be uploaded to the returned URL"
+          }
+        },
+        "required": [
+          "pendingId",
+          "contentType"
+        ]
+      },
+      "PhotoUploadUrlResponse": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Relative upload URL carrying a signed token; POST the photo as multipart field \"file\" to it"
+          },
+          "key": {
+            "type": "string",
+            "description": "Storage key the photo will be written to"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "Token expiry as epoch milliseconds"
+          }
+        },
+        "required": [
+          "url",
+          "key",
+          "expiresAt"
+        ],
+        "description": "Response payload"
+      },
+      "Recommendation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recommendation id."
+          },
+          "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Id of the company that owns the recommendation."
+          },
+          "category": {
+            "type": "string",
+            "nullable": true,
+            "description": "Recommendation category, or null."
+          },
+          "name": {
+            "type": "string",
+            "description": "Recommendation name."
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "good",
+              "marginal",
+              "significant",
+              "minor"
+            ],
+            "description": "Severity class of the recommendation."
+          },
+          "defaultRepairSummary": {
+            "type": "string",
+            "description": "Scope of the repair. A repair item carries scope, never a price."
+          },
+          "recommendedContractorTypeId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Soft reference to contractor_types.id; suggested contractor for this repair item."
+          },
+          "createdByUserId": {
+            "type": "string",
+            "nullable": true,
+            "description": "User who created the recommendation, or null for seeded entries."
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "description": "When the recommendation was created."
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "category",
+          "name",
+          "severity",
+          "defaultRepairSummary",
+          "recommendedContractorTypeId",
+          "createdByUserId",
+          "createdAt"
+        ]
+      },
+      "RecommendationListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "True when the request succeeded."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Recommendation"
+            },
+            "description": "Recommendation payload."
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReportData": {
+        "type": "object",
+        "properties": {
+          "inspection": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Inspection id."
+              },
+              "propertyAddress": {
+                "type": "string",
+                "description": "Street address of the inspected property."
+              },
+              "date": {
+                "type": "string",
+                "description": "Inspection date."
+              },
+              "status": {
+                "type": "string",
+                "description": "Lifecycle status of the inspection."
+              },
+              "inspectorName": {
+                "type": "string",
+                "nullable": true,
+                "description": "Name of the inspector, or null."
+              }
+            },
+            "required": [
+              "id",
+              "propertyAddress",
+              "date",
+              "status",
+              "inspectorName"
+            ],
+            "description": "Header facts about the inspection."
+          },
+          "styleProfile": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "schemaVersion": {
+                "type": "number"
+              },
+              "colour": {
+                "type": "string",
+                "nullable": true
+              },
+              "badgeLayout": {
+                "type": "string",
+                "enum": [
+                  "strip",
+                  "inline"
+                ]
+              },
+              "photoColumns": {
+                "type": "number"
+              },
+              "tokens": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "schemaVersion",
+              "colour",
+              "badgeLayout",
+              "photoColumns",
+              "tokens"
+            ],
+            "description": "Resolved report appearance profile (Report Style Presets)"
+          },
+          "inspectorCredentials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "memberNumber": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "imageUrl": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "label",
+                "memberNumber",
+                "imageUrl"
+              ]
+            },
+            "description": "Inspector self-asserted credentials snapshotted into the report (Spec B)"
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "number",
+                "description": "Total number of rated items."
+              },
+              "satisfactory": {
+                "type": "number",
+                "description": "Number of items rated satisfactory."
+              },
+              "monitor": {
+                "type": "number",
+                "description": "Number of items rated for monitoring."
+              },
+              "defect": {
+                "type": "number",
+                "description": "Number of items rated as defects."
+              }
+            },
+            "required": [
+              "total",
+              "satisfactory",
+              "monitor",
+              "defect"
+            ],
+            "description": "Rating counts across the whole report."
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportSection"
+            },
+            "description": "Report sections in display order."
+          },
+          "ratingLevels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Rating level id."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "Rating level label."
+                },
+                "abbreviation": {
+                  "type": "string",
+                  "description": "Short form of the rating label."
+                },
+                "color": {
+                  "type": "string",
+                  "description": "Display colour of the rating level."
+                },
+                "severity": {
+                  "type": "string",
+                  "description": "Severity class of the rating level."
+                },
+                "isDefect": {
+                  "type": "boolean",
+                  "description": "True when items with this rating count as defects."
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "abbreviation",
+                "color",
+                "severity",
+                "isDefect"
+              ]
+            },
+            "description": "Rating levels available to the report, in display order."
+          }
+        },
+        "required": [
+          "inspection",
+          "styleProfile",
+          "inspectorCredentials",
+          "stats",
+          "sections",
+          "ratingLevels"
+        ],
+        "description": "Response payload"
+      },
+      "ReportItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Item id."
+          },
+          "label": {
+            "type": "string",
+            "description": "Item label as shown in the report."
+          },
+          "rating": {
+            "type": "string",
+            "nullable": true,
+            "description": "Rating level id chosen for the item, or null when unrated."
+          },
+          "ratingColor": {
+            "type": "string",
+            "description": "Display colour of the chosen rating level."
+          },
+          "ratingLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Display label of the chosen rating level, or null when unrated."
+          },
+          "severityBucket": {
+            "type": "string",
+            "enum": [
+              "satisfactory",
+              "monitor",
+              "defect",
+              "other"
+            ],
+            "description": "Report grouping the rating falls into."
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "description": "Inspector notes for the item, or null."
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "Storage key of the photo."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Download URL of the photo."
+                }
+              },
+              "required": [
+                "key",
+                "url"
+              ]
+            },
+            "description": "Photos attached to the item."
+          },
+          "recommendation": {
+            "type": "string",
+            "nullable": true,
+            "description": "Recommendation text attached to the item, if any."
+          },
+          "repairItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "summary": {
+                  "type": "string"
+                },
+                "estimateMin": {
+                  "type": "number",
+                  "nullable": true
+                },
+                "estimateMax": {
+                  "type": "number",
+                  "nullable": true
+                },
+                "contractorType": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "summary",
+                "estimateMin",
+                "estimateMax",
+                "contractorType"
+              ]
+            },
+            "description": "Attached repair items snapshotted on this finding (dollars, not cents)."
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "rating",
+          "ratingColor",
+          "ratingLabel",
+          "severityBucket",
+          "notes",
+          "photos"
+        ]
+      },
+      "ReportSection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Section id."
+          },
+          "title": {
+            "type": "string",
+            "description": "Section title."
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true,
+            "description": "Icon name for the section, or null."
+          },
+          "defectCount": {
+            "type": "number",
+            "description": "Number of items in the section rated as defects."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportItem"
+            },
+            "description": "Items in the section."
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "defectCount",
+          "items"
+        ]
+      },
+      "SetPoster": {
+        "type": "object",
+        "properties": {
+          "streamUid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloudflare Stream UID"
+          },
+          "posterPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Poster timestamp as a fraction of duration (0..1)"
+          }
+        },
+        "required": [
+          "streamUid",
+          "posterPct"
+        ]
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "True when the request succeeded."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean",
+                "example": true,
+                "description": "True when the request succeeded."
+              }
+            },
+            "required": [
+              "success"
+            ],
+            "description": "Present when the action reports a result."
+          },
+          "error": {
+            "nullable": true,
+            "description": "Error detail; present only when the request failed."
+          },
+          "meta": {
+            "nullable": true,
+            "description": "Optional response metadata, such as pagination information."
+          }
+        },
+        "required": [
+          "success"
+        ]
+      },
+      "Tag": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tag id."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "Tag name, at most 40 characters."
+          },
+          "color": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[a-z]{3,20}$",
+            "description": "Colour token for the tag, or null."
+          },
+          "isSeed": {
+            "type": "boolean",
+            "description": "True for built-in tags that ship with the company."
+          },
+          "createdAt": {
+            "type": "number",
+            "description": "When the tag was created (epoch milliseconds)."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "isSeed",
+          "createdAt"
+        ]
+      },
+      "TagListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "True when the request succeeded."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            },
+            "description": "Response payload"
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "example": "Error message",
+                "description": "Human-readable description of the error."
+              },
+              "code": {
+                "type": "string",
+                "example": "ERROR_CODE",
+                "description": "Stable machine-readable error code."
+              },
+              "details": {
+                "nullable": true,
+                "description": "Optional structured context for the error, such as per-field validation failures."
+              }
+            },
+            "required": [
+              "message",
+              "code"
+            ],
+            "description": "Error detail; present only when the request failed."
+          },
+          "meta": {
+            "nullable": true,
+            "description": "Optional response metadata, such as pagination information."
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "UpdateInspection": {
+        "type": "object",
+        "properties": {
+          "propertyAddress": {
+            "type": "string",
+            "minLength": 5,
+            "example": "123 Main St, Anytown",
+            "description": "New street address of the property (at least 5 characters)."
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            ],
+            "example": "2024-03-20T10:00:00Z",
+            "description": "New date: ISO datetime or bare YYYY-MM-DD (calendar drag). Moves the scheduled instant with it, preserving tenant wall-clock time."
+          },
+          "inspectorId": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440001",
+            "description": "Assigned inspector (users.id) — must be a member of the caller's tenant; null unassigns."
+          },
+          "price": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 450,
+            "description": "Inspection price in cents."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "requested",
+              "scheduled",
+              "confirmed",
+              "completed",
+              "cancelled"
+            ],
+            "example": "completed",
+            "description": "New lifecycle status of the inspection."
+          },
+          "paymentRequired": {
+            "type": "boolean",
+            "example": false,
+            "description": "When true the inspection is gated on payment."
+          },
+          "agreementRequired": {
+            "type": "boolean",
+            "example": false,
+            "description": "When true the inspection is gated on a signed agreement."
+          },
+          "propertyType": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "single_family",
+              "multi_unit",
+              "commercial",
+              null
+            ],
+            "example": "commercial",
+            "description": "Reclassify the property. Decides report tier, PCA block, Building Profile preset and the per-unit editor surface. Moving off commercial hides commercial data without deleting it; null clears the classification."
+          },
+          "yearBuilt": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1800,
+            "maximum": 2100,
+            "example": 1990,
+            "description": "Year the property was built, from 1800 to 2100; null clears it."
+          },
+          "sqft": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "example": 1800,
+            "description": "Floor area in square feet; null clears it."
+          },
+          "foundationType": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "basement",
+              "slab",
+              "crawlspace",
+              "other",
+              null
+            ],
+            "description": "Foundation type of the property; null clears it."
+          },
+          "bedrooms": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "example": 3,
+            "description": "Number of bedrooms; null clears it."
+          },
+          "bathrooms": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 20,
+            "example": 2.5,
+            "description": "Number of bathrooms, halves allowed; null clears it."
+          },
+          "lotSize": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 50,
+            "example": "0.25 acres",
+            "description": "Free-text lot size, for example 0.25 acres; null clears it."
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 50,
+            "description": "Unit or suite identifier within the property; null clears it."
+          },
+          "county": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 100,
+            "description": "County of the property; null clears it."
+          },
+          "closingDate": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "example": "2026-07-15",
+            "description": "Closing date of the property sale (YYYY-MM-DD); null clears it."
+          },
+          "referenceNumber": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 64,
+            "example": "REF-2026-0142",
+            "description": "External order or reference number for the job; null clears it."
+          },
+          "referralSource": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 100,
+            "example": "Realtor",
+            "description": "Free-text label for the referral channel; null clears it."
+          },
+          "referredByContactId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Contact who referred this job. Any contact, not only agents; distinct from referral_source, which is the channel."
+          },
+          "profileOverride": {
+            "type": "string",
+            "nullable": true,
+            "example": "meridian",
+            "description": "Per-inspection appearance profile override (built-in profile id); NULL inherits"
+          },
+          "badgeLayoutOverride": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "strip",
+              "inline",
+              null
+            ],
+            "example": "inline",
+            "description": "Per-inspection credential badge layout override; NULL inherits the profile"
+          },
+          "reportPhotoColumns": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 4,
+            "example": 2,
+            "description": "Per-inspection report photo grid columns (1-4); NULL inherits the profile"
+          },
+          "coverPhotoId": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "example": "tenant/insp/itemId_uuid.jpg",
+            "description": "Report cover photo — the R2 key of a photo belonging to this inspection (attached item photo or pool photo); null clears it."
+          },
+          "requireDefectFieldsOverride": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "none",
+              "location",
+              "trade",
+              "both",
+              null
+            ],
+            "description": "Per-inspection override of which defect fields the publish gate requires; null inherits the tenant default."
+          },
+          "autoSignOnPublish": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the inspector signature is auto-applied when the report is published."
+          },
+          "templateId": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440002",
+            "description": "Template assigned to this inspection (free-text template id)."
+          },
+          "depositRequiredCents": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "example": 9000,
+            "description": "Deposit owed on this order, in integer cents. Setting it marks the order as operator-overridden; null clears the override."
+          }
+        }
+      },
+      "VideoCreateUploadResponse": {
+        "type": "object",
+        "properties": {
+          "uploadURL": {
+            "type": "string",
+            "description": "One-shot upload URL (Cloudflare Stream or worker r2-upload endpoint)"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "stream",
+              "r2"
+            ],
+            "description": "Video backend provider selected for this tenant"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "stream"
+                    ]
+                  },
+                  "streamUid": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "streamUid"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "r2"
+                    ]
+                  },
+                  "mediaId": {
+                    "type": "string"
+                  },
+                  "r2Key": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "mediaId",
+                  "r2Key"
+                ]
+              }
+            ],
+            "description": "Backend-specific video reference — echo this back to finalize"
+          }
+        },
+        "required": [
+          "uploadURL",
+          "provider",
+          "ref"
+        ],
+        "description": "Response payload"
+      },
+      "VideoFinalizeResponse": {
+        "type": "object",
+        "properties": {
+          "poolId": {
+            "type": "string",
+            "description": "inspection_media_pool row id"
+          },
+          "streamUid": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cloudflare Stream UID (null for R2 videos)"
+          },
+          "durationSec": {
+            "type": "number",
+            "nullable": true,
+            "description": "Video duration in seconds (null if not yet known)"
+          },
+          "readyToStream": {
+            "type": "boolean",
+            "description": "Whether the video is ready for playback"
+          }
+        },
+        "required": [
+          "poolId",
+          "streamUid",
+          "durationSec",
+          "readyToStream"
+        ],
+        "description": "Response payload"
+      },
+      "VideoRef": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "stream"
+                ]
+              },
+              "streamUid": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cloudflare Stream UID returned by create-upload"
+              }
+            },
+            "required": [
+              "provider",
+              "streamUid"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "r2"
+                ]
+              },
+              "mediaId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "R2 media row id (UUID) from r2-upload response"
+              },
+              "r2Key": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Real R2 object key from r2-upload response (with correct extension)"
+              },
+              "posterKey": {
+                "type": "string",
+                "description": "R2 poster object key from r2-upload-poster response"
+              }
+            },
+            "required": [
+              "provider",
+              "mediaId",
+              "r2Key"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

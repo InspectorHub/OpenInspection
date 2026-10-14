@@ -32,7 +32,7 @@ const commentAssistRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: CommentAssistSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: CommentAssistSchema,
                 },
             },
         },
@@ -41,14 +41,14 @@ const commentAssistRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: CommentAssistResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: CommentAssistResponseSchema,
                 },
             },
             description: 'Success',
         },
     },
     operationId: "createAiCommentAssist",
-    description: "Auto-generated placeholder for createAiCommentAssist (POST /comment-assist, ai domain). TODO: replace with a real description sourced from the handler."
+    description: "Rewrite a rough inspector note as clear report prose. Returns the rewritten text and the id of the AI call record that produced it."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -65,7 +65,7 @@ const autoSummaryRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: AutoSummarySchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AutoSummarySchema,
                 },
             },
         },
@@ -74,7 +74,7 @@ const autoSummaryRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: AutoSummaryResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AutoSummaryResponseSchema,
                 },
             },
             description: 'Success',
@@ -101,11 +101,11 @@ const commentEditRoute = createRoute(withMcpMetadata({
     summary: 'Rewrite a canned comment with AI assistance',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        body: { content: { 'application/json': { schema: CommentEditSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: CommentEditSchema } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: CommentEditResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: CommentEditResponseSchema } },
             description: 'Rewritten comment',
         },
     },
@@ -121,12 +121,12 @@ const suggestCommentRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         body: {
-            content: { 'application/json': { schema: SuggestCommentSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuggestCommentSchema } },
         },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuggestCommentResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuggestCommentResponseSchema } },
             description: 'Suggestions',
         },
     },
