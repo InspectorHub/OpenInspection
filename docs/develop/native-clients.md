@@ -1,0 +1,397 @@
+# Native clients
+
+The engine can serve an offline-first native app (iOS, Android, Windows). This
+page describes the server-side mechanisms: how a native client signs in, how it
+and the server agree on a version, how it uploads media and reconnects its
+editor, how work captured offline reaches the server, and which parts of the API
+are a promise to installed binaries and therefore may only grow.
+
+It is written for two readers: an operator who runs a deployment, and a
+contributor who changes the engine. The native app itself is a separate
+project; nothing here depends on how it is built.
+
+---
+
+## 1. Turning it on
+
+Set `NATIVE_CLIENT_ENABLED` to `true` (or `1`) on the worker and redeploy.
+
+```jsonc
+// wrangler.local.jsonc, under "vars"
+{ "vars": { "NATIVE_CLIENT_ENABLED": "true" } }
+```
+
+The switch is **off by default**, and off means closed rather than quiet:
+
+- the authorization step, the token exchange and the refresh grant refuse a
+  native client;
+- a native access token presented to `/api/*` is rejected (on `/mcp` a native
+  grant is always refused with `403`, whatever the switch says);
+- a one-time WebSocket ticket (section 7) is rejected.
+
+Everything else behaves exactly as it did. The OAuth provider is mounted when
+either `MCP_ENABLED` or `NATIVE_CLIENT_ENABLED` is set (`oauthProviderEnabled` in
+`server/lib/mcp/flag.ts`); enabling one never enables the other, and an MCP grant
+can never be used as a native session or the reverse (see the `native` scope
+below).
+
+Deploy order matters when you upgrade: apply the migrations **before** the new
+code (section 14).
+
+---
+
+## 2. Signing in: OAuth with the `native` scope
+
+A native client authenticates with the same OAuth 2.1 provider that serves MCP
+(`/oauth/authorize`, `/oauth/token`, `/oauth/register`), asking for the scope
+`native`. A native grant carries exactly that scope and no MCP module scopes,
+whatever else the client asked for.
+
+| Rule | Detail |
+|---|---|
+| Flow | Authorization code with PKCE. **`S256` is required**: a request without a challenge, or with `plain`, is refused. |
+| Redirect URI | Only a **private-use scheme containing a dot** (reverse-domain form, for example `io.example.app:/callback`) or an **IP-literal loopback** (`http://127.0.0.1` or `http://[::1]`). `https`, the hostname `localhost` and remote `http` are refused. The dot requirement excludes every scheme a browser treats as active content (`javascript`, `data`, `file`, ...). |
+| Consent screen | Shows the app name, the scheme the code will be delivered to (or "this computer" for a loopback redirect), and an "unverified app" label. Client registration is open, so the name is whatever the client claimed. |
+| Roles | `owner`, `manager` and `inspector`. The `agent` role is refused before any grant exists. |
+| Access token | Opaque, **1 hour**. |
+| Refresh token | No fixed expiry, but a grant **unused for 90 days** is refused and revoked. The 90 days slide: each successful exchange moves the clock. |
+| Transport | The client sends the token as `Authorization: Bearer`. No cookie is involved. |
+
+### What ends a session
+
+A token is checked against the member's row on every request, and the grant is
+revoked on the events below. Either is enough to stop access.
+
+| Event | Effect |
+|---|---|
+| Member removed | Every OAuth grant the member holds is revoked; the token also fails the row check. |
+| Password change or reset | Grants are revoked (the session-invalidation marker that cuts off web sessions is never read by an OAuth token, so grants are cut directly). |
+| Role change | Grants are revoked, so no token keeps the old role. Between the change and the revocation the role used is the row's current role, never the one captured at consent. |
+| Role no longer native-capable (for example `agent`) | The token resolves to no identity. |
+| Account self-deletion | Grants are revoked. |
+| `NATIVE_CLIENT_ENABLED` turned off | Every native token and ticket is refused immediately. |
+
+Consent is written to the audit log as `native.grant.created`. With the switch
+off, a refresh attempt also revokes the grant it was made with, so a grant cannot
+outlive the switch that allowed it.
+
+---
+
+## 3. Offline time limit: `offline_max_days`
+
+The company setting `offline_max_days` (API field `offlineMaxDays`, integer
+1 to 365, default 30) is how long a device may stay offline before it locks its
+local data. The **device enforces it**; the server only publishes it, in
+`GET /api/client/session`. Change it with `PATCH /api/admin/tenant-config`.
+A company with no configuration row reports the default.
+
+---
+
+## 4. Version handshake
+
+The server can ask old app versions to update. All of it is optional: with no
+variables set, no app is ever asked to update.
+
+| Variable | Meaning |
+|---|---|
+| `NATIVE_MIN_VERSION_<PLATFORM>` | Lowest version still allowed to make changes. Below it, ordinary API calls answer `426`. |
+| `NATIVE_RECOMMENDED_VERSION_<PLATFORM>` | Below it, the response carries a "recommended" signal and nothing is blocked. |
+| `NATIVE_DOWNLOAD_URL_<PLATFORM>` | Where the client points the user to update. |
+
+`<PLATFORM>` is `IOS`, `ANDROID` or `WINDOWS`. Versions are up to three numeric
+components (`1`, `1.4`, `1.4.2`).
+
+**Request headers** the client sends on every call: `X-Client-Platform` (`ios`,
+`android` or `windows`) and `X-Client-Version`. A missing platform, a missing
+version or an unparseable version never blocks anything; the rule fails open.
+
+**Response header** `X-Client-Upgrade`: `required` or `recommended`, set when the
+sent version is below the corresponding threshold. A browser can read it because
+it is in `Access-Control-Expose-Headers` for the native origins.
+
+**`426`** (`CLIENT_UPGRADE_REQUIRED`) is returned only when the status is
+`required` **and** the path is not in `NEVER_BLOCK_PATHS`
+(`server/lib/native/client-version.ts`). Work captured on a device must always be
+deliverable, so these paths are never blocked by version:
+
+- the collab socket, collab import and ticket routes, and the presence sockets;
+- the media upload-URL and video upload routes, and `/api/public/uploads/*`;
+- `GET /api/client/session`, `POST /api/client/import` and `GET /api/client/compat`.
+
+**`GET /api/client/compat?platform=<platform>`** is public, so a client can call
+it before signing in. It returns `minSupported`, `recommended`, `downloadUrl`
+(each possibly `null`) and `serverContractVersion`.
+
+---
+
+## 5. CORS for the app's WebView
+
+A Capacitor WebView serves its pages from `capacitor://localhost` (iOS) or
+`https://localhost` (Android), so its calls to the API are cross-origin. For
+exactly those two origins the API answers with:
+
+- the request headers `Idempotency-Key`, `X-Client-Version` and
+  `X-Client-Platform` allowed, and `X-Client-Upgrade` exposed;
+- **no `Access-Control-Allow-Credentials`** and no `Set-Cookie` exposure.
+
+The convention is **Bearer only, no credentials**: the app never relies on a
+cookie, so the browser is never asked to send one cross-origin. Every other
+origin keeps the baseline policy unchanged. Other origins cannot opt in; the
+list is fixed in `server/lib/native/cors-origins.ts`.
+
+---
+
+## 6. Client-provided inspection ids
+
+`POST /api/inspections` accepts an optional `id` matching
+`^[A-Za-z0-9_-]{1,64}$`, so a device can create an inspection offline and keep
+referring to it by a name it chose. The id is not required to be a UUID.
+
+| Case | Answer |
+|---|---|
+| New id | `201`, the inspection is created. |
+| Id already belongs to an inspection in the same company | `200` with the existing inspection. None of the create's side effects run again, so a retry is safe. |
+| Id belongs to a record outside the company | `409` `ID_CONFLICT`. |
+
+---
+
+## 7. One-time WebSocket tickets
+
+A WebView WebSocket cannot send an `Authorization` header, and a native client
+holds a bearer token rather than a session cookie. It trades its bearer identity
+for a ticket and opens the socket with `?ticket=`.
+
+- `POST /api/inspections/{id}/collab/ticket` issues a ticket. The caller must be
+  a native session with access to that inspection.
+- A ticket is valid for **60 seconds**, for **one use**, and for **one
+  inspection**.
+- It is accepted only on the WebSocket upgrade of that inspection's collab or
+  presence socket (`/api/inspections/{id}/collab/ws`,
+  `/api/inspections/{id}/presence/ws`). It is not a credential for any other
+  route.
+- Redemption deletes the ticket before using it. When the ticket is presented,
+  the member's current role is read again; a member who was removed or demoted
+  since issue cannot open the socket.
+- Every failure (unknown, expired, used, wrong inspection, member gone, native
+  clients disabled) is a `401`.
+
+---
+
+## 8. Signed media uploads
+
+A background upload can outlive the access token that started it, so uploads do
+not use one.
+
+1. The authenticated client asks for an upload URL:
+   `POST /api/inspections/{id}/media/upload-url` for a photo, or the video
+   create-upload route for a video. Only native sessions are offered this.
+2. The response carries a URL with a signed token. The token is valid for
+   **24 hours** (`expiresAt` is in the response), and names one company, one
+   inspection and one media id. The photo token also names the member who minted
+   it.
+3. The client sends the file to `POST /api/public/uploads/photo?token=...` or
+   `/api/public/uploads/video?token=...` as a multipart field named `file`, with
+   no `Authorization` header.
+
+Rules the upload route applies, in order:
+
+- A photo token is refused by the video route and the reverse; a tampered or
+  expired token is `401`.
+- Before reading any bytes it re-checks that the inspection still exists and that
+  the member who minted the token is still an active member; otherwise `401` or
+  `404`.
+- The request **must declare `Content-Length`**: a missing or non-numeric length
+  is `411`, and an oversized declaration is `413`, both before the body is
+  buffered. The limits are 10 MiB for a photo and 200 MiB for a video.
+- The photo's content type must be the one the URL was minted for (`image/jpeg`,
+  `image/png` or `image/heic`).
+- The storage key is a pure function of the token, so sending the same token
+  twice overwrites one object instead of adding another.
+
+---
+
+## 9. Offline package, format v1
+
+When a device cannot sync, it can write a **package** that another signed-in
+member imports with `POST /api/client/import` (body `application/zip`, with
+`Content-Length`). Everything in a package is a claim by whoever produced it:
+the company and the importing identity come from the importer's verified
+session, never from the package.
+
+### Contents
+
+A package is a zip with only these entries; any other name refuses the package.
+
+| Entry | Content |
+|---|---|
+| `manifest.json` | `format` (`openinspection-offline-package`), `version` (`1`), `tenantId`, `deviceId`, `exportedBy`, `exportedAt`, and the list of `inspections` (`id`, `reportId`). Unknown keys are ignored, so a later writer can add fields within version 1. |
+| `yjs/<inspectionId>.bin` | The collaborative results document of one inspection, as a Yjs update. |
+| `outbox.json` | The writes the device queued. Each entry has an `idempotencyKey`, an `op` (`inspection.create`, `inspection.update` or `inspection.complete`) and a `payload` whose `id` names the inspection. The envelope is strict: an unknown key or an unknown `op` refuses the package. |
+| `media/index.json` | One row per photo: `pendingId`, `inspectionId`, `contentType`. |
+| `media/<pendingId>.<jpg\|png\|heic>` | The photo bytes. |
+
+Identifiers match `^[A-Za-z0-9_-]{1,64}$`, so an id can never smuggle a path
+separator into a zip entry name or a storage key.
+
+### Import semantics
+
+An import has two phases and the line between them is the point.
+
+1. **Validate, writing nothing.** The archive is judged from its directory (entry
+   names, counts, declared sizes), the manifest, media index and outbox are
+   parsed, the manifest's company must be the importer's, and every inspection
+   named must be one the **importer** is allowed to edit or one the package's own
+   outbox creates. Any failure changes nothing, for every inspection in the
+   package.
+2. **Apply**, in this order: queued creates, photos, Yjs updates (resolving
+   pending photo references), then the remaining queued writes.
+
+Further rules:
+
+- **The importer is the caller.** Queued writes are replayed as ordinary
+  requests with the caller's credentials, so each is checked by the route it
+  targets against the caller's role. `exportedBy` is recorded in the audit trail
+  and never consulted for authorization; a package from a member who has since
+  been removed imports fine when another member with access imports it.
+- **Partial failure is reported, not hidden.** A queued write the server refuses
+  is listed in `outbox.failed` (`idempotencyKey`, `op`, `inspectionId` and the
+  HTTP `status` it was refused with). The results and photos in the package are
+  still imported; the listed entries need attention on the device.
+- **Imports are idempotent.** Sending the same package again is safe. A create is
+  held by its client-chosen id; the 24-hour `Idempotency-Key` ledger replays a
+  repeat inside its window; and the table `offline_import_applied` records every
+  queued write that was applied, per company, key and inspection, so a repeat
+  after the ledger expired cannot put an old value over a newer edit. Rows are
+  written only after the target route answered `2xx`, so a refused entry stays
+  retryable. The rows are never swept.
+- **A deleted inspection stays deleted.** If a recorded create names an
+  inspection that has since been deleted, the package is refused with `409`
+  `PACKAGE_INSPECTION_DELETED` and nothing is written.
+- The response reports `inspections`, `photos`, `outbox` (`applied`, `skipped`,
+  `failed`) and `yjs` (`changed`, `unchanged`).
+
+---
+
+## 10. Import limits
+
+One import is **one worker invocation**, and an invocation has a CPU-time limit
+and a limit on subrequests (every call to a binding counts: each D1 query, KV or
+R2 operation, Durable Object fetch). A package can reach those before it runs
+out of memory, so the server bounds the size of what it accepts at once.
+
+| Variable | Default | Allowed range |
+|---|---|---|
+| `NATIVE_IMPORT_MAX_INSPECTIONS` | 8 | 1 to 200 |
+| `NATIVE_IMPORT_MAX_OUTBOX` (queued writes) | 20 | 1 to 500 |
+| `NATIVE_IMPORT_MAX_PHOTOS` | 50 | 1 to 1500 |
+| `NATIVE_IMPORT_MAX_ENTRIES` (zip entries) | 200 | 4 to 2000 |
+| `NATIVE_IMPORT_MAX_COMPRESSED_BYTES` (request body) | 16777216 (16 MiB) | 65536 (64 KiB) to 25165824 (24 MiB) |
+| `NATIVE_IMPORT_MAX_UNCOMPRESSED_BYTES` (sum of decompressed entries) | 50331648 (48 MiB) | 65536 (64 KiB) to 75497472 (72 MiB) |
+
+Reading a variable never throws. A missing, blank or non-numeric value falls
+back to the default, and a number outside the range is clamped into it, so a
+misconfiguration can never switch a limit off.
+
+The defaults are sized from a measured estimate of the subrequests a package
+costs:
+
+```
+estimated subrequests = 70 + inspections * 22 + queued writes * 20 + photos * 3
+```
+
+The largest default package (8 inspections, 20 queued writes, 50 photos) comes to
+796. Queued writes dominate because each is replayed as an ordinary request and
+pays the whole middleware chain.
+
+On the Cloudflare Workers Free plan, use the default small batches. Before raising
+a limit, check the platform's current CPU-time and subrequest limits for your
+plan against the estimate above.
+
+### When a package is over a limit
+
+Nothing is written. The answer is `422` `PACKAGE_TOO_LARGE` for a count (too
+many inspections, queued writes, photos or entries) and `413` `PACKAGE_TOO_LARGE`
+for a size (request body or unpacked size). `details` names the limit that was
+hit, its maximum and the package's actual value, and `details.limits` carries the
+numbers a client needs to split the package: `inspections`, `outbox`, `photos`
+and `compressedBytes`.
+
+A split package imports exactly like a whole one, because every step is
+idempotent. When splitting, keep each inspection's results, photos and queued
+writes in the same part, and send the part that carries an inspection's create
+first.
+
+---
+
+## 11. Owner rules
+
+Only an **owner** can change or remove an owner. A non-owner is refused when they
+try to remove an owner, demote an owner, invite someone as an owner, or promote a
+member to owner. The check runs before the target is looked at further, so a
+refused caller learns nothing about the target. The last owner of a company can
+neither be removed nor demoted, and nobody can remove themselves or change their
+own role.
+
+---
+
+## 12. The contract registry and the add-only rule
+
+An installed app binary cannot be recalled, so every endpoint a native client
+calls is a promise. Two files keep the promise visible:
+
+- `server/lib/native/contract-registry.ts` lists the endpoints. Operations
+  declared with `createRoute()` are in `NATIVE_CONTRACT`; endpoints OpenAPI
+  cannot describe (WebSocket upgrades, binary bodies, the OAuth endpoints a
+  library serves) are in `NATIVE_NON_OPENAPI_CONTRACT`, and their shape is pinned
+  by `tests/unit/native/contract-non-openapi.spec.ts`.
+- `contracts/native-contract.openapi.json` is the OpenAPI slice for the first
+  list, generated from the live routes.
+
+**The rule is add-only.** Adding an endpoint, an optional request field or a
+response property is fine. Removing or renaming anything, making an optional
+request field required, or removing a response property breaks installed apps.
+
+Workflow when you change a registered endpoint:
+
+```bash
+npm run native:contract      # regenerate contracts/native-contract.openapi.json
+npm run lint:native-contract # registry and committed document must agree
+```
+
+- `tests/unit/native/contract-drift.spec.ts` fails when the committed file is
+  stale, so a route change cannot land without regenerating it.
+- `lint:native-contract` fails when a registry entry has no operation in the
+  file, when an operation has no registry entry, when none are found, or when the
+  registry is empty. It prints both numbers on every run.
+- In CI, **oasdiff** compares the file against the base branch's copy and fails
+  the pull request on any breaking change. The comparison is skipped only in the
+  pull request that first introduces the file.
+
+---
+
+## 13. Related pages
+
+- [`../integrations/mcp.md`](../integrations/mcp.md): the MCP server, which shares
+  the OAuth provider.
+- [`conventions/mcp-oauth-notes.md`](conventions/mcp-oauth-notes.md): OAuth provider
+  internals and pinned package symbols.
+- [`../operate/deploy.md`](../operate/deploy.md): what a deploy provisions.
+- [`testing.md`](testing.md) and [`gates.md`](gates.md): where the specs and gates
+  mentioned above live.
+
+---
+
+## 14. Upgrading a deployment that already runs the engine
+
+The native surface adds two forward-only migrations:
+
+| Migration | Adds |
+|---|---|
+| `0001_offline_max_days.sql` | `tenant_configs.offline_max_days` (integer, default 30) |
+| `0002_offline_import_applied.sql` | The `offline_import_applied` table |
+
+**Apply migrations before deploying the new code.** The new code reads
+`offline_max_days` on the session route and writes `offline_import_applied` on
+import; running it against a database that has not been migrated fails those
+routes. With the flag off, nothing else changes. See
+[`../operate/upgrade.md`](../operate/upgrade.md) for the upgrade procedure.

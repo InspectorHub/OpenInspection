@@ -14,8 +14,13 @@ Settings.
 ## 1. Enable the server (operator)
 
 Set the `MCP_ENABLED` environment variable to `true` (or `1`) on the worker and
-redeploy. When it is unset/anything else, the entire OAuth + MCP surface is not
-mounted — existing behavior is byte-for-byte unchanged and `/mcp` returns 404.
+redeploy. When it is unset/anything else (and `NATIVE_CLIENT_ENABLED` is unset too), the
+entire OAuth + MCP surface is not mounted — existing behavior is byte-for-byte unchanged and `/mcp` returns 404.
+
+`MCP_ENABLED` and `NATIVE_CLIENT_ENABLED` are independent switches that share one
+OAuth provider. Setting `NATIVE_CLIENT_ENABLED` alone mounts the OAuth endpoints
+and the token-protected `/mcp` route, but a native grant is refused there with
+`403`; the two kinds of grant are not interchangeable. See [`../develop/native-clients.md`](../develop/native-clients.md).
 
 ```jsonc
 // wrangler.jsonc / wrangler.saas.jsonc  → "vars"

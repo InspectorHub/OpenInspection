@@ -32,9 +32,9 @@ export class TeamService {
      *   is rejected on the next request instead of surviving up to its
      *   24h expiry — jwtAuthMiddleware checks this key but never re-reads
      *   the user row. Guarded by `if (this.kv)`.
-     * @param oauth Optional MCP OAuth provider helper (present only when
-     *   MCP_ENABLED — see di.ts). Used by `removeMember` to revoke every
-     *   outstanding MCP grant the removed member holds: grant `props` are
+     * @param oauth Optional OAuth provider helper (present only when MCP or
+     *   native clients are enabled — see di.ts). `removeMember` uses it to revoke
+     *   every outstanding OAuth grant the removed member holds: grant `props` are
      *   baked in at authorize time and never re-checked against the `users`
      *   row per MCP call, so the `pwchanged` marker above has no effect on
      *   MCP traffic (see identity-bridge.ts). Guarded by `if (this.oauth)`.

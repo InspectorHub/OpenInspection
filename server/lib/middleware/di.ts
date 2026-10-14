@@ -259,8 +259,8 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'team':
                     // Removal emits `user.deleted`, writes a `pwchanged` marker,
-                    // and revokes MCP grants (OAUTH_PROVIDER is only on env when
-                    // MCP_ENABLED — lib/mcp/oauth-provider.ts).
+                    // and revokes OAuth grants (OAUTH_PROVIDER is only on env when
+                    // MCP or native clients are enabled — lib/mcp/oauth-provider.ts).
                     target.team = new TeamService(c.env.DB, buildOutbox(), c.env.TENANT_CACHE, (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER);
                     break;
                 case 'template':
