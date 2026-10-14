@@ -178,6 +178,7 @@
     "docs:shots": "playwright test -c playwright.docs-shots.config.ts",
     "lint:unwired": "node scripts/check-unwired.mjs",
     "lint:unread-fields": "node scripts/check-unread-fields.mjs",
+    "lint:no-placeholder-descriptions": "node scripts/check-no-placeholder-descriptions.mjs",
     "lint:url-taxonomy": "node scripts/check-url-taxonomy.mjs",
     "lint:route-dispatch": "node scripts/check-route-dispatch-parity.mjs"
   },

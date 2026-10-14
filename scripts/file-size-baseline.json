@@ -54,7 +54,6 @@
   "scripts/check-processing-stores.mjs": 483,
   "server/services/report-export-consumer.ts": 482,
   "server/portal/integration.routes.ts": 476,
-  "scripts/lib/gate-registry.mjs": 473,
   "server/api/admin/admin-config.ts": 472,
   "app/components/inspection/PeopleEditor.tsx": 465,
   "server/lib/db/schema/tenant/core.ts": 463,
