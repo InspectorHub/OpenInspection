@@ -154,7 +154,7 @@ const mediaUploadRoute = createRoute(withMcpMetadata({
             description: 'Pool photo created',
         },
     },
-    operationId: "uploadInspection",
+    operationId: "uploadInspectionMedia",
     description: "Uploads one photo to the inspection's media pool, the holding area for photos not yet attached to a checklist item, and returns the pool entry with an authenticated URL to view it. The file is stored in photo storage (location data stripped where the image service is available) and a pool row is created; attach it to an item later with the attach route. Each call creates a new entry. Responds 400 when storage is unavailable or the file is missing. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 

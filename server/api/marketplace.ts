@@ -187,7 +187,7 @@ const marketplaceRoutes = createApiRouter()
         403: { description: "Missing the 'templateImport' capability" },
         404: { description: 'Not found' },
     },
-    operationId: "importMarketplace",
+    operationId: "importMarketplaceLibrary",
     description: "Install a marketplace library into the company, whatever its kind: a comment pack creates canned comments (rowCount rows), a template or statutory form creates one local template. Runs the same import as the catalogue import route, so it is idempotent (a library already installed returns its earlier result and creates nothing) and reinstalls one that was uninstalled. Returns 404 for an unknown library; any other failure is returned as a 500 with code import_failed and the error detail. Needs the template import capability and the owner or manager role."
 }, { scopes: ['write'], tier: 'extended', capability: 'templateImport' })), async (c) => {
     const { id } = c.req.valid('param');

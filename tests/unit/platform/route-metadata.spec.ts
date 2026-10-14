@@ -104,15 +104,24 @@ describe('route metadata', { timeout: 30_000 }, () => {
     });
 
     it('operationIds are globally unique', () => {
-        const seen = new Map<string, string>();
+        // eachOperation() already collapses repeated operationIds, so it cannot
+        // see a duplicate. Walk the raw document instead. One route object
+        // mounted at two paths (an alias) repeats its operationId together with
+        // its summary and description; two different routes that merely share a
+        // name differ in those, and the second silently loses its MCP tool.
+        const seen = new Map<string, { where: string; text: string }>();
         const dupes: string[] = [];
-        for (const { op, where } of eachOperation()) {
-            if (!op.operationId) continue;
-            const prior = seen.get(op.operationId);
-            if (prior) dupes.push(`${op.operationId}: ${prior} vs ${where}`);
-            else seen.set(op.operationId, where);
+        for (const [path, methods] of Object.entries(getOpenApiDoc().paths ?? {})) {
+            for (const [method, op] of Object.entries(methods as Record<string, OperationLike>)) {
+                if (!HTTP_METHODS.has(method) || !op.operationId) continue;
+                const where = `${method.toUpperCase()} ${path}`;
+                const text = `${op.summary ?? ''}\n${op.description ?? ''}`;
+                const prior = seen.get(op.operationId);
+                if (!prior) seen.set(op.operationId, { where, text });
+                else if (prior.text !== text) dupes.push(`${op.operationId}: ${prior.where} vs ${where}`);
+            }
         }
-        expect(dupes, `Duplicate operationIds:\n${dupes.join('\n')}`).toEqual([]);
+        expect(dupes, `Duplicate operationIds on different routes:\n${dupes.join('\n')}`).toEqual([]);
     });
 
     it('every route has a valid summary (4-12 words, no trailing period)', () => {

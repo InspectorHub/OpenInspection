@@ -9863,6 +9863,33 @@
     "description": "Install a marketplace catalogue entry into the company. A template or statutory form entry becomes one new local template (returned as localTemplateId); a comment pack becomes a set of canned comments and returns localTemplateId null. The kind is read from the entry, and a template schema that is not valid v2 is refused. Idempotent: importing something already installed returns what the first import produced and creates nothing; an entry that was uninstalled is reinstalled. Returns 404 for an unknown entry. Same handler as the libraries import route. Needs the template import capability and the owner or manager role."
   },
   {
+    "operationId": "importMarketplaceLibrary",
+    "method": "POST",
+    "pathTemplate": "/api/templates/marketplace/libraries/{id}/import",
+    "scopes": [
+      "write"
+    ],
+    "tag": "marketplace",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Marketplace library to install.",
+          "schema": {
+            "type": "string",
+            "description": "Marketplace library to install."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Import marketplace library into tenant",
+    "description": "Install a marketplace library into the company, whatever its kind: a comment pack creates canned comments (rowCount rows), a template or statutory form creates one local template. Runs the same import as the catalogue import route, so it is idempotent (a library already installed returns its earlier result and creates nothing) and reinstalls one that was uninstalled. Returns 404 for an unknown library; any other failure is returned as a 500 with code import_failed and the error detail. Needs the template import capability and the owner or manager role."
+  },
+  {
     "operationId": "importOfflinePackage",
     "method": "POST",
     "pathTemplate": "/api/client/import",
@@ -23164,6 +23191,34 @@
     },
     "summary": "Upload inspection for current tenant",
     "description": "Uploads one photo file (multipart) to the inspection's photo storage and returns its storage key. This route only stores the file: it does not add the photo to any checklist item or to the media pool, so the client must record the returned key itself. itemId must be present but is not used to place the file, and targetType and customId are only validated and echoed back (customId is required when targetType is defect). Location data is stripped from the image where the image service is available. Each call stores a new file. Responds 400 when storage is unavailable or file or itemId is missing. Available to owner, manager and inspector roles."
+  },
+  {
+    "operationId": "uploadInspectionMedia",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/media/upload",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection the photo is uploaded to.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection the photo is uploaded to."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Upload a photo to the inspection media pool (loose, unattached)",
+    "description": "Uploads one photo to the inspection's media pool, the holding area for photos not yet attached to a checklist item, and returns the pool entry with an authenticated URL to view it. The file is stored in photo storage (location data stripped where the image service is available) and a pool row is created; attach it to an item later with the attach route. Each call creates a new entry. Responds 400 when storage is unavailable or the file is missing. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "uploadInspectorCredentialImage",
