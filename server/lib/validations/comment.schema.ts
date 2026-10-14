@@ -35,18 +35,18 @@ export const UpdateCommentSchema = z.object({
 }).openapi('UpdateComment');
 
 export const CommentResponseSchema = z.object({
-    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId: z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    text: z.string().describe('TODO describe text field for the OpenInspection MCP integration'),
-    category: z.string().nullable().describe('TODO describe category field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1),
+    tenantId: z.string().trim().min(1),
+    text: z.string(),
+    category: z.string().nullable(),
     severity: SeverityFieldSchema.nullable().describe('The single severity vocabulary shared with rating levels.'),
-    section: z.string().nullable().describe('TODO describe section field for the OpenInspection MCP integration'),
+    section: z.string().nullable(),
     itemLabel: z.string().nullable().optional(),
     repairSummary: z.string().nullable().optional(),
     recommendedContractorTypeId: z.string().nullable().optional(),
     useCount: z.number().int().optional(),
     lastUsedAt: z.string().nullable().optional(),
-    createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    createdAt: z.string(),
 }).openapi('CommentResponse');
 
 export const ListCommentsQuerySchema = z.object({

@@ -26,20 +26,20 @@ import { getDrizzle } from '../lib/route-helpers';
 
 const LinkRowSchema = z
     .object({
-        id:          z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-        agentUserId: z.string().describe('TODO describe agentUserId field for the OpenInspection MCP integration'),
-        agentName:   z.string().nullable().describe('TODO describe agentName field for the OpenInspection MCP integration'),
-        agentEmail:  z.string().nullable().describe('TODO describe agentEmail field for the OpenInspection MCP integration'),
-        status:      z.enum(['active', 'revoked']).describe('TODO describe status field for the OpenInspection MCP integration'),
-        createdAt:   z.number().nullable().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-        revokedAt:   z.number().nullable().describe('TODO describe revokedAt field for the OpenInspection MCP integration'),
+        id:          z.string(),
+        agentUserId: z.string(),
+        agentName:   z.string().nullable(),
+        agentEmail:  z.string().nullable(),
+        status:      z.enum(['active', 'revoked']),
+        createdAt:   z.number().nullable(),
+        revokedAt:   z.number().nullable(),
     })
     .openapi('AgentLinkRow');
 
 const ListLinksResponseSchema = z
     .object({
-        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-        data: z.object({ links: z.array(LinkRowSchema).describe('TODO describe links field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+        success: z.literal(true),
+        data: z.object({ links: z.array(LinkRowSchema) }),
     })
     .openapi('ListAgentLinksResponse');
 
@@ -69,8 +69,8 @@ const RevokeParamsSchema = z.object({
 
 const RevokeResponseSchema = z
     .object({
-        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-        data: z.object({ ok: z.literal(true).describe('TODO describe ok field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+        success: z.literal(true),
+        data: z.object({ ok: z.literal(true) }),
     })
     .openapi('AgentLinkRevokeResponse');
 

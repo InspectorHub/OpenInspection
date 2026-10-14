@@ -55,10 +55,10 @@ const uploadPhotoRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: createApiResponseSchema(z.object({
-                        key: z.string().describe('TODO describe key field for the OpenInspection MCP integration'),
-                        targetType: z.enum(['item', 'defect']).describe('TODO describe targetType field for the OpenInspection MCP integration'),
-                        itemId: z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
-                        customId: z.string().nullable().describe('TODO describe customId field for the OpenInspection MCP integration'),
+                        key: z.string(),
+                        targetType: z.enum(['item', 'defect']),
+                        itemId: z.string(),
+                        customId: z.string().nullable(),
                     })),
                 },
             },

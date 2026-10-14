@@ -61,7 +61,7 @@ const listCommentsRoute = createRoute(withMcpMetadata({
     request: { query: ListCommentsQuerySchema },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(CommentResponseSchema).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.array(CommentResponseSchema) }) } },
             description: 'Success',
         },
     },
@@ -82,7 +82,7 @@ const createCommentRoute = createRoute(withMcpMetadata({
     request: { body: { content: { 'application/json': { schema: CommentSchema.describe('The canned comment to add to the library') } } } },
     responses: {
         201: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ comment: CommentResponseSchema.describe('TODO describe comment field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ comment: CommentResponseSchema }) }) } },
             description: 'Created',
         },
     },
@@ -103,7 +103,7 @@ const deleteCommentRoute = createRoute(withMcpMetadata({
     request: { params: z.object({ id: z.string().trim().min(1).describe('Id of the library comment to delete; must belong to this company') }) },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean() }) } },
             description: 'Deleted',
         },
         404: { description: 'Not found' },
@@ -127,7 +127,7 @@ const updateCommentRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ comment: CommentResponseSchema.describe('TODO describe comment field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ comment: CommentResponseSchema }) }) } },
             description: 'Updated',
         },
         404: { description: 'Not found' },

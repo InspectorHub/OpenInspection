@@ -247,11 +247,11 @@ const CancellationClauseStateSchema = z.object({
 
 export const BrandingResponseSchema = createApiResponseSchema(z.object({
     branding: z.object({
-        companyName: z.string().describe('TODO describe companyName field for the OpenInspection MCP integration'),
-        primaryColor: z.string().describe('TODO describe primaryColor field for the OpenInspection MCP integration'),
-        logoUrl: z.string().nullable().describe('TODO describe logoUrl field for the OpenInspection MCP integration'),
-        supportEmail: z.string().describe('TODO describe supportEmail field for the OpenInspection MCP integration'),
-        billingUrl: z.string().nullable().describe('TODO describe billingUrl field for the OpenInspection MCP integration'),
+        companyName: z.string(),
+        primaryColor: z.string(),
+        logoUrl: z.string().nullable(),
+        supportEmail: z.string(),
+        billingUrl: z.string().nullable(),
         defaultTimezone: z.string().describe('Tenant default IANA timezone (e.g. America/New_York); UTC when unset.'),
         defaultLocale: z.string().describe('Tenant default display locale (BCP-47, e.g. es-419); en-US when unset.'),
         currency: z.string().describe('Tenant currency (ISO 4217, e.g. USD); USD when unset.'),
@@ -263,7 +263,7 @@ export const BrandingResponseSchema = createApiResponseSchema(z.object({
             .describe('The tenant cancellation ladder, or null when none is configured.'),
         cancellationClause: CancellationClauseStateSchema.optional()
             .describe('Whether the agreement-clause attestation the fee gate reads is currently valid.'),
-    }).describe('TODO describe branding field for the OpenInspection MCP integration'),
+    }),
 })).openapi('BrandingResponse');
 
 // handoff-decisions §1 — attention thresholds (in hours, 1..720 = 30 days max)
@@ -274,8 +274,8 @@ export const AttentionThresholdsSchema = z.object({
 }).openapi('AttentionThresholds');
 
 export const AttentionThresholdsResponseSchema = z.object({
-    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-    data: z.object({ thresholds: AttentionThresholdsSchema.describe('TODO describe thresholds field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+    success: z.literal(true),
+    data: z.object({ thresholds: AttentionThresholdsSchema }),
 }).openapi('AttentionThresholdsResponse');
 
 export const ATTENTION_THRESHOLDS_DEFAULTS = {
@@ -295,6 +295,6 @@ export const DashboardColumnPrefsSchema = z.object({
 }).openapi('DashboardColumnPrefs');
 
 export const DashboardColumnPrefsResponseSchema = z.object({
-    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-    data: z.object({ columns: z.array(z.string()).describe('TODO describe columns field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+    success: z.literal(true),
+    data: z.object({ columns: z.array(z.string()) }),
 }).openapi('DashboardColumnPrefsResponse');

@@ -226,10 +226,10 @@ export const UpdateInspectionSchema = z.object({
 }).openapi('UpdateInspection');
 
 export const InspectionCountsSchema = z.object({
-    all:         z.number().openapi({ example: 42 }).describe('TODO describe all field for the OpenInspection MCP integration'),
-    today:       z.number().openapi({ example: 3 }).describe('TODO describe today field for the OpenInspection MCP integration'),
-    upcoming:    z.number().openapi({ example: 12 }).describe('TODO describe upcoming field for the OpenInspection MCP integration'),
-    past:        z.number().openapi({ example: 27 }).describe('TODO describe past field for the OpenInspection MCP integration'),
+    all:         z.number().openapi({ example: 42 }),
+    today:       z.number().openapi({ example: 3 }),
+    upcoming:    z.number().openapi({ example: 12 }),
+    past:        z.number().openapi({ example: 27 }),
     needsConfirmation: z.number().openapi({ example: 2 }).describe('Booked but not confirmed by the client yet.'),
     awaitingReport: z.number().openapi({ example: 1 }).describe('Inspection finished, report not published yet.'),
 }).openapi('InspectionCounts');

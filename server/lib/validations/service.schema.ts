@@ -3,17 +3,17 @@ import { createApiResponseSchema } from './shared.schema';
 import { DepositPolicySchema } from './deposit-policy.schema';
 
 const ServiceSchema = z.object({
-    id:              z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId:        z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    name:            z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-    description:     z.string().nullable().describe('TODO describe description field for the OpenInspection MCP integration'),
-    price:           z.number().int().describe('TODO describe price field for the OpenInspection MCP integration'),
-    durationMinutes: z.number().int().nullable().describe('TODO describe durationMinutes field for the OpenInspection MCP integration'),
-    templateId:      z.string().nullable().describe('TODO describe templateId field for the OpenInspection MCP integration'),
-    agreementId:     z.string().nullable().describe('TODO describe agreementId field for the OpenInspection MCP integration'),
-    active:          z.boolean().describe('TODO describe active field for the OpenInspection MCP integration'),
-    sortOrder:       z.number().int().describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
-    createdAt:       z.string().nullable().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    id:              z.string(),
+    tenantId:        z.string(),
+    name:            z.string(),
+    description:     z.string().nullable(),
+    price:           z.number().int(),
+    durationMinutes: z.number().int().nullable(),
+    templateId:      z.string().nullable(),
+    agreementId:     z.string().nullable(),
+    active:          z.boolean(),
+    sortOrder:       z.number().int(),
+    createdAt:       z.string().nullable(),
     depositPolicy:   DepositPolicySchema.nullable().optional()
         .describe("This service's deposit policy; null inherits the workspace default."),
 }).openapi('Service');
@@ -81,10 +81,10 @@ export const ValidateDiscountSchema = z.object({
 }).openapi('ValidateDiscount');
 
 export const ValidateDiscountResponseSchema = z.object({
-    valid:          z.boolean().describe('TODO describe valid field for the OpenInspection MCP integration'),
-    discountAmount: z.number().int().describe('TODO describe discountAmount field for the OpenInspection MCP integration'),
-    discountCodeId: z.string().nullable().describe('TODO describe discountCodeId field for the OpenInspection MCP integration'),
-    message:        z.string().optional().describe('TODO describe message field for the OpenInspection MCP integration'),
+    valid:          z.boolean(),
+    discountAmount: z.number().int(),
+    discountCodeId: z.string().nullable(),
+    message:        z.string().optional(),
 }).openapi('ValidateDiscountResponse');
 
 export const ServiceListResponseSchema = createApiResponseSchema(z.array(ServiceSchema));

@@ -148,7 +148,7 @@ const signAgreementRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration') }),
+                    schema: z.object({ success: z.literal(true) }),
                 },
             },
             description: 'Signed',
@@ -178,7 +178,7 @@ const declineAgreementRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } },
             description: 'Declined',
         },
     },

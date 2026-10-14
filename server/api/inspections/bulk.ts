@@ -106,14 +106,14 @@ const listInspectorsRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.boolean().openapi({ example: true }).describe('TODO describe success field for the OpenInspection MCP integration'),
+                        success: z.boolean().openapi({ example: true }),
                         data: z.array(z.object({
-                            id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-                            email: z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
-                            role: z.string().describe('TODO describe role field for the OpenInspection MCP integration'),
+                            id: z.string(),
+                            email: z.string(),
+                            role: z.string(),
                             // Handler returns raw service rows; createdAt is a Date instance.
-                            createdAt: z.date().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-                        })).describe('TODO describe data field for the OpenInspection MCP integration'),
+                            createdAt: z.date(),
+                        })),
                     }),
                 },
             },
@@ -153,7 +153,7 @@ const bulkUpdateRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ count: z.number().describe('TODO describe count field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ count: z.number() })),
                 },
             },
             description: 'Success',

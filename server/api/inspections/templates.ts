@@ -79,15 +79,15 @@ const listTemplateDuplicatesRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.boolean().openapi({ example: true }).describe('TODO describe success field for the OpenInspection MCP integration'),
+                        success: z.boolean().openapi({ example: true }),
                         data: z.array(z.object({
-                            marketplaceId: z.string().describe('TODO describe marketplaceId field for the OpenInspection MCP integration'),
+                            marketplaceId: z.string(),
                             copies: z.array(z.object({
-                                id:        z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-                                name:      z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-                                version:   z.string().describe('TODO describe version field for the OpenInspection MCP integration'),
-                                createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-                            })).describe('TODO describe copies field for the OpenInspection MCP integration'),
+                                id:        z.string(),
+                                name:      z.string(),
+                                version:   z.string(),
+                                createdAt: z.string(),
+                            })),
                         })),
                     }),
                 },
@@ -115,7 +115,7 @@ const getTemplateRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ template: z.unknown().describe('TODO describe template field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ template: z.unknown() })),
                 },
             },
             description: 'Template details',
@@ -148,7 +148,7 @@ const createTemplateRoute = createRoute(withMcpMetadata({
         201: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ template: z.unknown().describe('TODO describe template field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ template: z.unknown() })),
                 },
             },
             description: 'Created',
@@ -185,7 +185,7 @@ const updateTemplateRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ template: z.unknown().describe('TODO describe template field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ template: z.unknown() })),
                 },
             },
             description: 'Success',

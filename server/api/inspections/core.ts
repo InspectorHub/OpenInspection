@@ -143,7 +143,7 @@ const cloneInspectionRoute = createRoute(withMcpMetadata({
         201: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ inspection: InspectionSchema.describe('TODO describe inspection field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ inspection: InspectionSchema })),
                 },
             },
             description: 'Created',
@@ -173,8 +173,8 @@ const createFromWizardRoute = createRoute(withMcpMetadata({
         200: {
             description: 'Created',
             content: { 'application/json': { schema: z.object({
-                success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-                data:    z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                success: z.literal(true),
+                data:    z.object({ id: z.string() }),
             }) } },
         },
         400: { description: 'Validation error' },

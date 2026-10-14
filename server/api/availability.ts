@@ -71,7 +71,7 @@ const updateScheduleRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ count: z.number().describe('TODO describe count field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ count: z.number() })),
                 },
             },
             description: 'Success',

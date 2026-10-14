@@ -73,8 +73,8 @@ const byInspectionRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-                        data: z.object({ request: InspectionRequestResponseSchema.nullable().describe('TODO describe request field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                        success: z.literal(true),
+                        data: z.object({ request: InspectionRequestResponseSchema.nullable() }),
                     }),
                 },
             },

@@ -32,7 +32,7 @@ const createUnitRoute = createRoute(withMcpMetadata({
         body: { content: { 'application/json': { schema: CreateUnitSchema.describe('Where the new node sits in the tree (parent, or null for top level), what kind of node it is and its name.') } } },
     },
     responses: {
-        200: { description: 'created', content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } } },
+        200: { description: 'created', content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ id: z.string() }) }) } } },
         400: { description: 'validation / depth / duplicate-name' },
     },
     operationId: "createInspectionUnits",
@@ -53,7 +53,7 @@ const bulkCreateUnitsRoute = createRoute(withMcpMetadata({
         body: { content: { 'application/json': { schema: BulkCreateUnitsSchema.describe('Either a floors-by-stacks grid or CSV text, plus the optional parent node to create the units under.') } } },
     },
     responses: {
-        200: { description: 'created', content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ ids: z.array(z.string()).describe('TODO describe ids field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } } },
+        200: { description: 'created', content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ ids: z.array(z.string()) }) }) } } },
         400: { description: 'validation' },
     },
     operationId: "bulkCreateInspectionUnits",
@@ -70,7 +70,7 @@ const duplicateUnitRoute = createRoute(withMcpMetadata({
         params: z.object({ id: z.string().trim().min(1).describe('Inspection the unit belongs to.'), unitId: z.string().min(1).describe('Unit to copy.') }),
     },
     responses: {
-        200: { description: 'duplicated', content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } } },
+        200: { description: 'duplicated', content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ id: z.string() }) }) } } },
         400: { description: 'unit not found' },
     },
     operationId: "duplicateInspectionUnit",

@@ -20,8 +20,8 @@ const ConfirmBodySchema = z.object({
 
 const ConfirmResponseSchema = createApiResponseSchema(
     z.object({
-        inspectionId: z.string().trim().min(1).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
-        redirect:     z.string().describe('TODO describe redirect field for the OpenInspection MCP integration'),
+        inspectionId: z.string().trim().min(1),
+        redirect:     z.string(),
     }),
 ).openapi('ConciergeConfirmResponse');
 

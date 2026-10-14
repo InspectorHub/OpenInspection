@@ -30,7 +30,7 @@ const listSigningRequestsRoute = createRoute(withMcpMetadata({
     summary: 'List signing requests for tenant',
     middleware: [requireRole('owner', 'manager')],
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(z.unknown()).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'OK' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.array(z.unknown()) }) } }, description: 'OK' },
     },
     operationId: "listTenantAgreementsRequests",
     description: "Lists the company's agreement signing requests, newest first, capped at the 200 most recent (no paging or filters). Each row has the client name and email, the linked inspection and agreement template name, status, created/sent/viewed/signed timestamps, and signersTotal / signersSigned counts for multi-signer requests. Includes requests in every status. Read-only. Restricted to owners and managers."
@@ -44,8 +44,8 @@ const getSigningRequestDetailRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager')],
     request: { params: z.object({ id: z.string().describe('Id of the signing request (the id returned by the signing requests list).') }) },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.unknown().describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'OK' },
-        404: { content: { 'application/json': { schema: z.object({ success: z.literal(false).describe('TODO describe success field for the OpenInspection MCP integration'), error: z.unknown().describe('TODO describe error field for the OpenInspection MCP integration') }) } }, description: 'Not found' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.unknown() }) } }, description: 'OK' },
+        404: { content: { 'application/json': { schema: z.object({ success: z.literal(false), error: z.unknown() }) } }, description: 'Not found' },
     },
     operationId: "getTenantAgreementsRequest",
     description: "Returns one signing request with everything needed to review its evidence: the stored request record, the agreement template's id and name (null if the template is gone), the full tamper-evident audit event chain in chronological order (hash, previous hash, signature, signing-key fingerprint), and chainValid / chainReason from re-verifying that chain on this call. Returns 404 when the id is not a signing request of this company. Read-only. Restricted to owners and managers."

@@ -32,22 +32,22 @@ const ConditionsSchema = z.object({
 }).strict();
 
 export const AutomationSchema = z.object({
-    id:              z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId:        z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    name:            z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-    trigger:         z.enum(AUTOMATION_TRIGGERS).describe('TODO describe trigger field for the OpenInspection MCP integration'),
+    id:              z.string(),
+    tenantId:        z.string(),
+    name:            z.string(),
+    trigger:         z.enum(AUTOMATION_TRIGGERS),
     recipientKind:   z.enum(RECIPIENT_KINDS).describe("Who this rule sends to: 'role' (see recipientRoleProfileId), 'inspector', 'all', or 'staff' (the workspace's owners + managers)."),
     recipientRoleProfileId: z.string().nullable().describe("The contact_role_profiles.id targeted when recipientKind is 'role'; null otherwise."),
-    delayMinutes:    z.number().int().describe('TODO describe delayMinutes field for the OpenInspection MCP integration'),
+    delayMinutes:    z.number().int(),
     conditions:      z.string().nullable().describe('JSON-encoded send-time gates, or null. Editor parses it.'),
     // Track L (D2) — enabled delivery channels. Replaces the dead `channel` shadow column.
     channels:        z.array(z.enum(AUTOMATION_CHANNELS)).describe('Enabled delivery channels.'),
     // SP2 — template references; embedded body fields (subjectTemplate/bodyTemplate/smsBody) are dead and dropped.
     emailTemplateId: z.string().nullable().describe('Referenced email template id, or null.'),
     smsTemplateId:   z.string().nullable().describe('Referenced SMS template id, or null.'),
-    active:          z.boolean().describe('TODO describe active field for the OpenInspection MCP integration'),
-    isDefault:       z.boolean().describe('TODO describe isDefault field for the OpenInspection MCP integration'),
-    createdAt:       z.string().nullable().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    active:          z.boolean(),
+    isDefault:       z.boolean(),
+    createdAt:       z.string().nullable(),
 }).openapi('Automation');
 
 const CreateAutomationBase = z.object({
@@ -113,20 +113,20 @@ export const UpdateAutomationSchema = CreateAutomationBase.partial().extend({
 }).openapi('UpdateAutomation');
 
 const AutomationLogSchema = z.object({
-    id:             z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
+    id:             z.string(),
     // Nullable, and the null is the MANUAL-send marker: `automation_logs.automation_id
     // IS NULL` means an operator pressed Send rather than a rule firing (see the
     // column comment in db/schema/inspection/automation.ts). Declaring it `z.string()`
     // described a row shape the table cannot produce.
     automationId:   z.string().nullable().describe('The rule that produced this delivery; null for a manual send.'),
-    inspectionId:   z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    inspectionId:   z.string(),
     // Track L — email address for email logs, E.164 phone for sms logs.
     recipient:      z.string().describe('Delivery address: email for email logs, E.164 phone for sms logs.'),
     channel:        z.enum(AUTOMATION_CHANNELS).describe("This log's own delivery channel."),
-    sendAt:         z.string().describe('TODO describe sendAt field for the OpenInspection MCP integration'),
-    deliveredAt:    z.string().nullable().describe('TODO describe deliveredAt field for the OpenInspection MCP integration'),
-    status:         z.enum(['pending', 'sent', 'failed', 'skipped']).describe('TODO describe status field for the OpenInspection MCP integration'),
-    error:          z.string().nullable().describe('TODO describe error field for the OpenInspection MCP integration'),
+    sendAt:         z.string(),
+    deliveredAt:    z.string().nullable(),
+    status:         z.enum(['pending', 'sent', 'failed', 'skipped']),
+    error:          z.string().nullable(),
 }).openapi('AutomationLog');
 
 export const AutomationListResponseSchema = createApiResponseSchema(z.array(AutomationSchema));

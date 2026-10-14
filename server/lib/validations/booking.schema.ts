@@ -164,7 +164,7 @@ export const OverrideSchema = z.object({
  * Response Schemas
  */
 export const InspectorsResponseSchema = createApiResponseSchema(z.array(z.object({
-    id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
     // Nullable because an account may carry no name. It used to be `string`,
     // which the service satisfied by returning the local part of the mailbox —
     // a contract that promised a name and was kept by inventing one.
@@ -172,17 +172,17 @@ export const InspectorsResponseSchema = createApiResponseSchema(z.array(z.object
 }))).openapi('InspectorsResponse');
 
 export const AvailabilityResponseSchema = createApiResponseSchema(z.object({
-    bookedSlots: z.array(z.string()).openapi({ example: ['2024-04-15T09:00:00Z'] }).describe('TODO describe bookedSlots field for the OpenInspection MCP integration'),
+    bookedSlots: z.array(z.string()).openapi({ example: ['2024-04-15T09:00:00Z'] }),
     overrides: z.array(z.any()).openapi({ description: 'Active availability overrides' }),
     baseAvailability: z.array(z.any()).openapi({ description: 'Standard weekly availability' }),
 })).openapi('AvailabilityResponse');
 
 export const BookingResponseSchema = createApiResponseSchema(z.object({
-    success: z.boolean().openapi({ example: true }).describe('TODO describe success field for the OpenInspection MCP integration'),
+    success: z.boolean().openapi({ example: true }),
     // Single-service legacy callers still get the first inspection's id here.
-    inspectionId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    inspectionId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
     // Sprint 2 S2-2 — request grouping is always present, even for single-service bookings.
-    requestId: z.string().optional().openapi({ example: 'req-abc12345' }).describe('TODO describe requestId field for the OpenInspection MCP integration'),
+    requestId: z.string().optional().openapi({ example: 'req-abc12345' }),
     inspectionIds: z.array(z.string().trim().min(1)).optional().openapi({ description: 'All inspection ids in the request' }),
     // What the booking OWES up front, frozen at this moment. 0 (the default for
     // every workspace) means no payment step is shown. Never what was paid —
@@ -192,33 +192,33 @@ export const BookingResponseSchema = createApiResponseSchema(z.object({
 })).openapi('BookingResponse');
 
 export const AvailabilityListResponseSchema = createApiResponseSchema(z.array(z.object({
-    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId: z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    dayOfWeek: z.number().describe('TODO describe dayOfWeek field for the OpenInspection MCP integration'),
-    startTime: z.string().describe('TODO describe startTime field for the OpenInspection MCP integration'),
-    endTime: z.string().describe('TODO describe endTime field for the OpenInspection MCP integration'),
-    inspectorId: z.string().trim().min(1).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1),
+    tenantId: z.string(),
+    dayOfWeek: z.number(),
+    startTime: z.string(),
+    endTime: z.string(),
+    inspectorId: z.string().trim().min(1),
+    createdAt: z.string(),
 }))).openapi('AvailabilityListResponse');
 
 export const OverrideListResponseSchema = createApiResponseSchema(z.array(z.object({
-    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId: z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    date: z.string().describe('TODO describe date field for the OpenInspection MCP integration'),
-    isAvailable: z.boolean().describe('TODO describe isAvailable field for the OpenInspection MCP integration'),
-    startTime: z.string().nullable().describe('TODO describe startTime field for the OpenInspection MCP integration'),
-    endTime: z.string().nullable().describe('TODO describe endTime field for the OpenInspection MCP integration'),
-    inspectorId: z.string().trim().min(1).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1),
+    tenantId: z.string(),
+    date: z.string(),
+    isAvailable: z.boolean(),
+    startTime: z.string().nullable(),
+    endTime: z.string().nullable(),
+    inspectorId: z.string().trim().min(1),
+    createdAt: z.string(),
 }))).openapi('OverrideListResponse');
 
 export const OverrideResponseSchema = createApiResponseSchema(z.object({
     override: z.object({
-        id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-        date: z.string().describe('TODO describe date field for the OpenInspection MCP integration'),
-        isAvailable: z.boolean().describe('TODO describe isAvailable field for the OpenInspection MCP integration'),
-        startTime: z.string().nullable().describe('TODO describe startTime field for the OpenInspection MCP integration'),
-        endTime: z.string().nullable().describe('TODO describe endTime field for the OpenInspection MCP integration'),
-        inspectorId: z.string().trim().min(1).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    }).describe('TODO describe override field for the OpenInspection MCP integration'),
+        id: z.string().trim().min(1),
+        date: z.string(),
+        isAvailable: z.boolean(),
+        startTime: z.string().nullable(),
+        endTime: z.string().nullable(),
+        inspectorId: z.string().trim().min(1),
+    }),
 })).openapi('OverrideResponse');

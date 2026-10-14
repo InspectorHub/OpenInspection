@@ -16,8 +16,8 @@ export const AgentReportsQuerySchema = z.object({
  */
 export const AgentReportsResponseSchema = createApiResponseSchema(
     z.object({
-        agentId: z.string().trim().min(1).describe('TODO describe agentId field for the OpenInspection MCP integration'),
-        reports: z.array(InspectionSchema).describe('TODO describe reports field for the OpenInspection MCP integration'),
+        agentId: z.string().trim().min(1),
+        reports: z.array(InspectionSchema),
     })
 ).openapi('AgentReportsResponse');
 
@@ -25,16 +25,16 @@ export const AgentReportsResponseSchema = createApiResponseSchema(
  * Schema for the agent performance leaderboard.
  */
 const LeaderboardEntrySchema = z.object({
-    agentId: z.string().trim().min(1).nullable().describe('TODO describe agentId field for the OpenInspection MCP integration'),
-    name:    z.string().nullable().optional().describe('TODO describe name field for the OpenInspection MCP integration'),
-    agency:  z.string().nullable().optional().describe('TODO describe agency field for the OpenInspection MCP integration'),
-    email:   z.string().nullable().optional().describe('TODO describe email field for the OpenInspection MCP integration'),
-    total:   z.number().openapi({ example: 42 }).describe('TODO describe total field for the OpenInspection MCP integration'),
+    agentId: z.string().trim().min(1).nullable(),
+    name:    z.string().nullable().optional(),
+    agency:  z.string().nullable().optional(),
+    email:   z.string().nullable().optional(),
+    total:   z.number().openapi({ example: 42 }),
 }).openapi('LeaderboardEntry');
 
 export const LeaderboardResponseSchema = createApiResponseSchema(
     z.object({
-        leaderboard: z.array(LeaderboardEntrySchema).describe('TODO describe leaderboard field for the OpenInspection MCP integration'),
+        leaderboard: z.array(LeaderboardEntrySchema),
     })
 ).openapi('LeaderboardResponse');
 
@@ -51,7 +51,7 @@ export const AgentProfilePatchSchema = z.object({
 
 export const AgentProfilePatchResponseSchema = createApiResponseSchema(
     z.object({
-        ok: z.literal(true).describe('TODO describe ok field for the OpenInspection MCP integration'),
+        ok: z.literal(true),
     }),
 ).openapi('AgentProfilePatchResponse');
 
@@ -60,9 +60,9 @@ export const AgentProfilePatchResponseSchema = createApiResponseSchema(
 // agent, seeding the settings-profile page's loader.
 export const AgentProfileResponseSchema = createApiResponseSchema(
     z.object({
-        name:             z.string().nullable().describe('TODO describe name field for the OpenInspection MCP integration'),
-        email:            z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
-        slug:             z.string().nullable().describe('TODO describe slug field for the OpenInspection MCP integration'),
+        name:             z.string().nullable(),
+        email:            z.string(),
+        slug:             z.string().nullable(),
         timezone:         z.string().nullable().describe('Personal display timezone (IANA id), or null to use each company timezone.'),
     }),
 ).openapi('AgentProfileResponse');
@@ -92,8 +92,8 @@ export const ConciergeBookSchema = z.object({
 
 export const ConciergeBookResponseSchema = createApiResponseSchema(
     z.object({
-        inspectionId: z.string().trim().min(1).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
-        status:       z.enum(['awaiting_inspector', 'awaiting_client']).describe('TODO describe status field for the OpenInspection MCP integration'),
+        inspectionId: z.string().trim().min(1),
+        status:       z.enum(['awaiting_inspector', 'awaiting_client']),
     }),
 ).openapi('ConciergeBookResponse');
 
@@ -102,37 +102,37 @@ export const ConciergeBookResponseSchema = createApiResponseSchema(
 // from server/api/agent.ts (file-size ratchet) alongside this module's other
 // route-response schemas.
 const RecommendationRowSchema = z.object({
-    inspectionId:    z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    inspectionId:    z.string(),
     // Owning company: shown inline under the property heading, and the slug
     // addresses that inspection's repair share channel.
     tenantName:      z.string().describe('Owning inspection company name.'),
     tenantSlug:      z.string().describe('Owning inspection company slug (addresses the repair share channel).'),
     // The portal offers only what the API would allow (IA-35).
     repairAccess:    z.enum(['off', 'read', 'readwrite']).describe("This company's policy for agents on its repair list."),
-    propertyAddress: z.string().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
-    inspectionDate:  z.string().describe('TODO describe inspectionDate field for the OpenInspection MCP integration'),
-    sectionTitle:    z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
-    itemLabel:       z.string().describe('TODO describe itemLabel field for the OpenInspection MCP integration'),
-    defectTitle:     z.string().describe('TODO describe defectTitle field for the OpenInspection MCP integration'),
+    propertyAddress: z.string(),
+    inspectionDate:  z.string(),
+    sectionTitle:    z.string(),
+    itemLabel:       z.string(),
+    defectTitle:     z.string(),
     // A defect_categories.id or legacy seed name (DefectCategory is `string`).
     // IA-41: kept verbatim — a tenant custom category is no longer dropped; it
     // groups under recommendation (same merge direction as the PCA summary).
     category:        z.string().describe('Defect category — a defect_categories.id or legacy seed name.'),
-    comment:         z.string().describe('TODO describe comment field for the OpenInspection MCP integration'),
-    location:        z.string().nullable().describe('TODO describe location field for the OpenInspection MCP integration'),
-    photos:          z.array(z.string()).describe('TODO describe photos field for the OpenInspection MCP integration'),
+    comment:         z.string(),
+    location:        z.string().nullable(),
+    photos:          z.array(z.string()),
     // IA-41 — true for field-added defects (customComments.defects).
     isCustom:        z.boolean().describe('Whether this is a field-added custom defect (vs a template canned defect).'),
 });
 
 // UC-A-5 — GET /api/agent/my-recommendations response envelope.
 export const AgentMyRecommendationsResponseSchema = z.object({
-    success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+    success: z.boolean(),
     data: z.object({
-        safety:         z.array(RecommendationRowSchema).describe('TODO describe safety field for the OpenInspection MCP integration'),
-        recommendation: z.array(RecommendationRowSchema).describe('TODO describe recommendation field for the OpenInspection MCP integration'),
-        maintenance:    z.array(RecommendationRowSchema).describe('TODO describe maintenance field for the OpenInspection MCP integration'),
-    }).describe('TODO describe data field for the OpenInspection MCP integration'),
+        safety:         z.array(RecommendationRowSchema),
+        recommendation: z.array(RecommendationRowSchema),
+        maintenance:    z.array(RecommendationRowSchema),
+    }),
 });
 
 // C-10 ③-C — row shape for GET /api/agent/referrals.

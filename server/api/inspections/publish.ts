@@ -204,7 +204,7 @@ const publishRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ reportUrl: z.string().describe('TODO describe reportUrl field for the OpenInspection MCP integration'), reportStatus: z.string().describe('TODO describe reportStatus field for the OpenInspection MCP integration'), isnSync: z.object({ ok: z.boolean(), isnReportId: z.string().optional(), error: z.string().optional() }).nullable().describe('Outcome of adding the report link to the ISN order named in Reference Number; null when ISN is not configured or the inspection has no Reference Number.') })),
+                    schema: createApiResponseSchema(z.object({ reportUrl: z.string(), reportStatus: z.string(), isnSync: z.object({ ok: z.boolean(), isnReportId: z.string().optional(), error: z.string().optional() }).nullable().describe('Outcome of adding the report link to the ISN order named in Reference Number; null when ISN is not configured or the inspection has no Reference Number.') })),
                 },
             },
             description: 'Published',

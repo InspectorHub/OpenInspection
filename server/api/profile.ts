@@ -160,7 +160,7 @@ const photoUploadRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ photoUrl: z.string().describe('TODO describe photoUrl field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ photoUrl: z.string() })),
                 },
             },
             description: 'Uploaded',

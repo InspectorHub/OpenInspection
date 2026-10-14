@@ -106,14 +106,14 @@ const meRoute = createRoute(withMcpMetadata({
                 'application/json': {
                     schema: createApiResponseSchema(z.object({
                         user: z.object({
-                            id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-                            email: z.string().optional().describe('TODO describe email field for the OpenInspection MCP integration'),
-                            tenantId: z.string().optional().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-                            role: z.string().describe('TODO describe role field for the OpenInspection MCP integration'),
-                            onboardingState: z.record(z.string(), z.boolean()).nullable().optional().describe('TODO describe onboardingState field for the OpenInspection MCP integration'),
-                            totpEnabled: z.boolean().optional().describe('TODO describe totpEnabled field for the OpenInspection MCP integration'),
-                            recoveryCodesRemaining: z.number().nullable().optional().describe('TODO describe recoveryCodesRemaining field for the OpenInspection MCP integration'),
-                        }).describe('TODO describe user field for the OpenInspection MCP integration'),
+                            id: z.string(),
+                            email: z.string().optional(),
+                            tenantId: z.string().optional(),
+                            role: z.string(),
+                            onboardingState: z.record(z.string(), z.boolean()).nullable().optional(),
+                            totpEnabled: z.boolean().optional(),
+                            recoveryCodesRemaining: z.number().nullable().optional(),
+                        }),
                         // Derived from TOGGLEABLE, not hand-listed. The five
                         // sentences that used to sit here inline now live in
                         // CAPABILITY_DESCRIPTIONS beside the set they describe,

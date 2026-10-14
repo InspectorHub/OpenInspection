@@ -175,13 +175,13 @@ const updateMediaAnnotationsRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
+                        success: z.literal(true),
                         data: z.object({
-                            id:          z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-                            annotations: z.string().nullable().describe('TODO describe annotations field for the OpenInspection MCP integration'),
-                            caption:     z.string().nullable().describe('TODO describe caption field for the OpenInspection MCP integration'),
-                            updatedAt:   z.number().describe('TODO describe updatedAt field for the OpenInspection MCP integration'),
-                        }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                            id:          z.string(),
+                            annotations: z.string().nullable(),
+                            caption:     z.string().nullable(),
+                            updatedAt:   z.number(),
+                        }),
                     }),
                 },
             },
@@ -219,7 +219,7 @@ const saveAnnotationRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {
         200: {
-            content: { 'application/json': { schema: createApiResponseSchema(z.object({ annotatedKey: z.string().describe('TODO describe annotatedKey field for the OpenInspection MCP integration') })) } },
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ annotatedKey: z.string() })) } },
             description: 'Annotation saved',
         },
     },

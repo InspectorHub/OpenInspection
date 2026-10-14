@@ -45,24 +45,24 @@ export const ListRecommendationsQuerySchema = z.object({
 }).openapi('ListRecommendationsQuery');
 
 export const AttachedRecommendationItemSchema = z.object({
-    recommendationId:    z.string().describe('TODO describe recommendationId field for the OpenInspection MCP integration'),
-    estimateSnapshotMin: z.number().int().nullable().describe('TODO describe estimateSnapshotMin field for the OpenInspection MCP integration'),
-    estimateSnapshotMax: z.number().int().nullable().describe('TODO describe estimateSnapshotMax field for the OpenInspection MCP integration'),
-    summarySnapshot:     z.string().describe('TODO describe summarySnapshot field for the OpenInspection MCP integration'),
+    recommendationId:    z.string(),
+    estimateSnapshotMin: z.number().int().nullable(),
+    estimateSnapshotMax: z.number().int().nullable(),
+    summarySnapshot:     z.string(),
     contractorTypeSnapshot: z.string().nullable().describe('Contractor type name captured at attach time.'),
-    attachedAt:          z.number().int().nonnegative().describe('TODO describe attachedAt field for the OpenInspection MCP integration'),
-    itemId:              z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
+    attachedAt:          z.number().int().nonnegative(),
+    itemId:              z.string(),
 }).openapi('AttachedRecommendationItem');
 
 export const AggregatedRecommendationsResponseSchema = z.object({
-    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
+    success: z.literal(true),
     data: z.object({
-        items: z.array(AttachedRecommendationItemSchema).describe('TODO describe items field for the OpenInspection MCP integration'),
+        items: z.array(AttachedRecommendationItemSchema),
         totals: z.object({
-            count:           z.number().int().nonnegative().describe('TODO describe count field for the OpenInspection MCP integration'),
-            estimateMinSum:  z.number().int().nonnegative().describe('TODO describe estimateMinSum field for the OpenInspection MCP integration'),
-            estimateMaxSum:  z.number().int().nonnegative().describe('TODO describe estimateMaxSum field for the OpenInspection MCP integration'),
-        }).describe('TODO describe totals field for the OpenInspection MCP integration'),
+            count:           z.number().int().nonnegative(),
+            estimateMinSum:  z.number().int().nonnegative(),
+            estimateMaxSum:  z.number().int().nonnegative(),
+        }),
     }),
 }).openapi('AggregatedRecommendationsResponse');
 

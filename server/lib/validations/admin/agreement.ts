@@ -35,13 +35,13 @@ export const AgreementSchema = z.object({
 }).openapi('Agreement');
 
 export const AgreementListResponseSchema = createApiResponseSchema(z.array(z.object({
-    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId: z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    name: z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-    content: z.string().describe('TODO describe content field for the OpenInspection MCP integration'),
-    version: z.number().describe('TODO describe version field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1),
+    tenantId: z.string().trim().min(1),
+    name: z.string(),
+    content: z.string(),
+    version: z.number(),
     // Handler returns the raw Drizzle row; createdAt is a Date instance, not ISO string.
-    createdAt: z.date().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    createdAt: z.date(),
 }))).openapi('AgreementListResponse');
 
 /** Track I-a Task 9 — one recipient row in a multi-signer envelope. */
@@ -75,13 +75,13 @@ export const SendAgreementSchema = z.object({
 
 export const AgreementResponseSchema = createApiResponseSchema(z.object({
     agreement: z.object({
-        id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-        tenantId: z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-        name: z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-        content: z.string().describe('TODO describe content field for the OpenInspection MCP integration'),
-        version: z.number().describe('TODO describe version field for the OpenInspection MCP integration'),
-        createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-    }).describe('TODO describe agreement field for the OpenInspection MCP integration'),
+        id: z.string().trim().min(1),
+        tenantId: z.string().trim().min(1),
+        name: z.string(),
+        content: z.string(),
+        version: z.number(),
+        createdAt: z.string(),
+    }),
 })).openapi('AgreementResponse');
 
 /**

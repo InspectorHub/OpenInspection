@@ -156,7 +156,7 @@ const removeTeamMemberRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ removed: z.boolean().describe('TODO describe removed field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ removed: z.boolean() })),
                 },
             },
             description: 'Member removed',

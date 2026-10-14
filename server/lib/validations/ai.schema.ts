@@ -110,7 +110,7 @@ export const CommentEditSchema = z.object({
 }).openapi('CommentEditRequest');
 
 export const CommentEditResponseSchema = createApiResponseSchema(z.object({
-    rewritten: z.string().openapi({ example: 'Major cracking observed at the NW corner of the roof field; recommend evaluation by a licensed roofer.' }).describe('TODO describe rewritten field for the OpenInspection MCP integration'),
+    rewritten: z.string().openapi({ example: 'Major cracking observed at the NW corner of the roof field; recommend evaluation by a licensed roofer.' }),
     aiCallId: z.string().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('The ai_call_provenance row id, or null when the rewrite is a standalone dev mock rather than model output.'),
 })).openapi('CommentEditResponse');
 

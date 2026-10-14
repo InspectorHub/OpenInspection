@@ -36,7 +36,7 @@ const listInvoicesRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('financial')],
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(InvoiceResponseSchema).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.array(InvoiceResponseSchema) }) } },
             description: 'Success',
         },
     },
@@ -52,7 +52,7 @@ const createInvoiceRoute = createRoute(withMcpMetadata({
     request: { body: { content: { 'application/json': { schema: CreateInvoiceSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         201: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ invoice: InvoiceResponseSchema.describe('TODO describe invoice field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ invoice: InvoiceResponseSchema }) }) } },
             description: 'Created',
         },
     },
@@ -67,7 +67,7 @@ const markSentRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager')],
     request: { params: z.object({ id: INVOICE_ID.describe('Invoice to mark as sent.') }) },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }) } }, description: 'Success' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Success' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "markSentInvoice",
@@ -96,7 +96,7 @@ const deleteInvoiceRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager')],
     request: { params: z.object({ id: INVOICE_ID.describe('Id of the invoice to void.') }) },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }) } }, description: 'Deleted' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Deleted' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "deleteInvoice",

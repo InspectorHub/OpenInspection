@@ -73,7 +73,7 @@ const marketplaceRoutes = createApiRouter()
     request: { params: z.object({ id: z.string().describe('Marketplace catalogue entry to import.') }) },
     responses: {
         201: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ localTemplateId: z.string().nullable().describe('Local template id for a 1:1 kind; null for a 1:N kind, which produces row_count rows rather than one') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.object({ localTemplateId: z.string().nullable().describe('Local template id for a 1:1 kind; null for a 1:N kind, which produces row_count rows rather than one') }) }) } },
             description: 'Imported',
         },
         403: { description: "Missing the 'templateImport' capability" },
@@ -103,7 +103,7 @@ const marketplaceRoutes = createApiRouter()
         query: z.object({ kind: z.enum(MARKETPLACE_KINDS).optional().describe('Return only entries of this kind. Omit to list every kind.') }),
     },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(z.any()).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'OK' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.array(z.any()) }) } }, description: 'OK' },
     },
     operationId: "listMarketplaceLibraries",
     description: "Lists the marketplace catalogue (comment packs, templates and statutory forms) as one unpaginated array, up to 1000 entries, optionally narrowed to one kind. Delisted entries are not shown. Featured entries come first, then by download count. Each entry carries the company's own install state: importedSemver is the installed version (null if not installed or uninstalled) and hasUpdate says a newer version exists. The pack content itself is not returned, only itemCount and the description. The paginated catalogue route offers search and further filters. Read-only. Available to owner, manager and inspector roles."
@@ -127,13 +127,13 @@ const marketplaceRoutes = createApiRouter()
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+                success: z.boolean(),
                 data: z.object({
-                    newLocalId: z.string().describe('TODO describe newLocalId field for the OpenInspection MCP integration'),
-                    newName: z.string().describe('TODO describe newName field for the OpenInspection MCP integration'),
-                    fromSemver: z.string().describe('TODO describe fromSemver field for the OpenInspection MCP integration'),
-                    toSemver: z.string().describe('TODO describe toSemver field for the OpenInspection MCP integration'),
-                }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                    newLocalId: z.string(),
+                    newName: z.string(),
+                    fromSemver: z.string(),
+                    toSemver: z.string(),
+                }),
             }) } },
             description: 'Updated',
         },
@@ -183,7 +183,7 @@ const marketplaceRoutes = createApiRouter()
     middleware: [requireRole('owner', 'manager'), requireCapability('templateImport')] as const,
     request: { params: z.object({ id: z.string().describe('Marketplace library to install.') }) },
     responses: {
-        201: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ kind: z.enum(['comments', 'templates', 'statutory']).describe('Which shape the import produced'), rowCount: z.number().describe('Rows created for a 1:N kind; 0 for a 1:1 kind'), localEntityId: z.string().nullable().describe('Local row id for a 1:1 kind; null for a 1:N kind') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Imported' },
+        201: { content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.object({ kind: z.enum(['comments', 'templates', 'statutory']).describe('Which shape the import produced'), rowCount: z.number().describe('Rows created for a 1:N kind; 0 for a 1:1 kind'), localEntityId: z.string().nullable().describe('Local row id for a 1:1 kind; null for a 1:N kind') }) }) } }, description: 'Imported' },
         403: { description: "Missing the 'templateImport' capability" },
         404: { description: 'Not found' },
     },
@@ -219,12 +219,12 @@ const marketplaceRoutes = createApiRouter()
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+                success: z.boolean(),
                 data: z.object({
-                    rowsAdded:  z.number().describe('TODO describe rowsAdded field for the OpenInspection MCP integration'),
-                    newSemver:  z.string().describe('TODO describe newSemver field for the OpenInspection MCP integration'),
-                    fromSemver: z.string().describe('TODO describe fromSemver field for the OpenInspection MCP integration'),
-                }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                    rowsAdded:  z.number(),
+                    newSemver:  z.string(),
+                    fromSemver: z.string(),
+                }),
             }) } },
             description: 'Updated',
         },
@@ -311,7 +311,7 @@ const marketplaceRoutes = createApiRouter()
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+                success: z.boolean(),
                 data: z.object({
                     rowsAdded:     z.number().int().describe('Rows the new pack inserted'),
                     rowsDeleted:   z.number().int().describe('Prior-import rows removed'),
@@ -371,13 +371,13 @@ const marketplaceRoutes = createApiRouter()
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+                success: z.boolean(),
                 data: z.object({
-                    items:    z.array(z.unknown()).describe('TODO describe items field for the OpenInspection MCP integration'),
-                    page:     z.number().int().describe('TODO describe page field for the OpenInspection MCP integration'),
-                    pageSize: z.number().int().describe('TODO describe pageSize field for the OpenInspection MCP integration'),
-                    hasMore:  z.boolean().describe('TODO describe hasMore field for the OpenInspection MCP integration'),
-                }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                    items:    z.array(z.unknown()),
+                    page:     z.number().int(),
+                    pageSize: z.number().int(),
+                    hasMore:  z.boolean(),
+                }),
             }) } },
             description: 'OK',
         },

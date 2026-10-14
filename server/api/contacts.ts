@@ -33,7 +33,7 @@ const listContactsRoute = createRoute(withMcpMetadata({
     request: { query: ContactListQuerySchema },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(ContactResponseSchema).describe('TODO describe data field for the OpenInspection MCP integration'), meta: z.object({ total: z.number().describe('TODO describe total field for the OpenInspection MCP integration') }).describe('TODO describe meta field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.array(ContactResponseSchema), meta: z.object({ total: z.number() }) }) } },
             description: 'Success',
         },
     },
@@ -67,7 +67,7 @@ const createContactRoute = createRoute(withMcpMetadata({
     request: { body: { content: { 'application/json': { schema: CreateContactSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         201: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ contact: ContactResponseSchema.describe('TODO describe contact field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ contact: ContactResponseSchema }) }) } },
             description: 'Created',
         },
     },
@@ -87,7 +87,7 @@ const updateContactRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ contact: ContactResponseSchema.describe('TODO describe contact field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ contact: ContactResponseSchema }) }) } },
             description: 'Success',
         },
     },
@@ -110,7 +110,7 @@ const deleteContactRoute = createRoute(withMcpMetadata({
     request: { params: z.object({ id: CONTACT_ID.describe('Contact id.') }) },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean() }) } },
             description: 'Deleted',
         },
     },

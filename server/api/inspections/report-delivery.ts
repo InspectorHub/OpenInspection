@@ -97,37 +97,37 @@ const getReportDataRoute = createRoute(withMcpMetadata({
  * service via a server-side render at /inspections/:id/repair-list.
  */
 const RepairListEntrySchema = z.object({
-    sectionId:           z.string().describe('TODO describe sectionId field for the OpenInspection MCP integration'),
-    sectionTitle:        z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
-    itemId:              z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
-    itemLabel:           z.string().describe('TODO describe itemLabel field for the OpenInspection MCP integration'),
-    comment:             z.string().describe('TODO describe comment field for the OpenInspection MCP integration'),
-    location:            z.string().nullable().describe('TODO describe location field for the OpenInspection MCP integration'),
-    category:            z.enum(['safety', 'recommendation', 'maintenance']).describe('TODO describe category field for the OpenInspection MCP integration'),
-    recommendationId:    z.string().nullable().describe('TODO describe recommendationId field for the OpenInspection MCP integration'),
-    recommendationLabel: z.string().nullable().describe('TODO describe recommendationLabel field for the OpenInspection MCP integration'),
+    sectionId:           z.string(),
+    sectionTitle:        z.string(),
+    itemId:              z.string(),
+    itemLabel:           z.string(),
+    comment:             z.string(),
+    location:            z.string().nullable(),
+    category:            z.enum(['safety', 'recommendation', 'maintenance']),
+    recommendationId:    z.string().nullable(),
+    recommendationLabel: z.string().nullable(),
     // No estimateLow / estimateHigh: the platform publishes no repair price,
     // and this response is on the MCP `extended` tier (see
     // scripts/check-price-capability.mjs).
-    photos:              z.array(z.object({ key: z.string().describe('TODO describe key field for the OpenInspection MCP integration'), url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') })).describe('TODO describe photos field for the OpenInspection MCP integration'),
-    source:              z.enum(['canned', 'custom']).describe('TODO describe source field for the OpenInspection MCP integration'),
+    photos:              z.array(z.object({ key: z.string(), url: z.string() })),
+    source:              z.enum(['canned', 'custom']),
 });
 const RepairListResponseSchema = z.object({
     inspection: z.object({
-        id:              z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-        propertyAddress: z.string().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
-        date:            z.string().nullable().describe('TODO describe date field for the OpenInspection MCP integration'),
-        inspectorName:   z.string().nullable().describe('TODO describe inspectorName field for the OpenInspection MCP integration'),
-    }).describe('TODO describe inspection field for the OpenInspection MCP integration'),
-    defects: z.array(RepairListEntrySchema).describe('TODO describe defects field for the OpenInspection MCP integration'),
+        id:              z.string(),
+        propertyAddress: z.string(),
+        date:            z.string().nullable(),
+        inspectorName:   z.string().nullable(),
+    }),
+    defects: z.array(RepairListEntrySchema),
     totals: z.object({
-        count:           z.number().describe('TODO describe count field for the OpenInspection MCP integration'),
-        safety:          z.number().describe('TODO describe safety field for the OpenInspection MCP integration'),
-        recommendation:  z.number().describe('TODO describe recommendation field for the OpenInspection MCP integration'),
-        maintenance:     z.number().describe('TODO describe maintenance field for the OpenInspection MCP integration'),
+        count:           z.number(),
+        safety:          z.number(),
+        recommendation:  z.number(),
+        maintenance:     z.number(),
         // Counts, not money — `estimateLowSum` / `estimateHighSum` are gone.
-    }).describe('TODO describe totals field for the OpenInspection MCP integration'),
-    showEstimates: z.boolean().describe('TODO describe showEstimates field for the OpenInspection MCP integration'),
+    }),
+    showEstimates: z.boolean(),
 });
 
 const getRepairListRoute = createRoute(withMcpMetadata({
@@ -209,9 +209,9 @@ const refreshPdfRoute = createRoute(withMcpMetadata({
     responses: {
         202: {
             content: { 'application/json': { schema: createApiResponseSchema(z.object({
-                status: z.string().describe('TODO describe status field for the OpenInspection MCP integration'),
-                summary: z.string().describe('TODO describe summary field for the OpenInspection MCP integration'),
-                full: z.string().describe('TODO describe full field for the OpenInspection MCP integration'),
+                status: z.string(),
+                summary: z.string(),
+                full: z.string(),
             })) } },
             description: 'PDF renders enqueued',
         },

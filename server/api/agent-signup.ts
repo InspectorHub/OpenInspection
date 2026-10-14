@@ -36,11 +36,11 @@ const SignupBodySchema = z
 
 const SignupResponseSchema = z
     .object({
-        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
+        success: z.literal(true),
         data: z.object({
-            redirect: z.string().describe('TODO describe redirect field for the OpenInspection MCP integration'),
-            userId: z.string().describe('TODO describe userId field for the OpenInspection MCP integration'),
-        }).describe('TODO describe data field for the OpenInspection MCP integration'),
+            redirect: z.string(),
+            userId: z.string(),
+        }),
     })
     .openapi('AgentSignupResponse');
 

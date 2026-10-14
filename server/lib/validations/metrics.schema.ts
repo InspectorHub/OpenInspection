@@ -15,9 +15,9 @@ export const MetricsQuerySchema = z.object({
 });
 
 const MonthlyDataSchema = z.object({
-    month:   z.string().describe('TODO describe month field for the OpenInspection MCP integration'),
-    revenue: z.number().describe('TODO describe revenue field for the OpenInspection MCP integration'),
-    count:   z.number().describe('TODO describe count field for the OpenInspection MCP integration'),
+    month:   z.string(),
+    revenue: z.number(),
+    count:   z.number(),
 });
 
 const TopAgentSchema = z.object({
@@ -46,9 +46,9 @@ const ByInspectorSchema = z.object({
 });
 
 const ServiceDistributionSchema = z.object({
-    serviceName: z.string().describe('TODO describe serviceName field for the OpenInspection MCP integration'),
-    count:       z.number().describe('TODO describe count field for the OpenInspection MCP integration'),
-    revenue:     z.number().describe('TODO describe revenue field for the OpenInspection MCP integration'),
+    serviceName: z.string(),
+    count:       z.number(),
+    revenue:     z.number(),
 });
 
 const MetricsResponseSchema = z.object({

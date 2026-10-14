@@ -185,8 +185,8 @@ const tenantConfigGetRoute = createRoute(withMcpMetadata({
 // from its shape, and a service cannot import a router module.
 
 const TenantConfigPatchResponseSchema = z.object({
-    success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
-    data: z.object({ ok: z.literal(true).describe('TODO describe ok field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+    success: z.boolean(),
+    data: z.object({ ok: z.literal(true) }),
 }).openapi('TenantConfigPatchResponse');
 
 const tenantConfigPatchRoute = createRoute(withMcpMetadata({

@@ -41,14 +41,14 @@ const publicGeocodeRoute = createRoute(withMcpMetadata({
                 'application/json': {
                     schema: z.object({
                         data: z.array(z.object({
-                            label:   z.string().describe('TODO describe label field for the OpenInspection MCP integration'),
-                            line1:   z.string().describe('TODO describe line1 field for the OpenInspection MCP integration'),
-                            city:    z.string().nullable().describe('TODO describe city field for the OpenInspection MCP integration'),
-                            state:   z.string().nullable().describe('TODO describe state field for the OpenInspection MCP integration'),
-                            zip:     z.string().nullable().describe('TODO describe zip field for the OpenInspection MCP integration'),
-                            placeId: z.string().describe('TODO describe placeId field for the OpenInspection MCP integration'),
-                        })).describe('TODO describe data field for the OpenInspection MCP integration'),
-                        reason: z.enum(['NO_API_KEY', 'UPSTREAM_ERROR']).optional().describe('TODO describe reason field for the OpenInspection MCP integration'),
+                            label:   z.string(),
+                            line1:   z.string(),
+                            city:    z.string().nullable(),
+                            state:   z.string().nullable(),
+                            zip:     z.string().nullable(),
+                            placeId: z.string(),
+                        })),
+                        reason: z.enum(['NO_API_KEY', 'UPSTREAM_ERROR']).optional(),
                     }),
                 },
             },

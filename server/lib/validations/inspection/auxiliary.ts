@@ -8,37 +8,37 @@ import { z } from '@hono/zod-openapi';
  * with the same card UI, but only attached photos carry an itemId/section.
  */
 const MediaCenterAttachedPhotoSchema = z.object({
-    key:           z.string().describe('TODO describe key field for the OpenInspection MCP integration'),
+    key:           z.string(),
     originalKey:   z.string().describe('Source R2 key (revert target); differs from key when the photo is annotated'),
-    url:           z.string().describe('TODO describe url field for the OpenInspection MCP integration'),
-    itemId:        z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
-    itemLabel:     z.string().describe('TODO describe itemLabel field for the OpenInspection MCP integration'),
-    sectionId:     z.string().describe('TODO describe sectionId field for the OpenInspection MCP integration'),
-    sectionTitle:  z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
-    photoIndex:    z.number().int().nonnegative().describe('TODO describe photoIndex field for the OpenInspection MCP integration'),
-    annotated:     z.boolean().describe('TODO describe annotated field for the OpenInspection MCP integration'),
+    url:           z.string(),
+    itemId:        z.string(),
+    itemLabel:     z.string(),
+    sectionId:     z.string(),
+    sectionTitle:  z.string(),
+    photoIndex:    z.number().int().nonnegative(),
+    annotated:     z.boolean(),
     defectId:      z.string().optional().describe('Defect id when the photo hangs off a canned/custom defect rather than the item'),
 }).openapi('MediaCenterAttachedPhoto');
 
 const MediaCenterPoolPhotoSchema = z.object({
-    id:            z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-    key:           z.string().describe('TODO describe key field for the OpenInspection MCP integration'),
-    url:           z.string().describe('TODO describe url field for the OpenInspection MCP integration'),
-    uploadedAt:    z.number().int().describe('TODO describe uploadedAt field for the OpenInspection MCP integration'),
-    takenAt:       z.number().int().nullable().describe('TODO describe takenAt field for the OpenInspection MCP integration'),
+    id:            z.string(),
+    key:           z.string(),
+    url:           z.string(),
+    uploadedAt:    z.number().int(),
+    takenAt:       z.number().int().nullable(),
 }).openapi('MediaCenterPoolPhoto');
 
 export const MediaCenterResponseSchema = z.object({
-    attached:  z.array(MediaCenterAttachedPhotoSchema).describe('TODO describe attached field for the OpenInspection MCP integration'),
-    pool:      z.array(MediaCenterPoolPhotoSchema).describe('TODO describe pool field for the OpenInspection MCP integration'),
+    attached:  z.array(MediaCenterAttachedPhotoSchema),
+    pool:      z.array(MediaCenterPoolPhotoSchema),
 }).openapi('MediaCenterResponse');
 
 export const MediaPoolUploadResponseSchema = z.object({
-    id:          z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-    key:         z.string().describe('TODO describe key field for the OpenInspection MCP integration'),
-    url:         z.string().describe('TODO describe url field for the OpenInspection MCP integration'),
-    uploadedAt:  z.number().int().describe('TODO describe uploadedAt field for the OpenInspection MCP integration'),
-    takenAt:     z.number().int().nullable().describe('TODO describe takenAt field for the OpenInspection MCP integration'),
+    id:          z.string(),
+    key:         z.string(),
+    url:         z.string(),
+    uploadedAt:  z.number().int(),
+    takenAt:     z.number().int().nullable(),
 }).openapi('MediaPoolUploadResponse');
 
 export const MediaAttachRequestSchema = z.object({
@@ -48,9 +48,9 @@ export const MediaAttachRequestSchema = z.object({
 }).openapi('MediaAttachRequest');
 
 export const MediaAttachResponseSchema = z.object({
-    key:        z.string().describe('TODO describe key field for the OpenInspection MCP integration'),
-    itemId:     z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
-    photoIndex: z.number().int().nonnegative().describe('TODO describe photoIndex field for the OpenInspection MCP integration'),
+    key:        z.string(),
+    itemId:     z.string(),
+    photoIndex: z.number().int().nonnegative(),
 }).openapi('MediaAttachResponse');
 
 // Media Studio (Plan 3) — reorder an item's photos[] by key. The reorder is

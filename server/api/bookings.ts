@@ -73,15 +73,15 @@ const listPublicServicesRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+                        success: z.boolean(),
                         data: z.object({
                             services: z.array(z.object({
-                                id:              z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-                                name:            z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-                                description:     z.string().nullable().describe('TODO describe description field for the OpenInspection MCP integration'),
-                                price:           z.number().describe('TODO describe price field for the OpenInspection MCP integration'),
-                                durationMinutes: z.number().nullable().describe('TODO describe durationMinutes field for the OpenInspection MCP integration'),
-                            })).describe('TODO describe services field for the OpenInspection MCP integration'),
+                                id:              z.string(),
+                                name:            z.string(),
+                                description:     z.string().nullable(),
+                                price:           z.number(),
+                                durationMinutes: z.number().nullable(),
+                            })),
                         }),
                     }),
                 },

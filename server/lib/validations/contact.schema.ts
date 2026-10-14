@@ -30,17 +30,17 @@ export const CreateContactSchema = z.object({
 export const UpdateContactSchema = CreateContactSchema.partial().openapi('UpdateContact');
 
 export const ContactResponseSchema = z.object({
-    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId: z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    type: z.enum(ROLE_KINDS).describe('TODO describe type field for the OpenInspection MCP integration'),
-    name: z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-    email: z.string().nullable().describe('TODO describe email field for the OpenInspection MCP integration'),
-    phone: z.string().nullable().describe('TODO describe phone field for the OpenInspection MCP integration'),
-    agency: z.string().nullable().describe('TODO describe agency field for the OpenInspection MCP integration'),
-    notes: z.string().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1),
+    tenantId: z.string().trim().min(1),
+    type: z.enum(ROLE_KINDS),
+    name: z.string(),
+    email: z.string().nullable(),
+    phone: z.string().nullable(),
+    agency: z.string().nullable(),
+    notes: z.string().nullable(),
     locale: z.string().nullable().describe("Contact's stated language preference (BCP-47), or null when they have not said."),
-    createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-    inspectionCount: z.number().optional().describe('TODO describe inspectionCount field for the OpenInspection MCP integration'),
+    createdAt: z.string(),
+    inspectionCount: z.number().optional(),
     referralCount: z.number().optional().describe('Inspections where this contact is the tenant buyer_agent (referrals sent).'),
 }).openapi('Contact');
 

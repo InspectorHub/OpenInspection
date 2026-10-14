@@ -42,7 +42,7 @@ const getConfigRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner')],
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ integrationConfig: IntegrationConfigSchema.describe('TODO describe integrationConfig field for the OpenInspection MCP integration'), secrets: z.record(z.string(), z.string()).describe('TODO describe secrets field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }).openapi('ConfigResponse') } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.object({ integrationConfig: IntegrationConfigSchema, secrets: z.record(z.string(), z.string()) }) }).openapi('ConfigResponse') } },
             description: 'Success',
         },
     },
@@ -59,7 +59,7 @@ const updateIntegrationConfigRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner')],
     request: { body: { content: { 'application/json': { schema: IntegrationConfigSchema.describe('Integration settings to merge into the stored set; keys left out are kept') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }) } }, description: 'Saved' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Saved' },
     },
     operationId: "createTenantConfig",
     description: "Save the company's non-sensitive integration settings (appBaseUrl, turnstileSiteKey, googleClientId, streamCustomerSubdomain). The body is merged into what is stored: keys that are sent overwrite, keys that are left out are kept, and a key sent as an empty string is removed. The values are stored as plaintext, so secrets never go through this route. The change is audit-logged. Idempotent for the same body. Restricted to the owner."
@@ -76,7 +76,7 @@ const getWidgetOriginsRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ origins: z.array(z.string()).describe('TODO describe origins field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ origins: z.array(z.string()) }) }) } },
             description: 'Success',
         },
     },
@@ -94,7 +94,7 @@ const setWidgetOriginsRoute = createRoute(withMcpMetadata({
     request: { body: { content: { 'application/json': { schema: z.object({ origins: z.array(z.string().min(1)).max(50).describe('Complete list of allowed origins, at most 50. Each must be an http or https origin and may contain at most one * wildcard (for example https://*.example.com)') }).describe('The full replacement origin allowlist; an empty list clears it') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ origins: z.array(z.string()).describe('TODO describe origins field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ origins: z.array(z.string()) }) }) } },
             description: 'Saved',
         },
     },
@@ -113,7 +113,7 @@ const getStripeConnectRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ accountId: z.string().nullable().describe('TODO describe accountId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ accountId: z.string().nullable() }) }) } },
             description: 'Success',
         },
     },
@@ -131,7 +131,7 @@ const setStripeConnectRoute = createRoute(withMcpMetadata({
     request: { body: { content: { 'application/json': { schema: StripeConnectAccountSchema.describe('The Stripe account to link to this company') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ accountId: z.string().describe('TODO describe accountId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ accountId: z.string() }) }) } },
             description: 'Saved',
         },
     },
@@ -148,7 +148,7 @@ const deleteStripeConnectRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ accountId: z.null().describe('TODO describe accountId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ accountId: z.null() }) }) } },
             description: 'Cleared',
         },
     },
@@ -170,12 +170,12 @@ const getEarningsSummaryRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
+                        success: z.literal(true),
                         data: z.object({
-                            paid: z.number().describe('TODO describe paid field for the OpenInspection MCP integration'),
-                            pending: z.number().describe('TODO describe pending field for the OpenInspection MCP integration'),
-                            count: z.number().describe('TODO describe count field for the OpenInspection MCP integration'),
-                        }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                            paid: z.number(),
+                            pending: z.number(),
+                            count: z.number(),
+                        }),
                     }),
                 },
             },
@@ -200,8 +200,8 @@ const icsTokenRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-                        data: z.object({ url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                        success: z.literal(true),
+                        data: z.object({ url: z.string() }),
                     }),
                 },
             },

@@ -53,23 +53,23 @@ export const CloneRatingSystemSchema = z.object({
 
 /** Output shape returned by the API. */
 const RatingSystemResponseSchema = z.object({
-    id:          z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-    name:        z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-    slug:        z.string().describe('TODO describe slug field for the OpenInspection MCP integration'),
-    description: z.string().nullable().describe('TODO describe description field for the OpenInspection MCP integration'),
-    isDefault:   z.boolean().describe('TODO describe isDefault field for the OpenInspection MCP integration'),
-    isSeed:      z.boolean().describe('TODO describe isSeed field for the OpenInspection MCP integration'),
-    levels:      z.array(RatingLevelSchema).describe('TODO describe levels field for the OpenInspection MCP integration'),
-    createdAt:   z.number().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-    updatedAt:   z.number().describe('TODO describe updatedAt field for the OpenInspection MCP integration'),
+    id:          z.string(),
+    name:        z.string(),
+    slug:        z.string(),
+    description: z.string().nullable(),
+    isDefault:   z.boolean(),
+    isSeed:      z.boolean(),
+    levels:      z.array(RatingLevelSchema),
+    createdAt:   z.number(),
+    updatedAt:   z.number(),
 });
 
 export const RatingSystemListResponseSchema = z.object({
-    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-    data:    z.array(RatingSystemResponseSchema).describe('TODO describe data field for the OpenInspection MCP integration'),
+    success: z.literal(true),
+    data:    z.array(RatingSystemResponseSchema),
 });
 
 export const RatingSystemSingleResponseSchema = z.object({
-    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-    data:    RatingSystemResponseSchema.describe('TODO describe data field for the OpenInspection MCP integration'),
+    success: z.literal(true),
+    data:    RatingSystemResponseSchema,
 });
