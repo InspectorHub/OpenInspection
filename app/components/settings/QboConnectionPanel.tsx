@@ -3,6 +3,7 @@ import { m } from "~/paraglide/messages";
 import { formatDate } from "~/lib/format";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { QboBooksHealth } from "~/components/settings/QboBooksHealth";
+import { useQboContactMatch } from "~/components/settings/useQboContactMatch";
 import { QboCopyButton } from "~/components/settings/QboCopyButton";
 import { QboEnvironmentBadge } from "~/components/settings/QboEnvironmentBadge";
 import { QboSyncStatus } from "~/components/settings/QboSyncStatus";
@@ -42,6 +43,7 @@ export function QboConnectionPanel({
   onDismissError: (id: string) => void;
 }) {
   const locale = useDisplayLocale();
+  const match = useQboContactMatch();
   const timeZone = useDisplayTimeZone();
   const now = Math.floor(Date.now() / 1000);
   const openErrors = status.openErrors ?? [];
@@ -135,7 +137,9 @@ export function QboConnectionPanel({
         heldDepositCount={status.heldDepositCount ?? 0}
         onDismissError={onDismissError}
         dismissingId={dismissingId}
+        onMatchContact={match.open}
       />
+      {match.dialog}
 
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-6" aria-labelledby="qbo-matching-heading">
         <h2 id="qbo-matching-heading" className="text-[15px] font-bold text-ih-fg-1">

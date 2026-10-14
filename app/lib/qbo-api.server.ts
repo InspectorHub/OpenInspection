@@ -21,13 +21,19 @@ export async function qboApiFetch(
   caller: QboCaller,
   path: string,
   method = "GET",
+  json?: unknown,
 ): Promise<Response | null> {
   try {
     const env = getCloudflareEnv(context);
     const apiBase = getApiUrl(context);
     const req = new Request(`${apiBase}/api/integrations/qbo${path}`, {
       method,
-      headers: { Cookie: caller.cookie, Authorization: `Bearer ${caller.token}` },
+      headers: {
+        Cookie: caller.cookie,
+        Authorization: `Bearer ${caller.token}`,
+        ...(json === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      ...(json === undefined ? {} : { body: JSON.stringify(json) }),
     });
     // Awaited so that a failed request lands in the catch below: returning the
     // promise itself would hand the caller a rejection instead of `null`.

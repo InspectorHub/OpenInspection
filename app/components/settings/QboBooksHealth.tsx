@@ -60,6 +60,7 @@ export function QboBooksHealth({
   heldDepositCount,
   onDismissError,
   dismissingId,
+  onMatchContact,
 }: {
   openErrors: QBOSyncErrorSummary[];
   discrepancies: QboDiscrepancy[];
@@ -68,6 +69,8 @@ export function QboBooksHealth({
   onDismissError: (id: string) => void;
   /** The row currently being closed, so only its own button reads as busy. */
   dismissingId: string | null;
+  /** Opens the matching dialog for a failed CONTACT row. Invoice and refund rows have no such action. */
+  onMatchContact: (error: QBOSyncErrorSummary) => void;
 }) {
   const locale = useDisplayLocale();
   // One press, one request, even if a second lands before the busy state renders.
@@ -112,14 +115,25 @@ export function QboBooksHealth({
                       push the card wider than the page. */}
                   <p className="text-[12px] text-ih-fg-2 mt-1 break-words">{e.message}</p>
                 </div>
-                <button
-                  type="button"
-                  {...pendingProps<HTMLButtonElement>(dismissingId !== null, () => latch(() => onDismissError(e.id)))}
-                  aria-busy={dismissingId === e.id || undefined}
-                  className={`shrink-0 px-3 py-1.5 text-[12px] font-bold text-ih-fg-2 bg-ih-bg-muted rounded-md hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}
-                >
-                  {m.settings_qbo_error_dismiss()}
-                </button>
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  {e.oiType === "contact" && (
+                    <button
+                      type="button"
+                      onClick={() => onMatchContact(e)}
+                      className="px-3 py-1.5 text-[12px] font-bold text-ih-fg-1 bg-ih-bg-muted rounded-md hover:bg-ih-bg-muted transition-colors"
+                    >
+                      {m.settings_qbo_match_button()}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    {...pendingProps<HTMLButtonElement>(dismissingId !== null, () => latch(() => onDismissError(e.id)))}
+                    aria-busy={dismissingId === e.id || undefined}
+                    className={`px-3 py-1.5 text-[12px] font-bold text-ih-fg-2 bg-ih-bg-muted rounded-md hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}
+                  >
+                    {m.settings_qbo_error_dismiss()}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

@@ -8,6 +8,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { qboApiFetch, qboCaller } from "~/lib/qbo-api.server";
 import { runCredentialCheck } from "~/lib/qbo-credential-check.server";
+import { runCustomerMatchIntent } from "~/lib/qbo-customer-match.server";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { getDeploymentProfile } from "../../server/lib/deployment-profile";
@@ -211,6 +212,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     // closed, rather than re-deriving it from client state.
     return { success: true, intent, error: null, syncEnabled: undefined, errorId };
   }
+
+  const match = await runCustomerMatchIntent(context, caller, intent, fd);
+  if (match) return match;
 
   // Tests the credentials the server already holds. No body goes out and none
   // comes back: the result is a small closed set, drawn by the credentials form.

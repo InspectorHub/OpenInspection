@@ -23,6 +23,7 @@ async function view(over: Partial<React.ComponentProps<typeof QboBooksHealth>> =
     discrepancies: [],
     heldDepositCount: 0,
     onDismissError: vi.fn(),
+    onMatchContact: vi.fn(),
     dismissingId: null as string | null,
     ...over,
   };
@@ -147,5 +148,44 @@ describe("QboBooksHealth - payment discrepancies and held deposits", () => {
     v.unmount();
     await view({ openErrors: [], heldDepositCount: 0 });
     expect(screen.queryByText("Not sent to QuickBooks")).not.toBeInTheDocument();
+  });
+});
+
+describe("QboBooksHealth - matching a failed contact", () => {
+  it("offers the match button on a contact row and passes that row to the handler", async () => {
+    const contact = row({ id: "c1", oiType: "contact", oiId: "contact-1234567" });
+    const { props } = await view({ openErrors: [contact] });
+    const button = screen.getByRole("button", { name: "Match to a QuickBooks customer" });
+    await act(async () => { button.click(); });
+    expect(props.onMatchContact).toHaveBeenCalledTimes(1);
+    expect(props.onMatchContact).toHaveBeenCalledWith(contact);
+  });
+
+  it("offers no match button on invoice or refund rows (control: the contact row has one)", async () => {
+    await view({
+      openErrors: [
+        row({ id: "i1", oiType: "invoice" }),
+        row({ id: "r1", oiType: "refund" }),
+      ],
+    });
+    expect(screen.queryByRole("button", { name: "Match to a QuickBooks customer" })).not.toBeInTheDocument();
+    // Control: Dismiss is still there for both, so the row actions did render.
+    expect(screen.getAllByRole("button", { name: "Dismiss" })).toHaveLength(2);
+
+    cleanup();
+    await view({ openErrors: [row({ id: "c2", oiType: "contact" })] });
+    expect(screen.getAllByRole("button", { name: "Match to a QuickBooks customer" })).toHaveLength(1);
+  });
+
+  it("puts the button on only the contact rows of a mixed list", async () => {
+    await view({
+      openErrors: [
+        row({ id: "c3", oiType: "contact" }),
+        row({ id: "i3", oiType: "invoice" }),
+        row({ id: "c4", oiType: "contact" }),
+      ],
+    });
+    expect(screen.getAllByRole("button", { name: "Match to a QuickBooks customer" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Dismiss" })).toHaveLength(3);
   });
 });
