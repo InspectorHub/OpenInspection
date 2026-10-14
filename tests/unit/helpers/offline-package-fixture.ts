@@ -56,3 +56,28 @@ export function buildPackage(spec: PackageSpec): Uint8Array {
     Object.assign(files, spec.extra);
     return zipSync(files);
 }
+
+/**
+ * Rewrites the uncompressed size a zip declares for one entry, in the central
+ * directory and in the local header, leaving the entry's bytes alone. This is
+ * what a package that lies about an entry's size looks like. Returns a copy.
+ */
+export function declareEntrySize(zip: Uint8Array, name: string, declared: number): Uint8Array {
+    const out = new Uint8Array(zip);
+    const view = new DataView(out.buffer);
+    let eocd = out.length - 22;
+    while (eocd >= 0 && view.getUint32(eocd, true) !== 0x06054b50) eocd--;
+    if (eocd < 0) throw new Error('not a zip archive');
+    let at = view.getUint32(eocd + 16, true);
+    for (let i = view.getUint16(eocd + 8, true); i > 0; i--) {
+        const nameLength = view.getUint16(at + 28, true);
+        const found = new TextDecoder().decode(out.subarray(at + 46, at + 46 + nameLength));
+        if (found === name) {
+            view.setUint32(at + 24, declared, true);
+            view.setUint32(view.getUint32(at + 42, true) + 22, declared, true);
+            return out;
+        }
+        at += 46 + nameLength + view.getUint16(at + 30, true) + view.getUint16(at + 32, true);
+    }
+    throw new Error(`no entry named ${name}`);
+}

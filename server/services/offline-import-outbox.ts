@@ -26,18 +26,22 @@
  * between two awaits; the write is an overwrite of the same value, so it only
  * matters if someone edited the same field inside that gap.
  *
- * Retention: rows are never swept. Each is a few dozen bytes and only an imported
- * package makes one. A retention policy is a separate decision; sweeping them is
- * exactly what re-opens the replay hole, so none is implied here.
+ * Retention: a record only matters while a package that could repeat it can
+ * still be imported, and a package is refused once it is `PACKAGE_MAX_AGE_DAYS`
+ * old. A record older than `APPLIED_RECORD_RETENTION_DAYS` (that age plus a
+ * margin) can therefore never be matched again, and `sweepAppliedRecords` deletes
+ * such rows, a bounded batch at a time, at the end of a successful import. The
+ * sweep is opportunistic: it needs no schedule, touches only the importing
+ * workspace, and a failure is logged without affecting the import.
  */
 
 import type { Context } from 'hono';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, lt, sql } from 'drizzle-orm';
 import { Errors, type AppError } from '../lib/errors';
 import { offlineImportApplied } from '../lib/db/schema';
 import { getDrizzle } from '../lib/route-helpers';
 import { logger } from '../lib/logger';
-import type { OutboxEntry } from '../lib/native/offline-package';
+import { APPLIED_RECORD_RETENTION_DAYS, APPLIED_RECORD_SWEEP_BATCH, type OutboxEntry } from '../lib/native/offline-package';
 import type { HonoConfig } from '../types/hono';
 
 export interface OutboxFailure {
@@ -197,4 +201,24 @@ export async function applyOutbox(
         if (repeat) result.skipped++; else result.applied++;
     }
     return result;
+}
+
+/**
+ * Delete this workspace's applied records that no package can repeat any more.
+ * Never throws: a failed sweep leaves the rows for the next import.
+ */
+export async function sweepAppliedRecords(c: Context<HonoConfig>, tenantId: string): Promise<void> {
+    try {
+        const cutoff = new Date(Date.now() - APPLIED_RECORD_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+        const t = offlineImportApplied;
+        // D1 has no DELETE ... LIMIT, so the batch is chosen by rowid in a subquery. Both
+        // the subquery and the delete are filtered by tenant.
+        await getDrizzle(c).delete(t).where(and(
+            eq(t.tenantId, tenantId),
+            lt(t.appliedAt, cutoff),
+            sql`rowid IN (SELECT rowid FROM offline_import_applied WHERE tenant_id = ${tenantId} AND applied_at < ${cutoff.getTime()} LIMIT ${APPLIED_RECORD_SWEEP_BATCH})`,
+        ));
+    } catch (err) {
+        logger.warn('offline import: sweeping old applied records failed', { error: err instanceof Error ? err.message : String(err) });
+    }
 }

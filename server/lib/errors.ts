@@ -82,6 +82,9 @@ export enum ErrorCode {
     // Nothing was written. `details` names the limit and carries the limits a
     // client needs to split the package into parts that fit.
     PACKAGE_TOO_LARGE = 'PACKAGE_TOO_LARGE',
+    // An offline package was exported longer ago than the import accepts (422).
+    // Nothing was written. `details.maxAgeDays` carries the limit.
+    PACKAGE_EXPIRED = 'PACKAGE_EXPIRED',
 }
 
 /**

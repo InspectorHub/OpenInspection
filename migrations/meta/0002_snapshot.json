@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0f005e0e-54fe-491b-8fa6-a320383ecebc",
+  "id": "cf82e438-229d-464a-b051-196eeeef0210",
   "prevId": "cb36bfc5-f3ba-4bcd-8d5a-a37797b68599",
   "tables": {
     "agent_terms_acceptances": {
@@ -6789,7 +6789,16 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_offline_import_applied_age": {
+          "name": "idx_offline_import_applied_age",
+          "columns": [
+            "tenant_id",
+            "applied_at"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "offline_import_applied_tenant_id_idempotency_key_inspection_id_pk": {

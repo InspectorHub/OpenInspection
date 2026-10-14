@@ -11,7 +11,7 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 |---|---|
 | Tables | 110 |
 | Columns | 1272 |
-| Indexes (excluding primary keys) | 183 |
+| Indexes (excluding primary keys) | 184 |
 | Database foreign keys (all legacy, frozen) | 51 |
 | Columns carrying a source comment | 615 (48%) |
 
@@ -1725,12 +1725,16 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
-| `tenant_id` | text | PK NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `tenant_id` | text | PK NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `idempotency_key` | text | PK NN |  |  | The queue entry's idempotency key, verbatim as the device minted it. The device mints it, so nothing stops two packages from using the same one for different inspections: the inspection id is part of the primary key, and a record only counts for the inspection it was written for. |
 | `op` | text | NN |  | `inspection.create, inspection.update, inspection.complete` |  |
 | `inspection_id` | text | PK NN |  |  | *The inspection (order) this belongs to. App-layer reference.* |
-| `applied_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `applied_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `applied_by` | text | NN |  |  | The importing member, taken from the verified session. |
+
+**Indexes**
+
+- `idx_offline_import_applied_age` (tenant_id, applied_at)
 
 ---
 

@@ -263,7 +263,22 @@ Further rules:
   queued write that was applied, per company, key and inspection, so a repeat
   after the ledger expired cannot put an old value over a newer edit. Rows are
   written only after the target route answered `2xx`, so a refused entry stays
-  retryable. The rows are never swept.
+  retryable. A row can only be matched by a package that is still importable,
+  so it is deleted once it is older than the package age limit plus a margin
+  (see the limits table); an import sweeps a bounded batch of such rows for its
+  own company at the end, and a failed sweep never affects the import.
+- **Packages expire.** A package whose manifest `exportedAt` is more than 400
+  days old is refused with `422` `PACKAGE_EXPIRED` and nothing is written. The
+  limit is longer than the longest a device can stay offline (`offline_max_days`
+  is at most 365), so an honest package is never turned away. `exportedAt` is the
+  device's own claim: the limit protects against replaying a stale package by
+  accident, not against a member who edits the manifest.
+- **Every entry must hold the bytes it declares.** The zip directory states each
+  entry's size; an entry that unpacks to more or fewer bytes than that refuses
+  the whole package with `400` before anything is written. (The zip checksum is
+  not verified: computing it over up to 48 MiB costs more CPU than the Free plan
+  allows. JSON and Yjs entries must parse, and photos pass the same type and size
+  checks as every other photo upload.)
 - **A deleted inspection stays deleted.** If a recorded create names an
   inspection that has since been deleted, the package is refused with `409`
   `PACKAGE_INSPECTION_DELETED` and nothing is written.
@@ -291,6 +306,15 @@ out of memory, so the server bounds the size of what it accepts at once.
 Reading a variable never throws. A missing, blank or non-numeric value falls
 back to the default, and a number outside the range is clamped into it, so a
 misconfiguration can never switch a limit off.
+
+Three constants are fixed rather than configurable, because together they define
+how long the server remembers what it has applied:
+
+| Constant | Value | Meaning |
+|---|---|---|
+| Package age (`PACKAGE_MAX_AGE_DAYS`) | 400 days | Oldest `exportedAt` an import accepts |
+| Applied-record retention (`APPLIED_RECORD_RETENTION_DAYS`) | 420 days | Age at which an `offline_import_applied` row may be swept |
+| Sweep batch (`APPLIED_RECORD_SWEEP_BATCH`) | 100 rows | Most rows one import deletes |
 
 The defaults are sized from a measured estimate of the subrequests a package
 costs:
@@ -388,7 +412,7 @@ The native surface adds two forward-only migrations:
 | Migration | Adds |
 |---|---|
 | `0001_offline_max_days.sql` | `tenant_configs.offline_max_days` (integer, default 30) |
-| `0002_offline_import_applied.sql` | The `offline_import_applied` table |
+| `0002_offline_import_applied.sql` | The `offline_import_applied` table and its `(tenant_id, applied_at)` index |
 
 **Apply migrations before deploying the new code.** The new code reads
 `offline_max_days` on the session route and writes `offline_import_applied` on

@@ -140,4 +140,20 @@ describe('native version handshake (real app)', () => {
     // Positive control: the same headers on the native token are refused.
     expect((await call('/api/inspections', OLD)).status).toBe(426);
   });
+
+  it('answers 401 on /api/client/session to a browser session JWT (positive control: the native token gets 200)', async () => {
+    h = await createHarness('standalone');
+    const keyring = await buildKeyring(h.env as unknown as Record<string, string | undefined>);
+    const now = Math.floor(Date.now() / 1000);
+    const jwt = await signJwt({
+      sub: INSPECTOR_ID, role: 'inspector', 'custom:userRole': 'inspector', 'custom:tenantId': TENANT_ID, iat: now, exp: now + 3600,
+    }, keyring);
+    // The same signed token authenticates an ordinary route, so the refusal below is about the session route.
+    expect((await call('/api/inspections', NEW, { auth: jwt })).status).toBe(200);
+    const asBearer = await call('/api/client/session', NEW, { auth: jwt });
+    expect(asBearer.status, await asBearer.clone().text()).toBe(401);
+    const asCookie = await call('/api/client/session', { ...NEW, cookie: `__Host-inspector_token=${jwt}` }, { auth: null });
+    expect(asCookie.status, await asCookie.clone().text()).toBe(401);
+    expect((await call('/api/client/session', NEW)).status).toBe(200);
+  });
 });

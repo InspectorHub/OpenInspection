@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
 
 /**
  * Queued writes an offline package has already applied, one row per (tenant, key, inspection).
@@ -14,10 +14,11 @@ import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core'
  * record is what tells the importer not to bring it back. For that reason the
  * inspection delete cascade leaves this table alone.
  *
- * Rows are written only after the target route answered 2xx. They are never
- * swept: each is a few dozen bytes and only an imported package produces one, so
- * the table grows with imports, not with traffic. A retention policy is a
- * separate decision and is deliberately not implied here.
+ * Rows are written only after the target route answered 2xx. A row can only be
+ * matched by a package that is still importable, and a package is refused once it
+ * is older than `PACKAGE_MAX_AGE_DAYS`, so an import deletes this workspace's rows
+ * older than that age plus a margin (`sweepAppliedRecords`), a bounded batch at a
+ * time. `idx_offline_import_applied_age` serves that delete.
  *
  * Referential integrity is enforced by the service layer (no foreign keys).
  */
@@ -34,6 +35,7 @@ export const offlineImportApplied = sqliteTable('offline_import_applied', {
     appliedBy:      text('applied_by').notNull(),
 }, (t) => [
     primaryKey({ columns: [t.tenantId, t.idempotencyKey, t.inspectionId] }),
+    index('idx_offline_import_applied_age').on(t.tenantId, t.appliedAt),
 ]);
 
 export type OfflineImportApplied = typeof offlineImportApplied.$inferSelect;

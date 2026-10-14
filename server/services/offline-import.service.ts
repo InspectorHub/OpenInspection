@@ -32,7 +32,7 @@ import type { Context } from 'hono';
 import { and, eq, inArray } from 'drizzle-orm';
 import { AppError, ErrorCode, Errors } from '../lib/errors';
 import { enforceLimit, packageTooLarge, type ImportLimits } from '../lib/native/import-limits';
-import { applyOutbox, findDeletedCreates, type OutboxFailure } from './offline-import-outbox';
+import { applyOutbox, findDeletedCreates, sweepAppliedRecords, type OutboxFailure } from './offline-import-outbox';
 import { auditFromContext } from '../lib/audit';
 import { inspections } from '../lib/db/schema';
 import { getDrizzle } from '../lib/route-helpers';
@@ -43,10 +43,10 @@ import { authorizeCollab, collabStub, type AuthResult } from '../lib/collab/auth
 import { importUpdateIntoDo } from '../lib/collab/import-route';
 import { resolvePendingInDo } from '../lib/collab/resolve-pending-route';
 import {
-    MANIFEST_ENTRY, MEDIA_INDEX_ENTRY, OUTBOX_ENTRY, listPackage, mediaEntryName, readPackageEntries, readPackageEntry, yjsEntryName,
+    MANIFEST_ENTRY, MEDIA_INDEX_ENTRY, OUTBOX_ENTRY, listPackage, mediaEntryName, readPackageEntries, readPackageEntry, verifyPackageEntries, yjsEntryName,
 } from '../lib/native/offline-zip';
 import {
-    MediaIndexSchema, OfflinePackageManifestSchema, OutboxSchema,
+    MediaIndexSchema, OfflinePackageManifestSchema, OutboxSchema, PACKAGE_MAX_AGE_DAYS,
     type MediaIndex, type OfflinePackageManifest, type OutboxEntry,
 } from '../lib/native/offline-package';
 import type { HonoConfig } from '../types/hono';
@@ -128,6 +128,21 @@ async function validate(c: Context<HonoConfig>, zip: Uint8Array, limits: ImportL
     // before its other entries are even parsed.
     if (manifest.tenantId !== tenantId) throw Errors.Forbidden('This package belongs to a different workspace');
 
+    // A package this old is refused, which is what lets the applied-record sweep delete old records.
+    const ageMs = Date.now() - Date.parse(manifest.exportedAt);
+    if (ageMs > PACKAGE_MAX_AGE_DAYS * 24 * 60 * 60 * 1000) {
+        throw new AppError(
+            422, ErrorCode.PACKAGE_EXPIRED,
+            `This package was exported more than ${PACKAGE_MAX_AGE_DAYS} days ago and can no longer be imported`,
+            { maxAgeDays: PACKAGE_MAX_AGE_DAYS },
+        );
+    }
+
+    // Every entry must hold exactly the bytes its directory entry declares. Judged here, in the read-only
+    // phase, so a package that lies about one entry's size is refused before any other entry is acted on.
+    const mismatched = verifyPackageEntries(zip, entries);
+    if (mismatched) throw Errors.BadRequest(`Invalid offline package: entry ${mismatched} does not match its declared size`);
+
     const rawOutbox = parseEntry(zip, entries, OUTBOX_ENTRY) ?? [];
     enforceLimit(limits, 'outbox', claimedLength(rawOutbox));
     const outboxParse = OutboxSchema.safeParse(rawOutbox);
@@ -180,6 +195,10 @@ async function validate(c: Context<HonoConfig>, zip: Uint8Array, limits: ImportL
         // for this inspection is a different one, importing would merge two documents.
         // A package that creates the inspection itself carries a placeholder: the device
         // cannot know the id the server gives the report, and a repeat import must pass too.
+        // That is safe because the manifest's reportId is only ever COMPARED here, never used as an
+        // address: the document object is opened with the report id `authorizeCollab` read from
+        // the server's own primary report (see `collabStub` below), so whatever a package claims for
+        // a created inspection, its document can only land in that inspection's own report.
         const claimed = manifest.inspections.find((i) => i.id === id)?.reportId;
         if (!creates.has(id) && claimed !== auth.reportId) {
             throw Errors.BadRequest(`Invalid offline package: inspection ${id} was exported from a different report`);
@@ -308,6 +327,8 @@ export async function importOfflinePackage(c: Context<HonoConfig>, zip: Uint8Arr
         skipped: created.skipped + others.skipped,
         failed: others.failed,
     };
+
+    await sweepAppliedRecords(c, tenantId);
 
     const photos = plan.media.length;
     auditFromContext(c, 'native.offline_import', 'tenant', {

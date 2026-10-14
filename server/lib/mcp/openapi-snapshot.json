@@ -12383,7 +12383,7 @@
       "body": null
     },
     "summary": "List current user OAuth grants",
-    "description": "Returns all active OAuth grants for the currently authenticated user, enabling visibility into which MCP clients have been authorized."
+    "description": "Returns all active OAuth grants for the currently authenticated user, enabling visibility into which MCP clients and native app devices have been authorized. Each grant says which in `kind`."
   },
   {
     "operationId": "listServiceDiscountCodes",

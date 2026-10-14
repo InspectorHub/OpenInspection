@@ -21,6 +21,7 @@ import { buildOAuthHandler } from '../../../server/lib/mcp/oauth-provider';
 import { completeNativeAuthorization } from '../../../server/lib/auth/native-consent';
 import { revokeAllUserGrants } from '../../../server/lib/mcp/grants';
 import { NATIVE_IDLE_LIMIT_S } from '../../../server/lib/auth/native-token';
+import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { applyMigrations as replayMigrations } from '../migration-replay';
 
 const migrationSql = import.meta.glob('../../../migrations/*.sql', {
@@ -42,6 +43,10 @@ const env = {
 } as unknown as Record<string, unknown>;
 /** Same deployment with only MCP opted in: the OAuth provider is mounted, native clients are not. */
 const mcpOnlyEnv = { ...env, NATIVE_CLIENT_ENABLED: undefined } as Record<string, unknown>;
+/** Same deployment with only native clients opted in: the provider is mounted, MCP itself is off. */
+const nativeOnlyEnv = { ...env, MCP_ENABLED: undefined } as Record<string, unknown>;
+/** Neither consumer opted in: no provider at all. */
+const neitherEnv = { ...env, MCP_ENABLED: undefined, NATIVE_CLIENT_ENABLED: undefined } as Record<string, unknown>;
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
 
 /**
@@ -304,5 +309,58 @@ describe('native client OAuth lifecycle (real provider)', () => {
         expect(await grantCount(USER)).toBe(0);
         expect((await sessionContext(theirs.access_token)).status).toBe(200);
         expect(await grantCount(OTHER_USER)).toBe(1);
+    });
+
+    describe('managing grants from the web session', () => {
+        interface GrantRow { id: string; kind: string; clientName: string | null }
+
+        async function sessionCookie(userId: string): Promise<string> {
+            const keyring = await buildKeyring(testEnv as never);
+            const jwt = await signJwt({ sub: userId, role: 'inspector', 'custom:userRole': 'inspector', 'custom:tenantId': TENANT }, keyring);
+            return `__Host-inspector_token=${jwt}`;
+        }
+        const grantsApi = (via: Call, userId: string, path = '/api/mcp/grants', init: RequestInit = {}) =>
+            sessionCookie(userId).then((cookie) => via(new Request(`${ORIGIN}${path}`, { ...init, headers: { cookie } })));
+        const listed = async (via: Call, userId: string): Promise<GrantRow[]> =>
+            ((await (await grantsApi(via, userId)).json()) as { data: GrantRow[] }).data;
+
+        it('with only native clients enabled, a member lists and revokes their own native grant and cannot touch another member grant', async () => {
+            const clientId = await registerClient();
+            const mine = (await (await authorizeAndExchange(clientId, 'native', USER)).json()) as Tokens;
+            const theirs = (await (await authorizeAndExchange(clientId, 'native', OTHER_USER)).json()) as Tokens;
+            // A second grant for the same user and client replaces the first, so the MCP grant gets its own client.
+            const asMcp = (await (await authorizeAndExchange(await registerClient(), 'read:inspections', USER)).json()) as Tokens;
+            expect(asMcp.access_token).toBeTruthy();
+            const via = callIn(nativeOnlyEnv);
+
+            const rows = await listed(via, USER);
+            const nativeRow = rows.find((r) => r.kind === 'native');
+            const mcpRow = rows.find((r) => r.kind === 'mcp');
+            expect(nativeRow, 'the native grant is listed and labelled').toBeDefined();
+            expect(mcpRow, 'an MCP grant is still labelled mcp').toBeDefined();
+            expect(rows).toHaveLength(await grantCount(USER));
+            const theirRows = await listed(via, OTHER_USER);
+            expect(theirRows.some((r) => rows.some((mine) => mine.id === r.id))).toBe(false);
+
+            // Another member's grant id is not found for this caller, and their token keeps working.
+            const foreign = await grantsApi(via, USER, `/api/mcp/grants/${theirRows[0]!.id}`, { method: 'DELETE' });
+            expect(foreign.status).toBe(404);
+            expect((await sessionContext(theirs.access_token)).status).toBe(200);
+
+            // Positive control: the caller's own native grant is revoked and its token dies.
+            expect((await sessionContext(mine.access_token)).status).toBe(200);
+            const revoked = await grantsApi(via, USER, `/api/mcp/grants/${nativeRow!.id}`, { method: 'DELETE' });
+            expect(revoked.status, await revoked.clone().text()).toBe(200);
+            expect((await sessionContext(mine.access_token)).status).toBe(401);
+            expect((await listed(via, USER)).some((r) => r.id === nativeRow!.id)).toBe(false);
+        });
+
+        it('with neither MCP nor native clients enabled, the grant routes answer 404', async () => {
+            const via = callIn(neitherEnv);
+            expect((await grantsApi(via, USER)).status).toBe(404);
+            expect((await grantsApi(via, USER, '/api/mcp/grants/anything', { method: 'DELETE' })).status).toBe(404);
+            // Control: the same request on the opted-in deployment is served.
+            expect((await grantsApi(call, USER)).status).toBe(200);
+        });
     });
 });

@@ -11,6 +11,7 @@ const McpGrantSchema = z.object({
     id: z.string().describe('Unique grant identifier assigned by the OAuth provider'),
     clientId: z.string().describe('OAuth client identifier for the MCP client application'),
     clientName: z.string().nullable().describe('Human-readable display name of the MCP client, null when unset'),
+    kind: z.enum(['mcp', 'native']).describe('What the grant is for: a remote MCP client, or a native app device'),
     scopes: z.array(z.string()).describe('List of OAuth permission scopes granted to this MCP client'),
     createdAt: z.number().describe('Unix timestamp in seconds when this OAuth grant was created'),
     expiresAt: z.number().nullable().describe('Unix timestamp in seconds for grant expiry, null when permanent'),

@@ -7,12 +7,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { zipSync } from 'fflate';
 import {
     OfflinePackageManifestSchema, OutboxEntrySchema, OutboxSchema, MediaIndexSchema, OFFLINE_ID_PATTERN,
+    PACKAGE_MAX_AGE_DAYS, APPLIED_RECORD_RETENTION_DAYS,
 } from '../../../server/lib/native/offline-package';
 import {
-    listPackage, readPackageEntry, readPackageEntries, readPackageBody, MAX_MEDIA_ENTRY_BYTES,
+    listPackage, readPackageEntry, readPackageEntries, verifyPackageEntries, readPackageBody, MAX_MEDIA_ENTRY_BYTES,
 } from '../../../server/lib/native/offline-zip';
 import { DEFAULT_IMPORT_LIMITS, IMPORT_LIMIT_CEILINGS } from '../../../server/lib/native/import-limits';
-import { buildPackage } from '../helpers/offline-package-fixture';
+import { buildPackage, declareEntrySize } from '../helpers/offline-package-fixture';
 
 const MAX_PACKAGE_BYTES = DEFAULT_IMPORT_LIMITS.compressedBytes;
 
@@ -54,6 +55,17 @@ describe('offline package manifest', () => {
     it('ignores unknown manifest keys instead of failing (additive fields within version 1)', () => {
         const parsed = OfflinePackageManifestSchema.safeParse({ ...manifest, future: true });
         expect(parsed.success).toBe(true);
+    });
+});
+
+describe('offline package age and record retention', () => {
+    it('accepts any package a device can have kept for as long as the longest offline setting allows', () => {
+        // offline_max_days tops out at 365 (server/lib/validations/admin/settings.ts).
+        expect(PACKAGE_MAX_AGE_DAYS).toBeGreaterThan(365);
+    });
+
+    it('keeps an applied record longer than any package that could repeat it can still be imported', () => {
+        expect(APPLIED_RECORD_RETENTION_DAYS).toBeGreaterThan(PACKAGE_MAX_AGE_DAYS);
     });
 });
 
@@ -220,7 +232,7 @@ describe('offline package archive listing', () => {
         expect(readPackageEntry(zip, 'yjs/absent.bin', 3)).toBeNull();
     });
 
-    it('reads many entries in one inflate pass rather than one pass each', () => {
+    it('reads many entries without re-reading the archive directory for each one', () => {
         const files: Record<string, Uint8Array> = { 'manifest.json': new Uint8Array([123, 125]) };
         for (let i = 0; i < 1500; i++) files[`media/p${i}.jpg`] = new Uint8Array([i % 251, 1, 2]);
         const zip = zipSync(files);
@@ -231,6 +243,8 @@ describe('offline package archive listing', () => {
         const wanted = new Map([...listing.entries].filter(([name]) => name.startsWith('media/')));
         expect(wanted.size).toBe(1500);
 
+        // Control: listing is a directory pass through fflate, and the counter sees it.
+        expect(passes.count).toBeGreaterThan(0);
         passes.count = 0;
         let read = 0;
         for (const [name, bytes] of readPackageEntries(zip, wanted)) {
@@ -238,25 +252,59 @@ describe('offline package archive listing', () => {
             read++;
         }
         expect(read).toBe(1500);
-        expect(passes.count).toBe(1);
-
-        // Control: a single-entry read is exactly one pass, so the counter does count passes.
-        passes.count = 0;
+        expect(passes.count).toBe(0);
         expect(readPackageEntry(zip, 'media/p7.jpg', 3)).toEqual(new Uint8Array([7, 1, 2]));
-        expect(passes.count).toBe(1);
     });
 
-    it('bounds how much one inflate pass holds: large entries are split into several passes', () => {
+    it('reads entries one at a time: large entries come back whole and in order', () => {
         const big = (seed: number) => Uint8Array.from({ length: 5 * 1024 * 1024 }, (_, i) => (i * 7 + seed) & 255);
         const zip = zipSync({ 'media/a.jpg': big(1), 'media/b.jpg': big(2), 'media/c.jpg': big(3) }, { level: 0 });
         const listing = listPackage(zip);
         expect(listing.ok).toBe(true);
         if (!listing.ok) return;
-        passes.count = 0;
         const sizes: number[] = [];
         for (const [, bytes] of readPackageEntries(zip, listing.entries)) sizes.push(bytes?.byteLength ?? -1);
         expect(sizes).toEqual([5 * 1024 * 1024, 5 * 1024 * 1024, 5 * 1024 * 1024]);
-        expect(passes.count).toBe(3);
+    });
+
+    describe('an entry whose directory understates its size', () => {
+        const names = ['yjs/insp-1.bin', 'media/p1.jpg', 'outbox.json'];
+        const actual = (): Uint8Array => Uint8Array.from({ length: 1000 }, (_, i) => (i * 31) & 255);
+
+        it.each(names)('is refused, not truncated: %s', (name) => {
+            const honest = zipSync({ [name]: actual() });
+            // Positive control: the same package, declared accurately, is read in full and verifies.
+            expect(readPackageEntry(honest, name, 1000)).toEqual(actual());
+            expect(verifyPackageEntries(honest, new Map([[name, 1000]]))).toBeNull();
+
+            const lying = declareEntrySize(honest, name, 10);
+            const listing = listPackage(lying);
+            expect(listing.ok, 'the directory alone looks fine').toBe(true);
+            expect(readPackageEntry(lying, name, 10)).toBeNull();
+            expect(verifyPackageEntries(lying, new Map([[name, 10]]))).toBe(name);
+        });
+
+        it('is refused when it is one byte over, and when it is stored', () => {
+            const oneOver = declareEntrySize(zipSync({ 'yjs/insp-1.bin': actual() }), 'yjs/insp-1.bin', 999);
+            expect(readPackageEntry(oneOver, 'yjs/insp-1.bin', 999)).toBeNull();
+            const stored = declareEntrySize(zipSync({ 'yjs/insp-1.bin': [actual(), { level: 0 }] }), 'yjs/insp-1.bin', 10);
+            expect(readPackageEntry(stored, 'yjs/insp-1.bin', 10)).toBeNull();
+            expect(verifyPackageEntries(stored, new Map([['yjs/insp-1.bin', 10]]))).toBe('yjs/insp-1.bin');
+        });
+
+        it('is refused when it overstates its size too, and an empty entry is still read', () => {
+            const over = declareEntrySize(zipSync({ 'yjs/insp-1.bin': actual() }), 'yjs/insp-1.bin', 1001);
+            expect(readPackageEntry(over, 'yjs/insp-1.bin', 1001)).toBeNull();
+            const empty = zipSync({ 'outbox.json': new Uint8Array(0) });
+            expect(readPackageEntry(empty, 'outbox.json', 0)).toEqual(new Uint8Array(0));
+        });
+
+        it('reports the first bad entry among many accurate ones', () => {
+            const zip = declareEntrySize(zipSync({ 'yjs/a.bin': actual(), 'yjs/b.bin': actual(), 'yjs/c.bin': actual() }), 'yjs/b.bin', 5);
+            const wanted = new Map([['yjs/a.bin', 1000], ['yjs/b.bin', 5], ['yjs/c.bin', 1000]]);
+            expect(verifyPackageEntries(zip, wanted)).toBe('yjs/b.bin');
+            expect(verifyPackageEntries(zip, new Map([['yjs/a.bin', 1000], ['yjs/c.bin', 1000]]))).toBeNull();
+        });
     });
 
     it('lists a package built the way the import specs build one', () => {

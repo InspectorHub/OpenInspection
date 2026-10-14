@@ -1,5 +1,9 @@
 /**
- * Grant management API for the remote MCP OAuth server.
+ * Grant management API for the OAuth provider's grants: remote MCP clients and
+ * native app clients. Listing and revoking are served whenever EITHER consumer is
+ * enabled, so a member can always see and cut off the devices they authorized; a
+ * grant's `kind` says which it is. Creating and using a grant stays behind each
+ * consumer's own switch.
  *
  * Routes:
  *   GET  /grants       — self: list caller's own OAuth grants
@@ -15,7 +19,7 @@ import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { mcpEnabled } from '../lib/mcp/flag';
+import { oauthProviderEnabled } from '../lib/mcp/flag';
 import { auditFromContext } from '../lib/audit';
 import { Errors } from '../lib/errors';
 import type { McpGrant } from '../lib/validations/mcp.schema';
@@ -29,14 +33,14 @@ const listSelfGrantsRoute = createRoute(withMcpMetadata({
     path: '/grants',
     tags: ['admin'] as const,
     summary: 'List current user OAuth grants',
-    description: 'Returns all active OAuth grants for the currently authenticated user, enabling visibility into which MCP clients have been authorized.',
+    description: 'Returns all active OAuth grants for the currently authenticated user, enabling visibility into which MCP clients and native app devices have been authorized. Each grant says which in `kind`.',
     operationId: 'listSelfMcpGrants',
     responses: {
         200: {
             content: { 'application/json': { schema: McpGrantListResponseSchema } },
             description: 'List of OAuth grants for the calling user',
         },
-        404: { description: 'MCP feature is not enabled on this instance' },
+        404: { description: 'Neither MCP nor native clients are enabled on this instance' },
     },
 }, { scopes: ['read'], tier: 'excluded' }));
 
@@ -61,7 +65,7 @@ const revokeMcpGrantRoute = createRoute(withMcpMetadata({
             description: 'Grant successfully revoked from the OAuth provider',
         },
         403: { description: 'Admin role required; caller is not owner or manager' },
-        404: { description: 'Grant not found or MCP feature is not enabled' },
+        404: { description: 'Grant not found, or neither MCP nor native clients are enabled' },
     },
 }, { scopes: ['write'], tier: 'excluded' }));
 
@@ -79,7 +83,7 @@ const listAllGrantsRoute = createRoute(withMcpMetadata({
             description: 'All OAuth grants for every member of the calling user\'s tenant',
         },
         403: { description: 'Requires owner or manager role to list tenant grants' },
-        404: { description: 'MCP feature is not enabled on this instance' },
+        404: { description: 'Neither MCP nor native clients are enabled on this instance' },
     },
 }, { scopes: ['admin'], tier: 'excluded' }));
 
@@ -103,6 +107,7 @@ function mapGrant(g: RawGrant, extra?: { userId?: string; userEmail?: string; us
         id: g.id,
         clientId: g.clientId,
         clientName: ((g.metadata as { clientName?: string } | null)?.clientName) ?? null,
+        kind: (g.metadata as { kind?: string } | null)?.kind === 'native' ? 'native' : 'mcp',
         scopes: g.scope,
         createdAt: g.createdAt,
         expiresAt: g.expiresAt ?? null,
@@ -116,8 +121,8 @@ const mcpGrantsRoutes = createApiRouter()
     // GET /grants — self: list caller's own grants only
     .openapi(listSelfGrantsRoute, async (c) => {
         const oauth = (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER;
-        if (!mcpEnabled(c.env as { MCP_ENABLED?: string }) || !oauth) {
-            throw Errors.NotFound('MCP feature is not enabled');
+        if (!oauthProviderEnabled(c.env as { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string }) || !oauth) {
+            throw Errors.NotFound('Neither MCP nor native clients are enabled');
         }
 
         const userId = c.get('user').sub;
@@ -130,8 +135,8 @@ const mcpGrantsRoutes = createApiRouter()
     // DELETE /grants/:id — self or admin revoke
     .openapi(revokeMcpGrantRoute, async (c) => {
         const oauth = (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER;
-        if (!mcpEnabled(c.env as { MCP_ENABLED?: string }) || !oauth) {
-            throw Errors.NotFound('MCP feature is not enabled');
+        if (!oauthProviderEnabled(c.env as { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string }) || !oauth) {
+            throw Errors.NotFound('Neither MCP nor native clients are enabled');
         }
 
         const { id } = c.req.valid('param');
@@ -196,8 +201,8 @@ const mcpGrantsRoutes = createApiRouter()
     // GET /grants/all — admin: list grants for all tenant members
     .openapi(listAllGrantsRoute, async (c) => {
         const oauth = (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER;
-        if (!mcpEnabled(c.env as { MCP_ENABLED?: string }) || !oauth) {
-            throw Errors.NotFound('MCP feature is not enabled');
+        if (!oauthProviderEnabled(c.env as { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string }) || !oauth) {
+            throw Errors.NotFound('Neither MCP nor native clients are enabled');
         }
 
         const tenantId = c.get('tenantId');

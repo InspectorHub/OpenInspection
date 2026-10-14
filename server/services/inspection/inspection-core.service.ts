@@ -323,10 +323,10 @@ export class InspectionCoreService extends InspectionSubService {
             if (own) return { inspection: own, created: false };
             throw new AppError(409, ErrorCode.ID_CONFLICT, 'That inspection id is already in use.');
         }
-        // #180 — Atomic discount redemption, now that this call owns the row. If the
-        // cap has been reached (redeemDiscountCode returns false) the inspection
-        // simply keeps no discount. A failure between insert and redemption leaves
-        // the inspection undiscounted, never a discount that was not redeemed.
+        // #180 — The redemption is atomic (one capped UPDATE), the write-back is a second statement.
+        // Cap reached: the inspection keeps no discount. If the write-back fails after a redemption,
+        // the use is spent and the inspection is undiscounted (never a discount that was not
+        // redeemed); a replay of this create finds the row and does not redeem again.
         let persistedDiscountCodeId: string | null = null;
         let persistedDiscountAmount = 0;
         if (rawDiscountCodeId && await new ServiceService(this.db).redeemDiscountCode(tenantId, rawDiscountCodeId)) {

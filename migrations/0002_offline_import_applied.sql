@@ -7,3 +7,5 @@ CREATE TABLE `offline_import_applied` (
 	`applied_by` text NOT NULL,
 	PRIMARY KEY(`tenant_id`, `idempotency_key`, `inspection_id`)
 );
+--> statement-breakpoint
+CREATE INDEX `idx_offline_import_applied_age` ON `offline_import_applied` (`tenant_id`,`applied_at`);

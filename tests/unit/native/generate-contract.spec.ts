@@ -26,12 +26,11 @@ describe.runIf(process.env['GENERATE_NATIVE_CONTRACT'] === 'true')(
                 openapi: '3.0.0',
                 info: { version: 'native-contract', title: 'OpenInspection Native Contract' },
             });
-            const { contract, missing, unresolvedRefs } = buildNativeContract(doc);
+            const { contract, missing } = buildNativeContract(doc);
             expect(
                 missing.map((m) => `${m.method} ${m.path}`),
                 'every registry entry must be declared in the live OpenAPI document',
             ).toEqual([]);
-            expect(unresolvedRefs, 'every $ref must resolve to a component').toEqual([]);
             mkdirSync(dirname(CONTRACT_PATH), { recursive: true });
             writeFileSync(CONTRACT_PATH, serializeNativeContract(contract), 'utf-8');
             console.log(`[native:contract] Wrote ${NATIVE_CONTRACT.length} operations -> ${CONTRACT_PATH}`);

@@ -381,7 +381,7 @@
             }
           },
           "400": {
-            "description": "The package is malformed, or names something outside its manifest"
+            "description": "The package is malformed, names something outside its manifest, or holds an entry whose bytes do not match the size its directory declares"
           },
           "403": {
             "description": "The package belongs to another workspace, or the caller cannot edit one of its inspections"
@@ -396,7 +396,7 @@
             "description": "PACKAGE_TOO_LARGE or BAD_REQUEST: the package exceeds the byte limit; details.limits names the limits"
           },
           "422": {
-            "description": "PACKAGE_TOO_LARGE: the package has more inspections, queued writes, photos or entries than this server imports at once; nothing was written. details names the limit and details.limits the sizes to split to"
+            "description": "PACKAGE_TOO_LARGE: the package has more inspections, queued writes, photos or entries than this server imports at once; nothing was written. details names the limit and details.limits the sizes to split to. PACKAGE_EXPIRED: the package was exported more than details.maxAgeDays days ago; nothing was written"
           }
         }
       }

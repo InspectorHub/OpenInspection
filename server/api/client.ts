@@ -40,12 +40,12 @@ const importOfflinePackageRoute = createRoute(withMcpMetadata({
     request: { body: { required: true, content: { 'application/zip': { schema: z.string().openapi({ type: 'string', format: 'binary' }) } } } },
     responses: {
         200: { description: 'Package imported', content: { 'application/json': { schema: ImportOfflinePackageResponseSchema } } },
-        400: { description: 'The package is malformed, or names something outside its manifest' },
+        400: { description: 'The package is malformed, names something outside its manifest, or holds an entry whose bytes do not match the size its directory declares' },
         403: { description: 'The package belongs to another workspace, or the caller cannot edit one of its inspections' },
         409: { description: 'PACKAGE_INSPECTION_DELETED: the package would create an inspection that an earlier import created and that has since been deleted; nothing was written' },
         411: { description: 'Content-Length is required' },
         413: { description: 'PACKAGE_TOO_LARGE or BAD_REQUEST: the package exceeds the byte limit; details.limits names the limits' },
-        422: { description: 'PACKAGE_TOO_LARGE: the package has more inspections, queued writes, photos or entries than this server imports at once; nothing was written. details names the limit and details.limits the sizes to split to' },
+        422: { description: 'PACKAGE_TOO_LARGE: the package has more inspections, queued writes, photos or entries than this server imports at once; nothing was written. details names the limit and details.limits the sizes to split to. PACKAGE_EXPIRED: the package was exported more than details.maxAgeDays days ago; nothing was written' },
     },
 }, { scopes: ['write'], tier: 'excluded' }));
 

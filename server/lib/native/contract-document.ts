@@ -15,8 +15,6 @@ export interface NativeContractBuild {
     contract: Record<string, unknown>;
     /** Registry entries the live document does not declare. */
     missing: NativeContractEntry[];
-    /** `$ref` targets that point at a component the live document lacks. */
-    unresolvedRefs: string[];
 }
 
 interface OpenApiLike {
@@ -107,6 +105,9 @@ export function buildNativeContract(
         for (const next of nested) queue.push(next);
     }
 
+    // A dangling $ref would publish a contract that cannot be read, so it stops the build.
+    if (unresolved.size > 0) throw new Error(`Native contract has unresolved $ref targets: ${[...unresolved].sort().join(', ')}`);
+
     const components = sortedRecord(
         [...keptComponents].map(([group, members]): [string, unknown] => [group, sortedRecord(members)]),
     );
@@ -123,7 +124,6 @@ export function buildNativeContract(
             components,
         },
         missing,
-        unresolvedRefs: [...unresolved].sort(),
     };
 }
 

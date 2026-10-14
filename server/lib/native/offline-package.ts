@@ -48,6 +48,26 @@ const MAX_PACKAGE_INSPECTIONS = IMPORT_LIMIT_CEILINGS.inspections;
 const MAX_OUTBOX_ENTRIES = IMPORT_LIMIT_CEILINGS.outbox;
 const MAX_MEDIA_ENTRIES = IMPORT_LIMIT_CEILINGS.photos;
 
+/**
+ * Oldest package, by its manifest's `exportedAt`, that an import will accept. It
+ * is longer than the longest a device can stay offline (`offline_max_days` tops
+ * out at 365) so no honest package is turned away.
+ *
+ * It is what makes the `offline_import_applied` records disposable: a package
+ * exported at E can no longer be imported after E + PACKAGE_MAX_AGE_DAYS, and a
+ * record is written after the export that carried it, so a record older than
+ * that can never again be matched by a repeat. `exportedAt` is the device's own
+ * claim, so this guards against an honest stale package being replayed by
+ * accident, not against a member who rewrites the manifest.
+ */
+export const PACKAGE_MAX_AGE_DAYS = 400;
+
+/** Applied records older than this are swept; the margin over the age limit covers clock skew. */
+export const APPLIED_RECORD_RETENTION_DAYS = PACKAGE_MAX_AGE_DAYS + 20;
+
+/** Most applied records one import deletes, to keep its write cost bounded. */
+export const APPLIED_RECORD_SWEEP_BATCH = 100;
+
 export const OfflinePackageManifestSchema = z.object({
     format: z.literal(OFFLINE_PACKAGE_FORMAT),
     version: z.literal(1),

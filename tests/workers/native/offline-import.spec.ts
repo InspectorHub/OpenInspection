@@ -26,7 +26,8 @@ import type { InspectionDocDO } from '../../../server/durable-objects/inspection
 import type { PhotoEntry } from '../../../server/lib/collab/results-doc.types';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { applyMigrations } from '../migration-replay';
-import { buildPackage, JPEG_BYTES, type PackageSpec } from '../../unit/helpers/offline-package-fixture';
+import { PACKAGE_MAX_AGE_DAYS, APPLIED_RECORD_RETENTION_DAYS, APPLIED_RECORD_SWEEP_BATCH } from '../../../server/lib/native/offline-package';
+import { buildPackage, declareEntrySize, JPEG_BYTES, type PackageSpec } from '../../unit/helpers/offline-package-fixture';
 
 const migrationSql = import.meta.glob('../../../migrations/*.sql', {
     query: '?raw', import: 'default', eager: true,
@@ -266,6 +267,29 @@ describe('POST /api/client/import', () => {
         expect(await inspectionCount()).toBe(before + 1);
         const reportRow = await b.DB.prepare('SELECT id FROM reports WHERE inspection_id = ?').bind(id).first<{ id: string }>();
         expect(await ratingOf({ id, reportId: reportRow!.id })).toBe('SAT');
+    });
+
+    it('puts the document of a created inspection in the server primary report, whatever report id the manifest claims', async () => {
+        // The victim is an unrelated inspection whose report id the package claims as its own.
+        const victim = await createInspection(author);
+        const id = fresh('insp-claims');
+        const spec: PackageSpec = {
+            tenantId: TENANT, exportedBy: author.id, inspections: [{ id, reportId: victim.reportId }],
+            yjs: { [id]: deviceState('SAT') },
+            outbox: [{ idempotencyKey: fresh('k'), op: 'inspection.create', payload: { id, propertyAddress: '4 Claims Court, Town', templateId: TEMPLATE } }],
+        };
+        const victimSnapshots = await snapshotCount(victim);
+        const res = await importPackage(manager.token, buildPackage(spec));
+        expect(res.status, await res.clone().text()).toBe(200);
+
+        const own = await b.DB.prepare('SELECT id FROM reports WHERE inspection_id = ? AND tenant_id = ?').bind(id, TENANT).first<{ id: string }>();
+        expect(own!.id).not.toBe(victim.reportId);
+        expect(await ratingOf({ id, reportId: own!.id })).toBe('SAT');
+        // The claimed report was not touched: no rating merged in, no snapshot taken, nothing persisted for it.
+        expect(await ratingOf(victim)).toBeUndefined();
+        expect(await snapshotCount(victim)).toBe(victimSnapshots);
+        const stored = await b.DB.prepare('SELECT data FROM inspection_results WHERE report_id = ?').bind(victim.reportId).all<{ data: string }>();
+        expect(stored.results.filter((r) => r.data.includes('"SAT"'))).toEqual([]);
     });
 
     it('refuses a package that names a missing inspection it does not create (positive control: creating it)', async () => {
@@ -707,14 +731,6 @@ describe('POST /api/client/import', () => {
         const reportRow = await b.DB.prepare('SELECT id FROM reports WHERE inspection_id = ?').bind(id).first<{ id: string }>();
         const insp: Created = { id, reportId: reportRow!.id };
         const snapshotsBefore = await snapshotCount(insp);
-        // The results object debounces a persist after the import. Let that debounce go (timer and alarm)
-        // so it cannot write into the inspection while the test deletes it; the delete itself is the subject here.
-        await runInDurableObject(stubFor(insp), async (instance: InspectionDocDO, state) => {
-            const timers = instance as unknown as { persistTimer: ReturnType<typeof setTimeout> | null };
-            if (timers.persistTimer !== null) clearTimeout(timers.persistTimer);
-            timers.persistTimer = null;
-            await state.storage.deleteAlarm();
-        });
         await deleteInspectionCascade(drizzle(b.DB), b.PHOTOS, TENANT, id);
         expect(await addressOf(id)).toBeNull();
         expect(await photoKeys(insp)).toEqual([]);
@@ -732,6 +748,134 @@ describe('POST /api/client/import', () => {
         expect(await photoKeys(insp)).toEqual([]);
         expect(await snapshotCount(insp)).toBe(snapshotsBefore);
         expect(await recordedCount(createKey)).toBe(1);
+    });
+
+    it('stops persisting a document whose inspection was hard-deleted: no unhandled error, no re-armed alarm, no row written (positive control: the persist before the delete)', async () => {
+        const insp = await createInspection(author);
+        const res = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, insp)));
+        expect(res.status, await res.clone().text()).toBe(200);
+        const resultsRows = async (): Promise<number> => (await b.DB.prepare('SELECT count(*) AS n FROM inspection_results WHERE tenant_id = ? AND inspection_id = ?')
+            .bind(TENANT, insp.id).first<{ n: number }>())?.n ?? 0;
+
+        // Control: with the inspection alive, the pending alarm flushes the edit into D1.
+        await runInDurableObject(stubFor(insp), async (instance: InspectionDocDO) => {
+            await (instance as unknown as { alarm(): Promise<void> }).alarm();
+        });
+        expect(await resultsRows()).toBe(1);
+
+        // An edit is pending when the inspection is deleted: the debounce timer and the storage alarm are both armed.
+        await runInDurableObject(stubFor(insp), async (instance: InspectionDocDO, state) => {
+            const doc = (instance as unknown as { doc: Y.Doc }).doc;
+            applyItemPatch(doc, KEY, 'rating', 'SAT');
+            expect(await state.storage.getAlarm()).not.toBeNull();
+        });
+        await deleteInspectionCascade(drizzle(b.DB), b.PHOTOS, TENANT, insp.id);
+        expect(await resultsRows()).toBe(0);
+
+        // The alarm firing must neither throw nor write, and must not schedule itself again.
+        await runInDurableObject(stubFor(insp), async (instance: InspectionDocDO, state) => {
+            await expect((instance as unknown as { alarm(): Promise<void> }).alarm()).resolves.toBeUndefined();
+            expect(await state.storage.getAlarm()).toBeNull();
+            const timers = instance as unknown as { persistTimer: ReturnType<typeof setTimeout> | null };
+            expect(timers.persistTimer).toBeNull();
+            // The deleted inspection's document is not kept in the object's storage either.
+            expect([...(await state.storage.list()).keys()]).toEqual([]);
+        });
+        expect(await resultsRows()).toBe(0);
+    });
+
+    it.each(['photo', 'yjs', 'outbox'] as const)('refuses the whole package when a %s entry holds more bytes than its directory declares, before any write (positive control: the accurate package)', async (kind) => {
+        const id = fresh('insp-lying');
+        const key = fresh('k');
+        const spec: PackageSpec = {
+            tenantId: TENANT, exportedBy: author.id, inspections: [{ id, reportId: 'device-report' }],
+            yjs: { [id]: deviceState('RR', 'pend-1') },
+            media: [{ pendingId: 'pend-1', inspectionId: id, contentType: 'image/jpeg', bytes: Uint8Array.from({ length: 1000 }, (_, i) => (i * 7) & 255) }],
+            outbox: [{ idempotencyKey: key, op: 'inspection.create', payload: { id, propertyAddress: '3 Lying Lane, Town', templateId: TEMPLATE } }],
+        };
+        const entry = { photo: 'media/pend-1.jpg', yjs: `yjs/${id}.bin`, outbox: 'outbox.json' }[kind];
+        const honest = buildPackage(spec);
+        const lying = declareEntrySize(honest, entry, 10);
+
+        const refused = await importPackage(manager.token, lying);
+        expect(refused.status, await refused.clone().text()).toBe(400);
+        expect(await refused.text()).toContain(entry);
+        // Nothing was written: no inspection, no record of the create, no photo anywhere in the workspace's store for it.
+        expect(await addressOf(id)).toBeNull();
+        expect(await recordedCount(key)).toBe(0);
+        expect((await b.PHOTOS.list({ prefix: `${TENANT}/inspections/${id}/` })).objects).toEqual([]);
+
+        const accepted = await importPackage(manager.token, honest);
+        expect(accepted.status, await accepted.clone().text()).toBe(200);
+        expect(await addressOf(id)).toBe('3 Lying Lane, Town');
+    });
+
+    // ── Package age and the retention of applied records ───────────────────────
+
+    const DAY = 24 * 60 * 60 * 1000;
+    const exportedDaysAgo = (days: number): string => new Date(Date.now() - days * DAY).toISOString();
+
+    it('refuses a package exported more than the maximum age ago, before any write (positive control: just inside the age)', async () => {
+        const id = fresh('insp-aged');
+        const key = fresh('k');
+        const make = (days: number) => buildPackage({
+            tenantId: TENANT, exportedBy: author.id, inspections: [{ id, reportId: 'device-report' }],
+            yjs: { [id]: deviceState('RR') }, manifest: { exportedAt: exportedDaysAgo(days) },
+            outbox: [{ idempotencyKey: key, op: 'inspection.create', payload: { id, propertyAddress: '6 Aged Avenue, Town', templateId: TEMPLATE } }],
+        });
+        const expired = await importPackage(manager.token, make(PACKAGE_MAX_AGE_DAYS + 1));
+        expect(expired.status, await expired.clone().text()).toBe(422);
+        const text = await expired.text();
+        expect(text).toContain('PACKAGE_EXPIRED');
+        expect(text).toContain(String(PACKAGE_MAX_AGE_DAYS));
+        expect(await addressOf(id)).toBeNull();
+        expect(await recordedCount(key)).toBe(0);
+
+        const inside = await importPackage(manager.token, make(PACKAGE_MAX_AGE_DAYS - 1));
+        expect(inside.status, await inside.clone().text()).toBe(200);
+        expect(await addressOf(id)).toBe('6 Aged Avenue, Town');
+    });
+
+    it('sweeps old applied records of this workspace after an import: keeps recent ones and those of other workspaces (positive control: the old record is there first)', async () => {
+        const old = fresh('k-old');
+        const recent = fresh('k-recent');
+        const foreign = fresh('k-foreign');
+        const insert = (tenant: string, key: string, daysAgo: number) => b.DB.prepare(
+            'INSERT INTO offline_import_applied (tenant_id, idempotency_key, op, inspection_id, applied_at, applied_by) VALUES (?, ?, ?, ?, ?, ?)',
+        ).bind(tenant, key, 'inspection.update', 'gone-inspection', Date.now() - daysAgo * DAY, 'someone').run();
+        await insert(TENANT, old, APPLIED_RECORD_RETENTION_DAYS + 5);
+        await insert(TENANT, recent, APPLIED_RECORD_RETENTION_DAYS - 5);
+        await insert(OTHER_TENANT, foreign, APPLIED_RECORD_RETENTION_DAYS + 5);
+        const countFor = async (tenant: string, key: string): Promise<number> =>
+            (await b.DB.prepare('SELECT count(*) AS n FROM offline_import_applied WHERE tenant_id = ? AND idempotency_key = ?').bind(tenant, key).first<{ n: number }>())?.n ?? 0;
+        expect([await countFor(TENANT, old), await countFor(TENANT, recent), await countFor(OTHER_TENANT, foreign)]).toEqual([1, 1, 1]);
+
+        const insp = await createInspection(author);
+        const res = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, insp)));
+        expect(res.status, await res.clone().text()).toBe(200);
+
+        expect(await countFor(TENANT, old)).toBe(0);
+        expect(await countFor(TENANT, recent)).toBe(1);
+        expect(await countFor(OTHER_TENANT, foreign)).toBe(1);
+    });
+
+    it('sweeps a bounded batch per import, so a large backlog is cleared over several imports', async () => {
+        const backlog = APPLIED_RECORD_SWEEP_BATCH + 5;
+        await b.DB.batch(Array.from({ length: backlog }, (_, i) => b.DB.prepare(
+            'INSERT INTO offline_import_applied (tenant_id, idempotency_key, op, inspection_id, applied_at, applied_by) VALUES (?, ?, ?, ?, ?, ?)',
+        ).bind(TENANT, `backlog-${i}`, 'inspection.update', 'gone-inspection', Date.now() - (APPLIED_RECORD_RETENTION_DAYS + 30) * DAY, 'someone')));
+        const left = async (): Promise<number> =>
+            (await b.DB.prepare("SELECT count(*) AS n FROM offline_import_applied WHERE tenant_id = ? AND idempotency_key LIKE 'backlog-%'").bind(TENANT).first<{ n: number }>())?.n ?? 0;
+        expect(await left()).toBe(backlog);
+        const importOnce = async (): Promise<void> => {
+            const insp = await createInspection(author);
+            const res = await importPackage(manager.token, buildPackage(pkg({ exportedBy: author.id }, insp)));
+            expect(res.status, await res.clone().text()).toBe(200);
+        };
+        await importOnce();
+        expect(await left()).toBe(5);
+        await importOnce();
+        expect(await left()).toBe(0);
     });
 
     it('records nothing for a create the server refused, so the same key creates once the entry is valid', async () => {

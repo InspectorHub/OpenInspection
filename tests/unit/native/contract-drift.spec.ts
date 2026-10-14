@@ -26,15 +26,24 @@ function liveDocument() {
 
 describe('native contract drift', { timeout: 30_000 }, () => {
     it('finds every registry entry in the live OpenAPI document', () => {
-        const { missing, unresolvedRefs } = buildNativeContract(liveDocument());
+        // Throws on a dangling $ref, so reaching the assertion means every one resolved.
+        const { missing } = buildNativeContract(liveDocument());
         expect(missing.map((m) => `${m.method} ${m.path}`)).toEqual([]);
-        expect(unresolvedRefs).toEqual([]);
     });
 
     it('lists a registry entry the API does not declare, by name (positive control)', () => {
         const control: NativeContractEntry = { method: 'get', path: '/api/native-contract-control/{id}' };
         const { missing } = buildNativeContract(liveDocument(), [...NATIVE_CONTRACT, control]);
         expect(missing).toEqual([control]);
+    });
+
+    it('refuses to build when an operation points at a component the document lacks (positive control: it builds once the component exists)', () => {
+        const entry: NativeContractEntry = { method: 'get', path: '/api/ref-control' };
+        const operation = { responses: { 200: { content: { 'application/json': { schema: { $ref: '#/components/schemas/RefControl' } } } } } };
+        const doc = { paths: { '/api/ref-control': { get: operation } }, components: { schemas: {} } };
+        expect(() => buildNativeContract(doc, [entry])).toThrow(/#\/components\/schemas\/RefControl/);
+        const fixed = { ...doc, components: { schemas: { RefControl: { type: 'object' } } } };
+        expect(buildNativeContract(fixed, [entry]).missing).toEqual([]);
     });
 
     it('has no duplicate registry entries', () => {
