@@ -125,7 +125,7 @@ const uploadLogoRoute = createRoute(withMcpMetadata({
         + "and the company logo URL is switched to it immediately; the previous file is not deleted. The response "
         + "returns the new logoUrl, a path on this deployment. Not idempotent: each call stores another file. "
         + "Restricted to owners and managers."
-}, { scopes: ['admin'], tier: 'extended' }));
+}, { scopes: ['admin'], tier: 'excluded' }));
 
 
 const adminBrandingRoutes = createApiRouter()

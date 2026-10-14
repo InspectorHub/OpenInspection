@@ -203,6 +203,29 @@ describe('route metadata', { timeout: 30_000 }, () => {
         expect(issues, issues.join('\n')).toEqual([]);
     });
 
+    it('routes that take a multipart file body are never offered as MCP tools', () => {
+        // The MCP request builder sends JSON only, so a tool for a multipart route
+        // can never carry its file: every call answers 400 "file is missing" and
+        // an LLM keeps picking it. The HTTP route itself is unaffected. A JSON
+        // route is the positive control: it must still be offered.
+        const multipart: string[] = [];
+        const exposed: string[] = [];
+        let jsonRoutes = 0;
+        for (const { op, where } of eachOperation()) {
+            const tier = op['x-tier'] as string | undefined;
+            const takesFile = Object.keys(op.requestBody?.content ?? {}).some((t) => t.startsWith('multipart/'));
+            if (takesFile) {
+                multipart.push(where);
+                if (tier !== 'excluded') exposed.push(`${where} (${tier})`);
+            } else if (op.requestBody && tier !== 'excluded') {
+                jsonRoutes += 1;
+            }
+        }
+        expect(multipart.length, 'the scan sees multipart routes at all').toBeGreaterThan(0);
+        expect(jsonRoutes, 'and still sees JSON routes that stay offered').toBeGreaterThan(0);
+        expect(exposed, `Multipart routes exposed to MCP:\n${exposed.join('\n')}`).toEqual([]);
+    });
+
     it(`primary-tier route count ≤ ${PRIMARY_TIER_CAP}`, () => {
         const primary = eachOperation().filter(({ op }) => op['x-tier'] === 'primary');
         expect(

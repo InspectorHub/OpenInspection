@@ -88,7 +88,7 @@ const uploadRouteDef = createRoute(withMcpMetadata({
   responses: { 200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ imageUrl: z.string() }) }) } }, description: 'Uploaded' } },
   operationId: 'uploadInspectorCredentialImage',
   description: 'Uploads (or replaces) the badge image for a credential; returns the public asset URL.',
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'excluded' }));
 
 const MAX_BADGE_BYTES = 2_000_000;
 /**

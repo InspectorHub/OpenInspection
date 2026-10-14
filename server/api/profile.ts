@@ -166,7 +166,7 @@ const photoUploadRoute = createRoute(withMcpMetadata({
             description: 'Uploaded',
         },
     },
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'excluded' }));
 
 const profileRoutes = createApiRouter()
     .openapi(getProfileRoute, async (c) => {

@@ -67,7 +67,7 @@ const uploadPhotoRoute = createRoute(withMcpMetadata({
     },
     operationId: "uploadInspection",
     description: "Uploads one photo file (multipart) to the inspection's photo storage and returns its storage key. This route only stores the file: it does not add the photo to any checklist item or to the media pool, so the client must record the returned key itself. itemId must be present but is not used to place the file, and targetType and customId are only validated and echoed back (customId is required when targetType is defect). Location data is stripped from the image where the image service is available. Each call stores a new file. Responds 400 when storage is unavailable or file or itemId is missing. Available to owner, manager and inspector roles."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'excluded' }));
 
 /* ── A-9 — Inspection photo serve ─────────────────────────────────────────
  * Item + pool photos are referenced across the editor (SideRail, PhotoStudio)
@@ -156,7 +156,7 @@ const mediaUploadRoute = createRoute(withMcpMetadata({
     },
     operationId: "uploadInspectionMedia",
     description: "Uploads one photo to the inspection's media pool, the holding area for photos not yet attached to a checklist item, and returns the pool entry with an authenticated URL to view it. The file is stored in photo storage (location data stripped where the image service is available) and a pool row is created; attach it to an item later with the attach route. Each call creates a new entry. Responds 400 when storage is unavailable or the file is missing. Available to owner, manager and inspector roles."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'excluded' }));
 
 const mediaAttachRoute = createRoute(withMcpMetadata({
     method: 'post',
