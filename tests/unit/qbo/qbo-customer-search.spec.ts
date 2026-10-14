@@ -43,6 +43,13 @@ describe('escapeQboLike', () => {
         expect(escapeQboLike('a\\b')).toBe('a\\\\b');
     });
 
+    it('escapes all four together, in one pass, without doubling a backslash it just added', () => {
+        // a % b _ c \ d ' e   ->   each of the four gets exactly one backslash in front.
+        expect(escapeQboLike("a%b_c\\d'e")).toBe("a\\%b\\_c\\\\d\\'e");
+        // A backslash followed by a wildcard: the backslash is escaped, the wildcard too.
+        expect(escapeQboLike('\\%')).toBe('\\\\\\%');
+    });
+
     it('lets an ordinary name through untouched (positive control)', () => {
         expect(escapeQboLike('Alice Adams')).toBe('Alice Adams');
     });

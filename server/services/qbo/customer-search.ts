@@ -43,7 +43,9 @@ const escapeQboString = (input: string): string => input.replace(/\\/g, '\\\\').
  * widening the search.
  */
 export function escapeQboLike(input: string): string {
-    return escapeQboString(input).replace(/%/g, '\\%').replace(/_/g, '\\_');
+    // One pass over every character that needs a backslash in front of it, so the
+    // backslash itself is escaped in the same step as the rest.
+    return input.replace(/[\\'%_]/g, (ch) => `\\${ch}`);
 }
 
 /**
