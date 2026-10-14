@@ -221,42 +221,6 @@ const calendarRoutes = createApiRouter()
         }, 200);
     })
     /**
-     * GET /api/calendar/connections/:id/calendars
-     * A-polish 10b — the user's Google calendars, for choosing the multi-read
-     * set and the single write target. Owner-only: loads the requester's own
-     * connection and 404s if :id is not theirs.
-     */
-    .get('/connections/:id/calendars', async (c) => {
-        const jwtUser = c.get('user');
-        if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
-        const tenantId = c.get('tenantId') as string;
-        const connId = c.req.param('id');
-        const open = await loadOpenCalendarConnection(
-            c.env.DB,
-            tenantId,
-            jwtUser.sub,
-            c.env.JWT_SECRET,
-            c.env.JWT_SECRET_PREVIOUS,
-        );
-        if (!open || open.connection.id !== connId) {
-            return c.json({ success: false, error: { message: 'Google Calendar not connected' } }, 404);
-        }
-        const provider = getCalendarProvider(open.connection.provider);
-        const auth = await provider.resolveAuth({
-            tenantId, credentials: open.credentials, env: c.env,
-        });
-        if (!auth) {
-            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 400);
-        }
-        try {
-            const calendars = await provider.listCalendars({ auth });
-            return c.json({ success: true, data: { calendars } }, 200);
-        } catch (e) {
-            logger.error('[calendar] listCalendars failed', { tenantId }, e instanceof Error ? e : undefined);
-            return c.json({ success: false, error: { message: 'Failed to fetch Google calendars' } }, 500);
-        }
-    })
-    /**
      * PUT /api/calendar/connections/:id/calendars
      * A-polish 10b — save the multi-read set + single write target under the
      * locked invariants (write editable, write ∈ read, Primary always read).

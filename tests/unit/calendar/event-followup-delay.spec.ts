@@ -21,6 +21,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { asD1Db } from '../helpers/test-db';
+import { seedDefaultEventTypes } from '../helpers/seed-event-types';
 
 const TENANT = '00000000-0000-0000-0000-000000000097';
 const hours = (n: number) => n * 3600_000;
@@ -46,7 +47,7 @@ describe('EventService.followUpSendAt — per-event-type delay', () => {
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await svc.bulkSeed(TENANT);
+        await seedDefaultEventTypes(testDb, TENANT);
         const types = await svc.listEventTypes(TENANT);
         sewerEventTypeId = types.find(t => t.slug === 'sewer_scope')!.id as string;
     });

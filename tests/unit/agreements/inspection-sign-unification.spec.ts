@@ -3,13 +3,15 @@ import { eq, asc } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { AgreementService } from '../../../server/services/agreement.service';
+import { InspectionService } from '../../../server/services/inspection.service';
+import { ScopedDB } from '../../../server/lib/db/scoped';
+import { asScopedDbSource } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 /**
  * Track I-a Task 5 — on-site (in-app) signing rides the agreement ENVELOPE.
  *
- * The three authed in-app routes (GET /:id/sign-status, GET /:id/agreement,
- * POST /:id/sign) used to read/write the bare legacy `inspection_agreements`
+ * The two authed in-app routes (GET /:id/agreement, POST /:id/sign) used to read/write the bare legacy `inspection_agreements`
  * table. They now ride the agreement_requests + agreement_signers envelope so
  * on-site signatures carry the same snapshot + audit chain + receipt as the
  * emailed envelope, and the dashboard 📋 / signedByClient truth is unified.
@@ -105,10 +107,9 @@ describe('in-app on-site signing rides the envelope (Track I-a Task 5)', () => {
         expect(signers[0].status).toBe('signed');
         expect(signers[0].channel).toBe('in_person');
 
-        // sign-status reflects the envelope
-        const statusRes = await app.request(`/${INSP_ID}/sign-status`, {}, FAKE_ENV, makeExecCtx().ctx);
-        const statusBody = await statusRes.json() as any;
-        expect(statusBody.data.signed).toBe(true);
+        // the inspection read model reflects the signed envelope
+        const read = new InspectionService({} as D1Database, undefined, new ScopedDB(asScopedDbSource(db), TENANT_ID));
+        expect((await read.getInspection(INSP_ID, TENANT_ID)).inspection.signedByClient).toBe(true);
 
         // completion workflow fired exactly once
         expect(workflowCreate).toHaveBeenCalledTimes(1);

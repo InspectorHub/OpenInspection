@@ -13229,34 +13229,6 @@
     "description": "Mark every unread notification of the calling user in the current company as read, archived ones included. Other users' notifications are not affected. Idempotent, a repeat changes nothing. Available to any signed-in user."
   },
   {
-    "operationId": "markOnboardingFlag",
-    "method": "POST",
-    "pathTemplate": "/api/auth/onboarding/flag",
-    "scopes": [],
-    "tag": "auth",
-    "tier": "excluded",
-    "inputSchema": {
-      "parameters": [],
-      "body": {
-        "type": "object",
-        "properties": {
-          "flag": {
-            "type": "string",
-            "enum": [
-              "checklistDismissed"
-            ],
-            "description": "The onboarding flag to mark as true. One of: checklistDismissed."
-          }
-        },
-        "required": [
-          "flag"
-        ]
-      }
-    },
-    "summary": "Mark a one-time onboarding flag as seen",
-    "description": "Sets a boolean flag in the current user's onboardingState. Allowlisted flags only: checklistDismissed. Idempotent."
-  },
-  {
     "operationId": "markOnboardingStep",
     "method": "POST",
     "pathTemplate": "/api/users/me/onboarding",
@@ -19272,20 +19244,6 @@
     },
     "summary": "Record a dual sign-off attestation",
     "description": "Signs a dual sign-off attestation (field_observer or pcr_reviewer) with the tenant Ed25519 signing key. Re-signing the same role upserts and replaces the prior attestation. Requires report_tier=full_pca."
-  },
-  {
-    "operationId": "skipOnboardingWizard",
-    "method": "POST",
-    "pathTemplate": "/api/auth/setup/skip",
-    "scopes": [],
-    "tag": "auth",
-    "tier": "excluded",
-    "inputSchema": {
-      "parameters": [],
-      "body": null
-    },
-    "summary": "Skip the onboarding wizard",
-    "description": "Marks the in-app onboarding wizard as skipped for the current user. Does not affect tenant-level setup or any system configuration."
   },
   {
     "operationId": "softDeleteMyAccount",

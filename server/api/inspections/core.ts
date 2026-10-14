@@ -15,7 +15,7 @@ import { getInspectionRoster } from '../../lib/inspection/roster';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { InspectionSchema, UpdateInspectionSchema, PatchInspectionResponseSchema } from '../../lib/validations/inspection.schema';
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
-import { inspections as inspectionTable, inspectionResults } from '../../lib/db/schema';
+import { inspections as inspectionTable } from '../../lib/db/schema';
 import { datePatchValues } from '../../services/inspection/reschedule-date';
 import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
 import { findPatchRefusal } from './patch-guards';
@@ -346,24 +346,6 @@ const coreRoutes = createApiRouter()
         const out = await c.var.services.inspection.createFromWizard(tenantId, userId, input);
         fireQuotaThresholdNotice(c, tenantId);
         return c.json({ success: true as const, data: out }, 200);
-    })
-    // Typed-Hono dead-routes cleanup Task 12 — list persisted sync conflicts.
-    .get('/:id/full', requireRole('owner', 'manager', 'inspector'), async (c) => {
-        const id       = c.req.param('id') as string;
-        const tenantId = c.get('tenantId');
-        const svc      = c.var.services.inspection;
-        try {
-            const { inspection, template } = await svc.getInspection(id, tenantId);
-            const db = getDrizzle(c);
-            const results = await db.select().from(inspectionResults)
-                .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId))).get();
-            return c.json({ success: true, data: { inspection, template: template || null, results: results || null, base: null } });
-        } catch (err) {
-            if (err instanceof Error && err.message.includes('not found')) {
-                return c.json({ success: false, error: { code: 'not_found', message: 'Inspection not found' } }, 404);
-            }
-            throw err;
-        }
     })
     .get('/:id/presence/ws', async (c) => {
         if (c.req.header('Upgrade') !== 'websocket') {

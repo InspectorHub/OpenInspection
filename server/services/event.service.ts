@@ -1,7 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, gte, lte, asc } from 'drizzle-orm';
+import { eq, and, asc } from 'drizzle-orm';
 import { eventTypes, inspectionEvents, automations, automationLogs } from '../lib/db/schema';
-import { EVENT_TYPES } from './starter-content/fixtures/event-types';
 import { logger } from '../lib/logger';
 import { PeopleService } from './people.service';
 import { resolveAutomationCompanyName } from './automation/company-name';
@@ -59,44 +58,12 @@ export class EventService {
         }
     }
 
-    async bulkSeed(tenantId: string): Promise<{ seeded: number; skipped: number }> {
-        const d = drizzle(this.db);
-        const existing = await d.select({ slug: eventTypes.slug }).from(eventTypes)
-            .where(eq(eventTypes.tenantId, tenantId)).all();
-        const existingSlugs = new Set(existing.map(e => e.slug as string));
-        let seeded = 0, skipped = 0;
-        // Same list provisioning uses. This endpoint is now a repair tool —
-        // idempotent on slug, so it fills gaps for a tenant provisioned before a
-        // type existed and does nothing for anyone else.
-        for (const seed of EVENT_TYPES) {
-            if (existingSlugs.has(seed.slug)) { skipped++; continue; }
-            await d.insert(eventTypes).values({
-                id:        crypto.randomUUID(),
-                tenantId,
-                createdAt: new Date(),
-                active:    true,
-                ...seed,
-            }).run();
-            seeded++;
-        }
-        return { seeded, skipped };
-    }
-
     // ---- Inspection events ----
 
     async listInspectionEvents(tenantId: string, inspectionId: string) {
         return drizzle(this.db).select().from(inspectionEvents)
             .where(and(eq(inspectionEvents.tenantId, tenantId), eq(inspectionEvents.inspectionId, inspectionId)))
             .orderBy(asc(inspectionEvents.scheduledAt)).all();
-    }
-
-    async listEventsByDateRange(tenantId: string, fromTs: number, toTs: number) {
-        return drizzle(this.db).select().from(inspectionEvents)
-            .where(and(
-                eq(inspectionEvents.tenantId, tenantId),
-                gte(inspectionEvents.scheduledAt, new Date(fromTs)),
-                lte(inspectionEvents.scheduledAt, new Date(toTs)),
-            )).orderBy(asc(inspectionEvents.scheduledAt)).all();
     }
 
     /**

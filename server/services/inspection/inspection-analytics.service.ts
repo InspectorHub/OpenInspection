@@ -528,10 +528,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
         const uniqueIds = Array.from(new Set(allBucketIds));
         const statsMap = await this.getDefectStatsBatch(tenantId, uniqueIds);
 
-        // Sub-spec B Task 7 (B-6) — list row metadata: agent name lookup +
-        // status flags + invoice paid lookup. We surface:
+        // Sub-spec B Task 7 (B-6) — list row metadata: agent name lookup. We surface:
         //   agentName  → from inspection_people (listing_agent, else buyer_agent)
-        //   statusFlags = { reportPublished, agreementSigned, paid, flagged, canceled }
         //
         // Task 9c-X3 — replaces the legacy inspections.sellingAgentId /
         // .referredByAgentId column reads (frozen cache, dropped Task 13).
@@ -574,16 +572,6 @@ export class InspectionAnalyticsService extends InspectionSubService {
                 map.set(r.inspectionId as string, r.contactName as string);
             }
         }
-        // Paid invoice lookup — any inspection with at least one paid invoice
-        // counts as paid in the row indicator.
-        const paidIdSet = new Set<string>();
-        const paidRows = await db.select({ inspectionId: invoices.inspectionId })
-            .from(invoices)
-            .where(and(eq(invoices.tenantId, tenantId), sql`${invoices.paidAt} IS NOT NULL`, isNull(invoices.voidedAt)));
-        for (const r of paidRows) {
-            if (r.inspectionId) paidIdSet.add(r.inspectionId as string);
-        }
-
         // IA-131 — the dashboard used to render `inspections.price` straight from
         // the row. That is tier 3 of the P-4 authority chain, the denormalized
         // cache, and on seeded production-shaped data it read 0 for inspections
@@ -666,7 +654,6 @@ export class InspectionAnalyticsService extends InspectionSubService {
             // written on `InspectionListItemSchema` in validations/inspection/read.ts.
             agentName:      string | null;
             inspectorName:  string | null;
-            statusFlags:    { reportPublished: boolean; reportReady: boolean; agreementSigned: boolean; paid: boolean; sent: boolean; flagged: boolean; canceled: boolean };
             requestId:      string | null;
             siblingCount:   number | null;
         }> =>
@@ -677,11 +664,6 @@ export class InspectionAnalyticsService extends InspectionSubService {
                 const siblingCount = reqId ? (requestSiblingCounts.get(reqId) ?? 1) : 1;
                 const inspectorId = r.inspectorId as string | null;
                 const inspectorName = inspectorId ? inspectorNameMap.get(inspectorId) : undefined;
-                // Round-2 F2 — split "report ready" (built/completed) from "sent"
-                // (published = publish workflow completed). reportPublished is the
-                // canonical flag; sent is an alias for the ✈️ icon on the dashboard.
-                const reportReady = r.status === INSPECTION_STATUS.COMPLETED;
-                const sent        = isReportPublished((r as { reportStatus?: unknown }).reportStatus);
                 return {
                     ...r,
                     // IA-131 — overrides the row's cached `price` with the
@@ -694,15 +676,6 @@ export class InspectionAnalyticsService extends InspectionSubService {
                     defectStats: statsMap.get(id) ?? zeroCounts(),
                     agentName:     agentName ?? null,
                     inspectorName: inspectorName ?? null,
-                    statusFlags: {
-                        reportPublished: reportReady,
-                        reportReady,
-                        agreementSigned: signedSet.has(id),
-                        paid:            paidIdSet.has(id),
-                        sent,
-                        flagged:         overdueSet.has(id),
-                        canceled:        r.status === INSPECTION_STATUS.CANCELLED,
-                    },
                     // null, not 1: an inspection in no request has no sibling group.
                     requestId:    reqId ?? null,
                     siblingCount: reqId ? siblingCount : null,

@@ -13,11 +13,9 @@ const TypeBody = z.object({
     color:              z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#6366f1').describe('Hex colour used to draw visits of this type on the calendar.'),
     sortOrder:          z.number().int().min(0).default(0).describe('Position of the event type in lists, lowest first.'),
     // Hours after completion before the follow-up is queued. `.optional()` with
-    // NO `.default()`: this schema is re-used as `.partial()` for PUT, and a
-    // default survives `.partial()` — it would reset a tenant's configured delay
-    // to 72 on every update that omits the field. Omitted on create leaves the
-    // column default (72). `min(0)` because zero is a real setting: a sewer
-    // scope's results exist when the camera comes out.
+    // NO `.default()`: omitted on create leaves the column default (72), so the
+    // schema never invents a value of its own. `min(0)` because zero is a real
+    // setting: a sewer scope's results exist when the camera comes out.
     followUpDelayHours: z.number().int().min(0).max(8760).optional()
         .describe('Hours after a visit is completed before its follow-up is queued. 0 = immediately.'),
 });
@@ -47,22 +45,6 @@ const eventsRoutes = createApiRouter()
         if (!parsed.success) throw Errors.BadRequest('Invalid event type', parsed.error.flatten().fieldErrors);
         const row = await c.var.services.event.createEventType(c.get('tenantId'), parsed.data);
         return c.json({ success: true, data: row }, 201);
-    })
-    .put('/event-types/:id', requireRole('owner', 'manager'), async (c) => {
-        const id = c.req.param('id') as string;
-        const parsed = TypeBody.partial().safeParse(await c.req.json());
-        if (!parsed.success) throw Errors.BadRequest('Invalid event type', parsed.error.flatten().fieldErrors);
-        await c.var.services.event.updateEventType(c.get('tenantId'), id, parsed.data);
-        return c.json({ success: true });
-    })
-    .delete('/event-types/:id', requireRole('owner', 'manager'), async (c) => {
-        const id = c.req.param('id') as string;
-        await c.var.services.event.deactivateEventType(c.get('tenantId'), id);
-        return c.json({ success: true });
-    })
-    .post('/event-types/seed', requireRole('owner', 'manager'), async (c) => {
-        const r = await c.var.services.event.bulkSeed(c.get('tenantId'));
-        return c.json({ success: true, data: r });
     })
     // ---- Inspection events ----
     .get('/inspections/:inspectionId/events', requireRole('owner', 'manager', 'inspector'), async (c) => {
@@ -104,13 +86,6 @@ const eventsRoutes = createApiRouter()
         const id = c.req.param('id') as string;
         await c.var.services.event.deleteEvent(c.get('tenantId'), id);
         return c.json({ success: true });
-    })
-    .get('/events/upcoming', requireRole('owner', 'manager', 'inspector'), async (c) => {
-        const days = parseInt(c.req.query('days') || '7', 10);
-        const from = Date.now();
-        const to   = from + days * 86_400_000;
-        const data = await c.var.services.event.listEventsByDateRange(c.get('tenantId'), from, to);
-        return c.json({ success: true, data });
     });
 
 export type EventsApi = typeof eventsRoutes;

@@ -7,6 +7,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Removed
+
+* Unused API routes that no client called: `PUT /api/event-types/:id`, `DELETE /api/event-types/:id`, `POST /api/event-types/seed`, `GET /api/events/upcoming`, `GET /api/calendar/connections/:id/calendars`, `GET /api/inspections/{id}/full`, `GET /api/inspections/{id}/sign-status`, the `statusFlags` object on dashboard rows, `POST /api/auth/setup/skip` and `POST /api/auth/onboarding/flag`. Missing default event types are filled in by `POST /api/admin/data/install-bundled-content`; the signed state of an inspection is still returned as `signedByClient` by the inspection read.
+* The unreachable `feature-disabled` page and its translation strings.
+
 ## [2.2.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.1.0...openinspection-v2.2.0) (2026-09-15)
 
 
