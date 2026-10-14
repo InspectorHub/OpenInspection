@@ -11,12 +11,12 @@ import { createApiResponseSchema } from '../shared.schema';
  * column on `inspections`.
  */
 export const PropertyFactsSchema = z.object({
-    yearBuilt:      z.number().int().min(1800).max(2100).nullable().optional().openapi({ example: 1990 }).describe('TODO describe yearBuilt field for the OpenInspection MCP integration'),
-    sqft:           z.number().int().min(0).max(1_000_000).nullable().optional().openapi({ example: 1800 }).describe('TODO describe sqft field for the OpenInspection MCP integration'),
-    foundationType: z.enum(['basement', 'slab', 'crawlspace', 'other']).nullable().optional().openapi({ example: 'basement' }).describe('TODO describe foundationType field for the OpenInspection MCP integration'),
-    lotSize:        z.string().max(50).nullable().optional().openapi({ example: '0.25 acres' }).describe('TODO describe lotSize field for the OpenInspection MCP integration'),
-    bedrooms:       z.number().int().min(0).max(50).nullable().optional().openapi({ example: 3 }).describe('TODO describe bedrooms field for the OpenInspection MCP integration'),
-    bathrooms:      z.number().min(0).max(50).nullable().optional().openapi({ example: 2.5 }).describe('TODO describe bathrooms field for the OpenInspection MCP integration'),
+    yearBuilt:      z.number().int().min(1800).max(2100).nullable().optional().openapi({ example: 1990 }).describe('Year the building was built.'),
+    sqft:           z.number().int().min(0).max(1_000_000).nullable().optional().openapi({ example: 1800 }).describe('Building floor area in square feet.'),
+    foundationType: z.enum(['basement', 'slab', 'crawlspace', 'other']).nullable().optional().openapi({ example: 'basement' }).describe('Type of foundation under the building, shown in the Property Facts strip.'),
+    lotSize:        z.string().max(50).nullable().optional().openapi({ example: '0.25 acres' }).describe('Size of the lot as free text including its unit, for example 0.25 acres or 10,000 sqft; it is stored without parsing.'),
+    bedrooms:       z.number().int().min(0).max(50).nullable().optional().openapi({ example: 3 }).describe('Number of bedrooms in the building.'),
+    bathrooms:      z.number().min(0).max(50).nullable().optional().openapi({ example: 2.5 }).describe('Number of bathrooms in the building; half baths are written as .5.'),
     unit:           z.string().max(120).nullable().optional().openapi({ example: 'Suite 200' }).describe('Unit / suite designation for the subject property (maps to the inspections.unit column). Null on properties with no unit.'),
     county:         z.string().max(120).nullable().optional().openapi({ example: 'Travis County' }).describe('County the subject property sits in (maps to the inspections.county column). Autofilled at intake; editable in the Property Facts strip.'),
     // Commercial PCA Phase T — tier elevation from the editor. Validated
@@ -55,7 +55,7 @@ export const PropertyFactsResponseSchema = createApiResponseSchema(PropertyFacts
  * code when the provider can't supply data — graceful degrade pattern).
  */
 export const PropertyFactsAutofillRequestSchema = z.object({
-    addressString: z.string().min(5, 'Address is too short').max(200).describe('TODO describe addressString field for the OpenInspection MCP integration'),
+    addressString: z.string().min(5, 'Address is too short').max(200).describe('Full street address to look up in public property records. The lookup result is returned for the inspector to review and is not saved by this call.'),
 }).openapi('PropertyFactsAutofillRequest');
 
 export const PropertyFactsAutofillResponseSchema = z.object({

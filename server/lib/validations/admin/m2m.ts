@@ -6,15 +6,15 @@ import { AUTHORITY_BASES } from '../../auth/authority-basis';
  * slug comes from URL param, not body.
  */
 export const TenantStatusBodySchema = z.object({
-    id: z.string().trim().min(1).optional().describe('TODO describe id field for the OpenInspection MCP integration'),
-    status: z.string().min(1).describe('TODO describe status field for the OpenInspection MCP integration'),
-    tier: z.string().optional().describe('TODO describe tier field for the OpenInspection MCP integration'),
-    name: z.string().optional().describe('TODO describe name field for the OpenInspection MCP integration'),
-    deploymentMode: z.enum(['shared', 'silo']).optional().describe('TODO describe deploymentMode field for the OpenInspection MCP integration'),
-    setupVerificationCode: z.string().optional().describe('TODO describe setupVerificationCode field for the OpenInspection MCP integration'),
-    maxUsers: z.number().int().positive().optional().describe('TODO describe maxUsers field for the OpenInspection MCP integration'),
-    adminEmail: z.string().email().optional().describe('TODO describe adminEmail field for the OpenInspection MCP integration'),
-    adminPasswordHash: z.string().optional().describe('TODO describe adminPasswordHash field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1).optional().describe('Stable tenant id the synced company is keyed on. When omitted the company is matched by its slug from the URL instead; a match on id also lets the stored slug be corrected.'),
+    status: z.string().min(1).describe('Lifecycle status to store for the company; a company that does not exist yet is created with it, and an existing one is moved to it.'),
+    tier: z.string().optional().describe('Plan tier label to store for the company; when omitted the stored tier is kept (a new company starts on the lowest tier).'),
+    name: z.string().optional().describe('Company name used to initialise the company display name. It only fills a name that is still empty and never overwrites one the company has set in its own settings; renames travel by a separate command.'),
+    deploymentMode: z.enum(['shared', 'silo']).optional().describe('Isolation mode recorded for the company, either on the shared deployment or a dedicated one. Used by the standalone provisioning provider (new companies default to a dedicated deployment); the portal provider ignores it.'),
+    setupVerificationCode: z.string().optional().describe('Accepted by the schema but not read by the tenant update handlers in this codebase; sending it has no effect.'),
+    maxUsers: z.number().int().positive().optional().describe('Cap on the number of user seats in the company; invitations are checked against it. When omitted the stored cap is unchanged.'),
+    adminEmail: z.string().email().optional().describe('Email address of the administrator account to create or whose credential to rotate. Takes effect only together with adminPasswordHash.'),
+    adminPasswordHash: z.string().optional().describe('Already-hashed password for the administrator account. The engine stores the hash as given and never receives a plaintext password; takes effect only together with adminEmail.'),
     /**
      * What the admin accepted, captured portal-side.
      *

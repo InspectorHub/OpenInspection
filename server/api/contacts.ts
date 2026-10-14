@@ -64,7 +64,7 @@ const createContactRoute = createRoute(withMcpMetadata({
     tags: ["contacts"], summary: "Create contact for current tenant",
     // Task 10 — manageContacts capability gates contact CREATE/UPDATE/DELETE.
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('manageContacts')],
-    request: { body: { content: { 'application/json': { schema: CreateContactSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: CreateContactSchema.describe('Details of the contact to create: its kind, name and optional email, phone, agency and notes.') } } } },
     responses: {
         201: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ contact: ContactResponseSchema }) }) } },

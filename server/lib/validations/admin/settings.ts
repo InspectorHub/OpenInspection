@@ -206,7 +206,7 @@ export const CommunicationPatchSchema = z.object({
  * before it moved here, and naming it now would change the published document.
  */
 export const TeamDefaultsSchema = z.object({
-    teamModeDefault:          z.boolean().optional().describe('TODO describe teamModeDefault field for the OpenInspection MCP integration'),
+    teamModeDefault:          z.boolean().optional().describe('Company-wide default for team mode, the setting that enables a lead inspector plus helpers on inspections. Stored on the team page defaults; it is read and written there, and sending nothing leaves it unchanged.'),
 });
 
 /**
@@ -291,7 +291,7 @@ export const ATTENTION_THRESHOLDS_DEFAULTS = {
 // drop unknown ones server-side via `normalizeDashboardColumns`.
 export const DashboardColumnPrefsSchema = z.object({
     columns: z.array(z.string().min(1).max(64)).max(64)
-        .openapi({ example: ['propertyAddress', 'clientName', 'date', 'price'] }).describe('TODO describe columns field for the OpenInspection MCP integration'),
+        .openapi({ example: ['propertyAddress', 'clientName', 'date', 'price'] }).describe('Ordered ids of the columns the inspection dashboard shows by default for the company. Ids the server does not recognise are dropped when the preference is saved.'),
 }).openapi('DashboardColumnPrefs');
 
 export const DashboardColumnPrefsResponseSchema = z.object({

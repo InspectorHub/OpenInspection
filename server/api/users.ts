@@ -35,7 +35,7 @@ const setOnboardingRoute = createRoute(withMcpMetadata({
         body: { content: { 'application/json': { schema: z.object({
             key: z.string().min(1).max(64).describe('Onboarding-step identifier (e.g. "dashboard.welcome", "templates.tour").'),
             completed: z.boolean().describe('True to mark the step as completed; false to clear / un-dismiss it.'),
-        }).describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        }).describe('The onboarding step key and whether the signed-in user has completed it.') } } },
     },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'OK' },

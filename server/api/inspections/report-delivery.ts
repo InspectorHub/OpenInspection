@@ -537,7 +537,7 @@ const reportDeliveryRoutes = createApiRouter()
         request: { params: z.object({ id: z.string().describe('Inspection the agent view link is for.') }) },
         responses: {
             200: {
-                content: { 'application/json': { schema: createApiResponseSchema(z.object({ token: z.string().describe('TODO describe token field for the OpenInspection MCP integration'), url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') })) } },
+                content: { 'application/json': { schema: createApiResponseSchema(z.object({ token: z.string().describe('The newly minted agent view token, also embedded in the url field.'), url: z.string().describe('Full report URL ending in the agent view query string, ready to share with the agent.') })) } },
                 description: 'Agent view token and URL',
             },
         },
@@ -559,7 +559,7 @@ const reportDeliveryRoutes = createApiRouter()
         request: { params: z.object({ id: z.string().describe('Inspection whose report link is emailed to the buyer agent.') }) },
         responses: {
             200: {
-                content: { 'application/json': { schema: createApiResponseSchema(z.object({ sentTo: z.string().describe('TODO describe sentTo field for the OpenInspection MCP integration') })) } },
+                content: { 'application/json': { schema: createApiResponseSchema(z.object({ sentTo: z.string().describe('Email address of the buyer agent the report link was sent to.') })) } },
                 description: 'Share link emailed to agent',
             },
         },

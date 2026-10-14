@@ -141,11 +141,11 @@ export const PublicBookingSchema = z.object({
  * Validation schema for recurring weekly availability.
  */
 export const AvailabilitySchema = z.object({
-    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspector whose weekly schedule is replaced. Defaults to the caller; only owners and managers may name another inspector.'),
     slots: z.array(z.object({
-        dayOfWeek: z.number().min(0).max(6).openapi({ example: 1 }).describe('TODO describe dayOfWeek field for the OpenInspection MCP integration'),
-        startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').openapi({ example: '09:00' }).describe('TODO describe startTime field for the OpenInspection MCP integration'),
-        endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').openapi({ example: '17:00' }).describe('TODO describe endTime field for the OpenInspection MCP integration'),
+        dayOfWeek: z.number().min(0).max(6).openapi({ example: 1 }).describe('Day of the week the slot recurs on, counted from Sunday as 0 through Saturday as 6.'),
+        startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').openapi({ example: '09:00' }).describe('Time of day the availability window opens, as a 24-hour HH:mm wall-clock time.'),
+        endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').openapi({ example: '17:00' }).describe('Time of day the availability window closes, as a 24-hour HH:mm wall-clock time.'),
     })).min(0).openapi({ description: 'List of weekly availability slots (empty array clears all slots)' }),
 }).openapi('Availability');
 
@@ -153,11 +153,11 @@ export const AvailabilitySchema = z.object({
  * Validation schema for date-specific availability overrides.
  */
 export const OverrideSchema = z.object({
-    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').openapi({ example: '2024-04-16' }).describe('TODO describe date field for the OpenInspection MCP integration'),
-    isAvailable: z.boolean().openapi({ example: false }).describe('TODO describe isAvailable field for the OpenInspection MCP integration'),
-    startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().nullable().openapi({ example: '09:00' }).describe('TODO describe startTime field for the OpenInspection MCP integration'),
-    endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().nullable().openapi({ example: '17:00' }).describe('TODO describe endTime field for the OpenInspection MCP integration'),
+    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspector the override applies to. Defaults to the caller; only owners and managers may name another inspector.'),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').openapi({ example: '2024-04-16' }).describe('Calendar date the override applies to, as YYYY-MM-DD.'),
+    isAvailable: z.boolean().openapi({ example: false }).describe('False blocks the date so no booking slots are offered; true replaces the weekly schedule for that date with the start and end time given.'),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().nullable().openapi({ example: '09:00' }).describe('Opening time of the replacement window as 24-hour HH:mm; used when isAvailable is true and omitted or null for a blocked date.'),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().nullable().openapi({ example: '17:00' }).describe('Closing time of the replacement window as 24-hour HH:mm; used when isAvailable is true and omitted or null for a blocked date.'),
 }).openapi('Override');
 
 /**

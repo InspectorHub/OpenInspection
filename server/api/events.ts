@@ -6,12 +6,12 @@ import { isAdminRole } from '../lib/auth/roles';
 import { Errors } from '../lib/errors';
 
 const TypeBody = z.object({
-    name:               z.string().min(1).describe('TODO describe name field for the OpenInspection MCP integration'),
-    slug:               z.string().min(1).regex(/^[a-z0-9_]+$/).describe('TODO describe slug field for the OpenInspection MCP integration'),
-    defaultDurationMin: z.number().int().positive().default(30).describe('TODO describe defaultDurationMin field for the OpenInspection MCP integration'),
-    defaultPriceCents:  z.number().int().min(0).default(0).describe('TODO describe defaultPriceCents field for the OpenInspection MCP integration'),
-    color:              z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#6366f1').describe('TODO describe color field for the OpenInspection MCP integration'),
-    sortOrder:          z.number().int().min(0).default(0).describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
+    name:               z.string().min(1).describe('Display name of the event type, shown when scheduling a visit and on the calendar.'),
+    slug:               z.string().min(1).regex(/^[a-z0-9_]+$/).describe('Stable lowercase identifier of the event type, unique within the company; the starter-type seeding matches on it to skip types that already exist.'),
+    defaultDurationMin: z.number().int().positive().default(30).describe('Length in minutes that a new visit of this type is given unless the caller overrides it.'),
+    defaultPriceCents:  z.number().int().min(0).default(0).describe('Price in cents that a new visit of this type starts with unless the caller overrides it.'),
+    color:              z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#6366f1').describe('Hex colour used to draw visits of this type on the calendar.'),
+    sortOrder:          z.number().int().min(0).default(0).describe('Position of the event type in lists, lowest first.'),
     // Hours after completion before the follow-up is queued. `.optional()` with
     // NO `.default()`: this schema is re-used as `.partial()` for PUT, and a
     // default survives `.partial()` — it would reset a tenant's configured delay
@@ -23,16 +23,16 @@ const TypeBody = z.object({
 });
 
 const EventBody = z.object({
-    eventTypeId:  z.string().min(1).describe('TODO describe eventTypeId field for the OpenInspection MCP integration'),
-    inspectorId:  z.string().optional().describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    scheduledAt:  z.string().datetime().describe('TODO describe scheduledAt field for the OpenInspection MCP integration'),
-    durationMin:  z.number().int().positive().describe('TODO describe durationMin field for the OpenInspection MCP integration'),
-    priceCents:   z.number().int().min(0).default(0).describe('TODO describe priceCents field for the OpenInspection MCP integration'),
-    notes:        z.string().optional().describe('TODO describe notes field for the OpenInspection MCP integration'),
+    eventTypeId:  z.string().min(1).describe('Id of the event type this visit is an instance of.'),
+    inspectorId:  z.string().optional().describe('Id of the user assigned to carry out the visit; leave out to leave it unassigned.'),
+    scheduledAt:  z.string().datetime().describe('Start of the visit as an ISO 8601 date-time; the 24-hour reminder is scheduled relative to it.'),
+    durationMin:  z.number().int().positive().describe('Length of the visit in minutes.'),
+    priceCents:   z.number().int().min(0).default(0).describe('Price of this visit in cents.'),
+    notes:        z.string().optional().describe('Free-text notes attached to the visit.'),
 });
 
 const EventStatusBody = z.object({
-    status: z.enum(['scheduled', 'completed', 'results_received', 'cancelled']).describe('TODO describe status field for the OpenInspection MCP integration'),
+    status: z.enum(['scheduled', 'completed', 'results_received', 'cancelled']).describe('New lifecycle status of the visit; moving to completed, results received or cancelled stamps the matching timestamp on the visit.'),
 });
 
 // ---- Event types CRUD ----

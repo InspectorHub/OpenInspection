@@ -94,11 +94,11 @@ const updateAgreementRoute = createRoute(withMcpMetadata({
     summary: "Update tenant agreement for current tenant",
     middleware: [requireRole('owner', 'manager')],
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the agreement template to update, as returned when it was created or listed.') }),
         body: {
             content: {
                 'application/json': {
-                    schema: AgreementSchema.partial().describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AgreementSchema.partial().describe('Any subset of the template fields to change, such as its name or body; fields left out keep their current value.'),
                 },
             },
         },
@@ -129,7 +129,7 @@ const deleteAgreementRoute = createRoute(withMcpMetadata({
     summary: "Delete tenant agreement for current tenant",
     middleware: [requireRole('owner', 'manager')],
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the agreement template to delete.') }),
     },
     responses: {
         200: {

@@ -144,7 +144,7 @@ const updateProfileRoute = createRoute(withMcpMetadata({
                     schema: z.object({
                         name: z.string().max(100).optional().describe('Display name shown on dashboards, reports, and booking pages.'),
                         phone: z.string().max(30).optional().describe('Contact phone number; included on reports if set.'),
-                    }).describe('TODO describe schema field for the OpenInspection MCP integration')
+                    }).describe('Profile fields to change on the signed-in user; only the fields sent are updated.')
                 }
             }
         }

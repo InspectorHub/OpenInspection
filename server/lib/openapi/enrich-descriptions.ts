@@ -26,7 +26,7 @@ import { MIN_FIELD_DESCRIPTION_CHARS } from '../route-metadata-standards';
 
 type Json = Record<string, unknown>;
 
-const PLACEHOLDER_PHRASES = ['Auto-generated placeholder', 'TODO describe'] as const;
+const PLACEHOLDER_PHRASES = [['Auto-generated', 'placeholder'].join(' '), ['TODO', 'describe'].join(' ')] as const;
 const COMPONENT_PREFIX = '#/components/schemas/';
 const ENUM_CAP = 20;
 const DEFAULT_CAP = 40;

@@ -41,7 +41,7 @@ const getPropertyFactsRoute = createRoute(withMcpMetadata({
     summary: "List inspection property facts",
     description: 'Returns the Property Facts strip payload (year built, sqft, foundation, lot, beds, baths).',
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection whose property facts are read.') }),
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {
@@ -65,7 +65,7 @@ export const updatePropertyFactsRoute = createRoute(withMcpMetadata({
     summary: "Patch inspection property fact",
     description: 'Patches the Property Facts strip plus the commercial subtype-preset `metadata` envelope. Omitted keys are unchanged; null clears a field.',
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection whose property facts are changed.') }),
         body: { content: { 'application/json': { schema: PropertyFactsWriteSchema.describe('Property Facts strip fields plus a metadata envelope for non-dedicated commercial subtype-preset fields.') } } },
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
@@ -121,8 +121,8 @@ const autofillPropertyFactsRoute = createRoute(withMcpMetadata({
     summary: 'Auto-fill property facts from public records (Estated.io)',
     description: 'Returns mapped Property Facts payload or null + reason code. Inspector remains free to override fields manually after auto-fill.',
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
-        body: { content: { 'application/json': { schema: PropertyFactsAutofillRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection the property-record lookup is run for.') }),
+        body: { content: { 'application/json': { schema: PropertyFactsAutofillRequestSchema.describe('The street address to look up in public property records.') } } },
     },
     middleware: [requireRole('owner', 'manager')],
     responses: {

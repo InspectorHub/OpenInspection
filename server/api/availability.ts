@@ -62,7 +62,7 @@ const updateScheduleRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: AvailabilitySchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AvailabilitySchema.describe('The inspector weekly schedule; the submitted slots replace the existing schedule in full.'),
                 },
             },
         },
@@ -122,7 +122,7 @@ const createOverrideRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: OverrideSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: OverrideSchema.describe('A single date-specific override that blocks a date or replaces the weekly schedule for it.'),
                 },
             },
         },

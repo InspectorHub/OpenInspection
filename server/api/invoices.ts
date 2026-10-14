@@ -49,7 +49,7 @@ const createInvoiceRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["invoices"], summary: "Create invoice for current tenant",
     middleware: [requireRole('owner', 'manager')],
-    request: { body: { content: { 'application/json': { schema: CreateInvoiceSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: CreateInvoiceSchema.describe('Details of the invoice to create: who is billed, the amount in integer cents, optional line items, due date and linked inspection.') } } } },
     responses: {
         201: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ invoice: InvoiceResponseSchema }) }) } },

@@ -152,7 +152,7 @@ const photoUploadRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'multipart/form-data': { schema: z.object({ photo: z.any().describe('Profile photo file — jpg, png, or webp; max 2 MB.') }).describe('TODO describe schema field for the OpenInspection MCP integration') },
+                'multipart/form-data': { schema: z.object({ photo: z.any().describe('Profile photo file — jpg, png, or webp; max 2 MB.') }).describe('Multipart form carrying the profile photo file in the photo field.') },
             },
         },
     },

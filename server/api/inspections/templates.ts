@@ -109,7 +109,7 @@ const getTemplateRoute = createRoute(withMcpMetadata({
     summary: "Get inspection template for current tenant",
     description: "Retrieve a single template with full schema. (GET /templates/{id}, inspections domain).",
     request: {
-        params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }),
+        params: z.object({ id: z.string().describe('Id of the inspection template to retrieve.') }),
     },
     responses: {
         200: {

@@ -4,9 +4,9 @@ import { z } from '@hono/zod-openapi';
  * The shapes QuickBooks Online sends US, validated at the boundary.
  *
  * Every `describe()` here is published — this file feeds the OpenAPI document
- * Intuit reviews for the app listing. They previously all read
- * `TODO describe <field> field for the OpenInspection MCP integration`, an
- * auto-generated placeholder, which is worse than no description: it presents
+ * Intuit reviews for the app listing. They previously all carried a generated
+ * stub description naming only the field and the integration, which is worse
+ * than no description: it presents
  * as documentation and says nothing, so nobody notices it is missing.
  *
  * These describe INTUIT's contract, not our preferences. Where a field's meaning

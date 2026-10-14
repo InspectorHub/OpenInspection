@@ -137,7 +137,7 @@ const bulkUpdateRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: BulkInspectionSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: BulkInspectionSchema.describe('The inspections to change, the action to apply to all of them, and the inspector or status that action needs.'),
                 },
             },
         },

@@ -39,8 +39,8 @@ function requireUserId(c: any): string {
 }
 
 const OkResponseSchema = z.object({
-    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-    data: z.object({ ok: z.literal(true).describe('TODO describe ok field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+    success: z.literal(true).describe('Always true when the request succeeded.'),
+    data: z.object({ ok: z.literal(true).describe('Confirmation payload of the notification change.') }).describe('Always true once the notification change is stored.'),
 });
 
 // GET / — list notifications for current user

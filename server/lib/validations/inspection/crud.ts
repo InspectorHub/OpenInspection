@@ -238,10 +238,10 @@ export const InspectionCountsSchema = z.object({
  * Validation schema for bulk operations.
  */
 export const BulkInspectionSchema = z.object({
-    ids: z.array(z.string().trim().min(1)).min(1).max(100).describe('TODO describe ids field for the OpenInspection MCP integration'),
-    action: z.enum(['assignInspector', 'updateStatus']).describe('TODO describe action field for the OpenInspection MCP integration'),
-    inspectorId: z.string().trim().min(1).optional().describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    status: z.enum(INSPECTION_STATUSES).optional().describe('TODO describe status field for the OpenInspection MCP integration'),
+    ids: z.array(z.string().trim().min(1)).min(1).max(100).describe('Ids of the inspections the bulk action is applied to, all within the caller company.'),
+    action: z.enum(['assignInspector', 'updateStatus']).describe('Which bulk operation to run: reassign the lead inspector on every listed inspection, or set a new status on all of them.'),
+    inspectorId: z.string().trim().min(1).optional().describe('Inspector to assign to every listed inspection. Required when the action is assignInspector and ignored otherwise.'),
+    status: z.enum(INSPECTION_STATUSES).optional().describe('Status to set on every listed inspection. Required when the action is updateStatus and ignored otherwise; cancelling is refused here and must go through the cancel route.'),
 }).openapi('BulkInspection');
 
 /**
@@ -255,7 +255,7 @@ const CancellationReasonSchema = z.enum(CANCELLATION_REASONS).openapi('Cancellat
 
 export const CancelInspectionSchema = z.object({
     reason: CancellationReasonSchema.describe('Why the inspection was cancelled; also classifies the cancellation for the fee ladder.'),
-    notes:  z.string().max(500).optional().describe('TODO describe notes field for the OpenInspection MCP integration'),
+    notes:  z.string().max(500).optional().describe('Optional free-text note about why the inspection was cancelled, stored with the cancellation and cleared again if the inspection is uncancelled.'),
     // The fee the caller was shown and is confirming. A cancellation that
     // silently charges 50% is a chargeback, so the server refuses to charge a
     // fee the caller has not echoed back: whoever cancels has to have seen the

@@ -68,8 +68,8 @@ const syncRoutes = createApiRouter()
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-                        data: z.object({ deletedKey: z.string().nullable().describe('TODO describe deletedKey field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                        success: z.literal(true).describe('Always true when the photo was removed.'),
+                        data: z.object({ deletedKey: z.string().nullable().describe('Result of the photo removal.') }).describe('Result of the photo removal.'),
                     }),
                 },
             },
@@ -126,8 +126,8 @@ const syncRoutes = createApiRouter()
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-                        data: z.object({ savedAt: z.number().int().positive().describe('TODO describe savedAt field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                        success: z.literal(true).describe('Always true when the signature was recorded.'),
+                        data: z.object({ savedAt: z.number().int().positive().describe('Result of recording the inspector signature.') }).describe('Result of recording the inspector signature.'),
                     }),
                 },
             },
@@ -177,7 +177,7 @@ const syncRoutes = createApiRouter()
     summary: 'Upgrade inspection template snapshot to current master version',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: z.object({ id: z.string().trim().min(1).describe('Inspection id.') }) },
-    responses: { 200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ from: z.number().describe('TODO describe from field for the OpenInspection MCP integration'), to: z.number().describe('TODO describe to field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Upgraded' } },
+    responses: { 200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('Always true when the upgrade check completed.'), data: z.object({ from: z.number().describe('Template snapshot version the inspection was on before this call.'), to: z.number().describe('Template snapshot version the inspection is on after this call; equal to from when it was already current.') }).describe('Versions before and after the snapshot upgrade.') }) } }, description: 'Upgraded' } },
     operationId: "upgradeInspection",
     description: "Brings the inspection's frozen copy of its template up to the current version of the master template it was created from. When the master has a newer version, its current schema replaces the inspection's snapshot and the snapshot version is updated, and an inspection.template_upgraded audit record is written. When the snapshot is already current nothing changes and from equals to. Results already entered are not touched by this route. Responds 400 if the inspection has no master template and 404 if the inspection or the master template no longer exists. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' })), async (c) => {

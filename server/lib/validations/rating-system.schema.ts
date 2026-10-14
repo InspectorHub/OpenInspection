@@ -29,8 +29,8 @@ export type RatingLevelInput = z.infer<typeof RatingLevelInputSchema>;
 
 /** Persisted level (id + order always present). */
 const RatingLevelSchema = RatingLevelInputSchema.extend({
-    id:    z.string().min(1).max(64).describe('TODO describe id field for the OpenInspection MCP integration'),
-    order: z.number().int().min(0).max(20).describe('TODO describe order field for the OpenInspection MCP integration'),
+    id:    z.string().min(1).max(64).describe('Id of the rating level; always present once the system is saved (the server assigns one to levels submitted without it).'),
+    order: z.number().int().min(0).max(20).describe('Display position of the level among its siblings, lowest first; always present once the system is saved.'),
 });
 export type RatingLevel = z.infer<typeof RatingLevelSchema>;
 

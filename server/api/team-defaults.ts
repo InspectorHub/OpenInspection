@@ -56,7 +56,7 @@ const teamDefaultsRoutes = createApiRouter()
         summary: "Update tenant team-page default toggles",
         description: "Patches any subset of the team-page toggles (teamModeDefault). Missing keys leave existing values unchanged.",
         middleware: [requireRole('owner', 'manager')] as const,
-        request: { body: { content: { 'application/json': { schema: TeamDefaultsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+        request: { body: { content: { 'application/json': { schema: TeamDefaultsSchema.describe('The team-page toggles to change; toggles left out keep their stored value.') } } } },
         responses: { 200: { description: 'ok' } },
     }, { scopes: ['admin'], tier: 'extended' }), async (c) => {
         const tenantId = c.get('tenantId');
