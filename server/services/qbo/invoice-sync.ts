@@ -12,7 +12,7 @@ import type {
 } from './api-base';
 import { describeQboError } from './api-base';
 import { applyInvoiceStatusFromQBO } from './inbound-reconcile';
-import { billableLines, toQboLines, buildInvoicePayload } from './invoice-payload';
+import { billableLines, toQboLines, buildInvoicePayload, noCustomerFailureMessage } from './invoice-payload';
 import type { CustomerSyncSurface } from './customer-sync';
 import { withPaymentSync } from './payment-sync';
 
@@ -146,17 +146,17 @@ export function withInvoiceSync<
             // the operator cannot act on, and it is the same statement whether
             // the invoice has no contact or the contact has never synced.
             if (!qboCustomerId) {
-                const why = invoice.contactId
-                    ? `contact ${invoice.contactId} has no QuickBooks customer yet`
-                    : 'invoice has no contact';
+                const message = invoice.contactId
+                    ? noCustomerFailureMessage(invoice.contactId)
+                    : 'Cannot send to QuickBooks: invoice has no contact';
                 await db.update(invoices).set({ qboSyncStatus: 'failed' }).where(
                     and(eq(invoices.id, invoice.id), eq(invoices.tenantId, tenantId)),
                 );
                 await this.logSyncError(
                     tenantId, 'invoice', invoice.id,
-                    new Error(`Cannot send to QuickBooks: ${why}`),
+                    new Error(message),
                 );
-                logger.warn('QBO upsertInvoice skipped: no customer', { tenantId, invoiceId: invoice.id, why });
+                logger.warn('QBO upsertInvoice skipped: no customer', { tenantId, invoiceId: invoice.id, why: message });
                 return;
             }
 

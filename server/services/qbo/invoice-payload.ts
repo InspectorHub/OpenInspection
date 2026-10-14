@@ -7,6 +7,15 @@
  * database, a token or a clock. Reading it should not mean reading a retry loop.
  */
 
+/**
+ * Why an invoice could not be sent when its contact has no QuickBooks customer.
+ * The push writes it into the open item and the re-sync after a match reads the
+ * same text back to find those invoices, so both sides share this one builder.
+ */
+export function noCustomerFailureMessage(contactId: string): string {
+    return `Cannot send to QuickBooks: contact ${contactId} has no QuickBooks customer yet`;
+}
+
 /** One billable line as this product stores it. */
 export interface BillableLine {
     description: string;

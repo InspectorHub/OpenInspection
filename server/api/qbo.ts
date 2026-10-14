@@ -5,6 +5,8 @@ import { verifyJwt } from '../lib/jwt-keyring';
 import { requireRole } from '../lib/middleware/rbac';
 import { logger } from '../lib/logger';
 import { checkRateLimit } from '../lib/rate-limit';
+import { fireAndForget } from '../lib/fire-and-forget';
+import { resyncInvoicesForContact } from '../services/qbo/resync';
 import { QBOCustomerSearchQuerySchema, QBOLinkCustomerBodySchema } from '../lib/validations/qbo.schema';
 
 const api = new Hono<HonoConfig>();
@@ -158,7 +160,16 @@ api.post('/contacts/:contactId/link', async (c) => {
     // user behind it is refused rather than written as an anonymous match.
     const actorUserId = c.get('user')?.sub;
     if (!actorUserId) return c.json({ success: false, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
-    const result = await c.var.services.qbo.linkExistingCustomer(c.get('tenantId'), c.req.param('contactId'), parsed.data.qboCustomerId, actorUserId);
+    const tenantId = c.get('tenantId');
+    const contactId = c.req.param('contactId');
+    const svc = c.var.services.qbo;
+    const result = await svc.linkExistingCustomer(tenantId, contactId, parsed.data.qboCustomerId, actorUserId);
+    // The match is done and is the answer. Pushing the invoices that were waiting
+    // for it is slow (calls to QuickBooks), so it runs after the response, capped
+    // at RESYNC_INVOICE_LIMIT; a failure there is logged and never undoes the match.
+    fireAndForget(c, resyncInvoicesForContact(svc, tenantId, contactId).then((r) => {
+        logger.info('QBO re-sync after match finished', { tenantId, contactId, ...r });
+    }), 'QBO re-sync after match', { tenantId, contactId });
     return c.json({
         success: true,
         data: {
