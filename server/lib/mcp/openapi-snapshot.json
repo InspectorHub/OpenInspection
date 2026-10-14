@@ -22956,7 +22956,7 @@
       }
     },
     "summary": "Update a team member's role or permissions",
-    "description": "Changes role and/or capability overrides for an active member. A role change also invalidates the member's sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats)."
+    "description": "Changes role and/or capability overrides for an active member. A role change also invalidates the member's sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Only an owner may change an owner or promote anyone to owner."
   },
   {
     "operationId": "updateTenantAgreement",
