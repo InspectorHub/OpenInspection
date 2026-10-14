@@ -38,13 +38,13 @@ const getReportsRoute = createRoute(withMcpMetadata({
     tags: ["agents"],
     summary: "List agent my reports",
     request: {
-        query: AgentReportsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration'),
+        query: AgentReportsQuerySchema,
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: AgentReportsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AgentReportsResponseSchema,
                 },
             },
             description: 'Success',
@@ -96,7 +96,7 @@ const getLeaderboardRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: LeaderboardResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: LeaderboardResponseSchema,
                 },
             },
             description: 'Success',
@@ -125,7 +125,7 @@ const updateProfileRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: AgentProfilePatchResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: AgentProfilePatchResponseSchema } },
             description: 'Profile updated',
         },
         400: { description: 'Invalid input' },
@@ -152,7 +152,7 @@ const getProfileRoute = createRoute(withMcpMetadata({
     summary: 'Get agent profile (slug + notification prefs)',
     responses: {
         200: {
-            content: { 'application/json': { schema: AgentProfileResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: AgentProfileResponseSchema } },
             description: 'Success',
         },
         401: { description: 'Unauthorized' },
@@ -181,7 +181,7 @@ const conciergeBookRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: ConciergeBookResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: ConciergeBookResponseSchema } },
             description: 'Booking created — state machine entered',
         },
         400: { description: 'Invalid input' },

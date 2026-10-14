@@ -54,7 +54,7 @@ const totpSetupRoute = createRoute(withMcpMetadata({
     description: 'Generates a fresh TOTP secret plus recovery codes and returns the QR data URI. Caller must POST /2fa/verify before 2FA is actually enabled.',
     tags: ['auth'],
     responses: {
-        200: { content: { 'application/json': { schema: TotpSetupResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Setup payload' },
+        200: { content: { 'application/json': { schema: TotpSetupResponseSchema } }, description: 'Setup payload' },
         401: { description: 'Unauthorized' },
     }
 }, { scopes: [], tier: 'extended' }));
@@ -98,7 +98,7 @@ const totpRegenRoute = createRoute(withMcpMetadata({
     tags: ['auth'],
     request: { body: { content: { 'application/json': { schema: TotpDisableSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: TotpSetupResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'New recovery codes' },
+        200: { content: { 'application/json': { schema: TotpSetupResponseSchema } }, description: 'New recovery codes' },
         401: { description: 'Unauthorized' },
     }
 }, { scopes: [], tier: 'extended' }));
@@ -113,7 +113,7 @@ const login2faRoute = createRoute(withMcpMetadata({
     middleware: [requireCsrfToken],
     request: { body: { content: { 'application/json': { schema: TotpLoginSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: Login2faResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Login complete' },
+        200: { content: { 'application/json': { schema: Login2faResponseSchema } }, description: 'Login complete' },
         401: { description: 'Invalid or expired challenge / code' },
     }
 }, { scopes: [], tier: 'excluded' }));

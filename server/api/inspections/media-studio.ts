@@ -160,7 +160,7 @@ const updateMediaAnnotationsRoute = createRoute(withMcpMetadata({
     summary:    'Save PhotoStudio annotation overlay + caption',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'), mediaId: z.string().min(1).describe('TODO describe mediaId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'), mediaId: z.string().min(1).describe('TODO describe mediaId field for the OpenInspection MCP integration') }),
         body: {
             content: {
                 'application/json': {
@@ -203,7 +203,7 @@ const saveAnnotationRoute = createRoute(withMcpMetadata({
             id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
             itemId: z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
             photoIndex: z.coerce.number().int().min(0).describe('TODO describe photoIndex field for the OpenInspection MCP integration'),
-        }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        }),
         body: {
             content: {
                 'multipart/form-data': {

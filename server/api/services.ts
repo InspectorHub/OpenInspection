@@ -21,7 +21,7 @@ export const servicesRoutes = createApiRouter()
         method: 'get', path: '/',
         tags: ["services"], summary: "List services for current tenant",
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        responses: { 200: { content: { 'application/json': { schema: ServiceListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' } },
+        responses: { 200: { content: { 'application/json': { schema: ServiceListResponseSchema } }, description: 'OK' } },
         operationId: "listServices",
         description: "Auto-generated placeholder for listServices (GET /, services domain). TODO: replace with a real description sourced from the handler."
     }, { scopes: ['read'], tier: 'primary' })), async (c) => {
@@ -81,7 +81,7 @@ export const servicesRoutes = createApiRouter()
         tags: ["services"], summary: "Update service discount code",
         middleware: [requireRole('owner', 'manager')] as const,
         request: {
-            params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+            params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }),
             body: { content: { 'application/json': { schema: UpdateDiscountCodeSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
         },
         responses: { 200: { content: { 'application/json': { schema: DiscountCodeResponseSchema } }, description: 'Updated' } },
@@ -99,7 +99,7 @@ export const servicesRoutes = createApiRouter()
         method: 'delete', path: '/discount-codes/{id}',
         tags: ["services"], summary: "Delete service discount code",
         middleware: [requireRole('owner', 'manager')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
         responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
         operationId: "deleteServiceDiscountCode",
         description: "Auto-generated placeholder for deleteServiceDiscountCode (DELETE /discount-codes/{id}, services domain). TODO: replace with a real description sourced from the handler."
@@ -115,7 +115,7 @@ export const servicesRoutes = createApiRouter()
         tags: ["services"], summary: "Create service for current tenant",
         middleware: [requireRole('owner', 'manager')] as const,
         request: { body: { content: { 'application/json': { schema: CreateServiceSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
-        responses: { 201: { content: { 'application/json': { schema: ServiceResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' } },
+        responses: { 201: { content: { 'application/json': { schema: ServiceResponseSchema } }, description: 'Created' } },
         operationId: "createService",
         description: "Auto-generated placeholder for createService (POST /, services domain). TODO: replace with a real description sourced from the handler."
     }, { scopes: ['write'], tier: 'primary' })), async (c) => {
@@ -264,10 +264,10 @@ export const servicesRoutes = createApiRouter()
         tags: ["services"], summary: "Replace service for current tenant",
         middleware: [requireRole('owner', 'manager')] as const,
         request: {
-            params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+            params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }),
             body: { content: { 'application/json': { schema: UpdateServiceSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
         },
-        responses: { 200: { content: { 'application/json': { schema: ServiceResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' } },
+        responses: { 200: { content: { 'application/json': { schema: ServiceResponseSchema } }, description: 'OK' } },
         operationId: "replaceService",
         description: "Auto-generated placeholder for replaceService (PUT /{id}, services domain). TODO: replace with a real description sourced from the handler."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
@@ -282,7 +282,7 @@ export const servicesRoutes = createApiRouter()
         method: 'delete', path: '/{id}',
         tags: ["services"], summary: "Delete service for current tenant",
         middleware: [requireRole('owner', 'manager')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
         responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
         operationId: "deleteService",
         description: "Auto-generated placeholder for deleteService (DELETE /{id}, services domain). TODO: replace with a real description sourced from the handler."

@@ -70,7 +70,7 @@ const marketplaceRoutes = createApiRouter()
     // half -- owner/manager hold templateImport by default, so the practical
     // effect is confined to a workspace that has deliberately revoked it.
     middleware: [requireRole('owner', 'manager'), requireCapability('templateImport')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
     responses: {
         201: {
             content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ localTemplateId: z.string().nullable().describe('Local template id for a 1:1 kind; null for a 1:N kind, which produces row_count rows rather than one') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
@@ -100,10 +100,10 @@ const marketplaceRoutes = createApiRouter()
     summary: 'List marketplace catalogue entries (comment packs, templates)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        query: z.object({ kind: z.enum(MARKETPLACE_KINDS).optional().describe('TODO describe kind field for the OpenInspection MCP integration') }).describe('TODO describe query field for the OpenInspection MCP integration'),
+        query: z.object({ kind: z.enum(MARKETPLACE_KINDS).optional().describe('TODO describe kind field for the OpenInspection MCP integration') }),
     },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(z.any()).describe('TODO describe data field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(z.any()).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'OK' },
     },
     operationId: "listMarketplaceLibraries",
     description: "Auto-generated placeholder for listMarketplaceLibraries (GET /libraries, marketplace domain). TODO: replace with a real description sourced from the handler."
@@ -123,7 +123,7 @@ const marketplaceRoutes = createApiRouter()
     // Scheme 2 mints a SECOND local template row, so "update to latest" is a
     // template import by any measure that matters here (#307).
     middleware: [requireRole('owner', 'manager'), requireCapability('templateImport')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
@@ -181,7 +181,7 @@ const marketplaceRoutes = createApiRouter()
     // enumerating grep was `insert(templates)` and this path writes
     // `insert(templates as any)`, which that pattern does not match.
     middleware: [requireRole('owner', 'manager'), requireCapability('templateImport')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
     responses: {
         201: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ kind: z.enum(['comments', 'templates', 'statutory']).describe('Which shape the import produced'), rowCount: z.number().describe('Rows created for a 1:N kind; 0 for a 1:1 kind'), localEntityId: z.string().nullable().describe('Local row id for a 1:1 kind; null for a 1:N kind') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Imported' },
         403: { description: "Missing the 'templateImport' capability" },
@@ -215,7 +215,7 @@ const marketplaceRoutes = createApiRouter()
     // kind other than 'comments' outright, so this path cannot reach the
     // `templates` table. Said here so the next auditor does not re-derive it.
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
@@ -298,7 +298,7 @@ const marketplaceRoutes = createApiRouter()
     // else before that. No template is minted, so no template capability.
     middleware: [requireRole('owner', 'manager')] as const,
     request: {
-        params: LibraryReplaceParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: LibraryReplaceParamsSchema,
         body: {
             content: {
                 'application/json': {
@@ -367,7 +367,7 @@ const marketplaceRoutes = createApiRouter()
     summary: 'List per-import history events',
     description: "Auto-generated placeholder for listMarketplaceImportsHistory (GET /imports/history, marketplace domain). TODO: replace with a real description sourced from the handler.",
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { query: ImportHistoryQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
+    request: { query: ImportHistoryQuerySchema },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({

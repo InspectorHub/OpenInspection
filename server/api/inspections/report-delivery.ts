@@ -43,7 +43,7 @@ const sendReportPdfRoute = createRoute(withMcpMetadata({
     summary: 'Send the inspection report to one or more role-keyed recipients',
     middleware: [requireRole('owner', 'manager', 'inspector')],
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
         body: {
             content: {
                 'application/json': { schema: SendReportSchema },
@@ -136,7 +136,7 @@ const getRepairListRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Get aggregated repair list (defects-only punch list)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: createApiResponseSchema(RepairListResponseSchema) } },
@@ -158,10 +158,10 @@ const recipientsRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'List the recipients eligible for the Publish modal',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
     responses: {
         200: {
-            content: { 'application/json': { schema: InspectionRecipientsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: InspectionRecipientsResponseSchema } },
             description: 'Recipient list',
         },
     },
@@ -205,7 +205,7 @@ const refreshPdfRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Refresh PDF renders (Summary + Full)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
     responses: {
         202: {
             content: { 'application/json': { schema: createApiResponseSchema(z.object({
@@ -302,12 +302,12 @@ const downloadPdfRoute = createRoute(withMcpMetadata({
     summary: 'Download report PDF (Summary or Full)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        query: z.object({ type: z.enum(['summary', 'full']).default('full').describe('TODO describe type field for the OpenInspection MCP integration') }).describe('TODO describe query field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }),
+        query: z.object({ type: z.enum(['summary', 'full']).default('full').describe('TODO describe type field for the OpenInspection MCP integration') }),
     },
     responses: {
         200: {
-            content: { 'application/pdf': { schema: z.any().describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/pdf': { schema: z.any() } },
             description: 'PDF bytes',
         },
     },
@@ -534,7 +534,7 @@ const reportDeliveryRoutes = createApiRouter()
         tags: ["inspections"],
         summary: 'Generate shareable agent view token',
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
         responses: {
             200: {
                 content: { 'application/json': { schema: createApiResponseSchema(z.object({ token: z.string().describe('TODO describe token field for the OpenInspection MCP integration'), url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') })) } },
@@ -556,7 +556,7 @@ const reportDeliveryRoutes = createApiRouter()
         tags: ["inspections"],
         summary: 'Email the report share link to the linked agent',
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
         responses: {
             200: {
                 content: { 'application/json': { schema: createApiResponseSchema(z.object({ sentTo: z.string().describe('TODO describe sentTo field for the OpenInspection MCP integration') })) } },

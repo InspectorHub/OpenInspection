@@ -191,7 +191,7 @@ const publishRoute = createRoute(withMcpMetadata({
     // ("requires review") is 403'd here.
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish')] as const,
     request: {
-        params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }),
         body: {
             content: {
                 'application/json': {
@@ -344,7 +344,7 @@ const publishRoutes = createApiRouter()
         method: 'post', path: '/{id}/confirm',
         tags: ["inspections"], summary: "Confirm inspection for current tenant",
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
         responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Confirmed' } },
         operationId: "confirmInspection",
         description: "Auto-generated placeholder for confirmInspection (POST /{id}/confirm, inspections domain). TODO: replace with a real description sourced from the handler."

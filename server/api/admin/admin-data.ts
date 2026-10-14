@@ -44,7 +44,7 @@ const exportDataRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: AdminExportResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AdminExportResponseSchema,
                 },
             },
             description: 'Success',
@@ -76,7 +76,7 @@ const inviteMemberRoute = createRoute(withMcpMetadata({
         201: {
             content: {
                 'application/json': {
-                    schema: InviteResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: InviteResponseSchema,
                 },
             },
             description: 'Created',
@@ -103,7 +103,7 @@ const listMembersRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: MemberListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: MemberListResponseSchema,
                 },
             },
             description: 'Success',
@@ -129,13 +129,13 @@ const getAuditLogsRoute = createRoute(withMcpMetadata({
             cursor: z.string().optional().describe('TODO describe cursor field for the OpenInspection MCP integration'),
             action: z.string().optional().describe('TODO describe action field for the OpenInspection MCP integration'),
             entityType: z.string().optional().describe('TODO describe entityType field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
+        }),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: AuditLogResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AuditLogResponseSchema,
                 },
             },
             description: 'Success',
@@ -206,7 +206,7 @@ const eraseDataRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: EraseDataResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: EraseDataResponseSchema,
                 },
             },
             description: 'Success',

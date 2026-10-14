@@ -33,7 +33,7 @@ const publicGeocodeRoute = createRoute(withMcpMetadata({
     request: {
         query: z.object({
             q: z.string().min(1).max(200).openapi({ example: '1005 S Gay' }).describe('TODO describe q field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
+        }),
     },
     responses: {
         200: {

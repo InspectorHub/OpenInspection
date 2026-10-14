@@ -12,7 +12,7 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
 const listRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/', tags: ["automations"],
     middleware: [requireRole('owner', 'manager')],
-    responses: { 200: { content: { 'application/json': { schema: AutomationListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'List' } },
+    responses: { 200: { content: { 'application/json': { schema: AutomationListResponseSchema } }, description: 'List' } },
     operationId: "listAutomations",
     summary: "List automations for current tenant",
     description: "Auto-generated placeholder for listAutomations (GET /, automations domain). TODO: replace with a real description sourced from the handler."
@@ -34,8 +34,8 @@ const createAutomationRoute = createRoute(withMcpMetadata({
 const getRecentLogsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/logs/recent', tags: ["automations"],
     middleware: [requireRole('owner', 'manager')],
-    request: { query: z.object({ limit: z.coerce.number().int().min(1).max(200).optional().describe('TODO describe limit field for the OpenInspection MCP integration') }).describe('TODO describe query field for the OpenInspection MCP integration') },
-    responses: { 200: { content: { 'application/json': { schema: AutomationLogListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Recent automation logs' } },
+    request: { query: z.object({ limit: z.coerce.number().int().min(1).max(200).optional().describe('TODO describe limit field for the OpenInspection MCP integration') }) },
+    responses: { 200: { content: { 'application/json': { schema: AutomationLogListResponseSchema } }, description: 'Recent automation logs' } },
     operationId: "listAutomationLogsRecent",
     summary: "List automation logs recent",
     description: "Auto-generated placeholder for listAutomationLogsRecent (GET /logs/recent, automations domain). TODO: replace with a real description sourced from the handler."
@@ -52,7 +52,7 @@ const updateRoute = createRoute(withMcpMetadata({
     method: 'patch', path: '/{id}', tags: ["automations"],
     middleware: [requireRole('owner', 'manager')],
     request: {
-        params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }),
         body: { content: { 'application/json': { schema: UpdateAutomationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: { 200: { content: { 'application/json': { schema: createApiResponseSchema(AutomationSchema) } }, description: 'Updated' } },
@@ -65,7 +65,7 @@ const updateRoute = createRoute(withMcpMetadata({
 const deleteRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}', tags: ["automations"],
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }) },
     responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
     operationId: "deleteAutomation",
     summary: "Delete automation for current tenant",

@@ -93,7 +93,7 @@ const signupRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SignupResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SignupResponseSchema } },
             description: 'Account created',
         },
         400: { description: 'Invalid input' },

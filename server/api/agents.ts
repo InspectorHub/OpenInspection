@@ -51,7 +51,7 @@ const listLinksRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listAgentLinks (GET /links, agents domain). TODO: replace with a real description sourced from the handler.",
     responses: {
         200: {
-            content: { 'application/json': { schema: ListLinksResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: ListLinksResponseSchema } },
             description: 'Links',
         },
         401: { description: 'Unauthorized' },
@@ -80,10 +80,10 @@ const revokeRoute = createRoute(withMcpMetadata({
     tags: ["agents"],
     summary: 'Revoke a partner-agent link',
     description: "Auto-generated placeholder for revokeAgent (POST /{linkId}/revoke, agents domain). TODO: replace with a real description sourced from the handler.",
-    request: { params: RevokeParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: RevokeParamsSchema },
     responses: {
         200: {
-            content: { 'application/json': { schema: RevokeResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: RevokeResponseSchema } },
             description: 'Link revoked',
         },
         401: { description: 'Unauthorized' },

@@ -67,7 +67,7 @@ const listTeamMembersRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: TeamMembersResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: TeamMembersResponseSchema,
                 },
             },
             description: 'Success',
@@ -100,7 +100,7 @@ const inviteTeamMemberRoute = createRoute(withMcpMetadata({
         201: {
             content: {
                 'application/json': {
-                    schema: InviteResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: InviteResponseSchema,
                 },
             },
             description: 'Created',
@@ -150,7 +150,7 @@ const removeTeamMemberRoute = createRoute(withMcpMetadata({
     summary: 'Remove a team member',
     middleware: [requireRole('manager', 'owner')],
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
     },
     responses: {
         200: {

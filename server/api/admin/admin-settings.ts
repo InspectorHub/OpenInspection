@@ -50,7 +50,7 @@ const getAttentionThresholdsRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager')] as const,
     responses: {
         200: {
-            content: { 'application/json': { schema: AttentionThresholdsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: AttentionThresholdsResponseSchema } },
             description: 'Success',
         },
     },
@@ -68,7 +68,7 @@ const updateAttentionThresholdsRoute = createRoute(withMcpMetadata({
     request: { body: { content: { 'application/json': { schema: AttentionThresholdsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: AttentionThresholdsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: AttentionThresholdsResponseSchema } },
             description: 'Success',
         },
     },
@@ -94,7 +94,7 @@ const getDashboardColumnsRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     responses: {
         200: {
-            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema } },
             description: 'Success',
         },
     },
@@ -112,7 +112,7 @@ const updateDashboardColumnsRoute = createRoute(withMcpMetadata({
     request: { body: { content: { 'application/json': { schema: DashboardColumnPrefsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema } },
             description: 'Success',
         },
     },
@@ -198,7 +198,7 @@ const tenantConfigPatchRoute = createRoute(withMcpMetadata({
     request: { body: { content: { 'application/json': { schema: TenantConfigPatchSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: TenantConfigPatchResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: TenantConfigPatchResponseSchema } },
             description: 'Updated',
         },
     },

@@ -69,7 +69,7 @@ const confirmRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: ConfirmResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: ConfirmResponseSchema } },
             description: 'Confirmed — caller redirects to either the agreement signing page or the inspection report',
         },
         400: { description: 'Token expired or already used' },

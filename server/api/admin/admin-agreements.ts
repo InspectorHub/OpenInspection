@@ -44,7 +44,7 @@ const listAgreementsRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: AgreementListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AgreementListResponseSchema,
                 },
             },
             description: 'Success',
@@ -74,7 +74,7 @@ const createAgreementRoute = createRoute(withMcpMetadata({
         201: {
             content: {
                 'application/json': {
-                    schema: AgreementResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AgreementResponseSchema,
                 },
             },
             description: 'Created',
@@ -92,7 +92,7 @@ const updateAgreementRoute = createRoute(withMcpMetadata({
     summary: "Update tenant agreement for current tenant",
     middleware: [requireRole('owner', 'manager')],
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
         body: {
             content: {
                 'application/json': {
@@ -127,7 +127,7 @@ const deleteAgreementRoute = createRoute(withMcpMetadata({
     summary: "Delete tenant agreement for current tenant",
     middleware: [requireRole('owner', 'manager')],
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
     },
     responses: {
         200: {

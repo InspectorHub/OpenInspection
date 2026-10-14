@@ -36,7 +36,7 @@ const autocompleteRoute = createRoute(withMcpMetadata({
         query: z.object({
             q: z.string().min(2).max(200).openapi({ example: '1005 S Gay' }).describe('TODO describe q field for the OpenInspection MCP integration'),
             session: z.string().min(8).max(128).openapi({ example: '550e8400-e29b-41d4-a716-446655440099' }).describe('TODO describe session field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
+        }),
     },
     responses: {
         200: {
@@ -69,7 +69,7 @@ const detailsRoute = createRoute(withMcpMetadata({
         query: z.object({
             placeId: z.string().min(8).max(200).openapi({ example: 'ChIJxxx' }).describe('TODO describe placeId field for the OpenInspection MCP integration'),
             session: z.string().min(8).max(128).openapi({ example: '550e8400-e29b-41d4-a716-446655440099' }).describe('TODO describe session field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
+        }),
     },
     responses: {
         200: {
@@ -89,7 +89,7 @@ const detailsRoute = createRoute(withMcpMetadata({
                 meta: z.object({
                     cached: z.boolean().describe('TODO describe cached field for the OpenInspection MCP integration'),
                 }),
-            }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            }) } },
             description: 'Place details',
         },
     },

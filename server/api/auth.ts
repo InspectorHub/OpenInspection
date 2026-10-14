@@ -50,7 +50,7 @@ const loginRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: {
-                'application/json': { schema: LoginResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: LoginResponseSchema }
             },
             description: 'Login successful'
         },
@@ -101,7 +101,7 @@ const joinTeamRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: {
-                'application/json': { schema: AuthResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: AuthResponseSchema }
             },
             description: 'Team joined successfully'
         }
@@ -216,7 +216,7 @@ const setupRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: {
-                'application/json': { schema: AuthResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: AuthResponseSchema }
             },
             description: 'Success'
         },

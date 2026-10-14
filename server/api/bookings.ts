@@ -47,7 +47,7 @@ const listInspectorsRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: InspectorsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: InspectorsResponseSchema,
                 },
             },
             description: 'Success',
@@ -102,20 +102,20 @@ const getAvailabilityRoute = createRoute(withMcpMetadata({
     tags: ["bookings", "public"],
     summary: "Get booking availability for current tenant",
     request: {
-        params: z.object({ inspectorId: z.string().trim().min(1).describe('TODO describe inspectorId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ inspectorId: z.string().trim().min(1).describe('TODO describe inspectorId field for the OpenInspection MCP integration') }),
         query: z.object({
             // A-17 — the tenant slug is authoritative (B-16 pattern): this public
             // endpoint is not slug-routed, so context resolution never applies.
             tenant: z.string().min(1).openapi({ example: 'acme-inspections' }).describe('Tenant slug from the booking page URL; resolved server-side to the tenant id.'),
             start: z.string().optional().describe('TODO describe start field for the OpenInspection MCP integration'),
             end: z.string().optional().describe('TODO describe end field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
+        }),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: AvailabilityResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AvailabilityResponseSchema,
                 },
             },
             description: 'Success',

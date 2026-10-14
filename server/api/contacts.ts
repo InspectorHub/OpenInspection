@@ -30,7 +30,7 @@ const listContactsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["contacts"], summary: "List contacts for current tenant",
     middleware: [requireRole('owner', 'manager', 'inspector')],
-    request: { query: ContactListQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
+    request: { query: ContactListQuerySchema },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(ContactResponseSchema).describe('TODO describe data field for the OpenInspection MCP integration'), meta: z.object({ total: z.number().describe('TODO describe total field for the OpenInspection MCP integration') }).describe('TODO describe meta field for the OpenInspection MCP integration') }) } },
@@ -104,7 +104,7 @@ const deleteContactRoute = createRoute(withMcpMetadata({
     request: { params: z.object({ id: CONTACT_ID.describe('Contact id.') }) },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }) } },
             description: 'Deleted',
         },
     },

@@ -65,9 +65,9 @@ const markSentRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/mark-sent',
     tags: ["invoices"], summary: 'Mark invoice as sent',
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: INVOICE_ID.describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: INVOICE_ID.describe('TODO describe id field for the OpenInspection MCP integration') }) },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Success' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }) } }, description: 'Success' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "markSentInvoice",
@@ -94,9 +94,9 @@ const deleteInvoiceRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["invoices"], summary: "Delete invoice for current tenant",
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: INVOICE_ID.describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: INVOICE_ID.describe('TODO describe id field for the OpenInspection MCP integration') }) },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Deleted' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }) } }, description: 'Deleted' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "deleteInvoice",

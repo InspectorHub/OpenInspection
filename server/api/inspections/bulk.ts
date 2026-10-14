@@ -77,7 +77,7 @@ const listInspectionsRoute = createRoute(withMcpMetadata({
     description: 'Retrieve a paginated list of inspections with optional filtering.',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        query: InspectionListQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration'),
+        query: InspectionListQuerySchema,
     },
     responses: {
         200: {

@@ -33,7 +33,7 @@ const getAgreementByTokenRoute = createRoute(withMcpMetadata({
     path: '/agreements/:token',
     tags: ["bookings", "public"],
     summary: 'Get agreement for signing (public, token-gated)',
-    request: { params: z.object({ token: z.string().min(1).describe('TODO describe token field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ token: z.string().min(1).describe('TODO describe token field for the OpenInspection MCP integration') }) },
     responses: {
         200: {
             content: {
@@ -131,7 +131,7 @@ const signAgreementRoute = createRoute(withMcpMetadata({
     tags: ["bookings", "public"],
     summary: 'Submit client signature (public, token-gated)',
     request: {
-        params: z.object({ token: z.string().min(1).describe('TODO describe token field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ token: z.string().min(1).describe('TODO describe token field for the OpenInspection MCP integration') }),
         body: {
             content: {
                 'application/json': {
@@ -148,7 +148,7 @@ const signAgreementRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration') }),
                 },
             },
             description: 'Signed',
@@ -167,7 +167,7 @@ const declineAgreementRoute = createRoute(withMcpMetadata({
     tags: ["bookings", "public"],
     summary: 'Decline agreement (public, token-gated)',
     request: {
-        params: z.object({ token: z.string().min(1).describe('TODO describe token field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ token: z.string().min(1).describe('TODO describe token field for the OpenInspection MCP integration') }),
         body: {
             content: {
                 'application/json': {
@@ -178,7 +178,7 @@ const declineAgreementRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration') }) } },
             description: 'Declined',
         },
     },

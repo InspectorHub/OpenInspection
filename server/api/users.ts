@@ -38,7 +38,7 @@ const setOnboardingRoute = createRoute(withMcpMetadata({
         }).describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }) } }, description: 'OK' },
         401: { description: 'Unauthorized' },
     },
 }, { scopes: ['write'], tier: 'extended' }));

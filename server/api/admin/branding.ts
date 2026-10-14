@@ -22,7 +22,7 @@ const getBrandingRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: BrandingResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: BrandingResponseSchema,
                 },
             },
             description: 'Success',
@@ -55,7 +55,7 @@ const updateBrandingRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: BrandingResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: BrandingResponseSchema,
                 },
             },
             description: 'Success',
@@ -105,7 +105,7 @@ const uploadLogoRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ logoUrl: z.string().describe('TODO describe logoUrl field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ logoUrl: z.string().describe('TODO describe logoUrl field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }),
                 },
             },
             description: 'Success',

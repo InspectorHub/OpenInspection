@@ -37,7 +37,7 @@ const createBookingRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: BookingResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: BookingResponseSchema,
                 },
             },
             description: 'Success',

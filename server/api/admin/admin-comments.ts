@@ -58,7 +58,7 @@ const listCommentsRoute = createRoute(withMcpMetadata({
     // Inspectors need read access so the inspection-edit picker (T7+1) can
     // populate. Create/delete remain admin-only further below.
     middleware: [requireRole('owner', 'manager', 'inspector')],
-    request: { query: ListCommentsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
+    request: { query: ListCommentsQuerySchema },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(CommentResponseSchema).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
@@ -96,10 +96,10 @@ const deleteCommentRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Delete a comment library entry',
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }) },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }) } },
             description: 'Deleted',
         },
         404: { description: 'Not found' },
@@ -117,7 +117,7 @@ const updateCommentRoute = createRoute(withMcpMetadata({
     summary: 'Update a comment library entry',
     middleware: [requireRole('owner', 'manager')],
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }),
         body: { content: { 'application/json': { schema: UpdateCommentSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
