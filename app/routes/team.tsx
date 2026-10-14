@@ -6,9 +6,14 @@ import { createApi } from "~/lib/api-client.server";
 import { SeatBanner } from "~/components/SeatBanner";
 import { InviteSeatDrawer } from "~/components/modals/InviteSeatDrawer";
 import { EditMemberDrawer, type EditableMember } from "~/components/modals/EditMemberDrawer";
+import { TeamRolesReference } from "~/components/TeamRolesReference";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { InviteLinkModal, type InviteLinkTarget } from "~/components/modals/InviteLinkModal";
 import { ResetTwoFactorDialog, type ResetTwoFactorTarget } from "~/components/modals/ResetTwoFactorDialog";
+import { RemoveMemberDialog } from "~/components/modals/RemoveMemberDialog";
+import { useRemoveMember } from "~/components/modals/useRemoveMember";
+import { resolveRole } from "~/lib/access.server";
+import { relayedApiError } from "~/lib/relayed-api-error";
 import { resetMemberTwoFactor } from "./team.reset-two-factor.server";
 import { useDisplayLocale, useSessionContext } from "~/hooks/useSessionContext";
 import { importEntryHref } from "~/lib/import-entry-points";
@@ -18,7 +23,7 @@ import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 import { isAdminRole } from "~/lib/access";
-import { ROLE_TONES, expiryLabel, lastActiveLabel, type Member, type LoaderActiveUser, type LoaderInvite } from "./team.shapes";
+import { ROLE_TONES, canRemove, expiryLabel, lastActiveLabel, type Member, type LoaderActiveUser, type LoaderInvite } from "./team.shapes";
 
 export function meta() {
   return [{ title: m.settings_team_meta_title() }];
@@ -31,16 +36,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   // Resolve the caller role so the cancel affordance is hidden for inspectors
   // (server enforces owner/manager regardless — this is just UI hygiene).
-  let role: string | undefined;
-  try {
-    const ctxRes = await api.sessionContext.context.$get();
-    if (ctxRes.ok) {
-      const b = (await ctxRes.json()) as { data?: { user?: { role?: string } } };
-      role = b.data?.user?.role;
-    }
-  } catch {
-    role = undefined;
-  }
+  const role = await resolveRole(context, token);
 
   // IA-118 — a fetch failure must not be answered with an empty roster. This
   // page states who has access to the workspace; "no members" is a claim, and
@@ -84,24 +80,25 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
-  const token = await requireToken(context, request);
+  const api = createApi(context, { token: await requireToken(context, request) });
   const form = await request.formData();
-  const intent = form.get("intent") as string;
-  const api = createApi(context, { token });
+  const intent = form.get("intent");
+  const id = String(form.get("id") ?? "");
+  const inviteToken = String(form.get("token") ?? "");
 
   if (intent === "cancel-invite") {
-    const inviteToken = form.get("token") as string;
     const res = await api.team.invites[":token"].$delete({ param: { token: inviteToken } });
     return { ok: res.ok };
   }
-  if (intent === "reset-two-factor") {
-    return resetMemberTwoFactor(api, form.get("id") as string);
-  }
   if (intent === "resend-invite") {
-    const inviteToken = form.get("token") as string;
     const res = await api.team.invites[":token"].resend.$post({ param: { token: inviteToken } });
     return { ok: res.ok, resent: res.ok };
   }
+  if (intent === "remove-member") {
+    const res = await api.team.members[":id"].$delete({ param: { id } });
+    return res.ok ? { ok: true } : { ok: false, error: await relayedApiError(res) };
+  }
+  if (intent === "reset-two-factor") return resetMemberTwoFactor(api, id);
   return { ok: false };
 }
 
@@ -120,6 +117,7 @@ export default function TeamPage() {
   // a reset that silently rode a cancel's in-flight guard would be dropped.
   const { submit: submitResetTwoFactor, busy: resetTwoFactorBusy } = useGuardedSubmit<{ ok?: boolean }>();
   const [pendingReset, setPendingReset] = useState<ResetTwoFactorTarget | null>(null);
+  const removeMember = useRemoveMember();
   const resendFetcher = useFetcher<{ ok?: boolean; resent?: boolean }>();
   const resendLatch = useSubmitLatch(resendFetcher.state);
   const [pendingCancel, setPendingCancel] = useState<{ token: string; email: string } | null>(null);
@@ -129,6 +127,7 @@ export default function TeamPage() {
   // copying it.
   const [linkInvite, setLinkInvite] = useState<InviteLinkTarget | null>(null);
   const sessionCtx = useSessionContext();
+  const viewerEmail = sessionCtx?.user?.email;
   const locale = useDisplayLocale();
   const [activeTab, setActiveTab] = useState("active");
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -308,7 +307,7 @@ export default function TeamPage() {
                     <button
                       type="button"
                       onClick={() => setEditMember({
-                        id: member.id as string,
+                        id: member.id,
                         name: member.name as string | null,
                         email: member.email,
                         role: member.role as string,
@@ -324,10 +323,19 @@ export default function TeamPage() {
                           the wider admin tier — and offering it on a member
                           with no enrolment would answer with a refusal the
                           owner could have been spared. */}
+                      {canRemove(member, viewerEmail, isOwner) && (
+                        <button
+                          type="button"
+                          onClick={() => removeMember.open({ id: member.id, name: member.name || member.email })}
+                          className="text-[12px] font-medium text-ih-bad-fg hover:underline"
+                        >
+                          {m.common_remove()}
+                        </button>
+                      )}
                       {isOwner && member.totpEnabled === true && (
                         <button
                           type="button"
-                          onClick={() => setPendingReset({ id: member.id as string, email: member.email })}
+                          onClick={() => setPendingReset({ id: member.id, email: member.email })}
                           className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1"
                         >
                           {m.settings_team_reset_two_factor()}
@@ -341,23 +349,7 @@ export default function TeamPage() {
         </Card>
       )}
 
-      {/* Roles reference */}
-      <Card className="p-6">
-        <h2 className="text-sm font-bold text-ih-fg-1 mb-3">{m.settings_team_roles_heading()}</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {[
-            { role: m.settings_team_role_owner_name(), desc: m.settings_team_role_owner_desc() },
-            { role: m.settings_team_role_manager_name(), desc: m.settings_team_role_manager_desc() },
-            { role: m.settings_team_role_inspector_name(), desc: m.settings_team_role_inspector_desc() },
-            { role: m.settings_team_role_agent_name(), desc: m.settings_team_role_agent_desc() },
-          ].map((r) => (
-            <div key={r.role} className="p-3 border border-ih-border rounded-md">
-              <p className="text-[13px] font-bold text-ih-fg-1">{r.role}</p>
-              <p className="text-[12px] text-ih-fg-3 mt-0.5">{r.desc}</p>
-            </div>
-          ))}
-        </div>
-      </Card>
+      <TeamRolesReference />
 
       <ConfirmDialog
         open={pendingCancel !== null}
@@ -379,6 +371,7 @@ export default function TeamPage() {
         }}
         onCancel={() => setPendingCancel(null)}
       />
+      <RemoveMemberDialog {...removeMember.dialogProps} />
       <ResetTwoFactorDialog
         target={pendingReset}
         busy={resetTwoFactorBusy}

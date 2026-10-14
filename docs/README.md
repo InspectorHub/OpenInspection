@@ -76,6 +76,7 @@ conventions common to all of them: [`integrations/README.md`](integrations/READM
 | [`develop/testing.md`](develop/testing.md) | Five suites, where a spec lives, how to run each one |
 | [`develop/gates.md`](develop/gates.md) | The conformance gates — the registry, the two rungs, and the conventions a new gate has to meet |
 | [`develop/integration-adapters.md`](develop/integration-adapters.md) | Writing code that talks to somebody else's API — shape, credentials, failure recording, contract tests |
+| [`develop/native-clients.md`](develop/native-clients.md) | Server side of the native app: the `NATIVE_CLIENT_ENABLED` switch, OAuth `native` scope, version handshake, signed uploads, offline package import and limits, and the add-only contract |
 | [`develop/design-system.md`](develop/design-system.md) | Tokens, `packages/shared-ui`, dark mode, the `lint:ds` gate |
 | [`develop/logo-design.md`](develop/logo-design.md) | Logo construction and brand asset spec |
 | [`develop/conventions/route-metadata.md`](develop/conventions/route-metadata.md) | Metadata every `createRoute()` must declare, and the gate that enforces it |

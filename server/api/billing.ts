@@ -29,7 +29,7 @@ const summaryRoute = createRoute(withMcpMetadata({
         404: { description: 'Tenant not found' },
     },
     operationId: "listBillingSummary",
-    description: "Auto-generated placeholder for listBillingSummary (GET /summary, invoices domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the company's seat summary: its tier, the user cap (maxUsers, 1 when unset), and seatsUsed, which counts current non-removed members and excludes invitations not yet accepted. permanent mirrors seatsUsed and guests is always 0, kept only for response shape. When the deployment has a billing portal configured, portalUrl points to its billing page; otherwise it is omitted. Read-only and never contacts a payment provider. The route applies no role check of its own beyond a signed-in session. Returns 404 if the company record is missing."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const billingRoutes = createApiRouter()

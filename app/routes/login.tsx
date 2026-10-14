@@ -37,10 +37,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // here with ?returnTo=<same-origin /oauth/authorize URL>). safeReturnTo gates
   // it to same-origin paths, so an attacker can't turn this into an open
   // redirect. Absent/invalid → /inspections (unchanged behavior).
-  const returnTo = new URL(request.url).searchParams.get("returnTo");
+  const params = new URL(request.url).searchParams;
+  const returnTo = params.get("returnTo");
+  // `app=1` marks a sign-in started by the native client (the authorize
+  // endpoint adds it). It is carried through both steps so the 2FA page and its
+  // "start over" link resume the same authorization instead of dropping it.
+  const app = params.get("app") === "1";
   const token = await getToken(context, request);
   if (token) return redirect(safeReturnTo(returnTo, "/inspections"));
-  return { returnTo };
+  return { returnTo, app };
 }
 
 /**
@@ -66,7 +71,12 @@ async function completeTwoFactor(
   // would drop the challenge and send the person back to the password form —
   // which reads as "wrong password" and is how a working second factor gets
   // reported as a broken login.
-  const again = { requires2fa: true as const, challengeToken, returnTo: typeof returnTo === "string" ? returnTo : "" };
+  const again = {
+    requires2fa: true as const,
+    challengeToken,
+    returnTo: typeof returnTo === "string" ? returnTo : "",
+    app: formData.get("app") === "1",
+  };
 
   if (code.length < 6) {
     return { ...again, error: m.auth_login_2fa_error_code_required() };
@@ -150,7 +160,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     const challenge = body?.data?.requires2fa ? (body.data.challengeToken as string | undefined) : undefined;
     if (challenge) {
       const rt = formData.get("returnTo");
-      return { requires2fa: true as const, challengeToken: challenge, returnTo: typeof rt === "string" ? rt : "", error: "" };
+      return {
+        requires2fa: true as const,
+        challengeToken: challenge,
+        returnTo: typeof rt === "string" ? rt : "",
+        app: formData.get("app") === "1",
+        error: "",
+      };
     }
 
     return submission.reply({ formErrors: [m.auth_login_error_no_token()] });
@@ -163,6 +179,7 @@ export default function LoginPage() {
   const actionData = useActionData<typeof action>();
   const data = useLoaderData<typeof loader>();
   const returnTo = data && "returnTo" in data ? (data.returnTo ?? "") : "";
+  const app = data && "app" in data ? data.app : false;
   const navigation = useNavigation();
   const latch = useSubmitLatch();
   const isSubmitting = navigation.state === "submitting";
@@ -202,6 +219,7 @@ export default function LoginPage() {
         <TwoFactorChallengeForm
           challengeToken={challenge.challengeToken}
           returnTo={challenge.returnTo}
+          app={challenge.app}
           error={challenge.error || undefined}
         />
       </AuthShell>
@@ -223,6 +241,7 @@ export default function LoginPage() {
           {returnTo ? (
             <input type="hidden" name="returnTo" value={returnTo} />
           ) : null}
+          {app ? <input type="hidden" name="app" value="1" /> : null}
           {/* `reserveErrorSpace`: these fields validate on blur, and without a
               held-open error slot the message pushes the "Forgot password?"
               link down mid-click. */}

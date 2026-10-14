@@ -19,12 +19,12 @@ const listRecommendationsRoute = createRoute(withMcpMetadata({
     tags: ["recommendations"],
     summary: 'List recommendations (filter: category, severity)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { query: ListRecommendationsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
+    request: { query: ListRecommendationsQuerySchema },
     responses: {
-        200: { content: { 'application/json': { schema: RecommendationListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'List' },
+        200: { content: { 'application/json': { schema: RecommendationListResponseSchema } }, description: 'List' },
     },
     operationId: "listRecommendations",
-    description: "Auto-generated placeholder for listRecommendations (GET /, recommendations domain). TODO: replace with a real description sourced from the handler."
+    description: "List the company recommendation library, optionally filtered by category or severity."
 }, { scopes: ['read'], tier: 'primary' }));
 
 /* ── GET /api/recommendations/:id ─────────────────────────────────────────── */
@@ -32,13 +32,13 @@ const getRecommendationRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}',
     tags: ["recommendations"],
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('Recommendation id.') }) },
     responses: {
-        200: { content: { 'application/json': { schema: RecommendationResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Single recommendation' },
+        200: { content: { 'application/json': { schema: RecommendationResponseSchema } }, description: 'Single recommendation' },
     },
     operationId: "getRecommendation",
     summary: "Get recommendation for current tenant",
-    description: "Auto-generated placeholder for getRecommendation (GET /{id}, recommendations domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns one recommendation (a canned repair item with severity and repair scope) from the company library. Fails with not found when the id is unknown or belongs to an ordinary canned comment that has no repair summary. Owner, manager or inspector."
 }, { scopes: ['read'], tier: 'primary' }));
 
 /* ── POST /api/recommendations ────────────────────────────────────────────── */
@@ -46,13 +46,13 @@ const createRecommendationRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["recommendations"],
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { body: { content: { 'application/json': { schema: CreateRecommendationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: CreateRecommendationSchema } } } },
     responses: {
-        200: { content: { 'application/json': { schema: RecommendationResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' },
+        200: { content: { 'application/json': { schema: RecommendationResponseSchema } }, description: 'Created' },
     },
     operationId: "createRecommendation",
     summary: "Create recommendation for current tenant",
-    description: "Auto-generated placeholder for createRecommendation (POST /, recommendations domain). TODO: replace with a real description sourced from the handler."
+    description: "Adds a recommendation to the company library: a name, a severity, a repair-scope summary and optionally a category and suggested contractor type. Stored alongside the canned-comment library. Owner, manager or inspector. Writes an audit entry (recommendation.created). Returns the created recommendation."
 }, { scopes: ['write'], tier: 'primary' }));
 
 /* ── PUT /api/recommendations/:id ─────────────────────────────────────────── */
@@ -61,15 +61,15 @@ const replaceRecommendationRoute = createRoute(withMcpMetadata({
     tags: ["recommendations"],
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: UpdateRecommendationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().trim().min(1).describe('Recommendation id.') }),
+        body: { content: { 'application/json': { schema: UpdateRecommendationSchema } } },
     },
     responses: {
-        200: { content: { 'application/json': { schema: RecommendationResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Updated' },
+        200: { content: { 'application/json': { schema: RecommendationResponseSchema } }, description: 'Updated' },
     },
     operationId: "replaceRecommendation",
     summary: "Replace recommendation for current tenant",
-    description: "Auto-generated placeholder for replaceRecommendation (PUT /{id}, recommendations domain). TODO: replace with a real description sourced from the handler."
+    description: "Update a recommendation in the company library. Despite the PUT verb it is a partial update: only the fields sent change. Returns 404 when the id is unknown or belongs to an ordinary canned comment with no repair summary. Writes a recommendation.updated audit entry and marks the entry as edited, since recommendations share storage with the canned-comment library. Owner, manager or inspector."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /* ── DELETE /api/recommendations/:id ──────────────────────────────────────── */
@@ -77,13 +77,13 @@ const deleteRecommendationRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["recommendations"],
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('Recommendation id.') }) },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ deleted: z.literal(true).describe('TODO describe deleted field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Deleted' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('True when the request succeeded.'), data: z.object({ deleted: z.literal(true).describe('True when the recommendation was deleted.') }).describe('Response payload.') }) } }, description: 'Deleted' },
     },
     operationId: "deleteRecommendation",
     summary: "Delete recommendation for current tenant",
-    description: "Auto-generated placeholder for deleteRecommendation (DELETE /{id}, recommendations domain). TODO: replace with a real description sourced from the handler."
+    description: "Permanently deletes a recommendation from the company library. Owner, manager or inspector. Writes an audit entry (recommendation.deleted)."
 }, { scopes: ['write'], tier: 'primary' }));
 
 /* ── POST /api/recommendations/seed-defaults ──────────────────────────────── */
@@ -95,12 +95,12 @@ const seedDefaultsRecommendationRoute = createRoute(withMcpMetadata({
     request: {},
     responses: {
         200: { content: { 'application/json': { schema: z.object({
-            success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-            data: z.object({ inserted: z.number().describe('TODO describe inserted field for the OpenInspection MCP integration'), skipped: z.number().describe('TODO describe skipped field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+            success: z.literal(true).describe('True when the request succeeded.'),
+            data: z.object({ inserted: z.number().describe('Number of default recommendations added.'), skipped: z.number().describe('Number of default recommendations skipped because they already exist.') }).describe('Response payload.'),
         }) } }, description: 'Bulk seed result' },
     },
     operationId: "seedDefaultsRecommendation",
-    description: "Auto-generated placeholder for seedDefaultsRecommendation (POST /seed-defaults, recommendations domain). TODO: replace with a real description sourced from the handler."
+    description: "Load the built-in starter set of recommendations into the company library. An entry whose category and name already exist as a recommendation is skipped, so repeating the call is safe and adds only what is missing; the response counts how many were inserted and skipped. Takes no body and writes no audit entry. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const recommendationsRoutes = createApiRouter()

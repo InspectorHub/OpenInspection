@@ -5,5 +5,5 @@ import { z } from '@hono/zod-openapi';
 // OnboardingWorkflow to populate a newly-provisioned tenant with starter
 // content. Idempotent — re-runs return all-zero counts.
 export const SeedStarterContentBodySchema = z.object({
-    tenantId: z.string().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+    tenantId: z.string().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Id of the freshly provisioned company that the starter content (templates, comments, recommendations and similar) is seeded into. The call is idempotent, so repeating it seeds nothing new.'),
 }).openapi('SeedStarterContentBody');

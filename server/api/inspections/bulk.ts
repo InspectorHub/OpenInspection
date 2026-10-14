@@ -62,7 +62,7 @@ const dashboardRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "dashboardInspection",
-    description: "Auto-generated placeholder for dashboardInspection (GET /dashboard, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the inspection dashboard in one response, as buckets of inspections for the whole company (not filtered to the caller): needsAttention, today, thisWeek (after today through 7 days ahead), later (beyond 7 days, capped at the first 50, with laterTotal giving the full count), recentReports (completed with a published report) and cancelled (cancelled in the last 30 days judged by creation time, at most 20). The today, thisWeek and later buckets exclude cancelled inspections. Each row carries defect counts, agent name and status flags. Also returns conciergePending, the number of agent bookings awaiting inspector approval (0 if that lookup fails), and defectAggregate. needsAttention uses the company's attention thresholds (see the attention thresholds route). Dates are compared as UTC calendar days. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -77,13 +77,13 @@ const listInspectionsRoute = createRoute(withMcpMetadata({
     description: 'Retrieve a paginated list of inspections with optional filtering.',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        query: InspectionListQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration'),
+        query: InspectionListQuerySchema,
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: InspectionListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: InspectionListResponseSchema,
                 },
             },
             description: 'Success',
@@ -106,14 +106,14 @@ const listInspectorsRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.boolean().openapi({ example: true }).describe('TODO describe success field for the OpenInspection MCP integration'),
+                        success: z.boolean().openapi({ example: true }),
                         data: z.array(z.object({
-                            id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-                            email: z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
-                            role: z.string().describe('TODO describe role field for the OpenInspection MCP integration'),
+                            id: z.string(),
+                            email: z.string(),
+                            role: z.string(),
                             // Handler returns raw service rows; createdAt is a Date instance.
-                            createdAt: z.date().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-                        })).describe('TODO describe data field for the OpenInspection MCP integration'),
+                            createdAt: z.date(),
+                        })),
                     }),
                 },
             },
@@ -121,7 +121,7 @@ const listInspectorsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listInspectionInspectors",
-    description: "Auto-generated placeholder for listInspectionInspectors (GET /inspectors, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists every user account of the company, not only users with the inspector role, for assignee pickers: id, email, role, creation time, and whether a calendar is connected and when it last synced. Owners, managers and inspectors are all included; pending invitations are not. Not paginated. Read-only. Available to owner, manager and inspector roles, so inspectors can see colleagues' email addresses."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -137,7 +137,7 @@ const bulkUpdateRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: BulkInspectionSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: BulkInspectionSchema.describe('The inspections to change, the action to apply to all of them, and the inspector or status that action needs.'),
                 },
             },
         },
@@ -153,7 +153,7 @@ const bulkUpdateRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ count: z.number().describe('TODO describe count field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ count: z.number() })),
                 },
             },
             description: 'Success',
@@ -179,7 +179,7 @@ const getCountsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "countsInspection",
-    description: "Auto-generated placeholder for countsInspection (GET /counts, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns six counts across all of the company's inspections for the list tabs: all; today (scheduled date is today, UTC); upcoming (dated after today and not completed or cancelled); past (dated before today, or completed or cancelled); needsConfirmation (status scheduled or requested); awaitingReport (completed with the report not yet published). Cancelled inspections are counted in all and past. The tab counts overlap, so they do not sum to all. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // IA-6 — GET /api/inspections/schedule-conflicts

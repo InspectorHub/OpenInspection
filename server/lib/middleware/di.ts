@@ -210,11 +210,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     // returns undefined when SYNC_QUEUE is absent (standalone)
                     // → AuthService.append no-ops (guarded by `if (this.outbox)`),
                     // so no portal code runs and no dead sync_outbox rows accumulate.
-                    target.auth = new AuthService(
-                        c.env.DB,
-                        c.env.TENANT_CACHE,
-                        buildOutbox(),
-                    );
+                    target.auth = new AuthService(c.env.DB, c.env.TENANT_CACHE, buildOutbox(), (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER);
                     break;
                 case 'outbox':
                     // SaaS-only: concrete sink exists only when SYNC_QUEUE is
@@ -263,8 +259,8 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'team':
                     // Removal emits `user.deleted`, writes a `pwchanged` marker,
-                    // and revokes MCP grants (OAUTH_PROVIDER is only on env when
-                    // MCP_ENABLED — lib/mcp/oauth-provider.ts).
+                    // and revokes OAuth grants (OAUTH_PROVIDER is only on env when
+                    // MCP or native clients are enabled — lib/mcp/oauth-provider.ts).
                     target.team = new TeamService(c.env.DB, buildOutbox(), c.env.TENANT_CACHE, (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER);
                     break;
                 case 'template':

@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from '../shared.schema';
-import { ROLES } from '../../auth/roles';
+import { ROLES, ROLE } from '../../auth/roles';
 import { TOGGLEABLE, type Capability } from '../../auth/capabilities';
 
 /**
@@ -74,9 +74,12 @@ export function resolvedCapabilitySchema() {
  * Validation schema for inviting a new team member.
  */
 export const InviteMemberSchema = z.object({
-    email: z.string().email('Invalid email address').openapi({ example: 'new-user@example.com' }).describe('TODO describe email field for the OpenInspection MCP integration'),
-    role: z.enum(ROLES)
-        .default('inspector').openapi({ example: 'inspector' }).describe('TODO describe role field for the OpenInspection MCP integration'),
+    email: z.string().email('Invalid email address').openapi({ example: 'new-user@example.com' }).describe('Email address the invitation is sent to'),
+    // Not `agent`: agents are granted access per inspection and are never team
+    // members (TeamService.updateMember refuses the same role for the same
+    // reason). Offering it here would be a second, contradictory way in.
+    role: z.enum([ROLE.OWNER, ROLE.MANAGER, ROLE.INSPECTOR])
+        .default('inspector').openapi({ example: 'inspector' }).describe('Role the new member gets: owner, manager or inspector (default inspector). Only an owner may invite an owner. Agents are never invited as team members'),
     // Role permission-template overrides (2026-06-13). Optional sparse map of
     // every toggleable capability. Only differing-from-template keys are sent;
     // TeamService stores the diff (or null when nothing differs) and it is
@@ -114,46 +117,46 @@ export const UpdateMemberSchema = z.object({
  * Validation schema for the GDPA data erasure request.
  */
 export const DataErasureSchema = z.object({
-    clientEmail: z.string().email('Invalid email address').openapi({ example: 'client-to-delete@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
+    clientEmail: z.string().email('Invalid email address').openapi({ example: 'client-to-delete@example.com' }).describe('Email address of the client (data subject) to erase; matched against this company\'s contact records'),
 }).openapi('DataErasure');
 
 /**
  * Response Schemas
  */
 export const AdminExportResponseSchema = createApiResponseSchema(z.object({
-    exportedAt: z.string().openapi({ example: '2024-04-09T10:00:00Z' }).describe('TODO describe exportedAt field for the OpenInspection MCP integration'),
-    tenantId: z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    inspections: z.array(z.record(z.string(), z.any())).describe('TODO describe inspections field for the OpenInspection MCP integration'),
-    templates: z.array(z.record(z.string(), z.any())).describe('TODO describe templates field for the OpenInspection MCP integration'),
-    agreements: z.array(z.record(z.string(), z.any())).describe('TODO describe agreements field for the OpenInspection MCP integration'),
-    inspectionResults: z.array(z.record(z.string(), z.any())).describe('TODO describe inspectionResults field for the OpenInspection MCP integration'),
+    exportedAt: z.string().openapi({ example: '2024-04-09T10:00:00Z' }),
+    tenantId: z.string().trim().min(1),
+    inspections: z.array(z.record(z.string(), z.any())),
+    templates: z.array(z.record(z.string(), z.any())),
+    agreements: z.array(z.record(z.string(), z.any())),
+    inspectionResults: z.array(z.record(z.string(), z.any())),
 })).openapi('AdminExportResponse');
 
 export const MemberListResponseSchema = createApiResponseSchema(z.array(z.object({
-    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-    email: z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
-    role: z.string().describe('TODO describe role field for the OpenInspection MCP integration'),
-    createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1),
+    email: z.string(),
+    role: z.string(),
+    createdAt: z.string(),
     calendarConnected: z.boolean().describe('Whether this member has a connected Google calendar'),
     calendarLastSyncAt: z.number().nullable().describe('Epoch ms of the last successful Google busy pull; null when never synced'),
 }))).openapi('MemberListResponse');
 
 export const AuditLogResponseSchema = createApiResponseSchema(z.object({
     items: z.array(z.object({
-        id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-        action: z.string().describe('TODO describe action field for the OpenInspection MCP integration'),
-        entityType: z.string().describe('TODO describe entityType field for the OpenInspection MCP integration'),
-        metadata: z.any().nullable().describe('TODO describe metadata field for the OpenInspection MCP integration'),
-        ipAddress: z.string().nullable().describe('TODO describe ipAddress field for the OpenInspection MCP integration'),
-        createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-        userId: z.string().trim().min(1).nullable().describe('TODO describe userId field for the OpenInspection MCP integration'),
-    })).describe('TODO describe items field for the OpenInspection MCP integration'),
-    nextCursor: z.string().nullable().describe('TODO describe nextCursor field for the OpenInspection MCP integration'),
+        id: z.string().trim().min(1),
+        action: z.string(),
+        entityType: z.string(),
+        metadata: z.any().nullable(),
+        ipAddress: z.string().nullable(),
+        createdAt: z.string(),
+        userId: z.string().trim().min(1).nullable(),
+    })),
+    nextCursor: z.string().nullable(),
 })).openapi('AuditLogResponse');
 
 export const InviteResponseSchema = createApiResponseSchema(z.object({
-    inviteLink: z.string().describe('TODO describe inviteLink field for the OpenInspection MCP integration'),
-    expiresAt: z.string().describe('TODO describe expiresAt field for the OpenInspection MCP integration'),
+    inviteLink: z.string(),
+    expiresAt: z.string(),
 })).openapi('InviteResponse');
 
 /**
@@ -228,10 +231,10 @@ export const EraseDataResponseSchema = createApiResponseSchema(z.object({
 
 export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
     members: z.array(z.object({
-        id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
+        id: z.string().trim().min(1),
         name: z.string().nullable().describe("The member's display name; null when never set (renders as 'Unnamed')."),
-        email: z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
-        role: z.string().describe('TODO describe role field for the OpenInspection MCP integration'),
+        email: z.string(),
+        role: z.string(),
         // Named bits, not `z.record(z.string(), z.boolean())`. The column holds a
         // SPARSE map (`PermissionOverrides` = `Partial<CapabilitySet>`), so a
         // record-of-required-booleans described a payload the server never sends
@@ -243,14 +246,14 @@ export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
         // this list is readable by every inspector, and the page needs exactly
         // one bit — whether there is a second factor for an owner to clear.
         totpEnabled: z.boolean().describe('Whether this member has two-factor authentication enrolled. An owner can clear it from the team page when they have lost both their authenticator and their recovery codes.'),
-        createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-    })).describe('TODO describe members field for the OpenInspection MCP integration'),
+        createdAt: z.string(),
+    })),
     invites: z.array(z.object({
-        id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-        email: z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
-        role: z.string().describe('TODO describe role field for the OpenInspection MCP integration'),
-        status: z.string().describe('TODO describe status field for the OpenInspection MCP integration'),
-        expiresAt: z.string().describe('TODO describe expiresAt field for the OpenInspection MCP integration'),
+        id: z.string(),
+        email: z.string(),
+        role: z.string(),
+        status: z.string(),
+        expiresAt: z.string(),
         // The SAME string the invitation email carries, built from the same
         // deployment base URL. It is here rather than composed by the caller
         // because a client that pastes its own origin in front of the token
@@ -260,7 +263,7 @@ export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
         // wrong one. `id` above already IS the token, so this exposes nothing
         // the response did not already carry.
         inviteLink: z.string().describe('Absolute accept URL for this invitation — identical to the one emailed.'),
-    })).describe('TODO describe invites field for the OpenInspection MCP integration'),
+    })),
 })).openapi('TeamMembersResponse');
 
 /**

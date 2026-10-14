@@ -152,7 +152,7 @@ const photoUploadRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'multipart/form-data': { schema: z.object({ photo: z.any().describe('Profile photo file — jpg, png, or webp; max 2 MB.') }).describe('TODO describe schema field for the OpenInspection MCP integration') },
+                'multipart/form-data': { schema: z.object({ photo: z.any().describe('Profile photo file — jpg, png, or webp; max 2 MB.') }).describe('Multipart form carrying the profile photo file in the photo field.') },
             },
         },
     },
@@ -160,13 +160,13 @@ const photoUploadRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ photoUrl: z.string().describe('TODO describe photoUrl field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ photoUrl: z.string() })),
                 },
             },
             description: 'Uploaded',
         },
     },
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'excluded' }));
 
 const profileRoutes = createApiRouter()
     .openapi(getProfileRoute, async (c) => {

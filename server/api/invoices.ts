@@ -36,42 +36,42 @@ const listInvoicesRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('financial')],
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(InvoiceResponseSchema).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.array(InvoiceResponseSchema) }) } },
             description: 'Success',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "listInvoices",
-    description: "Auto-generated placeholder for listInvoices (GET /, invoices domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists all of the company's invoices, newest first, including voided ones (status void). Amounts are integer cents. Requires the financial capability and the owner, manager or inspector role. Not paged."
 }, { scopes: ['read'], tier: 'primary', capability: 'financial' }));
 
 const createInvoiceRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["invoices"], summary: "Create invoice for current tenant",
     middleware: [requireRole('owner', 'manager')],
-    request: { body: { content: { 'application/json': { schema: CreateInvoiceSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: CreateInvoiceSchema.describe('Details of the invoice to create: who is billed, the amount in integer cents, optional line items, due date and linked inspection.') } } } },
     responses: {
         201: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ invoice: InvoiceResponseSchema.describe('TODO describe invoice field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ invoice: InvoiceResponseSchema }) }) } },
             description: 'Created',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "createInvoice",
-    description: "Auto-generated placeholder for createInvoice (POST /, invoices domain). TODO: replace with a real description sourced from the handler."
+    description: "Creates a draft invoice with a company-unique invoice number, in the company's configured currency (USD if unset). Owner or manager only. Does not email the client; use the request-payment route to send one. When inspectionId is given, any deposit already held for that inspection is applied to the invoice. Fires the invoice.created automation and, if QuickBooks is connected, pushes the invoice there in the background."
 }, { scopes: ['write'], tier: 'primary' }));
 
 const markSentRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/mark-sent',
     tags: ["invoices"], summary: 'Mark invoice as sent',
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: INVOICE_ID.describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: INVOICE_ID.describe('Invoice to mark as sent.') }) },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Success' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Success' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "markSentInvoice",
-    description: "Auto-generated placeholder for markSentInvoice (POST /{id}/mark-sent, invoices domain). TODO: replace with a real description sourced from the handler."
+    description: "Record that an invoice has been sent by stamping its sent time with the current time, which moves a draft to sent (an invoice that is already paid, partly paid or void keeps that status). Nothing is emailed to the client; use the request-payment route to send one. When QuickBooks is configured for the deployment the invoice is also upserted into QuickBooks in the background. Returns 404 for an unknown invoice. Repeating the call restamps the sent time. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const markPaidRoute = createRoute(withMcpMetadata({
@@ -94,13 +94,13 @@ const deleteInvoiceRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["invoices"], summary: "Delete invoice for current tenant",
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: INVOICE_ID.describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: INVOICE_ID.describe('Id of the invoice to void.') }) },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Deleted' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Deleted' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "deleteInvoice",
-    description: "Auto-generated placeholder for deleteInvoice (DELETE /{id}, invoices domain). TODO: replace with a real description sourced from the handler."
+    description: "Voids the invoice rather than erasing it: the row is kept for the audit trail and its status becomes void. Repeating the call is harmless. Owner or manager only. Re-syncs the linked inspection's payment gate and, if QuickBooks is connected, voids the invoice there in the background. Fails with not found for an unknown id."
 }, { scopes: ['write'], tier: 'primary' }));
 
 /**

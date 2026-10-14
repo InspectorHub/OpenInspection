@@ -43,7 +43,7 @@ const sendReportPdfRoute = createRoute(withMcpMetadata({
     summary: 'Send the inspection report to one or more role-keyed recipients',
     middleware: [requireRole('owner', 'manager', 'inspector')],
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection whose report is sent.') }),
         body: {
             content: {
                 'application/json': { schema: SendReportSchema },
@@ -72,7 +72,7 @@ const getReportDataRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Get structured report data',
     request: {
-        params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().describe('Inspection id.') }),
     },
     responses: {
         200: {
@@ -85,7 +85,7 @@ const getReportDataRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listInspectionReportData",
-    description: "Auto-generated placeholder for listInspectionReportData (GET /{id}/report-data, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Return the structured report payload of an inspection: header facts, rating levels, rating counts and sections with their items."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -97,37 +97,37 @@ const getReportDataRoute = createRoute(withMcpMetadata({
  * service via a server-side render at /inspections/:id/repair-list.
  */
 const RepairListEntrySchema = z.object({
-    sectionId:           z.string().describe('TODO describe sectionId field for the OpenInspection MCP integration'),
-    sectionTitle:        z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
-    itemId:              z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
-    itemLabel:           z.string().describe('TODO describe itemLabel field for the OpenInspection MCP integration'),
-    comment:             z.string().describe('TODO describe comment field for the OpenInspection MCP integration'),
-    location:            z.string().nullable().describe('TODO describe location field for the OpenInspection MCP integration'),
-    category:            z.enum(['safety', 'recommendation', 'maintenance']).describe('TODO describe category field for the OpenInspection MCP integration'),
-    recommendationId:    z.string().nullable().describe('TODO describe recommendationId field for the OpenInspection MCP integration'),
-    recommendationLabel: z.string().nullable().describe('TODO describe recommendationLabel field for the OpenInspection MCP integration'),
+    sectionId:           z.string(),
+    sectionTitle:        z.string(),
+    itemId:              z.string(),
+    itemLabel:           z.string(),
+    comment:             z.string(),
+    location:            z.string().nullable(),
+    category:            z.enum(['safety', 'recommendation', 'maintenance']),
+    recommendationId:    z.string().nullable(),
+    recommendationLabel: z.string().nullable(),
     // No estimateLow / estimateHigh: the platform publishes no repair price,
     // and this response is on the MCP `extended` tier (see
     // scripts/check-price-capability.mjs).
-    photos:              z.array(z.object({ key: z.string().describe('TODO describe key field for the OpenInspection MCP integration'), url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') })).describe('TODO describe photos field for the OpenInspection MCP integration'),
-    source:              z.enum(['canned', 'custom']).describe('TODO describe source field for the OpenInspection MCP integration'),
+    photos:              z.array(z.object({ key: z.string(), url: z.string() })),
+    source:              z.enum(['canned', 'custom']),
 });
 const RepairListResponseSchema = z.object({
     inspection: z.object({
-        id:              z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-        propertyAddress: z.string().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
-        date:            z.string().nullable().describe('TODO describe date field for the OpenInspection MCP integration'),
-        inspectorName:   z.string().nullable().describe('TODO describe inspectorName field for the OpenInspection MCP integration'),
-    }).describe('TODO describe inspection field for the OpenInspection MCP integration'),
-    defects: z.array(RepairListEntrySchema).describe('TODO describe defects field for the OpenInspection MCP integration'),
+        id:              z.string(),
+        propertyAddress: z.string(),
+        date:            z.string().nullable(),
+        inspectorName:   z.string().nullable(),
+    }),
+    defects: z.array(RepairListEntrySchema),
     totals: z.object({
-        count:           z.number().describe('TODO describe count field for the OpenInspection MCP integration'),
-        safety:          z.number().describe('TODO describe safety field for the OpenInspection MCP integration'),
-        recommendation:  z.number().describe('TODO describe recommendation field for the OpenInspection MCP integration'),
-        maintenance:     z.number().describe('TODO describe maintenance field for the OpenInspection MCP integration'),
+        count:           z.number(),
+        safety:          z.number(),
+        recommendation:  z.number(),
+        maintenance:     z.number(),
         // Counts, not money — `estimateLowSum` / `estimateHighSum` are gone.
-    }).describe('TODO describe totals field for the OpenInspection MCP integration'),
-    showEstimates: z.boolean().describe('TODO describe showEstimates field for the OpenInspection MCP integration'),
+    }),
+    showEstimates: z.boolean(),
 });
 
 const getRepairListRoute = createRoute(withMcpMetadata({
@@ -136,7 +136,7 @@ const getRepairListRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Get aggregated repair list (defects-only punch list)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('Id of the inspection whose repair list to return.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: createApiResponseSchema(RepairListResponseSchema) } },
@@ -144,7 +144,7 @@ const getRepairListRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listInspectionRepairList",
-    description: "Auto-generated placeholder for listInspectionRepairList (GET /{id}/repair-list, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the inspection's repair list: a flat list of every defect marked as included in the report, both defects picked from the template's canned comments and custom ones the inspector added, each with section and item, comment, location, category (safety, recommendation or maintenance), recommendation, photos and a source flag (canned or custom). Defects marked as not included are omitted. totals gives the overall count and a count per category; no repair costs are published. Custom defects carry no photos in this list. Returns 404 when the inspection is not in this company. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -158,15 +158,15 @@ const recipientsRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'List the recipients eligible for the Publish modal',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('Id of the inspection whose eligible recipients to list.') }) },
     responses: {
         200: {
-            content: { 'application/json': { schema: InspectionRecipientsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: InspectionRecipientsResponseSchema } },
             description: 'Recipient list',
         },
     },
     operationId: "listInspectionRecipients",
-    description: "Auto-generated placeholder for listInspectionRecipients (GET /{id}/recipients, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the people the Publish dialog can send the report to for one inspection: the client, the buyer's agent and the listing agent, as {contactId, name, role (client, agent_buyer or agent_listing), email, phone}. People in other roles (such as co-clients or attorneys) and people with neither an email nor a phone are left out. Returns 404 when the inspection is not in this company. Read-only; sends nothing. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -205,19 +205,19 @@ const refreshPdfRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Refresh PDF renders (Summary + Full)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('Inspection whose report PDFs are re-rendered.') }) },
     responses: {
         202: {
             content: { 'application/json': { schema: createApiResponseSchema(z.object({
-                status: z.string().describe('TODO describe status field for the OpenInspection MCP integration'),
-                summary: z.string().describe('TODO describe summary field for the OpenInspection MCP integration'),
-                full: z.string().describe('TODO describe full field for the OpenInspection MCP integration'),
+                status: z.string(),
+                summary: z.string(),
+                full: z.string(),
             })) } },
             description: 'PDF renders enqueued',
         },
     },
     operationId: "refreshInspection",
-    description: "Auto-generated placeholder for refreshInspection (POST /{id}/pdf/refresh, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Force a fresh render of both report PDFs (Summary and Full) for an inspection. Marks both as queued, answers 202 immediately and renders in the background, replacing the stored PDF for the current version rather than an archived one; poll the PDF download route for the result. Returns 403 when the PDF pipeline is switched off for the company (Settings, Reports). The inspection id is not checked for existence. Safe to repeat, each call just queues another render. Restricted to owners, managers and inspectors."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // ── Commercial PCA Phase W Task 4 — .docx export status + download ─────────
@@ -302,17 +302,17 @@ const downloadPdfRoute = createRoute(withMcpMetadata({
     summary: 'Download report PDF (Summary or Full)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        query: z.object({ type: z.enum(['summary', 'full']).default('full').describe('TODO describe type field for the OpenInspection MCP integration') }).describe('TODO describe query field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().describe('Id of the inspection whose report PDF to download.') }),
+        query: z.object({ type: z.enum(['summary', 'full']).default('full').describe('Which PDF to download: summary or the full report.') }),
     },
     responses: {
         200: {
-            content: { 'application/pdf': { schema: z.any().describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/pdf': { schema: z.any() } },
             description: 'PDF bytes',
         },
     },
     operationId: "listInspectionPdf",
-    description: "Auto-generated placeholder for listInspectionPdf (GET /{id}/pdf, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Downloads the inspection's report PDF as an attachment, either the full report (default) or the summary. Always renders the current content: a stored render is reused when the report content is unchanged, otherwise it is rendered on demand, so a first call can be slow; frozen per-version PDFs are not served here. Returns 503 when the deployment has no PDF rendering or storage configured, 404 when the inspection is not in this company or the stored file is missing. Responses are marked private with a 5 minute cache lifetime. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 
@@ -534,15 +534,15 @@ const reportDeliveryRoutes = createApiRouter()
         tags: ["inspections"],
         summary: 'Generate shareable agent view token',
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+        request: { params: z.object({ id: z.string().describe('Inspection the agent view link is for.') }) },
         responses: {
             200: {
-                content: { 'application/json': { schema: createApiResponseSchema(z.object({ token: z.string().describe('TODO describe token field for the OpenInspection MCP integration'), url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') })) } },
+                content: { 'application/json': { schema: createApiResponseSchema(z.object({ token: z.string().describe('The newly minted agent view token, also embedded in the url field.'), url: z.string().describe('Full report URL ending in the agent view query string, ready to share with the agent.') })) } },
                 description: 'Agent view token and URL',
             },
         },
         operationId: "createInspectionAgentToken",
-        description: "Auto-generated placeholder for createInspectionAgentToken (POST /{id}/agent-token, inspections domain). TODO: replace with a real description sourced from the handler."
+        description: "Mint a read-only agent view link for an inspection report. Stores a new token that expires after 30 days and returns it with the full report URL (?view=agent&token=...). Nothing is sent: the caller delivers the link. Every call mints a new token and earlier tokens keep working until they expire. Returns 404 for an unknown inspection. Restricted to owners, managers and inspectors."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId') as string;
         const { id } = c.req.valid('param');
@@ -556,15 +556,15 @@ const reportDeliveryRoutes = createApiRouter()
         tags: ["inspections"],
         summary: 'Email the report share link to the linked agent',
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+        request: { params: z.object({ id: z.string().describe('Inspection whose report link is emailed to the buyer agent.') }) },
         responses: {
             200: {
-                content: { 'application/json': { schema: createApiResponseSchema(z.object({ sentTo: z.string().describe('TODO describe sentTo field for the OpenInspection MCP integration') })) } },
+                content: { 'application/json': { schema: createApiResponseSchema(z.object({ sentTo: z.string().describe('Email address of the buyer agent the report link was sent to.') })) } },
                 description: 'Share link emailed to agent',
             },
         },
         operationId: "createInspectionShareAgent",
-        description: "Auto-generated placeholder for createInspectionShareAgent (POST /{id}/share-agent, inspections domain). TODO: replace with a real description sourced from the handler."
+        description: "Email the report link to the inspection's buyer agent. Mints a new agent view token (valid 30 days), builds the agent view URL and sends it to the email on the buyer agent contact, with the inspector's signature appended, then writes an inspection.share_agent audit entry. Returns 400 when no buyer agent is linked to the inspection or that contact has no email, 404 for an unknown inspection and 500 if the email fails to send. Each call sends another email with a new token. Restricted to owners, managers and inspectors."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');

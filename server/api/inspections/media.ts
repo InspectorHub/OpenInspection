@@ -20,7 +20,6 @@ import {
     MovePhotoSchema,
 } from '../../lib/validations/inspection.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
-
 /**
  * Photo Upload
  *
@@ -36,16 +35,16 @@ const uploadPhotoRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "Upload inspection for current tenant",
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection the photo is stored under.') }),
         body: {
             content: {
                 'multipart/form-data': {
                     schema: z.object({
-                        file: z.unknown().openapi({ type: 'string', format: 'binary' }).describe('TODO describe file field for the OpenInspection MCP integration'),
-                        itemId: z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
-                        targetType: z.enum(['item', 'defect']).optional().describe('TODO describe targetType field for the OpenInspection MCP integration'),
-                        customId: z.string().optional().describe('TODO describe customId field for the OpenInspection MCP integration'),
-                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                        file: z.unknown().openapi({ type: 'string', format: 'binary' }).describe('The photo to upload.'),
+                        itemId: z.string().describe('Id of the checklist item the photo is for. Required and echoed back, but not used to place the file.'),
+                        targetType: z.enum(['item', 'defect']).optional().describe('Whether the photo is for the item itself or for one of its custom defect rows.'),
+                        customId: z.string().optional().describe('Id of the custom defect row the photo is for. Required when targetType is defect and echoed back.'),
+                    }).describe('Multipart form with the photo file and the item it is meant for.'),
                 },
             },
         },
@@ -56,10 +55,10 @@ const uploadPhotoRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: createApiResponseSchema(z.object({
-                        key: z.string().describe('TODO describe key field for the OpenInspection MCP integration'),
-                        targetType: z.enum(['item', 'defect']).describe('TODO describe targetType field for the OpenInspection MCP integration'),
-                        itemId: z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
-                        customId: z.string().nullable().describe('TODO describe customId field for the OpenInspection MCP integration'),
+                        key: z.string(),
+                        targetType: z.enum(['item', 'defect']),
+                        itemId: z.string(),
+                        customId: z.string().nullable(),
                     })),
                 },
             },
@@ -67,8 +66,8 @@ const uploadPhotoRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "uploadInspection",
-    description: "Auto-generated placeholder for uploadInspection (POST /{id}/upload, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' }));
+    description: "Uploads one photo file (multipart) to the inspection's photo storage and returns its storage key. This route only stores the file: it does not add the photo to any checklist item or to the media pool, so the client must record the returned key itself. itemId must be present but is not used to place the file, and targetType and customId are only validated and echoed back (customId is required when targetType is defect). Location data is stripped from the image where the image service is available. Each call stores a new file. Responds 400 when storage is unavailable or file or itemId is missing. Available to owner, manager and inspector roles."
+}, { scopes: ['write'], tier: 'excluded' }));
 
 /* ── A-9 — Inspection photo serve ─────────────────────────────────────────
  * Item + pool photos are referenced across the editor (SideRail, PhotoStudio)
@@ -115,7 +114,7 @@ const mediaCenterRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Media Center — all attached + pool photos',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection whose photos to list.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: createApiResponseSchema(MediaCenterResponseSchema) } },
@@ -123,7 +122,7 @@ const mediaCenterRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listInspectionMedia",
-    description: "Auto-generated placeholder for listInspectionMedia (GET /{id}/media, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the photo library of one inspection in two lists. attached holds photos already placed on checklist items or defects, each with its item and section labels (taken from the inspection's own template snapshot, falling back to the item id when there is none), photoIndex, an annotated flag and the original key to revert to. pool holds loose photos uploaded to the inspection but not yet attached to any item, with upload time and optional taken-at time. Not paginated. Returns 404 when the inspection is not in this company. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const mediaUploadRoute = createRoute(withMcpMetadata({
@@ -133,18 +132,18 @@ const mediaUploadRoute = createRoute(withMcpMetadata({
     summary: 'Upload a photo to the inspection media pool (loose, unattached)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection the photo is uploaded to.') }),
         body: {
             content: {
                 'multipart/form-data': {
                     schema: z.object({
-                        file:    z.unknown().openapi({ type: 'string', format: 'binary' }).describe('TODO describe file field for the OpenInspection MCP integration'),
+                        file:    z.unknown().openapi({ type: 'string', format: 'binary' }).describe('The photo to add to the media pool.'),
                         // Optional EXIF take-time as epoch milliseconds — the
                         // client-side photo picker extracts this when the
                         // browser exposes File.lastModified or an EXIF parser
                         // is available.
-                        takenAt: z.coerce.number().int().nonnegative().optional().describe('TODO describe takenAt field for the OpenInspection MCP integration'),
-                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                        takenAt: z.coerce.number().int().nonnegative().optional().describe('When the photo was taken, as Unix milliseconds, if the client can read it from the image. Stored with the pool entry; a missing or non-positive value is treated as unknown.'),
+                    }).describe('Multipart form with the photo file and an optional time it was taken.'),
                 },
             },
         },
@@ -155,9 +154,9 @@ const mediaUploadRoute = createRoute(withMcpMetadata({
             description: 'Pool photo created',
         },
     },
-    operationId: "uploadInspection",
-    description: "Auto-generated placeholder for uploadInspection (POST /{id}/media/upload, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' }));
+    operationId: "uploadInspectionMedia",
+    description: "Uploads one photo to the inspection's media pool, the holding area for photos not yet attached to a checklist item, and returns the pool entry with an authenticated URL to view it. The file is stored in photo storage (location data stripped where the image service is available) and a pool row is created; attach it to an item later with the attach route. Each call creates a new entry. Responds 400 when storage is unavailable or the file is missing. Available to owner, manager and inspector roles."
+}, { scopes: ['write'], tier: 'excluded' }));
 
 const mediaAttachRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -166,8 +165,8 @@ const mediaAttachRoute = createRoute(withMcpMetadata({
     summary: 'Attach a pool photo to an inspection item',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: MediaAttachRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection the pool photo and the item belong to.') }),
+        body: { content: { 'application/json': { schema: MediaAttachRequestSchema.describe('Which pool photo to attach and which item, optionally within a section, to attach it to.') } } },
     },
     responses: {
         200: {
@@ -176,7 +175,7 @@ const mediaAttachRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "attachInspection",
-    description: "Auto-generated placeholder for attachInspection (POST /{id}/media/attach, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Attaches a media pool photo to a checklist item (or to an item within a section), appending it to that item's photo list in the inspection's results. The pool entry is removed as part of the attach, but the stored image file is kept, so the photo then lives only on the item. A results row is created if none exists. Returns the storage key and the new position of the photo in the item's list. Records an inspection.media.attach audit entry. Not idempotent: a repeat fails with 404 because the pool entry is gone. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const mediaPoolDeleteRoute = createRoute(withMcpMetadata({
@@ -186,16 +185,16 @@ const mediaPoolDeleteRoute = createRoute(withMcpMetadata({
     summary: 'Delete a pool photo (cancel an upload)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'), poolId: z.string().min(1).describe('TODO describe poolId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection the pool photo belongs to.'), poolId: z.string().min(1).describe('Id of the media pool entry to delete.') }),
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Pool photo deleted',
         },
     },
     operationId: "deleteInspectionMediaPool",
-    description: "Auto-generated placeholder for deleteInspectionMediaPool (DELETE /{id}/media/pool/{poolId}, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Permanently deletes a photo from the inspection's media pool: both the pool entry and the stored image file (a failed file deletion is logged and ignored). Only unattached pool photos are addressed here; photos already attached to items are removed with the detach route or the item photo delete route. Refused with 409 while the photo is the report cover, so clear the cover first. Responds 404 if the pool entry is not found. Cannot be undone. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // Media Studio (Plan 3, P4) — reorder an item's photos[] (array order ==
@@ -208,19 +207,19 @@ const itemPhotosReorderRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({
-            id:     z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-            itemId: z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
-        }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: ReorderPhotosSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+            id:     z.string().trim().min(1).describe('Inspection the item belongs to.'),
+            itemId: z.string().min(1).describe('Id of the checklist item whose photos are reordered.'),
+        }),
+        body: { content: { 'application/json': { schema: ReorderPhotosSchema.describe('The full list of the item photo keys in the desired order, plus an optional section id.') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Photos reordered',
         },
     },
     operationId: "reorderInspectionItemPhotos",
-    description: "Auto-generated placeholder for reorderInspectionItemPhotos (POST /{id}/items/{itemId}/photos/reorder, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Sets the order of one checklist item's photos, which is also their order in the report. Send the complete list of the item's current photo keys in the new order: the list must contain exactly the same keys, so photos cannot be added or dropped through it, and a mismatch is rejected. Only the order in the stored results changes. Responds 404 if the inspection has no results yet and 400 if the item has no photos. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // Media Studio (Plan 3, P4) — detach a photo from an item (drop the array
@@ -233,20 +232,20 @@ const itemPhotoDetachRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({
-            id:         z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-            itemId:     z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
+            id:         z.string().trim().min(1).describe('Inspection the item belongs to.'),
+            itemId:     z.string().min(1).describe('Id of the checklist item the photo is removed from.'),
             photoIndex: z.coerce.number().int().nonnegative().describe('Index of the photo within the item\'s photos[] array'),
-        }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: ItemPhotoMutationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        }),
+        body: { content: { 'application/json': { schema: ItemPhotoMutationSchema.describe('Optional section id used to locate the item when it is addressed within a section.') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Photo detached',
         },
     },
     operationId: "detachInspectionItemPhoto",
-    description: "Auto-generated placeholder for detachInspectionItemPhoto (POST /{id}/items/{itemId}/photos/{photoIndex}/detach, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Removes one photo from a checklist item's photo list without deleting the image file, so the file stays in storage. The photo is addressed by its position in the list and later photos shift down by one, so a repeated call removes a different photo. Unlike the item photo delete route this does not delete the file from storage. Responds 404 if the inspection has no results yet and 400 if the item has no photos; an index past the end is rejected. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // Media Studio (Plan 3) — revert a photo's edits to the original (drop the
@@ -259,20 +258,20 @@ const itemPhotoRevertRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({
-            id:         z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-            itemId:     z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
+            id:         z.string().trim().min(1).describe('Inspection the item belongs to.'),
+            itemId:     z.string().min(1).describe('Id of the checklist item whose photo is reverted.'),
             photoIndex: z.coerce.number().int().nonnegative().describe('Index of the photo within the item\'s photos[] array'),
-        }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: ItemPhotoMutationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        }),
+        body: { content: { 'application/json': { schema: ItemPhotoMutationSchema.describe('Optional section id used to locate the item when it is addressed within a section.') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Photo reverted',
         },
     },
     operationId: "revertInspectionItemPhoto",
-    description: "Auto-generated placeholder for revertInspectionItemPhoto (POST /{id}/items/{itemId}/photos/{photoIndex}/revert, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Undoes edits on one checklist item photo, returning it to the original image. The photo's entry keeps only its source image key, so the annotated image reference, the stored annotation shapes and any other derived data on that entry are dropped from the results; the derived image files themselves are not deleted from storage. Safe to repeat. Responds 404 if the inspection has no results yet and 400 if the item has no photos; an index past the end is rejected. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // Media Studio (Plan 3, Task 9b) — move a photo from one item to another
@@ -285,20 +284,20 @@ const itemPhotoMoveRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({
-            id:         z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-            itemId:     z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
+            id:         z.string().trim().min(1).describe('Inspection both items belong to.'),
+            itemId:     z.string().min(1).describe('Id of the source checklist item the photo is taken from.'),
             photoIndex: z.coerce.number().int().nonnegative().describe('Index of the photo within the source item\'s photos[] array'),
-        }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: MovePhotoSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        }),
+        body: { content: { 'application/json': { schema: MovePhotoSchema.describe('The target item, plus optional section ids for the source and target items.') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Photo moved',
         },
     },
     operationId: "moveInspectionItemPhoto",
-    description: "Auto-generated placeholder for moveInspectionItemPhoto (POST /{id}/items/{itemId}/photos/{photoIndex}/move, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Moves one photo from a checklist item to the end of another item's photo list within the same inspection, keeping its annotated or cropped versions with it. The photo is addressed by its position in the source list, and later photos in that list shift down by one. Section ids are only needed when the items are addressed within a section. Responds 404 if the inspection has no results yet and 400 if the source item has no photos; an index past the end is rejected. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // -----------------------------------------------------------------------------
@@ -314,18 +313,18 @@ const approveConciergeRoute = createRoute(withMcpMetadata({
     summary: 'Approve a concierge booking awaiting inspector review',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Concierge inspection awaiting approval.') }),
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Approved',
         },
         404: { description: 'Inspection not found in this tenant' },
         409: { description: 'Inspection is not in awaiting_inspector state' },
     },
     operationId: "approveInspection",
-    description: "Auto-generated placeholder for approveInspection (POST /{id}/concierge/approve, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Approves a concierge booking that is waiting for inspector review. The booking moves from awaiting inspector to awaiting client, a confirmation link is created, and the client is emailed that link so they can confirm the appointment. Responds 409 if the booking is not currently awaiting inspector approval, 400 if the inspection has no client email on file, and 404 if the inspection does not exist. Not idempotent: a second call fails with 409. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 

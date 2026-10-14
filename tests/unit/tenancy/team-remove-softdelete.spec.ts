@@ -27,6 +27,7 @@ import { MockKV } from '../mocks';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
 // Route every drizzle(d1) call inside the services under test to the
 // in-memory SQLite test DB (the established pattern in this suite).
@@ -34,6 +35,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { withBatch } from '../helpers/d1-binding';
 import { LegalVersionService } from '../../../server/services/legal-version.service';
+import { CREDENTIAL_MARKER_TTL_S } from '../../../server/lib/auth/credential-marker';
 
 const TENANT = '00000000-0000-0000-0000-0000000000d1';
 const ADMIN = '11111111-1111-1111-1111-1111111111d1';
@@ -81,7 +83,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
     it('leaves the row with deletedAt set instead of deleting it', async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const team = new TeamService({} as any, undefined, kv as any);
-        await team.removeMember(TENANT, MEMBER, ADMIN);
+        await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
 
         const row = await testDb.select().from(schema.users).where(eq(schema.users.id, MEMBER)).get();
         expect(row).toBeDefined();
@@ -100,7 +102,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         // The old hard-delete would violate the inspections.inspector_id FK
         // (baseline migration + FK-ON by the time all migrations replay) —
         // this must NOT throw.
-        await expect(team.removeMember(TENANT, MEMBER, ADMIN)).resolves.toBeDefined();
+        await expect(team.removeMember(TENANT, MEMBER, ADMIN, 'owner')).resolves.toBeDefined();
 
         const inspection = await testDb.select().from(schema.inspections).where(eq(schema.inspections.id, 'insp-1')).get();
         expect(inspection?.inspectorId).toBe(MEMBER);
@@ -115,7 +117,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const team = new TeamService({} as any, undefined, kv as any);
-        await team.removeMember(TENANT, MEMBER, ADMIN);
+        await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
 
         const after = await getSeatUsage(TENANT, {} as never);
         expect(after.used).toBe(1); // admin only — the seat is freed
@@ -124,7 +126,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
     it('excludes the removed member from the team list', async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const team = new TeamService({} as any, undefined, kv as any);
-        await team.removeMember(TENANT, MEMBER, ADMIN);
+        await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
 
         const { activeUsers } = await team.getMembers(TENANT);
         expect(activeUsers.map(u => u.id)).toEqual([ADMIN]);
@@ -133,12 +135,12 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
     it('writes a pwchanged:{userId} KV invalidation marker (mandatory addendum)', async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const team = new TeamService({} as any, undefined, kv as any);
-        await team.removeMember(TENANT, MEMBER, ADMIN);
+        await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
 
         expect(kv.put).toHaveBeenCalledWith(
             `pwchanged:${MEMBER}`,
             expect.any(String),
-            expect.objectContaining({ expirationTtl: 90000 }),
+            expect.objectContaining({ expirationTtl: CREDENTIAL_MARKER_TTL_S }),
         );
     });
 
@@ -147,7 +149,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         const auth = new AuthService({} as any, kv as any);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const team = new TeamService({} as any, undefined, kv as any);
-        await team.removeMember(TENANT, MEMBER, ADMIN);
+        await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
 
         // The removed member's password hash is bogus ('hash'), but the
         // point is the row must be excluded from the lookup entirely —
@@ -164,7 +166,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const auth = new AuthService({} as any, kv as any);
 
-        await team.removeMember(TENANT, MEMBER, ADMIN);
+        await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
         expect((await getSeatUsage(TENANT, {} as never)).used).toBe(1);
 
         // createInvite must NOT be blocked by the soft-deleted row.
@@ -188,6 +190,37 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         expect(activeUsers.map(u => u.id).sort()).toEqual([ADMIN, MEMBER].sort());
     });
 
+    it('reactivation on re-invite retires every OAuth grant the reused id still holds and no other', async () => {
+        const grants = new Map<string, string>([['g-member', MEMBER], ['g-admin', ADMIN]]);
+        const oauth = {
+            listUserGrants: vi.fn(async (userId: string) => ({ items: [...grants].filter(([, o]) => o === userId).map(([id]) => ({ id })) })),
+            revokeGrant: vi.fn(async (grantId: string) => { grants.delete(grantId); }),
+        } as unknown as OAuthHelpers;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, undefined, kv as any);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const auth = new AuthService({} as any, kv as any, undefined, oauth);
+
+        await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
+        // The removal's own revocation failed: the grant is still there.
+        grants.set('g-member', MEMBER);
+        const invite = await team.createInvite({ tenantId: TENANT, email: MEMBER_EMAIL, role: 'inspector' });
+        await auth.joinTeam(invite.token, 'new-password-123', { seatQuota: SEAT_QUOTA_UNENFORCED });
+
+        expect([...grants.keys()]).toEqual(['g-admin']);
+    });
+
+    it('a first-time join holds no grants, so no revocation is attempted', async () => {
+        const oauth = { listUserGrants: vi.fn(), revokeGrant: vi.fn() } as unknown as OAuthHelpers;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, undefined, kv as any);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const auth = new AuthService({} as any, kv as any, undefined, oauth);
+        const invite = await team.createInvite({ tenantId: TENANT, email: 'brand-new@acme.test', role: 'inspector' });
+        await auth.joinTeam(invite.token, 'new-password-123', { seatQuota: SEAT_QUOTA_UNENFORCED });
+        expect(oauth.listUserGrants).not.toHaveBeenCalled();
+    });
+
     it('reactivation on re-invite resets TOTP enrollment to never-enrolled defaults', async () => {
         // Simulate the removed member having had 2FA enabled before removal.
         await testDb.update(schema.users).set({
@@ -202,7 +235,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const auth = new AuthService({} as any, kv as any);
 
-        await team.removeMember(TENANT, MEMBER, ADMIN);
+        await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
 
         const invite = await team.createInvite({
             tenantId: TENANT,
@@ -225,9 +258,9 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
     it('removing an already-removed member returns not-found instead of re-running the soft-delete path', async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const team = new TeamService({} as any, undefined, kv as any);
-        await team.removeMember(TENANT, MEMBER, ADMIN);
+        await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
 
-        await expect(team.removeMember(TENANT, MEMBER, ADMIN)).rejects.toThrow('Member not found');
+        await expect(team.removeMember(TENANT, MEMBER, ADMIN, 'owner')).rejects.toThrow('Member not found');
     });
 
     it('revokes every MCP OAuth grant held by the removed member (Fix 1)', async () => {
@@ -241,7 +274,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const team = new TeamService({} as any, undefined, kv as any, oauth as any);
-        await team.removeMember(TENANT, MEMBER, ADMIN);
+        await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
 
         expect(oauth.listUserGrants).toHaveBeenCalledWith(MEMBER);
         expect(oauth.revokeGrant).toHaveBeenCalledWith('grant-1', MEMBER);
@@ -251,7 +284,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
     it('does not touch OAuth grants when no oauth helper is wired (standalone / MCP off)', async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const team = new TeamService({} as any, undefined, kv as any, undefined);
-        await expect(team.removeMember(TENANT, MEMBER, ADMIN)).resolves.toBeDefined();
+        await expect(team.removeMember(TENANT, MEMBER, ADMIN, 'owner')).resolves.toBeDefined();
     });
 
     it('grant revocation failure does not abort the removal (fail-open, same discipline as the KV write)', async () => {
@@ -261,7 +294,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const team = new TeamService({} as any, undefined, kv as any, oauth as any);
-        await expect(team.removeMember(TENANT, MEMBER, ADMIN)).resolves.toBeDefined();
+        await expect(team.removeMember(TENANT, MEMBER, ADMIN, 'owner')).resolves.toBeDefined();
 
         const row = await testDb.select().from(schema.users).where(eq(schema.users.id, MEMBER)).get();
         expect(row!.deletedAt).not.toBeNull();
@@ -276,7 +309,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         const outbox = { append: vi.fn(async () => { order.push('outbox'); }) };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const team = new TeamService({} as any, outbox as any, kv as any, oauth as any);
-        await team.removeMember(TENANT, MEMBER, ADMIN);
+        await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
 
         expect(order).toEqual(['grants', 'outbox']);
     });
@@ -291,14 +324,87 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         // The outbox append is unguarded by design (task 8a decision) — an
         // outbox failure surfaces as a rejection — but the KV write must have
         // already landed by the time it throws, since it now runs first.
-        await expect(team.removeMember(TENANT, MEMBER, ADMIN)).rejects.toThrow('D1 outbox insert failed');
+        await expect(team.removeMember(TENANT, MEMBER, ADMIN, 'owner')).rejects.toThrow('D1 outbox insert failed');
 
         expect(kv.put).toHaveBeenCalledWith(
             `pwchanged:${MEMBER}`,
             expect.any(String),
-            expect.objectContaining({ expirationTtl: 90000 }),
+            expect.objectContaining({ expirationTtl: CREDENTIAL_MARKER_TTL_S }),
         );
         const row = await testDb.select().from(schema.users).where(eq(schema.users.id, MEMBER)).get();
         expect(row!.deletedAt).not.toBeNull(); // the soft-delete itself still committed
+    });
+
+    it('refuses to remove the last owner, leaving the workspace administrable', async () => {
+        // Backstop: only an owner reaches this rule and the self-check covers
+        // the ordinary case, so the requester here is a stale session whose
+        // user row is no longer live. Without the check the tenant is left
+        // with no one able to restore an owner (mirrors updateMember).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, undefined, kv as any);
+
+        await expect(team.removeMember(TENANT, ADMIN, 'stale-session', 'owner')).rejects.toThrow('Cannot remove the last owner');
+
+        const row = await testDb.select().from(schema.users).where(eq(schema.users.id, ADMIN)).get();
+        expect(row!.deletedAt).toBeNull();
+        expect(kv.put).not.toHaveBeenCalled();
+    });
+
+    it('still removes an owner when another owner remains', async () => {
+        const SECOND_OWNER = '44444444-4444-4444-4444-4444444444d1';
+        await testDb.insert(schema.users).values({
+            id: SECOND_OWNER, tenantId: TENANT, email: 'owner2@acme.test',
+            passwordHash: 'x', role: 'owner', createdAt: new Date(),
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, undefined, kv as any);
+
+        await team.removeMember(TENANT, SECOND_OWNER, ADMIN, 'owner');
+
+        const row = await testDb.select().from(schema.users).where(eq(schema.users.id, SECOND_OWNER)).get();
+        expect(row!.deletedAt).not.toBeNull();
+    });
+
+    describe('only an owner removes an owner', () => {
+        const MANAGER = '33333333-3333-3333-3333-3333333333d2';
+        const SECOND_OWNER = '44444444-4444-4444-4444-4444444444d2';
+
+        beforeEach(async () => {
+            await testDb.insert(schema.users).values([
+                { id: MANAGER, tenantId: TENANT, email: 'manager2@acme.test', passwordHash: 'x', role: 'manager', createdAt: new Date() },
+                { id: SECOND_OWNER, tenantId: TENANT, email: 'owner3@acme.test', passwordHash: 'x', role: 'owner', createdAt: new Date() },
+            ]);
+        });
+
+        it('forbids a manager from removing an owner even when another owner remains', async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const team = new TeamService({} as any, undefined, kv as any);
+
+            await expect(team.removeMember(TENANT, ADMIN, MANAGER, 'manager')).rejects.toMatchObject({ status: 403 });
+
+            const row = await testDb.select().from(schema.users).where(eq(schema.users.id, ADMIN)).get();
+            expect(row!.deletedAt).toBeNull();
+            expect(kv.put).not.toHaveBeenCalled();
+        });
+
+        it('still lets a manager remove a non-owner', async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const team = new TeamService({} as any, undefined, kv as any);
+
+            await team.removeMember(TENANT, MEMBER, MANAGER, 'manager');
+
+            const row = await testDb.select().from(schema.users).where(eq(schema.users.id, MEMBER)).get();
+            expect(row!.deletedAt).not.toBeNull();
+        });
+
+        it('lets an owner remove another owner', async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const team = new TeamService({} as any, undefined, kv as any);
+
+            await team.removeMember(TENANT, SECOND_OWNER, ADMIN, 'owner');
+
+            const row = await testDb.select().from(schema.users).where(eq(schema.users.id, SECOND_OWNER)).get();
+            expect(row!.deletedAt).not.toBeNull();
+        });
     });
 });

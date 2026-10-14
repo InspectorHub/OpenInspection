@@ -5,8 +5,8 @@
 import { z } from '@hono/zod-openapi';
 
 export const UpdateMediaAnnotationsSchema = z.object({
-    annotations: z.string().max(8 * 1024, 'annotations must be <= 8 KB').describe('TODO describe annotations field for the OpenInspection MCP integration'),
-    caption:     z.string().max(200, 'caption must be <= 200 chars').describe('TODO describe caption field for the OpenInspection MCP integration'),
+    annotations: z.string().max(8 * 1024, 'annotations must be <= 8 KB').describe('Annotation overlay for the photo, as a JSON-encoded string the editor produced. Stored as is and not interpreted by the server.'),
+    caption:     z.string().max(200, 'caption must be <= 200 chars').describe('Caption shown with the photo in published reports.'),
 }).openapi('UpdateMediaAnnotations');
 
 // ── Plan 7 — video walk-through (Cloudflare Stream direct creator upload) ────
@@ -68,3 +68,21 @@ export const SetPosterSchema = z.object({
     posterPct: z.number().min(0).max(1)
         .describe('Poster timestamp as a fraction of duration (0..1)'),
 }).openapi('SetPoster');
+
+// ── Signed photo upload URLs (background uploads from a native client) ───────
+// The client mints the media id itself (`pendingId`), so a retry or a replay
+// after a long offline period addresses the same object and overwrites it
+// rather than adding a second one.
+
+export const PhotoUploadUrlRequestSchema = z.object({
+    pendingId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, 'Use 1-64 letters, digits, hyphens or underscores')
+        .describe('Client-generated media id; repeating the request with the same id yields the same storage key'),
+    contentType: z.enum(['image/jpeg', 'image/png', 'image/heic'])
+        .describe('Content type of the photo that will be uploaded to the returned URL'),
+}).openapi('PhotoUploadUrlRequest');
+
+export const PhotoUploadUrlResponseSchema = z.object({
+    url: z.string().describe('Relative upload URL carrying a signed token; POST the photo as multipart field "file" to it'),
+    key: z.string().describe('Storage key the photo will be written to'),
+    expiresAt: z.number().int().describe('Token expiry as epoch milliseconds'),
+}).openapi('PhotoUploadUrlResponse');

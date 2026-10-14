@@ -9,11 +9,11 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 109 |
-| Columns | 1265 |
-| Indexes (excluding primary keys) | 183 |
+| Tables | 111 |
+| Columns | 1277 |
+| Indexes (excluding primary keys) | 184 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 612 (48%) |
+| Columns carrying a source comment | 615 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants`
 
-That is 13 of 109. If a table you just added appears here,
+That is 13 of 111. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 206 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 209 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -1664,6 +1664,22 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ---
 
+## `native_client_seen`
+
+<sub>server/lib/db/schema/native-client-seen.ts · 5 columns · primary key `tenant_id, platform, client_version`</sub>
+
+> Which native app versions a company's devices have been seen running, and when. An installed binary cannot be recalled, so retiring an old version safely means knowing nothing still runs it.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `tenant_id` | text | PK NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `platform` | text | PK NN |  | `ios, android, windows` |  |
+| `client_version` | text | PK NN |  |  |  |
+| `first_seen_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `last_seen_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+
+---
+
 ## `notification_preferences`
 
 <sub>server/lib/db/schema/notification-preferences.ts · 9 columns · primary key `id`</sub>
@@ -1714,6 +1730,27 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - `idx_notifications_tenant_user_created` (tenant_id, user_id, created_at)
 - `idx_notifications_tenant_user_unread` (tenant_id, user_id, read_at)
 - `idx_notifications_tenant_contact_created` (tenant_id, contact_id, created_at)
+
+---
+
+## `offline_import_applied`
+
+<sub>server/lib/db/schema/offline-import.ts · 6 columns · primary key `tenant_id, idempotency_key, inspection_id`</sub>
+
+> Queued writes an offline package has already applied, one row per (tenant, key, inspection).
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `tenant_id` | text | PK NN IX |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `idempotency_key` | text | PK NN |  |  | The queue entry's idempotency key, verbatim as the device minted it. The device mints it, so nothing stops two packages from using the same one for different inspections: the inspection id is part of the primary key, and a record only counts for the inspection it was written for. |
+| `op` | text | NN |  | `inspection.create, inspection.update, inspection.complete` |  |
+| `inspection_id` | text | PK NN |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `applied_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `applied_by` | text | NN |  |  | The importing member, taken from the verified session. |
+
+**Indexes**
+
+- `idx_offline_import_applied_age` (tenant_id, applied_at)
 
 ---
 
@@ -2578,7 +2615,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `tenant_configs`
 
-<sub>server/lib/db/schema/tenant/core.ts · 82 columns · primary key `tenant_id`</sub>
+<sub>server/lib/db/schema/tenant/core.ts · 83 columns · primary key `tenant_id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2664,6 +2701,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `invoice_seq` | integer | NN | `1000` |  | The last invoice number handed out for this tenant. Default 1000, so the first invoice is **1001** — Jobber's convention, and the category's; starting at 1 tells a homebuyer they are this company's first customer. **[more]** |
 | `report_pdf_retention_years` | integer | NN | `7` |  | Years a rendered report PDF is kept. `0` = indefinite, which is an explicit controller instruction the platform executes rather than an absence of a setting. **[more]** |
 | `is_report_view_counting_enabled` | integer | NN | `false` |  | Whether this workspace counts report opens. Default FALSE. **[more]** |
+| `offline_max_days` | integer | NN | `30` |  | Native clients lock their local data after this many days without a successful refresh. Enforced on the device; the server only publishes it. |
 
 ---
 

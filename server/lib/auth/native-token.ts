@@ -1,0 +1,187 @@
+import { drizzle } from 'drizzle-orm/d1';
+import { and, eq, isNull } from 'drizzle-orm';
+import { users } from '../db/schema';
+import { nativeClientEnabled } from '../mcp/flag';
+import { memoOnce } from '../request-scope';
+
+/** The scope a native client requests and the consent page grants. */
+export const NATIVE_SCOPE = 'native';
+
+const NATIVE_ROLES = ['owner', 'manager', 'inspector'] as const;
+export type NativeRole = (typeof NATIVE_ROLES)[number];
+
+/** Grant props written by the consent page for a native client. */
+export interface NativeProps {
+  kind: 'native';
+  userId: string;
+  tenantId: string;
+  role: NativeRole;
+  /** Epoch seconds of the last successful token exchange; drives the sliding idle limit. */
+  lastUsedAt: number;
+  /**
+   * Epoch seconds when the member consented. Never moves on refresh. A
+   * `pwchanged:{userId}` marker newer than this ends the grant, and a grant
+   * made after the marker (the member signed in again) is unaffected.
+   */
+  grantedAt: number;
+}
+
+/**
+ * The slice of the OAuth provider's helpers this module reads. Declared
+ * structurally so the real `OAuthHelpers` satisfies it and a test double does
+ * not have to fabricate the rest of the surface.
+ */
+interface TokenUnwrapper {
+  unwrapToken(token: string): Promise<{
+    /** The access token's own scope; an RFC 8693 exchange can narrow it below the grant's. */
+    scope: string[];
+    grant: { scope: string[]; props: unknown };
+  } | null>;
+}
+
+export interface NativeTokenEnv {
+  DB: D1Database;
+  OAUTH_PROVIDER?: TokenUnwrapper;
+  NATIVE_CLIENT_ENABLED?: string;
+  TENANT_CACHE?: KVNamespace;
+}
+
+export function isNativeRole(role: string): role is NativeRole {
+  return (NATIVE_ROLES as readonly string[]).includes(role);
+}
+
+export function isNativeProps(p: unknown): p is NativeProps {
+  if (!p || typeof p !== 'object') return false;
+  const o = p as Record<string, unknown>;
+  return o.kind === 'native'
+    && typeof o.userId === 'string' && o.userId.length > 0
+    && typeof o.tenantId === 'string' && o.tenantId.length > 0
+    && typeof o.role === 'string' && (NATIVE_ROLES as readonly string[]).includes(o.role)
+    && typeof o.lastUsedAt === 'number' && Number.isFinite(o.lastUsedAt)
+    && typeof o.grantedAt === 'number' && Number.isFinite(o.grantedAt);
+}
+
+/**
+ * True for any grant that says it is a native one, whether or not its props are
+ * well-formed (`isNativeProps`). The two answer different questions. A grant that
+ * fails `isNativeProps` because a field is missing is not an MCP grant: it must be
+ * refused, not handed to the MCP server on the strength of a type guard that was
+ * written to decide what a valid session is.
+ */
+export function claimsNative(p: unknown): boolean {
+  return typeof p === 'object' && p !== null && 'kind' in p && p.kind === 'native';
+}
+
+/** Opaque provider tokens are `userId:grantId:secret`; JWTs are dot-separated. */
+export function looksLikeOpaqueOAuthToken(token: string): boolean {
+  return !token.includes('.') && token.split(':').length === 3;
+}
+
+/**
+ * The user's CURRENT role if they are still an active member of the tenant and
+ * hold a role a native client may act with, else null. Shared by every native
+ * entry (bearer token, WebSocket ticket) so none trusts a role captured earlier.
+ */
+export async function currentNativeRole(db: D1Database, userId: string, tenantId: string): Promise<NativeRole | null> {
+  const row = await drizzle(db)
+    .select({ role: users.role })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.tenantId, tenantId), isNull(users.deletedAt)))
+    .get();
+  if (!row || !isNativeRole(row.role)) return null;
+  return row.role;
+}
+
+/**
+ * True when a credential change or removal (`pwchanged:{userId}`) happened after
+ * the grant was made. Web sessions read the same marker; an OAuth token never
+ * did, so grant revocation was the only control and a failed revocation left
+ * the grant alive. Semantics match the session check: no KV bound skips it, a
+ * KV read that throws fails closed (the session path answers 401 in that case).
+ *
+ * The three answers matter to different callers. A request that cannot be
+ * verified is simply refused (and retried), so `unreadable` may be treated like
+ * `changed`. A token refresh must not: `changed` ends the grant for good, while
+ * `unreadable` is a transient storage fault that must leave a healthy grant alone.
+ */
+export type NativeCredentialState = 'ok' | 'changed' | 'unreadable';
+
+export async function nativeGrantCredentialState(
+  env: { TENANT_CACHE?: KVNamespace },
+  props: Pick<NativeProps, 'userId' | 'grantedAt'>,
+): Promise<NativeCredentialState> {
+  const kv = env.TENANT_CACHE;
+  if (!kv) return 'ok';
+  try {
+    // The same memo key the session check uses, so one in-process fan-out (an
+    // import replaying its queued writes) reads the marker once, not per call.
+    const raw = await memoOnce(env, `pwchanged:${props.userId}`, () => kv.get(`pwchanged:${props.userId}`));
+    if (!raw) return 'ok';
+    const changedAt = parseInt(raw, 10);
+    return !Number.isFinite(changedAt) || props.grantedAt < changedAt ? 'changed' : 'ok';
+  } catch {
+    return 'unreadable';
+  }
+}
+
+/** Fail-closed boolean form: an unreadable marker counts as a change. */
+export async function nativeGrantPredatesCredentialChange(
+  env: { TENANT_CACHE?: KVNamespace },
+  props: Pick<NativeProps, 'userId' | 'grantedAt'>,
+): Promise<boolean> {
+  return (await nativeGrantCredentialState(env, props)) !== 'ok';
+}
+
+/**
+ * Resolve a native client's access token to an identity, or null.
+ *
+ * Three conditions, all required: the provider knows the token and it has not
+ * expired; both the grant and the token itself carry the native scope (an MCP
+ * grant must not be usable against /api/*, because MCP scopes are narrower than
+ * a session, and a token exchanged down to a narrower scope must not regain it);
+ * and the user is still an active member. The returned role is the users row's
+ * current role, never the one baked into the grant when it was consented, so a
+ * demotion takes effect on the next request. Grant revocation on removal is the primary control;
+ * the users-row check covers the window before it lands and a revocation that
+ * failed open.
+ */
+export async function resolveNativeToken(env: NativeTokenEnv, token: string): Promise<NativeProps | null> {
+  if (!nativeClientEnabled(env) || !env.OAUTH_PROVIDER) return null;
+  const summary = await env.OAUTH_PROVIDER.unwrapToken(token);
+  if (!summary) return null;
+  if (!summary.grant.scope.includes(NATIVE_SCOPE) || !summary.scope.includes(NATIVE_SCOPE)) return null;
+  const props = summary.grant.props;
+  if (!isNativeProps(props)) return null;
+  const role = await currentNativeRole(env.DB, props.userId, props.tenantId);
+  if (!role) return null;
+  if (await nativeGrantPredatesCredentialChange(env, props)) return null;
+  return { ...props, role };
+}
+
+const ACCESS_TOKEN_TTL_S = 3600;
+/** A native grant unused for this long is refused and revoked. */
+export const NATIVE_IDLE_LIMIT_S = 90 * 86400;
+
+export type NativeExchangeDecision =
+  | { kind: 'allow'; result: { accessTokenTTL: number; refreshTokenTTL?: undefined; newProps?: NativeProps } }
+  | { kind: 'deny' };
+
+/**
+ * Native refresh tokens follow the common sliding rule: they never expire on a
+ * fixed date, but a grant left unused for 90 days is refused. The provider fixes
+ * a refresh expiry per grant and cannot change it on refresh, so the idle clock
+ * lives in the grant props and is checked here.
+ *
+ * `refreshTokenTTL: undefined` is only legal on the code exchange; the provider
+ * rejects the key on a refresh (even when undefined), so the refresh result
+ * must not carry it. Returns undefined for non-native grants (library defaults).
+ */
+export function nativeTokenExchange(props: unknown, grantType: string, nowSec: number): NativeExchangeDecision | undefined {
+  if (!isNativeProps(props)) return undefined;
+  const newProps: NativeProps = { ...props, lastUsedAt: nowSec };
+  if (grantType === 'authorization_code') {
+    return { kind: 'allow', result: { accessTokenTTL: ACCESS_TOKEN_TTL_S, refreshTokenTTL: undefined, newProps } };
+  }
+  if (nowSec - props.lastUsedAt > NATIVE_IDLE_LIMIT_S) return { kind: 'deny' };
+  return { kind: 'allow', result: { accessTokenTTL: ACCESS_TOKEN_TTL_S, newProps } };
+}

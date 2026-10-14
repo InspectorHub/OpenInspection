@@ -16,6 +16,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app } from '../../../server/index';
+import { buildOpenApiDocument } from '../../../server/lib/openapi/build-document';
 import { reduceOpenApiDoc, type SnapshotEntry } from '../../../server/lib/mcp/snapshot-helpers';
 import { plainPaths } from '../helpers/openapi-doc';
 
@@ -28,7 +29,7 @@ function loadCommitted(): SnapshotEntry[] {
 
 describe('openapi snapshot drift', { timeout: 30_000 }, () => {
     it('live /doc matches committed openapi-snapshot.json (run `npm run mcp:snapshot` to fix)', () => {
-        const doc = app.getOpenAPIDocument({
+        const doc = buildOpenApiDocument(app, {
             openapi: '3.0.0',
             info: { version: 'snapshot', title: 'OpenInspection Core API' },
         });

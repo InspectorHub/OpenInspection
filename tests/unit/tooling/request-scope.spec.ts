@@ -9,7 +9,7 @@
  * external HTTP requests on unchanged per-request verification.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { createRequestScope, memoOnce, REQUEST_SCOPE } from '../../../server/lib/request-scope';
+import { createCredentialScope, createRequestScope, memoOnce, REQUEST_SCOPE } from '../../../server/lib/request-scope';
 
 describe('RequestScope', () => {
     it('runs the factory once per key', async () => {
@@ -68,5 +68,25 @@ describe('memoOnce', () => {
         expect(await memoOnce({}, 'k', fn)).toBe(1);
         expect(await memoOnce(undefined, 'k', fn)).toBe(1);
         expect(fn).toHaveBeenCalledTimes(3);
+    });
+});
+
+describe('createCredentialScope', () => {
+    it('shares native-token and credential-change lookups, and only those', async () => {
+        const env = { [REQUEST_SCOPE]: createCredentialScope() };
+        const shared = vi.fn(async () => 'who');
+        const marker = vi.fn(async () => 'ts');
+        await memoOnce(env, 'native:u:g:s', shared);
+        await memoOnce(env, 'native:u:g:s', shared);
+        await memoOnce(env, 'pwchanged:u1', marker);
+        await memoOnce(env, 'pwchanged:u1', marker);
+        expect(shared).toHaveBeenCalledTimes(1);
+        expect(marker).toHaveBeenCalledTimes(1);
+
+        // Control: anything else runs every time, so a replay never reads another replay's write.
+        const other = vi.fn(async () => 'cfg');
+        await memoOnce(env, 'tenant-config:all:t1', other);
+        await memoOnce(env, 'tenant-config:all:t1', other);
+        expect(other).toHaveBeenCalledTimes(2);
     });
 });

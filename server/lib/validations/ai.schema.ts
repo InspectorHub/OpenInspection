@@ -5,15 +5,15 @@ import { createApiResponseSchema } from './shared.schema';
  * Input for the comment assistance request.
  */
 export const CommentAssistSchema = z.object({
-    text: z.string().min(1, 'Text is required').openapi({ example: 'Roof is bad' }).describe('TODO describe text field for the OpenInspection MCP integration'),
-    context: z.string().optional().openapi({ example: 'Roof inspection' }).describe('TODO describe context field for the OpenInspection MCP integration'),
+    text: z.string().min(1, 'Text is required').openapi({ example: 'Roof is bad' }).describe('Rough inspector note to rewrite.'),
+    context: z.string().optional().openapi({ example: 'Roof inspection' }).describe('Optional description of what is being inspected, to guide the rewrite.'),
 }).openapi('CommentAssistRequest');
 
 /**
  * Input for the automatic summary request.
  */
 export const AutoSummarySchema = z.object({
-    inspectionId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    inspectionId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Id of the inspection to summarise.'),
 }).openapi('AutoSummaryRequest');
 
 /**
@@ -42,7 +42,7 @@ export const AutoSummarySchema = z.object({
  * Response for the comment assistance.
  */
 export const CommentAssistResponseSchema = createApiResponseSchema(z.object({
-    text: z.string().openapi({ example: 'The roof covering shows signs of significant wear and deterioration.' }).describe('TODO describe text field for the OpenInspection MCP integration'),
+    text: z.string().openapi({ example: 'The roof covering shows signs of significant wear and deterioration.' }).describe('The rewritten, report-ready comment.'),
     aiCallId: z.string().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('The ai_call_provenance row id for this call — what a content-review record cites.'),
 })).openapi('CommentAssistResponse');
 
@@ -50,7 +50,7 @@ export const CommentAssistResponseSchema = createApiResponseSchema(z.object({
  * Response for the automatic summary.
  */
 export const AutoSummaryResponseSchema = createApiResponseSchema(z.object({
-    summary: z.string().openapi({ example: 'The inspection revealed critical defects in the roofing and plumbing systems.' }).describe('TODO describe summary field for the OpenInspection MCP integration'),
+    summary: z.string().openapi({ example: 'The inspection revealed critical defects in the roofing and plumbing systems.' }).describe('The generated summary of the inspection.'),
     aiCallId: z.string().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('The ai_call_provenance row id, or null when the summary is the system "no defects observed" literal rather than model output.'),
 })).openapi('AutoSummaryResponse');
 
@@ -70,11 +70,11 @@ export const AutoSummaryResponseSchema = createApiResponseSchema(z.object({
  * Guarded by `tests/unit/ai/prompt-address-boundary.spec.ts`.
  */
 export const SuggestCommentSchema = z.object({
-    itemName:        z.string().min(1).max(200).openapi({ example: 'Roof Covering' }).describe('TODO describe itemName field for the OpenInspection MCP integration'),
-    sectionName:     z.string().min(1).max(200).openapi({ example: 'Roof' }).describe('TODO describe sectionName field for the OpenInspection MCP integration'),
-    rating:          z.string().optional().openapi({ example: 'Defect' }).describe('TODO describe rating field for the OpenInspection MCP integration'),
-    yearBuilt:       z.number().int().nullable().optional().describe('TODO describe yearBuilt field for the OpenInspection MCP integration'),
-    sqft:            z.number().int().nullable().optional().describe('TODO describe sqft field for the OpenInspection MCP integration'),
+    itemName:        z.string().min(1).max(200).openapi({ example: 'Roof Covering' }).describe('Name of the inspection item to suggest comments for, such as Roof Covering'),
+    sectionName:     z.string().min(1).max(200).openapi({ example: 'Roof' }).describe('Name of the report section the item sits in, such as Roof'),
+    rating:          z.string().optional().openapi({ example: 'Defect' }).describe('Rating already given to the item, as free text (for example Defect), so the suggestions match it. Omit when the item is not yet rated'),
+    yearBuilt:       z.number().int().nullable().optional().describe('Year the property was built, as a four-digit year, to tailor the suggestions to its age; null or omitted when unknown'),
+    sqft:            z.number().int().nullable().optional().describe('Property size in square feet, as a whole number; null or omitted when unknown'),
 }).openapi('SuggestCommentRequest');
 
 /**
@@ -100,17 +100,17 @@ export const SuggestCommentResponseSchema = createApiResponseSchema(z.object({
  * comment in-place.
  */
 export const CommentEditSchema = z.object({
-    itemLabel:       z.string().min(1).max(200).openapi({ example: 'Roof Covering' }).describe('TODO describe itemLabel field for the OpenInspection MCP integration'),
-    sectionTitle:    z.string().min(1).max(200).openapi({ example: 'Roof' }).describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
-    tab:             z.enum(['information', 'limitations', 'defects']).openapi({ example: 'defects' }).describe('TODO describe tab field for the OpenInspection MCP integration'),
-    originalComment: z.string().min(1).max(4000).openapi({ example: 'Cracking observed across the field of the roof.' }).describe('TODO describe originalComment field for the OpenInspection MCP integration'),
-    instruction:     z.string().min(1).max(500).openapi({ example: 'Make it more specific to the NW corner damage.' }).describe('TODO describe instruction field for the OpenInspection MCP integration'),
-    category:        z.enum(['safety', 'recommendation', 'maintenance']).optional().openapi({ example: 'safety' }).describe('TODO describe category field for the OpenInspection MCP integration'),
-    location:        z.string().max(200).optional().openapi({ example: 'Northwest corner' }).describe('TODO describe location field for the OpenInspection MCP integration'),
+    itemLabel:       z.string().min(1).max(200).openapi({ example: 'Roof Covering' }).describe('Label of the inspection item the comment belongs to, 1-200 characters'),
+    sectionTitle:    z.string().min(1).max(200).openapi({ example: 'Roof' }).describe('Title of the report section the item sits in, 1-200 characters'),
+    tab:             z.enum(['information', 'limitations', 'defects']).openapi({ example: 'defects' }).describe('Which comment tab the text belongs to: information, limitations or defects'),
+    originalComment: z.string().min(1).max(4000).openapi({ example: 'Cracking observed across the field of the roof.' }).describe('The existing comment text to rewrite, 1-4000 characters'),
+    instruction:     z.string().min(1).max(500).openapi({ example: 'Make it more specific to the NW corner damage.' }).describe('Free-form instruction for the rewrite, 1-500 characters, for example shorten it'),
+    category:        z.enum(['safety', 'recommendation', 'maintenance']).optional().openapi({ example: 'safety' }).describe('Finding category, if known: safety, recommendation or maintenance'),
+    location:        z.string().max(200).optional().openapi({ example: 'Northwest corner' }).describe('Where on the property the finding is, up to 200 characters, for example Northwest corner'),
 }).openapi('CommentEditRequest');
 
 export const CommentEditResponseSchema = createApiResponseSchema(z.object({
-    rewritten: z.string().openapi({ example: 'Major cracking observed at the NW corner of the roof field; recommend evaluation by a licensed roofer.' }).describe('TODO describe rewritten field for the OpenInspection MCP integration'),
+    rewritten: z.string().openapi({ example: 'Major cracking observed at the NW corner of the roof field; recommend evaluation by a licensed roofer.' }),
     aiCallId: z.string().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('The ai_call_provenance row id, or null when the rewrite is a standalone dev mock rather than model output.'),
 })).openapi('CommentEditResponse');
 

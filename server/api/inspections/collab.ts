@@ -24,109 +24,53 @@
  * (server/api/inspections.ts), same as the other sub-routers.
  */
 
-import type { Context } from 'hono';
+import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { logger } from '../../lib/logger';
-import { CollabFollowupRequestSchema, CollabRestoreRequestSchema, CollabSnapshotParamSchema } from '../../lib/validations/collab.schema';
-import type { HonoConfig } from '../../types/hono';
-import { canAccessInspectionCollab } from '../../lib/collab/can-access';
-import { getInspectionRoster } from '../../lib/inspection/roster';
-import { collabDocName } from '../../lib/collab/doc-name';
-import { resolvePrimaryReportId } from '../../lib/inspection/reports';
+import {
+    CollabFollowupRequestSchema, CollabRestoreRequestSchema, CollabSnapshotParamSchema,
+    CollabTicketParamSchema, CollabTicketResponseSchema,
+} from '../../lib/validations/collab.schema';
+import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { Errors } from '../../lib/errors';
+import { issueWsTicket, WS_TICKET_TTL_S } from '../../lib/native/ws-ticket';
 import { getDrizzle } from '../../lib/route-helpers';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../../lib/db/schema';
 import { parseReinspectionStatuses } from '../../lib/reinspection-status';
+import { forwardCollabImport } from '../../lib/collab/import-route';
+import { authorizeCollab, collabStub } from '../../lib/collab/authorize';
 
-/**
- * Result of the shared fail-closed auth: either an early `Response` (the caller
- * returns it verbatim) or the resolved identity needed to address the DO.
- */
-type AuthResult =
-    | { ok: false; response: Response }
-    | { ok: true; tenantId: string; inspectionId: string; reportId: string; userId: string };
-
-/**
- * Shared fail-closed auth for every collab route (checks 1–5 above, excluding
- * the WS-only Upgrade check). Factored out so the snapshot/restore routes can
- * never diverge from the ws route's checks.
- */
-async function authorizeCollab(c: Context<HonoConfig>): Promise<AuthResult> {
-    // ── (1) Feature-detect binding ────────────────────────────────────────────
-    if (!c.env.INSPECTION_DOC) {
-        return { ok: false, response: new Response('collab unavailable', { status: 501 }) };
-    }
-
-    // ── (2) Inspection id param ───────────────────────────────────────────────
-    const id = c.req.param('id');
-    if (!id) return { ok: false, response: new Response('not found', { status: 404 }) };
-
-    // ── (3) Auth — JWT claims only (never from client) ────────────────────────
-    const tenantId = c.get('tenantId');
-    const user     = c.get('user') as { sub?: string } | undefined;
-    const userId   = user?.sub;
-    if (!tenantId || !userId) {
-        return { ok: false, response: new Response('unauthorized', { status: 401 }) };
-    }
-
-    // ── (4) Inspection lookup — tenant-scoped ─────────────────────────────────
-    // Called for the guard, not the row: it throws when the inspection does not
-    // exist OR belongs to another tenant, which is the 404 below. Who may edit
-    // comes from the roster in step 5.
-    try {
-        await c.var.services.inspection.getInspection(id, tenantId);
-    } catch (err) {
-        logger.error(
-            'collab: inspection lookup failed',
-            { inspectionId: id, tenantId },
-            err instanceof Error ? err : undefined,
-        );
-        return { ok: false, response: new Response('not found', { status: 404 }) };
-    }
-
-    // ── (5) Edit-permission check (mirrors presence route) ────────────────────
-    const userRole = c.get('userRole') as string | undefined;
-    const roster = await getInspectionRoster(getDrizzle(c), tenantId, id);
-    const allowed = canAccessInspectionCollab(roster, { id: userId, role: userRole ?? '' });
-
-    if (!allowed) {
-        return { ok: false, response: new Response('forbidden', { status: 403 }) };
-    }
-
-    // Which DOCUMENT is being edited. The route is addressed by inspection, so
-    // the primary report is the answer for every caller today; when a client
-    // can open the radon report directly it passes its own id and this becomes
-    // a lookup rather than a default.
-    const primaryReportId = await resolvePrimaryReportId(getDrizzle(c), tenantId, id);
-    if (!primaryReportId) {
-        // No report row means nothing to edit. Fail closed rather than falling
-        // back to an inspection-keyed document, which is the shared-Y.Doc bug.
-        return { ok: false, response: new Response('not found', { status: 404 }) };
-    }
-
-    return { ok: true, tenantId, inspectionId: id, reportId: primaryReportId, userId };
-}
-
-/**
- * Resolve the tenant-scoped DO stub for an authorized collab request.
- *
- * Keyed on the REPORT, not the inspection. Two inspectors working the standard
- * report and the sewer report of one order used to land in the same Durable
- * Object and share one Y.Doc — nothing threw, the CRDT merged content belonging
- * to two different documents, and the corruption surfaced when a client read a
- * report containing someone else's findings.
- * Only reached after `authorizeCollab` has proven `INSPECTION_DOC` is bound;
- * the explicit guard re-narrows for the type checker (the binding is optional
- * in the generated Env) and never throws in practice.
- */
-function collabStub(c: Context<HonoConfig>, tenantId: string, reportId: string) {
-    const ns = c.env.INSPECTION_DOC;
-    if (!ns) throw new Error('INSPECTION_DOC binding missing');
-    const doId = ns.idFromName(collabDocName(tenantId, reportId));
-    return ns.get(doId);
-}
+const issueCollabTicketRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/{id}/collab/ticket', operationId: 'issueCollabTicket', tags: ['client'],
+    summary: 'Issue a one-time WebSocket ticket',
+    description: 'Exchanges the signed-in native client identity for a single-use ticket, valid for sixty seconds and for one inspection, which authenticates the collab or presence WebSocket upgrade through the ticket query parameter because a WebView socket cannot send an Authorization header.',
+    request: { params: CollabTicketParamSchema },
+    responses: { 200: { description: 'One-time ticket', content: { 'application/json': { schema: CollabTicketResponseSchema } } } },
+}, { scopes: ['write'], tier: 'excluded' }));
 
 const collabRoutes = createApiRouter()
+    // Native identity only, and the same checks as the socket itself: a ticket is
+    // never issued for an inspection the caller could not open.
+    .openapi(issueCollabTicketRoute, async (c) => {
+        if (!c.get('nativeClient')) throw Errors.Unauthorized('Native session required');
+        const auth = await authorizeCollab(c);
+        if (!auth.ok) {
+            const { status } = auth.response;
+            if (status === 403) throw Errors.Forbidden();
+            if (status === 404) throw Errors.NotFound();
+            if (status === 501) throw Errors.ServiceUnavailable('Collaboration is unavailable');
+            throw Errors.Unauthorized();
+        }
+        const kv = c.env.TENANT_CACHE;
+        if (!kv) throw Errors.ServiceUnavailable('Ticket storage is unavailable');
+        // Role comes from the identity the middleware verified, never from the request.
+        const role = c.get('userRole');
+        if (!role) throw Errors.Unauthorized();
+        const ticket = await issueWsTicket(kv, {
+            tenantId: auth.tenantId, userId: auth.userId, role, inspectionId: auth.inspectionId,
+        });
+        return c.json({ success: true as const, data: { ticket, expiresIn: WS_TICKET_TTL_S } }, 200);
+    })
     .get('/:id/collab/ws', async (c) => {
         // ── (0) WebSocket protocol check (ws-only) ────────────────────────────
         if (c.req.header('Upgrade') !== 'websocket') {
@@ -321,6 +265,16 @@ const collabRoutes = createApiRouter()
             body: JSON.stringify(parsed.data),
         });
         return stub.fetch(fwd);
+    })
+    // ── POST /:id/collab/import — apply an offline client's Yjs update ─────────
+    // Raw bytes, so no zod body schema; see `forwardCollabImport` for how the
+    // size is bounded. The DO snapshots first and refuses what it cannot undo.
+    // Idempotent by construction: re-applying a Yjs update changes nothing, so
+    // a retry after any failure is safe without an Idempotency-Key.
+    .post('/:id/collab/import', async (c) => {
+        const auth = await authorizeCollab(c);
+        if (!auth.ok) return auth.response;
+        return forwardCollabImport(c, { ...auth, stub: collabStub(c, auth.tenantId, auth.reportId) });
     });
 
 export default collabRoutes;

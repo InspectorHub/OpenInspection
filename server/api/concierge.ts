@@ -15,13 +15,13 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
  * client-side script can route to the appropriate next step.
  */
 const ConfirmBodySchema = z.object({
-    token: z.string().min(8).max(128).describe('TODO describe token field for the OpenInspection MCP integration'),
+    token: z.string().min(8).max(128).describe('Single-use confirmation token from the link emailed to the client after an agent booked on their behalf'),
 }).openapi('ConciergeConfirmBody');
 
 const ConfirmResponseSchema = createApiResponseSchema(
     z.object({
-        inspectionId: z.string().trim().min(1).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
-        redirect:     z.string().describe('TODO describe redirect field for the OpenInspection MCP integration'),
+        inspectionId: z.string().trim().min(1),
+        redirect:     z.string(),
     }),
 ).openapi('ConciergeConfirmResponse');
 
@@ -65,18 +65,24 @@ const confirmRoute = createRoute(withMcpMetadata({
     tags: ["bookings"],
     summary: 'Client redeems a concierge magic-link token',
     request: {
-        body: { content: { 'application/json': { schema: ConfirmBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: ConfirmBodySchema.describe('The confirmation token to redeem') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: ConfirmResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: ConfirmResponseSchema } },
             description: 'Confirmed — caller redirects to either the agreement signing page or the inspection report',
         },
         400: { description: 'Token expired or already used' },
         404: { description: 'Token not found' },
     },
     operationId: "confirmConcierge",
-    description: "Auto-generated placeholder for confirmConcierge (POST /confirm, bookings domain). TODO: replace with a real description sourced from the handler."
+    description: "Redeem the emailed confirmation link for a booking an agent placed on a client's behalf. Public: the "
+        + "single-use token is the only credential. Sets the inspection to confirmed, clears its awaiting-client "
+        + "state, marks the token used, and notifies the agent who booked it. The response carries a redirect: to "
+        + "the agreement signing page when the inspection requires a signed agreement (an agreement request is "
+        + "found or created for it), otherwise to the report page. If no agreement template exists the redirect "
+        + "falls back to the report page. 404 for an unknown token, 400 for an expired token or a cancelled "
+        + "inspection, and 409 once the token has been used, so a repeat call fails."
 }, { scopes: [], tier: 'extended' }));
 
 const conciergeRoutes = createApiRouter()

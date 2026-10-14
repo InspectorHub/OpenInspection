@@ -14,10 +14,10 @@ import { z } from '@hono/zod-openapi';
 const SeverityFieldSchema = z.enum(['good', 'marginal', 'significant', 'minor']);
 
 export const CommentSchema = z.object({
-    text: z.string().min(1).max(1000).openapi({ example: 'Evidence of previous repair was observed.' }).describe('TODO describe text field for the OpenInspection MCP integration'),
-    category: z.string().max(50).optional().nullable().openapi({ example: 'Roofing' }).describe('TODO describe category field for the OpenInspection MCP integration'),
+    text: z.string().min(1).max(1000).openapi({ example: 'Evidence of previous repair was observed.' }).describe('The reusable comment wording inserted into a report (1-1000 characters)'),
+    category: z.string().max(50).optional().nullable().openapi({ example: 'Roofing' }).describe('Free-text grouping label for the library, up to 50 characters; null for none'),
     severity: SeverityFieldSchema.optional().nullable().openapi({ example: 'significant' }).describe('The single severity vocabulary shared with rating levels.'),
-    section: z.string().max(64).optional().nullable().openapi({ example: 'Roof' }).describe('TODO describe section field for the OpenInspection MCP integration'),
+    section: z.string().max(64).optional().nullable().openapi({ example: 'Roof' }).describe('Report section the comment belongs to, as free text up to 64 characters (for example Roof); null for none'),
     // Comments Library Upgrade — canonical single item label drives sort/filter.
     itemLabel: z.string().max(120).optional().nullable().openapi({ example: 'Roof Covering' }),
     repairSummary: z.string().max(2000).optional().nullable().describe('Repair recommendation summary (defect comments only). Scope of work, never a price.'),
@@ -25,36 +25,36 @@ export const CommentSchema = z.object({
 }).openapi('Comment');
 
 export const UpdateCommentSchema = z.object({
-    text: z.string().min(1).max(1000).openapi({ example: 'Evidence of previous repair was observed.' }).describe('TODO describe text field for the OpenInspection MCP integration'),
-    category: z.string().max(50).nullable().optional().openapi({ example: 'Roofing' }).describe('TODO describe category field for the OpenInspection MCP integration'),
+    text: z.string().min(1).max(1000).openapi({ example: 'Evidence of previous repair was observed.' }).describe('The reusable comment wording (1-1000 characters). Required on every update'),
+    category: z.string().max(50).nullable().optional().openapi({ example: 'Roofing' }).describe('Free-text grouping label, up to 50 characters. Omitting it or sending null clears the stored value'),
     severity: SeverityFieldSchema.nullable().optional().openapi({ example: 'significant' }).describe('The single severity vocabulary shared with rating levels.'),
-    section: z.string().max(64).nullable().optional().openapi({ example: 'Roof' }).describe('TODO describe section field for the OpenInspection MCP integration'),
+    section: z.string().max(64).nullable().optional().openapi({ example: 'Roof' }).describe('Report section, as free text up to 64 characters. Omitting it or sending null clears the stored value'),
     itemLabel: z.string().max(120).optional().nullable(),
     repairSummary: z.string().max(2000).optional().nullable().describe('Repair recommendation summary (defect comments only). Scope of work, never a price.'),
     recommendedContractorTypeId: z.string().optional().nullable().describe('Soft ref to contractor_types.id.'),
 }).openapi('UpdateComment');
 
 export const CommentResponseSchema = z.object({
-    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId: z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    text: z.string().describe('TODO describe text field for the OpenInspection MCP integration'),
-    category: z.string().nullable().describe('TODO describe category field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1),
+    tenantId: z.string().trim().min(1),
+    text: z.string(),
+    category: z.string().nullable(),
     severity: SeverityFieldSchema.nullable().describe('The single severity vocabulary shared with rating levels.'),
-    section: z.string().nullable().describe('TODO describe section field for the OpenInspection MCP integration'),
+    section: z.string().nullable(),
     itemLabel: z.string().nullable().optional(),
     repairSummary: z.string().nullable().optional(),
     recommendedContractorTypeId: z.string().nullable().optional(),
     useCount: z.number().int().optional(),
     lastUsedAt: z.string().nullable().optional(),
-    createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    createdAt: z.string(),
 }).openapi('CommentResponse');
 
 export const ListCommentsQuerySchema = z.object({
     severity: SeverityFieldSchema.optional().openapi({ example: 'significant' }).describe('Filter by the single severity vocabulary shared with rating levels.'),
-    section: z.string().max(64).optional().openapi({ example: 'Roof' }).describe('TODO describe section field for the OpenInspection MCP integration'),
+    section: z.string().max(64).optional().openapi({ example: 'Roof' }).describe('Section name to match exactly. Only applied when filterMode is auto; ignored when filterMode is all.'),
     sectionId: z.string().max(64).optional().openapi({ example: 'roof-general' }).describe('Filter by section ID (matches within the section_ids JSON array)'),
     triggerCode: z.string().max(64).optional().openapi({ example: 'NI' }).describe('Filter by trigger code'),
-    search: z.string().max(200).optional().describe('TODO describe search field for the OpenInspection MCP integration'),
+    search: z.string().max(200).optional().describe('Free-text search over comment text and curated search keywords (case-insensitive substring). Ignored unless at least 2 characters after trimming.'),
     // Comments Library Upgrade — new sort + filter mode + context filters.
     sort: z.enum(['relevance', 'recent', 'created', 'frequent', 'alpha']).optional().default('relevance').describe('Sort order for results: relevance, recent, created, frequent, or alpha'),
     filterMode: z.enum(['auto', 'all']).optional().default('all').describe('Filter mode: auto narrows to the inspection context, all shows everything'),

@@ -63,7 +63,7 @@ export const PublicBookingSchema = z.object({
     // public tenant identifier, resolved server-side exactly like the
     // GET /book/:tenant/:slug page data.
     tenant: z.string().min(1, 'Tenant is required').openapi({ example: 'acme-inspections' }).describe('Tenant slug from the booking page URL; resolved server-side to the tenant id.'),
-    address: z.string().min(5, 'Address is too short').openapi({ example: '123 Main St, City, ST 12345' }).describe('TODO describe address field for the OpenInspection MCP integration'),
+    address: z.string().min(5, 'Address is too short').openapi({ example: '123 Main St, City, ST 12345' }).describe('Property address to inspect, free text of at least 5 characters'),
     // The structured half of the address, present when the visitor picked a
     // suggestion from the public autocomplete instead of typing free text.
     //
@@ -78,8 +78,8 @@ export const PublicBookingSchema = z.object({
         .describe('ZIP hint from the selected autocomplete suggestion. Re-resolved server-side when a placeId is supplied.'),
     addressPlaceId: z.string().trim().min(8).max(200).optional().openapi({ example: 'ChIJxxx' })
         .describe('Google place id of the selected suggestion. Resolved server-side to the property coordinates used by `closest` routing.'),
-    clientName: z.string().min(1, 'Client name is required').openapi({ example: 'John Doe' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
-    clientEmail: z.string().email('Invalid email address').openapi({ example: 'john@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
+    clientName: z.string().min(1, 'Client name is required').openapi({ example: 'John Doe' }).describe('Name of the client booking the inspection'),
+    clientEmail: z.string().email('Invalid email address').openapi({ example: 'john@example.com' }).describe('Client email address. The confirmation email goes here, and the client contact is matched or created by it'),
     // F42 — the bounds are enforced by the two object-level refinements below,
     // not here: a `.refine()` on the field would wrap it in a ZodEffects, and
     // this object is registered with `.openapi('PublicBooking')` for the MCP
@@ -87,29 +87,29 @@ export const PublicBookingSchema = z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)')
         .openapi({ example: '2026-04-15' })
         .describe('Requested inspection date, YYYY-MM-DD. Must not be in the past, and must be within two years.'),
-    timeSlot: z.enum(['morning', 'afternoon', 'all-day', 'custom']).openapi({ example: 'morning' }).describe('TODO describe timeSlot field for the OpenInspection MCP integration'),
-    customTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().openapi({ example: '13:30' }).describe('TODO describe customTime field for the OpenInspection MCP integration'),
+    timeSlot: z.enum(['morning', 'afternoon', 'all-day', 'custom']).openapi({ example: 'morning' }).describe('Requested window: morning (8:00-12:00), afternoon (12:00-16:00), all-day (8:00-17:00) or custom, which needs customTime. Any free slot inside the window satisfies it'),
+    customTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().openapi({ example: '13:30' }).describe('Requested start time as HH:mm in the company\'s timezone. Required when timeSlot is custom'),
     // IA-26 — optional. Omit for company-level auto-assign (the server picks the
     // first available qualified inspector). Supply to target a specific inspector
     // (per-inspector deep link / allowInspectorChoice dropdown). If supplied and
     // the inspector is unavailable or belongs to a different tenant the request
     // is rejected; the server will NOT silently reassign to a free inspector.
     inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Optional inspector id. Omit for company-level auto-assign; supply to target a specific inspector (deep link / inspector-choice flow).'),
-    turnstileToken: z.string().optional().openapi({ example: '0.xtoken...' }).describe('TODO describe turnstileToken field for the OpenInspection MCP integration'),
+    turnstileToken: z.string().optional().openapi({ example: '0.xtoken...' }).describe('Token from the Turnstile bot challenge on the booking page. Required where the deployment enforces the challenge; verified server-side'),
     // Sprint 2 S2-2 — Multi-inspection per request. Customer can pick multiple
     // services in a single visit. When omitted (legacy single-service flow),
     // the server still creates a one-inspection request to keep the data model
     // uniform. `serviceIds` are tenant Service entries; their templateId is
     // resolved server-side.
     services: z.array(z.object({
-        serviceId: z.string().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe serviceId field for the OpenInspection MCP integration'),
+        serviceId: z.string().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Id of a service offered by this company; each service creates its own inspection, and a service with no template is refused'),
     })).min(1).max(10).optional().openapi({ description: 'Optional list of services to book in one visit (1-10)' }),
     // UC-A-1 — agent referral attribution. The `?ref=<agentSlug>` query param
     // on /book/<inspectorSlug> flows through the form as a hidden field. Server
     // resolves the slug to a global agent user, finds their active link to
     // this tenant, and persists the linked inspectorContactId on
     // inspections.referredByAgentId.
-    agentRefSlug: z.string().min(2).max(64).optional().openapi({ example: 'jane-tester' }).describe('TODO describe agentRefSlug field for the OpenInspection MCP integration'),
+    agentRefSlug: z.string().min(2).max(64).optional().openapi({ example: 'jane-tester' }).describe('Slug of the referring agent, from the ?ref= link on the booking page. When the agent is actively linked to this company the inspection is attributed to them; otherwise it is ignored'),
     // Track L (D6, path A) — unchecked SMS opt-in. When true, the submit records a
     // `granted` SMS consent event (captured_via=booking_form) for the client contact.
     smsOptin: z.boolean().optional().openapi({ example: false }).describe('Client self-book SMS opt-in (TCPA consent). When true, records a granted consent event.'),
@@ -141,11 +141,11 @@ export const PublicBookingSchema = z.object({
  * Validation schema for recurring weekly availability.
  */
 export const AvailabilitySchema = z.object({
-    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspector whose weekly schedule is replaced. Defaults to the caller; only owners and managers may name another inspector.'),
     slots: z.array(z.object({
-        dayOfWeek: z.number().min(0).max(6).openapi({ example: 1 }).describe('TODO describe dayOfWeek field for the OpenInspection MCP integration'),
-        startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').openapi({ example: '09:00' }).describe('TODO describe startTime field for the OpenInspection MCP integration'),
-        endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').openapi({ example: '17:00' }).describe('TODO describe endTime field for the OpenInspection MCP integration'),
+        dayOfWeek: z.number().min(0).max(6).openapi({ example: 1 }).describe('Day of the week the slot recurs on, counted from Sunday as 0 through Saturday as 6.'),
+        startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').openapi({ example: '09:00' }).describe('Time of day the availability window opens, as a 24-hour HH:mm wall-clock time.'),
+        endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').openapi({ example: '17:00' }).describe('Time of day the availability window closes, as a 24-hour HH:mm wall-clock time.'),
     })).min(0).openapi({ description: 'List of weekly availability slots (empty array clears all slots)' }),
 }).openapi('Availability');
 
@@ -153,18 +153,18 @@ export const AvailabilitySchema = z.object({
  * Validation schema for date-specific availability overrides.
  */
 export const OverrideSchema = z.object({
-    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').openapi({ example: '2024-04-16' }).describe('TODO describe date field for the OpenInspection MCP integration'),
-    isAvailable: z.boolean().openapi({ example: false }).describe('TODO describe isAvailable field for the OpenInspection MCP integration'),
-    startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().nullable().openapi({ example: '09:00' }).describe('TODO describe startTime field for the OpenInspection MCP integration'),
-    endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().nullable().openapi({ example: '17:00' }).describe('TODO describe endTime field for the OpenInspection MCP integration'),
+    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspector the override applies to. Defaults to the caller; only owners and managers may name another inspector.'),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').openapi({ example: '2024-04-16' }).describe('Calendar date the override applies to, as YYYY-MM-DD.'),
+    isAvailable: z.boolean().openapi({ example: false }).describe('False blocks the date so no booking slots are offered; true replaces the weekly schedule for that date with the start and end time given.'),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().nullable().openapi({ example: '09:00' }).describe('Opening time of the replacement window as 24-hour HH:mm; used when isAvailable is true and omitted or null for a blocked date.'),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().nullable().openapi({ example: '17:00' }).describe('Closing time of the replacement window as 24-hour HH:mm; used when isAvailable is true and omitted or null for a blocked date.'),
 }).openapi('Override');
 
 /**
  * Response Schemas
  */
 export const InspectorsResponseSchema = createApiResponseSchema(z.array(z.object({
-    id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
     // Nullable because an account may carry no name. It used to be `string`,
     // which the service satisfied by returning the local part of the mailbox —
     // a contract that promised a name and was kept by inventing one.
@@ -172,17 +172,17 @@ export const InspectorsResponseSchema = createApiResponseSchema(z.array(z.object
 }))).openapi('InspectorsResponse');
 
 export const AvailabilityResponseSchema = createApiResponseSchema(z.object({
-    bookedSlots: z.array(z.string()).openapi({ example: ['2024-04-15T09:00:00Z'] }).describe('TODO describe bookedSlots field for the OpenInspection MCP integration'),
+    bookedSlots: z.array(z.string()).openapi({ example: ['2024-04-15T09:00:00Z'] }),
     overrides: z.array(z.any()).openapi({ description: 'Active availability overrides' }),
     baseAvailability: z.array(z.any()).openapi({ description: 'Standard weekly availability' }),
 })).openapi('AvailabilityResponse');
 
 export const BookingResponseSchema = createApiResponseSchema(z.object({
-    success: z.boolean().openapi({ example: true }).describe('TODO describe success field for the OpenInspection MCP integration'),
+    success: z.boolean().openapi({ example: true }),
     // Single-service legacy callers still get the first inspection's id here.
-    inspectionId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    inspectionId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
     // Sprint 2 S2-2 — request grouping is always present, even for single-service bookings.
-    requestId: z.string().optional().openapi({ example: 'req-abc12345' }).describe('TODO describe requestId field for the OpenInspection MCP integration'),
+    requestId: z.string().optional().openapi({ example: 'req-abc12345' }),
     inspectionIds: z.array(z.string().trim().min(1)).optional().openapi({ description: 'All inspection ids in the request' }),
     // What the booking OWES up front, frozen at this moment. 0 (the default for
     // every workspace) means no payment step is shown. Never what was paid —
@@ -192,33 +192,33 @@ export const BookingResponseSchema = createApiResponseSchema(z.object({
 })).openapi('BookingResponse');
 
 export const AvailabilityListResponseSchema = createApiResponseSchema(z.array(z.object({
-    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId: z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    dayOfWeek: z.number().describe('TODO describe dayOfWeek field for the OpenInspection MCP integration'),
-    startTime: z.string().describe('TODO describe startTime field for the OpenInspection MCP integration'),
-    endTime: z.string().describe('TODO describe endTime field for the OpenInspection MCP integration'),
-    inspectorId: z.string().trim().min(1).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1),
+    tenantId: z.string(),
+    dayOfWeek: z.number(),
+    startTime: z.string(),
+    endTime: z.string(),
+    inspectorId: z.string().trim().min(1),
+    createdAt: z.string(),
 }))).openapi('AvailabilityListResponse');
 
 export const OverrideListResponseSchema = createApiResponseSchema(z.array(z.object({
-    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId: z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    date: z.string().describe('TODO describe date field for the OpenInspection MCP integration'),
-    isAvailable: z.boolean().describe('TODO describe isAvailable field for the OpenInspection MCP integration'),
-    startTime: z.string().nullable().describe('TODO describe startTime field for the OpenInspection MCP integration'),
-    endTime: z.string().nullable().describe('TODO describe endTime field for the OpenInspection MCP integration'),
-    inspectorId: z.string().trim().min(1).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1),
+    tenantId: z.string(),
+    date: z.string(),
+    isAvailable: z.boolean(),
+    startTime: z.string().nullable(),
+    endTime: z.string().nullable(),
+    inspectorId: z.string().trim().min(1),
+    createdAt: z.string(),
 }))).openapi('OverrideListResponse');
 
 export const OverrideResponseSchema = createApiResponseSchema(z.object({
     override: z.object({
-        id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-        date: z.string().describe('TODO describe date field for the OpenInspection MCP integration'),
-        isAvailable: z.boolean().describe('TODO describe isAvailable field for the OpenInspection MCP integration'),
-        startTime: z.string().nullable().describe('TODO describe startTime field for the OpenInspection MCP integration'),
-        endTime: z.string().nullable().describe('TODO describe endTime field for the OpenInspection MCP integration'),
-        inspectorId: z.string().trim().min(1).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    }).describe('TODO describe override field for the OpenInspection MCP integration'),
+        id: z.string().trim().min(1),
+        date: z.string(),
+        isAvailable: z.boolean(),
+        startTime: z.string().nullable(),
+        endTime: z.string().nullable(),
+        inspectorId: z.string().trim().min(1),
+    }),
 })).openapi('OverrideResponse');

@@ -43,14 +43,14 @@ const loginRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'application/json': { schema: LoginSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: LoginSchema.describe('Email and password of the account signing in.') }
             }
         }
     },
     responses: {
         200: {
             content: {
-                'application/json': { schema: LoginResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: LoginResponseSchema }
             },
             description: 'Login successful'
         },
@@ -69,14 +69,14 @@ const changePasswordRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'application/json': { schema: ChangePasswordSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: ChangePasswordSchema.describe('The current password and the new password to replace it with, for the signed-in user.') }
             }
         }
     },
     responses: {
         200: {
             content: {
-                'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: SuccessResponseSchema }
             },
             description: 'Password updated'
         },
@@ -94,14 +94,14 @@ const joinTeamRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'application/json': { schema: JoinTeamSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: JoinTeamSchema.describe('Invitation token, new password and optional display name used to create an account on the inviting team.') }
             }
         }
     },
     responses: {
         200: {
             content: {
-                'application/json': { schema: AuthResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: AuthResponseSchema }
             },
             description: 'Team joined successfully'
         }
@@ -155,14 +155,14 @@ const forgotPasswordRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'application/json': { schema: ForgotPasswordSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: ForgotPasswordSchema.describe('Email address of the account that should receive a password-reset link.') }
             }
         }
     },
     responses: {
         200: {
             content: {
-                'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: SuccessResponseSchema }
             },
             description: 'Reset email sent (if user exists)'
         },
@@ -185,14 +185,14 @@ const resetPasswordRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'application/json': { schema: ResetPasswordSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: ResetPasswordSchema.describe('Reset token from the password-reset email and the new password to set.') }
             }
         }
     },
     responses: {
         200: {
             content: {
-                'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: SuccessResponseSchema }
             },
             description: 'Password reset successful'
         }
@@ -209,14 +209,14 @@ const setupRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'application/json': { schema: SetupSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: SetupSchema.describe('First-run setup details: company name, first admin account and the setup code that authorises creating it.') }
             }
         }
     },
     responses: {
         200: {
             content: {
-                'application/json': { schema: AuthResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
+                'application/json': { schema: AuthResponseSchema }
             },
             description: 'Success'
         },

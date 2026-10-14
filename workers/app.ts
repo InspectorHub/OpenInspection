@@ -229,9 +229,9 @@ app.all("*", ssr);
 // (the allowed portal-import composition point) so this entry never imports
 // server/portal/* statically — it just forwards the runtime invocation.
 //
-// buildOAuthHandler wraps app.fetch with an OAuthProvider when MCP_ENABLED is
-// set, mounting the OAuth token endpoints and Bearer-protecting the MCP API
-// route. When the flag is off the call is a no-op pass-through.
+// buildOAuthHandler wraps app.fetch with an OAuthProvider when MCP_ENABLED or
+// NATIVE_CLIENT_ENABLED is set (OAuth endpoints, Bearer-protected MCP route).
+// When both flags are off the call is a no-op pass-through.
 export default {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fetch: (req: Request, env: any, ctx: ExecutionContext) =>

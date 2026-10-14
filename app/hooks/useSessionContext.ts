@@ -83,6 +83,8 @@ export interface SessionContext {
     hasBilling: boolean;
     hasSeatQuota: boolean;
     mcpEnabled: boolean;
+    /** Remote MCP or native clients are on, so the Connected applications page has something to list. */
+    connectedAppsEnabled: boolean;
     videoBackendManaged: boolean;
     hasManagedCompliance: boolean;
     /** Whether the import wizard may offer to hand an unreadable file to a

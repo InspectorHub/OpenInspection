@@ -27,6 +27,11 @@ export type InspectionServiceRow = typeof inspectionServices.$inferInsert;
  * Snapshots, not references: `nameSnapshot` / `priceSnapshot` freeze what the
  * catalog said on the day, so editing a service later never rewrites history.
  *
+ * Each line's id is derived from the inspection and the service, and the insert
+ * ignores a conflict: running this twice for one inspection, even at the same
+ * moment (a create and the replay that completes it), writes each line once and
+ * so never doubles what the inspection costs.
+ *
  * `serviceSelections` (IA-1 superset) takes precedence over the legacy flat
  * `serviceIds` list when both are present — the handlers already merge them so
  * only one branch ever fires.
@@ -70,7 +75,7 @@ export async function writeInspectionServiceSnapshots(
         (serviceSelections ?? []).map(s => [s.serviceId, s.priceOverrideCents]),
     );
     const rows: InspectionServiceRow[] = svcRows.map(s => ({
-        id:            crypto.randomUUID(),
+        id:            `${inspectionId}:${s.id}`,
         tenantId,
         inspectionId,
         serviceId:     s.id,
@@ -78,6 +83,6 @@ export async function writeInspectionServiceSnapshots(
         nameSnapshot:  s.name,
         priceSnapshot: s.price,
     }));
-    await db.insert(inspectionServices).values(rows);
+    await db.insert(inspectionServices).values(rows).onConflictDoNothing();
     return rows;
 }

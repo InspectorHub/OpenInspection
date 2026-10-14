@@ -32,8 +32,8 @@ const publicGeocodeRoute = createRoute(withMcpMetadata({
     summary: 'Address autocomplete proxy (public, rate-limited)',
     request: {
         query: z.object({
-            q: z.string().min(1).max(200).openapi({ example: '1005 S Gay' }).describe('TODO describe q field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
+            q: z.string().min(1).max(200).openapi({ example: '1005 S Gay' }).describe('Partial street address typed so far. Fewer than 3 characters returns an empty suggestion list.'),
+        }),
     },
     responses: {
         200: {
@@ -41,14 +41,14 @@ const publicGeocodeRoute = createRoute(withMcpMetadata({
                 'application/json': {
                     schema: z.object({
                         data: z.array(z.object({
-                            label:   z.string().describe('TODO describe label field for the OpenInspection MCP integration'),
-                            line1:   z.string().describe('TODO describe line1 field for the OpenInspection MCP integration'),
-                            city:    z.string().nullable().describe('TODO describe city field for the OpenInspection MCP integration'),
-                            state:   z.string().nullable().describe('TODO describe state field for the OpenInspection MCP integration'),
-                            zip:     z.string().nullable().describe('TODO describe zip field for the OpenInspection MCP integration'),
-                            placeId: z.string().describe('TODO describe placeId field for the OpenInspection MCP integration'),
-                        })).describe('TODO describe data field for the OpenInspection MCP integration'),
-                        reason: z.enum(['NO_API_KEY', 'UPSTREAM_ERROR']).optional().describe('TODO describe reason field for the OpenInspection MCP integration'),
+                            label:   z.string(),
+                            line1:   z.string(),
+                            city:    z.string().nullable(),
+                            state:   z.string().nullable(),
+                            zip:     z.string().nullable(),
+                            placeId: z.string(),
+                        })),
+                        reason: z.enum(['NO_API_KEY', 'UPSTREAM_ERROR']).optional(),
                     }),
                 },
             },
@@ -56,7 +56,7 @@ const publicGeocodeRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "geocodeBooking",
-    description: "Auto-generated placeholder for geocodeBooking (GET /geocode, bookings domain). TODO: replace with a real description sourced from the handler."
+    description: "Public, unauthenticated address autocomplete for the booking page, proxying Google Places so the API key never reaches the browser. Returns at most 5 US address suggestions (label, line1, and best-effort city, state and ZIP split from the suggestion text, plus a placeId). Queries shorter than 3 characters return an empty list without calling Google. When the deployment has no Places key, or Google fails or answers unexpectedly, the call still returns 200 with an empty list and a reason of NO_API_KEY or UPSTREAM_ERROR in meta, so a client should fall back to free-text address entry. Rate-limited with the booking limiter."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const publicGeocodeRoutes = createApiRouter()

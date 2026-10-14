@@ -26,20 +26,20 @@ import { getDrizzle } from '../lib/route-helpers';
 
 const LinkRowSchema = z
     .object({
-        id:          z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-        agentUserId: z.string().describe('TODO describe agentUserId field for the OpenInspection MCP integration'),
-        agentName:   z.string().nullable().describe('TODO describe agentName field for the OpenInspection MCP integration'),
-        agentEmail:  z.string().nullable().describe('TODO describe agentEmail field for the OpenInspection MCP integration'),
-        status:      z.enum(['active', 'revoked']).describe('TODO describe status field for the OpenInspection MCP integration'),
-        createdAt:   z.number().nullable().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-        revokedAt:   z.number().nullable().describe('TODO describe revokedAt field for the OpenInspection MCP integration'),
+        id:          z.string(),
+        agentUserId: z.string(),
+        agentName:   z.string().nullable(),
+        agentEmail:  z.string().nullable(),
+        status:      z.enum(['active', 'revoked']),
+        createdAt:   z.number().nullable(),
+        revokedAt:   z.number().nullable(),
     })
     .openapi('AgentLinkRow');
 
 const ListLinksResponseSchema = z
     .object({
-        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-        data: z.object({ links: z.array(LinkRowSchema).describe('TODO describe links field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+        success: z.literal(true),
+        data: z.object({ links: z.array(LinkRowSchema) }),
     })
     .openapi('ListAgentLinksResponse');
 
@@ -48,10 +48,10 @@ const listLinksRoute = createRoute(withMcpMetadata({
     path: '/links',
     tags: ["agents"],
     summary: 'List partner-agent links for the current tenant',
-    description: "Auto-generated placeholder for listAgentLinks (GET /links, agents domain). TODO: replace with a real description sourced from the handler.",
+    description: "Lists the company's partner-agent links: agent contacts that are bound to an agent account, with the agent's account name and email, an active or revoked status, and when the link was created and (if applicable) revoked. Revoked links are included. Ordinary agent contacts with no account are not links and are not listed. Newest link first, not paginated. The link id is the contact id used by the revoke route. Read-only. Available to owner, manager and inspector roles.",
     responses: {
         200: {
-            content: { 'application/json': { schema: ListLinksResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: ListLinksResponseSchema } },
             description: 'Links',
         },
         401: { description: 'Unauthorized' },
@@ -64,13 +64,13 @@ const listLinksRoute = createRoute(withMcpMetadata({
 // --- A2: POST /api/agents/<linkId>/revoke ---
 
 const RevokeParamsSchema = z.object({
-    linkId: z.string().min(1).describe('TODO describe linkId field for the OpenInspection MCP integration'),
+    linkId: z.string().min(1).describe('Id of the partner-agent link to revoke, as returned in the id field of the link list. It is the agent\'s contact id and must belong to this company'),
 }).openapi('AgentLinkRevokeParams');
 
 const RevokeResponseSchema = z
     .object({
-        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-        data: z.object({ ok: z.literal(true).describe('TODO describe ok field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+        success: z.literal(true),
+        data: z.object({ ok: z.literal(true) }),
     })
     .openapi('AgentLinkRevokeResponse');
 
@@ -79,11 +79,16 @@ const revokeRoute = createRoute(withMcpMetadata({
     path: '/{linkId}/revoke',
     tags: ["agents"],
     summary: 'Revoke a partner-agent link',
-    description: "Auto-generated placeholder for revokeAgent (POST /{linkId}/revoke, agents domain). TODO: replace with a real description sourced from the handler.",
-    request: { params: RevokeParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
+    description: "Withdraw a linked agent's access to this company's inspections in the agent portal. The link is the "
+        + "agent's contact record; revoking stamps it as revoked and keeps the history of who held it. The contact "
+        + "itself is not archived, so the person stays usable as an agent on existing inspections, and the "
+        + "agent's account is not deleted. A revoked agent can no longer book through this company on their own "
+        + "account. Returns 404 when the id is not a contact in this company. Calling it again succeeds and "
+        + "refreshes the revocation time. Open to owners, managers and inspectors.",
+    request: { params: RevokeParamsSchema },
     responses: {
         200: {
-            content: { 'application/json': { schema: RevokeResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: RevokeResponseSchema } },
             description: 'Link revoked',
         },
         401: { description: 'Unauthorized' },

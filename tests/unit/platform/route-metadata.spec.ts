@@ -9,6 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { app } from '../../../server/index';
+import { buildOpenApiDocument } from '../../../server/lib/openapi/build-document';
 import {
     VALID_TAGS,
     VALID_SECONDARY_TAGS,
@@ -51,7 +52,7 @@ function moduleOf(path: string): string {
 }
 
 function getOpenApiDoc() {
-    return app.getOpenAPIDocument({
+    return buildOpenApiDocument(app, {
         openapi: '3.0.0',
         info: { version: 'test', title: 'OpenInspection Core API' },
     });
@@ -103,15 +104,24 @@ describe('route metadata', { timeout: 30_000 }, () => {
     });
 
     it('operationIds are globally unique', () => {
-        const seen = new Map<string, string>();
+        // eachOperation() already collapses repeated operationIds, so it cannot
+        // see a duplicate. Walk the raw document instead. One route object
+        // mounted at two paths (an alias) repeats its operationId together with
+        // its summary and description; two different routes that merely share a
+        // name differ in those, and the second silently loses its MCP tool.
+        const seen = new Map<string, { where: string; text: string }>();
         const dupes: string[] = [];
-        for (const { op, where } of eachOperation()) {
-            if (!op.operationId) continue;
-            const prior = seen.get(op.operationId);
-            if (prior) dupes.push(`${op.operationId}: ${prior} vs ${where}`);
-            else seen.set(op.operationId, where);
+        for (const [path, methods] of Object.entries(getOpenApiDoc().paths ?? {})) {
+            for (const [method, op] of Object.entries(methods as Record<string, OperationLike>)) {
+                if (!HTTP_METHODS.has(method) || !op.operationId) continue;
+                const where = `${method.toUpperCase()} ${path}`;
+                const text = `${op.summary ?? ''}\n${op.description ?? ''}`;
+                const prior = seen.get(op.operationId);
+                if (!prior) seen.set(op.operationId, { where, text });
+                else if (prior.text !== text) dupes.push(`${op.operationId}: ${prior.where} vs ${where}`);
+            }
         }
-        expect(dupes, `Duplicate operationIds:\n${dupes.join('\n')}`).toEqual([]);
+        expect(dupes, `Duplicate operationIds on different routes:\n${dupes.join('\n')}`).toEqual([]);
     });
 
     it('every route has a valid summary (4-12 words, no trailing period)', () => {
@@ -191,6 +201,29 @@ describe('route metadata', { timeout: 30_000 }, () => {
             }
         }
         expect(issues, issues.join('\n')).toEqual([]);
+    });
+
+    it('routes that take a multipart file body are never offered as MCP tools', () => {
+        // The MCP request builder sends JSON only, so a tool for a multipart route
+        // can never carry its file: every call answers 400 "file is missing" and
+        // an LLM keeps picking it. The HTTP route itself is unaffected. A JSON
+        // route is the positive control: it must still be offered.
+        const multipart: string[] = [];
+        const exposed: string[] = [];
+        let jsonRoutes = 0;
+        for (const { op, where } of eachOperation()) {
+            const tier = op['x-tier'] as string | undefined;
+            const takesFile = Object.keys(op.requestBody?.content ?? {}).some((t) => t.startsWith('multipart/'));
+            if (takesFile) {
+                multipart.push(where);
+                if (tier !== 'excluded') exposed.push(`${where} (${tier})`);
+            } else if (op.requestBody && tier !== 'excluded') {
+                jsonRoutes += 1;
+            }
+        }
+        expect(multipart.length, 'the scan sees multipart routes at all').toBeGreaterThan(0);
+        expect(jsonRoutes, 'and still sees JSON routes that stay offered').toBeGreaterThan(0);
+        expect(exposed, `Multipart routes exposed to MCP:\n${exposed.join('\n')}`).toEqual([]);
     });
 
     it(`primary-tier route count ≤ ${PRIMARY_TIER_CAP}`, () => {

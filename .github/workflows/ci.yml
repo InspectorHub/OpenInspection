@@ -230,6 +230,39 @@ jobs:
       - run: npm run lint:gates-full
       - name: Migration drift gate (schema vs migrations)
         run: npm run db:check
+      # The native app is a shipped binary that cannot be recalled, so a breaking
+      # change to the endpoints it calls must fail the pull request. oasdiff
+      # compares the committed contract against the base branch's copy.
+      # `breaking --fail-on ERR` exits non-zero on any ERR-level change (a removed
+      # operation, a removed required response property, a new required request
+      # property, ...). Image pinned to a release at least two weeks old AND to its
+      # manifest digest, so a retagged image cannot change what runs here.
+      - name: Native contract - no breaking changes against the base branch
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -eu
+          BASE_FILE="contracts/native-contract.openapi.json"
+          # A base branch that cannot be resolved is an error, never a reason to skip:
+          # without this check a missing ref would look exactly like "file absent".
+          git rev-parse --verify --quiet "origin/${BASE_REF}^{commit}" > /dev/null
+          # The skip below is correct ONLY in the pull request that first
+          # introduces the contract. With the ref known to exist, `cat-file -e`
+          # answers one question - does the file exist on the base branch - so a
+          # failed read of a file that IS there (git show below) still fails the step.
+          # Remove this branch in the change that follows the first merge of the
+          # contract.
+          if ! git cat-file -e "origin/${BASE_REF}:${BASE_FILE}"; then
+            echo "Contract first introduced: origin/${BASE_REF} has no ${BASE_FILE} yet; nothing to compare against - skipping."
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/native-base"
+          git show "origin/${BASE_REF}:${BASE_FILE}" > "$RUNNER_TEMP/native-base/native-contract.openapi.json"
+          docker run --rm \
+            -v "$RUNNER_TEMP/native-base:/base:ro" -v "$PWD/contracts:/head:ro" \
+            tufin/oasdiff:v1.32.1@sha256:3b14fe0112e5d1bf862f91ab234a4bcd161a3f399e98f8b0b665ce70857694ac \
+            breaking /base/native-contract.openapi.json /head/native-contract.openapi.json --fail-on ERR
 
   # ── Tests ────────────────────────────────────────────────────────────────
   # Sharded across four runners. This job was the longest in the workflow at

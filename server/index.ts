@@ -1,6 +1,6 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
-import { cors } from 'hono/cors';
+import { apiCors } from './lib/native/cors-origins';
 import { serveStatic } from 'hono/cloudflare-workers';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
@@ -30,7 +30,6 @@ import { agentTermsGate } from './lib/middleware/agent-terms-gate';
 import { idempotencyMiddleware } from './lib/middleware/idempotency';
 import { agreementSignPath, agreementRenderPath } from './lib/public-urls';
 import { loadVerifyData } from './lib/verify-data';
-
 
 import coreAuthRoutes, { ssoRootRoutes } from './api/auth';
 import testHooksRoutes from './api/test-hooks';
@@ -67,6 +66,7 @@ import calendarRoutes from './api/calendar';
 import calendarEventsRoutes from './api/calendar-events';
 import scheduleWeekSummaryRoutes from './api/schedule-week-summary';
 import teamRoutes from './api/team';
+import { clientRoutes } from './api/client';
 import contactRoutes from './api/contacts';
 import contactsImportRoutes from './api/contacts/import';
 import migrationIntakeRoutes from './api/migration-intake';
@@ -102,6 +102,7 @@ import publicSlugRoutes from './api/public-slug';
 import unsubscribeRoutes from './api/unsubscribe';
 import publicShareRoutes from './api/public-share';
 import publicReportRoutes from './api/public-report';
+import { publicUploadsRoutes } from './api/public/uploads';
 import clientDocumentsRoutes, { inspectorDocumentsRoutes } from './api/client-documents';
 import profileRoutes from './api/profile';
 import conciergeRoutes from './api/concierge';
@@ -145,13 +146,8 @@ const app = new OpenAPIHono<HonoConfig>({
 // CORS — allows React Router v7 frontend (separate origin in dev) to call API endpoints.
 // In production both share the same origin; this is primarily for local dev
 // where Vite runs on :5173 and the API Worker runs on :8787.
-app.use('/api/*', cors({
-    origin: (origin) => origin,
-    credentials: true,
-    allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Token-Relay'],
-    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    exposeHeaders: ['Set-Cookie'],
-}));
+// The policy lives in lib/native/cors-origins.ts; the native app origins get extra headers there.
+app.use('/api/*', apiCors);
 
 // Global request logger
 app.use('*', async (c, next) => {
@@ -177,7 +173,6 @@ app.get('/status', (c) => c.json({
     buildTime: BUILD.buildTime,
     timestamp: new Date().toISOString(),
 }));
-
 
 /**
  * Global Error Handler
@@ -387,6 +382,8 @@ const routes = app
   // Signed email unsubscribe. MUST stay under /api/public — that prefix is what
   // keeps it outside the agent-terms gate; see server/api/unsubscribe.ts.
   .route('/api/public', unsubscribeRoutes)
+  // Native background uploads: authorized by the signed token in the query string, not a session.
+  .route('/api/public', publicUploadsRoutes)
   // Unified client portal — magic-link request/redeem + session-gated data routes.
   // The :tenant slug lives inside the route definitions (tenantRouter resolves it).
   .route('/api/portal', portalRoutes)
@@ -436,6 +433,7 @@ const routes = app
   .route('/api/calendar', calendarRoutes)
   .route('/api/schedule', scheduleWeekSummaryRoutes)
   .route('/api/team', teamRoutes)
+  .route('/api/client', clientRoutes)
   .route('/api/contacts', contactRoutes)
   // Import sub-router — extracted to fix hono/client type-collapse (C-10)
   .route('/api/contacts', contactsImportRoutes)
@@ -531,7 +529,7 @@ let openApiDocument: ReturnType<typeof app.getOpenAPIDocument> | undefined;
 app.get('/doc', async (c) => {
     // Before the build. Refusing after it pays the CPU, then withholds it.
     await checkRateLimit(c, 'openapi-doc');
-    openApiDocument ??= app.getOpenAPIDocument(OPENAPI_CONFIG);
+    openApiDocument ??= (await import('./lib/openapi/build-document')).buildOpenApiDocument(app, OPENAPI_CONFIG);
     c.header('Cache-Control', 'public, max-age=3600');
     return c.json(openApiDocument);
 });

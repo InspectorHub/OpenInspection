@@ -149,7 +149,7 @@ const uploadSourceRoute = createRoute(withMcpMetadata({
     },
     operationId: 'uploadStatutoryFormSource',
     description: "Supply the issuing authority's own published PDF for one revision of one statutory form. The upload is verified against the sha256 that revision records and refused if it does not match, naming both values. The bytes are never fetched on the operator's behalf: the source URL is provenance for a human, and an authority may publish a superseded revision at its most obvious address.",
-}, { scopes: ['admin'], tier: 'extended' }));
+}, { scopes: ['admin'], tier: 'excluded' }));
 
 const adminStatutorySourceRoutes = createApiRouter()
     .openapi(listSourcesRoute, async (c) => {

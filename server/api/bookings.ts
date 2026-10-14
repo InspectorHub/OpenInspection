@@ -47,14 +47,14 @@ const listInspectorsRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: InspectorsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: InspectorsResponseSchema,
                 },
             },
             description: 'Success',
         },
     },
     operationId: "listBookingInspectors",
-    description: "Auto-generated placeholder for listBookingInspectors (GET /inspectors, bookings domain). TODO: replace with a real description sourced from the handler."
+    description: "Public, unauthenticated list of the company's inspectors for the booking page's inspector-choice dropdown: id and display name (null when the user has no name) for every user with the inspector role. The company comes from the request's tenant context (host or slug), not a parameter. Not paginated; no email or other contact details are returned. Read-only."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -73,15 +73,15 @@ const listPublicServicesRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+                        success: z.boolean(),
                         data: z.object({
                             services: z.array(z.object({
-                                id:              z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-                                name:            z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-                                description:     z.string().nullable().describe('TODO describe description field for the OpenInspection MCP integration'),
-                                price:           z.number().describe('TODO describe price field for the OpenInspection MCP integration'),
-                                durationMinutes: z.number().nullable().describe('TODO describe durationMinutes field for the OpenInspection MCP integration'),
-                            })).describe('TODO describe services field for the OpenInspection MCP integration'),
+                                id:              z.string(),
+                                name:            z.string(),
+                                description:     z.string().nullable(),
+                                price:           z.number(),
+                                durationMinutes: z.number().nullable(),
+                            })),
                         }),
                     }),
                 },
@@ -90,7 +90,7 @@ const listPublicServicesRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listBookingServices",
-    description: "Auto-generated placeholder for listBookingServices (GET /services, bookings domain). TODO: replace with a real description sourced from the handler."
+    description: "Public, unauthenticated list of the services a client can pick on the booking page: only services that are active and have an inspection template attached. Each has id, name, description (nullable), price in integer cents, and durationMinutes (nullable). Internal service settings are not exposed. The company comes from the request's tenant context. Not paginated. Read-only."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -102,27 +102,27 @@ const getAvailabilityRoute = createRoute(withMcpMetadata({
     tags: ["bookings", "public"],
     summary: "Get booking availability for current tenant",
     request: {
-        params: z.object({ inspectorId: z.string().trim().min(1).describe('TODO describe inspectorId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ inspectorId: z.string().trim().min(1).describe('Id of the inspector whose availability to read, as listed by the public inspectors route.') }),
         query: z.object({
             // A-17 — the tenant slug is authoritative (B-16 pattern): this public
             // endpoint is not slug-routed, so context resolution never applies.
             tenant: z.string().min(1).openapi({ example: 'acme-inspections' }).describe('Tenant slug from the booking page URL; resolved server-side to the tenant id.'),
-            start: z.string().optional().describe('TODO describe start field for the OpenInspection MCP integration'),
-            end: z.string().optional().describe('TODO describe end field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
+            start: z.string().optional().describe('First date of the range, YYYY-MM-DD. Defaults to today (UTC).'),
+            end: z.string().optional().describe('Last date of the range, YYYY-MM-DD. Defaults to 14 days after today (UTC).'),
+        }),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: AvailabilityResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AvailabilityResponseSchema,
                 },
             },
             description: 'Success',
         },
     },
     operationId: "getBookingAvailability",
-    description: "Auto-generated placeholder for getBookingAvailability (GET /availability/{inspectorId}, bookings domain). TODO: replace with a real description sourced from the handler."
+    description: "Public, unauthenticated, rate-limited read of one inspector's raw availability for a date range: their recurring weekly availability rows, the date-specific overrides inside the range, and the dates of inspections already assigned to them as lead inspector (bookedSlots). It does not compute free time slots; use the company slots route for that. The tenant is resolved from the slug query parameter and 404s if unknown. The range defaults to today through 14 days ahead (UTC)."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**

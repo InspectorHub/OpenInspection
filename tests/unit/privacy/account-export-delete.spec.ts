@@ -15,6 +15,7 @@ import { createTestDb, setupSchema } from '../db';
 import { MockKV } from '../mocks';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { CREDENTIAL_MARKER_TTL_S } from '../../../server/lib/auth/credential-marker';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
@@ -188,7 +189,7 @@ describe('softDeleteAccount', () => {
         expect(kv.put).toHaveBeenCalledWith(
             `pwchanged:${USER_ID}`,
             expect.any(String),
-            expect.objectContaining({ expirationTtl: 90000 }),
+            expect.objectContaining({ expirationTtl: CREDENTIAL_MARKER_TTL_S }),
         );
     });
 

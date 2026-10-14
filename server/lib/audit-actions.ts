@@ -46,6 +46,11 @@ export type AuditAction =
     | 'inspection.template_upgraded'
     | 'inspection.results_batch_patched'
     | 'inspection.sync_conflict_resolved'
+    // An offline client's Yjs update applied to the live results document. Audited
+    // because it can change many findings at once and is the one write that
+    // arrives from a device rather than from a person at the editor; the
+    // snapshot it forces is what makes it undoable.
+    | 'inspection.collab.import'
     | 'inspection.share_agent'
     | 'inspection.property_facts.update'
     | 'inspection.pca_narrative.update'
@@ -153,6 +158,11 @@ export type AuditAction =
     | 'sms.compliance.provision'
     | 'sms.compliance.resubmit'
     | 'mcp.grant.created'
+    | 'native.grant.created'
+    // An offline package imported by a member other than (or the same as) the one who
+    // exported it. One entry per import: the package's contents change many
+    // records at once, and `exportedBy` here is the exporter's claim, not authority.
+    | 'native.offline_import'
     | 'mcp.grant.revoked'
     // Commercial PCA Phase M — ASTM compliance artifacts (dual sign-off / PSQ / doc-review).
     | 'inspection.compliance.signoff'

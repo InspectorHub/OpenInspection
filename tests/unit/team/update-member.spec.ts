@@ -75,7 +75,7 @@ describe('TeamService.updateMember', () => {
     const { kv, puts } = fakeKv();
     const svc = new TeamService({} as D1Database, undefined, kv);
 
-    await svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER, role: 'manager' });
+    await svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER, requesterRole: 'owner', role: 'manager' });
 
     expect(await roleOf(INSPECTOR)).toBe('manager');
     // Without this the demoted/promoted member keeps their OLD claims until
@@ -89,7 +89,7 @@ describe('TeamService.updateMember', () => {
     const svc = new TeamService({} as D1Database, undefined, kv);
 
     await svc.updateMember({
-      tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER,
+      tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER, requesterRole: 'owner',
       permissionOverrides: { financial: true },
     });
 
@@ -108,7 +108,7 @@ describe('TeamService.updateMember', () => {
     // and must not be persisted — otherwise the row would pin a value that
     // then stops tracking the role template if that template ever changes.
     await svc.updateMember({
-      tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER,
+      tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER, requesterRole: 'owner',
       permissionOverrides: { publish: true },
     });
 
@@ -125,7 +125,7 @@ describe('TeamService.updateMember', () => {
     // template's default. Diffing against the OLD role would persist a
     // redundant `{financial: true}` that outlives the reason for it.
     await svc.updateMember({
-      tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER,
+      tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER, requesterRole: 'owner',
       role: 'manager',
       permissionOverrides: { financial: true },
     });
@@ -139,8 +139,10 @@ describe('TeamService.updateMember', () => {
     await seed(db);
     const svc = new TeamService({} as D1Database);
 
+    // The requester id is not a live member, so the self-change rule does not
+    // fire first and the last-owner backstop is what answers.
     await expect(
-      svc.updateMember({ tenantId: TENANT, userId: OWNER, requesterId: MANAGER, role: 'inspector' }),
+      svc.updateMember({ tenantId: TENANT, userId: OWNER, requesterId: 'stale-session', requesterRole: 'owner', role: 'inspector' }),
     ).rejects.toThrow(/last owner/i);
 
     expect(await roleOf(OWNER)).toBe('owner');
@@ -150,8 +152,55 @@ describe('TeamService.updateMember', () => {
     await seed(db, true);
     const svc = new TeamService({} as D1Database);
 
-    await svc.updateMember({ tenantId: TENANT, userId: OWNER_2, requesterId: OWNER, role: 'manager' });
+    await svc.updateMember({ tenantId: TENANT, userId: OWNER_2, requesterId: OWNER, requesterRole: 'owner', role: 'manager' });
     expect(await roleOf(OWNER_2)).toBe('manager');
+  });
+
+  describe('owner rank is changed only by an owner', () => {
+    it('forbids a manager from demoting an owner', async () => {
+      await seed(db, true);
+      const svc = new TeamService({} as D1Database);
+
+      await expect(
+        svc.updateMember({ tenantId: TENANT, userId: OWNER, requesterId: MANAGER, requesterRole: 'manager', role: 'manager' }),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(await roleOf(OWNER)).toBe('owner');
+    });
+
+    it('forbids a manager from editing an owner without a role change', async () => {
+      await seed(db, true);
+      const svc = new TeamService({} as D1Database);
+
+      await expect(
+        svc.updateMember({ tenantId: TENANT, userId: OWNER, requesterId: MANAGER, requesterRole: 'manager', permissionOverrides: { financial: false } }),
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('forbids a manager from promoting anyone to owner', async () => {
+      await seed(db);
+      const svc = new TeamService({} as D1Database);
+
+      await expect(
+        svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: MANAGER, requesterRole: 'manager', role: 'owner' }),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(await roleOf(INSPECTOR)).toBe('inspector');
+    });
+
+    it('still lets a manager change a non-owner role', async () => {
+      await seed(db);
+      const svc = new TeamService({} as D1Database);
+
+      await svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: MANAGER, requesterRole: 'manager', role: 'manager' });
+      expect(await roleOf(INSPECTOR)).toBe('manager');
+    });
+
+    it('lets an owner promote a member to owner', async () => {
+      await seed(db);
+      const svc = new TeamService({} as D1Database);
+
+      await svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER, requesterRole: 'owner', role: 'owner' });
+      expect(await roleOf(INSPECTOR)).toBe('owner');
+    });
   });
 
   it('refuses to change your own role', async () => {
@@ -159,7 +208,7 @@ describe('TeamService.updateMember', () => {
     const svc = new TeamService({} as D1Database);
 
     await expect(
-      svc.updateMember({ tenantId: TENANT, userId: OWNER, requesterId: OWNER, role: 'inspector' }),
+      svc.updateMember({ tenantId: TENANT, userId: OWNER, requesterId: OWNER, requesterRole: 'owner', role: 'inspector' }),
     ).rejects.toThrow(/your own role/i);
   });
 
@@ -171,7 +220,7 @@ describe('TeamService.updateMember', () => {
     // with no account. Minting one from the Team page would be a second,
     // contradictory route in — and would put them on the seat count.
     await expect(
-      svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER, role: 'agent' }),
+      svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER, requesterRole: 'owner', role: 'agent' }),
     ).rejects.toThrow(/agents are granted access/i);
 
     expect(await roleOf(INSPECTOR)).toBe('inspector');
@@ -184,7 +233,7 @@ describe('TeamService.updateMember', () => {
     await expect(
       svc.updateMember({
         tenantId: '99999999-9999-9999-9999-999999999999',
-        userId: INSPECTOR, requesterId: OWNER, role: 'manager',
+        userId: INSPECTOR, requesterId: OWNER, requesterRole: 'owner', role: 'manager',
       }),
     ).rejects.toThrow(/not found/i);
 

@@ -1,0 +1,1 @@
+ALTER TABLE `tenant_configs` ADD `offline_max_days` integer DEFAULT 30 NOT NULL;

@@ -39,8 +39,8 @@ function requireUserId(c: any): string {
 }
 
 const OkResponseSchema = z.object({
-    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-    data: z.object({ ok: z.literal(true).describe('TODO describe ok field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+    success: z.literal(true).describe('Always true when the request succeeded.'),
+    data: z.object({ ok: z.literal(true).describe('Confirmation payload of the notification change.') }).describe('Always true once the notification change is stored.'),
 });
 
 // GET / — list notifications for current user
@@ -49,16 +49,16 @@ const listRoute = createRoute(withMcpMetadata({
     path: '/',
     tags: ["notifications"],
     summary: 'List notifications for current user',
-    request: { query: ListNotificationsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
+    request: { query: ListNotificationsQuerySchema },
     responses: {
         200: {
-            content: { 'application/json': { schema: ListNotificationsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: ListNotificationsResponseSchema } },
             description: 'OK',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "listNotifications",
-    description: "Auto-generated placeholder for listNotifications (GET /, notifications domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the calling user's own in-app notifications, newest first, within the current company. Archived ones are excluded unless includeArchived=1. Paged with a cursor: when meta.nextCursor is non-null, pass it as cursor to fetch the next page. Requires a signed-in user."
 }, { scopes: ['read'], tier: 'primary' }));
 
 // GET /unread-count
@@ -69,13 +69,13 @@ const unreadCountRoute = createRoute(withMcpMetadata({
     summary: 'Count unread notifications for current user',
     responses: {
         200: {
-            content: { 'application/json': { schema: UnreadCountResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: UnreadCountResponseSchema } },
             description: 'OK',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "unreadCountNotification",
-    description: "Auto-generated placeholder for unreadCountNotification (GET /unread-count, notifications domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the number of the calling user's own notifications in the current company that are unread and not archived, as data.count. Cheap enough for badge polling; other users' notifications are never counted. Read-only. Requires a signed-in user."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // POST /mark-read
@@ -84,16 +84,16 @@ const markReadRoute = createRoute(withMcpMetadata({
     path: '/mark-read',
     tags: ["notifications"],
     summary: 'Mark a list of notifications as read',
-    request: { body: { content: { 'application/json': { schema: MarkReadSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: MarkReadSchema.describe('The notifications to mark as read.') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: OkResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: OkResponseSchema } },
             description: 'OK',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "markReadNotification",
-    description: "Auto-generated placeholder for markReadNotification (POST /mark-read, notifications domain). TODO: replace with a real description sourced from the handler."
+    description: "Mark the listed notifications as read by stamping their read time. Only the calling user's own notifications are touched: ids that belong to someone else, do not exist or are already read are skipped silently, and the call still answers ok. Idempotent, a repeat changes nothing. Available to any signed-in user."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // POST /mark-all-read
@@ -104,13 +104,13 @@ const markAllRoute = createRoute(withMcpMetadata({
     summary: 'Mark every unread notification as read',
     responses: {
         200: {
-            content: { 'application/json': { schema: OkResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: OkResponseSchema } },
             description: 'OK',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "markAllReadNotification",
-    description: "Auto-generated placeholder for markAllReadNotification (POST /mark-all-read, notifications domain). TODO: replace with a real description sourced from the handler."
+    description: "Mark every unread notification of the calling user in the current company as read, archived ones included. Other users' notifications are not affected. Idempotent, a repeat changes nothing. Available to any signed-in user."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // DELETE /{id} — archive (soft-delete)
@@ -119,16 +119,16 @@ const archiveRoute = createRoute(withMcpMetadata({
     path: '/{id}',
     tags: ["notifications"],
     summary: 'Archive a notification (soft-delete from inbox)',
-    request: { params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().min(1).describe('Id of the notification to archive; must belong to the calling user.') }) },
     responses: {
         200: {
-            content: { 'application/json': { schema: OkResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: OkResponseSchema } },
             description: 'OK',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "deleteNotification",
-    description: "Auto-generated placeholder for deleteNotification (DELETE /{id}, notifications domain). TODO: replace with a real description sourced from the handler."
+    description: "Archives one of the calling user's notifications so it no longer appears in the default list; it is not erased and can still be listed with includeArchived=1. Only the caller's own notifications are affected, and an unknown id is silently ignored (still returns ok)."
 }, { scopes: ['write'], tier: 'primary' }));
 
 const notificationsRoutes = createApiRouter()

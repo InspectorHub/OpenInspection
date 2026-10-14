@@ -50,12 +50,12 @@ const getAttentionThresholdsRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager')] as const,
     responses: {
         200: {
-            content: { 'application/json': { schema: AttentionThresholdsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: AttentionThresholdsResponseSchema } },
             description: 'Success',
         },
     },
     operationId: "listTenantAttentionThresholds",
-    description: "Auto-generated placeholder for listTenantAttentionThresholds (GET /attention-thresholds, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the three hour thresholds (agreement_unsigned_h, invoice_overdue_h, report_unpublished_h) that decide when an inspection lands in the dashboard's Needs Attention list. When the company has never saved them, the defaults of 72 hours each are returned. Read-only. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -65,15 +65,15 @@ const updateAttentionThresholdsRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: "Patch tenant attention threshold",
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { body: { content: { 'application/json': { schema: AttentionThresholdsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: AttentionThresholdsSchema.describe('All three thresholds, in hours') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: AttentionThresholdsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: AttentionThresholdsResponseSchema } },
             description: 'Success',
         },
     },
     operationId: "patchTenantAttentionThreshold",
-    description: "Auto-generated placeholder for patchTenantAttentionThreshold (PATCH /attention-thresholds, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Set the hour thresholds that put an inspection into the dashboard's Needs Attention list: no signed agreement, an unpaid invoice past its due date, a completed inspection with an unpublished report. Despite the PATCH verb this replaces the whole setting, so all three values are required in every call. The change is audit-logged. Idempotent. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -94,12 +94,12 @@ const getDashboardColumnsRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     responses: {
         200: {
-            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema } },
             description: 'Success',
         },
     },
     operationId: "listTenantDashboardColumns",
-    description: "Auto-generated placeholder for listTenantDashboardColumns (GET /dashboard-columns, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the company's default list of visible inspection dashboard column ids, normalised the same way as on write. A company that has never set one gets the built-in default columns. Individual users may override it on their own device. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -109,15 +109,15 @@ const updateDashboardColumnsRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Update tenant default dashboard column prefs',
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { body: { content: { 'application/json': { schema: DashboardColumnPrefsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: DashboardColumnPrefsSchema.describe('The company default set of visible dashboard columns') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema } },
             description: 'Success',
         },
     },
     operationId: "patchTenantDashboardColumn",
-    description: "Auto-generated placeholder for patchTenantDashboardColumn (PATCH /dashboard-columns, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Replace the company's default set of inspection dashboard columns. The submitted list is normalised before it is stored: unknown ids and duplicates are dropped, columns that can never be hidden are added back, and the result is ordered as the dashboard orders its columns. The response returns the list that was actually stored. Individual users can still override the default on their own device. The change is audit-logged. Idempotent. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -133,6 +133,7 @@ const TenantConfigGetResponseSchema = z.object({
         agreementRetentionYears: z.number().int().describe('Years signed agreements are retained before the GDPR retention sweep destroys them (Track I-a). Default 6.'),
         reportPdfRetentionYears: z.number().int().describe('Years a rendered report PDF is kept. 0 = indefinite. Default 7 is a platform default, not a statutory requirement.'),
         reportViewCountingEnabled: z.boolean().describe('Whether this workspace counts report opens. Default false.'),
+        offlineMaxDays: z.number().int().describe('Days a native client may stay offline before it locks local data. Default 30.'),
         reviewUrl: z.string().nullable().optional().describe('Track J (#122) — company review link, or null.'),
         smsMode: z.enum(['platform', 'own', 'managed_shared', 'managed_dedicated']).describe('Track L (D3) — SMS sender mode.'),
         companyPhone: z.string().nullable().optional().describe('Track L — call-back number rendered as {{company_phone}} in SMS copy.'),
@@ -184,8 +185,8 @@ const tenantConfigGetRoute = createRoute(withMcpMetadata({
 // from its shape, and a service cannot import a router module.
 
 const TenantConfigPatchResponseSchema = z.object({
-    success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
-    data: z.object({ ok: z.literal(true).describe('TODO describe ok field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+    success: z.boolean(),
+    data: z.object({ ok: z.literal(true) }),
 }).openapi('TenantConfigPatchResponse');
 
 const tenantConfigPatchRoute = createRoute(withMcpMetadata({
@@ -194,15 +195,15 @@ const tenantConfigPatchRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Patch a small allowlist of tenant_configs columns',
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { body: { content: { 'application/json': { schema: TenantConfigPatchSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: TenantConfigPatchSchema.describe('Only the settings to change; omitted settings are left as they are') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: TenantConfigPatchResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: TenantConfigPatchResponseSchema } },
             description: 'Updated',
         },
     },
     operationId: "patchTenantTenantConfig",
-    description: "Auto-generated placeholder for patchTenantTenantConfig (PATCH /tenant-config, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Change any of a fixed set of company settings: booking behaviour (concierge review, unsigned-agreement blocking, inspector choice, slot grid, holiday and double-booking policies), retention periods for agreements and report PDFs, report-open counting, the native client's offline limit, SMS and email provider choices, the review link, company phone, video backend, and the privacy and terms source. Only the fields sent are written; sending none changes nothing. Empty strings clear reviewUrl, companyPhone and the custom URLs. Setting legalMode to custom is refused unless both custom URLs end up present. A deployment without managed SMS compliance forces smsMode to own whatever was submitted; where it exists, platform is rejected. Turning the holiday catalog on from off also applies default holiday policies unless they are sent. A changed privacy or terms body is also recorded as a new published version. The change is audit-logged. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -444,6 +445,7 @@ const adminSettingsRoutes = createApiRouter()
                 agreementRetentionYears: config?.agreementRetentionYears ?? 6,
                 reportPdfRetentionYears: resolveReportPdfRetentionYears(config),
                 reportViewCountingEnabled: config?.reportViewCountingEnabled ?? false,
+                offlineMaxDays: (config?.offlineMaxDays as number | undefined) ?? 30,
                 reviewUrl: config?.reviewUrl ?? null,
                 smsMode: (config?.smsMode as 'platform' | 'own' | 'managed_shared' | 'managed_dedicated') ?? 'platform',
                 companyPhone: (config?.companyPhone as string | null) ?? null,
@@ -499,6 +501,9 @@ const adminSettingsRoutes = createApiRouter()
         }
         if (body.agreementRetentionYears !== undefined) {
             update.agreementRetentionYears = body.agreementRetentionYears;
+        }
+        if (body.offlineMaxDays !== undefined) {
+            update.offlineMaxDays = body.offlineMaxDays;
         }
         if (body.reviewUrl !== undefined) {
             update.reviewUrl = body.reviewUrl || null;

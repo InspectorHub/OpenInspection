@@ -174,6 +174,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'inspection.share_agent': { family: 'inspection', label: 'audit_action_inspection_share_agent', meta: { agentEmail: 'person' }, status: { kind: 'live' } },
     'inspection.status_change': { family: 'inspection', label: 'audit_action_inspection_status_change', meta: { feeCents: 'count', from: 'from', reason: 'reason', refundCents: 'count', refundPaymentId: 'id', to: 'to' }, status: { kind: 'live' } },
     'inspection.status_changed': { family: 'inspection', label: 'audit_action_inspection_status_changed', meta: {}, status: { kind: 'superseded', by: 'inspection.status_change' } },
+    'inspection.collab.import': { family: 'inspection', label: 'audit_action_inspection_collab_import', meta: { bytes: 'count', changed: 'flag', snapshotSeq: 'id' }, status: { kind: 'live' } },
     'inspection.sync_conflict_resolved': { family: 'inspection', label: 'audit_action_inspection_sync_conflict_resolved', meta: {}, status: { kind: 'live' } },
     'inspection.template_snapshot.update': { family: 'inspection', label: 'audit_action_inspection_template_snapshot_update', meta: { sectionCount: 'count' }, status: { kind: 'live' } },
     'inspection.template_upgraded': {
@@ -195,6 +196,8 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
         status: { kind: 'live' },
     },
     'mcp.grant.created': { family: 'mcp_grant', label: 'audit_action_mcp_grant_created', meta: { clientId: 'id' }, status: { kind: 'live' } },
+    'native.grant.created': { family: 'mcp_grant', label: 'audit_action_native_grant_created', meta: { clientId: 'id' }, status: { kind: 'live' } },
+    'native.offline_import': { family: 'tenant', label: 'audit_action_native_offline_import', meta: { applied: 'count', changed: 'count', deviceId: 'name', exportedBy: 'person', failed: 'count', inspections: 'count', photos: 'count', skipped: 'count' }, status: { kind: 'live' } },
     'mcp.grant.revoked': { family: 'mcp_grant', label: 'audit_action_mcp_grant_revoked', meta: { admin: 'person', targetUserId: 'person' }, status: { kind: 'live' } },
     // The import pipeline, one entry per decision. `migration.abandoned` and
     // `migration.remapped` carry no metadata on purpose: what they record is

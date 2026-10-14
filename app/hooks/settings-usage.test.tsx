@@ -40,7 +40,7 @@ function sessionCtx(isSaas: boolean) {
     return {
         user: { role: 'owner', name: 'Alice', email: 'alice@example.com', initials: 'A' },
         branding: { isSaas, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, termsUrl: null },
-        deployment: { mode: isSaas ? 'saas' : 'standalone', hasBilling: isSaas, hasSeatQuota: isSaas, mcpEnabled: true },
+        deployment: { mode: isSaas ? 'saas' : 'standalone', hasBilling: isSaas, hasSeatQuota: isSaas, mcpEnabled: true, connectedAppsEnabled: true },
         seatUsage: null,
     };
 }

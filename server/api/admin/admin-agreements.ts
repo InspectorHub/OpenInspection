@@ -44,14 +44,14 @@ const listAgreementsRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: AgreementListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AgreementListResponseSchema,
                 },
             },
             description: 'Success',
         },
     },
     operationId: "listTenantAgreements",
-    description: "Auto-generated placeholder for listTenantAgreements (GET /agreements, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists every agreement template the company has created, each with its full body, version number and creation time. Not paginated and not explicitly ordered. These are the reusable templates, not the signing requests sent from them (see the agreement requests route). Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -65,7 +65,7 @@ const createAgreementRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: AgreementSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AgreementSchema.describe('The new template: its name and its agreement body'),
                 },
             },
         },
@@ -74,14 +74,16 @@ const createAgreementRoute = createRoute(withMcpMetadata({
         201: {
             content: {
                 'application/json': {
-                    schema: AgreementResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AgreementResponseSchema,
                 },
             },
             description: 'Created',
         },
     },
     operationId: "createTenantAgreements",
-    description: "Auto-generated placeholder for createTenantAgreements (POST /agreements, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Create an agreement template. The body is sanitised to the agreement HTML allowlist before it is "
+        + "stored, and the template starts at version 1. Creating a template sends nothing and revokes nothing; "
+        + "it only becomes a signing request when it is sent for an inspection. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -92,11 +94,11 @@ const updateAgreementRoute = createRoute(withMcpMetadata({
     summary: "Update tenant agreement for current tenant",
     middleware: [requireRole('owner', 'manager')],
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the agreement template to update, as returned when it was created or listed.') }),
         body: {
             content: {
                 'application/json': {
-                    schema: AgreementSchema.partial().describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AgreementSchema.partial().describe('Any subset of the template fields to change, such as its name or body; fields left out keep their current value.'),
                 },
             },
         },
@@ -127,7 +129,7 @@ const deleteAgreementRoute = createRoute(withMcpMetadata({
     summary: "Delete tenant agreement for current tenant",
     middleware: [requireRole('owner', 'manager')],
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the agreement template to delete.') }),
     },
     responses: {
         200: {
@@ -156,7 +158,7 @@ const sendAgreementRoute = createRoute(withMcpMetadata({
     tags: ["admin", "agreements"],
     summary: 'Send an agreement signing request to a client',
     middleware: [requireRole('owner', 'manager')],
-    request: { body: { content: { 'application/json': { schema: SendAgreementSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: SendAgreementSchema.describe('Which template to send, for which inspection, and who signs it') } } } },
     responses: {
         200: {
             // All sends go through the envelope model. Response always carries
@@ -172,7 +174,14 @@ const sendAgreementRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "sendTenant",
-    description: "Auto-generated placeholder for sendTenant (POST /agreements/send, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Send an agreement for signature on one inspection. Recipients are either a single clientEmail or an "
+        + "explicit signers list (up to 10). An inspection holds one live signing request: if one is already "
+        + "pending, sent or viewed, it is reused and any newly named signers are added to it instead of a second "
+        + "request being created. Otherwise a request is created from a snapshot of the chosen template. "
+        + "Each signer who has not yet signed or declined is emailed their own signing link, and the request is "
+        + "recorded in the signing audit trail. A signer whose email fails to deliver is marked delivery_failed in "
+        + "the response; a workspace-wide refusal (suppressed recipient, unverified sender domain, quota) fails the "
+        + "whole call. The response lists the request id and each signer's status; it never contains the signing links."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 

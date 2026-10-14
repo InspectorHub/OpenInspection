@@ -3,29 +3,29 @@ import { createApiResponseSchema } from './shared.schema';
 import { DepositPolicySchema } from './deposit-policy.schema';
 
 const ServiceSchema = z.object({
-    id:              z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId:        z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    name:            z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-    description:     z.string().nullable().describe('TODO describe description field for the OpenInspection MCP integration'),
-    price:           z.number().int().describe('TODO describe price field for the OpenInspection MCP integration'),
-    durationMinutes: z.number().int().nullable().describe('TODO describe durationMinutes field for the OpenInspection MCP integration'),
-    templateId:      z.string().nullable().describe('TODO describe templateId field for the OpenInspection MCP integration'),
-    agreementId:     z.string().nullable().describe('TODO describe agreementId field for the OpenInspection MCP integration'),
-    active:          z.boolean().describe('TODO describe active field for the OpenInspection MCP integration'),
-    sortOrder:       z.number().int().describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
-    createdAt:       z.string().nullable().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    id:              z.string(),
+    tenantId:        z.string(),
+    name:            z.string(),
+    description:     z.string().nullable(),
+    price:           z.number().int(),
+    durationMinutes: z.number().int().nullable(),
+    templateId:      z.string().nullable(),
+    agreementId:     z.string().nullable(),
+    active:          z.boolean(),
+    sortOrder:       z.number().int(),
+    createdAt:       z.string().nullable(),
     depositPolicy:   DepositPolicySchema.nullable().optional()
         .describe("This service's deposit policy; null inherits the workspace default."),
 }).openapi('Service');
 
 export const CreateServiceSchema = z.object({
-    name:            z.string().min(1).max(200).describe('TODO describe name field for the OpenInspection MCP integration'),
-    description:     z.string().max(1000).optional().describe('TODO describe description field for the OpenInspection MCP integration'),
-    price:           z.number().int().min(0).describe('TODO describe price field for the OpenInspection MCP integration'),
-    durationMinutes: z.number().int().min(0).optional().describe('TODO describe durationMinutes field for the OpenInspection MCP integration'),
-    templateId:      z.string().optional().describe('TODO describe templateId field for the OpenInspection MCP integration'),
-    agreementId:     z.string().optional().describe('TODO describe agreementId field for the OpenInspection MCP integration'),
-    sortOrder:       z.number().int().optional().describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
+    name:            z.string().min(1).max(200).describe('Service name shown in the catalog and on bookings, 1-200 characters.'),
+    description:     z.string().max(1000).optional().describe('Optional description of what the service covers, up to 1000 characters.'),
+    price:           z.number().int().min(0).describe('Price in integer cents (for example 45000 is 450.00 in the company currency).'),
+    durationMinutes: z.number().int().min(0).optional().describe('Expected duration in minutes.'),
+    templateId:      z.string().optional().describe('Id of the inspection template used for this service.'),
+    agreementId:     z.string().optional().describe('Id of the agreement the client signs for this service.'),
+    sortOrder:       z.number().int().optional().describe('Position in the catalog; lower values list first, ties by name. Defaults to 0.'),
     // Tier 2 of the booking deposit. Omitted or null = inherit the workspace
     // default; `{ type: 'none' }` = this service asks for no deposit even when
     // the workspace does. Those are different answers, which is why the column
@@ -35,24 +35,24 @@ export const CreateServiceSchema = z.object({
 }).openapi('CreateService');
 
 export const UpdateServiceSchema = CreateServiceSchema.partial().extend({
-    active: z.boolean().optional().describe('TODO describe active field for the OpenInspection MCP integration'),
+    active: z.boolean().optional().describe('Whether the service is active in the catalog; false hides it as a delete does, true brings a deleted service back.'),
 }).openapi('UpdateService');
 
 export const CreateDiscountCodeSchema = z.object({
-    code:      z.string().min(1).max(50).describe('TODO describe code field for the OpenInspection MCP integration'),
-    type:      z.enum(['fixed', 'percent']).describe('TODO describe type field for the OpenInspection MCP integration'),
-    value:     z.number().int().min(1).describe('TODO describe value field for the OpenInspection MCP integration'),
-    maxUses:   z.number().int().min(1).optional().describe('TODO describe maxUses field for the OpenInspection MCP integration'),
-    expiresAt: z.string().datetime().optional().describe('TODO describe expiresAt field for the OpenInspection MCP integration'),
+    code:      z.string().min(1).max(50).describe('Code the client enters; stored in upper case and matched case-insensitively.'),
+    type:      z.enum(['fixed', 'percent']).describe('Whether value is an amount off in cents (fixed) or a percentage off the subtotal (percent).'),
+    value:     z.number().int().min(1).describe('Discount size: cents for a fixed code, percentage points for a percent code.'),
+    maxUses:   z.number().int().min(1).optional().describe('Number of redemptions allowed; leave out for unlimited.'),
+    expiresAt: z.string().datetime().optional().describe('ISO 8601 time after which the code stops validating; leave out for no expiry.'),
 }).openapi('CreateDiscountCode');
 
 export const UpdateDiscountCodeSchema = z.object({
-    code:      z.string().min(1).max(50).optional().describe('TODO describe code field for the OpenInspection MCP integration'),
-    type:      z.enum(['fixed', 'percent']).optional().describe('TODO describe type field for the OpenInspection MCP integration'),
-    value:     z.number().int().min(0).optional().describe('TODO describe value field for the OpenInspection MCP integration'),
-    maxUses:   z.number().int().min(0).nullable().optional().describe('TODO describe maxUses field for the OpenInspection MCP integration'),
-    expiresAt: z.string().nullable().optional().describe('TODO describe expiresAt field for the OpenInspection MCP integration'),
-    active:    z.boolean().optional().describe('TODO describe active field for the OpenInspection MCP integration'),
+    code:      z.string().min(1).max(50).optional().describe('New code text; stored exactly as sent, without the upper-casing applied on create.'),
+    type:      z.enum(['fixed', 'percent']).optional().describe('Whether value is an amount off in cents (fixed) or a percentage off the subtotal (percent).'),
+    value:     z.number().int().min(0).optional().describe('Discount size: cents for a fixed code, percentage points for a percent code.'),
+    maxUses:   z.number().int().min(0).nullable().optional().describe('Number of redemptions allowed; null removes the cap.'),
+    expiresAt: z.string().nullable().optional().describe('ISO 8601 expiry time; null removes the expiry.'),
+    active:    z.boolean().optional().describe('Whether the code can be redeemed; false stops it validating without deleting it.'),
 }).openapi('UpdateDiscountCode');
 
 // The row as it goes over the wire. `GET /api/services/discount-codes` and
@@ -76,15 +76,15 @@ export const DiscountCodeListResponseSchema = createApiResponseSchema(z.array(Di
 export const DiscountCodeResponseSchema     = createApiResponseSchema(DiscountCodeSchema);
 
 export const ValidateDiscountSchema = z.object({
-    code:     z.string().min(1).describe('TODO describe code field for the OpenInspection MCP integration'),
-    subtotal: z.number().int().min(0).describe('TODO describe subtotal field for the OpenInspection MCP integration'),
+    code:     z.string().min(1).describe('Discount code to check, matched case-insensitively.'),
+    subtotal: z.number().int().min(0).describe('Order subtotal in cents that the discount is computed against.'),
 }).openapi('ValidateDiscount');
 
 export const ValidateDiscountResponseSchema = z.object({
-    valid:          z.boolean().describe('TODO describe valid field for the OpenInspection MCP integration'),
-    discountAmount: z.number().int().describe('TODO describe discountAmount field for the OpenInspection MCP integration'),
-    discountCodeId: z.string().nullable().describe('TODO describe discountCodeId field for the OpenInspection MCP integration'),
-    message:        z.string().optional().describe('TODO describe message field for the OpenInspection MCP integration'),
+    valid:          z.boolean(),
+    discountAmount: z.number().int(),
+    discountCodeId: z.string().nullable(),
+    message:        z.string().optional(),
 }).openapi('ValidateDiscountResponse');
 
 export const ServiceListResponseSchema = createApiResponseSchema(z.array(ServiceSchema));

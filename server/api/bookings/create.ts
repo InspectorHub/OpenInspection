@@ -28,7 +28,7 @@ const createBookingRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: PublicBookingSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: PublicBookingSchema.describe('The visitor\'s booking request: company, property, client, date, time window and services'),
                 },
             },
         },
@@ -37,14 +37,26 @@ const createBookingRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: BookingResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: BookingResponseSchema,
                 },
             },
             description: 'Success',
         },
     },
     operationId: "createBookingBook",
-    description: "Auto-generated placeholder for createBookingBook (POST /book, bookings domain). TODO: replace with a real description sourced from the handler."
+    description: "Submit a public online booking for a company, identified by its slug in the body. Public and "
+        + "rate-limited: no sign-in is needed. Where the deployment enforces the bot challenge, a valid "
+        + "turnstileToken is required (403 otherwise), and a submission from an embedded widget (?embed=1) must "
+        + "come from an origin on the company's widget allowlist. The booking is refused with 409 when online "
+        + "booking is not set up or open, no inspector serves the area, or the requested date and window have no "
+        + "free slot; a named inspector who is unavailable is refused rather than replaced. On success it creates "
+        + "an inspection request holding one inspection per selected service (or a single inspection when no "
+        + "services are sent), in the requested state and unpaid, assigned to the chosen or auto-selected "
+        + "inspector, and consumes any new-inspection quota. It then records the client and any referring agent, "
+        + "snapshots the deposit owed, emails the client a confirmation, pushes the appointment to the "
+        + "inspector's connected calendar, and fires the booking-received automation; the last three happen "
+        + "after the response is sent. The response gives the inspection and request ids and depositRequiredCents "
+        + "(integer cents, 0 when none). Not idempotent: each call creates another booking."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const createBookingRoutes = createApiRouter()

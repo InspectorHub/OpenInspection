@@ -15,9 +15,40 @@
  * and server/api/mcp-grants.ts (single-grant self/admin revoke).
  */
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
+import { logger } from '../logger';
 
 /** Revokes every OAuth grant currently held by the given user. */
 export async function revokeAllUserGrants(oauth: OAuthHelpers, userId: string): Promise<void> {
-    const { items } = await oauth.listUserGrants(userId);
-    await Promise.all(items.map((grant) => oauth.revokeGrant(grant.id, userId)));
+    // A page is at most `limit` grants (KV list pagination); a user with more
+    // than one page would otherwise keep every grant past the first.
+    let cursor: string | undefined;
+    do {
+        const page = await (cursor ? oauth.listUserGrants(userId, { cursor }) : oauth.listUserGrants(userId));
+        await Promise.all(page.items.map((grant) => oauth.revokeGrant(grant.id, userId)));
+        cursor = page.cursor;
+    } while (cursor);
+}
+
+/**
+ * Best-effort revocation for paths that write the `pwchanged:{userId}` marker
+ * (password change, reset, self-delete). The marker cuts off session JWTs but
+ * is never read for OAuth grants, so a native client's refresh token would
+ * otherwise outlive the credential change. Skipped when the provider is not
+ * mounted; a provider failure is logged, never thrown, so it cannot block the
+ * credential change the caller already committed.
+ */
+export async function revokeUserGrantsBestEffort(
+    oauth: OAuthHelpers | undefined,
+    userId: string,
+    reason: string,
+): Promise<void> {
+    if (!oauth) return;
+    try {
+        await revokeAllUserGrants(oauth, userId);
+    } catch (err) {
+        logger.warn(`Failed to revoke OAuth grants after ${reason}; outstanding grants may stay valid`, {
+            userId,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
 }

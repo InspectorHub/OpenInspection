@@ -101,28 +101,34 @@ export class InspectionService {
         return this.core.getStats(tenantId);
     }
 
-    /**
-     * Fetches a single inspection with its template.
-     */
-    /**
-     * Design System 0520 subsystem E P1.2 — Publish pre-flight gates.
-     *
-     * Loads the inspection + parsed inspection_results.data and
-     * delegates to the pure aggregator in server/lib/preflight.ts.
-     */
+    /** Publish pre-flight gates (pure aggregator in server/lib/preflight.ts). */
     async computePreflight(inspectionId: string, tenantId: string) {
         return this.core.computePreflight(inspectionId, tenantId);
     }
 
+    /** Fetches a single inspection with its template. */
     async getInspection(id: string, tenantId: string) {
         return this.core.getInspection(id, tenantId);
     }
 
-    /**
-     * Creates a new inspection.
-     */
+    /** The caller's own inspection with this id, or null (a replayed create). */
+    async findInspectionById(tenantId: string, id: string): Promise<Inspection | null> {
+        return this.core.findInspectionById(tenantId, id);
+    }
+
+    /** Creates a new inspection. */
     async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string }): Promise<Inspection> {
         return this.core.createInspection(tenantId, data);
+    }
+
+    /** As createInspection, plus whether this call made the row (false: a same-id replay that lost the insert race). */
+    async createInspectionOnce(...args: Parameters<InspectionCoreService['createInspectionOnce']>) {
+        return this.core.createInspectionOnce(...args);
+    }
+
+    /** Finishes a client-id create that stopped before its report. */
+    async completeInterruptedCreate(...args: Parameters<InspectionCoreService['completeInterruptedCreate']>) {
+        return this.core.completeInterruptedCreate(...args);
     }
 
     /**
@@ -166,21 +172,6 @@ export class InspectionService {
         baselineId: string,
     ): Promise<Array<{ itemId: string; label: string; originalNotes: string | null; open: boolean }>> {
         return this.core.getReinspectCandidates(tenantId, baselineId);
-    }
-
-    /**
-     * IA-1: Post-create hook — write priceOverride onto inspection_services rows
-     * that were already inserted by createInspection. Called by the handler AFTER
-     * createInspection returns so it can use the resolved inspection id.
-     * Only rows whose serviceId appears in selections AND carry a priceOverrideCents
-     * value are updated; rows without an override are left with priceOverride=null.
-     */
-    async applyServicePriceOverrides(
-        inspectionId: string,
-        tenantId: string,
-        selections: Array<{ serviceId: string; priceOverrideCents?: number | undefined }>,
-    ): Promise<void> {
-        return this.core.applyServicePriceOverrides(inspectionId, tenantId, selections);
     }
 
     /**

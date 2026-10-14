@@ -25,7 +25,7 @@ once per service and then forget until it breaks.
 | [Google Places](google-places.md) | Address autocomplete on the booking form and the new-inspection wizard | `GOOGLE_PLACES_API_KEY` | yes |
 | [ISN](isn.md) | Add a published report's link to its ISN order; optionally let ISN's payment/signature hold govern it | `ISN_DOMAIN`, `ISN_COMPANY_KEY`, `ISN_ACCESS_KEY`, `ISN_SECRET_KEY` | yes |
 | [Estated](estated.md) | Property facts (year built, sqft, foundation) by address | `ESTATED_API_KEY` | yes |
-| [MCP](mcp.md) | **Inbound.** Lets Claude or another MCP client drive this deployment over OAuth 2.1 | `MCP_ENABLED` | n/a |
+| [MCP](mcp.md) | **Inbound.** Lets Claude or another MCP client drive this deployment over OAuth 2.1 | `MCP_ENABLED` (native app sign-in uses the same OAuth provider behind a separate switch, `NATIVE_CLIENT_ENABLED`; see [native clients](../develop/native-clients.md)) | n/a |
 
 Every one of these is optional. The engine runs with none of them configured;
 what you lose is stated on each page under "When it is not configured".

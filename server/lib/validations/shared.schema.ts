@@ -16,14 +16,14 @@ export const passwordSchema = z.string()
  */
 export function createApiResponseSchema<T extends z.ZodTypeAny>(dataSchema: T) {
     return z.object({
-        success: z.boolean().openapi({ example: true }).describe('TODO describe success field for the OpenInspection MCP integration'),
+        success: z.boolean().openapi({ example: true }).describe('True when the request succeeded.'),
         data: dataSchema.openapi({ description: 'Response payload' }),
         error: z.object({
-            message: z.string().openapi({ example: 'Error message' }).describe('TODO describe message field for the OpenInspection MCP integration'),
-            code: z.string().openapi({ example: 'ERROR_CODE' }).describe('TODO describe code field for the OpenInspection MCP integration'),
-            details: z.any().optional().describe('TODO describe details field for the OpenInspection MCP integration'),
-        }).optional().describe('TODO describe error field for the OpenInspection MCP integration'),
-        meta: z.any().optional().describe('TODO describe meta field for the OpenInspection MCP integration'),
+            message: z.string().openapi({ example: 'Error message' }).describe('Human-readable description of the error.'),
+            code: z.string().openapi({ example: 'ERROR_CODE' }).describe('Stable machine-readable error code.'),
+            details: z.any().optional().describe('Optional structured context for the error, such as per-field validation failures.'),
+        }).optional().describe('Error detail; present only when the request failed.'),
+        meta: z.any().optional().describe('Optional response metadata, such as pagination information.'),
     });
 }
 
@@ -31,10 +31,10 @@ export function createApiResponseSchema<T extends z.ZodTypeAny>(dataSchema: T) {
  * Standard Success Response Schema (when no specific data is returned)
  */
 export const SuccessResponseSchema = z.object({
-    success: z.boolean().openapi({ example: true }).describe('TODO describe success field for the OpenInspection MCP integration'),
+    success: z.boolean().openapi({ example: true }).describe('True when the request succeeded.'),
     data: z.object({
-        success: z.boolean().openapi({ example: true }).describe('TODO describe success field for the OpenInspection MCP integration'),
-    }).optional().describe('TODO describe data field for the OpenInspection MCP integration'),
-    error: z.any().optional().describe('TODO describe error field for the OpenInspection MCP integration'),
-    meta: z.any().optional().describe('TODO describe meta field for the OpenInspection MCP integration'),
+        success: z.boolean().openapi({ example: true }).describe('True when the request succeeded.'),
+    }).optional().describe('Present when the action reports a result.'),
+    error: z.any().optional().describe('Error detail; present only when the request failed.'),
+    meta: z.any().optional().describe('Optional response metadata, such as pagination information.'),
 }).openapi('SuccessResponse');

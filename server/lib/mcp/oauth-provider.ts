@@ -1,7 +1,8 @@
-import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
+import { OAuthError, OAuthProvider, getOAuthApi, type OAuthProviderOptions, type TokenExchangeCallbackResult } from '@cloudflare/workers-oauth-provider';
+import { claimsNative, currentNativeRole, isNativeProps, nativeGrantCredentialState, nativeTokenExchange } from '../auth/native-token';
 import { InspectorMcp } from '../../durable-objects/inspector-mcp';
 import type { McpProps } from '../../durable-objects/inspector-mcp';
-import { mcpEnabled } from './flag';
+import { mcpEnabled, nativeClientEnabled, oauthProviderEnabled } from './flag';
 import { assertCompanySlugMatches, slugFromMcpPath, stripMcpSlugPrefix } from './identity-bridge';
 import { getDeploymentProfile, type ProfileEnv } from '../deployment-profile';
 
@@ -18,11 +19,11 @@ type FetchFn = (req: Request, env: any, ctx: ExecutionContext) => Response | Pro
  * worker-configuration.d.ts; regenerate with `wrangler types` once OAUTH_KV /
  * INSPECTOR_MCP are confirmed provisioned to update the global Env type.
  */
-type McpFlagEnv = { MCP_ENABLED?: string } & ProfileEnv;
+type McpFlagEnv = { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string; DB?: D1Database; TENANT_CACHE?: KVNamespace } & ProfileEnv;
 
 /**
- * Wraps `appFetch` with an OAuthProvider when the MCP_ENABLED flag is set.
- * Returns `{ fetch: appFetch }` unchanged when the flag is off — the caller
+ * Wraps `appFetch` with an OAuthProvider when MCP or native clients are enabled.
+ * Returns `{ fetch: appFetch }` unchanged when both flags are off — the caller
  * is unaffected and the OAuth surface is not mounted at all.
  *
  * apiRoute strategy (docs/develop/conventions/mcp-oauth-notes.md §4 / §11.3), read from
@@ -41,7 +42,7 @@ export function buildOAuthHandler(
     appFetch: FetchFn,
     env: McpFlagEnv,
 ): { fetch: FetchFn } {
-    if (!mcpEnabled(env)) return { fetch: appFetch };
+    if (!oauthProviderEnabled(env)) return { fetch: appFetch };
 
     // A literal path prefix — every /mcp* request goes through token auth.
     // Slug validation (spec §6) is applied in the wrapper below.
@@ -63,6 +64,26 @@ export function buildOAuthHandler(
             e: unknown,
             ctx: ExecutionContext & { props?: McpProps },
         ): Response | Promise<Response> {
+            // A native grant is a full session, not an MCP grant. It has no module
+            // scopes, so it would reach the MCP server with nothing to call by
+            // accident; refuse it outright instead of relying on that. Anything that
+            // CLAIMS to be native is refused, well-formed or not.
+            if (claimsNative(ctx.props)) {
+                return new Response(JSON.stringify({ error: 'forbidden' }), {
+                    status: 403,
+                    headers: { 'content-type': 'application/json' },
+                });
+            }
+            // The provider is also mounted for native clients alone. With MCP off
+            // there is no MCP surface: answer as if /mcp were not mounted, even to
+            // a token minted while it was on or obtained through the open
+            // registration endpoint.
+            if (!mcpEnabled(env)) {
+                return new Response(JSON.stringify({ error: 'not_found' }), {
+                    status: 404,
+                    headers: { 'content-type': 'application/json' },
+                });
+            }
             const url = new URL(req.url);
             const urlSlug = slugFromMcpPath(url.pathname);
             if (urlSlug === null) return baseServeHandler.fetch(req, e, ctx);
@@ -85,7 +106,7 @@ export function buildOAuthHandler(
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const provider = new OAuthProvider<any>({
+    const options: OAuthProviderOptions<any> = {
         apiRoute,
         apiHandler,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -114,7 +135,59 @@ export function buildOAuthHandler(
         // protected. Setting this to false both narrows the advertisement to
         // `["S256"]` and makes the parse REFUSE plain instead of accepting it.
         allowPlainPKCE: false,
-    });
+        // Native grants: 1h access token, refresh token with no fixed expiry and
+        // a sliding 90-day idle limit (see nativeTokenExchange). MCP grants
+        // return undefined and keep the library defaults. A denial revokes the
+        // grant, then throws OAuthError so the client gets 400 invalid_grant;
+        // any other thrown error would surface as a 500.
+        tokenExchangeCallback: async (opts): Promise<TokenExchangeCallbackResult | void> => {
+            // Every refusal revokes the grant first, so a grant cannot outlive the
+            // switch, the membership or the credential that allowed it, then
+            // throws OAuthError so the client gets 400 invalid_grant; any other
+            // thrown error would surface as a 500.
+            const refuse = async (description: string): Promise<never> => {
+                await getOAuthApi(options, env).revokeGrant(opts.grantId, opts.userId);
+                throw new OAuthError('invalid_grant', { description });
+            };
+            const decision = nativeTokenExchange(opts.props, opts.grantType, Math.floor(Date.now() / 1000));
+            if (!decision) {
+                // Claims to be native but is not a valid native grant: never an MCP grant by default.
+                if (claimsNative(opts.props)) return refuse('Native session cannot be verified');
+                // An MCP grant on a deployment where MCP is off (native-only mounts the provider).
+                if (!mcpEnabled(env)) return refuse('MCP is not enabled');
+                return;
+            }
+            if (!nativeClientEnabled(env)) return refuse('Native clients are not enabled');
+            if (decision.kind === 'deny') return refuse('Refresh token unused for too long');
+            // Re-check the member on every exchange: a revocation that failed when
+            // they were removed, or when their password changed, must not leave a
+            // refresh token that keeps minting access tokens.
+            const props = opts.props;
+            if (!isNativeProps(props) || !env.DB) return refuse('Native session cannot be verified');
+            if (!await currentNativeRole(env.DB, props.userId, props.tenantId)) return refuse('Member is no longer active');
+            const credentialState = await nativeGrantCredentialState(env, props);
+            if (credentialState === 'changed') return refuse('Credentials changed since sign-in');
+            // An unreadable marker is a storage fault, not evidence of a change: revoking here
+            // would end a healthy grant over a blip. The provider documents OAuthError
+            // 'temporarily_unavailable' as the retryable answer; a plain Error would surface as
+            // an unstructured 500. Nothing is revoked or consumed, so the same refresh token works on retry.
+            if (credentialState === 'unreadable') {
+                throw new OAuthError('temporarily_unavailable', {
+                    description: 'Credential check is temporarily unavailable; retry shortly',
+                    statusCode: 503,
+                    headers: { 'Retry-After': '30' },
+                });
+            }
+            // The provider tests for the PRESENCE of `refreshTokenTTL` on a code exchange, so the
+            // native result carries it as an explicit undefined (no fixed expiry). The library types
+            // it as `number`, which `exactOptionalPropertyTypes` will not widen; Object.assign copies
+            // the key, undefined value included, without an assertion.
+            const result: TokenExchangeCallbackResult = {};
+            Object.assign(result, decision.result);
+            return result;
+        },
+    };
+    const provider = new OAuthProvider<any>(options); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     return { fetch: (req, e, ctx) => provider.fetch(req, e, ctx) };
 }

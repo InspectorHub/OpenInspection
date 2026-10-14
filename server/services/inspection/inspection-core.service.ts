@@ -1,17 +1,15 @@
 import { eq, and, inArray } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, tenantConfigs, agreementRequests, contactRoleProfiles } from '../../lib/db/schema';
+import { inspections, inspectionResults, templates, tenantConfigs, agreementRequests } from '../../lib/db/schema';
 import { resolveAgentRepairAccess, type AgentRepairAccess } from '../../lib/people/agent-repair-access';
 import { contacts } from '../../lib/db/schema/contact';
+import { runCreatePipeline, pipelineInputFrom, type CreatePipelineOptions } from './create-pipeline';
+import { isUniqueViolation } from '../../lib/db/unique-violation';
 import { PeopleService } from '../people.service';
-import { Errors } from '../../lib/errors';
+import { AppError, ErrorCode, Errors } from '../../lib/errors';
 import { safeISODate } from '../../lib/date';
-import { logger } from '../../lib/logger';
-import { createPrimaryReport } from '../../lib/inspection/reports';
-import { writeInspectionServiceSnapshots, type ServiceSelection } from '../../lib/inspection/service-snapshot';
 import { computePreflightFromData } from '../../lib/preflight';
-import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { INSPECTION_STATUS, type InspectionStatus } from '../../lib/status/inspection-status';
-import { fireAutomation, type Inspection, type InspectionListParams, type CreateInspectionData } from './shared';
+import type { Inspection, InspectionListParams, CreateInspectionData } from './shared';
 import { InspectionSubService } from './base';
 import { ServiceService } from '../service.service';
 import type { ScopedDB } from '../../lib/db/scoped';
@@ -21,6 +19,9 @@ import { InspectionReinspectionService, type CreatedReinspection } from './inspe
 import { InspectionCreateVariantsService } from './inspection-create-variants.service';
 import { InspectionRecipientsService } from './inspection-recipients.service';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
+
+/** Steps a caller needs run inside the create, ahead of its last write. */
+export type CreateInspectionHooks = Pick<CreatePipelineOptions, 'beforeReport'>;
 
 /**
  * The inspection PRIMITIVE: create one, read one, and the two guards that
@@ -190,12 +191,46 @@ export class InspectionCoreService extends InspectionSubService {
         };
     }
 
-    /**
-     * Creates a new inspection.
-     */
-    async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string }): Promise<Inspection> {
+    /** The caller's own inspection with this id, or null: another tenant's id reads as absent. */
+    async findInspectionById(tenantId: string, id: string): Promise<Inspection | null> {
         if (!this.sdb) throw new Error('ScopedDB session missing');
-        const id = crypto.randomUUID();
+        return (await this.sdb.getById(inspections, id)) ? (await this.getInspection(id, tenantId)).inspection : null;
+    }
+
+    /**
+     * Finishes a client-id create whose first attempt stopped before the primary report, from the
+     * replay's own request body. Steps and idempotency rules: `./create-pipeline`.
+     */
+    async completeInterruptedCreate(
+        tenantId: string,
+        inspection: Inspection,
+        data: CreateInspectionData & { clientContactId?: string },
+        hooks?: CreateInspectionHooks,
+    ): Promise<void> {
+        await this.assertContactsBelongToTenant(tenantId, [data.referredByAgentId, data.sellingAgentId, data.clientContactId]);
+        // The stored row decides the template the report is built from, not the replay's body.
+        const input = pipelineInputFrom({ ...data, templateId: inspection.templateId ?? undefined }, { id: inspection.id, inspectorId: inspection.inspectorId, createdAt: new Date() });
+        await runCreatePipeline({ d1: this.db, db: this.getDrizzle() }, tenantId, input, { strict: true, beforeReport: hooks?.beforeReport });
+    }
+
+    /** Creates a new inspection. See `createInspectionOnce` for the replay semantics. */
+    async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string }): Promise<Inspection> {
+        return (await this.createInspectionOnce(tenantId, data)).inspection;
+    }
+
+    /**
+     * Creates a new inspection and says whether THIS call created it. `created`
+     * is false only when a client-chosen id was already the caller's own row
+     * because a concurrent request with the same id won the insert; that caller
+     * gets the existing row back and none of the create's side effects ran for it.
+     */
+    async createInspectionOnce(
+        tenantId: string,
+        data: CreateInspectionData & { inspectorId?: string; clientContactId?: string },
+        hooks?: CreateInspectionHooks,
+    ): Promise<{ inspection: Inspection; created: boolean }> {
+        if (!this.sdb) throw new Error('ScopedDB session missing');
+        const id = data.id ?? crypto.randomUUID();
         const createdAt = new Date();
         const status = INSPECTION_STATUS.REQUESTED;
         const date = data.date || createdAt.toISOString();
@@ -233,27 +268,10 @@ export class InspectionCoreService extends InspectionSubService {
         const defaultPaymentRequired   = tenantPolicy?.blockUnpaid ?? false;
         const defaultAgreementRequired = tenantPolicy?.blockUnsignedAgreement ?? false;
 
-        // #180 — Atomic discount redemption. When a discountCodeId is supplied,
-        // attempt an atomic cap-guarded increment. If the cap has been reached
-        // (redeemDiscountCode returns false), drop the discount from the persisted
-        // row but still create the inspection successfully. The preview-only
-        // validateDiscountCode path is unaffected.
+        // #180 — the discount is redeemed only AFTER the row exists (see below), so a
+        // request that loses a same-id insert race never spends a use of the code.
         const rawDiscountCodeId = (data as { discountCodeId?: string | null }).discountCodeId ?? null;
         const rawDiscountAmount = (data as { discountAmount?: number | null }).discountAmount ?? null;
-
-        let persistedDiscountCodeId: string | null = null;
-        let persistedDiscountAmount: number = 0;
-
-        if (rawDiscountCodeId) {
-            const svcSvc = new ServiceService(this.db);
-            const redeemed = await svcSvc.redeemDiscountCode(tenantId, rawDiscountCodeId);
-            if (redeemed) {
-                persistedDiscountCodeId = rawDiscountCodeId;
-                persistedDiscountAmount = rawDiscountAmount ?? 0;
-            }
-            // If redeemed === false: cap hit or code gone — drop the discount silently;
-            // the inspection is still created without it.
-        }
 
         // Task 13 (people-role-profiles) — the client/agent identity is NOT
         // stored on the inspections row anymore (clientContactId/clientName/
@@ -265,7 +283,6 @@ export class InspectionCoreService extends InspectionSubService {
         const clientContactIdInput = (data as { clientContactId?: string }).clientContactId ?? null;
         const clientNameInput = data.clientName || 'Private Client';
         const clientEmailInput = (data.clientEmail as string | null) || null;
-        const clientPhoneInput = data.clientPhone ?? null;
         const referredByAgentIdInput = (data.referredByAgentId as string | null) || null;
         const sellingAgentIdInput = (data.sellingAgentId as string | null) || null;
 
@@ -292,10 +309,9 @@ export class InspectionCoreService extends InspectionSubService {
             // Wizard step 1; decides what the report becomes (report-tier.ts,
             // pca-report-block.ts, the units surface). null = unclassified.
             propertyType:      data.propertyType ?? null,
-            // #180 — discount columns set after atomic redemption above.
-            // null/0 when no code was supplied or the cap blocked redemption.
-            discountCodeId:    persistedDiscountCodeId,
-            discountAmount:    persistedDiscountAmount,
+            // #180 — written by the redemption step after the insert; null/0 until then.
+            discountCodeId:    null,
+            discountAmount:    0,
             // Round-2 #10 — block-report gating defaults inherited from tenant
             // policy. The Sprint 1 D-7 ReportGatePage check at /report/:id
             // reads these per-inspection columns directly.
@@ -310,109 +326,43 @@ export class InspectionCoreService extends InspectionSubService {
         // inspection — a failed validation (e.g. a bad contact reference)
         // must never burn a free tenant's lifetime slot.
         await this.planQuota?.consumeInspection(tenantId);
-        await this.sdb.insert(inspections, newInspection);
-        // Before the results row, because that row has to NAME it: a NULL
-        // `report_id` is accepted silently and reads match a sibling document
-        // or none. See `lib/inspection/reports.ts`.
-        const primaryReportId = await createPrimaryReport(db, tenantId, id, data.templateId ?? null);
-        // Every inspection starts with a results row.
-        //
-        // The collaborative editor's Durable Object writes findings by UPDATEing
-        // this row, and an UPDATE that matches nothing changes nothing without
-        // complaining — so an inspection created without it accepted edits in
-        // the UI that never reached the database. The DO now inserts as a
-        // fallback, but the invariant belongs here, where the inspection is
-        // born: results exist for every inspection, empty until someone rates
-        // something.
-        await db.insert(inspectionResults).values({
-            id:           crypto.randomUUID(),
-            tenantId,
-            inspectionId: id,
-            reportId:     primaryReportId,
-            data:         {},
-            lastSyncedAt: createdAt,
-        });
-        // DB-8: mirror assignment into inspection_inspectors link table.
-        // Non-fatal — a sync failure must not roll back a committed inspection row.
-        try {
-            await syncInspectionAssignments(db, tenantId, id, { inspectorId: newInspection.inspectorId });
-        } catch (e) {
-            logger.error('inspection.assignment-sync.failed', { inspectionId: id }, e instanceof Error ? e : undefined);
+        try { await this.sdb.insert(inspections, newInspection); } catch (err) {
+            // No row was created, so the allowance taken above goes back. Without
+            // this a replayed offline create (same id, still in flight) would be
+            // charged twice.
+            await this.planQuota?.releaseInspection(tenantId);
+            // Only a client-chosen id can collide. The caller's own tenant is read first,
+            // so another tenant's row is never touched: absent here means someone else holds it.
+            if (!data.id || !isUniqueViolation(err, 'inspections.id')) throw err;
+            const own = await this.findInspectionById(tenantId, id);
+            if (own) return { inspection: own, created: false };
+            throw new AppError(409, ErrorCode.ID_CONFLICT, 'That inspection id is already in use.');
         }
-        await fireAutomation(this.db, tenantId, id, 'inspection.created');
-
-        // Soft-upsert the client into Contacts so it shows up in the Contacts list
-        // for future re-use (search, agent linking). Idempotent on tenantId+email
-        // (or tenantId+name if no email). Failures are non-fatal — inspection
-        // creation must not break because of a contact-side issue. Captures the
-        // resolved/created contact id for the inspection_people write below.
-        let resolvedClientContactId: string | null = clientContactIdInput;
-        if (clientNameInput !== 'Private Client') {
-            try {
-                const matchConds = [eq(contacts.tenantId, tenantId), eq(contacts.type, 'client')];
-                if (clientEmailInput) matchConds.push(eq(contacts.email, clientEmailInput));
-                else matchConds.push(eq(contacts.name, clientNameInput));
-                const existing = await db.select().from(contacts).where(and(...matchConds)).get();
-                if (existing) {
-                    resolvedClientContactId = resolvedClientContactId ?? existing.id;
-                } else {
-                    const newContactId = crypto.randomUUID();
-                    await db.insert(contacts).values({
-                        id: newContactId,
-                        tenantId,
-                        type: 'client',
-                        name: clientNameInput,
-                        email: clientEmailInput,
-                        phone: clientPhoneInput,
-                        agency: null,
-                        notes: null,
-                        createdAt: createdAt,
-                    });
-                    resolvedClientContactId = resolvedClientContactId ?? newContactId;
-                }
-            } catch (err) {
-                logger.error('contact upsert from inspection failed', { inspectionId: id }, err instanceof Error ? err : undefined);
-            }
+        const pipelineInput = pipelineInputFrom({ ...data, clientContactId: clientContactIdInput }, { id, inspectorId: newInspection.inspectorId, createdAt });
+        // #180 — The redemption is atomic (one capped UPDATE), the write-back is a second statement.
+        // Cap reached: the inspection keeps no discount. If the write-back fails after a redemption,
+        // the use is spent and the inspection is undiscounted (never a discount that was not
+        // redeemed); a replay of this create finds the row and does not redeem again.
+        let persistedDiscountCodeId: string | null = null;
+        let persistedDiscountAmount = 0;
+        if (rawDiscountCodeId && await new ServiceService(this.db).redeemDiscountCode(tenantId, rawDiscountCodeId)) {
+            persistedDiscountCodeId = rawDiscountCodeId;
+            persistedDiscountAmount = rawDiscountAmount ?? 0;
+            await db.update(inspections)
+                .set({ discountCodeId: persistedDiscountCodeId, discountAmount: persistedDiscountAmount })
+                .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
         }
+        await runCreatePipeline({ d1: this.db, db }, tenantId, pipelineInput, { strict: !!data.id, fresh: true, beforeReport: hooks?.beforeReport });
 
-        // Task 7 (people-role-profiles) — mirror the primary client, buyer's
-        // agent, and listing agent into the inspection_people join table.
-        // Task 13 dropped the legacy clientContactId / referredByAgentId /
-        // sellingAgentId columns from the inspections row — this is now the
-        // ONLY place WHO is persisted. Best-effort: a people-write failure
-        // must never roll back an already-committed inspection row.
-        try {
-            const roleRows = await db.select({ id: contactRoleProfiles.id, key: contactRoleProfiles.key })
-                .from(contactRoleProfiles)
-                .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
-            const roleIdByKey = new Map(roleRows.map(r => [r.key, r.id]));
-            const people = new PeopleService({ DB: this.db });
-            const links: Array<[string | null, string | undefined]> = [
-                [resolvedClientContactId,   roleIdByKey.get('client')],
-                [referredByAgentIdInput,    roleIdByKey.get('buyer_agent')],
-                [sellingAgentIdInput,       roleIdByKey.get('listing_agent')],
-            ];
-            for (const [contactId, roleProfileId] of links) {
-                if (contactId && roleProfileId) await people.addPerson(tenantId, id, contactId, roleProfileId);
-            }
-        } catch (err) {
-            logger.error('inspection-people write from inspection create failed', { inspectionId: id }, err instanceof Error ? err : undefined);
-        }
-
-        // Link selected services — the tier-2 money authority. Shared with any
-        // other path that must produce the same rows; see the module doc.
-        await writeInspectionServiceSnapshots(db, tenantId, id, {
-            serviceSelections: (data as { serviceSelections?: ServiceSelection[] }).serviceSelections,
-            serviceIds:        data.serviceIds,
-        });
-
-        return {
+        return { created: true, inspection: {
             ...newInspection,
+            discountCodeId: persistedDiscountCodeId,
+            discountAmount: persistedDiscountAmount,
             clientName: clientNameInput,
             clientEmail: clientEmailInput,
             inspectorId: newInspection.inspectorId as string | null,
             createdAt: safeISODate(newInspection.createdAt)
-        } as Inspection;
+        } as Inspection };
     }
 
     /** #119 — creates a follow-up round over a published baseline. Body in `./inspection-reinspection.service`. */
@@ -430,15 +380,6 @@ export class InspectionCoreService extends InspectionSubService {
         baselineId: string,
     ): Promise<Array<{ itemId: string; label: string; originalNotes: string | null; open: boolean }>> {
         return this.reinspection.getReinspectCandidates(tenantId, baselineId);
-    }
-
-    /** IA-1 post-create hook — priceOverride onto existing rows. Body in `./inspection-create-variants.service`. */
-    async applyServicePriceOverrides(
-        inspectionId: string,
-        tenantId: string,
-        selections: ServiceSelection[],
-    ): Promise<void> {
-        return this.variants.applyServicePriceOverrides(inspectionId, tenantId, selections);
     }
 
     /** NewInspectionWizard creation path. Body in `./inspection-create-variants.service`. */

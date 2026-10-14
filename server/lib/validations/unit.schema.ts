@@ -3,20 +3,20 @@
 import { z } from '@hono/zod-openapi';
 
 export const CreateUnitSchema = z.object({
-    parentUnitId: z.string().min(1).nullable().describe('TODO describe parentUnitId field for the OpenInspection MCP integration'),
-    kind:         z.enum(['building', 'floor', 'unit']).describe('TODO describe kind field for the OpenInspection MCP integration'),
+    parentUnitId: z.string().min(1).nullable().describe('Id of the node to create this one under; null places it at the top level.'),
+    kind:         z.enum(['building', 'floor', 'unit']).describe('Level of the node: building, floor or unit.'),
     type:         z.enum(['unit', 'common']).default('unit').describe('Purpose: regular unit or common area'),
-    name:         z.string().min(1).max(80).describe('TODO describe name field for the OpenInspection MCP integration'),
+    name:         z.string().min(1).max(80).describe('Display name, which must be unique among siblings under the same parent.'),
 }).openapi('CreateUnit');
 
 export const UpdateUnitSchema = z.object({
-    name:      z.string().min(1).max(80).optional().describe('TODO describe name field for the OpenInspection MCP integration'),
-    sortOrder: z.number().int().min(0).optional().describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
+    name:      z.string().min(1).max(80).optional().describe('New display name for the unit.'),
+    sortOrder: z.number().int().min(0).optional().describe('New position among siblings; lower values come first.'),
 }).openapi('UpdateUnit');
 
 export const MoveUnitSchema = z.object({
-    newParentUnitId: z.string().min(1).nullable().describe('TODO describe newParentUnitId field for the OpenInspection MCP integration'),
-    newSortOrder:    z.number().int().min(0).describe('TODO describe newSortOrder field for the OpenInspection MCP integration'),
+    newParentUnitId: z.string().min(1).nullable().describe('Id of the node to move the unit under; null moves it to the top level.'),
+    newSortOrder:    z.number().int().min(0).describe('Position among the new siblings; lower values come first.'),
 }).openapi('MoveUnit');
 
 // Commercial PCA Phase U — bulk create N units (floors×stacks or CSV) under one

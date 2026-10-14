@@ -34,29 +34,29 @@ const autocompleteRoute = createRoute(withMcpMetadata({
     summary: 'Address autocomplete (Google Places proxy)',
     request: {
         query: z.object({
-            q: z.string().min(2).max(200).openapi({ example: '1005 S Gay' }).describe('TODO describe q field for the OpenInspection MCP integration'),
-            session: z.string().min(8).max(128).openapi({ example: '550e8400-e29b-41d4-a716-446655440099' }).describe('TODO describe session field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
+            q: z.string().min(2).max(200).openapi({ example: '1005 S Gay' }).describe('Partial street address typed so far.'),
+            session: z.string().min(8).max(128).openapi({ example: '550e8400-e29b-41d4-a716-446655440099' }).describe('Client-generated session token (for example a UUID) created when the address field opens and reused for every autocomplete call and the final details call of that lookup.'),
+        }),
     },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
                 success: z.literal(true),
                 data: z.array(z.object({
-                    placeId: z.string().describe('TODO describe placeId field for the OpenInspection MCP integration'),
-                    description: z.string().describe('TODO describe description field for the OpenInspection MCP integration'),
-                    mainText: z.string().describe('TODO describe mainText field for the OpenInspection MCP integration'),
-                    secondaryText: z.string().describe('TODO describe secondaryText field for the OpenInspection MCP integration'),
-                })).describe('TODO describe data field for the OpenInspection MCP integration'),
+                    placeId: z.string(),
+                    description: z.string(),
+                    mainText: z.string(),
+                    secondaryText: z.string(),
+                })),
                 meta: z.object({
-                    cached: z.boolean().describe('TODO describe cached field for the OpenInspection MCP integration'),
+                    cached: z.boolean(),
                 }),
             }) } },
             description: 'Autocomplete suggestions',
         },
     },
     operationId: "autocompletePlace",
-    description: "Auto-generated placeholder for autocompletePlace (GET /autocomplete, bookings domain). TODO: replace with a real description sourced from the handler."
+    description: "Authenticated proxy to Google Places address autocomplete, restricted to US addresses. Returns suggestions with placeId, description, mainText and secondaryText; meta.cached says whether the list came from the one hour cache, which is keyed on the lowercased query text alone. Pass the same session token on every keystroke and on the final details call so Google bills the sequence as one session. Fails with 400 when the deployment has no Google Places key or Google errors. The route applies no role check of its own beyond a signed-in session."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // ── GET /api/places/details ────────────────────────────────────────────────
@@ -67,34 +67,34 @@ const detailsRoute = createRoute(withMcpMetadata({
     summary: 'Address details (Google Places Details proxy)',
     request: {
         query: z.object({
-            placeId: z.string().min(8).max(200).openapi({ example: 'ChIJxxx' }).describe('TODO describe placeId field for the OpenInspection MCP integration'),
-            session: z.string().min(8).max(128).openapi({ example: '550e8400-e29b-41d4-a716-446655440099' }).describe('TODO describe session field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
+            placeId: z.string().min(8).max(200).openapi({ example: 'ChIJxxx' }).describe('Google place id of the chosen suggestion, as returned by the autocomplete route.'),
+            session: z.string().min(8).max(128).openapi({ example: '550e8400-e29b-41d4-a716-446655440099' }).describe('The same session token used for the autocomplete calls that led to this selection.'),
+        }),
     },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
                 success: z.literal(true),
                 data: z.object({
-                    placeId: z.string().describe('TODO describe placeId field for the OpenInspection MCP integration'),
-                    formatted: z.string().describe('TODO describe formatted field for the OpenInspection MCP integration'),
-                    street: z.string().nullable().describe('TODO describe street field for the OpenInspection MCP integration'),
-                    city: z.string().nullable().describe('TODO describe city field for the OpenInspection MCP integration'),
-                    state: z.string().nullable().describe('TODO describe state field for the OpenInspection MCP integration'),
-                    zip: z.string().nullable().describe('TODO describe zip field for the OpenInspection MCP integration'),
-                    county: z.string().nullable().describe('TODO describe county field for the OpenInspection MCP integration'),
-                    lat: z.number().describe('TODO describe lat field for the OpenInspection MCP integration'),
-                    lng: z.number().describe('TODO describe lng field for the OpenInspection MCP integration'),
+                    placeId: z.string(),
+                    formatted: z.string(),
+                    street: z.string().nullable(),
+                    city: z.string().nullable(),
+                    state: z.string().nullable(),
+                    zip: z.string().nullable(),
+                    county: z.string().nullable(),
+                    lat: z.number(),
+                    lng: z.number(),
                 }),
                 meta: z.object({
-                    cached: z.boolean().describe('TODO describe cached field for the OpenInspection MCP integration'),
+                    cached: z.boolean(),
                 }),
-            }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            }) } },
             description: 'Place details',
         },
     },
     operationId: "listPlaceDetails",
-    description: "Auto-generated placeholder for listPlaceDetails (GET /details, bookings domain). TODO: replace with a real description sourced from the handler."
+    description: "Authenticated proxy that resolves one Google Places placeId (from the autocomplete route) to a structured address: formatted address, street, city, state, ZIP, county (each nullable) and latitude and longitude. meta.cached says whether it came from the 60 day cache keyed by placeId. Pass the same session token used for the autocomplete calls. Fails with 400 when the deployment has no Google Places key or Google cannot resolve the place. The route applies no role check of its own beyond a signed-in session."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const placesRoutes = createApiRouter()

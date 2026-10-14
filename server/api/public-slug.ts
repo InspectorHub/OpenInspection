@@ -31,9 +31,9 @@ const checkSlugRoute = createRoute(withMcpMetadata({
     summary: 'Check whether a booking slug is available',
     request: {
         query: z.object({
-            value: z.string().min(1).max(64).describe('TODO describe value field for the OpenInspection MCP integration'),
-            namespace: z.enum(['inspector', 'agent']).optional().describe('TODO describe namespace field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
+            value: z.string().min(1).max(64).describe('The slug to test, as the user typed it.'),
+            namespace: z.enum(['inspector', 'agent']).optional().describe('Which slug space to check: inspector (the default) is scoped to one company, agent is shared across all agent accounts.'),
+        }),
     },
     responses: {
         200: {
@@ -46,7 +46,7 @@ const checkSlugRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listSlugCheckSlug",
-    description: "Auto-generated placeholder for listSlugCheckSlug (GET /check/slug, profile domain). TODO: replace with a real description sourced from the handler."
+    description: "Public, unauthenticated check of whether a booking slug can be claimed. Returns available true, or false with a reason: reserved (on the reserved list), taken (another user already has it), or invalid (no company could be resolved from the request). For a taken slug in the inspector namespace, up to 3 alternative suggestions are included. The inspector namespace (default) checks within the company resolved from the request's tenant context; the agent namespace checks across all agent accounts, with no company needed, and the value is lower-cased first. Read-only; it does not reserve the slug."
 }, { scopes: [], tier: 'extended' }));
 
 const publicSlugRoutes = createApiRouter()

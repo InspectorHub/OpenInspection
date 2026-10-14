@@ -28,16 +28,16 @@ const listRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "List inspection requests for current tenant",
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { query: InspectionRequestListQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
+    request: { query: InspectionRequestListQuerySchema },
     responses: {
         200: {
-            content: { 'application/json': { schema: InspectionRequestListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: InspectionRequestListResponseSchema } },
             description: 'List of requests with sub-inspections',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "listInspectionRequests",
-    description: "Auto-generated placeholder for listInspectionRequests (GET /, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the company's inspection requests (a client, property and schedule with the inspections grouped under it), each with its inspections and their template names. Newest scheduled date first, paged with limit and offset. Filter by status and by a scheduled-date range (from and to, both inclusive). Note that total in the response is the number of requests on this page, not the count across all pages. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const detailRoute = createRoute(withMcpMetadata({
@@ -45,16 +45,16 @@ const detailRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "Get inspection request for current tenant",
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().min(1).describe('Id of the inspection request to fetch; must belong to this company.') }) },
     responses: {
         200: {
-            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema } },
             description: 'Request detail',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "getInspectionRequest",
-    description: "Auto-generated placeholder for getInspectionRequest (GET /{id}, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns one inspection request with its inspections, each with the inspection's template name. Returns 404 when the id is not a request of this company. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // Sprint 2 S2-2 — resolve the parent request for an inspection.
@@ -67,14 +67,14 @@ const byInspectionRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Get parent request by inspection id',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ inspectionId: z.string().min(1).describe('TODO describe inspectionId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ inspectionId: z.string().min(1).describe('Id of an inspection in this company whose parent request to look up.') }) },
     responses: {
         200: {
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-                        data: z.object({ request: InspectionRequestResponseSchema.nullable().describe('TODO describe request field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                        success: z.literal(true),
+                        data: z.object({ request: InspectionRequestResponseSchema.nullable() }),
                     }),
                 },
             },
@@ -83,7 +83,7 @@ const byInspectionRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "getInspectionRequestByInspection",
-    description: "Auto-generated placeholder for getInspectionRequestByInspection (GET /by-inspection/{inspectionId}, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Finds the parent request of an inspection, with all of its inspections, so a caller can show sibling inspections from the same booking. Returns 200 with request null (not 404) when the inspection has no parent request, which is the case for inspections created singly, or when the inspection id does not exist in this company. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const createReqRoute = createRoute(withMcpMetadata({
@@ -92,17 +92,23 @@ const createReqRoute = createRoute(withMcpMetadata({
     summary: 'Create inspection request with N sub-inspections',
     middleware: [requireRole('owner', 'manager')] as const,
     request: {
-        body: { content: { 'application/json': { schema: CreateInspectionRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: CreateInspectionRequestSchema.describe('The client, property, schedule and the inspections to create') } } },
     },
     responses: {
         201: {
-            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema } },
             description: 'Created',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "createInspectionRequest",
-    description: "Auto-generated placeholder for createInspectionRequest (POST /, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Create an inspection request: one client, property and schedule, with 1-10 inspections under it, each "
+        + "from its own template. Every referenced template must belong to this company (400 otherwise). Each "
+        + "inspection is created in the requested state, unpaid, at the sent price (default 0), with a copy of its "
+        + "template, and all take the request's address, date and optional inspector. The client is matched or "
+        + "created as a contact and recorded against each inspection. Any new-inspection quota is consumed once for "
+        + "the whole batch before anything is written. The request starts as pending. Sends no email. Not "
+        + "idempotent: each call creates a new request. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const updateReqRoute = createRoute(withMcpMetadata({
@@ -111,18 +117,22 @@ const updateReqRoute = createRoute(withMcpMetadata({
     summary: "Replace inspection request for current tenant",
     middleware: [requireRole('owner', 'manager')] as const,
     request: {
-        params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: UpdateInspectionRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().min(1).describe('Id of the inspection request to update; must belong to this company') }),
+        body: { content: { 'application/json': { schema: UpdateInspectionRequestSchema.describe('The request fields to change; omitted fields are left as they are') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema } },
             description: 'Updated',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "replaceInspectionRequest",
-    description: "Auto-generated placeholder for replaceInspectionRequest (PUT /{id}, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Update the top-level fields of an inspection request: client details, property address, schedule, "
+        + "notes and status. Despite the PUT verb this is a partial update, and sending a nullable field as null "
+        + "clears it. It edits the request record only: the inspections under it are not changed, so edit those "
+        + "through the inspection routes. Sends no email. Returns the request with its inspections, or 404 when the "
+        + "id is not in this company. Idempotent. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const addSubRoute = createRoute(withMcpMetadata({
@@ -131,28 +141,33 @@ const addSubRoute = createRoute(withMcpMetadata({
     summary: 'Add a sub-inspection to an existing request',
     middleware: [requireRole('owner', 'manager')] as const,
     request: {
-        params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().min(1).describe('Id of the inspection request to add an inspection to; must belong to this company') }),
         body: {
             content: {
                 'application/json': {
                     schema: z.object({
-                        templateId: z.string().min(1).describe('TODO describe templateId field for the OpenInspection MCP integration'),
-                        price:      z.number().int().min(0).optional().describe('TODO describe price field for the OpenInspection MCP integration'),
-                        notes:      z.string().max(500).optional().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
-                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                        templateId: z.string().min(1).describe('Id of the inspection template the new inspection uses; must belong to this company. The template is copied onto the inspection'),
+                        price:      z.number().int().min(0).optional().describe('Price for the new inspection in integer cents (for example 45000 is 450.00 in the company currency); defaults to 0'),
+                        notes:      z.string().max(500).optional().nullable().describe('Notes for the new inspection, up to 500 characters'),
+                    }).describe('The template, price and notes of the inspection to add'),
                 },
             },
         },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema } },
             description: 'Sub-inspection added',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "createInspectionRequestInspections",
-    description: "Auto-generated placeholder for createInspectionRequestInspections (POST /{id}/inspections, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Add one more inspection to an existing inspection request. The new inspection copies its template, takes "
+        + "the request's address and date, starts in the requested state, unpaid, at the sent price (default 0), "
+        + "and the request's client is recorded against it. It has no inspector assigned. Consumes any "
+        + "new-inspection quota. 404 when the request is not in this company, and 400 when the template is not. "
+        + "The route does not enforce the 10-inspection limit that applies at creation. Not idempotent: each call "
+        + "adds another inspection. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const inspectionRequestsRoutes = createApiRouter()

@@ -41,12 +41,12 @@ const getPropertyFactsRoute = createRoute(withMcpMetadata({
     summary: "List inspection property facts",
     description: 'Returns the Property Facts strip payload (year built, sqft, foundation, lot, beds, baths).',
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection whose property facts are read.') }),
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {
         200: {
-            content: { 'application/json': { schema: PropertyFactsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: PropertyFactsResponseSchema } },
             description: 'Success',
         },
     },
@@ -65,13 +65,13 @@ export const updatePropertyFactsRoute = createRoute(withMcpMetadata({
     summary: "Patch inspection property fact",
     description: 'Patches the Property Facts strip plus the commercial subtype-preset `metadata` envelope. Omitted keys are unchanged; null clears a field.',
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection whose property facts are changed.') }),
         body: { content: { 'application/json': { schema: PropertyFactsWriteSchema.describe('Property Facts strip fields plus a metadata envelope for non-dedicated commercial subtype-preset fields.') } } },
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {
         200: {
-            content: { 'application/json': { schema: PropertyFactsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: PropertyFactsResponseSchema } },
             description: 'Success',
         },
     },
@@ -121,13 +121,13 @@ const autofillPropertyFactsRoute = createRoute(withMcpMetadata({
     summary: 'Auto-fill property facts from public records (Estated.io)',
     description: 'Returns mapped Property Facts payload or null + reason code. Inspector remains free to override fields manually after auto-fill.',
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: PropertyFactsAutofillRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection the property-record lookup is run for.') }),
+        body: { content: { 'application/json': { schema: PropertyFactsAutofillRequestSchema.describe('The street address to look up in public property records.') } } },
     },
     middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
-            content: { 'application/json': { schema: PropertyFactsAutofillResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: PropertyFactsAutofillResponseSchema } },
             description: 'Auto-fill result',
         },
     },
@@ -143,7 +143,7 @@ const getResultsRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "List inspection results for current tenant",
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection id.') }),
         // Commercial PCA Phase U (Batch C-lazy) — OPTIONAL per-unit read-slice:
         // present ⇒ only that scope's findings (unit id, or '_default' common);
         // omitted ⇒ full map, backward compatible for every existing caller.
@@ -156,7 +156,7 @@ const getResultsRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: createApiResponseSchema(z.object({
-                        results: z.record(z.string(), z.unknown()).describe('TODO describe results field for the OpenInspection MCP integration'),
+                        results: z.record(z.string(), z.unknown()).describe('Saved findings keyed by item id.'),
                         // The `inspection_results` PRIMARY KEY, which the map itself
                         // does not carry. An `ai_content_reviews` row cites the row
                         // that received model-assisted text, and the editor is where
@@ -177,7 +177,7 @@ const getResultsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listInspectionResults",
-    description: "Auto-generated placeholder for listInspectionResults (GET /{id}/results, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Return the saved findings of an inspection as a map keyed by item id. Pass scope to read the slice for one unit."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -258,12 +258,12 @@ const aggregateRecommendationsRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Aggregate all attached recommendations + totals for repair list',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection whose attached recommendations to aggregate.') }) },
     responses: {
-        200: { content: { 'application/json': { schema: AggregatedRecommendationsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Aggregated recommendations' },
+        200: { content: { 'application/json': { schema: AggregatedRecommendationsResponseSchema } }, description: 'Aggregated recommendations' },
     },
     operationId: "listInspectionRecommendations",
-    description: "Auto-generated placeholder for listInspectionRecommendations (GET /{id}/recommendations, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Flattens every repair item (recommendation) attached to the inspection's findings into one list, with each item's recommendation id, summary, contractor type, attach time, the finding it is attached to, and the stored low and high estimates (null when none), plus totals: the count and the sums of the low and high estimates. The same recommendation attached to the same finding is listed once; attached to two findings it is listed twice. Unlike the repair list this includes every attached recommendation and ignores whether the related defect is marked included. Not paginated. An inspection with no results, or an id not in this company, returns an empty list with zero totals rather than 404. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // Design System 0520 subsystem E P1.3 — Publish pre-flight gates.
@@ -272,13 +272,13 @@ const preflightRoute = createRoute(withMcpMetadata({
     path:    '/{id}/preflight',
     tags: ["inspections"],
     summary: 'Compute Publish pre-flight gates (rated / facts / cover / agreement)',
-    request: { params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().min(1).describe('Id of the inspection to check before publishing.') }) },
     responses: {
         200: { description: 'ok' },
         404: { description: 'inspection not found in this tenant' },
     },
     operationId: "listInspectionPreflight",
-    description: "Auto-generated placeholder for listInspectionPreflight (GET /{id}/preflight, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Computes the checks that gate publishing a report, from the inspection's current data, without changing anything: allRated and unratedCount (every result item has a rating or a value; false when there are no items), propertyFactsComplete and missingFacts (year_built, sqft, foundation, bedrooms and bathrooms must all be filled in), coverPhotoSet, agreementSigned, and noOpenFields with openFieldCount (unfilled [PLACEHOLDER]-style fields left in item notes). Advisory only: this route does not publish or block anything. Returns 404 when the inspection is not in this company. The route applies no role check of its own beyond a signed-in session."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // -----------------------------------------------------------------------------

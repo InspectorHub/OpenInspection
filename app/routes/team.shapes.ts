@@ -85,3 +85,17 @@ export function expiryLabel(iso: string | null): string {
   if (ms <= 0) return m.settings_team_invite_expired({ days });
   return m.settings_team_invite_expires_in({ days });
 }
+
+/**
+ * Whether the viewer is offered "Remove" on an active member's row.
+ *
+ * Never on the viewer's own row (the API answers a self-removal with a 400),
+ * and never when the viewer's identity is unknown: with no email to compare,
+ * every row would look like somebody else's. An owner row is offered only to
+ * an owner, because the API refuses a manager the removal of an owner.
+ */
+export function canRemove(member: Pick<Member, "email" | "role">, viewerEmail: string | null | undefined, viewerIsOwner: boolean): boolean {
+  if (!viewerEmail) return false;
+  if (member.email.toLowerCase() === viewerEmail.toLowerCase()) return false;
+  return viewerIsOwner || member.role !== "owner";
+}

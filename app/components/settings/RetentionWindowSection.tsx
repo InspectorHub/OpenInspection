@@ -26,7 +26,10 @@ import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 export interface RetentionWindowSectionProps {
     heading: string;
     description: string;
-    note: string;
+    /** Disclosure shown under the control; omit when the window needs none. */
+    note?: string | undefined;
+    /** The input's label when the unit is not years (the offline limit counts days). */
+    unitLabel?: string | undefined;
     initialYears: number;
     min: number;
     max: number;
@@ -43,7 +46,7 @@ interface ActionResult {
 }
 
 export function RetentionWindowSection({
-    heading, description, note, initialYears, min, max, intent, field,
+    heading, description, note, unitLabel, initialYears, min, max, intent, field,
 }: RetentionWindowSectionProps) {
     const { fetcher, submit, busy } = useGuardedSubmit<() => ActionResult>();
     const [years, setYears] = useState(String(initialYears));
@@ -71,7 +74,7 @@ export function RetentionWindowSection({
             <div className="flex items-end gap-3 flex-wrap">
                 <label className="block">
                     <span className="block text-[12px] font-bold text-ih-fg-2 mb-1">
-                        {m.settings_compliance_years_label()}
+                        {unitLabel ?? m.settings_compliance_years_label()}
                     </span>
                     <input
                         type="number"
@@ -97,7 +100,7 @@ export function RetentionWindowSection({
                 )}
             </div>
 
-            <p className="text-[12px] text-ih-fg-3 leading-relaxed">{note}</p>
+            {note && <p className="text-[12px] text-ih-fg-3 leading-relaxed">{note}</p>}
         </section>
     );
 }

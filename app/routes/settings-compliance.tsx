@@ -21,6 +21,12 @@ const MIN_RETENTION_YEARS = 1;
 const MIN_PDF_RETENTION_YEARS = 0;
 const DEFAULT_PDF_RETENTION_YEARS = 7;
 const MAX_RETENTION_YEARS = 99;
+// Mirrors offlineMaxDays in server/lib/validations/admin/settings.ts.
+const DEFAULT_OFFLINE_DAYS = 30;
+const MIN_OFFLINE_DAYS = 1;
+const MAX_OFFLINE_DAYS = 365;
+
+type TenantConfigPatch = Parameters<ReturnType<typeof createApi>["admin"]["tenant-config"]["$patch"]>[0]["json"];
 
 interface ErasureDecision {
   table: string;
@@ -38,6 +44,12 @@ interface ErasureLogRow {
   deletedCount: number;
   decisions: ErasureDecision[];
   createdAt: number;
+}
+
+/** The API's error message from a failed PATCH, when it sent one. */
+async function patchErrorMessage(res: { json(): Promise<unknown> }): Promise<string | undefined> {
+  const err = (await res.json().catch(() => null)) as Record<string, Record<string, unknown>> | null;
+  return err?.error?.message as string | undefined;
 }
 
 export function meta() {
@@ -67,6 +79,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   let retentionYears = DEFAULT_RETENTION_YEARS;
   let pdfRetentionYears = DEFAULT_PDF_RETENTION_YEARS;
+  let offlineMaxDays = DEFAULT_OFFLINE_DAYS;
   let viewCountingEnabled = false;
   let legal = {
     legalMode: "hosted" as "hosted" | "custom",
@@ -93,6 +106,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const rawPdf = Number(d.reportPdfRetentionYears);
     if (Number.isInteger(rawPdf) && rawPdf >= MIN_PDF_RETENTION_YEARS && rawPdf <= MAX_RETENTION_YEARS) {
       pdfRetentionYears = rawPdf;
+    }
+    const rawOffline = Number(d.offlineMaxDays);
+    if (Number.isInteger(rawOffline) && rawOffline >= MIN_OFFLINE_DAYS && rawOffline <= MAX_OFFLINE_DAYS) {
+      offlineMaxDays = rawOffline;
     }
     const origin = getBaseUrlFromRequest(request);
     const legalMode = d.legalMode === "custom" ? "custom" : "hosted";
@@ -147,7 +164,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     };
   }
 
-  return { retentionYears, pdfRetentionYears, viewCountingEnabled, erasureLog, legal, aiAssurance };
+  return { retentionYears, pdfRetentionYears, offlineMaxDays, viewCountingEnabled, erasureLog, legal, aiAssurance };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -155,6 +172,16 @@ export async function action({ request, context }: Route.ActionArgs) {
   const api = createApi(context, { token });
   const form = await request.formData();
   const intent = String(form.get("intent"));
+
+  // Every save on this page is one PATCH of the tenant config. One call site, so the
+  // action's in-process API fan-out stays where the middleware budget put it.
+  const savePatch = async (json: TenantConfigPatch) => {
+    const res = await api.admin["tenant-config"].$patch({ json });
+    if (!res.ok) {
+      return { ok: false, intent, message: await patchErrorMessage(res) };
+    }
+    return { ok: true, intent };
+  };
 
   if (intent === "retention-save") {
     const raw = String(form.get("retentionYears") ?? "");
@@ -173,17 +200,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         message: m.settings_compliance_retention_range_error({ min: MIN_RETENTION_YEARS, max: MAX_RETENTION_YEARS }),
       };
     }
-    const res = await api.admin["tenant-config"].$patch({
-      json: { agreementRetentionYears: years },
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as
-        | string
-        | undefined;
-      return { ok: false, intent, message };
-    }
-    return { ok: true, intent };
+    return savePatch({ agreementRetentionYears: years });
   }
 
   if (intent === "pdf-retention-save") {
@@ -197,31 +214,24 @@ export async function action({ request, context }: Route.ActionArgs) {
     ) {
       return { ok: false, intent, message: m.settings_compliance_pdf_range_error() };
     }
-    const res = await api.admin["tenant-config"].$patch({
-      json: { reportPdfRetentionYears: years },
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as
-        | string
-        | undefined;
-      return { ok: false, intent, message };
+    return savePatch({ reportPdfRetentionYears: years });
+  }
+
+  if (intent === "offline-save") {
+    const raw = String(form.get("offlineMaxDays") ?? "");
+    const days = Number(raw);
+    if (raw.trim() === "" || !Number.isInteger(days) || days < MIN_OFFLINE_DAYS || days > MAX_OFFLINE_DAYS) {
+      return {
+        ok: false,
+        intent,
+        message: m.settings_compliance_offline_range_error({ min: MIN_OFFLINE_DAYS, max: MAX_OFFLINE_DAYS }),
+      };
     }
-    return { ok: true, intent };
+    return savePatch({ offlineMaxDays: days });
   }
 
   if (intent === "view-counting-save") {
-    const res = await api.admin["tenant-config"].$patch({
-      json: { reportViewCountingEnabled: String(form.get("enabled")) === "1" },
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as
-        | string
-        | undefined;
-      return { ok: false, intent, message };
-    }
-    return { ok: true, intent };
+    return savePatch({ reportViewCountingEnabled: String(form.get("enabled")) === "1" });
   }
 
   if (intent === "legal-save") {
@@ -237,23 +247,13 @@ export async function action({ request, context }: Route.ActionArgs) {
         message: m.settings_compliance_legal_custom_required(),
       };
     }
-    const res = await api.admin["tenant-config"].$patch({
-      json: {
-        legalMode,
-        customPrivacyUrl: legalMode === "custom" ? customPrivacyUrl : null,
-        customTermsUrl: legalMode === "custom" ? customTermsUrl : null,
-        privacyBody: privacyBody.trim() ? privacyBody : null,
-        termsBody: termsBody.trim() ? termsBody : null,
-      },
+    return savePatch({
+      legalMode,
+      customPrivacyUrl: legalMode === "custom" ? customPrivacyUrl : null,
+      customTermsUrl: legalMode === "custom" ? customTermsUrl : null,
+      privacyBody: privacyBody.trim() ? privacyBody : null,
+      termsBody: termsBody.trim() ? termsBody : null,
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as
-        | string
-        | undefined;
-      return { ok: false, intent, message };
-    }
-    return { ok: true, intent };
   }
 
   return { ok: false, intent };
@@ -289,6 +289,16 @@ export default function SettingsCompliancePage() {
         max={MAX_RETENTION_YEARS}
         intent="pdf-retention-save"
         field="pdfRetentionYears"
+      />
+      <RetentionWindowSection
+        heading={m.settings_compliance_offline_heading()}
+        description={m.settings_compliance_offline_desc()}
+        unitLabel={m.settings_compliance_offline_days_label()}
+        initialYears={data.offlineMaxDays}
+        min={MIN_OFFLINE_DAYS}
+        max={MAX_OFFLINE_DAYS}
+        intent="offline-save"
+        field="offlineMaxDays"
       />
       <ReportViewCountingSection initialEnabled={data.viewCountingEnabled} />
       <LegalDocsPanel initial={data.legal} />

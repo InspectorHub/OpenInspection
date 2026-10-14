@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import {
@@ -8,7 +8,17 @@ import {
   roleCanWrite,
   selectedScopesFromForm,
 } from "../../../server/lib/mcp/tag-catalog";
-import { ConsentForm, isRegisteredRedirectUri } from "~/routes/oauth/authorize";
+import { ConsentForm, isRegisteredRedirectUri, loader, action } from "~/routes/oauth/authorize";
+import { createLoadContext } from "~/lib/load-context";
+
+const getToken = vi.hoisted(() => vi.fn());
+const sessionGet = vi.hoisted(() => vi.fn());
+const writeAuditLog = vi.hoisted(() => vi.fn());
+vi.mock("~/lib/session.server", () => ({ getToken }));
+vi.mock("~/lib/api-client.server", () => ({
+  createApi: () => ({ sessionContext: { context: { $get: sessionGet } } }),
+}));
+vi.mock("../../../server/lib/audit", () => ({ writeAuditLog }));
 
 // The tags MODULE_GROUPS is allowed to use: the controlled vocabulary from
 // docs/develop/conventions/route-metadata.md plus the two real route tags that
@@ -146,5 +156,188 @@ describe("isRegisteredRedirectUri (cancel-path open-redirect guard)", () => {
   it("rejects when the client is missing (unknown clientId)", () => {
     expect(isRegisteredRedirectUri(null, "https://app.example.com/callback")).toBe(false);
     expect(isRegisteredRedirectUri(undefined, "https://app.example.com/callback")).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* The real loader and action, native branch                           */
+/* ------------------------------------------------------------------ */
+
+const APP_REDIRECT = "io.inspectorhub.app:/oauth/callback";
+const S256 = { codeChallenge: "c".repeat(43), codeChallengeMethod: "S256" };
+
+/** An unsigned JWT whose payload carries what resolveIdentity decodes. */
+function jwt(): string {
+  const payload = btoa(JSON.stringify({ sub: "u1", "custom:tenantId": "t1" }));
+  return `h.${payload}.s`;
+}
+
+interface Parsed {
+  clientId: string;
+  scope: string[];
+  redirectUri: string;
+  codeChallenge?: string;
+  codeChallengeMethod?: string;
+}
+
+function harness(opts: { native?: boolean; mcp?: boolean; parsed: Parsed }) {
+  const completeAuthorization = vi.fn(async (_o: { scope: string[]; props: Record<string, unknown> }) => ({
+    redirectTo: `${opts.parsed.redirectUri}?code=abc`,
+  }));
+  const provider = {
+    parseAuthRequest: vi.fn(async () => ({ responseType: "code", state: "s", ...opts.parsed })),
+    lookupClient: vi.fn(async () => ({ clientId: "c1", clientName: "Field App", redirectUris: [opts.parsed.redirectUri] })),
+    completeAuthorization,
+  };
+  // MCP is on unless a test says otherwise, as it is on any deployment that serves an MCP grant.
+  const env = {
+    APP_MODE: "standalone",
+    OAUTH_PROVIDER: provider,
+    ...(opts.mcp === false ? {} : { MCP_ENABLED: "true" }),
+    ...(opts.native ? { NATIVE_CLIENT_ENABLED: "true" } : {}),
+  };
+  return { provider, completeAuthorization, context: createLoadContext(env) };
+}
+
+const getArgs = (context: ReturnType<typeof createLoadContext>, scope: string) => {
+  const url = new URL(`https://app.test/oauth/authorize?scope=${scope}`);
+  return { request: new Request(url), url, context } as never;
+};
+
+beforeEach(() => {
+  getToken.mockReset().mockResolvedValue(jwt());
+  sessionGet.mockReset().mockResolvedValue({
+    ok: true,
+    json: async () => ({ data: { user: { role: "inspector" }, branding: { tenantSlug: "acme" } } }),
+  });
+  writeAuditLog.mockReset();
+});
+
+describe("authorize loader, native branch (the real loader)", () => {
+  const good: Parsed = { clientId: "c1", scope: ["native"], redirectUri: APP_REDIRECT, ...S256 };
+
+  it("is 404 when the operator has not opted in, and still serves an MCP request on that deployment", async () => {
+    const off = harness({ parsed: good });
+    const refused = await loader(getArgs(off.context, "native")).catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(Response);
+    expect((refused as Response).status).toBe(404);
+    const mcp = harness({ parsed: { clientId: "c1", scope: ["read:inspections"], redirectUri: "https://claude.ai/cb" } });
+    const data = await loader(getArgs(mcp.context, "read:inspections"));
+    expect(data.native).toBe(false);
+  });
+
+  it("native-only deployment: an MCP-scope authorization page is 404, the native one is served", async () => {
+    const mcpParsed: Parsed = { clientId: "c1", scope: ["read:inspections"], redirectUri: "https://claude.ai/cb" };
+    const nativeOnly = harness({ native: true, mcp: false, parsed: mcpParsed });
+    const refused = await loader(getArgs(nativeOnly.context, "read:inspections")).catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(Response);
+    expect((refused as Response).status).toBe(404);
+    // Control: the same deployment serves a native authorization.
+    const ok = harness({ native: true, mcp: false, parsed: good });
+    expect((await loader(getArgs(ok.context, "native"))).native).toBe(true);
+  });
+
+  it("refuses an agent before showing the consent page, as the action does", async () => {
+    sessionGet.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { user: { role: "agent" }, branding: { tenantSlug: "acme" } } }),
+    });
+    const h = harness({ native: true, parsed: good });
+    const err = await loader(getArgs(h.context, "native")).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Response);
+    expect((err as Response).status).toBe(403);
+    // Control: an inspector gets the page.
+    sessionGet.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { user: { role: "inspector" }, branding: { tenantSlug: "acme" } } }),
+    });
+    expect((await loader(getArgs(h.context, "native"))).native).toBe(true);
+  });
+
+  it("is 400 for a redirect that is not a private scheme or loopback", async () => {
+    const h = harness({ native: true, parsed: { ...good, redirectUri: "https://evil.example/cb" } });
+    const err = await loader(getArgs(h.context, "native")).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Response);
+    expect((err as Response).status).toBe(400);
+  });
+
+  it("is 400 without a PKCE S256 challenge (none, or plain) and shows no consent page", async () => {
+    const variants: Parsed[] = [
+      { clientId: "c1", scope: ["native"], redirectUri: APP_REDIRECT },
+      { ...good, codeChallengeMethod: "plain" },
+    ];
+    for (const parsed of variants) {
+      const h = harness({ native: true, parsed });
+      const err = await loader(getArgs(h.context, "native")).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(Response);
+      expect((err as Response).status).toBe(400);
+    }
+  });
+
+  it("serves the native consent page for a private scheme with S256, and names the scheme", async () => {
+    const h = harness({ native: true, parsed: good });
+    const data = await loader(getArgs(h.context, "native"));
+    expect(data.native).toBe(true);
+    expect(data.clientName).toBe("Field App");
+    expect(data.redirectScheme).toBe("io.inspectorhub.app");
+    expect(data.redirectLoopback).toBe(false);
+  });
+
+  it("serves a loopback redirect as 'this computer' rather than a scheme", async () => {
+    const h = harness({ native: true, parsed: { ...good, redirectUri: "http://127.0.0.1:53682/cb" } });
+    const data = await loader(getArgs(h.context, "native"));
+    expect(data.redirectLoopback).toBe(true);
+    expect(data.redirectScheme).toBe("");
+  });
+});
+
+describe("authorize action, native branch (the real action)", () => {
+  function post(context: ReturnType<typeof createLoadContext>, authReq: object) {
+    const url = new URL("https://app.test/oauth/authorize");
+    const body = new URLSearchParams({ oauthReq: JSON.stringify(authReq) });
+    return { request: new Request(url, { method: "POST", body }), url, context } as never;
+  }
+  const base = { responseType: "code", state: "s", clientId: "c1", scope: ["native", "read:inspections"], redirectUri: APP_REDIRECT, ...S256 };
+
+  it("grants only the native scope with native props and redirects with the code", async () => {
+    const h = harness({ native: true, parsed: base });
+    const res = (await action(post(h.context, base))) as Response;
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe(`${APP_REDIRECT}?code=abc`);
+    const arg = h.completeAuthorization.mock.calls[0]?.[0];
+    expect(arg?.scope).toEqual(["native"]);
+    expect(arg?.props).toMatchObject({ kind: "native", userId: "u1", tenantId: "t1", role: "inspector" });
+  });
+
+  it("is 404 when the flag is off, 400 without S256, and grants nothing in either case", async () => {
+    const off = harness({ parsed: base });
+    const e1 = await action(post(off.context, base)).catch((e: unknown) => e);
+    expect((e1 as Response).status).toBe(404);
+    const noPkce = harness({ native: true, parsed: base });
+    const e2 = await action(post(noPkce.context, { ...base, codeChallenge: undefined, codeChallengeMethod: undefined })).catch((e: unknown) => e);
+    expect((e2 as Response).status).toBe(400);
+    expect(off.completeAuthorization).not.toHaveBeenCalled();
+    expect(noPkce.completeAuthorization).not.toHaveBeenCalled();
+  });
+
+  it("native-only deployment: an MCP-scope authorization is 404 and grants nothing; native still completes", async () => {
+    const mcp = { ...base, scope: ["read:inspections"], codeChallenge: undefined, codeChallengeMethod: undefined };
+    const h = harness({ native: true, mcp: false, parsed: mcp });
+    const refused = await action(post(h.context, mcp)).catch((e: unknown) => e);
+    expect((refused as Response).status).toBe(404);
+    expect(h.completeAuthorization).not.toHaveBeenCalled();
+    // Control: the same deployment completes a native authorization.
+    const ok = harness({ native: true, mcp: false, parsed: base });
+    expect(((await action(post(ok.context, base))) as Response).status).toBe(302);
+    expect(ok.completeAuthorization).toHaveBeenCalledTimes(1);
+  });
+
+  it("control: an MCP request still takes the module-scope path", async () => {
+    const mcp = { ...base, scope: ["read:inspections"], codeChallenge: undefined, codeChallengeMethod: undefined };
+    const h = harness({ parsed: mcp });
+    const res = (await action(post(h.context, mcp))) as Response;
+    expect(res.status).toBe(302);
+    const arg = h.completeAuthorization.mock.calls[0]?.[0];
+    expect(arg?.props).not.toHaveProperty("kind");
   });
 });

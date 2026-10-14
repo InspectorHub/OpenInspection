@@ -13,10 +13,22 @@ export interface UploadTokenClaims {
     tenantId: string;
     inspectionId: string;
     mediaId: string;
+    /** File extension the object is stored under. Photo tokens carry it so the key is fixed at issue time. */
+    ext?: string;
+    /** The signed-in member the token was minted for. A public upload route re-checks they are still a member. Absent on tokens minted before the field existed. */
+    userId?: string;
 }
+
+/**
+ * What a token may be used to upload. A token minted for one purpose is refused
+ * by the other's verifier. Tokens minted before the field existed were video
+ * tokens, so a missing `kind` reads as 'video'.
+ */
+export type UploadTokenKind = 'photo' | 'video';
 
 interface TokenPayload extends UploadTokenClaims {
     exp: number;
+    kind?: UploadTokenKind;
 }
 
 // ── Base64url helpers (no external deps) ─────────────────────────────────────
@@ -57,15 +69,18 @@ async function importHmacKey(secret: string): Promise<CryptoKey> {
  * @param claims    `{ tenantId, inspectionId, mediaId }`
  * @param ttlSec    Lifetime in seconds (900 = 15 min for normal uploads).
  * @param secret    Raw secret string (from env.JWT_SECRET or equivalent).
+ * @param kind      What the token may upload; the matching verify call must name the same kind.
  * @returns         Opaque token string `{b64urlPayload}.{b64urlSig}`.
  */
 export async function signUploadToken(
     claims: UploadTokenClaims,
     ttlSec: number,
     secret: string,
+    kind: UploadTokenKind = 'video',
 ): Promise<string> {
     const payload: TokenPayload = {
         ...claims,
+        kind,
         exp: Math.floor(Date.now() / 1000) + ttlSec,
     };
     const payloadStr = toBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
@@ -78,11 +93,13 @@ export async function signUploadToken(
  * Verify a token produced by `signUploadToken`.
  *
  * Returns the decoded claims (including `exp`) on success, or `null` when the
- * token is invalid (bad signature, expired, or malformed).
+ * token is invalid (bad signature, expired, malformed, or minted for a different
+ * `kind` than the caller expects).
  */
 export async function verifyUploadToken(
     token: string,
     secret: string,
+    kind: UploadTokenKind = 'video',
 ): Promise<(UploadTokenClaims & { exp: number }) | null> {
     try {
         const dotIdx = token.lastIndexOf('.');
@@ -108,7 +125,17 @@ export async function verifyUploadToken(
         // Expiry check.
         if (Math.floor(Date.now() / 1000) > payload.exp) return null;
 
-        return payload;
+        // A photo token cannot upload a video, nor the reverse.
+        if ((payload.kind ?? 'video') !== kind) return null;
+
+        return {
+            tenantId: payload.tenantId,
+            inspectionId: payload.inspectionId,
+            mediaId: payload.mediaId,
+            ...(payload.ext !== undefined ? { ext: payload.ext } : {}),
+            ...(typeof payload.userId === 'string' && payload.userId.length > 0 ? { userId: payload.userId } : {}),
+            exp: payload.exp,
+        };
     } catch (err) {
         logger.error('verifyUploadToken: unexpected error', {}, err instanceof Error ? err : new Error(String(err)));
         return null;

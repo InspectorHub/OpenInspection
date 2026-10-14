@@ -23,11 +23,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
 
-  // Resolve session role to gate the admin-wide fetch, and mcpEnabled to short-circuit
-  // when the feature flag is off.
+  // Resolve session role to gate the admin-wide fetch, and connectedAppsEnabled to
+  // short-circuit when neither OAuth consumer (remote MCP, native clients) is on.
   let role = "inspector";
   let isSaas = false;
-  let mcpEnabledFlag = true; // fail-open: if the call throws, proceed normally
+  let enabledFlag = true; // fail-open: if the call throws, proceed normally
   try {
     const ctxRes = await api.sessionContext.context.$get();
     if (ctxRes.ok) {
@@ -35,19 +35,19 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         data?: {
           user?: { role?: string };
           branding?: { isSaas?: boolean };
-          deployment?: { mcpEnabled?: boolean };
+          deployment?: { connectedAppsEnabled?: boolean };
         };
       };
       role = body.data?.user?.role ?? "inspector";
       isSaas = body.data?.branding?.isSaas ?? false;
-      mcpEnabledFlag = body.data?.deployment?.mcpEnabled ?? true;
+      enabledFlag = body.data?.deployment?.connectedAppsEnabled ?? true;
     }
   } catch {
     // fall through with defaults — fail open on role so we still show self grants
   }
 
-  if (!mcpEnabledFlag) {
-    return { mcpEnabled: false, self: [], all: null, role, isSaas, loadFailed: false };
+  if (!enabledFlag) {
+    return { connectedAppsEnabled: false, self: [], all: null, role, isSaas, loadFailed: false };
   }
 
   // IA-118 — these are OAuth/MCP grants: third-party access to this workspace's
@@ -57,8 +57,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // told someone a contact "cannot open any reports" while they held two live
   // links.
   //
-  // A 404 is different and is NOT a failure: it means MCP is not enabled on
-  // this deployment, so "no grants" is genuinely correct.
+  // A 404 is different and is NOT a failure: it means neither MCP nor native
+  // clients are enabled on this deployment, so "no grants" is genuinely correct.
   let self: McpGrant[] = [];
   let loadFailed = false;
   try {
@@ -91,7 +91,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }
   }
 
-  return { mcpEnabled: true, self, all, role, isSaas, loadFailed };
+  return { connectedAppsEnabled: true, self, all, role, isSaas, loadFailed };
 }
 
 // ─── Action ──────────────────────────────────────────────────────────────────
@@ -208,6 +208,7 @@ function GrantRow({
         <p className="font-bold text-[13px] text-ih-fg-1 truncate">
           {grant.clientName ?? grant.clientId}
         </p>
+        <p className="text-[11px] text-ih-fg-3" data-testid="grant-kind">{grant.kind === "native" ? m.settings_apps_kind_native() : m.settings_apps_kind_mcp()}</p>
         {showUser && (
           <p className="text-[12px] text-ih-fg-3">
             {grant.userEmail ?? grant.userId ?? m.settings_apps_unknown_user()}{" "}
@@ -215,7 +216,7 @@ function GrantRow({
           </p>
         )}
         <div className="mt-0.5">
-          <ScopesSummary scopes={grant.scopes} />
+          {grant.kind === "native" ? <span className="text-[12px] text-ih-fg-3">{m.settings_apps_native_access()}</span> : <ScopesSummary scopes={grant.scopes} />}
         </div>
         <p className="text-[11px] text-ih-fg-3 mt-1">
           {m.settings_apps_created({ date: formatUnixDate(grant.createdAt, locale, tz) })}{" "}
@@ -260,8 +261,8 @@ export default function SettingsConnectedApps() {
     }
   }, [revokeFetcher.state, revokeFetcher.data]);
 
-  // Feature-off: MCP not enabled on this deployment.
-  if (data.mcpEnabled === false) {
+  // Feature-off: neither MCP nor native clients are enabled on this deployment.
+  if (data.connectedAppsEnabled === false) {
     return (
       <div className="text-center py-16 bg-ih-bg-card border border-ih-border rounded-lg">
         <p className="font-bold text-[14px] text-ih-fg-2">{m.settings_apps_mcp_disabled_title()}</p>

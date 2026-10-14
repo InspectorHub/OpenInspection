@@ -12,10 +12,13 @@
  *    because auth checks the column.
  */
 import { eq } from 'drizzle-orm';
+import { CREDENTIAL_MARKER_TTL_S } from '../lib/auth/credential-marker';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users, contacts, inspections } from '../lib/db/schema';
 import { redactIdentityForExport, type WithheldField } from '../lib/compliance/account-export-manifest';
 import { logger } from '../lib/logger';
+import { revokeUserGrantsBestEffort } from '../lib/mcp/grants';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
 export interface AccountExport {
     exportedAt: string;
@@ -70,6 +73,7 @@ export async function softDeleteAccount(
     userId: string,
     confirmEmail: string,
     kv?: KVNamespace,
+    oauth?: OAuthHelpers,
 ): Promise<AccountDeleteResult> {
     const identity = await db.select().from(users).where(eq(users.id, userId)).get();
     if (!identity) throw new Error('Identity not found');
@@ -88,7 +92,7 @@ export async function softDeleteAccount(
     if (kv) {
         const ts = Math.floor(Date.now() / 1000).toString();
         try {
-            await kv.put(`pwchanged:${userId}`, ts, { expirationTtl: 90000 });
+            await kv.put(`pwchanged:${userId}`, ts, { expirationTtl: CREDENTIAL_MARKER_TTL_S });
         } catch (err) {
             logger.warn('Failed to write session-invalidation key after self-delete; outstanding tokens may remain valid until exp', {
                 userId,
@@ -96,6 +100,10 @@ export async function softDeleteAccount(
             });
         }
     }
+
+    // Grants never read the marker above; revoke them so a refresh token cannot
+    // outlive the account.
+    await revokeUserGrantsBestEffort(oauth, userId, 'self-delete');
 
     return { deletedAt: deletedAt.toISOString(), identityId: userId };
 }

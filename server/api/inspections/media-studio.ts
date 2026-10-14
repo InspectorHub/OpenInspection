@@ -160,11 +160,11 @@ const updateMediaAnnotationsRoute = createRoute(withMcpMetadata({
     summary:    'Save PhotoStudio annotation overlay + caption',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'), mediaId: z.string().min(1).describe('TODO describe mediaId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection the media item belongs to.'), mediaId: z.string().min(1).describe('Id of the media pool item to annotate.') }),
         body: {
             content: {
                 'application/json': {
-                    schema: UpdateMediaAnnotationsSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: UpdateMediaAnnotationsSchema.describe('The annotation overlay and caption to store, replacing the previous values.'),
                 },
             },
         },
@@ -175,13 +175,13 @@ const updateMediaAnnotationsRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
+                        success: z.literal(true),
                         data: z.object({
-                            id:          z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-                            annotations: z.string().nullable().describe('TODO describe annotations field for the OpenInspection MCP integration'),
-                            caption:     z.string().nullable().describe('TODO describe caption field for the OpenInspection MCP integration'),
-                            updatedAt:   z.number().describe('TODO describe updatedAt field for the OpenInspection MCP integration'),
-                        }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                            id:          z.string(),
+                            annotations: z.string().nullable(),
+                            caption:     z.string().nullable(),
+                            updatedAt:   z.number(),
+                        }),
                     }),
                 },
             },
@@ -189,7 +189,7 @@ const updateMediaAnnotationsRoute = createRoute(withMcpMetadata({
         404: { description: 'Media not found in this tenant' },
     },
     operationId: "updateInspectionMediaAnnotation",
-    description: "Auto-generated placeholder for updateInspectionMediaAnnotation (PUT /{id}/media/{mediaId}/annotations, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Saves the annotation overlay and caption of one item in the inspection's media pool. This is a full replace: both annotations and caption are required and overwrite what was stored, so send an empty string for a value you want blank. The overlay is stored as opaque text and not interpreted by the server, and the caption is shown in published reports. Responds 404 if the media item is not in this inspection. Does not touch the image file. updatedAt in the response is the time of the call and is not stored. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // ── Phase T (T12): Photo annotation save ────────────────────────────────────────
@@ -200,18 +200,18 @@ const saveAnnotationRoute = createRoute(withMcpMetadata({
     summary: 'Save photo annotation (composite PNG + Konva nodes JSON)',
     request: {
         params: z.object({
-            id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-            itemId: z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
-            photoIndex: z.coerce.number().int().min(0).describe('TODO describe photoIndex field for the OpenInspection MCP integration'),
-        }).describe('TODO describe params field for the OpenInspection MCP integration'),
+            id: z.string().describe('Inspection the photo belongs to.'),
+            itemId: z.string().describe('Id of the checklist item whose photo is annotated.'),
+            photoIndex: z.coerce.number().int().min(0).describe('Zero-based position of the photo within the item photo list.'),
+        }),
         body: {
             content: {
                 'multipart/form-data': {
                     schema: z.object({
-                        image: z.unknown().openapi({ type: 'string', format: 'binary' }).describe('TODO describe image field for the OpenInspection MCP integration'),
-                        nodes: z.string().describe('TODO describe nodes field for the OpenInspection MCP integration'),
+                        image: z.unknown().openapi({ type: 'string', format: 'binary' }).describe('Flattened PNG rendering of the photo with its annotations drawn on.'),
+                        nodes: z.string().describe('JSON text of the annotation shapes, stored so the annotation can be re-edited.'),
                         sectionId: z.string().optional().describe('Section ID for composite finding key'),
-                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    }).describe('Multipart form carrying the annotated image, the shapes JSON and an optional section id.'),
                 },
             },
         },
@@ -219,13 +219,13 @@ const saveAnnotationRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {
         200: {
-            content: { 'application/json': { schema: createApiResponseSchema(z.object({ annotatedKey: z.string().describe('TODO describe annotatedKey field for the OpenInspection MCP integration') })) } },
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ annotatedKey: z.string() })) } },
             description: 'Annotation saved',
         },
     },
     operationId: "createInspectionItemsPhotosAnnotation",
-    description: "Auto-generated placeholder for createInspectionItemsPhotosAnnotation (POST /{id}/items/{itemId}/photos/{photoIndex}/annotation, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' }));
+    description: "Saves an annotated version of a checklist item photo from a multipart upload: image is the flattened PNG rendering and nodes is the JSON describing the drawn shapes, kept so the annotation can be edited again. The PNG is written to photo storage next to the original, which is kept untouched, and a repeat save overwrites the previous annotated image. Unless the company edits live in the collaborative editor, the photo entry in the report results also gains the annotated image key and the shapes JSON; with the collaborative editor on, only the image is stored and the returned key must be recorded by the client. Responds 400 when the image is missing or storage is unavailable, and 404 when there is no photo at that index. Available to owner, manager and inspector roles."
+}, { scopes: ['write'], tier: 'excluded' }));
 
 // ── Media Studio (cover crop): POST /api/inspections/:id/cover ───────────────
 // Bakes a cropped JPEG derivative of the chosen cover source photo to R2 and
@@ -260,7 +260,7 @@ const setCoverCropRoute = createRoute(withMcpMetadata({
     },
     operationId: "setInspectionCover",
     description: "Bake and store a cropped report-cover JPEG derivative for an inspection and record its re-editable crop transform (POST /{id}/cover, inspections domain)."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'excluded' }));
 
 // ── Media Studio (Plan 4): crop an item/defect photo ─────────────────────────
 const cropItemPhotoRoute = createRoute(withMcpMetadata({
@@ -295,7 +295,7 @@ const cropItemPhotoRoute = createRoute(withMcpMetadata({
     },
     operationId: "cropInspectionItemPhoto",
     description: "Bake and store a cropped derivative for an inspection-item or per-defect photo and record its re-editable crop transform (POST /{id}/items/{itemId}/photos/{photoIndex}/crop, inspections domain).",
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'excluded' }));
 
 
 // ── Route handlers ────────────────────────────────────────────────────────────
@@ -348,7 +348,7 @@ const mediaStudioRoutes = createApiRouter()
         const { backend, provider } = await resolveVideoBackend(c);
         let out: { uploadURL: string; ref: { provider: 'stream'; streamUid: string } | { provider: 'r2'; mediaId: string; r2Key: string } };
         try {
-            out = await backend.createUpload(id);
+            out = await backend.createUpload(id, { native: c.var.nativeClient === true, userId: c.get('user').sub });
         } catch (err) {
             // Cloudflare Stream rejects the direct-upload mint when the account has
             // no allocated minutes / Stream isn't provisioned (QuotaReachedError),

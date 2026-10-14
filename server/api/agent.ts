@@ -38,13 +38,13 @@ const getReportsRoute = createRoute(withMcpMetadata({
     tags: ["agents"],
     summary: "List agent my reports",
     request: {
-        query: AgentReportsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration'),
+        query: AgentReportsQuerySchema,
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: AgentReportsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AgentReportsResponseSchema,
                 },
             },
             description: 'Success',
@@ -54,7 +54,7 @@ const getReportsRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listAgentMyReports",
-    description: "Auto-generated placeholder for listAgentMyReports (GET /my-reports, agents domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the company's inspections on which a given agent contact is seated in a role that shows in the agent portal, as full inspection rows, with the agentId that was used. agentId is a contact id and defaults to the caller's own user id when omitted. Not paginated or explicitly ordered, and archived inspections are not filtered out. The handler itself only admits the manager role (owners and agents get 403), even though the operation is tagged with the agent scope. Read-only."
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**
@@ -96,7 +96,7 @@ const getLeaderboardRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: LeaderboardResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: LeaderboardResponseSchema,
                 },
             },
             description: 'Success',
@@ -106,7 +106,7 @@ const getLeaderboardRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "leaderboardAgent",
-    description: "Auto-generated placeholder for leaderboardAgent (GET /leaderboard, agents domain). TODO: replace with a real description sourced from the handler."
+    description: "Ranks referral sources by how many of the company's inspections each referred, most first, with the contact's name, agency and email and the total. Counts every inspection of the company with a referring contact, with no date window and no status or archive filter; inspections without a referrer are left out. Not paginated. Read-only. Available to owner, manager, inspector and agent roles."
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**
@@ -121,11 +121,11 @@ const updateProfileRoute = createRoute(withMcpMetadata({
     tags: ["agents"],
     summary: 'Update agent profile (slug + notification prefs)',
     request: {
-        body: { content: { 'application/json': { schema: AgentProfilePatchSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: AgentProfilePatchSchema.describe('The profile fields to change; omitted fields are left as they are') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: AgentProfilePatchResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: AgentProfilePatchResponseSchema } },
             description: 'Profile updated',
         },
         400: { description: 'Invalid input' },
@@ -135,7 +135,7 @@ const updateProfileRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "createAgentProfile",
-    description: "Auto-generated placeholder for createAgentProfile (POST /profile, agents domain). TODO: replace with a real description sourced from the handler."
+    description: "Update the signed-in agent's own profile: public slug, display name and personal display timezone. Despite the POST verb this is a partial update: only the fields sent are written, and sending none changes nothing. The slug is lower-cased and must be unique among agent accounts (409 when taken). A timezone must be a valid IANA id, and an empty string clears it so each company's timezone applies again. Agent accounts only; it always edits the caller's own account. Idempotent."
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**
@@ -152,7 +152,7 @@ const getProfileRoute = createRoute(withMcpMetadata({
     summary: 'Get agent profile (slug + notification prefs)',
     responses: {
         200: {
-            content: { 'application/json': { schema: AgentProfileResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: AgentProfileResponseSchema } },
             description: 'Success',
         },
         401: { description: 'Unauthorized' },
@@ -161,7 +161,7 @@ const getProfileRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "getAgentProfile",
-    description: "Auto-generated placeholder for getAgentProfile (GET /profile, agents domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the signed-in agent's own profile: name, email, public slug and personal display timezone (each null when unset). Always reads the caller's own account, never another agent's; 404 if the account is missing. Agent accounts only. Read-only."
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**
@@ -177,11 +177,11 @@ const conciergeBookRoute = createRoute(withMcpMetadata({
     tags: ["agents"],
     summary: 'Agent submits a concierge booking on behalf of a client',
     request: {
-        body: { content: { 'application/json': { schema: ConciergeBookSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: ConciergeBookSchema.describe('The company, the property, the client and the requested date for the booking') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: ConciergeBookResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: ConciergeBookResponseSchema } },
             description: 'Booking created — state machine entered',
         },
         400: { description: 'Invalid input' },
@@ -191,7 +191,7 @@ const conciergeBookRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "createAgentConciergeBook",
-    description: "Auto-generated placeholder for createAgentConciergeBook (POST /concierge-book, agents domain). TODO: replace with a real description sourced from the handler."
+    description: "Book an inspection on behalf of a client, as a linked agent. Creates an inspection in the requested state with price 0 (or the total of the attached services), a payment status of unpaid, and records the client and the agent against it; any quota the company has on new inspections is consumed. The caller is identified from the session, never from the body, and must be an active linked agent of the named company (403 otherwise). If the company reviews agent bookings, the inspector gets a review email and the status is awaiting_inspector; a named inspector is required unless the agent was invited by one. Otherwise the client is emailed a confirmation link at once and the status is awaiting_client. Not idempotent: each call creates another inspection. Agent accounts only."
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**

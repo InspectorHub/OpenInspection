@@ -64,6 +64,31 @@ export enum ErrorCode {
     // the short inline retry. Nothing is wrong with the message or the account;
     // trying again in a few seconds is the right response.
     EMAIL_RATE_LIMITED = 'EMAIL_RATE_LIMITED',
+    // A native app build below the operator's minimum supported version called
+    // a route that is not sync, upload or import. 426 rather than 400/403: the
+    // request is fine, the client binary is what must change.
+    CLIENT_UPGRADE_REQUIRED = 'CLIENT_UPGRADE_REQUIRED',
+    // A create named an id that already belongs to a record this caller cannot
+    // see. Distinct from CONFLICT so a client that mints its own ids can tell
+    // "pick another id" from every other 409.
+    ID_CONFLICT = 'ID_CONFLICT',
+    // An offline package would create an inspection that an earlier import of the
+    // same package already created and that has since been deleted. Importing it
+    // again would bring the deleted inspection back, so the whole package is
+    // refused. `details.inspectionId` names the inspection.
+    PACKAGE_INSPECTION_DELETED = 'PACKAGE_INSPECTION_DELETED',
+    // An offline package is larger than this deployment's import limits (too many
+    // inspections, queued writes, photos or entries: 422; too many bytes: 413).
+    // Nothing was written. `details` names the limit and carries the limits a
+    // client needs to split the package into parts that fit.
+    PACKAGE_TOO_LARGE = 'PACKAGE_TOO_LARGE',
+    // An offline package was exported longer ago than the import accepts (422).
+    // Nothing was written. `details.maxAgeDays` carries the limit.
+    PACKAGE_EXPIRED = 'PACKAGE_EXPIRED',
+    // An offline package claims to have been exported more than a day in the
+    // future (422): the device clock is wrong, and a package dated ahead would
+    // never age out. Nothing was written. `details.maxFutureSkewDays` carries the limit.
+    PACKAGE_FROM_THE_FUTURE = 'PACKAGE_FROM_THE_FUTURE',
 }
 
 /**

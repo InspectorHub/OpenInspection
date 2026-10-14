@@ -47,11 +47,13 @@ import {
     removeFindingKeys,
 } from '../lib/collab/results-doc';
 import type { ResultsProjection } from '../lib/collab/results-doc.types';
-import { applyFollowupPatch, resolveCarriedFindingKey } from '../lib/collab/followup-patch';
+import { followupResponse } from '../lib/collab/followup-patch';
 import { findingKeysFromTemplateSnapshot } from '../lib/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import { purgePathMatches } from './purge-path';
+import { writeResultsProjection } from './inspection-doc-d1';
+import { importResponse, newestImportSeq, resolvePendingResponse } from './inspection-doc-import';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -133,6 +135,7 @@ interface ResultsSnapshot {
      *   'connect'  — the pre-merge boundary capture taken when a client reconnects,
      *                BEFORE its buffered offline edits merge (preserves the
      *                about-to-be-overwritten value for the H2 compare/recover UI).
+     *   'import'   — the mandatory capture before an offline client's update is applied.
      * Optional so legacy snapshots persisted before this field stay readable.
      */
     reason?:    SnapshotReason;
@@ -140,7 +143,7 @@ interface ResultsSnapshot {
 }
 
 /** Discriminator for why a snapshot was captured. */
-type SnapshotReason = 'periodic' | 'manual' | 'connect';
+type SnapshotReason = 'periodic' | 'manual' | 'connect' | 'import';
 
 /** Snapshot metadata (the list view omits the heavy `projection` payload). */
 type ResultsSnapshotMeta = Omit<ResultsSnapshot, 'projection'>;
@@ -318,12 +321,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             // Identity is forwarded by the authorized route — store for D1
             // persistence. The DO never uses these for access control (the
             // authorized route is the trust boundary).
-            const headerTenantId     = req.headers.get('x-tenant-id');
-            const headerInspectionId = req.headers.get('x-inspection-id');
-            const headerReportId     = req.headers.get('x-report-id');
-            if (headerTenantId)     this.tenantId     = headerTenantId;
-            if (headerInspectionId) this.inspectionId = headerInspectionId;
-            if (headerReportId) this.reportId = headerReportId;
+            this.adoptIdentityHeaders(req);
 
             // M3: fail-closed — reject the upgrade if identity is unknown from
             // both headers and stored state (hydrate() would have loaded it).
@@ -334,7 +332,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             // I1: persist identity to DO storage on the first WS accept so a
             // hibernation-reconstructed DO knows its tenant/inspection even
             // before the next client connects (alarm() can then flush to D1).
-            if (!this.identityPersisted || headerReportId) {
+            if (!this.identityPersisted || req.headers.get('x-report-id')) {
                 await this.ctx.storage.put<PersistedIdentity>(IDENTITY_KEY, {
                     tenantId:     this.tenantId,
                     inspectionId: this.inspectionId,
@@ -430,17 +428,29 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         // + broadcast so all clients resync. The authorized route forwards the same
         // identity headers as /restore; identity is set below from request headers.
         if (url.pathname.endsWith('/restructure') && req.method === 'POST') {
-            // Capture identity from headers forwarded by the authorized route,
-            // mirroring the /ws path identity acquisition (the DO trusts the route).
-            const headerTenantId     = req.headers.get('x-tenant-id');
-            const headerInspectionId = req.headers.get('x-inspection-id');
-            const headerReportId     = req.headers.get('x-report-id');
-            if (headerTenantId)     this.tenantId     = headerTenantId;
-            if (headerInspectionId) this.inspectionId = headerInspectionId;
-            if (headerReportId) this.reportId = headerReportId;
-
+            this.adoptIdentityHeaders(req);
             await this.restructure();
             return Response.json({ ok: true });
+        }
+
+        // An offline client's Yjs update, behind a mandatory snapshot; hydrated first, like /followup.
+        if (url.pathname.endsWith('/import') && req.method === 'POST') {
+            if (!this.adoptIdentityHeaders(req)) return new Response('missing tenant/inspection identity', { status: 400 });
+            await this.hydrateFromD1Once();
+            return importResponse(
+                this.doc,
+                new Uint8Array(await req.arrayBuffer()),
+                () => this.captureSnapshot(req.headers.get('x-user-id'), 'import'),
+                () => this.persist(),
+                async () => newestImportSeq(asSnapshotArray(await this.ctx.storage.get(SNAPSHOTS_KEY))),
+            );
+        }
+
+        // Swap pending photo entries for their R2 keys after an offline import; same trust boundary as /import.
+        if (url.pathname.endsWith('/resolve-pending') && req.method === 'POST') {
+            this.adoptIdentityHeaders(req);
+            await this.hydrateFromD1Once();
+            return resolvePendingResponse(this.doc, await req.text(), { tenantId: this.tenantId, inspectionId: this.inspectionId }, () => this.persist());
         }
 
         // #119 — record a carried item's follow-up disposition. Same identity
@@ -449,38 +459,8 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         // no prior state, and patching an empty document and persisting it would
         // write an empty projection over the round's carried items.
         if (url.pathname.endsWith('/followup') && req.method === 'POST') {
-            const headerTenantId     = req.headers.get('x-tenant-id');
-            const headerInspectionId = req.headers.get('x-inspection-id');
-            const headerReportId     = req.headers.get('x-report-id');
-            if (headerTenantId)     this.tenantId     = headerTenantId;
-            if (headerInspectionId) this.inspectionId = headerInspectionId;
-            if (headerReportId)     this.reportId     = headerReportId;
-            if (!this.tenantId || !this.inspectionId) {
-                return new Response('missing tenant/inspection identity', { status: 400 });
-            }
-
-            let body: { itemId?: unknown; status?: unknown; notes?: unknown };
-            try {
-                body = (await req.json()) as typeof body;
-            } catch {
-                return new Response('invalid body', { status: 400 });
-            }
-            const itemId = typeof body.itemId === 'string' ? body.itemId : '';
-            if (!itemId) return new Response('invalid itemId', { status: 400 });
-            const status = typeof body.status === 'string' && body.status.length > 0 ? body.status : null;
-            const notes  = typeof body.notes === 'string' ? body.notes : undefined;
-
-            await this.hydrateFromD1Once();
-            const resolved = resolveCarriedFindingKey(this.doc, itemId);
-            if (!resolved.ok) {
-                return Response.json(
-                    { ok: false, reason: resolved.reason },
-                    { status: resolved.reason === 'ambiguous' ? 409 : 404 },
-                );
-            }
-            applyFollowupPatch(this.doc, resolved.findingKey, notes === undefined ? { status } : { status, notes });
-            await this.persist();
-            return Response.json({ ok: true, findingKey: resolved.findingKey });
+            if (!this.adoptIdentityHeaders(req)) return new Response('missing tenant/inspection identity', { status: 400 });
+            return followupResponse(this.doc, req, () => this.hydrateFromD1Once(), () => this.persist());
         }
 
         // Destruction. Called by TenantPurgeService for every report the tenant
@@ -600,44 +580,28 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             this.identityPersisted = true;
         }
 
-        const db: DrizzleD1Database = drizzle(this.env.DB);
-        const projection = projectResults(this.doc);
+        const written = await writeResultsProjection(
+            this.env.DB,
+            { tenantId, inspectionId, reportId: this.reportId },
+            stateUpdate,
+            projectResults(this.doc),
+        );
+        if (written === 'inspection_gone') await this.abandon();
+    }
 
-        const updated = await db
-            .update(inspectionResults)
-            .set({
-                ydocState:    stateUpdate,
-                data:         projection,
-                lastSyncedAt: new Date(),
-            })
-            .where(
-                and(
-                    eq(inspectionResults.tenantId, tenantId),
-                    // Per REPORT when we know which one. An inspection can now
-                    // carry several results rows, and matching on inspection id
-                    // alone updates all of them with this document.
-                    this.reportId
-                        ? eq(inspectionResults.reportId, this.reportId)
-                        : eq(inspectionResults.inspectionId, inspectionId),
-                ),
-            );
-
-        // An UPDATE that matches no row is not an error — it quietly changes
-        // nothing. `createInspection` does not create this row, so for every
-        // inspection made through the wizard that silence WAS the bug: the
-        // editor showed ratings, the socket said Connected, and D1 stayed empty.
-        // Insert on the way through instead of dropping the document.
-        if ((updated.meta?.changes ?? 0) === 0) {
-            await db.insert(inspectionResults).values({
-                id:           crypto.randomUUID(),
-                tenantId,
-                inspectionId,
-                ...(this.reportId ? { reportId: this.reportId } : {}),
-                ydocState:    stateUpdate,
-                data:         projection,
-                lastSyncedAt: new Date(),
-            });
-        }
+    /**
+     * The inspection this document belongs to was hard-deleted. Stop: cancel the
+     * debounce, drop the alarm so it is not re-armed, and empty storage so the
+     * deleted inspection's content is not kept. The in-memory document is left
+     * alone, as in the purge verb; a later edit from a socket still open simply
+     * lands here again.
+     */
+    private async abandon(): Promise<void> {
+        if (this.persistTimer !== null) clearTimeout(this.persistTimer);
+        this.persistTimer = null;
+        logger.warn('Results document abandoned: its inspection no longer exists', { tenantId: this.tenantId, inspectionId: this.inspectionId });
+        await this.ctx.storage.deleteAlarm();
+        await this.ctx.storage.deleteAll();
     }
 
     // ── Snapshot version history (#181 Phase 4) ───────────────────────────────
@@ -855,6 +819,17 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    /** Take the identity the authorized route forwarded (an absent header keeps what hibernation restored); true once tenant and inspection are known. */
+    private adoptIdentityHeaders(req: Request): boolean {
+        const tenantId     = req.headers.get('x-tenant-id');
+        const inspectionId = req.headers.get('x-inspection-id');
+        const reportId     = req.headers.get('x-report-id');
+        if (tenantId)     this.tenantId     = tenantId;
+        if (inspectionId) this.inspectionId = inspectionId;
+        if (reportId)     this.reportId     = reportId;
+        return !!this.tenantId && !!this.inspectionId;
+    }
 
     /**
      * I1: Load the persisted Y.Doc binary AND the stored tenant/inspection

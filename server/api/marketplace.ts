@@ -70,17 +70,17 @@ const marketplaceRoutes = createApiRouter()
     // half -- owner/manager hold templateImport by default, so the practical
     // effect is confined to a workspace that has deliberately revoked it.
     middleware: [requireRole('owner', 'manager'), requireCapability('templateImport')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('Marketplace catalogue entry to import.') }) },
     responses: {
         201: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ localTemplateId: z.string().nullable().describe('Local template id for a 1:1 kind; null for a 1:N kind, which produces row_count rows rather than one') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.object({ localTemplateId: z.string().nullable().describe('Local template id for a 1:1 kind; null for a 1:N kind, which produces row_count rows rather than one') }) }) } },
             description: 'Imported',
         },
         403: { description: "Missing the 'templateImport' capability" },
         404: { description: 'Not found' },
     },
     operationId: "importMarketplace",
-    description: "Auto-generated placeholder for importMarketplace (POST /{id}/import, marketplace domain). TODO: replace with a real description sourced from the handler."
+    description: "Install a marketplace catalogue entry into the company. A template or statutory form entry becomes one new local template (returned as localTemplateId); a comment pack becomes a set of canned comments and returns localTemplateId null. The kind is read from the entry, and a template schema that is not valid v2 is refused. Idempotent: importing something already installed returns what the first import produced and creates nothing; an entry that was uninstalled is reinstalled. Returns 404 for an unknown entry. Same handler as the libraries import route. Needs the template import capability and the owner or manager role."
 }, { scopes: ['write'], tier: 'extended', capability: 'templateImport' })), async (c) => {
     const { id } = c.req.valid('param');
     try {
@@ -100,13 +100,13 @@ const marketplaceRoutes = createApiRouter()
     summary: 'List marketplace catalogue entries (comment packs, templates)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        query: z.object({ kind: z.enum(MARKETPLACE_KINDS).optional().describe('TODO describe kind field for the OpenInspection MCP integration') }).describe('TODO describe query field for the OpenInspection MCP integration'),
+        query: z.object({ kind: z.enum(MARKETPLACE_KINDS).optional().describe('Return only entries of this kind. Omit to list every kind.') }),
     },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(z.any()).describe('TODO describe data field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.array(z.any()) }) } }, description: 'OK' },
     },
     operationId: "listMarketplaceLibraries",
-    description: "Auto-generated placeholder for listMarketplaceLibraries (GET /libraries, marketplace domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the marketplace catalogue (comment packs, templates and statutory forms) as one unpaginated array, up to 1000 entries, optionally narrowed to one kind. Delisted entries are not shown. Featured entries come first, then by download count. Each entry carries the company's own install state: importedSemver is the installed version (null if not installed or uninstalled) and hasUpdate says a newer version exists. The pack content itself is not returned, only itemCount and the description. The paginated catalogue route offers search and further filters. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' })), async (c) => {
     const q = c.req.valid('query');
     const data = await c.var.services.marketplace.listLibraries(q.kind ? { kind: q.kind } : {});
@@ -123,17 +123,17 @@ const marketplaceRoutes = createApiRouter()
     // Scheme 2 mints a SECOND local template row, so "update to latest" is a
     // template import by any measure that matters here (#307).
     middleware: [requireRole('owner', 'manager'), requireCapability('templateImport')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('Marketplace template entry that is already imported and has a newer version.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+                success: z.boolean(),
                 data: z.object({
-                    newLocalId: z.string().describe('TODO describe newLocalId field for the OpenInspection MCP integration'),
-                    newName: z.string().describe('TODO describe newName field for the OpenInspection MCP integration'),
-                    fromSemver: z.string().describe('TODO describe fromSemver field for the OpenInspection MCP integration'),
-                    toSemver: z.string().describe('TODO describe toSemver field for the OpenInspection MCP integration'),
-                }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                    newLocalId: z.string(),
+                    newName: z.string(),
+                    fromSemver: z.string(),
+                    toSemver: z.string(),
+                }),
             }) } },
             description: 'Updated',
         },
@@ -142,7 +142,7 @@ const marketplaceRoutes = createApiRouter()
         404: { description: 'Not found' },
     },
     operationId: "createMarketplaceUpdate",
-    description: "Auto-generated placeholder for createMarketplaceUpdate (POST /{id}/update, marketplace domain). TODO: replace with a real description sourced from the handler."
+    description: "Update an installed marketplace template to its latest version. Does not edit the existing template: it creates a new local template named with a (vX.Y.Z) suffix, points the import record at it, and leaves the old template in place so existing inspections keep working (a statutory form's superseded copy is retired from the pickers, never deleted). Records a template.marketplace.updated audit entry. Returns 400 when the entry is not a template or statutory form, was never imported, was uninstalled, or is already on the latest version, and 404 for an unknown entry. Comment packs use the libraries update route instead. Needs the template import capability and the owner or manager role."
 }, { scopes: ['write'], tier: 'extended', capability: 'templateImport' })), async (c) => {
     const { id } = c.req.valid('param');
     try {
@@ -181,14 +181,14 @@ const marketplaceRoutes = createApiRouter()
     // enumerating grep was `insert(templates)` and this path writes
     // `insert(templates as any)`, which that pattern does not match.
     middleware: [requireRole('owner', 'manager'), requireCapability('templateImport')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('Marketplace library to install.') }) },
     responses: {
-        201: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ kind: z.enum(['comments', 'templates', 'statutory']).describe('Which shape the import produced'), rowCount: z.number().describe('Rows created for a 1:N kind; 0 for a 1:1 kind'), localEntityId: z.string().nullable().describe('Local row id for a 1:1 kind; null for a 1:N kind') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Imported' },
+        201: { content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.object({ kind: z.enum(['comments', 'templates', 'statutory']).describe('Which shape the import produced'), rowCount: z.number().describe('Rows created for a 1:N kind; 0 for a 1:1 kind'), localEntityId: z.string().nullable().describe('Local row id for a 1:1 kind; null for a 1:N kind') }) }) } }, description: 'Imported' },
         403: { description: "Missing the 'templateImport' capability" },
         404: { description: 'Not found' },
     },
-    operationId: "importMarketplace",
-    description: "Auto-generated placeholder for importMarketplace (POST /libraries/{id}/import, marketplace domain). TODO: replace with a real description sourced from the handler."
+    operationId: "importMarketplaceLibrary",
+    description: "Install a marketplace library into the company, whatever its kind: a comment pack creates canned comments (rowCount rows), a template or statutory form creates one local template. Runs the same import as the catalogue import route, so it is idempotent (a library already installed returns its earlier result and creates nothing) and reinstalls one that was uninstalled. Returns 404 for an unknown library; any other failure is returned as a 500 with code import_failed and the error detail. Needs the template import capability and the owner or manager role."
 }, { scopes: ['write'], tier: 'extended', capability: 'templateImport' })), async (c) => {
     const { id } = c.req.valid('param');
     try {
@@ -215,16 +215,16 @@ const marketplaceRoutes = createApiRouter()
     // kind other than 'comments' outright, so this path cannot reach the
     // `templates` table. Said here so the next auditor does not re-derive it.
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().describe('Comment pack library that is already imported and has a newer version.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+                success: z.boolean(),
                 data: z.object({
-                    rowsAdded:  z.number().describe('TODO describe rowsAdded field for the OpenInspection MCP integration'),
-                    newSemver:  z.string().describe('TODO describe newSemver field for the OpenInspection MCP integration'),
-                    fromSemver: z.string().describe('TODO describe fromSemver field for the OpenInspection MCP integration'),
-                }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                    rowsAdded:  z.number(),
+                    newSemver:  z.string(),
+                    fromSemver: z.string(),
+                }),
             }) } },
             description: 'Updated',
         },
@@ -232,7 +232,7 @@ const marketplaceRoutes = createApiRouter()
         404: { description: 'Not found' },
     },
     operationId: "createMarketplaceLibrariesUpdate",
-    description: "Auto-generated placeholder for createMarketplaceLibrariesUpdate (POST /libraries/{id}/update, marketplace domain). TODO: replace with a real description sourced from the handler."
+    description: "Update an installed comment pack to its latest version in append mode: inserts the new release's comments as additional rows and does not delete or change the rows the earlier import created (use the replace route to swap them). Only comment packs are supported; template libraries are refused here. Records a library.marketplace.updated audit entry. Returns 400 when the library was never imported, was uninstalled, or is already on the latest version, and 404 for an unknown library. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' })), async (c) => {
     const { id } = c.req.valid('param');
     try {
@@ -298,11 +298,11 @@ const marketplaceRoutes = createApiRouter()
     // else before that. No template is minted, so no template capability.
     middleware: [requireRole('owner', 'manager')] as const,
     request: {
-        params: LibraryReplaceParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: LibraryReplaceParamsSchema,
         body: {
             content: {
                 'application/json': {
-                    schema: LibraryReplaceBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: LibraryReplaceBodySchema.describe('Replace options; the body may be omitted to keep rows the company rewrote.'),
                 },
             },
             required: false,
@@ -311,7 +311,7 @@ const marketplaceRoutes = createApiRouter()
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+                success: z.boolean(),
                 data: z.object({
                     rowsAdded:     z.number().int().describe('Rows the new pack inserted'),
                     rowsDeleted:   z.number().int().describe('Prior-import rows removed'),
@@ -365,19 +365,19 @@ const marketplaceRoutes = createApiRouter()
     method: 'get', path: '/imports/history',
     tags: ["marketplace"],
     summary: 'List per-import history events',
-    description: "Auto-generated placeholder for listMarketplaceImportsHistory (GET /imports/history, marketplace domain). TODO: replace with a real description sourced from the handler.",
+    description: "Lists the company's marketplace import history events, newest first, paged with page and pageSize (default page 1, 20 per page; the response carries hasMore rather than a total). Each event records the action (such as install, update, replace or uninstall), source and target versions, the number of rows affected, extra metadata, creation time and the user who did it. Filter by templateId or libraryId to see one item's history. Read-only. Available to owner, manager and inspector roles.",
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { query: ImportHistoryQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
+    request: { query: ImportHistoryQuerySchema },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+                success: z.boolean(),
                 data: z.object({
-                    items:    z.array(z.unknown()).describe('TODO describe items field for the OpenInspection MCP integration'),
-                    page:     z.number().int().describe('TODO describe page field for the OpenInspection MCP integration'),
-                    pageSize: z.number().int().describe('TODO describe pageSize field for the OpenInspection MCP integration'),
-                    hasMore:  z.boolean().describe('TODO describe hasMore field for the OpenInspection MCP integration'),
-                }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                    items:    z.array(z.unknown()),
+                    page:     z.number().int(),
+                    pageSize: z.number().int(),
+                    hasMore:  z.boolean(),
+                }),
             }) } },
             description: 'OK',
         },

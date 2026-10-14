@@ -44,16 +44,15 @@ const exportDataRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: AdminExportResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AdminExportResponseSchema,
                 },
             },
             description: 'Success',
         },
     },
     operationId: "exportTenant",
-    description: "Auto-generated placeholder for exportTenant (GET /export, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns a full JSON export of the company's data in one response: every inspection, template and agreement template row, all inspection results, and the agreement signing requests with their per-signer records. Signing-request token columns are deliberately left out, so signing links cannot be rebuilt from the export. Not paginated, so the response can be very large. Side effect: each call writes a data.export entry to the audit log. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
-
 
 /**
  * POST /api/admin/invite
@@ -68,7 +67,7 @@ const inviteMemberRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: InviteMemberSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: InviteMemberSchema.describe('Who to invite and with which role'),
                 },
             },
         },
@@ -77,14 +76,15 @@ const inviteMemberRoute = createRoute(withMcpMetadata({
         201: {
             content: {
                 'application/json': {
-                    schema: InviteResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: InviteResponseSchema,
                 },
             },
             description: 'Created',
         },
+        403: { description: 'Only an owner can invite someone as an owner' },
     },
     operationId: "inviteTenant",
-    description: "Auto-generated placeholder for inviteTenant (POST /invite, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Invite a person to join the company team. Creates a pending invite that expires after 7 days and emails the recipient the accept link (the email is sent in the background; if it is refused or fails, the invite still exists and the call still succeeds, so deliver the returned inviteLink yourself when in doubt). Only an owner may invite someone as an owner (403 otherwise). The body also lists notify and permissionOverrides, but this route does not apply either: it always sends the email and grants the plain role. Each call creates a new invite; repeating an email creates another. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -103,14 +103,14 @@ const listMembersRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: MemberListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: MemberListResponseSchema,
                 },
             },
             description: 'Success',
         },
     },
     operationId: "listTenantMembers",
-    description: "Auto-generated placeholder for listTenantMembers (GET /members, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the company's user accounts with id, email, role and creation time, plus whether each has a calendar connected and when it last synced. Pending invitations are not included; the invite route and the team members route cover those. Not paginated. Read-only. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -125,24 +125,24 @@ const getAuditLogsRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager')],
     request: {
         query: z.object({
-            limit: z.string().optional().describe('TODO describe limit field for the OpenInspection MCP integration'),
-            cursor: z.string().optional().describe('TODO describe cursor field for the OpenInspection MCP integration'),
-            action: z.string().optional().describe('TODO describe action field for the OpenInspection MCP integration'),
-            entityType: z.string().optional().describe('TODO describe entityType field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
+            limit: z.string().optional().describe('Number of log entries per page, sent as a numeric string. Defaults to 50 when omitted.'),
+            cursor: z.string().optional().describe('Opaque paging token: the nextCursor value from the previous response. A value that is not a valid token is rejected with 400.'),
+            action: z.string().optional().describe('Return only entries whose action matches this value exactly, for example inspection.create.'),
+            entityType: z.string().optional().describe('Return only entries for this entity type, matched exactly, for example audit_log.'),
+        }),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: AuditLogResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: AuditLogResponseSchema,
                 },
             },
             description: 'Success',
         },
     },
     operationId: "listTenantAuditLogs",
-    description: "Auto-generated placeholder for listTenantAuditLogs (GET /audit-logs, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Returns the company's audit log, newest first, one page at a time. Pass the nextCursor from a response back as cursor to read the next page; hasMore says whether another page exists. action and entityType filter by exact match. Side effect: each call writes an audit.view entry to the audit log itself. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -175,12 +175,12 @@ const postAuditLogRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: SuccessResponseSchema } },
             description: 'Recorded',
         },
     },
     operationId: "createTenantAuditLogs",
-    description: "Auto-generated placeholder for createTenantAuditLogs (POST /audit-logs, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Append one client-reported event to the company audit log. The only action accepted is inspection.sync_conflict_resolved, which the offline editor reports when an inspector resolves a sync conflict; every other audit action is written by the server itself and cannot be forged here. The entity family must be one of the known families, and detail is free-form metadata that is redacted by value shape when written. Each call appends a new entry; repeating it records the event again. Open to owners, managers and inspectors."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -197,7 +197,7 @@ const eraseDataRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: DataErasureSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: DataErasureSchema.describe('The client whose personal data is to be erased'),
                 },
             },
         },
@@ -206,14 +206,14 @@ const eraseDataRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: EraseDataResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: EraseDataResponseSchema,
                 },
             },
             description: 'Success',
         },
     },
     operationId: "deleteTenantData",
-    description: "Auto-generated placeholder for deleteTenantData (DELETE /data, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Erase a client's personal data, found by email address, from this company (a data-subject erasure request). Irreversible. Signed agreements are kept as evidence: their personal details are anonymised in place while the signature, signing times and signing audit trail remain. Agreements nobody has signed are deleted, and the client's contact record is deleted. Erasure is recorded in an append-only erasure log. The response reports the outcome status (completed, partially_completed, refused or held) with counts of rows anonymised, deleted and retained; a status other than completed means some data was kept or a step failed, so read the decisions before telling anyone it is done. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -278,7 +278,7 @@ const adminDataRoutes = createApiRouter()
         const body = c.req.valid('json');
 
         const adminService = c.var.services.admin;
-        const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role);
+        const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role, c.get('userRole'));
 
         const inviteLink = inviteAcceptUrl(c, inviteId);
 

@@ -8,9 +8,9 @@ import { z } from '@hono/zod-openapi';
 const SeverityEnum = z.enum(['good', 'marginal', 'significant', 'minor']);
 
 export const CreateRecommendationSchema = z.object({
-    category:             z.string().nullable().optional().describe('TODO describe category field for the OpenInspection MCP integration'),
-    name:                 z.string().min(1).max(200).describe('TODO describe name field for the OpenInspection MCP integration'),
-    severity:             SeverityEnum.describe('TODO describe severity field for the OpenInspection MCP integration'),
+    category:             z.string().nullable().optional().describe('Recommendation category, or null.'),
+    name:                 z.string().min(1).max(200).describe('Recommendation name.'),
+    severity:             SeverityEnum.describe('Severity class of the recommendation.'),
     defaultRepairSummary: z.string().min(1).max(2000).describe('Scope of the repair. A repair item carries scope, never a price.'),
     recommendedContractorTypeId: z.string().nullable().optional().describe('Soft reference to contractor_types.id (no DB FK). Suggested contractor for this repair item.'),
 }).openapi('CreateRecommendation');
@@ -18,51 +18,51 @@ export const CreateRecommendationSchema = z.object({
 export const UpdateRecommendationSchema = CreateRecommendationSchema.partial().openapi('UpdateRecommendation');
 
 const RecommendationSchema = z.object({
-    id:                   z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId:             z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    category:             z.string().nullable().describe('TODO describe category field for the OpenInspection MCP integration'),
-    name:                 z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-    severity:             SeverityEnum.describe('TODO describe severity field for the OpenInspection MCP integration'),
+    id:                   z.string().trim().min(1).describe('Recommendation id.'),
+    tenantId:             z.string().trim().min(1).describe('Id of the company that owns the recommendation.'),
+    category:             z.string().nullable().describe('Recommendation category, or null.'),
+    name:                 z.string().describe('Recommendation name.'),
+    severity:             SeverityEnum.describe('Severity class of the recommendation.'),
     defaultRepairSummary: z.string().describe('Scope of the repair. A repair item carries scope, never a price.'),
     recommendedContractorTypeId: z.string().nullable().describe('Soft reference to contractor_types.id; suggested contractor for this repair item.'),
-    createdByUserId:      z.string().nullable().describe('TODO describe createdByUserId field for the OpenInspection MCP integration'),
-    createdAt:            z.union([z.string(), z.date(), z.number()]).describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    createdByUserId:      z.string().nullable().describe('User who created the recommendation, or null for seeded entries.'),
+    createdAt:            z.union([z.string(), z.date(), z.number()]).describe('When the recommendation was created.'),
 }).openapi('Recommendation');
 
 export const RecommendationResponseSchema = z.object({
-    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-    data:    RecommendationSchema.describe('TODO describe data field for the OpenInspection MCP integration'),
+    success: z.literal(true).describe('True when the request succeeded.'),
+    data:    RecommendationSchema.describe('Recommendation payload.'),
 }).openapi('RecommendationResponse');
 
 export const RecommendationListResponseSchema = z.object({
-    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-    data:    z.array(RecommendationSchema).describe('TODO describe data field for the OpenInspection MCP integration'),
+    success: z.literal(true).describe('True when the request succeeded.'),
+    data:    z.array(RecommendationSchema).describe('Recommendation payload.'),
 }).openapi('RecommendationListResponse');
 
 export const ListRecommendationsQuerySchema = z.object({
-    category: z.string().optional().describe('TODO describe category field for the OpenInspection MCP integration'),
-    severity: SeverityEnum.optional().describe('TODO describe severity field for the OpenInspection MCP integration'),
+    category: z.string().optional().describe('Return only recommendations in this category.'),
+    severity: SeverityEnum.optional().describe('Return only recommendations of this severity.'),
 }).openapi('ListRecommendationsQuery');
 
 export const AttachedRecommendationItemSchema = z.object({
-    recommendationId:    z.string().describe('TODO describe recommendationId field for the OpenInspection MCP integration'),
-    estimateSnapshotMin: z.number().int().nullable().describe('TODO describe estimateSnapshotMin field for the OpenInspection MCP integration'),
-    estimateSnapshotMax: z.number().int().nullable().describe('TODO describe estimateSnapshotMax field for the OpenInspection MCP integration'),
-    summarySnapshot:     z.string().describe('TODO describe summarySnapshot field for the OpenInspection MCP integration'),
+    recommendationId:    z.string(),
+    estimateSnapshotMin: z.number().int().nullable(),
+    estimateSnapshotMax: z.number().int().nullable(),
+    summarySnapshot:     z.string(),
     contractorTypeSnapshot: z.string().nullable().describe('Contractor type name captured at attach time.'),
-    attachedAt:          z.number().int().nonnegative().describe('TODO describe attachedAt field for the OpenInspection MCP integration'),
-    itemId:              z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
+    attachedAt:          z.number().int().nonnegative(),
+    itemId:              z.string(),
 }).openapi('AttachedRecommendationItem');
 
 export const AggregatedRecommendationsResponseSchema = z.object({
-    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
+    success: z.literal(true),
     data: z.object({
-        items: z.array(AttachedRecommendationItemSchema).describe('TODO describe items field for the OpenInspection MCP integration'),
+        items: z.array(AttachedRecommendationItemSchema),
         totals: z.object({
-            count:           z.number().int().nonnegative().describe('TODO describe count field for the OpenInspection MCP integration'),
-            estimateMinSum:  z.number().int().nonnegative().describe('TODO describe estimateMinSum field for the OpenInspection MCP integration'),
-            estimateMaxSum:  z.number().int().nonnegative().describe('TODO describe estimateMaxSum field for the OpenInspection MCP integration'),
-        }).describe('TODO describe totals field for the OpenInspection MCP integration'),
+            count:           z.number().int().nonnegative(),
+            estimateMinSum:  z.number().int().nonnegative(),
+            estimateMaxSum:  z.number().int().nonnegative(),
+        }),
     }),
 }).openapi('AggregatedRecommendationsResponse');
 

@@ -11,12 +11,12 @@ import {
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
 const ContractorTypeResponseSchema = z.object({
-    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-    data: ContractorTypeSchema.describe('TODO describe data field for the OpenInspection MCP integration'),
+    success: z.literal(true).describe('True when the request succeeded.'),
+    data: ContractorTypeSchema.describe('Response payload.'),
 });
 const ContractorTypeListResponseSchema = z.object({
-    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-    data: z.array(ContractorTypeSchema).describe('TODO describe data field for the OpenInspection MCP integration'),
+    success: z.literal(true).describe('True when the request succeeded.'),
+    data: z.array(ContractorTypeSchema).describe('Response payload.'),
 });
 const ContractorTypeDeletePreflightResponseSchema = z.object({
     success: z.literal(true).describe('Always true; failures are returned as an error envelope.'),
@@ -33,10 +33,10 @@ const listContractorTypesRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {},
     responses: {
-        200: { content: { 'application/json': { schema: ContractorTypeListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'List' },
+        200: { content: { 'application/json': { schema: ContractorTypeListResponseSchema } }, description: 'List' },
     },
     operationId: "listContractorTypes",
-    description: "Auto-generated placeholder for listContractorTypes (GET /, contractor-types domain). TODO: replace with a real description sourced from the handler."
+    description: "List the contractor types configured for the company."
 }, { scopes: ['read'], tier: 'primary' }));
 
 /* ── POST /api/contractor-types ───────────────────────────────────────────── */
@@ -44,13 +44,13 @@ const createContractorTypeRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["contractor-types"],
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { body: { content: { 'application/json': { schema: CreateContractorTypeSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: CreateContractorTypeSchema } } } },
     responses: {
-        200: { content: { 'application/json': { schema: ContractorTypeResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' },
+        200: { content: { 'application/json': { schema: ContractorTypeResponseSchema } }, description: 'Created' },
     },
     operationId: "createContractorType",
     summary: "Create contractor type for current tenant",
-    description: "Auto-generated placeholder for createContractorType (POST /, contractor-types domain). TODO: replace with a real description sourced from the handler."
+    description: "Adds a contractor type (a trade label such as electrician) to the company's list, used to suggest who should perform a repair. Owner or manager only. New types have no canonical trade slug. Writes an audit entry (contractor_type.created). Returns the created type."
 }, { scopes: ['write'], tier: 'primary' }));
 
 /* ── PATCH /api/contractor-types/:id ──────────────────────────────────────── */
@@ -59,15 +59,15 @@ const updateContractorTypeRoute = createRoute(withMcpMetadata({
     tags: ["contractor-types"],
     middleware: [requireRole('owner', 'manager')] as const,
     request: {
-        params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: UpdateContractorTypeSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().min(1).describe('Contractor type id.') }),
+        body: { content: { 'application/json': { schema: UpdateContractorTypeSchema } } },
     },
     responses: {
-        200: { content: { 'application/json': { schema: ContractorTypeResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Updated' },
+        200: { content: { 'application/json': { schema: ContractorTypeResponseSchema } }, description: 'Updated' },
     },
     operationId: "updateContractorType",
     summary: "Update contractor type for current tenant",
-    description: "Auto-generated placeholder for updateContractorType (PATCH /{id}, contractor-types domain). TODO: replace with a real description sourced from the handler."
+    description: "Renames a contractor type or changes its sort order; send only the fields to change. Owner or manager only. Fails with not found when the id does not exist in this company. Writes an audit entry (contractor_type.updated). Returns the updated type."
 }, { scopes: ['write'], tier: 'primary' }));
 
 /* ── DELETE /api/contractor-types/:id ─────────────────────────────────────── */
@@ -75,13 +75,13 @@ const deleteContractorTypeRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["contractor-types"],
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().min(1).describe('Contractor type id.') }) },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ deleted: z.literal(true).describe('TODO describe deleted field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Deleted' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('True when the request succeeded.'), data: z.object({ deleted: z.literal(true).describe('True when the contractor type was deleted.') }).describe('Response payload.') }) } }, description: 'Deleted' },
     },
     operationId: "deleteContractorType",
     summary: "Delete contractor type for current tenant",
-    description: "Auto-generated placeholder for deleteContractorType (DELETE /{id}, contractor-types domain). TODO: replace with a real description sourced from the handler."
+    description: "Permanently deletes a contractor type. Owner or manager only. Not blocked by references: recommendations that name this type keep a dangling id, and published reports are unaffected because they store the label. Use the preflight route first to count affected comments. Writes an audit entry (contractor_type.deleted)."
 }, { scopes: ['write'], tier: 'primary' }));
 
 /* ── GET /api/contractor-types/:id/preflight ──────────────────────────────── */
@@ -108,12 +108,15 @@ const reorderContractorTypesRoute = createRoute(withMcpMetadata({
     tags: ["contractor-types"],
     summary: 'Reorder contractor types (persist the supplied id order as sortOrder)',
     middleware: [requireRole('owner', 'manager')] as const,
-    request: { body: { content: { 'application/json': { schema: ReorderContractorTypesSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: ReorderContractorTypesSchema } } } },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ reordered: z.literal(true).describe('TODO describe reordered field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Reordered' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('True when the request succeeded.'), data: z.object({ reordered: z.literal(true).describe('True when the new order was saved.') }).describe('Response payload.') }) } }, description: 'Reordered' },
     },
     operationId: "reorderContractorTypes",
-    description: "Auto-generated placeholder for reorderContractorTypes (POST /reorder, contractor-types domain). TODO: replace with a real description sourced from the handler."
+    description: "Set the display order of contractor types. The listed ids take sortOrder 0, 1, 2 and so on, in the "
+        + "order given. Ids that are not in this company are skipped without an error, and contractor types left "
+        + "out of the list keep their old sortOrder, so send the complete list to get a clean order. Idempotent. "
+        + "Owner or manager only."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const contractorTypesRoutes = createApiRouter()

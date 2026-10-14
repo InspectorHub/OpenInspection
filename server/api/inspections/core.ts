@@ -5,7 +5,6 @@
 // The per-inspection results/editing routes (property facts, results, rating
 // system, recommendations, item-field patch, preflight) live alongside in
 // ./results.ts to keep both files under the size ceiling.
-import type { Context } from 'hono';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
@@ -14,7 +13,7 @@ import { Errors } from '../../lib/errors';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 import { getInspectionRoster } from '../../lib/inspection/roster';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
-import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema, PatchInspectionResponseSchema } from '../../lib/validations/inspection.schema';
+import { InspectionSchema, UpdateInspectionSchema, PatchInspectionResponseSchema } from '../../lib/validations/inspection.schema';
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
 import { inspections as inspectionTable, inspectionResults } from '../../lib/db/schema';
 import { datePatchValues } from '../../services/inspection/reschedule-date';
@@ -24,60 +23,12 @@ import { deleteInspectionCascade } from '../../services/inspection/inspection-ca
 import { syncAssignmentsAndSplits } from '../../services/pay-split.service';
 import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
-import type { HonoConfig } from '../../types/hono';
-import { logger } from '../../lib/logger';
-import { MeteringService } from '../../services/metering.service';
-import { readTenantTier } from '../../features/plan-quota/guard';
-import { noticeFor } from '../../features/plan-quota/notice';
-import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/email/build-email-service';
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import { getDrizzle } from '../../lib/route-helpers';
 import { patchRevisionReport } from './patch-revision-report';
-
-/**
- * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
- * create/clone/wizard call, check whether the tenant's lifetime inspection
- * counter just crossed the 4/5 or 5/5 notice threshold and, if so, fire a
- * best-effort email. Gated on `hasUsageQuota` (SaaS only — standalone has no
- * DB reads added here beyond the one profile-flag check) and on the tenant's
- * plan tier ('free' only). The email itself is unmetered (see
- * `sendQuotaThresholdNotice` — no `meterTenantId` is passed to
- * `assembleTenantEmailService`) so it can never itself consume or be blocked
- * by the tenant's free-tier email quota.
- */
-async function maybeSendQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: string): Promise<void> {
-    if (!c.var.profile.hasUsageQuota) return;
-    const tier = await readTenantTier(c.env.DB, tenantId);
-    if (tier !== 'free') return;
-
-    const count = await new MeteringService(c.env.DB).lifetimeTotal(tenantId, 'inspections');
-    const n = noticeFor(count);
-    if (!n) return;
-
-    const cfg = await loadTenantEmailConfig(c.env, tenantId);
-    const email = assembleTenantEmailService(c.env, cfg);
-    await email.sendQuotaThresholdNotice(n, {
-        db: c.env.DB,
-        kv: c.env.TENANT_CACHE,
-        tenantId,
-        billingPortalUrl: c.var.profile.billingPortalUrl,
-    });
-}
-
-/**
- * Fire-and-forget wrapper: runs `maybeSendQuotaThresholdNotice` through
- * `c.executionCtx.waitUntil` so it adds zero latency to the response, and
- * never lets a failure (email provider down, KV unavailable, ...) surface as
- * an unhandled rejection. `c.executionCtx` throws when no execution context
- * is present (some unit-test harnesses) — degrade to a no-op there, mirroring
- * the guard in server/api/sms.ts.
- */
-function fireQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: string): void {
-    const run = maybeSendQuotaThresholdNotice(c, tenantId).catch((err) => {
-        logger.error('quota threshold notice failed', { tenantId }, err instanceof Error ? err : new Error(String(err)));
-    });
-    try { c.executionCtx.waitUntil(run); } catch { /* no execution context available (unit tests) */ }
-}
+import { createInspectionRoute } from './core-create-route';
+import { completeReplayedCreate } from './create-replay';
+import { fireQuotaThresholdNotice, recordCreateAudit, resolveCreateInput } from './create-support';
 
 /**
  * GET /api/inspections/:id
@@ -90,15 +41,15 @@ const getInspectionRoute = createRoute(withMcpMetadata({
     description: 'Retrieve detailed information about a single inspection.',
     request: {
         params: z.object({
-            id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
-        }).describe('TODO describe params field for the OpenInspection MCP integration'),
+            id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspection id.'),
+        }),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
                     schema: createApiResponseSchema(z.object({
-                        inspection: InspectionSchema.describe('TODO describe inspection field for the OpenInspection MCP integration'),
+                        inspection: InspectionSchema.describe('The inspection record.'),
                         template: z.unknown().openapi({ description: 'The associated template schema' }),
                     })),
                 },
@@ -123,15 +74,15 @@ const deleteInspectionRoute = createRoute(withMcpMetadata({
     description: "Permanently remove an inspection record. (DELETE /{id}, inspections domain).",
     request: {
         params: z.object({
-            id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
-        }).describe('TODO describe params field for the OpenInspection MCP integration'),
+            id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspection id.'),
+        }),
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: SuccessResponseSchema,
                 },
             },
             description: 'Success',
@@ -151,12 +102,12 @@ const updateInspectionRoute = createRoute(withMcpMetadata({
     description: "Partially update an inspection record. (PATCH /{id}, inspections domain).",
     request: {
         params: z.object({
-            id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
-        }).describe('TODO describe params field for the OpenInspection MCP integration'),
+            id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspection id.'),
+        }),
         body: {
             content: {
                 'application/json': {
-                    schema: UpdateInspectionSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: UpdateInspectionSchema,
                 },
             },
         },
@@ -166,7 +117,7 @@ const updateInspectionRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: PatchInspectionResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: PatchInspectionResponseSchema,
                 },
             },
             description: 'Success',
@@ -174,40 +125,6 @@ const updateInspectionRoute = createRoute(withMcpMetadata({
         400: { description: 'A refused patch: a dangling soft reference (DB-16); status:cancelled, which only POST /{id}/cancel may write (#78); or any status change on an already-cancelled inspection, which only POST /{id}/uncancel may make (#81)' },
     },
     operationId: "patchInspection"
-}, { scopes: ['write'], tier: 'primary' }));
-
-/**
- * POST /api/inspections
- */
-const createInspectionRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/',
-    tags: ["inspections"],
-    summary: "Create inspection for current tenant",
-    description: "Initialize a new inspection for a property. (POST /, inspections domain).",
-    request: {
-        body: {
-            content: {
-                'application/json': {
-                    schema: CreateInspectionSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
-                },
-            },
-        },
-    },
-    middleware: [requireRole('owner', 'manager', 'inspector')],
-    responses: {
-        201: {
-            content: {
-                'application/json': {
-                    schema: createApiResponseSchema(z.object({
-                        inspection: InspectionSchema.describe('TODO describe inspection field for the OpenInspection MCP integration'),
-                    })),
-                },
-            },
-            description: 'Created',
-        },
-    },
-    operationId: "createInspection"
 }, { scopes: ['write'], tier: 'primary' }));
 
 /**
@@ -219,21 +136,21 @@ const cloneInspectionRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "Clone inspection for current tenant",
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection to copy.') }),
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {
         201: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ inspection: InspectionSchema.describe('TODO describe inspection field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ inspection: InspectionSchema })),
                 },
             },
             description: 'Created',
         },
     },
     operationId: "cloneInspection",
-    description: "Auto-generated placeholder for cloneInspection (POST /{id}/clone, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Creates a new inspection as a copy of an existing one. The copy gets a new id, today's date and time, status draft and payment status unpaid; every other column of the source record is carried over as stored, and the source's client and agent links and its lead and helper assignments are copied onto it. Findings, photos and reports are not copied by this route. Counts as one new inspection against the company's plan quota, and a quota-threshold notice may be sent when the limit is approached. Records an inspection.create audit entry noting the source id. Not idempotent: each call makes another copy. Responds 404 if the source is missing. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // -----------------------------------------------------------------------------
@@ -250,20 +167,20 @@ const createFromWizardRoute = createRoute(withMcpMetadata({
     summary:    'Create an inspection from the 4-step NewInspectionWizard',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        body: { content: { 'application/json': { schema: CreateInspectionFromWizardSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: CreateInspectionFromWizardSchema.describe('The wizard answers: property facts, requested services, schedule and team assignment.') } } },
     },
     responses: {
         200: {
             description: 'Created',
             content: { 'application/json': { schema: z.object({
-                success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-                data:    z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                success: z.literal(true),
+                data:    z.object({ id: z.string() }),
             }) } },
         },
         400: { description: 'Validation error' },
     },
     operationId: "createInspectionWizard",
-    description: "Auto-generated placeholder for createInspectionWizard (POST /wizard, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Creates an inspection from the new-inspection wizard payload (property, services, schedule and team) and returns the new inspection id. The signed-in user becomes the inspector and the scheduled date and start time are combined into the inspection date. The client is not collected here: the inspection is created with the placeholder client name Private Client and no contact details, so attach a client afterwards. The services list is validated but this route does not use it to create anything. Property type and commercial subtype (only honoured for commercial) are applied after creation. When team mode is on, the lead defaults to the signed-in user and the helpers are assigned; when it is off, any lead or helpers sent are ignored and the creator is the sole assignee. Counts against the company's plan quota. Unlike the plain create route it responds 200, not 201. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 
@@ -370,7 +287,13 @@ const coreRoutes = createApiRouter()
         const body = c.req.valid('json');
         const tenantId = c.get('tenantId');
         const service = c.var.services.inspection;
-        const contactService = c.var.services.contact;
+
+        // A replay of a create that named its own id (an offline device after the Idempotency-Key window):
+        // answer with the existing inspection, finishing whatever the first attempt did not reach (./create-replay).
+        if (body.id) {
+            const existing = await service.findInspectionById(tenantId, body.id);
+            if (existing) return c.json({ success: true, data: { inspection: await completeReplayedCreate(c, existing, body) } }, 200);
+        }
 
         const civilDate = String(body.date ?? '').slice(0, 10);
         if (/^\d{4}-\d{2}-\d{2}$/.test(civilDate)) {
@@ -385,61 +308,14 @@ const coreRoutes = createApiRouter()
             }
         }
 
-        // Filter undefined values and handle inspectorId logic
-        const createData = Object.fromEntries(
-            Object.entries(body).filter(([_, v]) => v !== undefined)
-        ) as typeof body;
-
-        // IA-1: Resolve client contact before creating the inspection.
-        let clientContactId: string | undefined;
-        if (body.client) {
-            const { id } = await contactService.upsertClientContact(tenantId, {
-                name:  body.client.name,
-                email: body.client.email,
-                phone: body.client.phone,
-                type:  'client',
-            });
-            clientContactId = id;
-            // Double-write denormalized columns so legacy read paths keep working.
-            // Unconditional: the structured client object is the authoritative
-            // source — the flat clientName carries a zod default ('Private
-            // Client') that would otherwise always win and mask the real name.
-            (createData as Record<string, unknown>).clientName = body.client.name;
-            (createData as Record<string, unknown>).clientEmail = body.client.email ?? null;
-            (createData as Record<string, unknown>).clientPhone = body.client.phone ?? null;
-        }
-
-        // IA-1: Resolve agent — newAgent creates/finds a contacts row; agentContactId uses an existing one.
-        let resolvedAgentId: string | undefined = createData.referredByAgentId as string | undefined;
-        if (body.newAgent) {
-            const { id } = await contactService.upsertClientContact(tenantId, {
-                name:  body.newAgent.name,
-                email: body.newAgent.email,
-                type:  'agent',
-            });
-            resolvedAgentId = id;
-        } else if (body.agentContactId) {
-            resolvedAgentId = body.agentContactId;
-        }
-
-        const inspection = await service.createInspection(tenantId, {
-            ...createData,
-            inspectorId:       body.inspectorId || c.get('user').sub,
-            referredByAgentId: resolvedAgentId ?? null,
-            // IA-1: pass the resolved contact ids through; createInspection stores them.
-            clientContactId,
-        } as Parameters<typeof service.createInspection>[1]);
-
-        // IA-1: Apply serviceSelections price overrides — replace null priceOverride
-        // for any service whose id appears in serviceSelections with a set override.
-        if (body.serviceSelections && body.serviceSelections.length > 0) {
-            await service.applyServicePriceOverrides(inspection.id, tenantId, body.serviceSelections);
-        }
-
-        auditFromContext(c, 'inspection.create', 'inspection', {
-            entityId: inspection.id,
-            metadata: { propertyAddress: inspection.propertyAddress },
+        // The audit row is written inside the create, ahead of the primary report (./create-support).
+        const { inspection, created } = await service.createInspectionOnce(tenantId, await resolveCreateInput(c, body), {
+            beforeReport: (id) => recordCreateAudit(c, id, body.propertyAddress),
         });
+        // A concurrent request with the same client id won the insert: this one is a
+        // replay, so it answers like one and repeats none of the side effects below.
+        if (!created) return c.json({ success: true, data: { inspection: await completeReplayedCreate(c, inspection, body) } }, 200);
+
         fireQuotaThresholdNotice(c, tenantId);
 
         return c.json({

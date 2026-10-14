@@ -3,11 +3,13 @@ import { users, tenantInvites, tenants } from '../lib/db/schema';
 import { eq, and, isNull, ne } from 'drizzle-orm';
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import type { UserRole } from '../types/auth';
+import { assertMayTouchOwner } from '../lib/auth/owner-guard';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
 import { getCapabilities, TOGGLEABLE, type Capability, type PermissionOverrides } from '../lib/auth/capabilities';
 import { revokeAllUserGrants } from '../lib/mcp/grants';
+import { CREDENTIAL_MARKER_TTL_S } from '../lib/auth/credential-marker';
 import { resetMemberTwoFactor } from './team/reset-two-factor';
 
 /**
@@ -31,9 +33,9 @@ export class TeamService {
      *   is rejected on the next request instead of surviving up to its
      *   24h expiry — jwtAuthMiddleware checks this key but never re-reads
      *   the user row. Guarded by `if (this.kv)`.
-     * @param oauth Optional MCP OAuth provider helper (present only when
-     *   MCP_ENABLED — see di.ts). Used by `removeMember` to revoke every
-     *   outstanding MCP grant the removed member holds: grant `props` are
+     * @param oauth Optional OAuth provider helper (present only when MCP or
+     *   native clients are enabled — see di.ts). `removeMember` uses it to revoke
+     *   every outstanding OAuth grant the removed member holds: grant `props` are
      *   baked in at authorize time and never re-checked against the `users`
      *   row per MCP call, so the `pwchanged` marker above has no effect on
      *   MCP traffic (see identity-bridge.ts). Guarded by `if (this.oauth)`.
@@ -54,7 +56,7 @@ export class TeamService {
         if (!this.kv) return;
         const ts = Math.floor(Date.now() / 1000).toString();
         try {
-            await this.kv.put(`pwchanged:${userId}`, ts, { expirationTtl: 90000 });
+            await this.kv.put(`pwchanged:${userId}`, ts, { expirationTtl: CREDENTIAL_MARKER_TTL_S });
         } catch (err) {
             logger.warn('Failed to write session-invalidation key after member removal; outstanding tokens may remain valid until exp', {
                 userId,
@@ -234,6 +236,7 @@ export class TeamService {
         tenantId: string;
         userId: string;
         requesterId: string;
+        requesterRole: UserRole;
         role?: UserRole;
         permissionOverrides?: RequestedOverrides | null;
     }) {
@@ -246,6 +249,9 @@ export class TeamService {
         if (!user) throw Errors.NotFound('Member not found');
 
         const nextRole = params.role ?? (user.role as UserRole);
+
+        // Checked first so a refused caller learns nothing about the target.
+        assertMayTouchOwner(params.requesterRole, user.role, nextRole);
 
         // An agent is not a seat-holding team member: access is granted per
         // inspection by a token that works without an account at all. Letting
@@ -302,7 +308,7 @@ export class TeamService {
         return { id: userId, role: nextRole, permissionOverrides };
     }
 
-    async removeMember(tenantId: string, userId: string, requesterId: string) {
+    async removeMember(tenantId: string, userId: string, requesterId: string, requesterRole: UserRole) {
         if (userId === requesterId) {
             throw Errors.BadRequest('Cannot remove yourself');
         }
@@ -311,6 +317,20 @@ export class TeamService {
             .where(and(eq(users.id, userId), eq(users.tenantId, tenantId), isNull(users.deletedAt)))
             .get();
         if (!user) throw Errors.NotFound('Member not found');
+
+        assertMayTouchOwner(requesterRole, user.role, user.role);
+        // A workspace with no owner cannot be administered by anyone. Same
+        // rule as updateMember's role change (a backstop: only an owner gets here).
+        if (user.role === 'owner') {
+            const otherOwners = await db.select({ id: users.id }).from(users)
+                .where(and(
+                    eq(users.tenantId, tenantId),
+                    eq(users.role, 'owner'),
+                    ne(users.id, userId),
+                    isNull(users.deletedAt),
+                )).limit(1);
+            if (otherOwners.length === 0) throw Errors.BadRequest('Cannot remove the last owner');
+        }
 
         // Soft-delete rather than hard-delete: `inspections.inspector_id`
         // FK-references `users.id`, so a member with inspections can't be

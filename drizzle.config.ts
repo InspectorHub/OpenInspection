@@ -1,10 +1,13 @@
 import { defineConfig } from 'drizzle-kit';
 
-// PRE-LAUNCH POLICY: the Drizzle schema is the single source of truth. While
-// pre-launch, schema changes REGENERATE the single migrations/0000_baseline.sql
-// (`drizzle-kit generate --name baseline` after clearing migrations/) and the DB
-// is reset via `npm run wipe:d1:*` + `db:migrate*` — there are no forward
-// migrations. Forward-migration discipline resumes at launch (real data).
+// MIGRATION POLICY: the Drizzle schema is the single source of truth, and
+// migrations are forward-only. D1 has no rollback, so every change follows
+// expand-migrate-contract: add the new column or table first, backfill in the same
+// file, switch the code over, and only then retire the old structure. Do not
+// regenerate migrations/0000_baseline.sql and do not wipe a database to apply a
+// schema change; run `npm run db:generate` and commit the new incremental file.
+// An ADD COLUMN goes in its own migration, and the column goes at the END of the
+// table's definition in the schema.
 //
 // Schema-first source of truth. `npm run db:generate` diffs server/lib/db/schema
 // against migrations/meta and emits a new SQL migration. Apply with

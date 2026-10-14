@@ -8,6 +8,7 @@ import { PayrollExportSchema, PayrollRunResponseSchema } from '../lib/validation
 import { requireSeatAvailable } from '../features/seat-quota';
 import { inviteAcceptUrl } from '../lib/url';
 import { auditFromContext } from '../lib/audit';
+import { assertMayTouchOwner } from '../lib/auth/owner-guard';
 import {
     InviteMemberSchema,
     UpdateMemberSchema,
@@ -66,14 +67,14 @@ const listTeamMembersRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: TeamMembersResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: TeamMembersResponseSchema,
                 },
             },
             description: 'Success',
         },
     },
     operationId: "listTeamMembers",
-    description: "Auto-generated placeholder for listTeamMembers (GET /members, team domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the company's team: members (non-removed users) with id, name, email, role, permission overrides, whether two-factor sign-in is enabled (the flag only, never secrets), creation time and last active time; the pending invitations, each with its accept link (so anyone who can call this can see those links); and maxUsers, the seat cap (3 when the company has none recorded). Accepted, expired or cancelled invitations are not listed. Not paginated. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -90,7 +91,7 @@ const inviteTeamMemberRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: InviteMemberSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: InviteMemberSchema.describe('Who to invite, the role they get and whether to email the invitation.'),
                 },
             },
         },
@@ -99,14 +100,15 @@ const inviteTeamMemberRoute = createRoute(withMcpMetadata({
         201: {
             content: {
                 'application/json': {
-                    schema: InviteResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: InviteResponseSchema,
                 },
             },
             description: 'Created',
         },
+        403: { description: 'Only an owner can invite someone as an owner' },
     },
     operationId: "inviteTeam",
-    description: "Auto-generated placeholder for inviteTeam (POST /invite, team domain). TODO: replace with a real description sourced from the handler."
+    description: "Invite a person to join the team. Creates a pending invite that expires after 7 days and returns its accept link and expiry. The invitation email is sent unless notify is false, in which case nothing is sent and the caller must deliver the returned inviteLink. Role and the optional permissionOverrides are stored on the invite and applied when it is accepted; only an owner may invite someone as an owner (403). Returns 409 when the email already belongs to an active member and is refused when no seat is free under the seat limit, when one applies. Writes a user.invite audit entry. Each call creates another invite. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -119,7 +121,7 @@ const updateTeamMemberRoute = createRoute(withMcpMetadata({
     path: '/members/{id}',
     tags: ["team"],
     summary: 'Update a team member\'s role or permissions',
-    description: 'Changes role and/or capability overrides for an active member. A role change also invalidates the member\'s sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats).',
+    description: 'Changes role and/or capability overrides for an active member. A role change also invalidates the member\'s sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Only an owner may change an owner or promote anyone to owner.',
     middleware: [requireRole('manager', 'owner')],
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('The member\'s user id.') }),
@@ -131,6 +133,7 @@ const updateTeamMemberRoute = createRoute(withMcpMetadata({
             description: 'Member updated',
         },
         400: { description: 'Last owner, self role-change, or agent role requested' },
+        403: { description: 'Caller is not an owner but the target is, or the new role is, owner' },
         404: { description: 'Member not found in this tenant' },
     },
     operationId: "updateTeamMember",
@@ -147,20 +150,21 @@ const removeTeamMemberRoute = createRoute(withMcpMetadata({
     summary: 'Remove a team member',
     middleware: [requireRole('manager', 'owner')],
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('User id of the member to remove.') }),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ removed: z.boolean().describe('TODO describe removed field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ removed: z.boolean() })),
                 },
             },
             description: 'Member removed',
         },
+        403: { description: 'Caller is not an owner but the member is' },
     },
     operationId: "deleteTeamMember",
-    description: "Auto-generated placeholder for deleteTeamMember (DELETE /members/{id}, team domain). TODO: replace with a real description sourced from the handler."
+    description: "Remove a member from the team. The user is soft-deleted rather than erased, so inspections attributed to them and their report history stay intact, and the same email can be invited again later. Their live sessions and any MCP access grants are revoked immediately, and a user.deleted event is queued for the sync outbox when one is configured. Returns 400 when you try to remove yourself or the last owner, 404 for an unknown or already removed member, and 403 when the target is an owner and the caller is not. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -240,6 +244,10 @@ const teamRoutes = createApiRouter()
         const body = c.req.valid('json');
         const teamService = c.var.services.team;
 
+        // The invited role is copied onto the new user at accept time, so
+        // inviting as owner is minting an owner. Same rule as update/remove.
+        assertMayTouchOwner(c.get('userRole'), 'inspector', body.role);
+
         const { token, expiresAt } = await teamService.createInvite({
             tenantId,
             email: body.email,
@@ -294,6 +302,7 @@ const teamRoutes = createApiRouter()
             tenantId,
             userId: memberId,
             requesterId: user?.sub as string,
+            requesterRole: c.get('userRole'),
             ...(body.role ? { role: body.role } : {}),
             ...(body.permissionOverrides !== undefined ? { permissionOverrides: body.permissionOverrides } : {}),
         });
@@ -309,7 +318,7 @@ const teamRoutes = createApiRouter()
         const teamService = c.var.services.team;
         const authService = c.var.services.auth;
 
-        await teamService.removeMember(tenantId, memberId, requesterId);
+        await teamService.removeMember(tenantId, memberId, requesterId, c.get('userRole'));
 
         // Invalidate the deleted user's sessions so their cookie becomes invalid immediately
         await authService.invalidateUserSessions(memberId);

@@ -9,7 +9,7 @@
 import { z } from '@hono/zod-openapi';
 
 export const SyncQuotaSchema = z.object({
-    tenantId: z.string().min(1).max(128).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    maxUsers: z.number().int().min(1).max(10_000).describe('TODO describe maxUsers field for the OpenInspection MCP integration'),
+    tenantId: z.string().min(1).max(128).describe('Id of the company whose user-seat cap is being changed.'),
+    maxUsers: z.number().int().min(1).max(10_000).describe('New cap on user seats for the company; invitations are checked against it from the next request.'),
 }).openapi('SyncQuota');
 

@@ -80,3 +80,38 @@ export function applyFollowupPatch(
         applyItemPatch(doc, findingKey, 'followupNotes', patch.notes);
     }
 }
+
+/**
+ * The Durable Object's `/followup` answer. `hydrate` runs after the body is
+ * validated and before the document is read: it is NOT optional, because this is
+ * the one mutating path that can reach an object with no prior state, and
+ * patching an empty document and persisting it would write an empty projection
+ * over the round's carried items.
+ */
+export async function followupResponse(
+    doc: Y.Doc,
+    req: Request,
+    hydrate: () => Promise<void>,
+    persist: () => Promise<void>,
+): Promise<Response> {
+    let raw: unknown;
+    try {
+        raw = await req.json();
+    } catch {
+        return new Response('invalid body', { status: 400 });
+    }
+    const body: Record<string, unknown> = typeof raw === 'object' && raw !== null ? Object.fromEntries(Object.entries(raw)) : {};
+    const itemId = typeof body.itemId === 'string' ? body.itemId : '';
+    if (!itemId) return new Response('invalid itemId', { status: 400 });
+    const status = typeof body.status === 'string' && body.status.length > 0 ? body.status : null;
+    const notes  = typeof body.notes === 'string' ? body.notes : undefined;
+
+    await hydrate();
+    const resolved = resolveCarriedFindingKey(doc, itemId);
+    if (!resolved.ok) {
+        return Response.json({ ok: false, reason: resolved.reason }, { status: resolved.reason === 'ambiguous' ? 409 : 404 });
+    }
+    applyFollowupPatch(doc, resolved.findingKey, notes === undefined ? { status } : { status, notes });
+    await persist();
+    return Response.json({ ok: true, findingKey: resolved.findingKey });
+}

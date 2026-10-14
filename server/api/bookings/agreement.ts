@@ -33,7 +33,7 @@ const getAgreementByTokenRoute = createRoute(withMcpMetadata({
     path: '/agreements/:token',
     tags: ["bookings", "public"],
     summary: 'Get agreement for signing (public, token-gated)',
-    request: { params: z.object({ token: z.string().min(1).describe('TODO describe token field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ token: z.string().min(1).describe('Signer link token from the signing link emailed to that signer.') }) },
     responses: {
         200: {
             content: {
@@ -50,7 +50,7 @@ const getAgreementByTokenRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listBookingAgreements",
-    description: "Auto-generated placeholder for listBookingAgreements (GET /agreements/:token, bookings domain). TODO: replace with a real description sourced from the handler."
+    description: "Public, unauthenticated route gated by a signer's link token. Returns the agreement as presented to that signer: the pinned content snapshot (never the live template), agreement name, client name, the signer's name, role and status, signature progress across the envelope, and its completion policy. Returns 404 for an unknown token. Despite being a GET it writes: opening the agreement marks that signer as viewed (idempotent, and may roll the envelope status forward), pins the content snapshot on the first view of an unpinned request, and appends a signer.presented entry to the signing audit chain (best-effort; a failed append does not block the read)."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -131,15 +131,15 @@ const signAgreementRoute = createRoute(withMcpMetadata({
     tags: ["bookings", "public"],
     summary: 'Submit client signature (public, token-gated)',
     request: {
-        params: z.object({ token: z.string().min(1).describe('TODO describe token field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ token: z.string().min(1).describe('Signer token from the personal signing link the signer was emailed') }),
         body: {
             content: {
                 'application/json': {
                     schema: z.object({
-                        signatureBase64: z.string().min(1).describe('TODO describe signatureBase64 field for the OpenInspection MCP integration'),
+                        signatureBase64: z.string().min(1).describe('The drawn signature as a base64-encoded image, optionally with a data:image/...;base64, prefix. It is stored on the signer record and a SHA-256 hash of the image bytes is written to the signing audit trail'),
                         onBehalfOf: z.string().max(200).optional().describe('Client name an authorized agent is signing on behalf of'),
                         onBehalfDisclaimer: z.string().max(2000).optional().describe('Authorized-agent disclaimer text shown at sign time'),
-                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    }).describe('The signature and, when signing for someone else, who for'),
                 },
             },
         },
@@ -148,14 +148,14 @@ const signAgreementRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: z.object({ success: z.literal(true) }),
                 },
             },
             description: 'Signed',
         },
     },
     operationId: "createBookingAgreementsSign",
-    description: "Auto-generated placeholder for createBookingAgreementsSign (POST /agreements/:token/sign, bookings domain). TODO: replace with a real description sourced from the handler."
+    description: "Record a remote signature for one signer of an agreement, identified by the token in their personal signing link. Public: the token is the only credential. The signature is refused with 400 unless the signing audit trail already shows this signer was presented this exact agreement text, which happens when they open it through the get-agreement route. It also writes a signer.signed entry to that trail with IP, country, user agent and a hash of the signature image, stores the signature, and fires the per-signature automation trigger. When this signature completes the envelope under its completion policy, the completion pipeline runs exactly once (audit entry, verification token, completion workflow, admin notification, completion automation and confirmation email). The signer is also emailed a receipt with a verification link, except when their signature completed the envelope and they are the envelope's client, who gets the completion email instead. A signer who declined or whose request expired gets 409, and an unknown token gets 404. Repeating the call for a signer who already signed does not change the stored signature, but it can still append another audit entry and resend the receipt.",
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -167,23 +167,23 @@ const declineAgreementRoute = createRoute(withMcpMetadata({
     tags: ["bookings", "public"],
     summary: 'Decline agreement (public, token-gated)',
     request: {
-        params: z.object({ token: z.string().min(1).describe('TODO describe token field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ token: z.string().min(1).describe('Signer token from the personal signing link the signer was emailed') }),
         body: {
             content: {
                 'application/json': {
-                    schema: z.object({ reason: z.string().max(500).optional().describe('TODO describe reason field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: z.object({ reason: z.string().max(500).optional().describe('Why the signer is declining, up to 500 characters. Recorded in the signing audit trail, and kept on the envelope when this decline makes the whole envelope declined') }).describe('Optional reason for declining'),
                 },
             },
         },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } },
             description: 'Declined',
         },
     },
     operationId: "declineBooking",
-    description: "Auto-generated placeholder for declineBooking (POST /agreements/:token/decline, bookings domain). TODO: replace with a real description sourced from the handler."
+    description: "Decline an agreement as one signer, identified by the token in their personal signing link. Public: the token is the only credential. Marks that signer declined, writes a signer.declined entry (with reason, IP, country and user agent) to the signing audit trail, and recomputes the envelope status under its completion policy. The agreement-declined automation fires only when the whole envelope ends up declined. A signer who already signed or whose request expired gets 409; declining again after a decline succeeds without further change to the signer's status. 404 for an unknown token."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const agreementRoutes = createApiRouter()

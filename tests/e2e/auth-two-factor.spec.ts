@@ -27,8 +27,11 @@ import { TOTP, Secret } from 'otpauth';
 import { csrfHeaders } from './helpers/csrf';
 
 const BASE_URL = 'http://127.0.0.1:8789';
-const EMAIL = 'admin@autotest.com';
-const PASSWORD = 'Password123!';
+const ADMIN_EMAIL = 'admin@autotest.com';
+const ADMIN_PASSWORD = 'Password123!';
+// Unique per run so a re-run against the same local database can invite again.
+const EMAIL = `two-factor-${Date.now()}@autotest.com`;
+const PASSWORD = 'TwoFactor123!';
 
 /** What an authenticator app would show for this secret, right now. */
 const codeFor = (secret: string) =>
@@ -134,9 +137,34 @@ async function expectSignedIn(page: Page): Promise<void> {
     expect(new URL(page.url()).pathname, 'still signed in after a reload').toBe('/inspections');
 }
 
+/** Invite the throwaway member off the shared admin and have them join. */
+async function createMember(request: APIRequestContext): Promise<void> {
+    const login = await post(request, '/api/auth/login', { email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
+    expect(login.status(), 'admin login').toBe(200);
+    const adminToken = sessionFrom(login);
+    expect(adminToken, 'admin session cookie').not.toBe('');
+
+    const invite = await post(request, '/api/team/invite', { email: EMAIL, role: 'inspector' }, adminToken);
+    expect(invite.status(), 'invite').toBe(201);
+    const joinToken = new URL((await invite.json()).data?.inviteLink ?? '').searchParams.get('token') ?? '';
+    expect(joinToken, 'invite link carries a token').toBeTruthy();
+
+    const join = await post(request, '/api/auth/join', { token: joinToken, password: PASSWORD, name: 'Two Factor' });
+    expect(join.status(), 'join').toBe(200);
+}
+
 test.describe.configure({ mode: 'serial' });
 
 test.describe('two-factor sign-in', () => {
+    test.beforeAll(async ({ playwright }) => {
+        const request = await playwright.request.newContext();
+        try {
+            await createMember(request);
+        } finally {
+            await request.dispose();
+        }
+    });
+
     let secret = '';
     let recoveryCodes: string[] = [];
     let session = '';

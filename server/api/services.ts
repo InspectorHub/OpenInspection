@@ -21,9 +21,9 @@ export const servicesRoutes = createApiRouter()
         method: 'get', path: '/',
         tags: ["services"], summary: "List services for current tenant",
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        responses: { 200: { content: { 'application/json': { schema: ServiceListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' } },
+        responses: { 200: { content: { 'application/json': { schema: ServiceListResponseSchema } }, description: 'OK' } },
         operationId: "listServices",
-        description: "Auto-generated placeholder for listServices (GET /, services domain). TODO: replace with a real description sourced from the handler."
+        description: "Lists the company's active services (the bookable catalog), ordered by sort order then name. Inactive (deleted) services are not returned. Price is in integer cents and is omitted from the response for callers without the financial capability. Owner, manager or inspector."
     }, { scopes: ['read'], tier: 'primary' })), async (c) => {
         const tenantId = c.get('tenantId');
         const rows = await c.var.services.service.listServices(tenantId);
@@ -37,10 +37,10 @@ export const servicesRoutes = createApiRouter()
         method: 'post', path: '/discount/validate',
         tags: ["services"], summary: "Validate service for current tenant",
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        request: { body: { content: { 'application/json': { schema: ValidateDiscountSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+        request: { body: { content: { 'application/json': { schema: ValidateDiscountSchema.describe('The code to check and the subtotal to price it against.') } } } },
         responses: { 200: { content: { 'application/json': { schema: createApiResponseSchema(ValidateDiscountResponseSchema) } }, description: 'Validation result' } },
         operationId: "validateService",
-        description: "Auto-generated placeholder for validateService (POST /discount/validate, services domain). TODO: replace with a real description sourced from the handler."
+        description: "Check a discount code against an order subtotal and report what it would take off. Despite the POST verb this is read-only: it does not redeem the code or change its use count. Only active codes are considered and matching ignores case. A code that is unknown, expired or out of uses still answers 200, with valid false, a zero discountAmount and a message; a valid code returns its id and the amount in cents (a fixed code is capped at the subtotal, a percent code is rounded down). Available to owners, managers and inspectors."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { code, subtotal } = c.req.valid('json');
@@ -52,10 +52,10 @@ export const servicesRoutes = createApiRouter()
         method: 'post', path: '/discount-codes',
         tags: ["services"], summary: "Create service discount codes",
         middleware: [requireRole('owner', 'manager')] as const,
-        request: { body: { content: { 'application/json': { schema: CreateDiscountCodeSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
-        responses: { 201: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' } },
+        request: { body: { content: { 'application/json': { schema: CreateDiscountCodeSchema.describe('The new discount code and its limits.') } } } },
+        responses: { 201: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Created' } },
         operationId: "createServiceDiscountCodes",
-        description: "Auto-generated placeholder for createServiceDiscountCodes (POST /discount-codes, services domain). TODO: replace with a real description sourced from the handler."
+        description: "Create a discount code for the company. The code is stored in upper case, starts active with zero uses, and can carry a use limit and an expiry time. The response is only a success flag, so list the codes to read back the new id. Nothing is written to the audit log and each call creates another code. Restricted to owners and managers."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId');
         const data = c.req.valid('json');
@@ -69,7 +69,7 @@ export const servicesRoutes = createApiRouter()
         middleware: [requireRole('owner', 'manager', 'inspector')] as const,
         responses: { 200: { content: { 'application/json': { schema: DiscountCodeListResponseSchema } }, description: 'OK' } },
         operationId: "listServiceDiscountCodes",
-        description: "Auto-generated placeholder for listServiceDiscountCodes (GET /discount-codes, services domain). TODO: replace with a real description sourced from the handler."
+        description: "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owner, manager and inspector roles."
     }, { scopes: ['read'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId');
         const rows = await c.var.services.service.listDiscountCodes(tenantId);
@@ -81,12 +81,12 @@ export const servicesRoutes = createApiRouter()
         tags: ["services"], summary: "Update service discount code",
         middleware: [requireRole('owner', 'manager')] as const,
         request: {
-            params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-            body: { content: { 'application/json': { schema: UpdateDiscountCodeSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+            params: z.object({ id: z.string().describe('Discount code to update.') }),
+            body: { content: { 'application/json': { schema: UpdateDiscountCodeSchema.describe('The discount code fields to change; omitted fields are left as they are.') } } },
         },
         responses: { 200: { content: { 'application/json': { schema: DiscountCodeResponseSchema } }, description: 'Updated' } },
         operationId: "updateServiceDiscountCode",
-        description: "Auto-generated placeholder for updateServiceDiscountCode (PUT /discount-codes/{id}, services domain). TODO: replace with a real description sourced from the handler."
+        description: "Update a discount code. Despite the PUT verb it is a partial update: only the fields sent change, and the updated code is returned. Setting active false retires a code without deleting it, null maxUses or expiresAt removes that limit, and the use count cannot be edited. The code text is stored as sent, unlike create which upper-cases it. Returns 404 for an unknown code. Restricted to owners and managers."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
@@ -99,10 +99,10 @@ export const servicesRoutes = createApiRouter()
         method: 'delete', path: '/discount-codes/{id}',
         tags: ["services"], summary: "Delete service discount code",
         middleware: [requireRole('owner', 'manager')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
-        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Deleted' } },
+        request: { params: z.object({ id: z.string().describe('Discount code to delete.') }) },
+        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
         operationId: "deleteServiceDiscountCode",
-        description: "Auto-generated placeholder for deleteServiceDiscountCode (DELETE /discount-codes/{id}, services domain). TODO: replace with a real description sourced from the handler."
+        description: "Permanently delete a discount code (a hard delete, unlike deleting a service). To stop a code being accepted while keeping its record, update it with active false instead. Returns 404 for an unknown code and nothing is written to the audit log. Restricted to owners and managers."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
@@ -114,10 +114,10 @@ export const servicesRoutes = createApiRouter()
         method: 'post', path: '/',
         tags: ["services"], summary: "Create service for current tenant",
         middleware: [requireRole('owner', 'manager')] as const,
-        request: { body: { content: { 'application/json': { schema: CreateServiceSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
-        responses: { 201: { content: { 'application/json': { schema: ServiceResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' } },
+        request: { body: { content: { 'application/json': { schema: CreateServiceSchema.describe('The new catalog service.') } } } },
+        responses: { 201: { content: { 'application/json': { schema: ServiceResponseSchema } }, description: 'Created' } },
         operationId: "createService",
-        description: "Auto-generated placeholder for createService (POST /, services domain). TODO: replace with a real description sourced from the handler."
+        description: "Creates an active service in the catalog. Owner or manager only. Price is integer cents; durationMinutes, template, agreement, sort order and a per-service deposit policy are optional. Returns the created service."
     }, { scopes: ['write'], tier: 'primary' })), async (c) => {
         const tenantId = c.get('tenantId');
         const data = c.req.valid('json');
@@ -264,12 +264,12 @@ export const servicesRoutes = createApiRouter()
         tags: ["services"], summary: "Replace service for current tenant",
         middleware: [requireRole('owner', 'manager')] as const,
         request: {
-            params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-            body: { content: { 'application/json': { schema: UpdateServiceSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+            params: z.object({ id: z.string().describe('Service to update.') }),
+            body: { content: { 'application/json': { schema: UpdateServiceSchema.describe('The service fields to change; omitted fields are left as they are.') } } },
         },
-        responses: { 200: { content: { 'application/json': { schema: ServiceResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' } },
+        responses: { 200: { content: { 'application/json': { schema: ServiceResponseSchema } }, description: 'OK' } },
         operationId: "replaceService",
-        description: "Auto-generated placeholder for replaceService (PUT /{id}, services domain). TODO: replace with a real description sourced from the handler."
+        description: "Update a catalog service. Despite the PUT verb it is a partial update: only the fields sent change, and the updated service is returned. Sending active true reactivates a service that was deleted. Returns 404 for an unknown id. Nothing is written to the audit log. Restricted to owners and managers."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
@@ -282,10 +282,10 @@ export const servicesRoutes = createApiRouter()
         method: 'delete', path: '/{id}',
         tags: ["services"], summary: "Delete service for current tenant",
         middleware: [requireRole('owner', 'manager')] as const,
-        request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
-        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Deleted' } },
+        request: { params: z.object({ id: z.string().describe('Id of the service to deactivate.') }) },
+        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
         operationId: "deleteService",
-        description: "Auto-generated placeholder for deleteService (DELETE /{id}, services domain). TODO: replace with a real description sourced from the handler."
+        description: "Soft-deletes a service by marking it inactive: it disappears from the catalog list but existing inspections keep their snapshotted service lines. Owner or manager only. Fails with not found for an unknown id."
     }, { scopes: ['write'], tier: 'primary' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');

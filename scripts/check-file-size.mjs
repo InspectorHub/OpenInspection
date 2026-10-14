@@ -34,6 +34,10 @@ const EXCLUDE = [
   /(^|\/)drizzle-tmp\//,
   /(^|\/)\.react-router\//,
   /\/\+types\//, // react-router generated route types
+  // The gate registry is a list that grows by rule: every new gate adds a line,
+  // and splitting a list in two only moves the growth. Exempted by decision
+  // (2026-10-14), not grandfathered, so it carries no baseline entry.
+  /^scripts\/lib\/gate-registry\.mjs$/,
 ];
 
 // ⚠️ `.mjs` IS IN SCOPE, and was not until 2026-08-31.

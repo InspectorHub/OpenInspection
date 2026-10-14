@@ -11,12 +11,12 @@ import { createApiResponseSchema } from '../shared.schema';
  * column on `inspections`.
  */
 export const PropertyFactsSchema = z.object({
-    yearBuilt:      z.number().int().min(1800).max(2100).nullable().optional().openapi({ example: 1990 }).describe('TODO describe yearBuilt field for the OpenInspection MCP integration'),
-    sqft:           z.number().int().min(0).max(1_000_000).nullable().optional().openapi({ example: 1800 }).describe('TODO describe sqft field for the OpenInspection MCP integration'),
-    foundationType: z.enum(['basement', 'slab', 'crawlspace', 'other']).nullable().optional().openapi({ example: 'basement' }).describe('TODO describe foundationType field for the OpenInspection MCP integration'),
-    lotSize:        z.string().max(50).nullable().optional().openapi({ example: '0.25 acres' }).describe('TODO describe lotSize field for the OpenInspection MCP integration'),
-    bedrooms:       z.number().int().min(0).max(50).nullable().optional().openapi({ example: 3 }).describe('TODO describe bedrooms field for the OpenInspection MCP integration'),
-    bathrooms:      z.number().min(0).max(50).nullable().optional().openapi({ example: 2.5 }).describe('TODO describe bathrooms field for the OpenInspection MCP integration'),
+    yearBuilt:      z.number().int().min(1800).max(2100).nullable().optional().openapi({ example: 1990 }).describe('Year the building was built.'),
+    sqft:           z.number().int().min(0).max(1_000_000).nullable().optional().openapi({ example: 1800 }).describe('Building floor area in square feet.'),
+    foundationType: z.enum(['basement', 'slab', 'crawlspace', 'other']).nullable().optional().openapi({ example: 'basement' }).describe('Type of foundation under the building, shown in the Property Facts strip.'),
+    lotSize:        z.string().max(50).nullable().optional().openapi({ example: '0.25 acres' }).describe('Size of the lot as free text including its unit, for example 0.25 acres or 10,000 sqft; it is stored without parsing.'),
+    bedrooms:       z.number().int().min(0).max(50).nullable().optional().openapi({ example: 3 }).describe('Number of bedrooms in the building.'),
+    bathrooms:      z.number().min(0).max(50).nullable().optional().openapi({ example: 2.5 }).describe('Number of bathrooms in the building; half baths are written as .5.'),
     unit:           z.string().max(120).nullable().optional().openapi({ example: 'Suite 200' }).describe('Unit / suite designation for the subject property (maps to the inspections.unit column). Null on properties with no unit.'),
     county:         z.string().max(120).nullable().optional().openapi({ example: 'Travis County' }).describe('County the subject property sits in (maps to the inspections.county column). Autofilled at intake; editable in the Property Facts strip.'),
     // Commercial PCA Phase T — tier elevation from the editor. Validated
@@ -55,25 +55,25 @@ export const PropertyFactsResponseSchema = createApiResponseSchema(PropertyFacts
  * code when the provider can't supply data — graceful degrade pattern).
  */
 export const PropertyFactsAutofillRequestSchema = z.object({
-    addressString: z.string().min(5, 'Address is too short').max(200).describe('TODO describe addressString field for the OpenInspection MCP integration'),
+    addressString: z.string().min(5, 'Address is too short').max(200).describe('Full street address to look up in public property records. The lookup result is returned for the inspector to review and is not saved by this call.'),
 }).openapi('PropertyFactsAutofillRequest');
 
 export const PropertyFactsAutofillResponseSchema = z.object({
-    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
+    success: z.literal(true),
     data: z.object({
-        facts:  PropertyFactsSchema.nullable().describe('TODO describe facts field for the OpenInspection MCP integration'),
-        source: z.enum(['estated', 'manual_required']).describe('TODO describe source field for the OpenInspection MCP integration'),
-        reason: z.enum(['NO_API_KEY', 'NOT_FOUND', 'PROVIDER_ERROR']).optional().describe('TODO describe reason field for the OpenInspection MCP integration'),
-    }).describe('TODO describe data field for the OpenInspection MCP integration'),
+        facts:  PropertyFactsSchema.nullable(),
+        source: z.enum(['estated', 'manual_required']),
+        reason: z.enum(['NO_API_KEY', 'NOT_FOUND', 'PROVIDER_ERROR']).optional(),
+    }),
 }).openapi('PropertyFactsAutofillResponse');
 
 // Round-2 F1 — recipient list returned by GET /api/inspections/:id/recipients.
 const InspectionRecipientSchema = z.object({
-  contactId: z.string().nullable().describe('TODO describe contactId field for the OpenInspection MCP integration'),
-  name:      z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-  role:      z.enum(['client', 'agent_buyer', 'agent_listing']).describe('TODO describe role field for the OpenInspection MCP integration'),
-  email:     z.string().nullable().describe('TODO describe email field for the OpenInspection MCP integration'),
-  phone:     z.string().nullable().describe('TODO describe phone field for the OpenInspection MCP integration'),
+  contactId: z.string().nullable(),
+  name:      z.string(),
+  role:      z.enum(['client', 'agent_buyer', 'agent_listing']),
+  email:     z.string().nullable(),
+  phone:     z.string().nullable(),
 }).openapi('InspectionRecipient');
 
 export const InspectionRecipientsResponseSchema = createApiResponseSchema(
@@ -82,27 +82,27 @@ export const InspectionRecipientsResponseSchema = createApiResponseSchema(
 
 // Round-2 F3 — People card payload (Spectora §E.2).
 const PeopleAgentSchema = z.object({
-  id:     z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-  name:   z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-  email:  z.string().nullable().describe('TODO describe email field for the OpenInspection MCP integration'),
-  phone:  z.string().nullable().describe('TODO describe phone field for the OpenInspection MCP integration'),
-  agency: z.string().nullable().describe('TODO describe agency field for the OpenInspection MCP integration'),
+  id:     z.string(),
+  name:   z.string(),
+  email:  z.string().nullable(),
+  phone:  z.string().nullable(),
+  agency: z.string().nullable(),
 });
 
 const InspectionPeopleSchema = z.object({
   inspector: z.object({
-    id:    z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-    name:  z.string().nullable().describe('TODO describe name field for the OpenInspection MCP integration'),
-    email: z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
-    phone: z.string().nullable().describe('TODO describe phone field for the OpenInspection MCP integration'),
-  }).nullable().describe('TODO describe inspector field for the OpenInspection MCP integration'),
+    id:    z.string(),
+    name:  z.string().nullable(),
+    email: z.string(),
+    phone: z.string().nullable(),
+  }).nullable(),
   client: z.object({
-    name:  z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-    email: z.string().nullable().describe('TODO describe email field for the OpenInspection MCP integration'),
-    phone: z.string().nullable().describe('TODO describe phone field for the OpenInspection MCP integration'),
-  }).nullable().describe('TODO describe client field for the OpenInspection MCP integration'),
-  buyerAgents:   z.array(PeopleAgentSchema).describe('TODO describe buyerAgents field for the OpenInspection MCP integration'),
-  listingAgents: z.array(PeopleAgentSchema).describe('TODO describe listingAgents field for the OpenInspection MCP integration'),
+    name:  z.string(),
+    email: z.string().nullable(),
+    phone: z.string().nullable(),
+  }).nullable(),
+  buyerAgents:   z.array(PeopleAgentSchema),
+  listingAgents: z.array(PeopleAgentSchema),
 }).openapi('InspectionPeople');
 
 /**
@@ -277,15 +277,15 @@ export const AgreementRequestCreatedSchema = createApiResponseSchema(
 export { ReportDataResponseSchema } from './report-data.schema';
 
 const InspectionListItemSchema = z.object({
-    id:           z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-    date:         z.string().nullable().describe('TODO describe date field for the OpenInspection MCP integration'),
-    address:      z.string().nullable().optional().describe('TODO describe address field for the OpenInspection MCP integration'),
-    clientName:   z.string().nullable().optional().describe('TODO describe clientName field for the OpenInspection MCP integration'),
-    status:       z.string().describe('TODO describe status field for the OpenInspection MCP integration'),
-    confirmedAt:  z.string().nullable().optional().describe('TODO describe confirmedAt field for the OpenInspection MCP integration'),
-    cancelReason: z.string().nullable().optional().describe('TODO describe cancelReason field for the OpenInspection MCP integration'),
-    cancelNotes:  z.string().nullable().optional().describe('TODO describe cancelNotes field for the OpenInspection MCP integration'),
-    createdAt:    z.string().nullable().optional().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    id:           z.string(),
+    date:         z.string().nullable(),
+    address:      z.string().nullable().optional(),
+    clientName:   z.string().nullable().optional(),
+    status:       z.string(),
+    confirmedAt:  z.string().nullable().optional(),
+    cancelReason: z.string().nullable().optional(),
+    cancelNotes:  z.string().nullable().optional(),
+    createdAt:    z.string().nullable().optional(),
 
     /**
      * The four keys `decorate()` adds in `inspection-analytics.service.ts`.
@@ -308,27 +308,27 @@ const InspectionListItemSchema = z.object({
 
 // Sub-spec B Task 5 (B-4) — portfolio defectStats aggregated per top card.
 const DefectAggregateBucketSchema = z.object({
-    safety:         z.number().describe('TODO describe safety field for the OpenInspection MCP integration'),
-    recommendation: z.number().describe('TODO describe recommendation field for the OpenInspection MCP integration'),
-    maintenance:    z.number().describe('TODO describe maintenance field for the OpenInspection MCP integration'),
+    safety:         z.number(),
+    recommendation: z.number(),
+    maintenance:    z.number(),
 });
 
 export const DashboardResponseSchema = z.object({
-    needsAttention: z.array(InspectionListItemSchema).describe('TODO describe needsAttention field for the OpenInspection MCP integration'),
-    today:          z.array(InspectionListItemSchema).describe('TODO describe today field for the OpenInspection MCP integration'),
-    thisWeek:       z.array(InspectionListItemSchema).describe('TODO describe thisWeek field for the OpenInspection MCP integration'),
-    later:          z.array(InspectionListItemSchema).describe('TODO describe later field for the OpenInspection MCP integration'),
-    laterTotal:     z.number().describe('TODO describe laterTotal field for the OpenInspection MCP integration'),
-    recentReports:  z.array(InspectionListItemSchema).describe('TODO describe recentReports field for the OpenInspection MCP integration'),
-    cancelled:      z.array(InspectionListItemSchema).describe('TODO describe cancelled field for the OpenInspection MCP integration'),
+    needsAttention: z.array(InspectionListItemSchema),
+    today:          z.array(InspectionListItemSchema),
+    thisWeek:       z.array(InspectionListItemSchema),
+    later:          z.array(InspectionListItemSchema),
+    laterTotal:     z.number(),
+    recentReports:  z.array(InspectionListItemSchema),
+    cancelled:      z.array(InspectionListItemSchema),
     defectAggregate: z.object({
-        later:          DefectAggregateBucketSchema.describe('TODO describe later field for the OpenInspection MCP integration'),
-        thisWeek:       DefectAggregateBucketSchema.describe('TODO describe thisWeek field for the OpenInspection MCP integration'),
-        needsAttention: DefectAggregateBucketSchema.describe('TODO describe needsAttention field for the OpenInspection MCP integration'),
-        recentReports:  DefectAggregateBucketSchema.describe('TODO describe recentReports field for the OpenInspection MCP integration'),
-    }).optional().describe('TODO describe defectAggregate field for the OpenInspection MCP integration'),
+        later:          DefectAggregateBucketSchema,
+        thisWeek:       DefectAggregateBucketSchema,
+        needsAttention: DefectAggregateBucketSchema,
+        recentReports:  DefectAggregateBucketSchema,
+    }).optional(),
     // Agent Accounts A3 — concierge pending count for the UPCOMING substate.
     // Counts inspections where concierge_status = 'awaiting_inspector'. Optional
     // so older clients/cached responses still validate.
-    conciergePending: z.number().optional().describe('TODO describe conciergePending field for the OpenInspection MCP integration'),
+    conciergePending: z.number().optional(),
 }).openapi('DashboardResponse');

@@ -27,7 +27,7 @@ const shareTokenRoute = createRoute(withMcpMetadata({
     tags: ["inspections", "public"],
     summary: 'Mint a 30-day view-only share token (customer-initiated)',
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('Published inspection whose report is being shared.') }),
         // The caller MUST prove it can already see this report: the persistent
         // portal token (or legacy agent-view token) carried by the report page
         // it is forwarding from. Without this proof, knowing the inspection UUID
@@ -38,8 +38,8 @@ const shareTokenRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
-                data: z.object({ token: z.string().describe('TODO describe token field for the OpenInspection MCP integration'), url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                success: z.boolean(),
+                data: z.object({ token: z.string(), url: z.string() }),
             }) } },
             description: 'Share URL minted',
         },
@@ -47,7 +47,7 @@ const shareTokenRoute = createRoute(withMcpMetadata({
         404: { description: 'Inspection not found' },
     },
     operationId: "createPublicShareInspectionsShareToken",
-    description: "Auto-generated placeholder for createPublicShareInspectionsShareToken (POST /inspections/{id}/share-token, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Public route behind the report viewer's Share button: mints a view-only link to a published report that expires after 30 days. No login is needed, but the caller must prove it can already see the report by passing its existing portal or agent-view access token in the token query parameter; without a valid token for this inspection the answer is 404, the same as for an unknown inspection. Returns 403 when the report has not been published. The result is a new token and the full report URL (?view=agent&token=...). Nothing is emailed, and every call mints another token while earlier ones keep working until they expire."
 }, { scopes: [], tier: 'extended' }));
 
 const publicShareRoutes = createApiRouter()

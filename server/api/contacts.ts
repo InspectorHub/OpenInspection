@@ -30,16 +30,16 @@ const listContactsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["contacts"], summary: "List contacts for current tenant",
     middleware: [requireRole('owner', 'manager', 'inspector')],
-    request: { query: ContactListQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
+    request: { query: ContactListQuerySchema },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(ContactResponseSchema).describe('TODO describe data field for the OpenInspection MCP integration'), meta: z.object({ total: z.number().describe('TODO describe total field for the OpenInspection MCP integration') }).describe('TODO describe meta field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.array(ContactResponseSchema), meta: z.object({ total: z.number() }) }) } },
             description: 'Success',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "listContacts",
-    description: "Auto-generated placeholder for listContacts (GET /, contacts domain). TODO: replace with a real description sourced from the handler."
+    description: "Lists the company's contacts (clients, agents and other parties) with the number of inspections each appears on and, for agents, how many they referred as buyer agent. Live contacts by default; pass archived=only for archived ones. Results are paged with limit and offset and are not explicitly ordered. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'primary' }));
 
 const getContactDetailRoute = createRoute(withMcpMetadata({
@@ -64,16 +64,16 @@ const createContactRoute = createRoute(withMcpMetadata({
     tags: ["contacts"], summary: "Create contact for current tenant",
     // Task 10 — manageContacts capability gates contact CREATE/UPDATE/DELETE.
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('manageContacts')],
-    request: { body: { content: { 'application/json': { schema: CreateContactSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: CreateContactSchema.describe('Details of the contact to create: its kind, name and optional email, phone, agency and notes.') } } } },
     responses: {
         201: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ contact: ContactResponseSchema.describe('TODO describe contact field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ contact: ContactResponseSchema }) }) } },
             description: 'Created',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "createContact",
-    description: "Auto-generated placeholder for createContact (POST /, contacts domain). TODO: replace with a real description sourced from the handler."
+    description: "Creates a contact (client, agent or other party). Requires the manageContacts capability and the owner, manager or inspector role. Does not email the contact. When the QuickBooks integration is configured, the contact is also pushed to QuickBooks as a customer in the background. Returns the created contact."
 }, { scopes: ['write'], tier: 'primary', capability: 'manageContacts' }));
 
 const updateContactRoute = createRoute(withMcpMetadata({
@@ -83,17 +83,23 @@ const updateContactRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('manageContacts')],
     request: {
         params: z.object({ id: CONTACT_ID.describe('Contact id.') }),
-        body: { content: { 'application/json': { schema: UpdateContactSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: UpdateContactSchema.describe('The contact fields to change; omitted fields are left as they are') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ contact: ContactResponseSchema.describe('TODO describe contact field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ contact: ContactResponseSchema }) }) } },
             description: 'Success',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "replaceContact",
-    description: "Auto-generated placeholder for replaceContact (PUT /{id}, contacts domain). TODO: replace with a real description sourced from the handler."
+    description: "Update a contact's details. Despite the PUT verb this is a partial update: only fields present in the "
+        + "body are written, and sending a nullable field (email, phone, agency, notes, locale) as null clears it. "
+        + "The email of an agent contact is frozen and a new value is silently ignored, because it identifies the "
+        + "agent across companies; to change it, archive the contact and create a new one. Requires the "
+        + "manageContacts capability and the owner, manager or inspector role. Does not email the contact. When "
+        + "the QuickBooks integration is configured, the change is also pushed to QuickBooks in the background. "
+        + "Returns the updated contact, or 404 when the id is not in this company. Idempotent."
 }, { scopes: ['write'], tier: 'extended', capability: 'manageContacts' }));
 
 const deleteContactRoute = createRoute(withMcpMetadata({
@@ -104,13 +110,13 @@ const deleteContactRoute = createRoute(withMcpMetadata({
     request: { params: z.object({ id: CONTACT_ID.describe('Contact id.') }) },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean() }) } },
             description: 'Deleted',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "deleteContact",
-    description: "Auto-generated placeholder for deleteContact (DELETE /{id}, contacts domain). TODO: replace with a real description sourced from the handler."
+    description: "Removes a contact. A contact that no inspection references is deleted permanently; one that appears on any inspection is archived instead (restorable via the restore route) so past inspections keep their history. Archiving may also revoke that contact's live report links, if the company's archive-revokes-access setting is on. Requires the manageContacts capability."
 }, { scopes: ['write'], tier: 'primary', capability: 'manageContacts' }));
 
 /**

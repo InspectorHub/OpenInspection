@@ -15,6 +15,8 @@ import { Errors } from '../../lib/errors';
 import { hashPassword } from '../../lib/password';
 import { assertSeatAvailableForJoin, type SeatQuotaContext } from '../../features/seat-quota';
 import type { UserSyncOutbox } from '../../lib/integration/user-sync';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
+import { revokeUserGrantsBestEffort } from '../../lib/mcp/grants';
 
 export interface JoinTeamOptions {
     /** Display name the joiner typed on the accept form. */
@@ -31,6 +33,8 @@ export interface JoinTeamOptions {
 export interface JoinTeamDeps {
     db: D1Database;
     outbox?: UserSyncOutbox | undefined;
+    /** The OAuth provider's helpers, when it is mounted. Used to retire grants a reactivated row still holds. */
+    oauth?: OAuthHelpers | undefined;
 }
 
 /**
@@ -167,6 +171,13 @@ export async function joinTeam(
     await db.batch([memberStatement, ...acceptanceStatements] as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 
     await db.update(tenantInvites).set({ status: 'accepted' }).where(eq(tenantInvites.id, token));
+
+    // Reactivation keeps the user id, so an OAuth grant (a native app, MCP) the
+    // member held before removal would come back to life with the row if its
+    // revocation had failed at removal. The person accepting may be someone
+    // else entirely, so retire every grant the id still holds. Best effort:
+    // the account is already written and a provider failure must not undo it.
+    if (existing) await revokeUserGrantsBestEffort(deps.oauth, existing.id, 'a member being re-invited');
 
     // Tell portal about the new membership so its `/company/switch`
     // picker shows this company next time the identity signs in. Fires

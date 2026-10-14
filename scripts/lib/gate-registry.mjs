@@ -190,7 +190,6 @@ export const SCRIPT_GATES = [
     // rebase, and after a push it is not fixable at all. Measured at 0.67s over
     // 3,605 files.
     { key: 'privatereview', label: 'No private-review references', script: 'check-no-private-review-refs.mjs', fix: 'npm run lint:private-review', rung: PRECOMMIT },
-
     // ---- PUSH rung -------------------------------------------------------
     // The 33 gates `npm run lint` used to chain with `&&`. Generated from
     // package.json rather than retyped, and pinned by the spec against that
@@ -216,6 +215,7 @@ export const SCRIPT_GATES = [
     { key: 'unwired', label: 'lint:unwired', script: 'check-unwired.mjs', fix: 'npm run lint:unwired', rung: PUSH },
     // `unwired` one level down: a field, not a module. See that script's header.
     { key: 'unreadfields', label: 'lint:unread-fields', script: 'check-unread-fields.mjs', fix: 'npm run lint:unread-fields', rung: PUSH },
+    { key: 'noplaceholderdesc', label: 'lint:no-placeholder-descriptions', script: 'check-no-placeholder-descriptions.mjs', fix: 'npm run lint:no-placeholder-descriptions', rung: PUSH },
     { key: 'erasure', label: 'lint:erasure', script: 'check-erasure-manifest.mjs', fix: 'npm run lint:erasure', rung: PUSH },
     { key: 'retention', label: 'lint:retention', script: 'check-retention-manifest.mjs', fix: 'npm run lint:retention', rung: PUSH },
     { key: 'retentionpolicy', label: 'lint:retention-policy', script: 'check-retention-policy.mjs', fix: 'npm run lint:retention-policy', rung: PUSH },
@@ -310,6 +310,7 @@ export const SCRIPT_GATES = [
     // the same reason as the doc-link gate beside it: it reads every markdown
     // file in the repo, and a bare hosted path is introduced by prose that is
     // usually written across several commits before anyone pushes it.
+    { key: 'nativecontract', label: 'lint:native-contract', script: 'check-native-contract.mjs', fix: 'npm run lint:native-contract', rung: PUSH },
     { key: 'noportalroutes', label: 'lint:no-portal-routes', script: 'check-no-portal-routes.mjs', fix: 'npm run lint:no-portal-routes', rung: PUSH },
     { key: 'schemadoc', label: 'lint:schema-doc', script: 'gen-schema-doc.mjs', fix: 'npm run lint:schema-doc', rung: PUSH, args: ['--check'] },
     { key: 'verificationcopy', label: 'lint:verification-copy', script: 'check-verification-copy.mjs', fix: 'npm run lint:verification-copy', rung: PUSH },

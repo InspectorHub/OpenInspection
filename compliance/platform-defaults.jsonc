@@ -202,6 +202,16 @@
       "override_surface": "app/routes/settings-compliance.tsx",
       "note": "The market default among competitors is indefinite storage even after cancellation, so this default diverges from tenant expectation and has to be disclosed prominently rather than buried."
     },
+    {
+      "column": "offline_max_days",
+      "property": "offlineMaxDays",
+      "default_value": "30",
+      "default_owner": "engine",
+      "decision_type": "controller_choice",
+      "basis": "How many days a signed-in native device may hold inspection data without reaching the server before it locks that local copy. This bounds how long a copy of client data can stay on a device that is not synchronising, so it is treated like a retention period: the number is the controller's decision, and the platform default is only a starting position that the workspace can see and change.",
+      "controller_override": "required",
+      "override_surface": "app/routes/settings-compliance.tsx"
+    },
     // ── Settled by review ───────────────────────────────────────────────────
     {
       "column": "is_report_view_counting_enabled",

@@ -23,6 +23,10 @@ import { r2Keys } from '../../lib/r2-keys';
 import { signUploadToken } from '../../lib/video-upload-token';
 import type { VideoBackend, VideoDetails, VideoRef } from './types';
 
+/** Upload token lifetime for the web editor, and for a native client whose upload may be queued offline. */
+const WEB_UPLOAD_TTL_SEC = 900;
+const NATIVE_UPLOAD_TTL_SEC = 86400;
+
 // ── Key parsing helper ────────────────────────────────────────────────────────
 
 interface ParsedVideoKey {
@@ -70,16 +74,19 @@ export class R2VideoBackend implements VideoBackend {
      * Mint a one-shot upload URL backed by a signed token.
      *
      * The token carries `{ tenantId, inspectionId, mediaId }` and is valid for
-     * 15 minutes. The route handler that handles the PUT validates the token
-     * before streaming bytes into R2 — the worker never forwards untrusted keys
-     * to the bucket.
+     * 15 minutes (24 hours for a native client, which may queue the upload while
+     * offline and sends it from the background). The route that handles the POST
+     * validates the token before streaming bytes into R2 — the worker never
+     * forwards untrusted keys to the bucket. A native client is pointed at the
+     * token-only public route, because its access token may have expired by then.
      */
-    async createUpload(inspectionId: string): Promise<{ uploadURL: string; ref: VideoRef }> {
+    async createUpload(inspectionId: string, opts?: { native?: boolean; userId?: string }): Promise<{ uploadURL: string; ref: VideoRef }> {
         const mediaId = crypto.randomUUID();
+        const native = opts?.native === true;
 
         const token = await signUploadToken(
-            { tenantId: this.tenantId, inspectionId, mediaId },
-            900, // 15 minutes
+            { tenantId: this.tenantId, inspectionId, mediaId, ...(opts?.userId ? { userId: opts.userId } : {}) },
+            native ? NATIVE_UPLOAD_TTL_SEC : WEB_UPLOAD_TTL_SEC,
             this.jwtSecret,
         );
 
@@ -87,7 +94,9 @@ export class R2VideoBackend implements VideoBackend {
         // from the Content-Type header and may rewrite the key at that point.
         const r2Key = r2Keys.inspectionVideo(this.tenantId, inspectionId, mediaId, 'mp4');
 
-        const uploadURL = `${this.appOrigin}/api/inspections/${inspectionId}/media/video/r2-upload?token=${token}`;
+        const uploadURL = native
+            ? `${this.appOrigin}/api/public/uploads/video?token=${token}`
+            : `${this.appOrigin}/api/inspections/${inspectionId}/media/video/r2-upload?token=${token}`;
 
         logger.info('R2VideoBackend: created upload slot', {
             tenantId: this.tenantId,

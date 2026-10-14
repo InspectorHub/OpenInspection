@@ -1,9 +1,10 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
-import { tenants } from '../../lib/db/schema';
+import { count, eq } from 'drizzle-orm';
+import { inspections, tenants } from '../../lib/db/schema';
 import { MeteringService } from '../../services/metering.service';
 import { STOCK_PERIOD } from '../../lib/usage/period';
 import { Errors } from '../../lib/errors';
+import { logger } from '../../lib/logger';
 import { FREE_TIER_CAPS, type AiCappedMetric, type AiTierCaps, type TenantPlan } from './policy';
 
 /**
@@ -133,6 +134,29 @@ export class PlanQuotaGuard {
 
     if (res.meta.changes === 0) {
       throw Errors.QuotaExhausted({ metric: 'inspections', used: cap, cap, billingPortalUrl: this.opts.billingPortalUrl });
+    }
+  }
+
+  /** Give back what a `consumeInspection` took when the row it was for was never
+   *  created (the insert lost a same-id race, or the id belongs to another
+   *  workspace). Other tiers / standalone: undo the analytics increment. Free+
+   *  enforced: the counter is a cache of the row count, so re-measure it. */
+  async releaseInspection(tenantId: string): Promise<void> {
+    // Runs inside the caller's catch block, where the error that matters is the
+    // insert's. A failure here must not replace it, so it is logged and dropped:
+    // the counter is a cache that the next create re-measures, and a leftover
+    // analytics increment on a non-enforced tier is harmless.
+    try {
+      const metering = new MeteringService(this.db);
+      const tier = await readTenantTier(this.db, tenantId);
+      if (!this.opts.enforced || tier !== 'free') {
+        await metering.record(tenantId, 'inspections', STOCK_PERIOD, -1);
+        return;
+      }
+      const row = await drizzle(this.db).select({ n: count() }).from(inspections).where(eq(inspections.tenantId, tenantId)).get();
+      await metering.setGauge(tenantId, 'inspections', STOCK_PERIOD, row?.n ?? 0);
+    } catch (err) {
+      logger.warn('Could not give back an inspection allowance', { tenantId, error: err instanceof Error ? err.message : String(err) });
     }
   }
 

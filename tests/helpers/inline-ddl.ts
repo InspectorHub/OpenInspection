@@ -14,22 +14,12 @@
  * Drizzle `tenantConfigs` column, so the drift is caught as a fast unit test
  * instead of a real-workerd failure. Both consumers import this single source.
  *
- * ⚠️ `tenant_configs` IS AT D1's 100-COLUMN CEILING, and the ceiling is why the
- * legacy `secrets` column is no longer in the DDL below. That column is not in
- * the Drizzle schema at all — it was a harmless extra, and the sync assertion
- * next door asserts COVERAGE rather than equality precisely so extras are
- * allowed. It stopped being harmless the day the schema reached 100 columns of
- * its own: with the extra, the CREATE is 101 and D1 refuses it outright ("too
- * many columns on tenant_configs"), so the DDL could no longer be brought into
- * sync at all. Both halves of that were live at once — `is_courtesy_translation_enabled`
- * had been added to the schema without being added here, so `test:workers` was
- * already failing on every fixture that upserts a config, and the obvious repair
- * hit the ceiling.
- *
- * SO THE NEXT COLUMN ADDED TO `tenant_configs` HAS NOWHERE TO GO. There is no
- * second extra left to trade, and this file cannot be made correct again by
- * editing it. That is a schema problem — a table that cannot be CREATEd on the
- * platform it runs on — and it needs solving in the schema, not here.
+ * D1 refuses to CREATE a table with more than 100 columns, and `tenant_configs`
+ * is the widest table in the schema. `npm run lint:columns` prints the current
+ * width and the headroom left; check it before adding a column here. This DDL
+ * must stay creatable on D1, so an extra column it carries that the Drizzle
+ * schema does not (the sync assertion allows those) counts against the same
+ * limit and is the first thing to remove when room runs short.
  *
  * `inspection_results` is here for the same reason and learned it the same way:
  * the DDL was copy-pasted into four collab specs, the Drizzle table gained
@@ -38,7 +28,7 @@
  * one sync assertion.
  */
 export const TENANT_CONFIGS_TEST_DDL =
-    'CREATE TABLE IF NOT EXISTS tenant_configs (tenant_id TEXT PRIMARY KEY, company_name TEXT, primary_color TEXT, logo_url TEXT, support_email TEXT, sender_email TEXT, reply_to TEXT, email_mode TEXT, video_mode TEXT, sms_mode TEXT, sender_display_name TEXT, point_of_contact TEXT, billing_url TEXT, review_url TEXT, company_phone TEXT, integration_config TEXT, secrets_enc TEXT, dek_enc TEXT, ics_token TEXT, widget_allowed_origins TEXT, default_profile_id TEXT, attention_thresholds TEXT, inspection_prefs TEXT, is_repair_list_enabled INTEGER, is_customer_repair_export_enabled INTEGER, is_unpaid_blocked INTEGER, is_unsigned_agreement_blocked INTEGER, custom_referral_sources TEXT, dashboard_column_prefs TEXT, is_concierge_review_required INTEGER, is_inspector_choice_allowed INTEGER, is_pdf_pipeline_enabled INTEGER, auto_sign_on_publish_default INTEGER, is_team_mode_default TEXT, require_defect_fields TEXT, agreement_retention_years INTEGER, reinspection_statuses TEXT, is_collab_editing_enabled INTEGER NOT NULL DEFAULT 1, company_address TEXT, is_pdf_footer_shown INTEGER, is_pdf_page_numbers_shown INTEGER, is_pdf_license_shown INTEGER, sms_byo_provider TEXT, email_byo_provider TEXT, is_managed_eligible INTEGER NOT NULL DEFAULT 0, managed_provider TEXT NOT NULL DEFAULT \'twilio\', is_reserve_schedule_enabled INTEGER, reserve_term_years INTEGER, inflation_rate_bps INTEGER, default_timezone TEXT NOT NULL DEFAULT \'UTC\', booking_slot_mode TEXT NOT NULL DEFAULT \'fixed\', booking_slot_interval_min INTEGER NOT NULL DEFAULT 30, holiday_region TEXT, holiday_public_policy TEXT NOT NULL DEFAULT \'open\', holiday_internal_policy TEXT NOT NULL DEFAULT \'advisory\', default_locale TEXT NOT NULL DEFAULT \'en-US\', currency TEXT NOT NULL DEFAULT \'USD\', is_archive_revoking_access INTEGER NOT NULL DEFAULT 0, legal_mode TEXT NOT NULL DEFAULT \'hosted\', custom_privacy_url TEXT, custom_terms_url TEXT, privacy_body TEXT, terms_body TEXT, date_format TEXT NOT NULL DEFAULT \'us\', time_format TEXT NOT NULL DEFAULT \'12h\', booking_conflict_policy TEXT NOT NULL DEFAULT \'advisory\', cancellation_policy TEXT, cancellation_clause_agreement_id TEXT, cancellation_clause_version INTEGER, cancellation_clause_attested_at INTEGER, deposit_policy TEXT, booking_routing_strategy TEXT NOT NULL DEFAULT \'first_available\', booking_min_lead_hours INTEGER NOT NULL DEFAULT 0, booking_same_day_cutoff_time TEXT, company_lat REAL, company_lng REAL, company_geocoded_at INTEGER, repair_quick_phrases TEXT, legal_name TEXT, invoice_seq INTEGER NOT NULL DEFAULT 1000, report_pdf_retention_years INTEGER NOT NULL DEFAULT 7, is_report_view_counting_enabled INTEGER NOT NULL DEFAULT false, updated_at INTEGER);';
+    'CREATE TABLE IF NOT EXISTS tenant_configs (tenant_id TEXT PRIMARY KEY, company_name TEXT, primary_color TEXT, logo_url TEXT, support_email TEXT, sender_email TEXT, reply_to TEXT, email_mode TEXT, video_mode TEXT, sms_mode TEXT, sender_display_name TEXT, point_of_contact TEXT, billing_url TEXT, review_url TEXT, company_phone TEXT, integration_config TEXT, secrets_enc TEXT, dek_enc TEXT, ics_token TEXT, widget_allowed_origins TEXT, default_profile_id TEXT, attention_thresholds TEXT, inspection_prefs TEXT, is_repair_list_enabled INTEGER, is_customer_repair_export_enabled INTEGER, is_unpaid_blocked INTEGER, is_unsigned_agreement_blocked INTEGER, custom_referral_sources TEXT, dashboard_column_prefs TEXT, is_concierge_review_required INTEGER, is_inspector_choice_allowed INTEGER, is_pdf_pipeline_enabled INTEGER, auto_sign_on_publish_default INTEGER, is_team_mode_default TEXT, require_defect_fields TEXT, agreement_retention_years INTEGER, reinspection_statuses TEXT, is_collab_editing_enabled INTEGER NOT NULL DEFAULT 1, company_address TEXT, is_pdf_footer_shown INTEGER, is_pdf_page_numbers_shown INTEGER, is_pdf_license_shown INTEGER, sms_byo_provider TEXT, email_byo_provider TEXT, is_managed_eligible INTEGER NOT NULL DEFAULT 0, managed_provider TEXT NOT NULL DEFAULT \'twilio\', is_reserve_schedule_enabled INTEGER, reserve_term_years INTEGER, inflation_rate_bps INTEGER, default_timezone TEXT NOT NULL DEFAULT \'UTC\', booking_slot_mode TEXT NOT NULL DEFAULT \'fixed\', booking_slot_interval_min INTEGER NOT NULL DEFAULT 30, holiday_region TEXT, holiday_public_policy TEXT NOT NULL DEFAULT \'open\', holiday_internal_policy TEXT NOT NULL DEFAULT \'advisory\', default_locale TEXT NOT NULL DEFAULT \'en-US\', currency TEXT NOT NULL DEFAULT \'USD\', is_archive_revoking_access INTEGER NOT NULL DEFAULT 0, legal_mode TEXT NOT NULL DEFAULT \'hosted\', custom_privacy_url TEXT, custom_terms_url TEXT, privacy_body TEXT, terms_body TEXT, date_format TEXT NOT NULL DEFAULT \'us\', time_format TEXT NOT NULL DEFAULT \'12h\', booking_conflict_policy TEXT NOT NULL DEFAULT \'advisory\', cancellation_policy TEXT, cancellation_clause_agreement_id TEXT, cancellation_clause_version INTEGER, cancellation_clause_attested_at INTEGER, deposit_policy TEXT, booking_routing_strategy TEXT NOT NULL DEFAULT \'first_available\', booking_min_lead_hours INTEGER NOT NULL DEFAULT 0, booking_same_day_cutoff_time TEXT, company_lat REAL, company_lng REAL, company_geocoded_at INTEGER, repair_quick_phrases TEXT, legal_name TEXT, invoice_seq INTEGER NOT NULL DEFAULT 1000, report_pdf_retention_years INTEGER NOT NULL DEFAULT 7, is_report_view_counting_enabled INTEGER NOT NULL DEFAULT false, offline_max_days INTEGER NOT NULL DEFAULT 30, updated_at INTEGER);';
 
 /**
  * `users` is here for the third time the same lesson was learned, and this one

@@ -58,16 +58,18 @@ const listCommentsRoute = createRoute(withMcpMetadata({
     // Inspectors need read access so the inspection-edit picker (T7+1) can
     // populate. Create/delete remain admin-only further below.
     middleware: [requireRole('owner', 'manager', 'inspector')],
-    request: { query: ListCommentsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
+    request: { query: ListCommentsQuerySchema },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(CommentResponseSchema).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.array(CommentResponseSchema) }) } },
             description: 'Success',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "listTenantComments",
-    description: "Auto-generated placeholder for listTenantComments (GET /comments, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Pages through the company's canned-comment library. Each entry carries the calling user's own usage count and last-used time (0 and null when they have never used it). "
+        + "Sorted by sort (default relevance: severity, then newest first); paginated with page and pageSize, and meta carries the total. "
+        + "Severity, sectionId and triggerCode always filter; section and itemLabel only filter when filterMode is auto. Read-only; available to owner, manager and inspector roles."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -77,16 +79,18 @@ const createCommentRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Create a comment library entry',
     middleware: [requireRole('owner', 'manager')],
-    request: { body: { content: { 'application/json': { schema: CommentSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: CommentSchema.describe('The canned comment to add to the library') } } } },
     responses: {
         201: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ comment: CommentResponseSchema.describe('TODO describe comment field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ comment: CommentResponseSchema }) }) } },
             description: 'Created',
         },
     },
     security: [{ bearerAuth: [] }],
     operationId: "createTenantComments",
-    description: "Auto-generated placeholder for createTenantComments (POST /comments, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Add a canned comment to the company library. The entry is company-authored: it has no marketplace "
+        + "library link, and itemLabel in the body is not stored on create. The write is recorded in the audit log. "
+        + "Always creates a new entry; nothing is deduplicated. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -96,17 +100,18 @@ const deleteCommentRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Delete a comment library entry',
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('Id of the library comment to delete; must belong to this company') }) },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean() }) } },
             description: 'Deleted',
         },
         404: { description: 'Not found' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "deleteTenantComment",
-    description: "Auto-generated placeholder for deleteTenantComment (DELETE /comments/{id}, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Permanently delete one canned comment from the company library and record the deletion in the audit "
+        + "log. Returns 404 when the id does not exist in this company, so repeating the call fails the second time. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -117,19 +122,22 @@ const updateCommentRoute = createRoute(withMcpMetadata({
     summary: 'Update a comment library entry',
     middleware: [requireRole('owner', 'manager')],
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: UpdateCommentSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        params: z.object({ id: z.string().trim().min(1).describe('Id of the library comment to update; must belong to this company') }),
+        body: { content: { 'application/json': { schema: UpdateCommentSchema.describe('The full replacement values for the comment') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ comment: CommentResponseSchema.describe('TODO describe comment field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ comment: CommentResponseSchema }) }) } },
             description: 'Updated',
         },
         404: { description: 'Not found' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "updateTenantComment",
-    description: "Auto-generated placeholder for updateTenantComment (PUT /comments/{id}, admin domain). TODO: replace with a real description sourced from the handler."
+    description: "Replace a canned comment's fields. This is a full replace, not a patch: text is required, and "
+        + "category, severity and section are cleared to null when omitted. Only repairSummary and "
+        + "recommendedContractorTypeId are left untouched when omitted. The edited-at marker is set and the change "
+        + "is audit-logged. Returns 404 when the id is not in this company. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 

@@ -16,8 +16,8 @@ export const AgentReportsQuerySchema = z.object({
  */
 export const AgentReportsResponseSchema = createApiResponseSchema(
     z.object({
-        agentId: z.string().trim().min(1).describe('TODO describe agentId field for the OpenInspection MCP integration'),
-        reports: z.array(InspectionSchema).describe('TODO describe reports field for the OpenInspection MCP integration'),
+        agentId: z.string().trim().min(1),
+        reports: z.array(InspectionSchema),
     })
 ).openapi('AgentReportsResponse');
 
@@ -25,24 +25,24 @@ export const AgentReportsResponseSchema = createApiResponseSchema(
  * Schema for the agent performance leaderboard.
  */
 const LeaderboardEntrySchema = z.object({
-    agentId: z.string().trim().min(1).nullable().describe('TODO describe agentId field for the OpenInspection MCP integration'),
-    name:    z.string().nullable().optional().describe('TODO describe name field for the OpenInspection MCP integration'),
-    agency:  z.string().nullable().optional().describe('TODO describe agency field for the OpenInspection MCP integration'),
-    email:   z.string().nullable().optional().describe('TODO describe email field for the OpenInspection MCP integration'),
-    total:   z.number().openapi({ example: 42 }).describe('TODO describe total field for the OpenInspection MCP integration'),
+    agentId: z.string().trim().min(1).nullable(),
+    name:    z.string().nullable().optional(),
+    agency:  z.string().nullable().optional(),
+    email:   z.string().nullable().optional(),
+    total:   z.number().openapi({ example: 42 }),
 }).openapi('LeaderboardEntry');
 
 export const LeaderboardResponseSchema = createApiResponseSchema(
     z.object({
-        leaderboard: z.array(LeaderboardEntrySchema).describe('TODO describe leaderboard field for the OpenInspection MCP integration'),
+        leaderboard: z.array(LeaderboardEntrySchema),
     })
 ).openapi('LeaderboardResponse');
 
 // Agent Accounts A2 — POST /api/agent/profile body. All fields optional;
 // caller sends only the field(s) they want to update.
 export const AgentProfilePatchSchema = z.object({
-    slug:             z.string().min(3).max(32).regex(/^[a-z0-9][a-z0-9-]+[a-z0-9]$/).optional().describe('TODO describe slug field for the OpenInspection MCP integration'),
-    name:             z.string().min(1).max(120).optional().describe('TODO describe name field for the OpenInspection MCP integration'),
+    slug:             z.string().min(3).max(32).regex(/^[a-z0-9][a-z0-9-]+[a-z0-9]$/).optional().describe('Public handle, 3-32 characters of lower-case letters, digits and hyphens, starting and ending with a letter or digit. Must be unique among agent accounts'),
+    name:             z.string().min(1).max(120).optional().describe('Display name, 1-120 characters'),
     // Personal display-timezone override (IANA id). Empty string clears it, so
     // referral dates fall back to each inspecting company's timezone. Validated
     // against the runtime Intl database in the service (isValidTimeZone).
@@ -51,7 +51,7 @@ export const AgentProfilePatchSchema = z.object({
 
 export const AgentProfilePatchResponseSchema = createApiResponseSchema(
     z.object({
-        ok: z.literal(true).describe('TODO describe ok field for the OpenInspection MCP integration'),
+        ok: z.literal(true),
     }),
 ).openapi('AgentProfilePatchResponse');
 
@@ -60,9 +60,9 @@ export const AgentProfilePatchResponseSchema = createApiResponseSchema(
 // agent, seeding the settings-profile page's loader.
 export const AgentProfileResponseSchema = createApiResponseSchema(
     z.object({
-        name:             z.string().nullable().describe('TODO describe name field for the OpenInspection MCP integration'),
-        email:            z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
-        slug:             z.string().nullable().describe('TODO describe slug field for the OpenInspection MCP integration'),
+        name:             z.string().nullable(),
+        email:            z.string(),
+        slug:             z.string().nullable(),
         timezone:         z.string().nullable().describe('Personal display timezone (IANA id), or null to use each company timezone.'),
     }),
 ).openapi('AgentProfileResponse');
@@ -73,27 +73,27 @@ export const AgentProfileResponseSchema = createApiResponseSchema(
 // the client (default mode) or notifies the inspector for review (per-tenant
 // reviewer mode).
 export const ConciergeBookSchema = z.object({
-    tenantId:           z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+    tenantId:           z.string().trim().min(1).describe('Id of the company to book with. The agent must be actively linked to it'),
     // Naming an inspector is optional — a hold with nobody assigned is normal
     // when the agent takes whoever is free. A booking form knows the inspector's
     // user id; the tenant's own tooling knows the contact id.
     inspectorUserId:    z.string().min(1).optional().describe('Inspector user id, as published on the company booking profile.'),
     inspectorContactId: z.string().min(1).optional().describe('Inspector contact id, as used by the tenant contact list.'),
     services:           z.array(z.object({ serviceId: z.string().min(1) })).optional().describe('Services the agent requested; snapshotted onto the hold.'),
-    date:               z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Date must be ISO YYYY-MM-DD').describe('TODO describe date field for the OpenInspection MCP integration'),
-    timeSlot:           z.string().min(1).max(20).describe('TODO describe timeSlot field for the OpenInspection MCP integration'),
-    propertyAddress:    z.string().min(3).max(500).describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
-    clientName:         z.string().min(1).max(200).describe('TODO describe clientName field for the OpenInspection MCP integration'),
-    clientEmail:        z.string().email().describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
-    clientPhone:        z.string().max(40).optional().describe('TODO describe clientPhone field for the OpenInspection MCP integration'),
-    agreementRequired:  z.boolean().default(true).describe('TODO describe agreementRequired field for the OpenInspection MCP integration'),
-    paymentRequired:    z.boolean().default(false).describe('TODO describe paymentRequired field for the OpenInspection MCP integration'),
+    date:               z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Date must be ISO YYYY-MM-DD').describe('Requested inspection date as YYYY-MM-DD'),
+    timeSlot:           z.string().min(1).max(20).describe('Requested time slot label, up to 20 characters. Required, but the booking stores only the date, not this value'),
+    propertyAddress:    z.string().min(3).max(500).describe('Address of the property to inspect, 3-500 characters'),
+    clientName:         z.string().min(1).max(200).describe('Name of the client the inspection is for'),
+    clientEmail:        z.string().email().describe('Client email address. The client confirmation link is sent here, and the client contact is matched or created by it'),
+    clientPhone:        z.string().max(40).optional().describe('Client phone number, up to 40 characters'),
+    agreementRequired:  z.boolean().default(true).describe('Whether the new inspection requires a signed agreement. Defaults to true'),
+    paymentRequired:    z.boolean().default(false).describe('Whether the new inspection requires payment. Defaults to false'),
 }).openapi('ConciergeBook');
 
 export const ConciergeBookResponseSchema = createApiResponseSchema(
     z.object({
-        inspectionId: z.string().trim().min(1).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
-        status:       z.enum(['awaiting_inspector', 'awaiting_client']).describe('TODO describe status field for the OpenInspection MCP integration'),
+        inspectionId: z.string().trim().min(1),
+        status:       z.enum(['awaiting_inspector', 'awaiting_client']),
     }),
 ).openapi('ConciergeBookResponse');
 
@@ -102,37 +102,37 @@ export const ConciergeBookResponseSchema = createApiResponseSchema(
 // from server/api/agent.ts (file-size ratchet) alongside this module's other
 // route-response schemas.
 const RecommendationRowSchema = z.object({
-    inspectionId:    z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    inspectionId:    z.string(),
     // Owning company: shown inline under the property heading, and the slug
     // addresses that inspection's repair share channel.
     tenantName:      z.string().describe('Owning inspection company name.'),
     tenantSlug:      z.string().describe('Owning inspection company slug (addresses the repair share channel).'),
     // The portal offers only what the API would allow (IA-35).
     repairAccess:    z.enum(['off', 'read', 'readwrite']).describe("This company's policy for agents on its repair list."),
-    propertyAddress: z.string().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
-    inspectionDate:  z.string().describe('TODO describe inspectionDate field for the OpenInspection MCP integration'),
-    sectionTitle:    z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
-    itemLabel:       z.string().describe('TODO describe itemLabel field for the OpenInspection MCP integration'),
-    defectTitle:     z.string().describe('TODO describe defectTitle field for the OpenInspection MCP integration'),
+    propertyAddress: z.string(),
+    inspectionDate:  z.string(),
+    sectionTitle:    z.string(),
+    itemLabel:       z.string(),
+    defectTitle:     z.string(),
     // A defect_categories.id or legacy seed name (DefectCategory is `string`).
     // IA-41: kept verbatim — a tenant custom category is no longer dropped; it
     // groups under recommendation (same merge direction as the PCA summary).
     category:        z.string().describe('Defect category — a defect_categories.id or legacy seed name.'),
-    comment:         z.string().describe('TODO describe comment field for the OpenInspection MCP integration'),
-    location:        z.string().nullable().describe('TODO describe location field for the OpenInspection MCP integration'),
-    photos:          z.array(z.string()).describe('TODO describe photos field for the OpenInspection MCP integration'),
+    comment:         z.string(),
+    location:        z.string().nullable(),
+    photos:          z.array(z.string()),
     // IA-41 — true for field-added defects (customComments.defects).
     isCustom:        z.boolean().describe('Whether this is a field-added custom defect (vs a template canned defect).'),
 });
 
 // UC-A-5 — GET /api/agent/my-recommendations response envelope.
 export const AgentMyRecommendationsResponseSchema = z.object({
-    success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+    success: z.boolean(),
     data: z.object({
-        safety:         z.array(RecommendationRowSchema).describe('TODO describe safety field for the OpenInspection MCP integration'),
-        recommendation: z.array(RecommendationRowSchema).describe('TODO describe recommendation field for the OpenInspection MCP integration'),
-        maintenance:    z.array(RecommendationRowSchema).describe('TODO describe maintenance field for the OpenInspection MCP integration'),
-    }).describe('TODO describe data field for the OpenInspection MCP integration'),
+        safety:         z.array(RecommendationRowSchema),
+        recommendation: z.array(RecommendationRowSchema),
+        maintenance:    z.array(RecommendationRowSchema),
+    }),
 });
 
 // C-10 ③-C — row shape for GET /api/agent/referrals.

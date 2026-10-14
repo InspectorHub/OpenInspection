@@ -17,7 +17,9 @@ import { m } from "~/paraglide/messages";
 import { cloudflareContext, getCloudflareEnv } from "~/lib/load-context";
 import { writeAuditLog } from "../../../server/lib/audit";
 import { getDeploymentProfile } from "../../../server/lib/deployment-profile";
+import { mcpEnabled, nativeClientEnabled } from "../../../server/lib/mcp/flag";
 import type { WorkerEnv } from "../../../workers/env";
+import { assertNativeRoleAllowed, completeNativeAuthorization, hasNativePkce, isNativeAuthRequest, isNativeRedirectUri, nativeRedirectDisplay } from "../../../server/lib/auth/native-consent";
 
 export function meta() {
   return [{ title: m.oauth_authorize_meta_title() }];
@@ -25,10 +27,12 @@ export function meta() {
 
 /**
  * Env the shared `WorkerEnv` omits on purpose. OAUTH_PROVIDER: wrapper-injected,
- * never a binding, sole consumer.
+ * never a binding, sole consumer. NATIVE_CLIENT_ENABLED: operator opt-in var.
  */
 interface AuthorizeEnv {
   OAUTH_PROVIDER?: OAuthHelpers;
+  NATIVE_CLIENT_ENABLED?: string;
+  MCP_ENABLED?: string;
 }
 
 /** Resolved end-user identity backing an OAuth grant. */
@@ -112,16 +116,21 @@ export function isRegisteredRedirectUri(
  * normalized `url`, not `request.url`, whose `.data` suffix under
  * v8_passThroughRequests would be baked into the returnTo (bites on the action
  * path: a form POST from a client-side navigation).
+ *
+ * A native client's request (scope=native in the query) adds `app=1` so the
+ * login page can tell it is serving the app's sign-in. The scope is read from
+ * the query because no session exists yet to parse the request with.
  */
 function loginRedirect(env: WorkerEnv & AuthorizeEnv, url: URL): Response {
   const { loginRedirectBase } = getDeploymentProfile(env);
+  const app = isNativeAuthRequest(url.searchParams.get("scope")?.split(" ")) ? "app=1&" : "";
   if (loginRedirectBase) {
     // Cross-origin bounce to the portal — send the absolute authorize URL.
-    return redirect(`${loginRedirectBase}/login?returnTo=${encodeURIComponent(url.href)}`);
+    return redirect(`${loginRedirectBase}/login?${app}returnTo=${encodeURIComponent(url.href)}`);
   }
   // Standalone: relative path back to this same authorize URL (incl. query).
   const here = `${url.pathname}${url.search}`;
-  return redirect(`/login?returnTo=${encodeURIComponent(here)}`);
+  return redirect(`/login?${app}returnTo=${encodeURIComponent(here)}`);
 }
 
 export async function loader({ request, url, context }: Route.LoaderArgs) {
@@ -146,12 +155,33 @@ export async function loader({ request, url, context }: Route.LoaderArgs) {
   const client = await env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
   const clientName = client?.clientName?.trim() || m.oauth_authorize_client_fallback();
 
+  // A native grant equals a full session, so it is only offered where the
+  // operator opted in (404, as when OAuth is not mounted) and only for a
+  // redirect that can reach the user's own device (400), with PKCE S256 so a
+  // look-alike app holding the same scheme cannot redeem the code (400).
+  const native = isNativeAuthRequest(authReq.scope);
+  if (native && !nativeClientEnabled(env)) throw new Response("Not Found", { status: 404 });
+  // The provider is mounted for native clients alone as well; an MCP grant is
+  // only offered where MCP itself is on.
+  if (!native && !mcpEnabled(env)) throw new Response("Not Found", { status: 404 });
+  // Same check, same function as the action: do not show a consent page the
+  // action would refuse.
+  if (native) assertNativeRoleAllowed(identity.role);
+  if (native && (!isNativeRedirectUri(authReq.redirectUri) || !hasNativePkce(authReq))) {
+    throw new Response("Bad Request", { status: 400 });
+  }
+  // Only what the user can judge: the scheme (or loopback), never the full URL.
+  const { loopback: redirectLoopback, scheme: redirectScheme } = nativeRedirectDisplay(authReq.redirectUri);
+
   return {
     clientName,
     role: identity.role,
     modules: visibleModuleGroups(identity.role),
     canWrite: roleCanWrite(identity.role),
     oauthReqJson: JSON.stringify(authReq),
+    native,
+    redirectLoopback,
+    redirectScheme,
   };
 }
 
@@ -180,6 +210,11 @@ export async function action({ request, url, context }: Route.ActionArgs) {
   const client = await env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
   const clientName = client?.clientName?.trim() || m.oauth_authorize_client_fallback();
 
+  // Same switch as the loader: an MCP authorization is dead where MCP is off.
+  if (!isNativeAuthRequest(authReq.scope) && !mcpEnabled(env)) {
+    throw new Response("Not Found", { status: 404 });
+  }
+
   // Cancel => bounce back to the client's redirect_uri with an OAuth error
   // (RFC 6749 §4.1.2.1) — but ONLY if that redirect_uri is registered to the
   // client. A tampered/unregistered URI would be an open redirect; fall back to
@@ -192,6 +227,19 @@ export async function action({ request, url, context }: Route.ActionArgs) {
     u.searchParams.set("error", "access_denied");
     if (authReq.state) u.searchParams.set("state", authReq.state);
     return redirect(u.toString());
+  }
+
+  if (isNativeAuthRequest(authReq.scope)) {
+    const redirectTo = await completeNativeAuthorization({
+      env,
+      oauth: env.OAUTH_PROVIDER,
+      db: env.DB,
+      authReq,
+      clientName,
+      identity,
+      ctx: context?.get(cloudflareContext).ctx,
+    });
+    return redirect(redirectTo);
   }
 
   const visible = visibleModuleGroups(identity.role);
@@ -249,10 +297,14 @@ export { ConsentForm, type ConsentFormProps } from "~/components/oauth/ConsentFo
 // Imported as well as re-exported: `AuthorizePage` below renders it, and a
 // bare `export ... from` does not bind the name locally.
 import { ConsentForm } from "~/components/oauth/ConsentForm";
+import { NativeConsent } from "~/components/oauth/NativeConsent";
 
 export default function AuthorizePage() {
   const data = useLoaderData<typeof loader>();
   const navigation = useNavigation();
+  if (data.native) {
+    return <NativeConsent appName={data.clientName} redirectScheme={data.redirectScheme} redirectLoopback={data.redirectLoopback} oauthReqJson={data.oauthReqJson} submitting={navigation.state === "submitting"} />;
+  }
   return (
     <ConsentForm
       clientName={data.clientName}

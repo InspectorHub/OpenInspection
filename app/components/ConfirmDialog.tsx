@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Modal, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
@@ -10,7 +11,7 @@ import { m } from "~/paraglide/messages";
  * not look like ten omissions, it looks like one.
  */
 export function ConfirmDialog({
-  open, title, message, confirmLabel, cancelLabel, tone = "danger", busy = false, onConfirm, onCancel,
+  open, title, message, confirmLabel, cancelLabel, tone = "danger", busy = false, onConfirm, onCancel, children,
 }: {
   open: boolean;
   title: string;
@@ -27,6 +28,8 @@ export function ConfirmDialog({
   busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Extra content under the message, e.g. a warning Banner or an error. */
+  children?: ReactNode;
 }) {
   const confirmClass =
     tone === "danger"
@@ -58,6 +61,7 @@ export function ConfirmDialog({
       }
     >
       <p className="text-[13px] text-ih-fg-2">{message}</p>
+      {children}
     </Modal>
   );
 }

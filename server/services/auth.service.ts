@@ -5,6 +5,9 @@ import { tenantDisplayName } from '../lib/tenant-display-name';
 import { Errors } from '../lib/errors';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { logger } from '../lib/logger';
+import { revokeUserGrantsBestEffort } from '../lib/mcp/grants';
+import { CREDENTIAL_MARKER_TTL_S } from '../lib/auth/credential-marker';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import { joinTeam as joinTeamImpl, type JoinTeamOptions } from './auth/join-team';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
 
@@ -28,7 +31,12 @@ export const DUMMY_HASH = 'pbkdf2:00000000000000000000000000000000:0000000000000
  * intervention.
  */
 export class AuthService {
-    constructor(private db: D1Database, private kv?: KVNamespace, private outbox?: UserSyncOutbox) {}
+    constructor(
+        private db: D1Database,
+        private kv?: KVNamespace,
+        private outbox?: UserSyncOutbox,
+        private oauth?: OAuthHelpers,
+    ) {}
 
     private getDrizzle() {
         return drizzle(this.db);
@@ -36,10 +44,13 @@ export class AuthService {
 
     /** Write a session-invalidation marker for a user. Safe to call during DB mutations. */
     private async writeInvalidation(userId: string) {
+        // OAuth grants (native client, MCP) never read the marker below, so they are
+        // cut off here instead; the revocation does not depend on KV being bound.
+        await revokeUserGrantsBestEffort(this.oauth, userId, 'a credential change');
         if (!this.kv) return;
         const ts = Math.floor(Date.now() / 1000).toString();
         try {
-            await this.kv.put(`pwchanged:${userId}`, ts, { expirationTtl: 90000 });
+            await this.kv.put(`pwchanged:${userId}`, ts, { expirationTtl: CREDENTIAL_MARKER_TTL_S });
         } catch (err) {
             logger.warn('Failed to write session-invalidation key; outstanding tokens may remain valid until exp', {
                 userId,
@@ -157,7 +168,7 @@ export class AuthService {
      * documented at the implementation in `auth/join-team.ts`.
      */
     async joinTeam(token: string, password: string, opts: JoinTeamOptions) {
-        return joinTeamImpl({ db: this.db, outbox: this.outbox }, token, password, opts);
+        return joinTeamImpl({ db: this.db, outbox: this.outbox, oauth: this.oauth }, token, password, opts);
     }
 
     /**
