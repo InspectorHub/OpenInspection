@@ -445,6 +445,47 @@ describe('native client OAuth lifecycle (real provider)', () => {
         });
     });
 
+    describe('refresh when the credential marker cannot be read', () => {
+        /** The same deployment with a TENANT_CACHE whose reads fail; the provider's own OAUTH_KV is untouched. */
+        const kvDownEnv = {
+            ...env,
+            TENANT_CACHE: { get: () => Promise.reject(new Error('kv unavailable')) },
+        } as Record<string, unknown>;
+
+        it('a marker that shows a credential change ends the grant (positive control for the case below)', async () => {
+            const kv = testEnv.TENANT_CACHE as KVNamespace;
+            const clientId = await registerClient();
+            const t = (await (await authorizeAndExchange(clientId, 'native', PW_USER)).json()) as Tokens;
+            await kv.put(`pwchanged:${PW_USER}`, String(Math.floor(Date.now() / 1000) + 600)); // seed-lint-ok: epoch-seconds KV marker
+            try {
+                const refused = await refreshWith(call, clientId, t);
+                expect(refused.status).toBe(400);
+                expect(((await refused.json()) as { error: string }).error).toBe('invalid_grant');
+                expect(await grantCount(PW_USER)).toBe(0);
+            } finally {
+                await kv.delete(`pwchanged:${PW_USER}`);
+            }
+        });
+
+        it('a marker that cannot be read answers a retryable 503, keeps the grant, and the same refresh token works once the store recovers', async () => {
+            const clientId = await registerClient();
+            const t = (await (await authorizeAndExchange(clientId, 'native', PW_USER)).json()) as Tokens;
+            expect(await grantCount(PW_USER)).toBe(1);
+
+            const transient = await refreshWith(callIn(kvDownEnv), clientId, t);
+            expect(transient.status).toBe(503);
+            expect(transient.headers.get('Retry-After')).toBeTruthy();
+            expect(((await transient.json()) as { error: string }).error).toBe('temporarily_unavailable');
+            // Not revoked: the grant is still there and the refresh token was not consumed.
+            expect(await grantCount(PW_USER)).toBe(1);
+
+            const recovered = await refreshWith(call, clientId, t);
+            expect(recovered.status).toBe(200);
+            expect(await grantCount(PW_USER)).toBe(1);
+            await call(new Request(`${ORIGIN}/__test/revoke-all?user=${PW_USER}`));
+        });
+    });
+
     describe('grants are not bound to a device', () => {
         it('a second authorization under the same client_id leaves the first grant and its tokens valid', async () => {
             const clientId = await registerClient();

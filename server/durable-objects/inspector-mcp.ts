@@ -102,10 +102,7 @@ function makeExecutionContext(): ExecutionContext {
     } as unknown as ExecutionContext;
 }
 
-/** Lazily resolve `components.schemas` from the live OpenAPI document. Imported
- * dynamically so the DO's top-level graph stays small (same rationale as
- * workers/app.ts and identity-bridge.callApiAsUser). */
-async function getComponentSchemas(): Promise<Record<string, unknown>> {
+async function loadComponentSchemas(): Promise<Record<string, unknown>> {
     const { app } = await import('../index');
     const { buildOpenApiDocument } = await import('../lib/openapi/build-document');
     const doc = buildOpenApiDocument(app, OPENAPI_DOC_CONFIG) as {
@@ -113,6 +110,22 @@ async function getComponentSchemas(): Promise<Record<string, unknown>> {
     };
     return doc.components?.schemas ?? {};
 }
+
+let componentSchemasPromise: Promise<Record<string, unknown>> | undefined;
+
+/** Lazily resolve `components.schemas` from the live OpenAPI document. Imported
+ * dynamically so the DO's top-level graph stays small (same rationale as
+ * workers/app.ts and identity-bridge.callApiAsUser).
+ *
+ * Built ONCE per isolate: generating the ~1.2 MB document and walking it for
+ * descriptions is a large share of a 10 ms CPU budget, and every MCP session
+ * registration used to pay it again. The schemas are read-only to callers.
+ * A failed build is not kept, so the next session retries. */
+const getComponentSchemas = (): Promise<Record<string, unknown>> =>
+    (componentSchemasPromise ??= loadComponentSchemas().catch((err: unknown) => {
+        componentSchemasPromise = undefined;
+        throw err;
+    }));
 
 /** Read a Response body as text, truncating oversized payloads. */
 async function readTruncated(res: Response): Promise<string> {

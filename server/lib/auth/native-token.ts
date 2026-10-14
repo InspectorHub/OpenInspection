@@ -98,23 +98,38 @@ export async function currentNativeRole(db: D1Database, userId: string, tenantId
  * did, so grant revocation was the only control and a failed revocation left
  * the grant alive. Semantics match the session check: no KV bound skips it, a
  * KV read that throws fails closed (the session path answers 401 in that case).
+ *
+ * The three answers matter to different callers. A request that cannot be
+ * verified is simply refused (and retried), so `unreadable` may be treated like
+ * `changed`. A token refresh must not: `changed` ends the grant for good, while
+ * `unreadable` is a transient storage fault that must leave a healthy grant alone.
  */
-export async function nativeGrantPredatesCredentialChange(
+export type NativeCredentialState = 'ok' | 'changed' | 'unreadable';
+
+export async function nativeGrantCredentialState(
   env: { TENANT_CACHE?: KVNamespace },
   props: Pick<NativeProps, 'userId' | 'grantedAt'>,
-): Promise<boolean> {
+): Promise<NativeCredentialState> {
   const kv = env.TENANT_CACHE;
-  if (!kv) return false;
+  if (!kv) return 'ok';
   try {
     // The same memo key the session check uses, so one in-process fan-out (an
     // import replaying its queued writes) reads the marker once, not per call.
     const raw = await memoOnce(env, `pwchanged:${props.userId}`, () => kv.get(`pwchanged:${props.userId}`));
-    if (!raw) return false;
+    if (!raw) return 'ok';
     const changedAt = parseInt(raw, 10);
-    return !Number.isFinite(changedAt) || props.grantedAt < changedAt;
+    return !Number.isFinite(changedAt) || props.grantedAt < changedAt ? 'changed' : 'ok';
   } catch {
-    return true;
+    return 'unreadable';
   }
+}
+
+/** Fail-closed boolean form: an unreadable marker counts as a change. */
+export async function nativeGrantPredatesCredentialChange(
+  env: { TENANT_CACHE?: KVNamespace },
+  props: Pick<NativeProps, 'userId' | 'grantedAt'>,
+): Promise<boolean> {
+  return (await nativeGrantCredentialState(env, props)) !== 'ok';
 }
 
 /**

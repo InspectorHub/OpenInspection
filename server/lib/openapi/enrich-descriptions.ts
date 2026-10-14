@@ -20,193 +20,14 @@
  *   3. A fact the prose already states is not repeated (see `covered`), which
  *      also makes the function idempotent.
  *
- * Pure and WinterCG-safe: it deep-copies the document and returns the copy.
+ * Pure and WinterCG-safe: it never writes to its input and returns a copy that
+ * shares the subtrees it did not change.
  */
-import { MIN_FIELD_DESCRIPTION_CHARS } from '../route-metadata-standards';
+import { allFacts, appendFacts, isPlaceholderDescription, isRec, isSemantic, type Json } from './enrich-facts';
 
-type Json = Record<string, unknown>;
+export { isPlaceholderDescription };
 
-const PLACEHOLDER_PHRASES = [['Auto-generated', 'placeholder'].join(' '), ['TODO', 'describe'].join(' ')] as const;
 const COMPONENT_PREFIX = '#/components/schemas/';
-const ENUM_CAP = 20;
-const DEFAULT_CAP = 40;
-
-function isRec(value: unknown): value is Json {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** True for an absent, blank, or placeholder description. */
-export function isPlaceholderDescription(description: unknown): boolean {
-    if (typeof description !== 'string' || description.trim() === '') return true;
-    return PLACEHOLDER_PHRASES.some((phrase) => description.includes(phrase));
-}
-
-/** Hand-written and long enough to stand on its own. */
-function isSemantic(description: unknown): description is string {
-    return typeof description === 'string'
-        && !isPlaceholderDescription(description)
-        && description.trim().length >= MIN_FIELD_DESCRIPTION_CHARS;
-}
-
-// ---------------------------------------------------------------------------
-// Facts
-// ---------------------------------------------------------------------------
-
-/** One condition under which the prose is taken to state a fact already. */
-interface Check {
-    /** Every value must appear in the prose as a whole token. */
-    values: string[];
-    /** And the prose must use wording from this family. */
-    keywords: RegExp;
-}
-
-interface Fact {
-    text: string;
-    checks: Check[];
-}
-
-const ANY = /[\s\S]/;
-const RANGE_WORDS = /between|range|at least|at most|minimum|maximum|\bmin\b|\bmax\b|greater|less than|from|up to|\bto\b/i;
-const LENGTH_WORDS = /\bchars?\b|characters|length|long\b/i;
-const ITEM_WORDS = /\bitems?\b|entries|elements/i;
-
-function escapeRegex(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function hasToken(prose: string, value: string): boolean {
-    return new RegExp(`(?<![A-Za-z0-9_.])${escapeRegex(value)}(?![A-Za-z0-9_])`, 'i').test(prose);
-}
-
-function normalize(text: string): string {
-    return text.toLowerCase().replace(/\s+/g, ' ').trim();
-}
-
-function covered(prose: string, fact: Fact): boolean {
-    if (normalize(prose).includes(normalize(fact.text))) return true;
-    return fact.checks.every((c) => c.keywords.test(prose) && c.values.every((v) => hasToken(prose, v)));
-}
-
-function num(value: unknown): number | undefined {
-    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
-interface Bound {
-    value: number;
-    exclusive: boolean;
-}
-
-function bounds(node: Json): { lower?: Bound; upper?: Bound } {
-    const out: { lower?: Bound; upper?: Bound } = {};
-    const min = num(node['minimum']);
-    const max = num(node['maximum']);
-    const exMin = node['exclusiveMinimum'];
-    const exMax = node['exclusiveMaximum'];
-    if (num(exMin) !== undefined) out.lower = { value: num(exMin) as number, exclusive: true };
-    else if (min !== undefined) out.lower = { value: min, exclusive: exMin === true };
-    if (num(exMax) !== undefined) out.upper = { value: num(exMax) as number, exclusive: true };
-    else if (max !== undefined) out.upper = { value: max, exclusive: exMax === true };
-    return out;
-}
-
-function numericFact(node: Json, name: string | undefined): Fact | undefined {
-    const type = node['type'];
-    if (type !== 'integer' && type !== 'number') return undefined;
-    const cents = name !== undefined && /Cents$/.test(name);
-    const head = cents ? 'Integer cents' : type === 'integer' ? 'Integer' : '';
-    const { lower, upper } = bounds(node);
-    const checks: Check[] = [];
-    if (head) checks.push({ values: [], keywords: cents ? /\bcents\b/i : /\binteger\b/i });
-
-    let range: string;
-    let joiner = ', ';
-    if (lower && upper && !lower.exclusive && !upper.exclusive) {
-        range = `between ${lower.value} and ${upper.value}`;
-        joiner = ' ';
-    } else {
-        const parts: string[] = [];
-        if (lower) parts.push(`${lower.exclusive ? 'greater than' : 'at least'} ${lower.value}`);
-        if (upper) parts.push(`${upper.exclusive ? 'less than' : 'at most'} ${upper.value}`);
-        range = parts.join(' and ');
-    }
-    if (range) {
-        const values = [lower?.value, upper?.value].filter((v): v is number => v !== undefined).map(String);
-        checks.push({ values, keywords: RANGE_WORDS });
-    }
-    if (!head && !range) return undefined;
-    const text = head && range
-        ? `${head}${joiner}${range}.`
-        : head ? `${head}.` : `${range.charAt(0).toUpperCase()}${range.slice(1)}.`;
-    return { text, checks };
-}
-
-/** `1-200 characters.` / `Up to 80 characters.` / `At least 3 characters.` (a lone minLength of 1 is the required flag, not a fact). */
-function sizeFact(
-    node: Json, minKey: string, maxKey: string, unit: string, keywords: RegExp, singleMinIsNoise: boolean,
-): Fact | undefined {
-    const min = num(node[minKey]);
-    const max = num(node[maxKey]);
-    if (min === undefined && max === undefined) return undefined;
-    if (max === undefined && min === 1 && singleMinIsNoise) return undefined;
-    const values = [min, max].filter((v): v is number => v !== undefined).map(String);
-    let text: string;
-    if (min !== undefined && max !== undefined) text = `${min}-${max} ${unit}.`;
-    else if (max !== undefined) text = `Up to ${max} ${unit}.`;
-    else text = `At least ${min} ${unit}.`;
-    return { text, checks: [{ values, keywords }] };
-}
-
-function enumFact(node: Json): Fact | undefined {
-    const raw = node['enum'];
-    if (!Array.isArray(raw)) return undefined;
-    const values = raw.filter((v): v is string | number | boolean => v !== null && v !== undefined);
-    if (values.length === 0 || values.length > ENUM_CAP) return undefined;
-    if (!values.every((v) => ['string', 'number', 'boolean'].includes(typeof v))) return undefined;
-    const shown = values.map(String);
-    return { text: `One of: ${shown.join(', ')}.`, checks: [{ values: shown, keywords: ANY }] };
-}
-
-function defaultFact(node: Json): Fact | undefined {
-    const d = node['default'];
-    let shown: string;
-    if (typeof d === 'string') {
-        if (d.length > DEFAULT_CAP) return undefined;
-        shown = d === '' ? '""' : d;
-    } else if (typeof d === 'number' || typeof d === 'boolean') shown = String(d);
-    else return undefined;
-    return { text: `Defaults to ${shown}.`, checks: [{ values: d === '' ? [] : [shown], keywords: /default/i }] };
-}
-
-const FORMATS: Readonly<Record<string, { text: string; keywords: RegExp }>> = {
-    'date-time': { text: 'ISO 8601 date-time.', keywords: /iso ?8601|date-?time|timestamp/i },
-    date: { text: 'Date in YYYY-MM-DD format.', keywords: /yyyy-mm-dd|iso date/i },
-    email: { text: 'Must be a valid email address.', keywords: /e-?mail/i },
-};
-
-function formatFact(node: Json): Fact | undefined {
-    const f = typeof node['format'] === 'string' ? FORMATS[node['format']] : undefined;
-    return f ? { text: f.text, checks: [{ values: [], keywords: f.keywords }] } : undefined;
-}
-
-function allFacts(node: Json, name: string | undefined): Fact[] {
-    return [
-        numericFact(node, name),
-        sizeFact(node, 'minLength', 'maxLength', 'characters', LENGTH_WORDS, true),
-        sizeFact(node, 'minItems', 'maxItems', 'items', ITEM_WORDS, false),
-        enumFact(node),
-        formatFact(node),
-        defaultFact(node),
-    ].filter((f): f is Fact => f !== undefined);
-}
-
-/** Append the facts the prose does not already state. Returns `prose` itself when nothing is missing. */
-function appendFacts(prose: string, facts: Fact[]): string {
-    const missing = facts.filter((f) => !covered(prose, f));
-    if (missing.length === 0) return prose;
-    const base = prose.trim();
-    const stop = /[.!?]$/.test(base) ? base : `${base}.`;
-    return `${stop} ${missing.map((f) => f.text).join(' ')}`;
-}
 
 // ---------------------------------------------------------------------------
 // Path-parameter derivation
@@ -254,63 +75,120 @@ function derivePathIdDescription(pathTemplate: string): string | undefined {
 interface Ctx {
     schemas: Json | undefined;
     seen: Set<string>;
+    /** Component schemas the walk rewrote, by name. */
+    changed: Record<string, unknown>;
 }
 
-function enrichNode(node: Json, name: string | undefined): void {
+/**
+ * Copy-on-write: every function below returns the node it was given when nothing
+ * under it changed, and a shallow copy of just the changed spine otherwise. The
+ * input is never written to, and an untouched subtree is shared with it rather
+ * than cloned (the ~1.2 MB document is almost entirely untouched).
+ */
+function enrichNode(node: Json, name: string | undefined): Json {
     const d = node['description'];
-    if (!isSemantic(d)) return;
+    if (!isSemantic(d)) return node;
     const next = appendFacts(d, allFacts(node, name));
-    if (next !== d) node['description'] = next;
+    return next === d ? node : { ...node, description: next };
 }
 
-function walkSchema(node: unknown, name: string | undefined, ctx: Ctx): void {
-    if (!isRec(node)) return;
+/** Returns `node` itself, or a copy with `key` replaced when `value` differs. */
+function withKey(node: Json, key: string, value: unknown): Json {
+    return node[key] === value ? node : { ...node, [key]: value };
+}
+
+function walkProperties(map: Json, ctx: Ctx): Json {
+    let out: Json | undefined;
+    for (const [key, sub] of Object.entries(map)) {
+        const next = walkSchema(sub, key, ctx);
+        if (next !== sub) (out ??= { ...map })[key] = next;
+    }
+    return out ?? map;
+}
+
+function walkSchema(node: unknown, name: string | undefined, ctx: Ctx): unknown {
+    if (!isRec(node)) return node;
     const ref = node['$ref'];
     if (typeof ref === 'string') {
-        if (!ref.startsWith(COMPONENT_PREFIX)) return;
+        if (!ref.startsWith(COMPONENT_PREFIX)) return node;
         const target = ref.slice(COMPONENT_PREFIX.length);
-        if (ctx.seen.has(target)) return;
+        if (ctx.seen.has(target)) return node;
         ctx.seen.add(target);
-        walkSchema(ctx.schemas?.[target], undefined, ctx);
-        return;
+        const original = ctx.schemas?.[target];
+        const next = walkSchema(original, undefined, ctx);
+        if (next !== original) ctx.changed[target] = next;
+        return node;
     }
-    enrichNode(node, name);
-    const properties = node['properties'];
-    if (isRec(properties)) for (const [key, sub] of Object.entries(properties)) walkSchema(sub, key, ctx);
-    walkSchema(node['items'], undefined, ctx);
-    walkSchema(node['additionalProperties'], undefined, ctx);
+    let out = enrichNode(node, name);
+    const properties = out['properties'];
+    if (isRec(properties)) out = withKey(out, 'properties', walkProperties(properties, ctx));
+    for (const key of ['items', 'additionalProperties']) {
+        const sub = out[key];
+        if (sub !== undefined) out = withKey(out, key, walkSchema(sub, undefined, ctx));
+    }
     for (const key of ['allOf', 'anyOf', 'oneOf']) {
-        const variants = node[key];
-        if (Array.isArray(variants)) for (const v of variants) walkSchema(v, undefined, ctx);
+        const variants = out[key];
+        if (!Array.isArray(variants)) continue;
+        let copy: unknown[] | undefined;
+        variants.forEach((v: unknown, i) => {
+            const next = walkSchema(v, undefined, ctx);
+            if (next !== v) (copy ??= [...variants])[i] = next;
+        });
+        if (copy) out = withKey(out, key, copy);
     }
+    return out;
 }
 
-function enrichParameter(param: unknown, pathTemplate: string, ctx: Ctx): void {
-    if (!isRec(param) || typeof param['name'] !== 'string') return;
+function enrichParameter(param: unknown, pathTemplate: string, ctx: Ctx): unknown {
+    if (!isRec(param) || typeof param['name'] !== 'string') return param;
     const name = param['name'];
-    const schema = isRec(param['schema']) ? param['schema'] : undefined;
+    const original = isRec(param['schema']) ? param['schema'] : undefined;
     const description = param['description'];
 
     // The schema first: a description derived below must not then be enriched.
-    if (schema) walkSchema(schema, name, ctx);
+    const schema = original ? (walkSchema(original, name, ctx) as Json) : undefined;
+    let out: Json = param;
+    if (schema !== original) out = withKey(out, 'schema', schema);
     if (isSemantic(description)) {
-        param['description'] = appendFacts(description, allFacts(schema ?? {}, name));
+        out = withKey(out, 'description', appendFacts(description, allFacts(schema ?? {}, name)));
     } else if (isPlaceholderDescription(description) && param['in'] === 'path' && name === 'id') {
         const derived = derivePathIdDescription(pathTemplate);
         if (derived !== undefined) {
-            param['description'] = derived;
-            if (schema && isPlaceholderDescription(schema['description'])) schema['description'] = derived;
+            out = withKey(out, 'description', derived);
+            if (schema && isPlaceholderDescription(schema['description'])) {
+                out = withKey(out, 'schema', { ...schema, description: derived });
+            }
         }
     }
+    return out;
 }
 
-function enrichOperation(op: unknown, pathTemplate: string, ctx: Ctx): void {
-    if (!isRec(op)) return;
+function enrichParameters(parameters: unknown[], pathTemplate: string, ctx: Ctx): unknown[] {
+    let copy: unknown[] | undefined;
+    parameters.forEach((p, i) => {
+        const next = enrichParameter(p, pathTemplate, ctx);
+        if (next !== p) (copy ??= [...parameters])[i] = next;
+    });
+    return copy ?? parameters;
+}
+
+function enrichOperation(op: unknown, pathTemplate: string, ctx: Ctx): unknown {
+    if (!isRec(op)) return op;
+    let out: Json = op;
     const parameters = op['parameters'];
-    if (Array.isArray(parameters)) for (const p of parameters) enrichParameter(p, pathTemplate, ctx);
+    if (Array.isArray(parameters)) out = withKey(out, 'parameters', enrichParameters(parameters, pathTemplate, ctx));
     const body = op['requestBody'];
     const content = isRec(body) ? body['content'] : undefined;
-    if (isRec(content)) for (const media of Object.values(content)) if (isRec(media)) walkSchema(media['schema'], undefined, ctx);
+    if (isRec(body) && isRec(content)) {
+        let newContent: Json | undefined;
+        for (const [type, media] of Object.entries(content)) {
+            if (!isRec(media)) continue;
+            const next = withKey(media, 'schema', walkSchema(media['schema'], undefined, ctx));
+            if (next !== media) (newContent ??= { ...content })[type] = next;
+        }
+        if (newContent) out = withKey(out, 'requestBody', { ...body, content: newContent });
+    }
+    return out;
 }
 
 const OPERATION_KEYS = ['get', 'put', 'post', 'delete', 'patch', 'head', 'options'] as const;
@@ -318,22 +196,31 @@ const OPERATION_KEYS = ['get', 'put', 'post', 'delete', 'patch', 'head', 'option
 /**
  * Returns a copy of `doc` whose input descriptions carry schema-derived facts.
  * Only request inputs are touched: parameters, request bodies, and the
- * `components.schemas` those bodies reach through `$ref`.
+ * `components.schemas` those bodies reach through `$ref`. The copy shares every
+ * unchanged subtree with `doc`; treat both as read-only.
  */
 export function enrichDescriptions<T extends object>(doc: T): T {
-    const copy: T = structuredClone(doc);
-    const root: unknown = copy;
-    if (!isRec(root)) return copy;
+    const root: unknown = doc;
+    if (!isRec(root)) return doc;
     const components = root['components'];
     const schemas = isRec(components) && isRec(components['schemas']) ? components['schemas'] : undefined;
-    const ctx: Ctx = { schemas, seen: new Set() };
+    const ctx: Ctx = { schemas, seen: new Set(), changed: {} };
     const paths = root['paths'];
-    if (!isRec(paths)) return copy;
-    for (const [pathTemplate, item] of Object.entries(paths)) {
-        if (!isRec(item)) continue;
-        const shared = item['parameters'];
-        if (Array.isArray(shared)) for (const p of shared) enrichParameter(p, pathTemplate, ctx);
-        for (const method of OPERATION_KEYS) enrichOperation(item[method], pathTemplate, ctx);
+    let newPaths: Json | undefined;
+    if (isRec(paths)) {
+        for (const [pathTemplate, item] of Object.entries(paths)) {
+            if (!isRec(item)) continue;
+            let out: Json = item;
+            const shared = item['parameters'];
+            if (Array.isArray(shared)) out = withKey(out, 'parameters', enrichParameters(shared, pathTemplate, ctx));
+            for (const method of OPERATION_KEYS) out = withKey(out, method, enrichOperation(item[method], pathTemplate, ctx));
+            if (out !== item) (newPaths ??= { ...paths })[pathTemplate] = out;
+        }
     }
-    return copy;
+    const result: Json = { ...root };
+    if (newPaths) result['paths'] = newPaths;
+    if (schemas && isRec(components) && Object.keys(ctx.changed).length > 0) {
+        result['components'] = { ...components, schemas: { ...schemas, ...ctx.changed } };
+    }
+    return result as T;
 }

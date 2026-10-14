@@ -323,6 +323,39 @@ describe('enrichDescriptions: purity', () => {
         expect(out).not.toBe(doc);
     });
 
+    it('enriches a deeply frozen document, including a component reached by $ref, without writing to it', () => {
+        const freeze = <T,>(v: T): T => {
+            if (v && typeof v === 'object') for (const x of Object.values(v)) freeze(x);
+            return Object.freeze(v);
+        };
+        const doc = freeze({
+            openapi: '3.0.0',
+            paths: { '/api/widgets': { post: { requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/Widget' } } } } } } },
+            components: { schemas: { Widget: { type: 'object', properties: { f: { type: 'string', description: BASE, maxLength: 5 } } } } },
+        });
+        const out = enrichDescriptions(doc) as { components: { schemas: { Widget: { properties: Record<string, Obj> } } } };
+        expect(out.components.schemas.Widget.properties['f']?.['description']).toBe(`${BASE}. Up to 5 characters.`);
+        // control: the frozen original still says what it said
+        expect(doc.components.schemas.Widget.properties.f.description).toBe(BASE);
+    });
+
+    it('shares the subtrees it did not change instead of cloning them, and copies the ones it did', () => {
+        const untouched = { type: 'object', properties: { id: { type: 'string' } } };
+        const touched = { type: 'object', properties: { f: { type: 'string', description: BASE, maxLength: 5 } } };
+        const doc = {
+            openapi: '3.0.0',
+            paths: {
+                '/api/widgets': { post: { requestBody: { content: { 'application/json': { schema: touched } } }, responses: { 200: { content: { 'application/json': { schema: untouched } } } } } },
+                '/api/other': { get: { responses: { 200: { description: 'ok' } } } },
+            },
+        };
+        const out = enrichDescriptions(doc);
+        expect(out.paths['/api/other']).toBe(doc.paths['/api/other']);
+        expect(out.paths['/api/widgets'].post.responses).toBe(doc.paths['/api/widgets'].post.responses);
+        expect(out.paths['/api/widgets'].post.requestBody.content['application/json'].schema).not.toBe(touched);
+        expect(props(out as unknown as Obj)['f']?.['description']).toBe(`${BASE}. Up to 5 characters.`);
+    });
+
     it('returns a document without paths unchanged in content', () => {
         expect(enrichDescriptions({ openapi: '3.0.0' })).toEqual({ openapi: '3.0.0' });
     });

@@ -22,6 +22,7 @@ import { toD1Binding } from '../helpers/d1-binding';
 import * as schema from '../../../server/lib/db/schema';
 import {
   resolveNativeToken, looksLikeOpaqueOAuthToken, isNativeProps, claimsNative, NATIVE_SCOPE, type NativeProps,
+  nativeGrantCredentialState, nativeGrantPredatesCredentialChange,
 } from '../../../server/lib/auth/native-token';
 import { MockKV } from '../mocks';
 import { createHarness, INSPECTOR_ID, TENANT_ID, type Harness } from '../helpers/tenant-email-harness';
@@ -119,6 +120,21 @@ describe('resolveNativeToken and the pwchanged marker', () => {
   });
   it('fails closed when the marker cannot be read, like the session path', async () => {
     expect(await resolveWith(null, NOW, true)).toBeNull();
+  });
+  it('nativeGrantCredentialState tells a changed credential apart from an unreadable marker', async () => {
+    const throwing = new MockKV();
+    throwing.get.mockRejectedValue(new Error('kv down'));
+    const changed = new MockKV();
+    await changed.put(`pwchanged:${USER}`, String(NOW));
+    const healthy = new MockKV();
+    const p = { userId: USER, grantedAt: NOW - 600 };
+    expect(await nativeGrantCredentialState({ TENANT_CACHE: changed as unknown as KVNamespace }, p)).toBe('changed');
+    expect(await nativeGrantCredentialState({ TENANT_CACHE: throwing as unknown as KVNamespace }, p)).toBe('unreadable');
+    expect(await nativeGrantCredentialState({ TENANT_CACHE: healthy as unknown as KVNamespace }, p)).toBe('ok');
+    expect(await nativeGrantCredentialState({}, p)).toBe('ok');
+    // The boolean form keeps fail-closed for the bearer path.
+    expect(await nativeGrantPredatesCredentialChange({ TENANT_CACHE: throwing as unknown as KVNamespace }, p)).toBe(true);
+    expect(await nativeGrantPredatesCredentialChange({ TENANT_CACHE: healthy as unknown as KVNamespace }, p)).toBe(false);
   });
   it('skips the check when no KV is bound, like the session path', async () => {
     const DB = await unitEnv();

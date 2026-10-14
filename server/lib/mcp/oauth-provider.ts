@@ -1,5 +1,5 @@
 import { OAuthError, OAuthProvider, getOAuthApi, type OAuthProviderOptions, type TokenExchangeCallbackResult } from '@cloudflare/workers-oauth-provider';
-import { claimsNative, currentNativeRole, isNativeProps, nativeGrantPredatesCredentialChange, nativeTokenExchange } from '../auth/native-token';
+import { claimsNative, currentNativeRole, isNativeProps, nativeGrantCredentialState, nativeTokenExchange } from '../auth/native-token';
 import { InspectorMcp } from '../../durable-objects/inspector-mcp';
 import type { McpProps } from '../../durable-objects/inspector-mcp';
 import { mcpEnabled, nativeClientEnabled, oauthProviderEnabled } from './flag';
@@ -165,7 +165,19 @@ export function buildOAuthHandler(
             const props = opts.props;
             if (!isNativeProps(props) || !env.DB) return refuse('Native session cannot be verified');
             if (!await currentNativeRole(env.DB, props.userId, props.tenantId)) return refuse('Member is no longer active');
-            if (await nativeGrantPredatesCredentialChange(env, props)) return refuse('Credentials changed since sign-in');
+            const credentialState = await nativeGrantCredentialState(env, props);
+            if (credentialState === 'changed') return refuse('Credentials changed since sign-in');
+            // An unreadable marker is a storage fault, not evidence of a change: revoking here
+            // would end a healthy grant over a blip. The provider documents OAuthError
+            // 'temporarily_unavailable' as the retryable answer; a plain Error would surface as
+            // an unstructured 500. Nothing is revoked or consumed, so the same refresh token works on retry.
+            if (credentialState === 'unreadable') {
+                throw new OAuthError('temporarily_unavailable', {
+                    description: 'Credential check is temporarily unavailable; retry shortly',
+                    statusCode: 503,
+                    headers: { 'Retry-After': '30' },
+                });
+            }
             // The provider tests for the PRESENCE of `refreshTokenTTL` on a code exchange, so the
             // native result carries it as an explicit undefined (no fixed expiry). The library types
             // it as `number`, which `exactOptionalPropertyTypes` will not widen; Object.assign copies
