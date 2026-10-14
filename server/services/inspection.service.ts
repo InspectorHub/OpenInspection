@@ -122,8 +122,13 @@ export class InspectionService {
     }
 
     /** As createInspection, plus whether this call made the row (false: a same-id replay that lost the insert race). */
-    async createInspectionOnce(tenantId: string, data: Parameters<InspectionService['createInspection']>[1]) {
-        return this.core.createInspectionOnce(tenantId, data);
+    async createInspectionOnce(...args: Parameters<InspectionCoreService['createInspectionOnce']>) {
+        return this.core.createInspectionOnce(...args);
+    }
+
+    /** Finishes a client-id create that stopped before its report. */
+    async completeInterruptedCreate(...args: Parameters<InspectionCoreService['completeInterruptedCreate']>) {
+        return this.core.completeInterruptedCreate(...args);
     }
 
     /**
@@ -167,15 +172,6 @@ export class InspectionService {
         baselineId: string,
     ): Promise<Array<{ itemId: string; label: string; originalNotes: string | null; open: boolean }>> {
         return this.core.getReinspectCandidates(tenantId, baselineId);
-    }
-
-    /** IA-1: Post-create hook — write priceOverride onto the inspection_services rows createInspection inserted. */
-    async applyServicePriceOverrides(
-        inspectionId: string,
-        tenantId: string,
-        selections: Array<{ serviceId: string; priceOverrideCents?: number | undefined }>,
-    ): Promise<void> {
-        return this.core.applyServicePriceOverrides(inspectionId, tenantId, selections);
     }
 
     /**

@@ -1,19 +1,15 @@
 import { eq, and, inArray } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, tenantConfigs, agreementRequests, contactRoleProfiles } from '../../lib/db/schema';
+import { inspections, inspectionResults, templates, tenantConfigs, agreementRequests } from '../../lib/db/schema';
 import { resolveAgentRepairAccess, type AgentRepairAccess } from '../../lib/people/agent-repair-access';
 import { contacts } from '../../lib/db/schema/contact';
-import { softUpsertClientContact } from './create-client-contact';
+import { runCreatePipeline, pipelineInputFrom, type CreatePipelineOptions } from './create-pipeline';
 import { isUniqueViolation } from '../../lib/db/unique-violation';
 import { PeopleService } from '../people.service';
 import { AppError, ErrorCode, Errors } from '../../lib/errors';
 import { safeISODate } from '../../lib/date';
-import { logger } from '../../lib/logger';
-import { ensurePrimaryReportAndResults } from '../../lib/inspection/primary-report';
-import { writeInspectionServiceSnapshots, type ServiceSelection } from '../../lib/inspection/service-snapshot';
 import { computePreflightFromData } from '../../lib/preflight';
-import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { INSPECTION_STATUS, type InspectionStatus } from '../../lib/status/inspection-status';
-import { fireAutomation, type Inspection, type InspectionListParams, type CreateInspectionData } from './shared';
+import type { Inspection, InspectionListParams, CreateInspectionData } from './shared';
 import { InspectionSubService } from './base';
 import { ServiceService } from '../service.service';
 import type { ScopedDB } from '../../lib/db/scoped';
@@ -23,6 +19,9 @@ import { InspectionReinspectionService, type CreatedReinspection } from './inspe
 import { InspectionCreateVariantsService } from './inspection-create-variants.service';
 import { InspectionRecipientsService } from './inspection-recipients.service';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
+
+/** Steps a caller needs run inside the create, ahead of its last write. */
+export type CreateInspectionHooks = Pick<CreatePipelineOptions, 'beforeReport'>;
 
 /**
  * The inspection PRIMITIVE: create one, read one, and the two guards that
@@ -198,6 +197,22 @@ export class InspectionCoreService extends InspectionSubService {
         return (await this.sdb.getById(inspections, id)) ? (await this.getInspection(id, tenantId)).inspection : null;
     }
 
+    /**
+     * Finishes a client-id create whose first attempt stopped before the primary report, from the
+     * replay's own request body. Steps and idempotency rules: `./create-pipeline`.
+     */
+    async completeInterruptedCreate(
+        tenantId: string,
+        inspection: Inspection,
+        data: CreateInspectionData & { clientContactId?: string },
+        hooks?: CreateInspectionHooks,
+    ): Promise<void> {
+        await this.assertContactsBelongToTenant(tenantId, [data.referredByAgentId, data.sellingAgentId, data.clientContactId]);
+        // The stored row decides the template the report is built from, not the replay's body.
+        const input = pipelineInputFrom({ ...data, templateId: inspection.templateId ?? undefined }, { id: inspection.id, inspectorId: inspection.inspectorId, createdAt: new Date() });
+        await runCreatePipeline({ d1: this.db, db: this.getDrizzle() }, tenantId, input, { strict: true, beforeReport: hooks?.beforeReport });
+    }
+
     /** Creates a new inspection. See `createInspectionOnce` for the replay semantics. */
     async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string }): Promise<Inspection> {
         return (await this.createInspectionOnce(tenantId, data)).inspection;
@@ -212,6 +227,7 @@ export class InspectionCoreService extends InspectionSubService {
     async createInspectionOnce(
         tenantId: string,
         data: CreateInspectionData & { inspectorId?: string; clientContactId?: string },
+        hooks?: CreateInspectionHooks,
     ): Promise<{ inspection: Inspection; created: boolean }> {
         if (!this.sdb) throw new Error('ScopedDB session missing');
         const id = data.id ?? crypto.randomUUID();
@@ -267,7 +283,6 @@ export class InspectionCoreService extends InspectionSubService {
         const clientContactIdInput = (data as { clientContactId?: string }).clientContactId ?? null;
         const clientNameInput = data.clientName || 'Private Client';
         const clientEmailInput = (data.clientEmail as string | null) || null;
-        const clientPhoneInput = data.clientPhone ?? null;
         const referredByAgentIdInput = (data.referredByAgentId as string | null) || null;
         const sellingAgentIdInput = (data.sellingAgentId as string | null) || null;
 
@@ -323,6 +338,7 @@ export class InspectionCoreService extends InspectionSubService {
             if (own) return { inspection: own, created: false };
             throw new AppError(409, ErrorCode.ID_CONFLICT, 'That inspection id is already in use.');
         }
+        const pipelineInput = pipelineInputFrom({ ...data, clientContactId: clientContactIdInput }, { id, inspectorId: newInspection.inspectorId, createdAt });
         // #180 — The redemption is atomic (one capped UPDATE), the write-back is a second statement.
         // Cap reached: the inspection keeps no discount. If the write-back fails after a redemption,
         // the use is spent and the inspection is undiscounted (never a discount that was not
@@ -336,59 +352,7 @@ export class InspectionCoreService extends InspectionSubService {
                 .set({ discountCodeId: persistedDiscountCodeId, discountAmount: persistedDiscountAmount })
                 .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
         }
-        // The primary report first, because the results row has to NAME it: a NULL `report_id` is
-        // accepted silently and reads match a sibling document or none (see `lib/inspection/reports.ts`).
-        // One idempotent function does both, and a replay of a client-id create calls it again.
-        const primaryReportId = await ensurePrimaryReportAndResults(db, tenantId, id, data.templateId ?? null, createdAt);
-        // An id the server minted cannot be retried, so a missing report stays the logged, non-fatal
-        // gap it always was. A client-chosen id can: failing here lets the retry add what is missing.
-        if (!primaryReportId && data.id) throw Errors.ServiceUnavailable('The inspection was saved but its report could not be created; retry the request');
-        // DB-8: mirror assignment into inspection_inspectors link table.
-        // Non-fatal — a sync failure must not roll back a committed inspection row.
-        try {
-            await syncInspectionAssignments(db, tenantId, id, { inspectorId: newInspection.inspectorId });
-        } catch (e) {
-            logger.error('inspection.assignment-sync.failed', { inspectionId: id }, e instanceof Error ? e : undefined);
-        }
-        await fireAutomation(this.db, tenantId, id, 'inspection.created');
-
-        // Soft-upsert the client into Contacts (non-fatal; see the helper); the
-        // resolved id feeds the inspection_people write below.
-        const resolvedClientContactId = clientNameInput === 'Private Client'
-            ? clientContactIdInput
-            : await softUpsertClientContact(db, tenantId,
-                { name: clientNameInput, email: clientEmailInput, phone: clientPhoneInput, createdAt }, clientContactIdInput, id);
-
-        // Task 7 (people-role-profiles) — mirror the primary client, buyer's
-        // agent, and listing agent into the inspection_people join table.
-        // Task 13 dropped the legacy clientContactId / referredByAgentId /
-        // sellingAgentId columns from the inspections row — this is now the
-        // ONLY place WHO is persisted. Best-effort: a people-write failure
-        // must never roll back an already-committed inspection row.
-        try {
-            const roleRows = await db.select({ id: contactRoleProfiles.id, key: contactRoleProfiles.key })
-                .from(contactRoleProfiles)
-                .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
-            const roleIdByKey = new Map(roleRows.map(r => [r.key, r.id]));
-            const people = new PeopleService({ DB: this.db });
-            const links: Array<[string | null, string | undefined]> = [
-                [resolvedClientContactId,   roleIdByKey.get('client')],
-                [referredByAgentIdInput,    roleIdByKey.get('buyer_agent')],
-                [sellingAgentIdInput,       roleIdByKey.get('listing_agent')],
-            ];
-            for (const [contactId, roleProfileId] of links) {
-                if (contactId && roleProfileId) await people.addPerson(tenantId, id, contactId, roleProfileId);
-            }
-        } catch (err) {
-            logger.error('inspection-people write from inspection create failed', { inspectionId: id }, err instanceof Error ? err : undefined);
-        }
-
-        // Link selected services — the tier-2 money authority. Shared with any
-        // other path that must produce the same rows; see the module doc.
-        await writeInspectionServiceSnapshots(db, tenantId, id, {
-            serviceSelections: (data as { serviceSelections?: ServiceSelection[] }).serviceSelections,
-            serviceIds:        data.serviceIds,
-        });
+        await runCreatePipeline({ d1: this.db, db }, tenantId, pipelineInput, { strict: !!data.id, fresh: true, beforeReport: hooks?.beforeReport });
 
         return { created: true, inspection: {
             ...newInspection,
@@ -416,15 +380,6 @@ export class InspectionCoreService extends InspectionSubService {
         baselineId: string,
     ): Promise<Array<{ itemId: string; label: string; originalNotes: string | null; open: boolean }>> {
         return this.reinspection.getReinspectCandidates(tenantId, baselineId);
-    }
-
-    /** IA-1 post-create hook — priceOverride onto existing rows. Body in `./inspection-create-variants.service`. */
-    async applyServicePriceOverrides(
-        inspectionId: string,
-        tenantId: string,
-        selections: ServiceSelection[],
-    ): Promise<void> {
-        return this.variants.applyServicePriceOverrides(inspectionId, tenantId, selections);
     }
 
     /** NewInspectionWizard creation path. Body in `./inspection-create-variants.service`. */

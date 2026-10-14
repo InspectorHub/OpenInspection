@@ -242,11 +242,39 @@ referring to it by a name it chose. The id is not required to be a UUID.
 | Id already belongs to an inspection in the same company that the caller may open (an owner or manager, or a member assigned to it) | `200` with the existing inspection. None of the create's side effects run again, so a retry is safe. |
 | Id belongs to a record outside the company, or to an inspection in it that the caller is not assigned to | `409` `ID_CONFLICT`, the same answer for both, with no inspection fields. |
 
-A create is several writes and cannot be one transaction. If the first attempt
-stopped after writing the inspection but before its primary report, results row or
-assignment, the request answers with an error, and the retry (a replay of the same
-id) adds exactly what is missing and writes nothing for what is already there. An
-inspection that was created whole is not touched by a replay.
+A create is several writes and cannot be one transaction. For an inspection with a
+client-chosen id the writes after the inspection row run in a fixed order whose
+**last step is the primary report**, so "the report exists" means "the create
+finished". If the first attempt stopped before that, it answers with an error
+(a `5xx`) and the retry, a replay of the same id, finishes the job from the
+replay's own request body. The steps, each safe to run twice:
+
+| Step | A repeat |
+|---|---|
+| Roster entry for the inspector | Added only to an inspection nobody is assigned to, so it never undoes a reassignment. |
+| Automation notices (`inspection.created`) | Carry a deterministic dedup key, so the notices an earlier attempt wrote are not written again. |
+| Client contact | Matched by email (or name) and reused. Two runs at the very same moment can each add it, as two simultaneous creates for one client always could. |
+| People links (client, buyer's agent, listing agent) | Unique per inspection, contact and role. |
+| Service lines and their price overrides | Written only while the inspection has none, under ids derived from the inspection and the service, so the amounts are never doubled. |
+| `inspection.create` audit entry | Written under an id derived from the inspection, so there is one. |
+| Primary report and results row | Added only if missing. |
+
+The allowance and the discount are spent before any of this and are never spent
+again by a replay. A replay checks the contacts it names against the company
+before it writes anything, so it cannot link a contact from another company.
+Until the report exists the inspection cannot be opened for editing, and
+the collaboration routes answer `404` for it; the retry is what repairs that.
+
+Nothing locks the steps, because each is safe on its own: a replay that arrives
+while the first attempt is still running, or two replays at once, write the same
+rows once between them. An inspection that was created whole is not touched by a
+replay.
+
+A replay by a member who may not open the inspection (not an owner or manager and
+not on its roster) answers `409` `ID_CONFLICT`, as for an id held outside the
+company. A client should treat that `409` as the **final outcome of that outbox
+entry**: retrying it cannot succeed, and it must not be retried or silently
+dropped. Surface it to the user.
 
 ---
 
@@ -360,11 +388,17 @@ Further rules:
   not attempted: it is listed in `outbox.failed` with `status` `424` and
   `reason` `blocked_by_failed_update`, because completing the inspection would
   mark finished a record that lacks the device's change. Other inspections are
-  unaffected, and the entry stays retryable once the update is fixed.
+  unaffected, and the entry stays retryable once the update is fixed. The set of
+  `reason` values may grow in a later version, so a client must tolerate a value
+  it does not know: treat it as "not attempted, keep the entry", and do not
+  validate `reason` against a closed enumeration.
 - **A busy key stops the request.** A queued write whose idempotency key is held
   by a request that is still running (`409` `IDEMPOTENCY_IN_FLIGHT`, for example
   the same package sent twice at once) is not reported as failed: the whole import
-  answers `409` and the client retries it, exactly as for a `5xx`.
+  answers `409` and the client retries it, exactly as for a `5xx`. That `409` is
+  told apart from the other ones by `error.details.reason`, which is
+  `idempotency_in_flight`; `details` also names the `idempotencyKey`, `op` and
+  `inspectionId` of the busy write.
 - **Imports are idempotent.** Sending the same package again is safe. A create is
   held by its client-chosen id; the 24-hour `Idempotency-Key` ledger replays a
   repeat inside its window; and the table `offline_import_applied` records every
@@ -503,7 +537,7 @@ own role.
 An installed app binary cannot be recalled, so every endpoint a native client
 calls is a promise. Two files keep the promise visible:
 
-- `server/lib/native/contract-registry.ts` lists the endpoints. Operations
+- `scripts/lib/native-contract-registry.ts` lists the endpoints. Operations
   declared with `createRoute()` are in `NATIVE_CONTRACT`; endpoints OpenAPI
   cannot describe (WebSocket upgrades, binary bodies, the OAuth endpoints a
   library serves) are in `NATIVE_NON_OPENAPI_CONTRACT`, and their shape is pinned

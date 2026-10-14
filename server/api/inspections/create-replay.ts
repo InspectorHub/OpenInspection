@@ -13,28 +13,30 @@
  *    `inspector_id` also counts: it is written with the row, while the roster is
  *    written moments later, and a retry that races its own first attempt must not
  *    be told the id is taken.
- *  - It is complete. The first attempt may have died between writing the
- *    inspection and writing its report, results row and assignment, and nothing
- *    else would ever add them (the collab route answers 404 without a primary
- *    report and 403 to an assignee who is on no roster), so the replay adds
- *    whatever is missing. It is idempotent and writes nothing for an inspection
- *    that is whole. The assignment is only added to an inspection nobody is
- *    assigned to, so it can never undo a later reassignment.
+ *  - It is complete. The first attempt may have died anywhere after writing the
+ *    inspection. The create pipeline (`services/inspection/create-pipeline`) ends
+ *    with the primary report, so a missing report means it did not finish, and the
+ *    replay runs it again from the replay's own request body: the roster entry, the
+ *    automation notices, the client contact, the people links, the service lines
+ *    and their prices, the audit row, then the report and results row. Every step
+ *    is safe to repeat, and to run at the same moment as another run of it (the
+ *    create itself, or a second replay), so a pipeline that did reach some of
+ *    them adds nothing twice. A replay of an inspection that is whole writes
+ *    nothing, and the quota and the discount are never spent again.
  */
 
 import type { Context } from 'hono';
-import { and, eq } from 'drizzle-orm';
 import { AppError, ErrorCode } from '../../lib/errors';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 import { getInspectionRoster } from '../../lib/inspection/roster';
 import { ensurePrimaryReportAndResults } from '../../lib/inspection/primary-report';
-import { syncInspectionAssignments } from '../../lib/db/assignment-links';
-import { inspectionInspectors } from '../../lib/db/schema';
+import { resolvePrimaryReportId } from '../../lib/inspection/reports';
 import { getDrizzle } from '../../lib/route-helpers';
-import type { Inspection } from '../../services/inspection/shared';
+import type { CreateInspectionData, Inspection } from '../../services/inspection/shared';
 import type { HonoConfig } from '../../types/hono';
+import { fireQuotaThresholdNotice, recordCreateAudit, resolveCreateInput } from './create-support';
 
-export async function completeReplayedCreate(c: Context<HonoConfig>, existing: Inspection): Promise<Inspection> {
+export async function completeReplayedCreate(c: Context<HonoConfig>, existing: Inspection, body: CreateInspectionData): Promise<Inspection> {
     const tenantId = c.get('tenantId');
     const userId = c.get('user')?.sub;
     const db = getDrizzle(c);
@@ -42,11 +44,16 @@ export async function completeReplayedCreate(c: Context<HonoConfig>, existing: I
     const may = !!userId && !!roster
         && (existing.inspectorId === userId || canAccessInspectionCollab(roster, { id: userId, role: c.get('userRole') ?? '' }));
     if (!may) throw new AppError(409, ErrorCode.ID_CONFLICT, 'That inspection id is already in use.');
-    await ensurePrimaryReportAndResults(db, tenantId, existing.id, existing.templateId ?? null, new Date());
-    if (existing.inspectorId) {
-        const assigned = await db.select({ userId: inspectionInspectors.userId }).from(inspectionInspectors)
-            .where(and(eq(inspectionInspectors.tenantId, tenantId), eq(inspectionInspectors.inspectionId, existing.id))).limit(1);
-        if (assigned.length === 0) await syncInspectionAssignments(db, tenantId, existing.id, { inspectorId: existing.inspectorId });
+
+    if (!await resolvePrimaryReportId(db, tenantId, existing.id)) {
+        await c.var.services.inspection.completeInterruptedCreate(
+            tenantId, existing, await resolveCreateInput(c, body),
+            { beforeReport: (id) => recordCreateAudit(c, id, existing.propertyAddress) },
+        );
+        // The first attempt answered an error, so it never reached its own notice. The notice is deduplicated.
+        fireQuotaThresholdNotice(c, tenantId);
     }
+    // A report written, then a failure before its results row: nothing else adds the row.
+    await ensurePrimaryReportAndResults(db, tenantId, existing.id, existing.templateId ?? null, new Date());
     return existing;
 }

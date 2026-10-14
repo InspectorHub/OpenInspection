@@ -36,6 +36,12 @@ type AuditActorKind = 'tenant_user' | 'platform_staff' | 'system';
 
 interface AuditParams {
     db: D1Database;
+    /**
+     * A row id the caller derives from what happened, so that writing the same event twice (a retried
+     * request, two attempts at once) leaves one row: an insert under an existing id is a no-op.
+     * Leave it out for an event that can legitimately repeat.
+     */
+    id?: string | undefined;
     tenantId: string;
     userId?: string | undefined;
     /** Defaults to `tenant_user`. A caller with no person behind it says `system`. */
@@ -134,8 +140,8 @@ function redactAuditMetadata(metadata: Record<string, unknown> | undefined): Rec
  * make impossible. Such a caller awaits this and lets it throw.
  */
 export async function writeAuditRow(params: Omit<AuditParams, 'executionCtx'>): Promise<void> {
-    await drizzle(params.db).insert(auditLogs).values({
-        id: crypto.randomUUID(),
+    const insert = drizzle(params.db).insert(auditLogs).values({
+        id: params.id ?? crypto.randomUUID(),
         tenantId: params.tenantId,
         userId: params.userId ?? null,
         action: params.action,
@@ -150,6 +156,7 @@ export async function writeAuditRow(params: Omit<AuditParams, 'executionCtx'>): 
         // express, and the row would read as a support action.
         platformActorId: params.actorKind === 'platform_staff' ? (params.platformActorId ?? null) : null,
     });
+    await (params.id ? insert.onConflictDoNothing() : insert);
 }
 
 export function writeAuditLog(params: AuditParams): void {
@@ -181,6 +188,34 @@ export function auditFromContext(
     entityType: AuditFamily,
     options?: { entityId?: string; metadata?: Record<string, unknown> }
 ): void {
+    // `c.executionCtx` THROWS when the context was created without one (any
+    // non-Workers invocation path). Recording an audit event must never be the
+    // thing that fails a request that otherwise succeeded, so read it defensively
+    // — writeAuditLog already treats it as optional and just awaits inline.
+    let executionCtx: Pick<ExecutionContext, 'waitUntil'> | undefined;
+    try { executionCtx = c.executionCtx; } catch { executionCtx = undefined; }
+    writeAuditLog({ ...auditParamsFromContext(c, action, entityType, options), executionCtx });
+}
+
+/**
+ * As `auditFromContext`, but AWAITED and with nothing swallowed, for a caller
+ * that must know the row landed before it goes on (see `writeAuditRow`).
+ */
+export async function auditFromContextAwaited(
+    c: Context<HonoConfig>,
+    action: AuditAction,
+    entityType: AuditFamily,
+    options?: { id?: string; entityId?: string; metadata?: Record<string, unknown> }
+): Promise<void> {
+    await writeAuditRow(auditParamsFromContext(c, action, entityType, options));
+}
+
+function auditParamsFromContext(
+    c: Context<HonoConfig>,
+    action: AuditAction,
+    entityType: AuditFamily,
+    options?: { id?: string; entityId?: string; metadata?: Record<string, unknown> },
+): Omit<AuditParams, 'executionCtx'> {
     const user = c.get('user');
     // A support session reaches these routes signed in AS one of the workspace's
     // own administrators, so `user.sub` is a real tenant user and stays where it
@@ -188,14 +223,9 @@ export function auditFromContext(
     // missing is the second fact: that somebody else was driving. `platformActor`
     // is set only by the seam guard, from a value covered by the M2M signature.
     const platformActor = c.get('platformActor');
-    // `c.executionCtx` THROWS when the context was created without one (any
-    // non-Workers invocation path). Recording an audit event must never be the
-    // thing that fails a request that otherwise succeeded, so read it defensively
-    // — writeAuditLog already treats it as optional and just awaits inline.
-    let executionCtx: Pick<ExecutionContext, 'waitUntil'> | undefined;
-    try { executionCtx = c.executionCtx; } catch { executionCtx = undefined; }
-    writeAuditLog({
+    return {
         db: c.env.DB,
+        id: options?.id,
         tenantId: c.get('tenantId') as string,
         userId: user?.sub,
         actorKind: platformActor ? 'platform_staff' : 'tenant_user',
@@ -205,8 +235,7 @@ export function auditFromContext(
         entityId: options?.entityId,
         metadata: options?.metadata,
         ipAddress: c.req.header('CF-Connecting-IP'),
-        executionCtx,
-    });
+    };
 }
 
 /**

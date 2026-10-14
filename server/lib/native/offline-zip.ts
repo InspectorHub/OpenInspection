@@ -59,6 +59,13 @@
  * is what bounds CPU, because a stream that declares as much as it carries can
  * still expand a thousand-fold. Summed over entries the declared sizes are capped
  * by the unpacked-size limit (48 MiB by default).
+ *
+ * Memory. The inflater hands its output over per push, and one push is bounded by
+ * the slice size above, so a single push can buffer about twice the remaining
+ * allowance plus the fixed slack: roughly 2x an entry's declared size. The largest
+ * entry is a photo (`MAX_MEDIA_ENTRY_BYTES`, 10 MiB), so that is about 20 MiB at
+ * most, on top of the compressed package and the output buffer, and far below the
+ * Worker's 128 MB.
  */
 
 import { Inflate, unzipSync, type UnzipFileInfo } from 'fflate';

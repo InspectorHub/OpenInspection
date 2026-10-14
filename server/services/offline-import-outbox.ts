@@ -120,6 +120,9 @@ async function errorCodeOf(res: Response): Promise<string | undefined> {
     }
 }
 
+/** `details.reason` of the 409 that stops an import because another request holds a queued write's key. */
+const IN_FLIGHT_REASON = 'idempotency_in_flight';
+
 /**
  * A refusal that will answer the same way next time: the device sent something
  * the server will not accept. Rate limiting and timeouts are 4xx too, but they
@@ -128,9 +131,13 @@ async function errorCodeOf(res: Response): Promise<string | undefined> {
  * it says another request is running this very write, and the same entry answers
  * differently once that request finishes.
  */
-async function isPermanentRefusal(res: Response): Promise<boolean> {
-    if (res.status < 400 || res.status >= 500 || res.status === 408 || res.status === 429) return false;
-    return !(res.status === 409 && await errorCodeOf(res) === 'IDEMPOTENCY_IN_FLIGHT');
+function isPermanentRefusal(status: number, code: string | undefined): boolean {
+    if (status < 400 || status >= 500 || status === 408 || status === 429) return false;
+    return !isInFlight(status, code);
+}
+
+function isInFlight(status: number, code: string | undefined): boolean {
+    return status === 409 && code === 'IDEMPOTENCY_IN_FLIGHT';
 }
 
 /**
@@ -225,13 +232,16 @@ export async function applyOutbox(
         const res = await app.fetch(outboxRequest(c, entry), replayEnv, executionContext(c));
         if (!res.ok) {
             logger.warn('offline import: a queued write was refused', { op: entry.op, status: res.status });
+            const code = await errorCodeOf(res);
             const details = { idempotencyKey: entry.idempotencyKey, op: entry.op, inspectionId: entry.payload.id, status: res.status };
-            if (opts.tolerateRefusals && await isPermanentRefusal(res)) {
+            if (opts.tolerateRefusals && isPermanentRefusal(res.status, code)) {
                 result.failed.push(details);
                 if (entry.op === 'inspection.update') refusedUpdates.add(entry.payload.id);
                 continue;
             }
-            throw failureFor(res.status, `Queued write ${entry.idempotencyKey} (${entry.op}) was refused`, details);
+            // A 409 that only means "retry in a moment" must not read as one of the other 409s.
+            const stopped = isInFlight(res.status, code) ? { ...details, reason: IN_FLIGHT_REASON } : details;
+            throw failureFor(res.status, `Queued write ${entry.idempotencyKey} (${entry.op}) was refused`, stopped);
         }
         await record(c, tenantId, userId, entry);
         // A create that answers 200 found the inspection already there; any other

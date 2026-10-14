@@ -5,7 +5,6 @@
 // The per-inspection results/editing routes (property facts, results, rating
 // system, recommendations, item-field patch, preflight) live alongside in
 // ./results.ts to keep both files under the size ceiling.
-import type { Context } from 'hono';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
@@ -24,62 +23,12 @@ import { deleteInspectionCascade } from '../../services/inspection/inspection-ca
 import { syncAssignmentsAndSplits } from '../../services/pay-split.service';
 import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
-import type { HonoConfig } from '../../types/hono';
-import { logger } from '../../lib/logger';
-import { MeteringService } from '../../services/metering.service';
-import { readTenantTier } from '../../features/plan-quota/guard';
-import { noticeFor } from '../../features/plan-quota/notice';
-import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/email/build-email-service';
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import { getDrizzle } from '../../lib/route-helpers';
 import { patchRevisionReport } from './patch-revision-report';
 import { createInspectionRoute } from './core-create-route';
 import { completeReplayedCreate } from './create-replay';
-
-/**
- * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
- * create/clone/wizard call, check whether the tenant's lifetime inspection
- * counter just crossed the 4/5 or 5/5 notice threshold and, if so, fire a
- * best-effort email. Gated on `hasUsageQuota` (SaaS only — standalone has no
- * DB reads added here beyond the one profile-flag check) and on the tenant's
- * plan tier ('free' only). The email itself is unmetered (see
- * `sendQuotaThresholdNotice` — no `meterTenantId` is passed to
- * `assembleTenantEmailService`) so it can never itself consume or be blocked
- * by the tenant's free-tier email quota.
- */
-async function maybeSendQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: string): Promise<void> {
-    if (!c.var.profile.hasUsageQuota) return;
-    const tier = await readTenantTier(c.env.DB, tenantId);
-    if (tier !== 'free') return;
-
-    const count = await new MeteringService(c.env.DB).lifetimeTotal(tenantId, 'inspections');
-    const n = noticeFor(count);
-    if (!n) return;
-
-    const cfg = await loadTenantEmailConfig(c.env, tenantId);
-    const email = assembleTenantEmailService(c.env, cfg);
-    await email.sendQuotaThresholdNotice(n, {
-        db: c.env.DB,
-        kv: c.env.TENANT_CACHE,
-        tenantId,
-        billingPortalUrl: c.var.profile.billingPortalUrl,
-    });
-}
-
-/**
- * Fire-and-forget wrapper: runs `maybeSendQuotaThresholdNotice` through
- * `c.executionCtx.waitUntil` so it adds zero latency to the response, and
- * never lets a failure (email provider down, KV unavailable, ...) surface as
- * an unhandled rejection. `c.executionCtx` throws when no execution context
- * is present (some unit-test harnesses) — degrade to a no-op there, mirroring
- * the guard in server/api/sms.ts.
- */
-function fireQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: string): void {
-    const run = maybeSendQuotaThresholdNotice(c, tenantId).catch((err) => {
-        logger.error('quota threshold notice failed', { tenantId }, err instanceof Error ? err : new Error(String(err)));
-    });
-    try { c.executionCtx.waitUntil(run); } catch { /* no execution context available (unit tests) */ }
-}
+import { fireQuotaThresholdNotice, recordCreateAudit, resolveCreateInput } from './create-support';
 
 /**
  * GET /api/inspections/:id
@@ -338,13 +287,12 @@ const coreRoutes = createApiRouter()
         const body = c.req.valid('json');
         const tenantId = c.get('tenantId');
         const service = c.var.services.inspection;
-        const contactService = c.var.services.contact;
 
         // A replay of a create that named its own id (an offline device after the Idempotency-Key window):
-        // answer with the existing inspection, none of the create's side effects run again (./create-replay).
+        // answer with the existing inspection, finishing whatever the first attempt did not reach (./create-replay).
         if (body.id) {
             const existing = await service.findInspectionById(tenantId, body.id);
-            if (existing) return c.json({ success: true, data: { inspection: await completeReplayedCreate(c, existing) } }, 200);
+            if (existing) return c.json({ success: true, data: { inspection: await completeReplayedCreate(c, existing, body) } }, 200);
         }
 
         const civilDate = String(body.date ?? '').slice(0, 10);
@@ -360,64 +308,14 @@ const coreRoutes = createApiRouter()
             }
         }
 
-        // Filter undefined values and handle inspectorId logic
-        const createData = Object.fromEntries(
-            Object.entries(body).filter(([_, v]) => v !== undefined)
-        ) as typeof body;
-
-        // IA-1: Resolve client contact before creating the inspection.
-        let clientContactId: string | undefined;
-        if (body.client) {
-            const { id } = await contactService.upsertClientContact(tenantId, {
-                name:  body.client.name,
-                email: body.client.email,
-                phone: body.client.phone,
-                type:  'client',
-            });
-            clientContactId = id;
-            // Double-write denormalized columns so legacy read paths keep working.
-            // Unconditional: the structured client object is the authoritative
-            // source — the flat clientName carries a zod default ('Private
-            // Client') that would otherwise always win and mask the real name.
-            (createData as Record<string, unknown>).clientName = body.client.name;
-            (createData as Record<string, unknown>).clientEmail = body.client.email ?? null;
-            (createData as Record<string, unknown>).clientPhone = body.client.phone ?? null;
-        }
-
-        // IA-1: Resolve agent — newAgent creates/finds a contacts row; agentContactId uses an existing one.
-        let resolvedAgentId: string | undefined = createData.referredByAgentId as string | undefined;
-        if (body.newAgent) {
-            const { id } = await contactService.upsertClientContact(tenantId, {
-                name:  body.newAgent.name,
-                email: body.newAgent.email,
-                type:  'agent',
-            });
-            resolvedAgentId = id;
-        } else if (body.agentContactId) {
-            resolvedAgentId = body.agentContactId;
-        }
-
-        const { inspection, created } = await service.createInspectionOnce(tenantId, {
-            ...createData,
-            inspectorId:       body.inspectorId || c.get('user').sub,
-            referredByAgentId: resolvedAgentId ?? null,
-            // IA-1: pass the resolved contact ids through; createInspection stores them.
-            clientContactId,
-        } as Parameters<typeof service.createInspection>[1]);
+        // The audit row is written inside the create, ahead of the primary report (./create-support).
+        const { inspection, created } = await service.createInspectionOnce(tenantId, await resolveCreateInput(c, body), {
+            beforeReport: (id) => recordCreateAudit(c, id, body.propertyAddress),
+        });
         // A concurrent request with the same client id won the insert: this one is a
         // replay, so it answers like one and repeats none of the side effects below.
-        if (!created) return c.json({ success: true, data: { inspection: await completeReplayedCreate(c, inspection) } }, 200);
+        if (!created) return c.json({ success: true, data: { inspection: await completeReplayedCreate(c, inspection, body) } }, 200);
 
-        // IA-1: Apply serviceSelections price overrides — replace null priceOverride
-        // for any service whose id appears in serviceSelections with a set override.
-        if (body.serviceSelections && body.serviceSelections.length > 0) {
-            await service.applyServicePriceOverrides(inspection.id, tenantId, body.serviceSelections);
-        }
-
-        auditFromContext(c, 'inspection.create', 'inspection', {
-            entityId: inspection.id,
-            metadata: { propertyAddress: inspection.propertyAddress },
-        });
         fireQuotaThresholdNotice(c, tenantId);
 
         return c.json({

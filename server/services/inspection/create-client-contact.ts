@@ -9,6 +9,10 @@ import { logger } from '../../lib/logger';
  * tenantId+email (or tenantId+name when there is no email). Failures are
  * non-fatal: inspection creation must not break because of a contact-side
  * issue. Returns the contact id to link, or `current` when nothing was resolved.
+ *
+ * `rethrow` is for a create that can be retried (a client-chosen id): there a
+ * swallowed failure would leave the inspection without its client for good, so
+ * the failure is raised and the retry runs this step again.
  */
 export async function softUpsertClientContact(
     db: ReturnType<typeof drizzle>,
@@ -16,6 +20,7 @@ export async function softUpsertClientContact(
     client: { name: string; email: string | null; phone: string | null; createdAt: Date },
     current: string | null,
     inspectionId: string,
+    opts?: { rethrow?: boolean },
 ): Promise<string | null> {
     try {
         const matchConds = [eq(contacts.tenantId, tenantId), eq(contacts.type, 'client')];
@@ -37,6 +42,7 @@ export async function softUpsertClientContact(
         });
         return current ?? newContactId;
     } catch (err) {
+        if (opts?.rethrow) throw err;
         logger.error('contact upsert from inspection failed', { inspectionId }, err instanceof Error ? err : undefined);
         return current;
     }

@@ -1,11 +1,10 @@
 import { eq, and } from 'drizzle-orm';
-import { inspections, inspectionServices } from '../../lib/db/schema';
+import { inspections } from '../../lib/db/schema';
 import { PeopleService } from '../people.service';
 import { safeISODate } from '../../lib/date';
 import { logger } from '../../lib/logger';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { getInspectionRoster } from '../../lib/inspection/roster';
-import type { ServiceSelection } from '../../lib/inspection/service-snapshot';
 import type { Inspection, CreateInspectionData } from './shared';
 import type { ScopedDB } from '../../lib/db/scoped';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
@@ -14,8 +13,7 @@ import type { InspectionCoreService } from './inspection-core.service';
 import { InspectionSubService } from './base';
 
 /**
- * THE OTHER WAYS AN INSPECTION COMES INTO EXISTENCE, and the post-create hook
- * they share.
+ * THE OTHER WAYS AN INSPECTION COMES INTO EXISTENCE.
  *
  * `createInspection` on the core service is the primitive. Neither of these is
  * a caller-visible alternative to it — each is a TRANSLATION into it:
@@ -25,10 +23,6 @@ import { InspectionSubService } from './base';
  * back into the core service rather than duplicating the insert, and both
  * consume quota at the same point the primitive does — after the precondition
  * checks, before the row exists.
- *
- * `applyServicePriceOverrides` lives here because it is the same shape of
- * thing: a post-create hook the HANDLER runs once `createInspection` has
- * returned an id, never part of the insert itself.
  */
 export class InspectionCreateVariantsService extends InspectionSubService {
     private readonly planQuota: PlanQuotaGuard | undefined;
@@ -46,34 +40,6 @@ export class InspectionCreateVariantsService extends InspectionSubService {
         super(db, r2, sdb, kv, images);
         this.planQuota = planQuota;
         this.core = core;
-    }
-
-    /**
-     * IA-1: Post-create hook — write priceOverride onto inspection_services rows
-     * that were already inserted by createInspection. Called by the handler AFTER
-     * createInspection returns so it can use the resolved inspection id.
-     * Only rows whose serviceId appears in selections AND carry a priceOverrideCents
-     * value are updated; rows without an override are left with priceOverride=null.
-     */
-    async applyServicePriceOverrides(
-        inspectionId: string,
-        tenantId: string,
-        selections: ServiceSelection[],
-    ): Promise<void> {
-        const db = this.getDrizzle();
-        for (const sel of selections) {
-            if (sel.priceOverrideCents !== undefined) {
-                await db.update(inspectionServices)
-                    .set({ priceOverride: sel.priceOverrideCents })
-                    .where(
-                        and(
-                            eq(inspectionServices.inspectionId, inspectionId),
-                            eq(inspectionServices.tenantId, tenantId),
-                            eq(inspectionServices.serviceId, sel.serviceId),
-                        ),
-                    );
-            }
-        }
     }
 
     /**

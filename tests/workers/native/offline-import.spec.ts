@@ -1083,7 +1083,12 @@ describe('POST /api/client/import', () => {
 
         const busy = await importPackage(manager.token, zip);
         expect(busy.status, await busy.clone().text()).toBe(409);
-        expect(await busy.text()).not.toContain('"failed"');
+        const busyText = await busy.text();
+        expect(busyText).not.toContain('"failed"');
+        // A client can tell this 409 from the other ones: it names why, and the reason is the retry signal.
+        const busyError = (JSON.parse(busyText) as { error: { code: string; details: { reason?: string; idempotencyKey?: string } } }).error;
+        expect(busyError.details.reason).toBe('idempotency_in_flight');
+        expect(busyError.details.idempotencyKey).toBe(key);
         expect(await addressOf(insp.id)).toBe('1 Original Road, Anytown');
         expect(await recordedCount(key)).toBe(0);
 
@@ -1157,7 +1162,7 @@ describe('POST /api/client/import', () => {
             expect(await ticketStatus(manager, id), 'without its primary report an inspection cannot be opened for editing').toBe(openBefore);
             // With no report to name, the results row is written without a report id: the orphan the retry must adopt.
             expect(await rowCount('inspection_results', id)).toBe(table === 'reports' ? 1 : 0);
-            expect(await ticketStatus(author, id), 'nor by its assignee, who is on no roster yet').toBe(403);
+            expect(await ticketStatus(author, id), 'the roster entry is written ahead of the report, so its assignee gets the same answer as the manager').toBe(openBefore);
         } finally {
             await b.DB.exec(`DROP TRIGGER ${trigger}`);
         }

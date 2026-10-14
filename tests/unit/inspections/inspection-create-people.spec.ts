@@ -182,8 +182,7 @@ describe('new agent linking', () => {
 // ---------------------------------------------------------------------------
 describe('serviceSelections price override', () => {
     it('writes priceOverride onto the inspection_services row when serviceSelections carries an override', async () => {
-        // Create with serviceSelections (the handler merges this; here we call
-        // the service directly with the merged data, then call applyServicePriceOverrides).
+        // The override travels in the create itself: the service lines are written with it.
         const selections = [{ serviceId: SVC_ID, priceOverrideCents: 39900 }];
 
         await inspectionSvc.createInspection(TENANT, {
@@ -195,9 +194,6 @@ describe('serviceSelections price override', () => {
 
         const insp = await testDb.select().from(schema.inspections).get();
         expect(insp).toBeTruthy();
-
-        // applyServicePriceOverrides is the post-create step the handler calls.
-        await inspectionSvc.applyServicePriceOverrides(insp!.id, TENANT, selections);
 
         const iSvcRow = await testDb.select().from(schema.inspectionServices)
             .where(and(

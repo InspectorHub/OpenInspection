@@ -4,7 +4,7 @@
  * minus the fault is accepted) so a reader that rejects everything cannot pass.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { zipSync } from 'fflate';
+import { unzipSync, zipSync } from 'fflate';
 import {
     OfflinePackageManifestSchema, OutboxEntrySchema, OutboxSchema, MediaIndexSchema, OFFLINE_ID_PATTERN,
     PACKAGE_MAX_AGE_DAYS, APPLIED_RECORD_RETENTION_DAYS,
@@ -324,17 +324,25 @@ describe('offline package archive listing', () => {
             const value = fn();
             return { value, ms: performance.now() - start };
         };
+        /**
+         * Bounded work is judged against the unbounded work done on the same machine in the same run,
+         * not against a wall-clock figure: a slow runner slows both, and a bound that holds only on a
+         * fast one would fail for the wrong reason.
+         */
+        const FASTER_BY = 5;
+        const unboundedMs = (zip: Uint8Array): number => timed(() => unzipSync(zip)).ms;
 
         it('refuses an entry that declares 10 bytes and carries a 64 MiB zero stream, from the directory and at once (positive control: the honest entry)', () => {
             const honest = zipSync({ 'yjs/insp-1.bin': [new Uint8Array(64 * MIB), { level: 9 }] });
             expect(honest.byteLength, 'the bomb is small on the wire').toBeLessThan(200 * 1024);
             const bomb = declareEntrySize(honest, 'yjs/insp-1.bin', 10);
 
+            const inflateAll = unboundedMs(honest);
             const listed = timed(() => listPackage(bomb));
             expect(listed.value.ok).toBe(false);
             if (!listed.value.ok) expect(listed.value.reason).toMatch(/compressed data/);
-            expect(listed.ms, 'refused without inflating anything').toBeLessThan(100);
-            expect(timed(() => verifyPackageEntries(bomb, new Map([['yjs/insp-1.bin', 10]]))).ms).toBeLessThan(100);
+            expect(listed.ms, 'refused without inflating anything').toBeLessThan(inflateAll / FASTER_BY);
+            expect(timed(() => verifyPackageEntries(bomb, new Map([['yjs/insp-1.bin', 10]]))).ms).toBeLessThan(inflateAll / FASTER_BY);
             expect(readPackageEntry(bomb, 'yjs/insp-1.bin', 10)).toBeNull();
 
             // Control: the same stream declaring a size an encoder could have produced it from is not refused by the directory.
@@ -350,12 +358,13 @@ describe('offline package archive listing', () => {
             const wanted = new Map([['yjs/insp-1.bin', 200 * 1024]]);
             expect(listPackage(bomb).ok, 'the directory alone looks fine').toBe(true);
 
+            const inflateAll = unboundedMs(honest);
             const verified = timed(() => verifyPackageEntries(bomb, wanted));
             expect(verified.value).toBe('yjs/insp-1.bin');
-            expect(verified.ms, 'abandoned as soon as it passes its declaration').toBeLessThan(100);
+            expect(verified.ms, 'abandoned as soon as it passes its declaration').toBeLessThan(inflateAll / FASTER_BY);
             const read = timed(() => readPackageEntry(bomb, 'yjs/insp-1.bin', 200 * 1024));
             expect(read.value).toBeNull();
-            expect(read.ms).toBeLessThan(100);
+            expect(read.ms, 'abandoned as soon as it passes its declaration').toBeLessThan(inflateAll / FASTER_BY);
         });
 
         it('still reads a legitimate entry that compresses about 1000:1 (declared size equals actual size)', () => {

@@ -13,6 +13,12 @@ import { logger } from '../../lib/logger';
  */
 export async function fireAutomation(
     db: D1Database, tenantId: string, inspectionId: string, event: string, reportId?: string,
+    opts?: {
+        /** Dedup key for the notices this firing writes: a repeat of the same key adds none (`uq_automation_logs_event`). */
+        eventId?: string;
+        /** Let a failed trigger propagate instead of logging it, for a caller that retries the whole step. */
+        rethrow?: boolean;
+    },
 ): Promise<void> {
     // Resolved before the trigger so the `{{company_name}}` token renders the
     // tenant's own name instead of the blank the call site used to pass.
@@ -26,6 +32,10 @@ export async function fireAutomation(
             // radon report's first publish into the standard report's — for
             // ever, not for a window.
             ...(reportId ? { reportId } : {}),
+            ...(opts?.eventId ? { eventId: opts.eventId } : {}),
         })
-        .catch(err => logger.error('automation trigger failed', { event }, err instanceof Error ? err : undefined));
+        .catch(err => {
+            if (opts?.rethrow) throw err;
+            logger.error('automation trigger failed', { event }, err instanceof Error ? err : undefined);
+        });
 }

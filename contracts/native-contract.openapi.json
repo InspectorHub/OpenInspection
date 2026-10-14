@@ -305,7 +305,7 @@
                                     "enum": [
                                       "blocked_by_failed_update"
                                     ],
-                                    "description": "Present when the write was not attempted: blocked_by_failed_update means an earlier queued update to the same inspection was refused, and completing the inspection without it would finish work the device never delivered"
+                                    "description": "Present when the write was not attempted: blocked_by_failed_update means an earlier queued update to the same inspection was refused, and completing the inspection without it would finish work the device never delivered. Later versions may add values; a client treats an unknown reason as \"not attempted\" and keeps the entry"
                                   }
                                 },
                                 "required": [
@@ -394,7 +394,7 @@
             "description": "The package belongs to another workspace, or the caller cannot edit one of its inspections"
           },
           "409": {
-            "description": "PACKAGE_INSPECTION_DELETED: the package would create an inspection that an earlier import created and that has since been deleted; nothing was written"
+            "description": "PACKAGE_INSPECTION_DELETED: the package would create an inspection that an earlier import created and that has since been deleted; nothing was written. Also a CONFLICT whose details.reason is idempotency_in_flight: a queued write is being run by another request right now, so the import stopped and should be retried exactly as for a 5xx; writes already applied are skipped on the retry"
           },
           "411": {
             "description": "Content-Length is required"
@@ -689,7 +689,7 @@
         },
         "responses": {
           "200": {
-            "description": "Replay of a create that named an inspection the caller may open (an owner or manager, or someone assigned to it); nothing new was created, and a report or results row an interrupted first attempt did not get to write is added",
+            "description": "Replay of a create that named an inspection the caller may open (an owner or manager, or someone assigned to it); nothing new was created, and any step an interrupted first attempt did not reach is completed from this request (roster entry, client and people links, services and their prices, automation notices, audit entry, report and results row)",
             "content": {
               "application/json": {
                 "schema": {
@@ -826,6 +826,9 @@
           },
           "409": {
             "description": "ID_CONFLICT: the supplied id already belongs to a record the caller may not open: one outside this workspace, or an inspection in it the caller is not assigned to. The answer is the same for both, so it does not reveal which"
+          },
+          "503": {
+            "description": "The inspection was saved but its primary report could not be created. Retry the same request; the replay completes the create. (Any other step that fails answers 500, and the same retry applies when a client-generated id was sent.)"
           }
         }
       }

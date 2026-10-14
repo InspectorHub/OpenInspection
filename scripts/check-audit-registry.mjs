@@ -220,7 +220,7 @@ export function walkCallSites(scanDirs = SCAN) {
             // `writeAuditLog`, minus executionCtx). It is listed here because a
             // writer this walker does not know about is an audit call site the
             // gate reports as absent while it happily writes rows.
-            for (const name of ['auditFromContext', 'writeAuditLogWithSlug', 'writeAuditLog', 'writeAuditRow']) {
+            for (const name of ['auditFromContext', 'auditFromContextAwaited', 'writeAuditLogWithSlug', 'writeAuditLog', 'writeAuditRow']) {
                 const re = new RegExp(`(?<![A-Za-z0-9_$.])${name}\\s*\\(`, 'g');
                 let m;
                 while ((m = re.exec(text))) {
@@ -230,7 +230,7 @@ export function walkCallSites(scanDirs = SCAN) {
                     const parts = splitTop(args);
                     const where = `${rel}:${lineOf(m.index)}`;
                     let action, family, metaKeys;
-                    if (name === 'auditFromContext') {
+                    if (name === 'auditFromContext' || name === 'auditFromContextAwaited') {
                         action = asLiteral(parts[1]);
                         family = asLiteral(parts[2]);
                         metaKeys = parts[3] ? (objectKeys(propValue(parts[3], 'metadata') ?? '') ?? []) : [];
