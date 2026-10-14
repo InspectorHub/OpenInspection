@@ -86,6 +86,25 @@ describe('MCP resources wiring (Phase E)', () => {
         await client.close();
     });
 
+    it('answers a missing record with InvalidParams, not a 404 body as content', async () => {
+        const client = await connectedClient(['read:inspections']);
+        const ok = bridge.response;
+        bridge.response = () => new Response(JSON.stringify({ error: { code: 'NOT_FOUND' } }), { status: 404 });
+        try {
+            // The negative: the protocol error, with the standard InvalidParams code.
+            await expect(client.readResource({ uri: 'openinspection:///api/inspections/nope' })).rejects.toMatchObject({
+                code: -32602,
+            });
+            // The control: the same read with a 200 still returns its content.
+            bridge.response = ok;
+            const res = await client.readResource({ uri: 'openinspection:///api/inspections/abc123' });
+            expect((res.contents as Array<{ text: string }>)[0].text).toContain('i1');
+        } finally {
+            bridge.response = ok;
+        }
+        await client.close();
+    });
+
     it('substitutes the path param when reading a template resource', async () => {
         const client = await connectedClient(['read:inspections']);
         await client.readResource({ uri: 'openinspection:///api/inspections/abc123' });

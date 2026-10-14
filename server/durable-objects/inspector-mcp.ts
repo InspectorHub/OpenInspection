@@ -4,6 +4,7 @@
 // executes it in-process as the authenticated user via the identity bridge.
 import { McpAgent } from 'agents/mcp';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { selectTools, toolNameFromOperationId, type SnapshotEntry } from '../lib/mcp/tools';
 import { selectResources, buildResourceRequest } from '../lib/mcp/resources';
 import { buildToolInput, toZodInputSchema, type ToolInput } from '../lib/mcp/resolve-schema';
@@ -249,6 +250,10 @@ export async function registerGrantedResources(
             throw new Error(`forbidden: ${entry.operationId}`);
         }
         const res = await callApiAsUser(env, props, buildResourceRequest(entry, vars), makeCtx());
+        // A record that does not exist is a protocol error (InvalidParams), as the
+        // SDK itself answers for an unknown URI; returning the API's 404 body as
+        // content would read as a successful resource.
+        if (res.status === 404) throw new McpError(ErrorCode.InvalidParams, `Resource not found: ${uri.href}`);
         const text = await readTruncated(res);
         return { contents: [{ uri: uri.href, mimeType: 'application/json', text }] };
     };
