@@ -19,6 +19,8 @@ Four settings. Three are credentials from your Intuit app; the fourth says which
 
 Set them either as Worker secrets (`wrangler secret put`) or in the app under **Settings → Integrations → QuickBooks Online**. **The Worker environment wins**; a stored value is the fallback, which is what makes the settings form useful on a deployment you cannot easily redeploy.
 
+On that page the section **Your Intuit app** holds the four settings and the three addresses to register in your Intuit app (redirect URI, disconnect URL, webhook endpoint), each with a copy button. It opens by itself while a setting is missing and folds to one line once everything is set. A setting the Worker environment supplies is listed as built in, with an **Override** for storing a value of your own as the fallback; the Intuit environment is a two-way control that stays unselected until you choose, and saving credentials never writes it for you.
+
 `APP_BASE_URL` must also be set, and must be the exact public origin your deployment answers on. It is what the redirect URI is built from.
 
 ### `QBO_ENV` is not optional and has no default
@@ -65,11 +67,11 @@ If it is unset, the connect flow stops and the settings page says so explicitly 
 
 Every outcome of the handshake is reported on that page, including the failures — a missing credential, an unset `QBO_ENV`, an expired attempt, or a declined authorization.
 
-### One QuickBooks company, one workspace
+### One QuickBooks company, one OpenInspection company
 
-A QuickBooks company (its *realm*) can be connected to exactly one workspace. Connecting one that another workspace already holds is refused, and the page says so: disconnect it there first.
+A QuickBooks company (its *realm*) can be connected to exactly one OpenInspection company. Connecting one that another OpenInspection company already holds is refused, and the page says so: disconnect it there first.
 
-The reason is the webhook. It is a single unauthenticated endpoint shared by every connection — the path carries no workspace — so after verifying the Intuit signature the only thing that says whose books an event belongs to is the realm id inside the verified payload. Two workspaces claiming the same realm would make that answer ambiguous, and an ambiguous answer would post one company's payments into whichever workspace happened to be found first. Rather than guess, such an event is skipped and logged with both claimants named.
+The reason is the webhook. It is a single unauthenticated endpoint shared by every connection — the path names no company — so after verifying the Intuit signature the only thing that says whose books an event belongs to is the realm id inside the verified payload. Two OpenInspection companies claiming the same realm would make that answer ambiguous, and an ambiguous answer would post one company's payments into whichever OpenInspection company happened to be found first. Rather than guess, such an event is skipped and logged with both claimants named.
 
 ---
 
@@ -91,7 +93,7 @@ Mappings are cleared on purpose. Reconnecting can land on a **different** QuickB
 - QuickBooks **Online** only. The REST API this integration uses does not cover QuickBooks Desktop or Self-Employed.
 - Intuit throttles per app **and** company: 500 requests per minute per company, and at most 10 concurrent requests to the same company.
 - Two things are read back FROM QuickBooks: payment status, and whether an invoice was voided there. Everything else flows one way, out of OpenInspection.
-- A void in QuickBooks is **recorded, not mirrored**. OpenInspection files it under Sync Errors and leaves the invoice as it was, because voiding here resets the inspection's payment gate and can retract a published report — a decision, not something a poll should make for you. If the void was intended, void it here too.
+- A void in QuickBooks is **recorded, not mirrored**. OpenInspection lists it under the items that need attention and leaves the invoice as it was, because voiding here resets the inspection's payment gate and can retract a published report — a decision, not something a poll should make for you. If the void was intended, void it here too.
 - QuickBooks rejects a colon in a customer's name, so the name sent over is the contact's with any colons removed. The contact's record here is unchanged.
 
 ---
