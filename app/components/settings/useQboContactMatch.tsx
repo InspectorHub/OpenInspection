@@ -36,13 +36,21 @@ function useActionCall() {
   );
 }
 
+/** The contact a match dialog is opened for, and the match it already has. */
+export interface QboMatchTarget {
+  id: string;
+  name: string;
+  currentLink: { qboCustomerId: string; displayName: string | null } | null;
+}
+
 /**
- * The "match this contact to a QuickBooks customer" flow for the books-health
- * panel: `open(error)` is what the row button calls, `dialog` is rendered once.
- * A successful match closes the dialog; the action's revalidation drops the resolved row.
+ * The "match this contact to a QuickBooks customer" dialog and the searching and
+ * linking behind it, for any page whose route action runs the two matching
+ * intents. `open(target)` shows it; `dialog` is rendered once.
+ * A successful match closes the dialog; the action's revalidation refreshes the page.
  */
-export function useQboContactMatch(): { open: (error: QBOSyncErrorSummary) => void; dialog: ReactNode } {
-  const [target, setTarget] = useState<QBOSyncErrorSummary | null>(null);
+export function useQboMatchDialog(): { open: (target: QboMatchTarget) => void; dialog: ReactNode } {
+  const [target, setTarget] = useState<QboMatchTarget | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const call = useActionCall();
   const linkCall = useActionCall();
@@ -57,7 +65,7 @@ export function useQboContactMatch(): { open: (error: QBOSyncErrorSummary) => vo
     [call],
   );
 
-  const contactId = target?.oiId ?? "";
+  const contactId = target?.id ?? "";
   const link = useCallback(
     async (qboCustomerId: string): Promise<CustomerLinkResult> => {
       const answer = await linkCall({ intent: "qbo-link-customer", contactId, qboCustomerId });
@@ -69,12 +77,10 @@ export function useQboContactMatch(): { open: (error: QBOSyncErrorSummary) => vo
   const dialog = target ? (
     <QboCustomerLinkDialog
       open={isOpen}
-      // The row carries the contact's id, not its name; the dialog says "this contact".
-      contact={{ id: target.oiId, name: m.settings_qbo_match_this_contact() }}
-      currentLink={null}
+      contact={{ id: target.id, name: target.name }}
+      currentLink={target.currentLink}
       onClose={() => setIsOpen(false)}
-      // The link action's own completion revalidates the page's loader, which
-      // is what removes the resolved row.
+      // The link action's own completion revalidates the page's loader.
       onLinked={() => setIsOpen(false)}
       search={search}
       link={link}
@@ -82,10 +88,22 @@ export function useQboContactMatch(): { open: (error: QBOSyncErrorSummary) => vo
   ) : null;
 
   return {
-    open: (error) => {
-      setTarget(error);
+    open: (next) => {
+      setTarget(next);
       setIsOpen(true);
     },
     dialog,
+  };
+}
+
+/**
+ * The same flow for the books-health panel: `open(error)` is what the row button
+ * calls. The row carries the contact's id, not its name; the dialog says "this contact".
+ */
+export function useQboContactMatch(): { open: (error: QBOSyncErrorSummary) => void; dialog: ReactNode } {
+  const match = useQboMatchDialog();
+  return {
+    open: (error) => match.open({ id: error.oiId, name: m.settings_qbo_match_this_contact(), currentLink: null }),
+    dialog: match.dialog,
   };
 }

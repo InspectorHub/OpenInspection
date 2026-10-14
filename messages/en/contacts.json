@@ -113,5 +113,22 @@
   "contacts_archived_empty_title": "No archived contacts",
   "contacts_archived_empty_desc": "Contacts you archive appear here, and can be restored.",
   "contacts_roles_action_deactivate": "Deactivate",
-  "contacts_roles_action_reactivate": "Reactivate"
+  "contacts_roles_action_reactivate": "Reactivate",
+  "contact_qbo_heading": "QuickBooks",
+  "contact_qbo_not_matched": "Not matched yet",
+  "contact_qbo_not_matched_desc": "This contact is not matched to a QuickBooks customer yet. The next time it is synced, OpenInspection looks for a QuickBooks customer with the same email and creates one if there is none.",
+  "contact_qbo_matched": "Matched to {customer}",
+  "contact_qbo_matched_unnamed": "Matched (name not recorded)",
+  "contact_qbo_matched_id": "QuickBooks customer ID ending in {suffix}",
+  "contact_qbo_attention_one": "1 item needs attention",
+  "contact_qbo_attention_many": "{count} items need attention",
+  "contact_qbo_match_button": "Match to a QuickBooks customer",
+  "contact_qbo_change_button": "Change match",
+  "contact_qbo_remove_button": "Remove match",
+  "contact_qbo_archived_note": "This contact is archived, so it cannot be matched. Restore it to match it to a QuickBooks customer.",
+  "contact_qbo_remove_title": "Remove this match?",
+  "contact_qbo_remove_body": "Removing the match does not change anything in QuickBooks. The next time this contact is synced, OpenInspection first looks for an existing QuickBooks customer with the same email and otherwise creates a new one.",
+  "contact_qbo_remove_confirm": "Remove match",
+  "contact_qbo_remove_keep": "Keep match",
+  "contact_qbo_remove_failed": "The match could not be removed. Nothing was changed. Try again."
 }

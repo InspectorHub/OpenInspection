@@ -11,7 +11,7 @@ import type {
  * and QuickBooks customer ids are short opaque tokens; anything else is refused
  * here, before a URL is built, rather than trusting the encoder alone.
  */
-const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+export const ID_PATTERN =/^[A-Za-z0-9_-]{1,64}$/;
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
