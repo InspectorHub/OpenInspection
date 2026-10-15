@@ -31,8 +31,11 @@ denormalized `inspections.price` cache — see the money authority chain in
 `CLAUDE.md`.
 
 **Inbound:** the webhook at `POST /webhooks/stripe`, verified against
-`STRIPE_WEBHOOK_SECRET`. A successful payment marks the invoice paid, which is
-what releases the report pay-gate.
+`STRIPE_WEBHOOK_SECRET` — the workspace's secret saved under Settings →
+Integrations is honoured on this path exactly as it is on the API. A successful
+payment marks the invoice paid, which is what releases the report pay-gate.
+
+The webhook refuses a body larger than 1 MB with `413` and, where the `STRIPE_WEBHOOK_RATE_LIMITER` binding is configured (`wrangler.jsonc`, 300 requests per minute per workspace and source address), a burst beyond it with `429`. Both are answered before any workspace or secret lookup and logged without the payload; Stripe retries a non-2xx delivery.
 
 Point your Stripe webhook endpoint at:
 

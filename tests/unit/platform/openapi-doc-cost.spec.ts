@@ -74,6 +74,8 @@ describe('the OpenAPI document cannot be used as a CPU lever', () => {
             join(__dirname, '../../../server/lib/rate-limit.ts'),
             'utf8',
         );
-        expect(limiter).toMatch(/if \(!c\.env\.RATE_LIMITER\)\s*return/);
+        // The default limiter is the one `checkRateLimit` falls back to, and an
+        // absent binding returns before anything is counted.
+        expect(limiter).toMatch(/:\s*c\.env\.RATE_LIMITER;\s*if \(!binding\)\s*return/);
     });
 });

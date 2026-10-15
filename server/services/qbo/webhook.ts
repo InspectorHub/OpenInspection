@@ -27,6 +27,10 @@ export function withWebhook<
         }
 
         public async verifyWebhookSignature(rawBody: string, headerSig: string): Promise<boolean> {
+            // No token means nothing can be verified. Return before the key is
+            // imported: a runtime that accepts a zero-length HMAC key would
+            // otherwise let anyone sign with an empty key.
+            if (!this.webhookSecret) return false;
             try {
                 const encoder = new TextEncoder();
                 const key = await crypto.subtle.importKey(
@@ -98,6 +102,14 @@ export function withWebhook<
             headerSig: string,
             markPaid: MarkPaidFn,
             markPartial: MarkPartialFn,
+            /**
+             * Set when the verifier token that passed belongs to ONE company
+             * (it was resolved from that company's stored secrets). The
+             * signature then proves the sender holds that company's token and
+             * nothing more, so an event naming another company's realm is
+             * skipped rather than applied to a books it has no claim on.
+             */
+            onlyTenantId?: string,
         ): Promise<{ valid: boolean }> {
             const valid = await this.verifyWebhookSignature(rawBody, headerSig);
             if (!valid) return { valid: false };
@@ -121,24 +133,24 @@ export function withWebhook<
             let ignoredEntity = 0;
             let unknownRealm = 0;
             let ambiguousRealm = 0;
+            let outOfScope = 0;
             for (const event of events) {
                 const parsed = this.parseCloudEventType(event.type);
                 const entity = parsed?.entityType;
                 if (entity !== 'invoice' && entity !== 'payment') { ignoredEntity++; continue; }
 
                 // `.all()`, not `.get()`. This lookup IS the tenant decision for
-                // an unauthenticated endpoint, and `realm_id` carries no unique
-                // constraint — `tenant_id` is the primary key, so the table
-                // permits two tenants to hold the same QuickBooks company. With
-                // `.get()` a duplicate resolved to whichever row came back
-                // first, which applied one company's payments, voids and
-                // balance changes to an arbitrary tenant's books.
+                // an unauthenticated endpoint. `realm_id` is UNIQUE in the schema
+                // (server/lib/db/schema/qbo.ts), so the database itself refuses a
+                // second claim and more than one row should never come back. The
+                // ambiguity skip below is a backstop, not an expected path: with
+                // `.get()` a duplicate would resolve to whichever row came back
+                // first and apply one company's payments, voids and balance
+                // changes to an arbitrary tenant's books.
                 //
-                // Ambiguity is refused, not guessed. `saveConnection` now
-                // refuses to create a second claim, but a database can already
-                // hold one, and the wrong tenant is worse than no tenant: the
-                // event is skipped, counted and named below so somebody can
-                // untangle the two connections.
+                // Ambiguity is refused, not guessed: the wrong tenant is worse
+                // than no tenant, so the event is skipped, counted and named
+                // below so somebody can untangle the two connections.
                 const claimants = await db.select().from(qboConnections)
                     .where(eq(qboConnections.realmId, event.intuitaccountid)).all();
                 if (claimants.length === 0) { unknownRealm++; continue; }
@@ -153,6 +165,7 @@ export function withWebhook<
                     continue;
                 }
                 const conn = claimants[0]!;
+                if (onlyTenantId && conn.tenantId !== onlyTenantId) { outOfScope++; continue; }
 
                 try {
                     // A payment names the invoices it settled; an invoice event
@@ -182,14 +195,15 @@ export function withWebhook<
             // from "one of one". `unparsed > 0` in particular means Intuit's
             // payload shape no longer matches our schema, which used to surface
             // as a perfectly healthy-looking {valid:true} that processed nothing.
-            if (unparsed > 0 || ignoredEntity > 0 || unknownRealm > 0 || ambiguousRealm > 0) {
+            if (unparsed > 0 || ignoredEntity > 0 || unknownRealm > 0 || ambiguousRealm > 0 || outOfScope > 0) {
                 logger.warn('QBO webhook dropped events', {
                     received: candidates.length,
-                    handled:  events.length - ignoredEntity - unknownRealm - ambiguousRealm,
+                    handled:  events.length - ignoredEntity - unknownRealm - ambiguousRealm - outOfScope,
                     unparsed,
                     ignoredEntity,
                     unknownRealm,
                     ambiguousRealm,
+                    ...(onlyTenantId ? { outOfScope } : {}),
                 });
             }
 
