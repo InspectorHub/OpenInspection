@@ -15,6 +15,7 @@
   "helper_rating_desc_functional": "El elemento se inspeccionó visualmente y se observó en condiciones de servicio y de funcionamiento.",
   "helper_rating_desc_hazardous": "El elemento presenta un peligro de seguridad inmediato y se debe atender sin demora.",
   "helper_pdf_rate_limit": "El servicio de PDF está ocupado en este momento. Espere a que termine la cuenta regresiva y luego inténtelo de nuevo.",
+  "helper_pdf_unavailable": "El servicio de PDF no está disponible en este momento. Inténtelo de nuevo más tarde o comuníquese con su administrador.",
   "helper_pdf_network": "No se pudo conectar con el servicio de PDF. Espere y luego inténtelo de nuevo.",
   "helper_pdf_retry_in": "Reintentar en {seconds} s",
   "helper_pdf_generating": "Generando…",

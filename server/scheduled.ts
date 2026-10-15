@@ -34,6 +34,8 @@ export interface ScheduledEnv {
     TWILIO_SHARED_MESSAGING_SERVICE_SID?: string;
     /** Hosted shared SMS number switch (see AppEnv). Absent means off. */
     SMS_MANAGED_SHARED_ENABLED?: string;
+    /** Monthly SMS allowance for managed tenants (see AppEnv). Absent or non-numeric means the default. */
+    MANAGED_SMS_MONTHLY_ALLOWANCE?: string;
     TENANT_CACHE?: KVNamespace;
     /** Platform Google OAuth client, for the calendar sync sweep. Tenants with
      *  their OWN client are resolved from encrypted tenant secrets instead. */

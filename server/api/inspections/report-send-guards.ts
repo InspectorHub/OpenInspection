@@ -1,6 +1,7 @@
 /**
  * Route guards for the endpoints that put a report in someone's inbox:
- * `send-report-pdf`, `share-agent` and `agent-token`.
+ * `send-report-pdf`, `share-agent` and `agent-token`, plus `send-sms`, which
+ * shares the per-recipient hourly ceiling.
  *
  * Before these, the three ignored whether the report was published, accepted any
  * address in the body (a render token lets the PDF bypass the publish gate, so a
@@ -43,7 +44,7 @@ export async function guardReportLink(c: Context<HonoConfig>, next: Next) {
     return next();
 }
 
-/** Counts one send of this inspection to this address; refuses past the hourly ceiling. */
+/** Counts one send of this inspection to this address (or `sms:<contact id>`); refuses past the hourly ceiling. */
 async function countSend(c: Context<HonoConfig>, inspectionId: string, email: string): Promise<void> {
     const kv = c.env.TENANT_CACHE;
     const key = `sendlimit:${c.get('tenantId')}:${inspectionId}:${email.toLowerCase()}`;
@@ -106,8 +107,35 @@ export async function guardLinkExpiry(c: Context<HonoConfig>, next: Next) {
     return next();
 }
 
-/** send-sms: assigned or `scheduleOthers`; the TCPA gate stays the handler's. */
-export async function guardAssigned(c: Context<HonoConfig>, next: Next) {
-    await assertMayActOnInspection(c, c.req.param('id') ?? '', 'text its clients');
+/**
+ * send-sms: assigned or `scheduleOthers`, at most MAX_RECIPIENTS people per
+ * request, each person listed once, and each person texted at most MAX_PER_HOUR
+ * times per hour per inspection (the same counter the report sends use). The
+ * TCPA gate and the seated-person check stay the handler's, so a refused
+ * request spends nothing.
+ */
+export async function guardSendSms(c: Context<HonoConfig>, next: Next) {
+    const id = c.req.param('id') ?? '';
+    await assertMayActOnInspection(c, id, 'text its clients');
+    const list = readSmsContactIds(await c.req.json().catch(() => null));
+    if (!list) return next(); // malformed or empty: the schema answers 400
+    if (list.length > MAX_RECIPIENTS) {
+        throw Errors.BadRequest(`A text can go to at most ${MAX_RECIPIENTS} people at a time.`);
+    }
+    if (new Set(list).size !== list.length) throw Errors.BadRequest('Each recipient can be listed only once.');
+    for (const contactId of list) await countSend(c, id, `sms:${contactId}`);
     return next();
+}
+
+/** The contact ids in a send-sms body, or null when the body is not the shape the schema will accept. */
+function readSmsContactIds(raw: unknown): string[] | null {
+    const list = raw && typeof raw === 'object' ? (raw as { recipients?: unknown }).recipients : undefined;
+    if (!Array.isArray(list) || list.length === 0) return null;
+    const ids: string[] = [];
+    for (const r of list) {
+        const contactId = r && typeof r === 'object' ? (r as { contactId?: unknown }).contactId : undefined;
+        if (typeof contactId !== 'string' || contactId.length === 0) return null;
+        ids.push(contactId);
+    }
+    return ids;
 }

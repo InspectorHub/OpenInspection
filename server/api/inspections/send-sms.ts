@@ -10,7 +10,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
-import { guardAssigned } from './report-send-guards';
+import { guardSendSms } from './report-send-guards';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import { SendSmsSchema, SendSmsResponseDataSchema } from '../../lib/validations/send-sms.schema';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
@@ -38,7 +38,7 @@ const sendSmsRoute = createRoute(withMcpMetadata({
     path: '/{id}/send-sms',
     tags: ['inspections'],
     summary: 'Send a manual SMS to people on the inspection',
-    middleware: [requireRole('owner', 'manager', 'inspector'), guardAssigned],
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardSendSms],
     request: {
         params: z.object({
             id: z.string().trim().min(1).describe('Inspection id whose seated people receive the SMS.'),
@@ -52,14 +52,15 @@ const sendSmsRoute = createRoute(withMcpMetadata({
             content: { 'application/json': { schema: createApiResponseSchema(SendSmsResponseDataSchema) } },
             description: 'SMS outcomes (see data.sentTo / data.skipped)',
         },
-        400: { description: 'Malformed body or a recipient not seated on the inspection' },
+        400: { description: 'Malformed body, more than ten recipients, or the same recipient listed twice' },
+        429: { description: 'A recipient was already texted three times for this inspection in the last hour' },
         404: { description: 'Inspection not found' },
     },
     security: [{ bearerAuth: [] }],
     operationId: 'createInspectionSendSms',
     description:
         'Manual SMS via the shared sendOneSms core (TCPA consent, managed-send, quota). '
-        + 'Recipients must be people already on the inspection who have a phone — no free-typed numbers. Owner and manager, and inspectors assigned to the inspection or granted the scheduleOthers capability; other inspectors get 403.',
+        + 'Recipients must be people already on the inspection who have a phone — no free-typed numbers. At most ten recipients per request, each listed once, and the same person is texted at most three times per hour per inspection (429 past that). Owner and manager, and inspectors assigned to the inspection or granted the scheduleOthers capability; other inspectors get 403.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 const sendSmsRoutes = createApiRouter()

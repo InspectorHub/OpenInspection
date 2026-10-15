@@ -110,6 +110,10 @@ export const automationFlushJob: CronJob = {
             ...(env.TWILIO_SHARED_MESSAGING_SERVICE_SID
                 ? { TWILIO_SHARED_MESSAGING_SERVICE_SID: env.TWILIO_SHARED_MESSAGING_SERVICE_SID }
                 : {}),
+            // Without this the cron path always applied the built-in default allowance.
+            ...(env.MANAGED_SMS_MONTHLY_ALLOWANCE
+                ? { MANAGED_SMS_MONTHLY_ALLOWANCE: env.MANAGED_SMS_MONTHLY_ALLOWANCE }
+                : {}),
         };
         // Free-tier pre-flight (2026-07): cron has no Hono context/profile, so
         // it reads the env->capability seam directly — the sanctioned form for

@@ -68,8 +68,20 @@ export class BookingService {
         const db = this.getDrizzle();
         
         const [recurring, overrides, jobs] = await Promise.all([
-            db.select().from(availability).where(and(eq(availability.tenantId, tenantId), eq(availability.inspectorId, inspectorId))).all(),
-            db.select().from(availabilityOverrides).where(and(
+            // Public, anonymous read: name the columns. Selecting whole rows put the
+            // internal tenant id, row ids, creation times and (for synced overrides)
+            // the external calendar event id into the response.
+            db.select({
+                dayOfWeek: availability.dayOfWeek,
+                startTime: availability.startTime,
+                endTime: availability.endTime,
+            }).from(availability).where(and(eq(availability.tenantId, tenantId), eq(availability.inspectorId, inspectorId))).all(),
+            db.select({
+                date: availabilityOverrides.date,
+                isAvailable: availabilityOverrides.isAvailable,
+                startTime: availabilityOverrides.startTime,
+                endTime: availabilityOverrides.endTime,
+            }).from(availabilityOverrides).where(and(
                 eq(availabilityOverrides.tenantId, tenantId),
                 eq(availabilityOverrides.inspectorId, inspectorId),
                 gte(availabilityOverrides.date, startDate),

@@ -2270,7 +2270,7 @@
       }
     },
     "summary": "Send a manual SMS to people on the inspection",
-    "description": "Manual SMS via the shared sendOneSms core (TCPA consent, managed-send, quota). Recipients must be people already on the inspection who have a phone — no free-typed numbers. Owner and manager, and inspectors assigned to the inspection or granted the scheduleOthers capability; other inspectors get 403."
+    "description": "Manual SMS via the shared sendOneSms core (TCPA consent, managed-send, quota). Recipients must be people already on the inspection who have a phone — no free-typed numbers. At most ten recipients per request, each listed once, and the same person is texted at most three times per hour per inspection (429 past that). Owner and manager, and inspectors assigned to the inspection or granted the scheduleOthers capability; other inspectors get 403."
   },
   {
     "operationId": "createInspectionShareAgent",
@@ -10553,7 +10553,7 @@
       "body": null
     },
     "summary": "List booking inspectors for current tenant",
-    "description": "Public, unauthenticated list of the company's inspectors for the booking page's inspector-choice dropdown: id and display name (null when the user has no name) for every user with the inspector role. The company comes from the request's tenant context (host or slug), not a parameter. Not paginated; no email or other contact details are returned. Read-only."
+    "description": "Public, unauthenticated list of the company's inspectors for the booking page's inspector-choice dropdown: id and display name (null when the user has no name) for every user with the inspector role. Single-company (standalone) deployments only: the company is the deployment's own fixed company and there is no host, slug or other parameter to choose one. A multi-company deployment has no company on this path and answers 403; its booking page reads the company-scoped route GET /api/public/book/{slug} instead, which lists inspectors only when the company allows inspector choice. This route lists every inspector regardless of that setting. Not paginated; no email or other contact details are returned. Read-only."
   },
   {
     "operationId": "listBookingServices",
@@ -10569,7 +10569,7 @@
       "body": null
     },
     "summary": "List active services for public booking",
-    "description": "Public, unauthenticated list of the services a client can pick on the booking page: only services that are active and have an inspection template attached. Each has id, name, description (nullable), price in integer cents, and durationMinutes (nullable). Internal service settings are not exposed. The company comes from the request's tenant context. Not paginated. Read-only."
+    "description": "Public, unauthenticated list of the services a client can pick on the booking page: only services that are active and have an inspection template attached. Each has id, name, description (nullable), price in integer cents, and durationMinutes (nullable). Internal service settings are not exposed. Single-company (standalone) deployments only: the company is the deployment's own fixed company and there is no host, slug or other parameter to choose one. A multi-company deployment has no company on this path and answers 403; use GET /api/public/book/{slug}, which carries that company's services. Not paginated. Read-only."
   },
   {
     "operationId": "listCalendarBlocks",

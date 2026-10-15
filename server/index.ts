@@ -220,8 +220,8 @@ app.get('/fonts/*', serveStatic(staticOpts({ root: './' })));
 app.get('/photos/:tenantId/inspector-photos/:filename', async (c) => {
     const tenantId = c.req.param('tenantId');
     const filename = c.req.param('filename');
-    if (!c.env.PHOTOS) return c.notFound();
     const key = r2Keys.inspectorPhotoServe(tenantId, filename);
+    if (!c.env.PHOTOS || !key) return c.notFound();
     const obj = await c.env.PHOTOS.get(key);
     if (!obj) return c.notFound();
     const headers = new Headers();

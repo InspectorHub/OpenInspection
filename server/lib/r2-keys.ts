@@ -22,6 +22,9 @@
  * (checked rather than assumed). Anything under `_platform/` is deployment
  * data, out of scope for per-tenant list, meter and purge by construction.
  */
+const PLAIN_ID = /^[A-Za-z0-9_-]+$/;
+const PHOTO_FILENAME = /^[A-Za-z0-9_-]+\.(?:png|jpe?g|webp)$/i;
+
 export const r2Keys = {
   /**
    * An authority's published form PDF. NOT tenant-scoped -- see the exception in
@@ -61,9 +64,14 @@ export const r2Keys = {
     `${t}/credentials/${credentialId}/logo-${mediaId}.${ext}`,
   inspectorPhoto: (t: string, userId: string, ext: string) =>
     `${t}/inspector-photos/${userId}.${ext}`,
-  /** Serve-side variant — accepts the full filename (userId.ext) from the URL param. */
-  inspectorPhotoServe: (t: string, filename: string) =>
-    `${t}/inspector-photos/${filename}`,
+  /**
+   * Serve-side variant — accepts the full filename (userId.ext) from the URL
+   * param. Both params arrive percent-decoded, so a `%2F` becomes a real slash;
+   * null for anything but a plain id and a `<id>.<image ext>` name, so a param
+   * can never address a key outside `{tenant}/inspector-photos/`.
+   */
+  inspectorPhotoServe: (t: string, filename: string): string | null =>
+    PLAIN_ID.test(t) && PHOTO_FILENAME.test(filename) ? `${t}/inspector-photos/${filename}` : null,
   messageAttachment: (t: string, messageId: string, attachmentId: string, ext: string) =>
     `${t}/messages/${messageId}/${attachmentId}.${ext}`,
   // The file an intake run was created from. Under the plain tenant prefix on

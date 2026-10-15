@@ -80,6 +80,8 @@ The per-service resolvers keep their credential and endpoint logic and ask this 
 
 ## The held-back shared SMS number
 
+The monthly allowance for sends on a deployment-provided number is `MANAGED_SMS_MONTHLY_ALLOWANCE` (an integer; default 1000 when absent or not a positive number). Manual sends and the automation cron both read it.
+
 While `SMS_MANAGED_SHARED_ENABLED` is off, a deployment that supplies a shared number does not send on it. The SMS send gate (`managedSendAllowed`, run by `smsSendGate` for every send path: manual send, automations, template test-send, settings test-connection) refuses any company whose stored mode is not `own` with the reason `provider_confirmation_pending`. The automation log row records it as `skipped` with that error, and the manual-send API returns it as the skip reason. A company on its own account, and every self-hosted deployment, is unaffected. Callers must hand the gate the deployment env (or a resolved `profile`); an omitted env reads as self-hosted.
 
 ## Messages for reasons

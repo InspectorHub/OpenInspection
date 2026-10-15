@@ -15,6 +15,7 @@
   "helper_rating_desc_functional": "Item visually inspected and observed to be in serviceable, functional condition.",
   "helper_rating_desc_hazardous": "Item presents an immediate safety hazard and should be addressed without delay.",
   "helper_pdf_rate_limit": "The PDF service is busy right now. Please wait for the countdown, then try again.",
+  "helper_pdf_unavailable": "The PDF service is unavailable right now. Please try again later or contact your administrator.",
   "helper_pdf_network": "Couldn't reach the PDF service. Please wait, then try again.",
   "helper_pdf_retry_in": "Retry in {seconds}s",
   "helper_pdf_generating": "Generating…",
