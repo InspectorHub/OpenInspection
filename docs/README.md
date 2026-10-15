@@ -53,6 +53,7 @@ conventions common to all of them: [`integrations/README.md`](integrations/READM
 
 | Doc | Topic |
 |---|---|
+| [`integrations/services-and-credentials.md`](integrations/services-and-credentials.md) | Every outside service side by side: optional or not, where its credential goes, who holds the vendor account, and who is responsible for what |
 | [`integrations/quickbooks.md`](integrations/quickbooks.md) | Registering your own Intuit app, the four settings, what ends a connection |
 | [`integrations/stripe.md`](integrations/stripe.md) | Bring-your-own Stripe account; why a platform key must never win here |
 | [`integrations/email.md`](integrations/email.md) | Resend / SendGrid / Postmark / Mailgun, platform-vs-own credentials (no SMTP) |
