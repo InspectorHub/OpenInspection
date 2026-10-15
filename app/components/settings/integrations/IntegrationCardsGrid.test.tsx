@@ -94,6 +94,23 @@ describe("IntegrationCardsGrid", () => {
     expect(within(cardOf("Calendar")).getByRole("link", { name: "Set up: Calendar" }).getAttribute("href")).toBe("/settings/schedule");
   });
 
+  it("gives every card exactly one action, primary only where something needs doing, and at most two columns", async () => {
+    const { container } = renderGrid(CARDS);
+    await screen.findByText("Card payments");
+    for (const card of screen.getAllByRole("article")) {
+      expect(within(card).getAllByRole("link")).toHaveLength(1);
+    }
+    const manage = within(cardOf("Card payments")).getByRole("link");
+    const setUp = within(cardOf("Email")).getByRole("link");
+    expect(manage.className).toContain("text-ih-primary-text");
+    expect(manage.className).not.toContain("bg-ih-primary ");
+    expect(setUp.className).toContain("bg-ih-primary");
+    for (const grid of container.querySelectorAll("section > div")) {
+      expect(grid.className).toContain("md:grid-cols-2");
+      expect(grid.className).not.toContain("lg:grid-cols-3");
+    }
+  });
+
   it("counts the statuses at the top", async () => {
     renderGrid(CARDS);
     await screen.findByText("Card payments");

@@ -62,32 +62,30 @@ function ServiceCard({ card }: { card: IntegrationCard }) {
   const status = STATUS[card.status];
   const action = status.action();
   const titleId = `integration-${card.id}-title`;
+  const needsAction = card.status !== "connected";
   return (
-    <Card className="p-5 flex flex-col gap-3">
-      <article aria-labelledby={titleId} className="flex flex-col gap-3 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div aria-hidden="true" className="w-8 h-8 shrink-0 rounded-ih-button bg-ih-bg-muted text-ih-fg-2 flex items-center justify-center text-xs font-bold">
-              {title.slice(0, 2).toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <h3 id={titleId} className="text-sm font-bold text-ih-fg-1">{title}</h3>
-              {copy.vendor && <p className="text-xs text-ih-fg-3">{copy.vendor()}</p>}
-            </div>
+    <Card className="h-full">
+      <article aria-labelledby={titleId} className="flex h-full flex-col gap-3 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex flex-wrap items-baseline gap-x-2">
+            <h3 id={titleId} className="text-sm font-bold text-ih-fg-1">{title}</h3>
+            {copy.vendor && <span className="text-xs text-ih-fg-3">{copy.vendor()}</span>}
           </div>
           <span data-testid="integration-status" className="shrink-0">
             <Pill tone={status.tone}>{status.label()}</Pill>
           </span>
         </div>
-        <p className="text-xs text-ih-fg-3 flex-1">{copy.desc()}</p>
+        <p className="text-xs text-ih-fg-3">{copy.desc()}</p>
         <p data-testid="integration-source" className="text-xs font-bold text-ih-fg-2">{sourceText(card, title)}</p>
-        <Link
-          to={card.detailPath}
-          aria-label={m.integrations_hub_action_label({ action, title })}
-          className={buttonClasses({ variant: "secondary", size: "sm", className: "self-start" })}
-        >
-          {action}
-        </Link>
+        <div className="mt-auto pt-1">
+          <Link
+            to={card.detailPath}
+            aria-label={m.integrations_hub_action_label({ action, title })}
+            className={buttonClasses({ variant: needsAction ? "primary" : "link", size: "sm" })}
+          >
+            {action}
+          </Link>
+        </div>
       </article>
     </Card>
   );
@@ -111,7 +109,7 @@ export function IntegrationCardsGrid({ cards }: { cards: IntegrationCard[] }) {
   // Built-in only needs explaining where it can occur.
   const hasBuiltIn = cards.some((c) => c.source === "provided" || c.canUseOwn);
   return (
-    <div className="space-y-ih-list">
+    <div className="space-y-8">
       <Summary cards={cards} />
       <ul className="text-xs text-ih-fg-3 space-y-0.5">
         <li>{m.integrations_hub_legend_status()}</li>
@@ -122,9 +120,9 @@ export function IntegrationCardsGrid({ cards }: { cards: IntegrationCard[] }) {
         const inCategory = cards.filter((c) => c.category === category);
         if (inCategory.length === 0) return null;
         return (
-          <section key={category} className="space-y-3">
-            <h2 className="text-sm font-bold text-ih-fg-1">{CATEGORY_TITLE[category]()}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <section key={category} className="space-y-2">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-ih-fg-3">{CATEGORY_TITLE[category]()}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {inCategory.map((card) => <ServiceCard key={card.id} card={card} />)}
             </div>
           </section>
