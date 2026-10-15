@@ -16,6 +16,9 @@ import type { CapabilitySet } from './capabilities';
  * — which in TypeScript surfaces as a field ending in `Cents`, plus the legacy
  * `price` column that predates the rule.
  *
+ * The write half of the capability, and the response helper handlers call, are in
+ * ./money-access.ts.
+ *
  * Redaction DELETES the key rather than zeroing it. A zero is a lie an operator
  * could act on; an absent field is the truth ("you may not see this"), and the
  * schemas mark these fields optional so the compiler forces the UI to handle it.
@@ -24,6 +27,13 @@ import type { CapabilitySet } from './capabilities';
 /** A money field, by the naming convention the schema rules require. */
 export function isMoneyField(key: string): boolean {
     return key === 'price' || /Cents$/.test(key);
+}
+
+/** True when `value` carries a money field anywhere. Lets a caller skip the capability lookup for a payload with nothing to redact. */
+export function hasMoneyField(value: unknown): boolean {
+    if (Array.isArray(value)) return value.some(hasMoneyField);
+    if (value === null || typeof value !== 'object' || value instanceof Date) return false;
+    return Object.entries(value as Record<string, unknown>).some(([key, v]) => isMoneyField(key) || hasMoneyField(v));
 }
 
 /**

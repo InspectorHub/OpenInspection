@@ -1,6 +1,8 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
+import { capabilitiesFor } from '../../lib/middleware/require-capability';
+import { guardMoneyWrite } from '../../lib/auth/money-access';
 import {
     UpdateBrandingSchema,
     BrandingResponseSchema,
@@ -172,12 +174,23 @@ const adminBrandingRoutes = createApiRouter()
             timeFormat: branding.timeFormat || '12h'
         };
 
+        // The two money policies are the only amounts on this record. Omitted, not
+        // zeroed, for a caller without `financial` (see lib/auth/money-redaction).
+        if (!(await capabilitiesFor(c)).financial) {
+            delete (formattedBranding as { cancellationPolicy?: unknown }).cancellationPolicy;
+            delete (formattedBranding as { depositPolicy?: unknown }).depositPolicy;
+        }
         return c.json({ success: true, data: { branding: formattedBranding } }, 200);
     })
     .openapi(updateBrandingRoute, async (c) => {
-        const body = c.req.valid('json');
         const brandingService = c.var.services.branding;
         const tenantId = c.get('tenantId');
+        // Only a CHANGE to a money policy needs `financial`; the form resends the whole record.
+        const body = await guardMoneyWrite(
+            c, c.req.valid('json'),
+            await brandingService.getBranding(tenantId, { companyName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown>,
+            ['cancellationPolicy', 'depositPolicy'],
+        );
 
         // Phase B — `confirmCurrencyChange` is a transient acknowledgement, never a
         // persisted column; strip it before it reaches the branding service.

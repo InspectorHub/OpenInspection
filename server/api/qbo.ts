@@ -4,6 +4,7 @@ import { getCookie } from 'hono/cookie';
 import { verifyJwt } from '../lib/jwt-keyring';
 import { bearerToken } from '../lib/auth-helpers';
 import { requireRole } from '../lib/middleware/rbac';
+import { requireCapability } from '../lib/middleware/require-capability';
 import { logger } from '../lib/logger';
 import { checkRateLimit } from '../lib/rate-limit';
 import { fireAndForget } from '../lib/fire-and-forget';
@@ -68,6 +69,8 @@ api.use('*', async (c, next) => {
  * authorization gate can see a hand-rolled Hono router.
  */
 api.use('*', requireRole('owner', 'manager'));
+// The books are money state: a manager whose `financial` capability is off loses the integration too.
+api.use('*', requireCapability('financial'));
 
 api.get('/status', async (c) => {
     const state = await c.var.services.qbo.getConnectionStatus(c.get('tenantId'));

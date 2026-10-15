@@ -10,6 +10,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { eq } from 'drizzle-orm';
 import { requireRole } from '../../lib/middleware/rbac';
+import { requireCapability } from '../../lib/middleware/require-capability';
 import { auditFromContext } from '../../lib/audit';
 import { getBaseUrl } from '../../lib/url';
 import { logger } from '../../lib/logger';
@@ -19,7 +20,6 @@ import {
 import { tenantConfigs } from '../../lib/db/schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { getDrizzle } from '../../lib/route-helpers';
-
 
 // ─── Integration Config & Secrets ────────────────────────────────────────────
 
@@ -110,7 +110,7 @@ const getStripeConnectRoute = createRoute(withMcpMetadata({
     path: '/stripe-connect',
     tags: ["admin"],
     summary: 'Get the tenant Stripe Connect account ID',
-    middleware: [requireRole('owner', 'manager')],
+    middleware: [requireRole('owner', 'manager'), requireCapability('financial')],
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ accountId: z.string().nullable() }) }) } },
@@ -120,14 +120,14 @@ const getStripeConnectRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "listTenantStripeConnect",
     description: "Returns the Stripe Connect account id (acct_...) linked to the company, or null when none is linked. Reads the stored id only and does not contact Stripe. Read-only. Restricted to owners and managers."
-}, { scopes: ['admin'], tier: 'extended' }));
+}, { scopes: ['admin'], tier: 'extended', capability: 'financial' }));
 
 const setStripeConnectRoute = createRoute(withMcpMetadata({
     method: 'put',
     path: '/stripe-connect',
     tags: ["admin"],
     summary: 'Set the tenant Stripe Connect account ID',
-    middleware: [requireRole('owner', 'manager')],
+    middleware: [requireRole('owner', 'manager'), requireCapability('financial')],
     request: { body: { content: { 'application/json': { schema: StripeConnectAccountSchema.describe('The Stripe account to link to this company') } } } },
     responses: {
         200: {
@@ -138,14 +138,14 @@ const setStripeConnectRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "updateTenantStripeConnect",
     description: "Link the company to a Stripe Connect account by its acct_ id, replacing any account already linked. The integrations list then reports Stripe as connected. Only the id format is checked; this call does not contact Stripe to confirm the account exists or has finished onboarding. The change is audit-logged. Idempotent for the same id. Restricted to owners and managers."
-}, { scopes: ['admin'], tier: 'extended' }));
+}, { scopes: ['admin'], tier: 'extended', capability: 'financial' }));
 
 const deleteStripeConnectRoute = createRoute(withMcpMetadata({
     method: 'delete',
     path: '/stripe-connect',
     tags: ["admin"],
     summary: 'Disconnect the tenant Stripe Connect account',
-    middleware: [requireRole('owner', 'manager')],
+    middleware: [requireRole('owner', 'manager'), requireCapability('financial')],
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ accountId: z.null() }) }) } },
@@ -155,7 +155,7 @@ const deleteStripeConnectRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "deleteTenantStripeConnect",
     description: "Unlink the company's Stripe Connect account by clearing the stored acct_ id. Nothing is changed in Stripe itself, and invoices that already exist are not edited. The change is audit-logged. Idempotent: clearing an already-empty link succeeds. Restricted to owners and managers."
-}, { scopes: ['admin'], tier: 'extended' }));
+}, { scopes: ['admin'], tier: 'extended', capability: 'financial' }));
 
 // --- Earnings Summary ---
 
@@ -164,7 +164,7 @@ const getEarningsSummaryRoute = createRoute(withMcpMetadata({
     path: '/earnings-summary',
     tags: ["admin"],
     summary: 'Get aggregated invoice earnings (paid/pending/count)',
-    middleware: [requireRole('owner', 'manager')],
+    middleware: [requireRole('owner', 'manager'), requireCapability('financial')],
     responses: {
         200: {
             content: {
@@ -185,7 +185,7 @@ const getEarningsSummaryRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "listTenantEarningsSummary",
     description: "Returns all-time invoice totals for the company, with amounts in integer cents: paid is the sum of paid invoices, pending is the sum of invoices that were sent but not yet paid, and count is the number of paid invoices. Voided invoices are excluded from all three, and invoices never sent (drafts) are not counted as pending. There is no date window or filter. Read-only. Restricted to owners and managers."
-}, { scopes: ['admin'], tier: 'extended' }));
+}, { scopes: ['admin'], tier: 'extended', capability: 'financial' }));
 
 // --- ICS Subscription Token ---
 

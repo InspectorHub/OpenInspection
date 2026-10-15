@@ -34,8 +34,8 @@ import { tenantConfigs } from '../../lib/db/schema';
 import { defaultPoliciesOnFirstEnable } from '../../lib/holidays/apply-holiday-policy';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { getDrizzle } from '../../lib/route-helpers';
+import { moneyView, guardMoneyWrite } from '../../lib/auth/money-access';
 import { resolveReportPdfRetentionYears } from '../../lib/compliance/report-pdf-retention';
-
 
 // --- Attention Thresholds (handoff-decisions §1) ---
 //
@@ -57,7 +57,6 @@ const getAttentionThresholdsRoute = createRoute(withMcpMetadata({
     operationId: "listTenantAttentionThresholds",
     description: "Returns the three hour thresholds (agreement_unsigned_h, invoice_overdue_h, report_unpublished_h) that decide when an inspection lands in the dashboard's Needs Attention list. When the company has never saved them, the defaults of 72 hours each are returned. Read-only. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
-
 
 const updateAttentionThresholdsRoute = createRoute(withMcpMetadata({
     method: 'patch',
@@ -654,22 +653,23 @@ const adminSettingsRoutes = createApiRouter()
     .openapi(listEventTypesRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const data = await c.var.services.event.listEventTypes(tenantId);
-        return c.json({ success: true as const, data }, 200);
+        return c.json({ success: true as const, data: await moneyView(c, data) }, 200);
     })
     .openapi(createEventTypeRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
+        const body = await guardMoneyWrite(c, c.req.valid('json'), null);
         const data = await c.var.services.event.createEventType(tenantId, body);
-        return c.json({ success: true as const, data }, 200);
+        return c.json({ success: true as const, data: await moneyView(c, data) }, 200);
     })
     .openapi(updateEventTypeRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
-        const body = c.req.valid('json');
+        const before = (await c.var.services.event.listEventTypes(tenantId)).find((t: { id: string }) => t.id === id) ?? null;
+        const body = await guardMoneyWrite(c, c.req.valid('json'), before);
         await c.var.services.event.updateEventType(tenantId, id, body);
         const fresh = (await c.var.services.event.listEventTypes(tenantId)).find((t: { id: string }) => t.id === id);
         if (!fresh) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Event type not found' } }, 404);
-        return c.json({ success: true as const, data: fresh }, 200);
+        return c.json({ success: true as const, data: await moneyView(c, fresh) }, 200);
     })
     .openapi(deleteEventTypeRoute, async (c) => {
         const tenantId = c.get('tenantId');

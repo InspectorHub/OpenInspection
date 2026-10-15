@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
+import { moneyView } from '../lib/auth/money-access';
 import {
     CreateInvoiceSchema,
     INVOICE_ID,
@@ -48,7 +49,7 @@ const listInvoicesRoute = createRoute(withMcpMetadata({
 const createInvoiceRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["invoices"], summary: "Create invoice for current tenant",
-    middleware: [requireRole('owner', 'manager')],
+    middleware: [requireRole('owner', 'manager'), requireCapability('financial')],
     request: { body: { content: { 'application/json': { schema: CreateInvoiceSchema.describe('Details of the invoice to create: who is billed, the amount in integer cents, optional line items, due date and linked inspection.') } } } },
     responses: {
         201: {
@@ -59,12 +60,12 @@ const createInvoiceRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "createInvoice",
     description: "Creates a draft invoice with a company-unique invoice number, in the company's configured currency (USD if unset). Owner or manager only. Does not email the client; use the request-payment route to send one. When inspectionId is given, any deposit already held for that inspection is applied to the invoice. Fires the invoice.created automation and, if QuickBooks is connected, pushes the invoice there in the background."
-}, { scopes: ['write'], tier: 'primary' }));
+}, { scopes: ['write'], tier: 'primary', capability: 'financial' }));
 
 const markSentRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/mark-sent',
     tags: ["invoices"], summary: 'Mark invoice as sent',
-    middleware: [requireRole('owner', 'manager')],
+    middleware: [requireRole('owner', 'manager'), requireCapability('financial')],
     request: { params: z.object({ id: INVOICE_ID.describe('Invoice to mark as sent.') }) },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Success' },
@@ -72,12 +73,12 @@ const markSentRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "markSentInvoice",
     description: "Record that an invoice has been sent by stamping its sent time with the current time, which moves a draft to sent (an invoice that is already paid, partly paid or void keeps that status). Nothing is emailed to the client; use the request-payment route to send one. When QuickBooks is configured for the deployment the invoice is also upserted into QuickBooks in the background. Returns 404 for an unknown invoice. Repeating the call restamps the sent time. Restricted to owners and managers."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'financial' }));
 
 const markPaidRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/mark-paid',
     tags: ["invoices"], summary: 'Mark invoice as paid',
-    middleware: [requireRole('owner', 'manager')],
+    middleware: [requireRole('owner', 'manager'), requireCapability('financial')],
     request: {
         params: z.object({ id: INVOICE_ID.describe('Invoice id to mark as paid.') }).describe('Path params for the mark-paid endpoint.'),
         body: { content: { 'application/json': { schema: MarkInvoicePaidSchema } } },
@@ -88,12 +89,12 @@ const markPaidRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "markPaidInvoice",
     description: "Marks an invoice as paid and records the payment method. Manual offline/check payments flip the linked inspection's payment gate so the report unlocks; syncs the payment to QuickBooks when connected."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'financial' }));
 
 const deleteInvoiceRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["invoices"], summary: "Delete invoice for current tenant",
-    middleware: [requireRole('owner', 'manager')],
+    middleware: [requireRole('owner', 'manager'), requireCapability('financial')],
     request: { params: z.object({ id: INVOICE_ID.describe('Id of the invoice to void.') }) },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Deleted' },
@@ -101,7 +102,7 @@ const deleteInvoiceRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "deleteInvoice",
     description: "Voids the invoice rather than erasing it: the row is kept for the audit trail and its status becomes void. Repeating the call is harmless. Owner or manager only. Re-syncs the linked inspection's payment gate and, if QuickBooks is connected, voids the invoice there in the background. Fails with not found for an unknown id."
-}, { scopes: ['write'], tier: 'primary' }));
+}, { scopes: ['write'], tier: 'primary', capability: 'financial' }));
 
 /**
  * Task 8 (Issue #111) — POST /api/invoices/request-payment.
@@ -346,12 +347,12 @@ const invoiceRoutes = createApiRouter()
 
         // Re-read for the canonical post-send status + sentAt.
         const sent = await c.var.services.invoice.findByInspectionId(tenantId, inspectionId);
-        return c.json({
+        return c.json(await moneyView(c, {
             id:          invoiceId,
             status:      sent?.status ?? 'sent',
             amountCents,
             sentAt:      sent?.sentAt ?? null,
-        }, 200);
+        }), 200);
     });
 
 export type InvoicesApi = typeof invoiceRoutes;

@@ -21,6 +21,16 @@ export function formatCents(cents: number, opts?: MoneyOpts): string {
   return formatCurrency(cents, { locale: opts?.locale ?? 'en-US', currency: opts?.currency ?? 'USD' });
 }
 
+/**
+ * A money figure the viewer may not see is ABSENT from the payload (the server
+ * deletes the key; see server/lib/auth/money-redaction.ts). Render that as a
+ * dash, never as $0.00, which would read as a true zero.
+ */
+const MISSING_MONEY = '—';
+export function formatCentsOrDash(cents: number | null | undefined, opts?: MoneyOpts): string {
+  return cents == null ? MISSING_MONEY : formatCents(cents, opts);
+}
+
 /** User dollar string -> integer cents. Empty / non-numeric -> null. */
 export function parseDollarsToCents(input: string): number | null {
   const trimmed = input.trim();

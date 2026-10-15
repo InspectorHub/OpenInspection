@@ -40,7 +40,7 @@ export const RequestPaymentSchema = z.object({
 export const RequestPaymentResponseSchema = z.object({
     id: z.string().describe('Invoice row id'),
     status: z.enum(['draft', 'sent', 'partial', 'paid', 'void']).describe('Invoice status after the request (sent)'),
-    amountCents: z.number().describe('Amount requested, in cents (money authority chain)'),
+    amountCents: z.number().optional().describe('Amount requested, in cents (money authority chain). ABSENT without the financial capability.'),
     sentAt: z.string().nullable().describe('ISO timestamp the request was marked sent'),
 }).openapi('RequestPaymentResponse');
 

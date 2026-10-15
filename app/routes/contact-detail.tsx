@@ -5,6 +5,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
+import { formatCentsOrDash } from "~/lib/money";
 import { formatCents } from "~/lib/hub-blocks";
 import { humanizeStatus, capitalize } from "~/lib/status";
 import { Breadcrumb } from "~/components/Breadcrumb";
@@ -42,15 +43,17 @@ interface ContactDetail {
     propertyAddress: string;
     date: string;
     status: string;
-    price: number;
+    /** Absent when the caller lacks the `financial` capability. */
+    price?: number;
     paymentStatus: string;
   }>;
   stats: {
     inspectionCount: number;
     /** Paid invoices billed to THIS contact. */
-    totalRevenueCents: number;
+    /** Absent when the caller lacks the `financial` capability. */
+    totalRevenueCents?: number;
     /** Paid invoices on this contact's inspections billed to someone else. */
-    billedToOthersCents: number;
+    billedToOthersCents?: number;
   };
 }
 
@@ -243,7 +246,7 @@ export default function ContactDetailPage() {
                 {m.contacts_detail_revenue_label()}
               </p>
               <p className="text-[24px] font-bold text-ih-fg-1 tabular-nums">
-                {formatCents(stats.totalRevenueCents)}
+                {formatCentsOrDash(stats.totalRevenueCents)}
               </p>
             </div>
             {/* THE SAME MONEY MAY NOT CARRY THE SAME WORD TWICE.
@@ -252,7 +255,7 @@ export default function ContactDetailPage() {
                 records used to print the one $450 under "TOTAL REVENUE"; adding
                 them gave $900 of revenue from a single payment. Hidden at zero,
                 which is the ordinary case for a client. */}
-            {stats.billedToOthersCents > 0 && (
+            {(stats.billedToOthersCents ?? 0) > 0 && (
               <div>
                 <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3 mb-1">
                   {m.contacts_detail_billed_to_others_label()}
@@ -296,7 +299,7 @@ export default function ContactDetailPage() {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-[13px] font-medium text-ih-fg-1 tabular-nums">
-                    {formatCents(insp.price)}
+                    {formatCentsOrDash(insp.price)}
                   </p>
                   <p className="text-[12px] text-ih-fg-3">{humanizeStatus(insp.paymentStatus)}</p>
                 </div>

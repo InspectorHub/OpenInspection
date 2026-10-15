@@ -54,7 +54,7 @@ export function ServicesStep({
                 {s.name}
               </button>
               {/* Price: editable input when selected, static text otherwise */}
-              {selected ? (
+              {selected && typeof s.price === "number" ? (
                 <MoneyInput
                   cents={priceCents}
                   onChange={(c) => handlePriceOverrideChange(s.id, c, catalogCents)}
@@ -73,7 +73,9 @@ export function ServicesStep({
           helper. At wizard time there is no invoice yet, so only tier 2 applies.
           Catalog svc.price maps to priceSnapshot; per-row priceOverrides maps to
           priceOverride. Empty set falls through to zero (no cache row here). */}
-      {services.size > 0 && (
+      {/* No catalogue prices at all means the viewer may not see money: no total, and
+          no price field above (an override would be refused by the server). */}
+      {services.size > 0 && serviceCatalog.some((s) => typeof s.price === "number") && (
         <div className="flex justify-end pt-1 border-t border-ih-border mt-2">
           <span className="text-[12px] font-bold text-ih-fg-2">
             {m.newinsp_services_total()}{" "}

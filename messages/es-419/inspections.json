@@ -210,6 +210,7 @@
   "inspections_hub_cancel_notes_ph": "Cualquier cosa que valga la pena registrar sobre esta cancelación.",
   "inspections_hub_cancel_quote_heading": "Lo que hace esta cancelación",
   "inspections_hub_cancel_quote_loading": "Calculando lo que cuesta esta cancelación…",
+  "inspections_hub_cancel_needs_financial": "Una cancelación que involucra un pago, un cargo o un reembolso requiere a un miembro del equipo con el permiso financiero. Pida al propietario o a un gerente que cancele esta inspección.",
   "inspections_hub_cancel_quote_failed": "No se pudo calcular lo que cuesta esta cancelación, así que no se canceló nada. Inténtelo de nuevo.",
   "inspections_hub_cancel_quote_fee": "Cargo que retiene su empresa: {amount}",
   "inspections_hub_cancel_quote_refund": "Reembolsado al cliente: {amount}",
