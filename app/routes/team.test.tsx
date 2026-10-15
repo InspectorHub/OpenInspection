@@ -52,6 +52,20 @@ describe("/team — who is offered the invite controls", () => {
     expect(await screen.findByRole("button", { name: /Invite Member/i })).toBeTruthy();
     expect(screen.getAllByRole("link", { name: /import/i }).length).toBeGreaterThan(0);
   });
+
+  it("shows no Pending Invites tab to someone who cannot manage the team", async () => {
+    renderTeam({ ...BASE, canManage: false });
+    await screen.findByRole("heading", { name: /team/i });
+
+    expect(screen.queryByText("Pending Invites")).toBeNull();
+  });
+
+  it("still shows the Pending Invites tab to someone who can (positive control)", async () => {
+    renderTeam({ ...BASE, canManage: true });
+
+    expect(await screen.findByText("Pending Invites")).toBeTruthy();
+    expect(screen.getByText("Active")).toBeTruthy();
+  });
 });
 
 describe("/team — the bulk entrance", () => {

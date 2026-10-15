@@ -37,6 +37,7 @@ export const CAP_LABELS: Record<Capability, string> = {
  get templateEdit()   { return m.label_cap_template_edit(); },
  get templateDelete() { return m.label_cap_template_delete(); },
  get templateImport() { return m.label_cap_template_import(); },
+ get deleteInspection() { return m.label_cap_delete_inspection(); },
 };
 
 /**
@@ -52,7 +53,7 @@ export const CAP_GROUPS: ReadonlyArray<{ id: string; label: () => string; caps: 
  {
   id: "general",
   label: () => m.modal_invite_cap_group_general(),
-  caps: ["publish", "scheduleOthers", "financial", "manageContacts", "viewCommunication"],
+  caps: ["publish", "scheduleOthers", "financial", "manageContacts", "viewCommunication", "deleteInspection"],
  },
  {
   id: "templates",

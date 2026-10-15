@@ -20,6 +20,7 @@ describe("CAP_LABELS — the advanced-permission toggles", () => {
         expect(CAP_LABELS.templateEdit).toBe("Edit templates");
         expect(CAP_LABELS.templateDelete).toBe("Delete templates");
         expect(CAP_LABELS.templateImport).toBe("Import templates");
+        expect(CAP_LABELS.deleteInspection).toBe("Delete inspections");
     });
 });
 
@@ -49,13 +50,15 @@ describe("the disclosure initial state reflects the role template", () => {
             // create/edit/import stay on. Only DELETE is off: its repair cost
             // is rebuild-from-scratch rather than change-it-back (#307).
             templateCreate: true, templateEdit: true, templateDelete: false, templateImport: true,
+            // Deleting is on for everyone who could already do it.
+            deleteInspection: true,
         });
     });
     it("manager defaults: every capability on", () => {
         const caps = getCapabilities("manager", null);
         expect(caps).toEqual({
             publish: true, scheduleOthers: true, financial: true, manageContacts: true, viewCommunication: true,
-            templateCreate: true, templateEdit: true, templateDelete: true, templateImport: true,
+            templateCreate: true, templateEdit: true, templateDelete: true, templateImport: true, deleteInspection: true,
         });
     });
 });
