@@ -368,4 +368,16 @@ describe("PeopleEditor", () => {
       { method: "post" },
     );
   });
+  it("opens the add-person dialog when the page asks for it, and not before", () => {
+    const { rerender, queryByText } = render(
+      <PeopleEditor people={[]} roleProfiles={[CLIENT_ROLE, AGENT_ROLE]} isAdmin openAddSignal={0} />,
+    );
+    // Negative half: a signal of 0 is "nobody asked", so the dialog stays shut.
+    expect(queryByText("Create a new contact instead")).toBeNull();
+
+    rerender(
+      <PeopleEditor people={[]} roleProfiles={[CLIENT_ROLE, AGENT_ROLE]} isAdmin openAddSignal={1} />,
+    );
+    expect(queryByText("Create a new contact instead")).toBeTruthy();
+  });
 });
