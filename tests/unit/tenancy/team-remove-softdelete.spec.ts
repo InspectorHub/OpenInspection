@@ -92,8 +92,10 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
 
     it('removing a member WITH inspections succeeds and keeps attribution intact (FK regression)', async () => {
         await testDb.insert(schema.inspections).values({
+            // A finished inspection: removal needs no decision about it, and it keeps its inspector.
+            // (One still open must be reassigned or left unassigned; that is covered in remove-member-reassign.spec.ts.)
             id: 'insp-1', tenantId: TENANT, inspectorId: MEMBER, propertyAddress: '1 Main St',
-            date: '2026-07-01', status: 'requested', paymentStatus: 'unpaid', price: 0,
+            date: '2026-07-01', status: 'completed', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
 

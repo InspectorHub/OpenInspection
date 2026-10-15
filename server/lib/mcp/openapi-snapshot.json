@@ -18488,7 +18488,7 @@
       }
     },
     "summary": "Store this workspace's AI endpoint, model and switch",
-    "description": "Blank values mean UNSET and are stored as null, which is how a workspace clears a destination. Turning the switch off keeps the endpoint and model — the control says so, and this is what makes that true. Every save bumps a version so anything holding a resolved endpoint can tell it is stale."
+    "description": "Blank values mean UNSET and are stored as null, which is how a workspace clears a destination. Turning the switch off keeps the endpoint and model — the control says so, and this is what makes that true. Every save bumps a version so anything holding a resolved endpoint can tell it is stale. A save that enables AI while the model or endpoint is blank, with nothing to fall back on, is refused with 422 naming the field."
   },
   {
     "operationId": "saveEmailTemplate",
