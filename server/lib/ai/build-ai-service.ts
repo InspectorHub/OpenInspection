@@ -32,6 +32,8 @@ interface BuildAiServiceArgs {
     tenantId: string | null;
     /** The workspace's own stored key (Settings → Advanced → AI), or null. */
     tenantKey: string | null;
+    /** The workspace's stored source choice for AI, when it has made one. */
+    sourceChoice?: 'provided' | 'own' | undefined;
     /** The deployment-provided credential, when one has been provisioned.
      *  A long-lived key, or one that refreshes itself — resolved upstream so
      *  the runtime and the provisioning read cannot answer it differently. */
@@ -59,7 +61,10 @@ interface BuildAiServiceArgs {
 }
 
 export function buildTenantAiService(args: BuildAiServiceArgs): AIService {
-    const { db, profile, tenantId, tenantKey, managedKey, model, plan } = args;
+    const { db, profile, tenantId, managedKey, model, plan } = args;
+    // An explicit Built-in choice means a stored workspace key is not this
+    // workspace's AI source: nothing downstream may see it as one.
+    const tenantKey = args.sourceChoice === 'provided' ? null : args.tenantKey;
 
     // THE one resolution, and now the only one: the ADAPTER it builds is the
     // adapter the service calls. Until this line handed the instance on, the
@@ -70,6 +75,7 @@ export function buildTenantAiService(args: BuildAiServiceArgs): AIService {
         profile,
         aiEnabled: args.aiEnabled,
         tenantKey,
+        sourceChoice: args.sourceChoice,
         tenantBaseUrl: args.tenantBaseUrl,
         tenantModel: args.tenantModel,
         managedKey,

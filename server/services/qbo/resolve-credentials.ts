@@ -18,6 +18,8 @@
  */
 import { loadTenantSecrets } from '../../lib/secrets-cache';
 import { applyIntegrationSecrets } from '../../lib/middleware/integration-secrets';
+import { getDeploymentProfile } from '../../lib/deployment-profile';
+import { resolveIntegrationSource, type StoredIntegrationSources } from '../../lib/integrations/sources';
 
 /**
  * Not exported: only `QboCredentialResolution` below names it, and that IS
@@ -50,6 +52,7 @@ const REQUIRED_KEYS = ['QBO_CLIENT_ID', 'QBO_CLIENT_SECRET'] as const;
 export async function resolveQboCredentialsForTenant(
     env: {
         DB: D1Database;
+        APP_MODE?: string;
         TENANT_CACHE?: KVNamespace;
         JWT_SECRET?: string;
         JWT_SECRET_PREVIOUS?: string;
@@ -59,6 +62,8 @@ export async function resolveQboCredentialsForTenant(
         QBO_ENV?: string;
     },
     tenantId: string,
+    /** The company's stored source choices, when the caller has read them. */
+    sources?: StoredIntegrationSources,
 ): Promise<QboCredentialResolution> {
     const merged: Record<string, string | undefined> = {
         QBO_CLIENT_ID:      env.QBO_CLIENT_ID,
@@ -74,6 +79,27 @@ export async function resolveQboCredentialsForTenant(
         const decrypted = await loadTenantSecrets(
             env.DB, env.TENANT_CACHE, tenantId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
         ).catch(() => null);
+        // With a stored source choice the merge rule below is replaced by a
+        // strict one: on a deployment that offers both, 'own' uses only the
+        // company's keys and 'provided' only the deployment's, no fallback.
+        // Self-hosted, the operator's env is the company's own, so it still merges.
+        if (sources?.quickbooks) {
+            const profile = getDeploymentProfile(env);
+            const res = resolveIntegrationSource('quickbooks', profile, { sources, ownSecrets: decrypted ?? {} }, env);
+            const bag: Record<string, string | undefined> = {};
+            if (res.source === 'provided') Object.assign(bag, merged);
+            else if (res.source === 'own' && profile.qboAppManaged) Object.assign(bag, decrypted);
+            else if (res.source === 'own') { Object.assign(bag, merged); applyIntegrationSecrets(bag, decrypted ?? {}); }
+            const missingStrict = REQUIRED_KEYS.filter((k) => !bag[k]);
+            if (missingStrict.length > 0) return { credentials: null, missing: [...missingStrict] };
+            return {
+                credentials: {
+                    clientId: bag.QBO_CLIENT_ID!, clientSecret: bag.QBO_CLIENT_SECRET!,
+                    webhookSecret: bag.QBO_WEBHOOK_SECRET ?? '', qboEnv: bag.QBO_ENV,
+                },
+                missing: [],
+            };
+        }
         if (decrypted) applyIntegrationSecrets(merged, decrypted);
     }
 

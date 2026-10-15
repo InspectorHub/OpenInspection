@@ -32,6 +32,8 @@ export interface ScheduledEnv {
     TELNYX_API_KEY?: string;
     /** Shared Messaging Service SID for managed_shared tenants (Task 8 send gate). */
     TWILIO_SHARED_MESSAGING_SERVICE_SID?: string;
+    /** Hosted shared SMS number switch (see AppEnv). Absent means off. */
+    SMS_MANAGED_SHARED_ENABLED?: string;
     TENANT_CACHE?: KVNamespace;
     /** Platform Google OAuth client, for the calendar sync sweep. Tenants with
      *  their OWN client are resolved from encrypted tenant secrets instead. */

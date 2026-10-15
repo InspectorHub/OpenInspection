@@ -129,6 +129,13 @@ export interface DeploymentProfile {
      *  instead of branching on APP_MODE — see the file header. */
     qboAppManaged: boolean;
 
+    /** Whether the deployment supplies a shared email sender that a company can
+     *  choose as its email source (shown as Built-in). True in saas. False in
+     *  standalone: there is no one else's sender to offer, so the only email
+     *  source is the operator's own account. Read this instead of borrowing a
+     *  quota capability to mean the same thing. */
+    providesEmailSource: boolean;
+
     /** Whether the anonymous-submission surfaces (public booking, agent signup)
      *  MUST carry a bot challenge.
      *
@@ -206,6 +213,7 @@ export const STANDALONE_PROFILE: DeploymentProfile = {
     videoBackendManaged: false,
     hasManagedCompliance: false,
     qboAppManaged: false,
+    providesEmailSource: false,
     botProtectionMandatory: false,
     tenantRecordOwnedByPortal: false,
     hasPortalIntegrationApi: false,
@@ -227,6 +235,7 @@ export const SAAS_PROFILE: DeploymentProfile = {
     videoBackendManaged: true,
     hasManagedCompliance: true,
     qboAppManaged: true,
+    providesEmailSource: true,
     botProtectionMandatory: true,
     tenantRecordOwnedByPortal: true,
     hasPortalIntegrationApi: true,
