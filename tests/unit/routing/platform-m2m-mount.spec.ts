@@ -18,7 +18,7 @@ const read = (...p: string[]) => readFileSync(join(ROOT, ...p), 'utf8');
 
 const module_ = read('server', 'portal', 'integration.module.ts');
 const entry = read('workers', 'app.ts');
-const jwtAuth = read('server', 'lib', 'middleware', 'jwt-auth.ts');
+const jwtAuth = read('server', 'lib', 'auth', 'public-paths.ts');
 const tenantRouter = read('server', 'features', 'tenant-routing', 'index.ts');
 const suspendGuard = read('server', 'lib', 'middleware', 'tenant-status-guard.ts');
 const authApi = read('server', 'api', 'auth.ts');

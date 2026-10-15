@@ -81,7 +81,7 @@ function countingDb(db: D1Database, onStatement: (sql: string) => void): D1Datab
     }) as D1Database;
 }
 
-const probe = () => new Request('http://x/api/event-types');
+const probe = () => new Request('http://x/api/public/__d1-floor-probe__');
 
 describe('global middleware D1 budget', () => {
     it('keeps the unscoped external path at its floor', async () => {

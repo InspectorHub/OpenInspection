@@ -28,6 +28,7 @@ import { PeopleService } from '../../../server/services/people.service';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 import { makeExecutionContext } from '../helpers/exec-ctx';
+import { seedSendGuardFixture, guardKv } from '../helpers/send-guard-fixture';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const AGENT = 'contact-agent-1';
@@ -119,6 +120,8 @@ describe('manual send-report — {{company_name}} is the display name, not the s
         await db.insert(schema.contacts).values([
             { id: AGENT, tenantId: TENANT, type: 'agent', name: 'Bob Agent', email: 'bob@brokerage.example.com', createdAt: new Date() },
         ]);
+        await seedSendGuardFixture(db, TENANT, INSP_ID, [{ contactId: AGENT, roleKey: 'buyer_agent' }]);
+        (ENV as unknown as Record<string, unknown>).TENANT_CACHE = guardKv();
         await db.insert(schema.messageTemplates).values([
             {
                 id: TPL_EMAIL, tenantId: TENANT, name: 'Agent report', channel: 'email',

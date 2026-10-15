@@ -37,6 +37,23 @@ function renderTeam(loaderData: Record<string, unknown>) {
 
 const BASE = { members: [], canManage: true, loadFailed: false };
 
+describe("/team — who is offered the invite controls", () => {
+  it("shows neither Invite Member nor Import members to someone who cannot manage the team", async () => {
+    renderTeam({ ...BASE, canManage: false });
+    await screen.findByRole("heading", { name: /team/i });
+
+    expect(screen.queryByRole("button", { name: /Invite Member/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /import/i })).toBeNull();
+  });
+
+  it("still shows both to someone who can (positive control for the absence above)", async () => {
+    renderTeam({ ...BASE, canManage: true });
+
+    expect(await screen.findByRole("button", { name: /Invite Member/i })).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: /import/i }).length).toBeGreaterThan(0);
+  });
+});
+
 describe("/team — the bulk entrance", () => {
   it("offers an import entrance that resolves to the wizard", async () => {
     renderTeam(BASE);

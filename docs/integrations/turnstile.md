@@ -13,6 +13,16 @@ the public booking form and agent self-signup.
 For local development Cloudflare publishes a test secret that always passes:
 `1x0000000000000000000000000000000AA`.
 
+## Agent signup is public once agent terms are published
+
+`POST /api/agent-signup` needs no session. It stays closed until the deployment
+publishes its agent terms (`scripts/publish-agent-terms.mjs`); from the moment
+terms are published, anyone who can reach the deployment can create an agent
+account with any email address, with no email verification. An agent account sees
+only the agent surface (its own referrals, notices and reports), but account
+creation itself is open. On a standalone deployment that publishes agent terms,
+configure `TURNSTILE_SECRET_KEY` so signup requires a solved challenge.
+
 ## Who has to solve a challenge
 
 Decided by deployment mode, read as a capability (`botProtectionMandatory`),

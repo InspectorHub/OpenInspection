@@ -8,7 +8,7 @@ import { inspections } from '../lib/db/schema/inspection';
 import { contacts } from '../lib/db/schema/contact';
 import { inspectionPeople, contactRoleProfiles } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
-import { ROLE } from '../lib/auth/roles';
+import { isAdminRole } from '../lib/auth/roles';
 import {
     AgentReportsQuerySchema,
     AgentReportsResponseSchema,
@@ -54,7 +54,7 @@ const getReportsRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listAgentMyReports",
-    description: "Lists the company's inspections on which a given agent contact is seated in a role that shows in the agent portal, as full inspection rows, with the agentId that was used. agentId is a contact id and defaults to the caller's own user id when omitted. Not paginated or explicitly ordered, and archived inspections are not filtered out. The handler itself only admits the manager role (owners and agents get 403), even though the operation is tagged with the agent scope. Read-only."
+    description: "Lists the company's inspections on which a given agent contact is seated in a role that shows in the agent portal, as full inspection rows, with the agentId that was used. agentId is a contact id and defaults to the caller's own user id when omitted. Not paginated or explicitly ordered, and archived inspections are not filtered out. Available to owner and manager roles; the agent role gets 403, because agentId is a contact id and an agent's own data is served by the agent referral routes. Read-only."
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**
@@ -106,7 +106,7 @@ const getLeaderboardRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "leaderboardAgent",
-    description: "Ranks referral sources by how many of the company's inspections each referred, most first, with the contact's name, agency and email and the total. Counts every inspection of the company with a referring contact, with no date window and no status or archive filter; inspections without a referrer are left out. Not paginated. Read-only. Available to owner, manager, inspector and agent roles."
+    description: "Ranks referral sources by how many of the company's inspections each referred, most first, with the contact's name, agency and email and the total. Counts every inspection of the company with a referring contact, with no date window and no status or archive filter; inspections without a referrer are left out. Not paginated. Read-only. Available to owner and manager roles; inspectors and agents get 403."
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**
@@ -243,7 +243,7 @@ const agentRoutes = createApiRouter()
     .route('/', agentNotificationPreferenceRoutes)
     .openapi(getReportsRoute, async (c) => {
         // Move RBAC check inside to fix OpenAPIHono type inference issues with context
-        await requireRole('manager')(c, async () => {});
+        await requireRole('owner', 'manager')(c, async () => {});
 
         const tenantId = c.get('tenantId');
         const user = c.get('user');
@@ -251,11 +251,11 @@ const agentRoutes = createApiRouter()
         const { agentId: queryAgentId } = c.req.valid('query');
         const db = getDrizzle(c);
 
-        // Admins/owners can pass ?agentId= to view any agent's reports
-        const agentId =
-            userRole === ROLE.MANAGER
-                ? (queryAgentId ?? user.sub)
-                : user.sub;
+        // Owners and managers (the only roles admitted above) may pass ?agentId=
+        // (a contact id) to view any agent's reports; without it the caller's own
+        // user id is used.
+        const mayChooseAgent = isAdminRole(userRole);
+        const agentId = mayChooseAgent ? (queryAgentId ?? user.sub) : user.sub;
 
         // Task 9 (two-layer role model) — visibility is the showsInAgentPortal
         // CAPABILITY, not the buyer_agent key: a listing agent's seat shows
@@ -305,7 +305,7 @@ const agentRoutes = createApiRouter()
         return c.json({ success: true, data: groups }, 200);
     })
     .openapi(getLeaderboardRoute, async (c) => {
-        await requireRole('owner', 'manager', 'inspector', 'agent')(c, async () => {});
+        await requireRole('owner', 'manager')(c, async () => {});
 
         const tenantId = c.get('tenantId');
         const db = getDrizzle(c);

@@ -91,7 +91,7 @@ describe('POST /api/inspections/:id/share-agent — buyer_agent via inspection_p
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT, propertyAddress: '1 Main St',
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'unpaid',
-            price: 0, inspectorId: null, createdAt: new Date(),
+            price: 0, inspectorId: null, reportStatus: 'published', createdAt: new Date(),
         });
     });
 

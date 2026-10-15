@@ -10,4 +10,7 @@ export const CreateInspectionTypeSchema = z.object({
     sortOrder:   z.number().int().nonnegative().default(0).describe('Display order.'),
 }).openapi('CreateInspectionType');
 
-export const UpdateInspectionTypeSchema = CreateInspectionTypeSchema.partial().openapi('UpdateInspectionType');
+// `.partial()` alone keeps `sortOrder`'s `.default(0)`, which would reset the order on every partial update.
+export const UpdateInspectionTypeSchema = CreateInspectionTypeSchema.partial().extend({
+    sortOrder: CreateInspectionTypeSchema.shape.sortOrder.unwrap().optional().describe('Display order.'),
+}).openapi('UpdateInspectionType');

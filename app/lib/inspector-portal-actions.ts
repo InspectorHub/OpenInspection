@@ -33,6 +33,30 @@ export async function toActionResult<I extends string>(
   return { ok: true, intent, error: undefined };
 }
 
+/**
+ * `send-report` result. The API refuses a send for three reasons a reader can act
+ * on, and each gets its own sentence instead of the generic failure: the report is
+ * not published (409), the recipient was already sent this inspection several times
+ * this hour (429), or a recipient is not a person on the inspection (400).
+ */
+export async function sendReportActionResult(
+  res: { ok: boolean; status?: number; json: () => Promise<unknown> },
+): Promise<{ ok: boolean; intent: "send-report"; error: string | undefined }> {
+  if (!res.ok) {
+    if (res.status === 409) return { ok: false, intent: "send-report", error: m.inspections_hub_error_send_report_not_published() };
+    if (res.status === 429) return { ok: false, intent: "send-report", error: m.inspections_hub_error_send_report_rate_limited() };
+    if (res.status === 400) {
+      const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+      const message = body?.error?.message ?? "";
+      if (/^(Recipients must be people|Each recipient can be listed only once|Recipient email does not match)/.test(message)) {
+        return { ok: false, intent: "send-report", error: m.inspections_hub_error_send_report_not_on_inspection() };
+      }
+      return { ok: false, intent: "send-report", error: message || m.inspections_hub_error_send_report() };
+    }
+  }
+  return toActionResult(res, "send-report", m.inspections_hub_error_send_report());
+}
+
 /* ------------------------------------------------------------------ */
 /*  Plan 1B Task 5 — People editor action intents                     */
 /* ------------------------------------------------------------------ */

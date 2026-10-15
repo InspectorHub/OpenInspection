@@ -5,6 +5,7 @@
  * the per-inspection view reads. Split from messages.ts purely for file size;
  * the router composes back into the same mount and the same typed client.
  */
+import { mayActOnContact, mayActOnInspection } from '../lib/inspection/assignment-access';
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
@@ -76,7 +77,7 @@ const sendThreadRoute = createRoute(withMcpMetadata({
     },
     operationId: 'sendMessageThread',
     summary: 'Send into a contact thread, optionally mentioning an inspection',
-    description: 'Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet.',
+    description: 'Owner and manager, and inspectors who work an inspection the contact is on or hold scheduleOthers (a contact on no inspection yet is open to all staff); other inspectors get 403. Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 export const messageThreadRoutes = createApiRouter()
@@ -92,7 +93,8 @@ export const messageThreadRoutes = createApiRouter()
         const contact = await svc.contactById(tenantId, contactId);
         if (!contact) throw Errors.NotFound('Contact not found');
         const messages = await svc.listThreadForContact(tenantId, contactId);
-        await svc.markContactThreadReadForStaff(tenantId, contactId);
+        // Reading stays company-wide; clearing the counts belongs to whoever works the contact.
+        if (await mayActOnContact(c, contactId)) await svc.markContactThreadReadForStaff(tenantId, contactId);
         return c.json({ success: true as const, data: { contact: { contactId: contact.contactId, name: contact.name, email: contact.email }, messages } }, 200);
     })
     .openapi(sendThreadRoute, async (c) => {
@@ -103,6 +105,11 @@ export const messageThreadRoutes = createApiRouter()
         const svc = c.var.services.message;
         const contact = await svc.contactById(tenantId, contactId);
         if (!contact) throw Errors.NotFound('Contact not found');
+        // Messaging a client is the assignee's act: the thread's contact must be on one of the
+        // caller's inspections, or the caller holds scheduleOthers (or the contact has none yet).
+        if (inspectionId ? !(await mayActOnInspection(c, inspectionId)) : !(await mayActOnContact(c, contactId))) {
+            throw Errors.Forbidden('Only an inspector assigned to this contact can message them');
+        }
         // A mention must name one of THIS tenant's inspections the contact is
         // actually seated on — reject a foreign or unknown id rather than
         // storing a dangling reference.

@@ -20,7 +20,8 @@ const listTemplatesRoute = createRoute(withMcpMetadata({
     path: '/templates',
     tags: ["inspections", "templates"],
     summary: "List inspection templates (paginated)",
-    description: "Paginated list of inspection templates for the tenant.",
+    description: "Paginated list of inspection templates for the tenant. Available to owner, manager and inspector roles.",
+    middleware: [requireRole('owner', 'manager', 'inspector')],
     request: { query: paginationQuerySchema.extend({ q: z.string().optional().describe('Filter templates by name (case-insensitive substring match)') }) },
     responses: {
         200: {
@@ -107,7 +108,8 @@ const getTemplateRoute = createRoute(withMcpMetadata({
     path: '/templates/{id}',
     tags: ["inspections", "templates"],
     summary: "Get inspection template for current tenant",
-    description: "Retrieve a single template with full schema. (GET /templates/{id}, inspections domain).",
+    description: "Retrieve a single template with its full schema. Available to owner, manager and inspector roles.",
+    middleware: [requireRole('owner', 'manager', 'inspector')],
     request: {
         params: z.object({ id: z.string().describe('Id of the inspection template to retrieve.') }),
     },

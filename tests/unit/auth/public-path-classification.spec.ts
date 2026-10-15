@@ -28,7 +28,7 @@ import { join } from 'node:path';
  * list: an extension may never, by itself, make an `/api/` path public.
  */
 const SRC = readFileSync(
-    join(process.cwd(), 'server/lib/middleware/jwt-auth.ts'),
+    join(process.cwd(), 'server/lib/auth/public-paths.ts'),
     'utf8',
 );
 

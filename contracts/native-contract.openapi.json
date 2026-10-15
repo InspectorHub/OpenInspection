@@ -938,7 +938,7 @@
           "inspections"
         ],
         "summary": "Patch inspection for current tenant",
-        "description": "Partially update an inspection record. (PATCH /{id}, inspections domain).",
+        "description": "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields.",
         "operationId": "patchInspection",
         "parameters": [
           {

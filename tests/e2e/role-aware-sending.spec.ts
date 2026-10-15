@@ -32,9 +32,9 @@
  *      `agent: true` with no Set-Cookie (server/api/portal.ts) — so an
  *      agent's per-inspection token can view THIS report but can never unlock
  *      the client hub. Mirrors agent-unified-link.spec's fresh-open checks.
- *   6. A second case: a one-off email + role profile picked directly in the
- *      modal (no pre-existing `inspection_people` row), showing the
- *      recipient list generalizes beyond people already on the inspection.
+ *   6. (Retired) A free-typed one-off email in the modal. The API now refuses
+ *      any address that is not a person on the inspection, and the modal no
+ *      longer offers the field; the refusal is covered by unit tests.
  *   7. AUTO `report.published` delivery (the 5-min cron -> AutomationService.
  *      flush): grepping `server/api/test-hooks.ts` (the only application
  *      test-only router, mounted at `/api/__test__`) turns up no flush/
@@ -73,7 +73,6 @@ const BUYER_AGENT = {
   name: `Bo BuyerAgentFixture ${suffix}`,
   email: `bo.buyer.${suffix}@example.com`,
 };
-const ONE_OFF_EMAIL = `oneoff.recipient.${suffix}@example.com`;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -162,7 +161,6 @@ let adminToken = '';
 let inspectionId = '';
 let propertyAddress = '';
 let listingAgentRoleProfileId = '';
-let oneOffRoleLabel = '';
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -186,9 +184,6 @@ test.describe.serial('Role-aware report sending (Spec 2 Task 8)', () => {
     const buyerAgentRole = roles.find((r) => r.key === 'buyer_agent');
     expect(buyerAgentRole, 'buyer_agent role profile must be seeded').toBeTruthy();
     const buyerAgentRoleProfileId = buyerAgentRole!.id;
-    const attorneyRole = roles.find((r) => r.key === 'attorney');
-    expect(attorneyRole, 'attorney role profile must be seeded').toBeTruthy();
-    oneOffRoleLabel = attorneyRole!.label;
 
     // Contacts for the listing agent and buyer agent — both NON-client roles
     // (kind=agent).
@@ -320,29 +315,6 @@ test.describe.serial('Role-aware report sending (Spec 2 Task 8)', () => {
     } finally {
       await freshContext.close();
     }
-  });
-
-  test('one-off email + role in the modal also gets its own tokenized link', async ({ page, request }) => {
-    await gotoAuth(page, `/inspections/${inspectionId}`, adminToken);
-    await page.getByRole('button', { name: 'Send report', exact: true }).click();
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-
-    await dialog.getByPlaceholder('name@example.com').fill(ONE_OFF_EMAIL);
-    // Not getByLabel('Role'): the people checkboxes' wrapping <label> text
-    // (name + roleLabel + email) collides with a substring match against
-    // "Role" for at least one seeded role label, so target the modal's only
-    // <select> element directly (the one-off role picker is the sole select
-    // control in this dialog).
-    await dialog.locator('select').selectOption({ label: oneOffRoleLabel });
-
-    await dialog.getByRole('button', { name: 'Send', exact: true }).click();
-    await expect(dialog).toBeHidden({ timeout: 10000 });
-
-    const sink = await request.get(`${BASE_URL}/api/__test__/last-email?to=${encodeURIComponent(ONE_OFF_EMAIL)}`);
-    expect(sink.status(), 'sink must have captured an email to the one-off recipient').toBe(200);
-    const { data } = await sink.json();
-    expect(String(data.html)).toContain('token=');
   });
 
   test('AUTO report.published cron delivery -> the buyer agent gets a role-keyed link via the real scheduled() handler', async ({

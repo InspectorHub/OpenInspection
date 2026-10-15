@@ -10,6 +10,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
+import { guardAssigned } from './report-send-guards';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import { SendSmsSchema, SendSmsResponseDataSchema } from '../../lib/validations/send-sms.schema';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
@@ -37,7 +38,7 @@ const sendSmsRoute = createRoute(withMcpMetadata({
     path: '/{id}/send-sms',
     tags: ['inspections'],
     summary: 'Send a manual SMS to people on the inspection',
-    middleware: [requireRole('owner', 'manager', 'inspector')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardAssigned],
     request: {
         params: z.object({
             id: z.string().trim().min(1).describe('Inspection id whose seated people receive the SMS.'),
@@ -58,7 +59,7 @@ const sendSmsRoute = createRoute(withMcpMetadata({
     operationId: 'createInspectionSendSms',
     description:
         'Manual SMS via the shared sendOneSms core (TCPA consent, managed-send, quota). '
-        + 'Recipients must be people already on the inspection who have a phone — no free-typed numbers.',
+        + 'Recipients must be people already on the inspection who have a phone — no free-typed numbers. Owner and manager, and inspectors assigned to the inspection or granted the scheduleOthers capability; other inspectors get 403.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 const sendSmsRoutes = createApiRouter()

@@ -2,6 +2,7 @@ import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
+import { isAdminRole } from '../lib/auth/roles';
 import { requireCapability } from '../lib/middleware/require-capability';
 import { exportPayroll } from '../services/pay-split.service';
 import { PayrollExportSchema, PayrollRunResponseSchema } from '../lib/validations/pay-split.schema';
@@ -74,7 +75,7 @@ const listTeamMembersRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listTeamMembers",
-    description: "Lists the company's team: members (non-removed users) with id, name, email, role, permission overrides, whether two-factor sign-in is enabled (the flag only, never secrets), creation time and last active time; the pending invitations, each with its accept link (so anyone who can call this can see those links); and maxUsers, the seat cap (3 when the company has none recorded). Accepted, expired or cancelled invitations are not listed. Not paginated. Read-only. Available to owner, manager and inspector roles."
+    description: "Lists the company's team: members (non-removed users) with id, name, email, role, permission overrides, whether two-factor sign-in is enabled (the flag only, never secrets), creation time and last active time; the pending invitations, each with its accept link, returned only to owner and manager callers (an inspector gets an empty invites list, because the accept link is a bearer credential for the invited role); and maxUsers, the seat cap (3 when the company has none recorded). Accepted, expired or cancelled invitations are not listed. Not paginated. Read-only. Available to owner, manager and inspector roles; invitations are included for owner and manager only."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -226,15 +227,22 @@ const teamRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const teamService = c.var.services.team;
         const { activeUsers, pendingInvites, maxUsers } = await teamService.getMembers(tenantId);
+        // The invite id IS the accept token (POST /api/auth/join), so the list is
+        // a bearer credential for the invited role. Only the roles that can send
+        // invitations may see it; anyone else gets members and the seat cap only.
+        const role = c.get('userRole');
+        const mayViewInvites = isAdminRole(role);
 
         return c.json({
             success: true,
             data: {
                 members: activeUsers,
-                invites: pendingInvites.map((invite) => ({
-                    ...invite,
-                    inviteLink: inviteAcceptUrl(c, invite.id),
-                })),
+                invites: mayViewInvites
+                    ? pendingInvites.map((invite) => ({
+                        ...invite,
+                        inviteLink: inviteAcceptUrl(c, invite.id),
+                    }))
+                    : [],
                 maxUsers,
             }
         }, 200);

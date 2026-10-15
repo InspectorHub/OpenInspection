@@ -43,7 +43,10 @@ export const CreateRatingSystemSchema = z.object({
 }).strict();
 export type CreateRatingSystemInput = z.infer<typeof CreateRatingSystemSchema>;
 
-export const UpdateRatingSystemSchema = CreateRatingSystemSchema.partial();
+// `.partial()` alone keeps `isDefault`'s `.default(false)`, which would clear the company default on every partial update.
+export const UpdateRatingSystemSchema = CreateRatingSystemSchema.partial().extend({
+    isDefault: CreateRatingSystemSchema.shape.isDefault.unwrap().describe('Make this the company default; the flag is cleared on every other system.'),
+});
 export type UpdateRatingSystemInput = z.infer<typeof UpdateRatingSystemSchema>;
 
 export const CloneRatingSystemSchema = z.object({

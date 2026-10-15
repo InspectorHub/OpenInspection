@@ -7,7 +7,12 @@ export const CreateDefectCategorySchema = z.object({
     sortOrder:     z.number().int().min(0).max(999).optional().describe('Display order.'),
 }).strict().openapi('CreateDefectCategory');
 
-export const UpdateDefectCategorySchema = CreateDefectCategorySchema.partial().openapi('UpdateDefectCategory');
+// `.partial()` alone keeps a field's `.default()`, which would reset an omitted colour or
+// drivesSummary to its default on every partial update; the defaults are unwrapped here.
+export const UpdateDefectCategorySchema = CreateDefectCategorySchema.partial().extend({
+    color:         CreateDefectCategorySchema.shape.color.unwrap().describe('Swatch color for the category chip.'),
+    drivesSummary: CreateDefectCategorySchema.shape.drivesSummary.unwrap().describe('When true, defects in this category are pulled into the report Summary.'),
+}).openapi('UpdateDefectCategory');
 
 export const DefectCategoryResponseSchema = z.object({
     id:            z.string().describe('Defect category id.'),

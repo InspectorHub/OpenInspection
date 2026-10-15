@@ -40,7 +40,7 @@ import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { publishCapFromMe, viewCommunicationCapFromMe } from "~/lib/inspector-portal-helpers";
 import { COURTESY_TRANSLATION_LOCALE } from "~/lib/courtesy-locale";
 import {
-  toActionResult, reinspectionDay,
+  toActionResult, sendReportActionResult, reinspectionDay,
   handlePersonAdd,
   handlePersonRemove,
   handlePersonResetAccess,
@@ -596,7 +596,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       param: { id },
       json: { recipients, channels },
     });
-    return toActionResult(res, "send-report", m.inspections_hub_error_send_report());
+    return sendReportActionResult(res);
   }
 
   // Communication A3.4 — manual SMS via the shared TCPA core. Recipients are
@@ -1350,7 +1350,6 @@ export default function InspectionHubPage() {
       {sendReportOpen && (
         <SendReportModal
           people={people}
-          roleProfiles={roleProfiles}
           fetcher={sendReportFetcher}
           onClose={() => setSendReportOpen(false)}
         />

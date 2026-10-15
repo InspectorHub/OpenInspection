@@ -5,7 +5,7 @@ import { join } from 'node:path';
 const ROOT = join(__dirname, '..', '..', '..');
 const index = readFileSync(join(ROOT, 'server', 'index.ts'), 'utf8');
 const entry = readFileSync(join(ROOT, 'workers', 'app.ts'), 'utf8');
-const jwtAuth = readFileSync(join(ROOT, 'server', 'lib', 'middleware', 'jwt-auth.ts'), 'utf8');
+const jwtAuth = readFileSync(join(ROOT, 'server', 'lib', 'auth', 'public-paths.ts'), 'utf8');
 const resolver = readFileSync(
   join(ROOT, 'server', 'features', 'tenant-routing', 'resolve-by-path-param.ts'),
   'utf8',

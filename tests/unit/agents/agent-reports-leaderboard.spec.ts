@@ -19,6 +19,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import agentRoutes from '../../../server/api/agent';
 import type { HonoConfig } from '../../../server/types/hono';
 import { asD1Db } from '../helpers/test-db';
+import { AppError } from '../../../server/lib/errors';
 import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
@@ -33,6 +34,11 @@ let db: BetterSQLite3Database<typeof schema>;
 
 function buildApp(userRole: string) {
     const app = new OpenAPIHono<HonoConfig>();
+    // Without this a thrown AppError (Forbidden) surfaces as a bare 500.
+    app.onError((err, c) => {
+        if (err instanceof AppError) return c.json({ success: false, error: { code: err.code, message: err.message } }, err.status);
+        return c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500);
+    });
     app.use('*', async (c, next) => {
         c.set('userRole', userRole as never);
         c.set('tenantId', TENANT);
@@ -142,5 +148,41 @@ describe('GET /api/agent/leaderboard — buyer_agent via inspection_people (Task
         expect(res.status).toBe(200);
         const body = await res.json() as { data: { leaderboard: unknown[] } };
         expect(body.data.leaderboard).toEqual([]);
+    });
+});
+
+describe('GET /api/agent/my-reports — role admission', () => {
+    beforeEach(async () => {
+        const fixture = createTestDb();
+        db = fixture.db;
+        await setupSchema(fixture.sqlite);
+        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        await db.insert(schema.tenants).values({
+            id: TENANT, slug: 'acme', status: 'active',
+            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        });
+        await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
+    });
+
+    it('owner is admitted (was 403 while the handler admitted only manager)', async () => {
+        const res = await buildApp('owner').request('/api/agent/my-reports', {}, ENV, CTX);
+        expect(res.status).toBe(200);
+    });
+
+    it('owner may pass ?agentId= to read another contact reports', async () => {
+        const res = await buildApp('owner').request(`/api/agent/my-reports?agentId=${OTHER_CONTACT}`, {}, ENV, CTX);
+        expect(res.status).toBe(200);
+        const body = await res.json() as { data: { agentId: string } };
+        expect(body.data.agentId).toBe(OTHER_CONTACT);
+    });
+
+    it('manager is admitted (positive control)', async () => {
+        const res = await buildApp('manager').request('/api/agent/my-reports', {}, ENV, CTX);
+        expect(res.status).toBe(200);
+    });
+
+    it('agent is refused', async () => {
+        const res = await buildApp('agent').request('/api/agent/my-reports', {}, ENV, CTX);
+        expect(res.status).toBe(403);
     });
 });
