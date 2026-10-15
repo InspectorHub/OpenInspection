@@ -7,7 +7,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
-import { guardPatchReschedule, guardInspectionDelete, deleteAuditMetadata } from './core-access';
+import { guardPatchReschedule, guardInspectionDelete, deleteFacts } from './core-access';
 import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
@@ -201,7 +201,7 @@ const coreRoutes = createApiRouter()
         const { inspection } = await service.getInspection(id, tenantId);
 
         // Read before the cascade: the audit record describes what was deleted.
-        const metadata = await deleteAuditMetadata(c, inspection, id);
+        const facts = await deleteFacts(c, inspection, id);
 
         // Cascade-delete every inspection-scoped row + R2 asset (D1 does not honor
         // FK cascades at runtime). Ownership verified by getInspection above.
@@ -209,7 +209,7 @@ const coreRoutes = createApiRouter()
 
         auditFromContext(c, 'inspection.delete', 'inspection', {
             entityId: id,
-            metadata,
+            metadata: { propertyAddress: inspection.propertyAddress, status: facts.status, reportPublished: facts.reportPublished, hadInvoice: facts.hadInvoice },
         });
         return c.json({ success: true }, 200);
     })

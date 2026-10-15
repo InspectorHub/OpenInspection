@@ -20,6 +20,7 @@ import { mayChangeSchedule, mayDeleteInspection } from '../../lib/inspection/ass
 import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { getDrizzle } from '../../lib/route-helpers';
 import { invoices } from '../../lib/db/schema';
+import { REPORT_STATUS } from '../../lib/status/report-status';
 import { safeISODate } from '../../lib/date';
 import type { HonoConfig } from '../../types/hono';
 
@@ -71,18 +72,19 @@ export async function guardScheduleMove(c: Context<HonoConfig>, next: Next) {
 /**
  * What the audit record of a delete says about the inspection that is gone: its
  * state and whether a report or an invoice existed, and nothing about the people.
+ * The caller writes these into the record as a literal, which is what the audit
+ * registry gate reads.
  */
-export async function deleteAuditMetadata(
+export async function deleteFacts(
     c: Context<HonoConfig>,
-    inspection: { propertyAddress: string; status: string; reportStatus?: string | null },
+    inspection: { status: string; reportStatus?: string | null },
     inspectionId: string,
-): Promise<Record<string, unknown>> {
+): Promise<{ status: string; reportPublished: boolean; hadInvoice: boolean }> {
     const invoice = await getDrizzle(c).select({ id: invoices.id }).from(invoices)
         .where(and(eq(invoices.tenantId, c.get('tenantId')), eq(invoices.inspectionId, inspectionId))).get();
     return {
-        propertyAddress: inspection.propertyAddress,
         status: inspection.status,
-        reportPublished: inspection.reportStatus === 'published',
+        reportPublished: inspection.reportStatus === REPORT_STATUS.PUBLISHED,
         hadInvoice: !!invoice,
     };
 }
