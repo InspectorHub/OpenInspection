@@ -9,6 +9,7 @@ import * as schema from './lib/db/schema';
 import { brandingMiddleware } from './lib/middleware/branding';
 import { contextBootstrap } from './lib/middleware/context-bootstrap';
 import { integrationSecretsMiddleware } from './lib/middleware/integration-secrets';
+import { webhookIngressGuard } from './lib/middleware/webhook-ingress';
 import { enforceTenantActive } from './lib/middleware/tenant-status-guard';
 import { inspectorPaletteMiddleware } from './lib/middleware/inspector-palette';
 import { touchLastActiveMiddleware } from './lib/middleware/touch-last-active';
@@ -242,6 +243,9 @@ app.get('/photos/:tenantId/inspector-photos/:filename', async (c) => {
 //   BYOK silently fell back to platform defaults) and, in saas mode, the
 //   tenant's integration secrets never merged into c.env.
 app.use('*', securityHeaders);
+// Unauthenticated inbound webhooks: refuse oversize / over-rate deliveries before
+// any tenant, secret or D1 work (see the middleware header).
+app.use('/webhooks/*', webhookIngressGuard);
 app.use('*', contextBootstrap);
 app.use('*', tenantRouter);
 app.use('*', brandingMiddleware);

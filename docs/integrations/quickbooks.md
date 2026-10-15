@@ -112,6 +112,10 @@ Things to know:
 - Archiving a contact keeps its match, and the customer stays unavailable to other contacts. An archived contact cannot be matched or changed, but its match can be removed from its page. Deleting a contact for good removes its match.
 - Only owners and managers can match or remove a match.
 
+The verifier token follows the same precedence as the other QuickBooks settings: the Worker environment wins, and the token saved in Settings → Integrations is the fallback (Stripe is the opposite: a workspace's saved value wins, see stripe.md). On a deployment with one fixed workspace the stored token is that workspace's. Where the path names no workspace, the realm id in the body is used only to choose which workspace's stored token to try; the Intuit signature must still verify against that token, and the events are then applied to that workspace alone. Another workspace's token cannot verify the payload.
+
+The webhook endpoint refuses a body larger than 256 KB with `413` and, where the `QBO_WEBHOOK_RATE_LIMITER` binding is configured (`wrangler.jsonc`, 120 requests per minute per source address), refuses a burst beyond it with `429`. Both are answered before any workspace or secret lookup and logged without the payload. Intuit's retry behaviour for a non-2xx answer is not documented here, so treat a logged refusal as a delivery that may need the next scheduled sync to catch up.
+
 ---
 
 ## What happens when a connection ends

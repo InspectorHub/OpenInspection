@@ -50,11 +50,14 @@ const TENANT_OWNED_KEYS = new Set<string>([
 export function applyIntegrationSecrets(
     env: Record<string, string | undefined>,
     decrypted: Record<string, string | undefined>,
+    /** Restrict the merge to these keys; default is every integration key. */
+    only?: ReadonlySet<string>,
 ): string[] {
     // Which keys took the tenant's stored value. A caller that needs to say
     // where a setting came from reads this instead of re-deriving the rule.
     const filled: string[] = [];
     for (const key of INTEGRATION_SECRET_KEYS) {
+        if (only && !only.has(key)) continue;
         const dbValue = decrypted[key];
         if (!dbValue) continue;
 
@@ -70,15 +73,41 @@ export function applyIntegrationSecrets(
     return filled;
 }
 
+/**
+ * Path prefixes whose handlers read integration secrets from `c.env`: the API,
+ * and the inbound provider webhooks (`/webhooks/{vendor}`), which verify a
+ * signature with a secret the operator may have saved in Settings instead of
+ * setting an env var. The tenant here is the one the ROUTE establishes
+ * (`/webhooks/stripe/:tenant`, or the fixed standalone tenant) -- never one the
+ * caller merely claims in a payload; a webhook with no route-established
+ * tenant resolves its secret inside its own handler.
+ */
+const SECRET_MERGE_PREFIXES = ['/api/', '/webhooks/'] as const;
+
+/**
+ * What a `/webhooks/` request may see. Webhook handlers verify a signature and
+ * then settle a payment, so they get the Stripe and QuickBooks keys and nothing
+ * else: an unrelated stored secret (a mail or AI key) has no business in an
+ * unauthenticated request's env. The SMS and email webhooks load their own
+ * secrets and are unaffected.
+ */
+const WEBHOOK_SECRET_KEYS: ReadonlySet<string> = new Set([
+    'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET',
+    'QBO_CLIENT_ID', 'QBO_CLIENT_SECRET', 'QBO_WEBHOOK_SECRET', 'QBO_ENV',
+]);
+
+export function secretsMergeAppliesTo(path: string): boolean {
+    return SECRET_MERGE_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
 export const integrationSecretsMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) => {
     const tenantId = c.get('tenantId') || c.get('resolvedTenantId');
     if (!tenantId) return next();
 
-    // Only decrypt for API routes where the secrets are actually consumed.
-    // HTML page renders don't access c.env.RESEND_API_KEY etc., so skip them
-    // to avoid an unnecessary D1 query + AES-GCM decrypt on every page load.
-    const path = c.req.path;
-    if (!path.startsWith('/api/')) return next();
+    // Only decrypt where the secrets are actually consumed. HTML page renders
+    // don't access c.env.RESEND_API_KEY etc., so skip them to avoid an
+    // unnecessary D1 query + AES-GCM decrypt on every page load.
+    if (!secretsMergeAppliesTo(c.req.path)) return next();
 
     try {
         // A-16 — ciphertext is KV-cached; loadTenantSecrets is the single
@@ -112,7 +141,8 @@ export const integrationSecretsMiddleware: MiddlewareHandler<HonoConfig> = async
             // stay the same references, only the string slots become per-request.
             const perRequest = { ...c.env };
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const filled = applyIntegrationSecrets(perRequest as any, decrypted as Record<string, string | undefined>);
+            const filled = applyIntegrationSecrets(perRequest as any, decrypted as Record<string, string | undefined>,
+                c.req.path.startsWith('/webhooks/') ? WEBHOOK_SECRET_KEYS : undefined);
             c.env = perRequest;
             // Names only, never values: the merged env no longer says which
             // side a setting came from, and the settings page has to.

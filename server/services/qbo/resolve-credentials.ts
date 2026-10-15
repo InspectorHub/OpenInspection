@@ -3,7 +3,7 @@
  * middleware.
  *
  * `integrationSecretsMiddleware` merges a tenant's encrypted secrets into
- * `c.env`, and it returns early for any path that does not start `/api/`. Cron
+ * `c.env` for API and webhook requests (and nothing else). Cron
  * has no Hono chain at all, so a sweep that reads `env.QBO_CLIENT_ID` directly
  * sees the PLATFORM credential or nothing — and under `qboAppManaged: false` a
  * self-hosted operator has nowhere to put a credential except the tenant row.
