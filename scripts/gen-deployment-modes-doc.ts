@@ -55,6 +55,8 @@ const DESCRIPTIONS: Record<keyof DeploymentProfile, string> = {
         'The platform supplies the Intuit app tenants connect through, so nobody is asked for a Client ID. Standalone brings its own: Intuit matches a redirect URI byte for byte and a self-hosted deploy answers on its own domain, so the platform app cannot work there — which is why the credential form, including `QBO_ENV`, renders only in standalone.',
     tenantRecordOwnedByPortal:
         'Whether a platform stores the authoritative tenant record and this worker reads a projection of it. Decides which admin provider is constructed; in standalone this deployment owns the row outright.',
+    providesEmailSource:
+        'The deployment supplies a shared email sender that a company can choose as its email source (shown as Built-in). Absent in standalone, where the only email source is the operator own account.',
     hasPortalIntegrationApi:
         'Whether the portal machine-to-machine surface (`/api/platform/*`) is mounted. Standalone 404s the whole prefix rather than answering on an API nobody can authenticate to.',
     hasAssistedMigration:

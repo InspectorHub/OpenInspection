@@ -60,6 +60,11 @@ export interface ResolveAiContext {
     aiEnabled: boolean;
     /** The workspace's own stored key (Settings → Advanced → AI), or null. */
     tenantKey: string | null;
+    /** The workspace's explicit source choice, when it has stored one
+     *  (`server/lib/integrations`). 'own' never falls through to the
+     *  deployment's credential; 'provided' never reads `tenantKey`. Absent =
+     *  no choice stored, and the rules below apply exactly as they always have. */
+    sourceChoice?: 'provided' | 'own' | undefined;
     /** The workspace's own endpoint and model, when they configured them. Null
      *  falls back to the deployment default. Read ONLY on the own-key path:
      *  a workspace with no key of its own does not get to redirect a call
@@ -105,10 +110,12 @@ export function resolveAi(ctx: ResolveAiContext): ResolvedAi | AiRefusal {
 
     // 1. A workspace's own key wins everywhere. Their endpoint and model win
     //    with it, falling back to the deployment's when they set neither.
-    if (ctx.tenantKey) {
+    const ownKey = ctx.sourceChoice === 'provided' ? null : ctx.tenantKey;
+    if (ctx.sourceChoice === 'own' && !ownKey) return { refused: AI_REFUSAL_REASON.NOT_CONFIGURED };
+    if (ownKey) {
         return {
             provider: new OpenAiCompatibleProvider({
-                apiKey:  ctx.tenantKey,
+                apiKey:  ownKey,
                 model:   ctx.tenantModel   || ctx.model          || '',
                 baseUrl: ctx.tenantBaseUrl || ctx.defaultBaseUrl || '',
             }),

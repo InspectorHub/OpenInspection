@@ -183,7 +183,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         db: c.env.DB,
                         profile: c.var.profile,
                         tenantId,
-                        tenantKey: emailCfg.dbSecrets.geminiApiKey || null,
+                        tenantKey: emailCfg.dbSecrets.geminiApiKey || null, sourceChoice: emailCfg.integrationSources?.ai,
                         // Resolved through the shared answer rather than read
                         // straight from env: the provisioning read asks the
                         // same question, and a deployment configured one way

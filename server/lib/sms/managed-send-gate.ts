@@ -2,6 +2,8 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { messagingCompliance, usageCounters } from '../db/schema';
 import { currentPeriodKey } from '../usage/period';
+import { getDeploymentProfile, type DeploymentProfile } from '../deployment-profile';
+import { SERVICE_SPECS } from '../integrations/source-catalog';
 
 /**
  * Default monthly SMS allowance for managed tenants when
@@ -23,6 +25,12 @@ export interface ManagedSendGateEnv {
      *  Parsed at gate-check time; defaults to DEFAULT_MANAGED_SMS_ALLOWANCE when absent
      *  or non-numeric. */
     MANAGED_SMS_MONTHLY_ALLOWANCE?: string;
+    /** Hosted shared-number switch ('true' or '1'). Absent means off. */
+    SMS_MANAGED_SHARED_ENABLED?: string;
+    /** Tells a hosted deployment from a self-hosted one. */
+    APP_MODE?: string;
+    /** A profile the caller already resolved; wins over APP_MODE. */
+    profile?: DeploymentProfile;
 }
 
 export interface ManagedSendGateResult {
@@ -83,6 +91,16 @@ export async function managedSendAllowed(
     tenantId: string,
     smsMode: string,
 ): Promise<ManagedSendGateResult> {
+    // The shared number is off unless the deployment turns it on. On a deployment
+    // that supplies one, every mode except an own account would send on it (or on
+    // the deployment's number), so each is refused with a reason the log row and
+    // the manual-send API carry.
+    // Self-hosted deployments offer no such number and are unaffected.
+    const profile = env.profile ?? getDeploymentProfile(env);
+    if (smsMode !== 'own' && SERVICE_SPECS.sms.offersProvided(profile) && SERVICE_SPECS.sms.providedHeldBack?.(env)) {
+        return { allowed: false, reason: 'provider_confirmation_pending' };
+    }
+
     if (smsMode === 'managed_dedicated') {
         // Fail-closed: missing row → not approved → block.
         let row: { complianceStatus: string } | null | undefined;
