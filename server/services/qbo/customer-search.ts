@@ -43,7 +43,8 @@ const clampPaging = (startPosition: number, limit: number) => ({
  * dropping them loses nothing a search could match. The only backslash left in
  * the text is the one before a quote.
  */
-const escapeQboString = (input: string): string => input.replace(/\\/g, '').replace(/'/g, "\\'");
+const escapeQboString = (input: string): string =>
+  Array.from(input, (ch) => (ch === '\\' ? '' : ch === "'" ? "\\'" : ch)).join('');
 
 /**
  * Typed text as the inside of a QuickBooks `LIKE '%...%'` literal. Only quotes
