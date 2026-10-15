@@ -188,3 +188,117 @@ describe('getConnectionStatus: existing fields are unchanged', () => {
         expect(await service('sandbox').getConnectionStatus(TENANT)).toBeNull();
     });
 });
+
+describe('getConnectionStatus: the contact an open row is about', () => {
+    const NOW = new Date('2026-03-02T10:00:00Z');
+
+    async function seedTenants() {
+        for (const [id, slug] of [[TENANT, 'acme'], [OTHER, 'other']] as const) {
+            await db.insert(schema.tenants).values({
+                id, slug, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: CONNECTED_AT,
+            });
+        }
+    }
+    const contact = (id: string, tenantId: string, name: string, archivedAt: Date | null = null) =>
+        db.insert(schema.contacts).values({
+            id, tenantId, type: 'client', name, createdAt: CONNECTED_AT, archivedAt,
+        } as never);
+    const flag = (id: string, tenantId: string, oiType: string, oiId: string) =>
+        db.insert(schema.qboSyncErrors).values({
+            id, tenantId, oiType, oiId, errorCode: 'SYNC_ERROR', errorMsg: 'refused',
+            retries: 0, resolved: false, createdAt: NOW, updatedAt: NOW,
+        } as never);
+    // How many `select({ id, name })` calls ran: the contacts lookup is the only one with that shape.
+    const contactReads = (spy: { mock: { calls: unknown[][] } }) =>
+        spy.mock.calls.filter((c) => Object.keys((c[0] ?? {}) as object).join() === 'id,name').length;
+    const nameOf = (status: Awaited<ReturnType<TestQbo['getConnectionStatus']>>, id: string) => {
+        const found = status?.openErrors.find((e) => e.id === id);
+        expect(found, id).toBeDefined();
+        return found?.contactName;
+    };
+
+    it('names a contact row, and gives null for an invoice row and a deleted contact', async () => {
+        const svc = service('sandbox');
+        await seedTenants();
+        await connect(svc, TENANT);
+        await contact('c-1', TENANT, 'Alice Adams');
+        await contact('c-old', TENANT, 'Archived Person', NOW);
+        await flag('e-contact', TENANT, 'contact', 'c-1');
+        await flag('e-archived', TENANT, 'contact', 'c-old');
+        await flag('e-gone', TENANT, 'contact', 'c-deleted');
+        // An invoice flag whose oi_id happens to equal a real contact id still reads null.
+        await flag('e-invoice', TENANT, 'invoice', 'c-1');
+
+        const status = await svc.getConnectionStatus(TENANT);
+
+        expect(nameOf(status, 'e-contact')).toBe('Alice Adams');
+        expect(nameOf(status, 'e-archived')).toBe('Archived Person');
+        expect(nameOf(status, 'e-gone')).toBeNull();
+        expect(nameOf(status, 'e-invoice')).toBeNull();
+    });
+
+    it('never resolves a contact id that belongs to another company', async () => {
+        const svc = service('sandbox');
+        await seedTenants();
+        await connect(svc, TENANT);
+        await connect(svc, OTHER);
+        await contact('c-foreign', OTHER, 'Foreign Person');
+        await flag('e-mine', TENANT, 'contact', 'c-foreign');
+        await flag('e-theirs', OTHER, 'contact', 'c-foreign');
+
+        const mine = await svc.getConnectionStatus(TENANT);
+        const theirs = await svc.getConnectionStatus(OTHER);
+
+        expect(nameOf(mine, 'e-mine')).toBeNull();
+        // Positive control: the same id does resolve for the company that owns it.
+        expect(nameOf(theirs, 'e-theirs')).toBe('Foreign Person');
+    });
+
+    it('looks the names up with one contacts query however many rows there are', async () => {
+        const svc = service('sandbox');
+        await seedTenants();
+        await connect(svc, TENANT);
+        for (const n of [1, 2, 3, 4]) {
+            await contact(`c-${n}`, TENANT, `Person ${n}`);
+            await flag(`e-${n}`, TENANT, 'contact', `c-${n}`);
+        }
+        const select = vi.spyOn(db, 'select');
+
+        const status = await svc.getConnectionStatus(TENANT);
+
+        expect(status?.openErrors.map((e) => e.contactName).sort())
+            .toEqual(['Person 1', 'Person 2', 'Person 3', 'Person 4']);
+        expect(contactReads(select)).toBe(1);
+    });
+
+    it('looks names up in groups so a large backlog never exceeds the 100 bound parameters D1 allows', async () => {
+        const svc = service('sandbox');
+        await seedTenants();
+        await connect(svc, TENANT);
+        for (let n = 1; n <= 205; n++) {
+            await contact(`c-${n}`, TENANT, `Person ${n}`);
+            await flag(`e-${n}`, TENANT, 'contact', `c-${n}`);
+        }
+        const select = vi.spyOn(db, 'select');
+
+        const status = await svc.getConnectionStatus(TENANT);
+
+        // Every row still gets its name, and 205 ids went in three groups (90 + 90 + 25).
+        expect(status?.openErrors).toHaveLength(205);
+        expect(status?.openErrors.every((e) => e.contactName === `Person ${e.oiId.slice(2)}`)).toBe(true);
+        expect(contactReads(select)).toBe(3);
+    });
+
+    it('does not query contacts at all when no open row is about a contact', async () => {
+        const svc = service('sandbox');
+        await seedTenants();
+        await connect(svc, TENANT);
+        await flag('e-invoice', TENANT, 'invoice', 'inv-1');
+        const select = vi.spyOn(db, 'select');
+
+        const status = await svc.getConnectionStatus(TENANT);
+
+        expect(nameOf(status, 'e-invoice')).toBeNull();
+        expect(contactReads(select)).toBe(0);
+    });
+});

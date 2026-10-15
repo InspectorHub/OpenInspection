@@ -1,5 +1,6 @@
 import { eq, and, count, inArray, isNull } from 'drizzle-orm';
 import { qboConnections, qboEntityMap, qboSyncErrors } from '../../lib/db/schema/qbo';
+import { contacts } from '../../lib/db/schema/contact';
 import { invoices } from '../../lib/db/schema/invoice';
 import { orderPayments } from '../../lib/db/schema/order-payment';
 import { encryptToken } from '../../lib/qbo-crypto';
@@ -15,6 +16,9 @@ import {
 } from './api-base';
 import { withToken } from './token';
 import { withCustomerLink } from './connection-link';
+
+/** Ids per name lookup: D1 binds at most 100 parameters, and the company id takes one. */
+const NAME_LOOKUP_CHUNK = 90;
 
 export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
     return class extends withCustomerLink(withToken(Base)) {
@@ -118,6 +122,25 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                 )).all();
             const currencyOf = new Map(currencies.map(c => [c.id, c.currency]));
 
+            // The name of each contact an open row is about, in ONE query. Tenant
+            // filtered, so a contact id from another company resolves to nothing;
+            // archived contacts are deliberately included, a deleted one is absent.
+            const contactIds = [...new Set(errorRows
+                .filter(r => r.errorCode !== QBO_PAYMENT_DISCREPANCY && r.oiType === 'contact')
+                .map(r => r.oiId))];
+            // D1 allows 100 bound parameters per statement and open rows are not
+            // capped (one per failed contact), so the ids go in groups; the usual
+            // case is still a single query.
+            const nameOf = new Map<string, string>();
+            for (let i = 0; i < contactIds.length; i += NAME_LOOKUP_CHUNK) {
+                const found = await db
+                    .select({ id: contacts.id, name: contacts.name })
+                    .from(contacts)
+                    .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, contactIds.slice(i, i + NAME_LOOKUP_CHUNK))))
+                    .all();
+                for (const c of found) nameOf.set(c.id, c.name);
+            }
+
             const paymentDiscrepancies: QBOPaymentDiscrepancy[] = [];
             for (const row of discrepancyRows) {
                 const figures = decodePaymentDiscrepancy(row.errorMsg);
@@ -176,6 +199,7 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                         id:         r.id,
                         oiType:     r.oiType,
                         oiId:       r.oiId,
+                        contactName: r.oiType === 'contact' ? (nameOf.get(r.oiId) ?? null) : null,
                         errorCode:  r.errorCode,
                         message:    r.errorMsg,
                         retries:    r.retries,

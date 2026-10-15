@@ -47,7 +47,7 @@ const CONNECTED: QBOConnectionStatus = {
 };
 
 const ROW = {
-  id: "err-1", oiType: "invoice", oiId: "inv-00001234", errorCode: "SYNC_ERROR",
+  id: "err-1", oiType: "invoice", oiId: "inv-00001234", contactName: null, errorCode: "SYNC_ERROR",
   message: "QuickBooks refused the invoice", retries: 2, lastSeenAt: NOW_SECONDS,
 };
 
@@ -387,13 +387,13 @@ describe("QuickBooks settings page - feedback bars", () => {
   });
 
   it("surfaces a failed Sync now, which used to fail without a word", async () => {
-    const { calls } = renderPage(CONNECTED, {}, { action: (c) => ({ success: false, intent: c.intent, error: "Could not start the sync. Try again." }) });
+    const { calls } = renderPage(CONNECTED, {}, { action: (c) => ({ success: false, intent: c.intent, error: "Could not check QuickBooks. Try again." }) });
     await screen.findByText("Sandbox Company US baeb");
     await act(async () => { screen.getByRole("button", { name: "Sync now" }).click(); });
     await settle();
 
     expect(calls.map((c) => c.intent)).toEqual(["qbo-sync"]);
-    expect(await screen.findByRole("alert")).toHaveTextContent("Could not start the sync. Try again.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not check QuickBooks. Try again.");
   });
 });
 
@@ -427,13 +427,42 @@ describe("QuickBooks settings page - after a sync", () => {
         return { success: true, intent: c.intent, error: null };
       },
     });
-    expect(await screen.findByText("Not synced yet")).toBeInTheDocument();
+    expect(await screen.findByText("Not checked yet")).toBeInTheDocument();
 
     await act(async () => { screen.getByRole("button", { name: "Sync now" }).click(); });
     await settle();
 
-    await waitFor(() => expect(screen.getByText(/Last sync/)).toBeInTheDocument());
-    expect(screen.queryByText("Not synced yet")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/Last checked/)).toBeInTheDocument());
+    expect(screen.queryByText("Not checked yet")).not.toBeInTheDocument();
+  });
+});
+
+describe("QuickBooks settings page - what Sync now found", () => {
+  const sync = (processed: number) => ({ success: true, intent: "qbo-sync", error: null, sync: { processed, checkedAt: NOW_SECONDS } });
+
+  it("says how many invoices were updated, and says nothing changed when none were", async () => {
+    let n = 2;
+    renderPage(CONNECTED, {}, { action: () => sync(n) });
+    await screen.findByText("Sandbox Company US baeb");
+
+    await act(async () => { screen.getByRole("button", { name: "Sync now" }).click(); });
+    await settle();
+    expect(await screen.findByText("Checked QuickBooks. 2 invoices updated.")).toBeInTheDocument();
+    expect(screen.queryByText("Checked QuickBooks. Nothing has changed.")).not.toBeInTheDocument();
+
+    n = 0;
+    await act(async () => { screen.getByRole("button", { name: "Sync now" }).click(); });
+    await settle();
+    expect(await screen.findByText("Checked QuickBooks. Nothing has changed.")).toBeInTheDocument();
+  });
+
+  it("shows no result line after a failed sync, only the error", async () => {
+    renderPage(CONNECTED, {}, { action: (c) => ({ success: false, intent: c.intent, error: "Could not check QuickBooks. Try again." }) });
+    await screen.findByText("Sandbox Company US baeb");
+    await act(async () => { screen.getByRole("button", { name: "Sync now" }).click(); });
+    await settle();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not check QuickBooks. Try again.");
+    expect(screen.queryByText(/Checked QuickBooks\./)).not.toBeInTheDocument();
   });
 });
 

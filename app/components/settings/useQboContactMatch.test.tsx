@@ -10,14 +10,16 @@ afterEach(cleanup);
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 30)); });
 
 const ERROR: QBOSyncErrorSummary = {
-  id: "e1", oiType: "contact", oiId: "contact-1", errorCode: "SYNC_ERROR", message: "x", retries: 1, lastSeenAt: 1,
+  id: "e1", oiType: "contact", oiId: "contact-1", contactName: null, errorCode: "SYNC_ERROR", message: "x", retries: 1, lastSeenAt: 1,
 };
+
+let current: QBOSyncErrorSummary = ERROR;
 
 function Harness() {
   const match = useQboContactMatch();
   return (
     <>
-      <button type="button" onClick={() => match.open(ERROR)}>open</button>
+      <button type="button" onClick={() => match.open(current)}>open</button>
       {match.dialog}
     </>
   );
@@ -39,6 +41,20 @@ async function mount(answers: (fields: Record<string, string>) => unknown) {
 }
 
 describe("useQboContactMatch", () => {
+  it("names the contact in the dialog when the row carries a name, and falls back when it does not", async () => {
+    await mount(() => ({ success: true }));
+    current = { ...ERROR, contactName: "Alice Adams" };
+    await act(async () => { screen.getByRole("button", { name: "open" }).click(); });
+    expect(screen.getByRole("dialog")).toHaveTextContent("that Alice Adams should be matched");
+    cleanup();
+
+    await mount(() => ({ success: true }));
+    current = { ...ERROR, contactName: null };
+    await act(async () => { screen.getByRole("button", { name: "open" }).click(); });
+    expect(screen.getByRole("dialog")).toHaveTextContent("that this contact should be matched");
+    current = ERROR;
+  });
+
   it("searches and links through the route's action, then closes", async () => {
     const seen = await mount((f) => f.intent === "qbo-search-customers"
       ? {

@@ -26,33 +26,33 @@ function view(over: Partial<React.ComponentProps<typeof QboSyncStatus>> = {}) {
 }
 
 describe("QboSyncStatus - last sync line", () => {
-  it("says 'Not synced yet' before the first sync, and a relative time after it", () => {
+  it("says 'Not checked yet' before the first sync, and a relative time after it", () => {
     const first = view({ lastSyncAt: null });
-    expect(screen.getByText("Not synced yet")).toBeInTheDocument();
-    expect(screen.getByText(/first sync sends customers, then invoices/i)).toBeInTheDocument();
+    expect(screen.getByText("Not checked yet")).toBeInTheDocument();
+    expect(screen.getByText(/Sync now checks QuickBooks for payments\. Contacts and invoices are sent when you create or update them/)).toBeInTheDocument();
     first.unmount();
 
     view({ lastSyncAt: NOW - 12 * 60 });
-    expect(screen.getByText(/Last sync 12 minutes ago/)).toBeInTheDocument();
-    expect(screen.queryByText("Not synced yet")).not.toBeInTheDocument();
+    expect(screen.getByText(/Last checked 12 minutes ago/)).toBeInTheDocument();
+    expect(screen.queryByText("Not checked yet")).not.toBeInTheDocument();
   });
 
   it("steps through just now, minutes, hours and days", () => {
     const text = (secondsAgo: number) => {
       const v = view({ lastSyncAt: NOW - secondsAgo });
-      const t = screen.getByText(/Last sync/).textContent;
+      const t = screen.getByText(/Last checked/).textContent;
       v.unmount();
       return t;
     };
-    expect(text(20)).toBe("Last sync Just now");
-    expect(text(5 * 60)).toBe("Last sync 5 minutes ago");
-    expect(text(3 * 3600)).toBe("Last sync 3 hours ago");
-    expect(text(48 * 3600)).toBe("Last sync 2 days ago");
+    expect(text(20)).toBe("Last checked Just now");
+    expect(text(5 * 60)).toBe("Last checked 5 minutes ago");
+    expect(text(3 * 3600)).toBe("Last checked 3 hours ago");
+    expect(text(48 * 3600)).toBe("Last checked 2 days ago");
   });
 
   it("counts days once the gap passes a day", () => {
     view({ lastSyncAt: NOW - 3 * 24 * 3600 });
-    expect(screen.getByText(/Last sync 3 days ago/)).toBeInTheDocument();
+    expect(screen.getByText(/Last checked 3 days ago/)).toBeInTheDocument();
   });
 
   it("links the attention count to the health section, and omits it when there is none", () => {

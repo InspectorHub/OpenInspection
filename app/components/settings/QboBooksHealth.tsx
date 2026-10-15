@@ -104,6 +104,14 @@ export function QboBooksHealth({
                       probe writes the sentinel oi_id 'bootstrap', so a link here
                       would be dead for one real row out of the set. */}
                   <p className="text-[12px] text-ih-fg-3">
+                    {/* A contact row leads with the person's name when it is known;
+                        the short id stays for every row and for a deleted contact. */}
+                    {e.oiType === "contact" && e.contactName && (
+                      <>
+                        <span className="font-bold text-ih-fg-1">{e.contactName}</span>
+                        {" · "}
+                      </>
+                    )}
                     {m.settings_qbo_error_entity({ entity: e.oiType, id: e.oiId === 'bootstrap' ? e.oiId : e.oiId.slice(0, 8) })}
                     {" · "}
                     {e.retries > 1

@@ -103,7 +103,7 @@ export function useQboMatchDialog(): { open: (target: QboMatchTarget) => void; d
 export function useQboContactMatch(): { open: (error: QBOSyncErrorSummary) => void; dialog: ReactNode } {
   const match = useQboMatchDialog();
   return {
-    open: (error) => match.open({ id: error.oiId, name: m.settings_qbo_match_this_contact(), currentLink: null }),
+    open: (error) => match.open({ id: error.oiId, name: error.contactName ?? m.settings_qbo_match_this_contact(), currentLink: null }),
     dialog: match.dialog,
   };
 }

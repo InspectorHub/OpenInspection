@@ -75,6 +75,12 @@ describe("QboCustomerLinkDialog - searching", () => {
     expect(searchButton()).toBeEnabled();
   });
 
+  it("tells the person that % and _ stand for any characters, next to the length rule", () => {
+    view();
+    expect(screen.getByText(/Enter at least 2 characters, then press Search\./)).toBeInTheDocument();
+    expect(screen.getByText(/% and _ stand for any characters\./)).toBeInTheDocument();
+  });
+
   it("does not search from Enter under two characters", async () => {
     const { props } = view();
     await searchFor("a");

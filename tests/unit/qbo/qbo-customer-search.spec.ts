@@ -5,8 +5,9 @@
  * under this company's credentials, so the ways it can go wrong are tested with
  * a positive control beside each refusal:
  *
- *  - the typed text is escaped (quote, backslash, `%`, `_`) and bounded, so it
- *    cannot widen or break the query;
+ *  - the typed text has its quote and backslash escaped and is bounded, so it
+ *    cannot break out of the query's string literal (`%` and `_` stay wildcards:
+ *    Intuit ignores escapes inside LIKE, so a search for them returns more, not less);
  *  - only active customers are asked for;
  *  - the rows handed back carry no SyncToken and no raw Intuit object;
  *  - each row says whether a contact of THIS company already holds it, and who;
@@ -37,17 +38,30 @@ const T0 = new Date('2026-03-01T10:00:00Z');
 class TestQbo extends withCustomerSearch(withConnection(QBOServiceBase)) {}
 
 describe('escapeQboLike', () => {
-    it('escapes a quote, a backslash and the two wildcards', () => {
+    it('escapes a quote (positive control) and drops a backslash, which Intuit ignores inside LIKE', () => {
         expect(escapeQboLike("O'Brien")).toBe("O\\'Brien");
-        expect(escapeQboLike('a%b_c')).toBe('a\\%b\\_c');
-        expect(escapeQboLike('a\\b')).toBe('a\\\\b');
+        expect(escapeQboLike('a\\b')).toBe('ab');
     });
 
-    it('escapes all four together, in one pass, without doubling a backslash it just added', () => {
-        // a % b _ c \ d ' e   ->   each of the four gets exactly one backslash in front.
-        expect(escapeQboLike("a%b_c\\d'e")).toBe("a\\%b\\_c\\\\d\\'e");
-        // A backslash followed by a wildcard: the backslash is escaped, the wildcard too.
-        expect(escapeQboLike('\\%')).toBe('\\\\\\%');
+    it('leaves % and _ alone: Intuit ignores backslash escapes inside LIKE, so they stay wildcards', () => {
+        // Verified against a real sandbox: `\%` and `\_` still act as wildcards there,
+        // so adding a backslash would only pretend to match them literally.
+        expect(escapeQboLike('a%b_c')).toBe('a%b_c');
+        expect(escapeQboLike("a%b_c\\d'e")).toBe("a%b_cd\\'e");
+    });
+
+    it('never leaves a single quote from user text unescaped', () => {
+        // Typed backslashes are dropped, so every quote is preceded by exactly the one
+        // backslash we add, and no run of backslashes is ever longer than one (a doubled
+        // one, escaped the conventional way, was refused by Intuit as a malformed query).
+        const bare = /(?<!\\)'/;
+        const doubled = /\\\\/;
+        for (const text of ["'", "''", "\\'", "a\\\\'b", "x' OR 1=1 --", "%'_"]) {
+            expect(bare.test(escapeQboLike(text)), text).toBe(false);
+            expect(doubled.test(escapeQboLike(text)), text).toBe(false);
+        }
+        // Control: the pattern does flag a bare quote.
+        expect(bare.test("O'Brien")).toBe(true);
     });
 
     it('lets an ordinary name through untouched (positive control)', () => {

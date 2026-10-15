@@ -37,6 +37,12 @@ export interface QBOSyncErrorSummary {
      * tolerate a miss rather than render a dead link.
      */
     oiId: string;
+    /**
+     * The contact's name when `oiType` is 'contact' and that contact still exists
+     * in this company (an archived one still resolves); null for every other row
+     * and for a contact that has been deleted.
+     */
+    contactName: string | null;
     /** `SYNC_ERROR`, `QBO_VOIDED_IN_QBO`, … — decides how the row reads. */
     errorCode: string;
     /** Whatever the failure actually said. Never a status code on its own. */

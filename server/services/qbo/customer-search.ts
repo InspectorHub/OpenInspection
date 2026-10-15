@@ -34,18 +34,31 @@ const clampPaging = (startPosition: number, limit: number) => ({
     max: Math.min(MAX_RESULTS, Math.max(1, Math.floor(limit))),
 });
 
-/** Quote and backslash: what keeps typed text inside a QuickBooks string literal. */
-const escapeQboString = (input: string): string => input.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+/**
+ * What keeps typed text inside a QuickBooks string literal: backslashes are
+ * removed and every quote is escaped. Intuit's parser does not treat a doubled
+ * backslash the conventional way (verified against a real sandbox: a typed
+ * two backslashes followed by a quote, escaped the conventional way, was refused
+ * as a malformed query), and it ignores backslashes inside LIKE anyway, so
+ * dropping them loses nothing a search could match. The only backslash left in
+ * the text is the one before a quote.
+ */
+const escapeQboString = (input: string): string => input.replace(/\\/g, '').replace(/'/g, "\\'");
 
 /**
- * Typed text as the inside of a QuickBooks `LIKE '%...%'` literal: the quote and
- * backslash cannot end the literal, and `%` / `_` match themselves rather than
- * widening the search.
+ * Typed text as the inside of a QuickBooks `LIKE '%...%'` literal. Only quotes
+ * are escaped (and backslashes dropped, see escapeQboString), which is what keeps
+ * the text inside the string literal.
+ *
+ * Verified against a real Intuit sandbox: inside LIKE, `%` and `_` stay wildcards
+ * whatever precedes them, and a backslash escape is ignored there (a typed `a%b`
+ * matched six customers, `sh_ra` matched "Shara Barnett", and `sh\ara` also matched
+ * it). So a search containing those characters returns a superset of what was
+ * typed. That cannot be prevented from this side, and it cannot break out of the
+ * literal; the picker tells the person that `%` and `_` stand for any characters.
  */
 export function escapeQboLike(input: string): string {
-    // One pass over every character that needs a backslash in front of it, so the
-    // backslash itself is escaped in the same step as the rest.
-    return input.replace(/[\\'%_]/g, (ch) => `\\${ch}`);
+    return escapeQboString(input);
 }
 
 /**

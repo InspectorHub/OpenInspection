@@ -225,9 +225,35 @@ describe("QuickBooks settings route - the other actions", () => {
       "POST /api/integrations/qbo/pause": () => jsonResponse(500, null),
       "POST /api/integrations/qbo/disconnect": () => jsonResponse(500, null),
     });
-    expect((await run({ intent: "qbo-sync" })).error).toBe("Could not start the sync. Try again.");
+    expect((await run({ intent: "qbo-sync" })).error).toBe("Could not check QuickBooks. Try again.");
     expect((await run({ intent: "qbo-pause" })).error).toBe("Could not change automatic sync. Try again.");
     expect((await run({ intent: "qbo-disconnect" })).error).toBe("Could not disconnect from QuickBooks. Try again.");
+  });
+
+  it("sync: passes the server's result through", async () => {
+    const seen = routedFetch({
+      "POST /api/integrations/qbo/sync": () => jsonResponse(200, { success: true, data: { processed: 3, checkedAt: 1760000000 } }),
+    });
+    expect(await run({ intent: "qbo-sync" })).toMatchObject({
+      success: true, intent: "qbo-sync", error: null, sync: { processed: 3, checkedAt: 1760000000 },
+    });
+    expect(seen.filter((r) => r.path.endsWith("/sync")).map((r) => r.method)).toEqual(["POST"]);
+  });
+
+  it("sync: a body without the result is a failure, not a quiet success", async () => {
+    routedFetch({ "POST /api/integrations/qbo/sync": () => jsonResponse(200, { data: {} }) });
+    expect(await run({ intent: "qbo-sync" })).toMatchObject({ success: false, error: "Could not check QuickBooks. Try again." });
+  });
+
+  it("sync: names a paused sync, and shows nothing the API said", async () => {
+    routedFetch({
+      "POST /api/integrations/qbo/sync": () => jsonResponse(409, {
+        error: { code: "CONFLICT", message: "secret-detail", details: { reason: "qbo_sync_paused" } },
+      }),
+    });
+    const r = await run({ intent: "qbo-sync" });
+    expect(r).toMatchObject({ success: false, error: "Automatic sync is off. Turn it on to check QuickBooks." });
+    expect(JSON.stringify(r)).not.toContain("secret-detail");
   });
 
   it("disconnect: posts to the disconnect path and succeeds", async () => {

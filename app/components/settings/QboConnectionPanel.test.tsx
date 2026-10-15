@@ -49,7 +49,7 @@ async function view(over: Partial<QBOConnectionStatus> = {}, handlers: Partial<R
 }
 
 const failedRow = {
-  id: "e1", oiType: "invoice", oiId: "inv-0001", errorCode: "SYNC_ERROR",
+  id: "e1", oiType: "invoice", oiId: "inv-0001", contactName: null, errorCode: "SYNC_ERROR",
   message: "refused", retries: 1, lastSeenAt: 1,
 };
 

@@ -194,7 +194,7 @@ describe('where the CDC window opens', () => {
 
         const result = await qbo.runCDCSync(TENANT, markPaid as never, markPartial as never);
 
-        expect(result).toEqual({ processed: 0 });
+        expect(result).toMatchObject({ processed: 0, outcome: 'paused' });
         expect(queries).toEqual([]);
         // Pausing must not silently move the cursor over the paused window.
         expect(connection()!.lastSyncAt).toBeNull();
@@ -206,7 +206,7 @@ describe('where the CDC window opens', () => {
         const result = await qbo.runCDCSync(
             '00000000-0000-0000-0000-0000000000ff', markPaid as never, markPartial as never);
 
-        expect(result).toEqual({ processed: 0 });
+        expect(result).toMatchObject({ processed: 0, outcome: 'not_connected' });
         expect(queries).toEqual([]);
     });
 });
@@ -244,7 +244,7 @@ describe('what a swept invoice actually does', () => {
 
         const result = await qbo.runCDCSync(TENANT, markPaid as never, markPartial as never);
 
-        expect(result).toEqual({ processed: 1 });
+        expect(result).toMatchObject({ processed: 1 });
         // The status-application path is what wrote these two rows; asserting
         // the mock's arguments alone would pass against a sweep that called it
         // and threw the result away.
@@ -260,7 +260,7 @@ describe('what a swept invoice actually does', () => {
 
         const result = await qbo.runCDCSync(TENANT, markPaid as never, markPartial as never);
 
-        expect(result).toEqual({ processed: 1 });
+        expect(result).toMatchObject({ processed: 1 });
         expect(markPaid).toHaveBeenCalledTimes(1);
     });
 
@@ -274,7 +274,7 @@ describe('what a swept invoice actually does', () => {
 
         const result = await qbo.runCDCSync(TENANT, markPaid as never, markPartial as never);
 
-        expect(result).toEqual({ processed: 1 });
+        expect(result).toMatchObject({ processed: 1 });
         expect(markPaid).not.toHaveBeenCalled();
         expect(markPartial).not.toHaveBeenCalled();
         expect(invoiceRow()!.paidAt).toBeNull();
@@ -309,7 +309,7 @@ describe('when the cursor is allowed to move', () => {
 
         const result = await qbo.runCDCSync(TENANT, markPaid as never, markPartial as never);
 
-        expect(result).toEqual({ processed: 0 });
+        expect(result).toMatchObject({ processed: 0, outcome: 'completed' });
         expect(connection()!.lastSyncAt).not.toBeNull();
     });
 
@@ -337,7 +337,9 @@ describe('when the cursor is allowed to move', () => {
 
         const result = await qbo.runCDCSync(TENANT, markPaid as never, markPartial as never);
 
-        expect(result).toEqual({ processed: 0 });
+        // The caller is told the sweep did not finish, and why; it does not throw.
+        expect(result).toMatchObject({ processed: 0, outcome: 'incomplete' });
+        expect((result as { cause: unknown }).cause).toBeInstanceOf(Error);
         expect(queries).toHaveLength(3); // apiCall retried, then gave up.
         expect(connection()!.lastSyncAt!.getTime()).toBe(LAST_SYNC_AT.getTime());
     });
@@ -378,7 +380,7 @@ describe('when the cursor is allowed to move', () => {
         stubMalformedOk();
 
         await expect(qbo.runCDCSync(TENANT, markPaid as never, markPartial as never))
-            .resolves.toEqual({ processed: 0 });
+            .resolves.toMatchObject({ processed: 0 });
     });
 });
 

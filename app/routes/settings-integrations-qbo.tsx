@@ -9,6 +9,8 @@ import { createApi } from "~/lib/api-client.server";
 import { qboApiFetch, qboCaller } from "~/lib/qbo-api.server";
 import { runCredentialCheck } from "~/lib/qbo-credential-check.server";
 import { runCustomerMatchIntent } from "~/lib/qbo-customer-match.server";
+import { runQboSync } from "~/lib/qbo-sync.server";
+import { QboSyncResult } from "~/components/settings/QboSyncResult";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { getDeploymentProfile } from "../../server/lib/deployment-profile";
@@ -156,7 +158,6 @@ export async function loader({ request, context }: Route.LoaderArgs): Promise<Qb
 /** What a failed fetcher action says, in words about the thing the person pressed. */
 function actionFailure(intent: string): string {
   switch (intent) {
-    case "qbo-sync": return m.settings_qbo_action_failed_sync();
     case "qbo-pause": return m.settings_qbo_action_failed_pause();
     case "qbo-disconnect": return m.settings_qbo_action_failed_disconnect();
     default: return m.settings_qbo_action_failed_dismiss();
@@ -224,8 +225,10 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { success: answered, intent, error: null, syncEnabled: undefined, check };
   }
 
-  if (intent === "qbo-sync" || intent === "qbo-pause" || intent === "qbo-disconnect") {
-    const path = intent === "qbo-sync" ? "/sync" : intent === "qbo-pause" ? "/pause" : "/disconnect";
+  if (intent === "qbo-sync") return runQboSync(context, caller);
+
+  if (intent === "qbo-pause" || intent === "qbo-disconnect") {
+    const path = intent === "qbo-pause" ? "/pause" : "/disconnect";
     const res = await qboApiFetch(context, caller, path, "POST");
     if (!res?.ok) return { success: false, intent, error: actionFailure(intent), syncEnabled: undefined };
 
@@ -270,6 +273,8 @@ export default function SettingsIntegrationsQbo() {
       syncEnabled?: boolean;
       /** Set only by `qbo-dismiss-error` -- which row the server closed. */
       errorId?: string;
+      /** Set only by a finished `qbo-sync`. */
+      sync?: { processed: number; checkedAt: number };
     }>();
 
   const syncing = qboBusy && qboFetcher.formData?.get("intent") === "qbo-sync";
@@ -336,6 +341,7 @@ export default function SettingsIntegrationsQbo() {
           {/* A failed sync, switch, dismiss or disconnect comes back on the fetcher,
               not on the route's action data, and used to be shown nowhere. */}
           {fetcherError && <Banner tone="danger">{fetcherError}</Banner>}
+          <QboSyncResult data={qboFetcher.data} />
 
           <QboOAuthOutcomeBanner outcome={oauth} />
 

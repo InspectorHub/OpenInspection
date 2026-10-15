@@ -7,6 +7,8 @@ import { requireRole } from '../lib/middleware/rbac';
 import { logger } from '../lib/logger';
 import { checkRateLimit } from '../lib/rate-limit';
 import { fireAndForget } from '../lib/fire-and-forget';
+import { Errors, AppError } from '../lib/errors';
+import { mapQboLookupFailure } from '../services/qbo/connection-link';
 import { resyncInvoicesForContact } from '../services/qbo/resync';
 import { describeCredentialSource } from '../services/qbo/credential-source';
 import { checkIntuitCredentials } from '../services/qbo/credential-check';
@@ -91,25 +93,43 @@ api.post('/pause', async (c) => {
     return c.json({ success: true, data: { syncEnabled: result } });
 });
 
+/**
+ * "Sync now": checks QuickBooks for invoice payments and waits for the answer.
+ *
+ * It used to hand the scan to `waitUntil` and answer "started" at once, so the
+ * page re-read its status before the scan had written `last_sync_at` and had no
+ * way to learn that the scan failed. One scan is a bounded number of page
+ * queries, so it is awaited here and its outcome is the response.
+ */
 api.post('/sync', async (c) => {
     const tenantId = c.get('tenantId');
     const svc = c.var.services.qbo;
     const invoiceSvc = c.var.services.invoice;
-    c.executionCtx.waitUntil(
-        svc.runCDCSync(
-            tenantId,
-            // Inbound: the row appended is dropped on purpose — QuickBooks is
-            // where this figure came from, so it must not be pushed back.
-            async (invoiceId, tid) => { await invoiceSvc.markPaid(invoiceId, tid, 'qbo'); },
-            async (invoiceId, amountPaidCents, tid) => { await invoiceSvc.markPartial(invoiceId, tid, 'qbo', amountPaidCents); },
-        // The response has already been sent by the time this settles, so a
-        // rejection here has no caller to reach — without this catch it is an
-        // unhandled rejection and the sweep fails with no trace at all.
-        ).catch((e: unknown) => {
-            logger.error('QBO CDC sweep failed', { tenantId }, e instanceof Error ? e : undefined);
-        }),
+    const result = await svc.runCDCSync(
+        tenantId,
+        // Inbound: the row appended is dropped on purpose — QuickBooks is
+        // where this figure came from, so it must not be pushed back.
+        async (invoiceId, tid) => { await invoiceSvc.markPaid(invoiceId, tid, 'qbo'); },
+        async (invoiceId, amountPaidCents, tid) => { await invoiceSvc.markPartial(invoiceId, tid, 'qbo', amountPaidCents); },
     );
-    return c.json({ success: true, data: { message: 'Sync started' } });
+    switch (result.outcome) {
+        case 'not_connected':
+            throw Errors.Conflict('QuickBooks is not connected', { reason: 'qbo_not_connected' });
+        case 'paused':
+            throw Errors.Conflict('Automatic sync is turned off', { reason: 'qbo_sync_paused' });
+        case 'incomplete': {
+            const mapped = mapQboLookupFailure(result.cause);
+            // Anything the mapper does not recognise is still an upstream failure here.
+            throw mapped instanceof AppError
+                ? mapped
+                : Errors.ServiceUnavailable('QuickBooks is not responding', { reason: 'qbo_unavailable' });
+        }
+        case 'completed':
+            return c.json({
+                success: true,
+                data: { processed: result.processed, checkedAt: Math.floor(Date.now() / 1000) },
+            });
+    }
 });
 
 /**

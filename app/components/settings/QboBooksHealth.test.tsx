@@ -12,7 +12,7 @@ const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 10
 
 function row(over: Partial<QBOSyncErrorSummary> = {}): QBOSyncErrorSummary {
   return {
-    id: "e1", oiType: "invoice", oiId: "0123456789abcdef", errorCode: "SYNC_ERROR",
+    id: "e1", oiType: "invoice", oiId: "0123456789abcdef", contactName: null, errorCode: "SYNC_ERROR",
     message: "QuickBooks said no", retries: 1, lastSeenAt: 1, ...over,
   };
 }
@@ -44,6 +44,24 @@ describe("QboBooksHealth - items that need attention", () => {
     const { container } = await view({ openErrors: [] });
     expect(screen.queryByRole("heading", { name: /need attention/i })).not.toBeInTheDocument();
     expect(container.querySelector("#health")).toBeNull();
+  });
+
+  it("leads a contact row with the contact's name, keeping the short id", async () => {
+    await view({ openErrors: [row({ oiType: "contact", oiId: "0123456789abcdef", contactName: "Alice Adams" })] });
+    expect(screen.getByText("Alice Adams")).toBeInTheDocument();
+    expect(screen.getByText(/contact 01234567/)).toBeInTheDocument();
+  });
+
+  it("shows only the id when the contact has no known name, or the row is not a contact", async () => {
+    await view({
+      openErrors: [
+        row({ id: "a", oiType: "contact", oiId: "aaaaaaaa11", contactName: null }),
+        row({ id: "b", oiType: "invoice", oiId: "bbbbbbbb22", contactName: "Should Not Show" }),
+      ],
+    });
+    expect(screen.getByText(/contact aaaaaaaa/)).toBeInTheDocument();
+    expect(screen.getByText(/invoice bbbbbbbb/)).toBeInTheDocument();
+    expect(screen.queryByText("Should Not Show")).not.toBeInTheDocument();
   });
 
   it("tells the three kinds of row apart, and still shows an unknown code", async () => {

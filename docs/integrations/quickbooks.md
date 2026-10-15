@@ -88,6 +88,12 @@ Only an explicit `invalid_client` is reported as rejected. A timeout, a server e
 
 ---
 
+## What Sync now does
+
+**Sync now** checks QuickBooks for invoices that changed since the last check and records any payments against the matching OpenInspection invoices. It waits for QuickBooks to answer, then says how many invoices were updated, and the page shows when it last checked. If QuickBooks cannot be reached, or automatic sync is switched off, it says so and the last-checked time does not move.
+
+It does not send anything to QuickBooks. Contacts and invoices are sent when you create or update them (and invoices that were waiting on a match are sent again once you match the contact).
+
 ## Matching contacts to QuickBooks customers
 
 A contact is matched to a QuickBooks customer the first time it is synced: by the email address when one matches, otherwise a new customer is created. When that cannot work, you can match by hand.
@@ -99,6 +105,7 @@ The dialog searches active QuickBooks customers by display name, or by exact ema
 
 Things to know:
 
+- `%` and `_` in the search text act as wildcards for any characters. QuickBooks does not honour escapes inside its name search, so a search containing them returns a superset of what was typed.
 - After a match, a contact's edits here update that QuickBooks customer's name, email and phone.
 - Invoices of that contact that failed for lack of a customer are sent again in the background: at most ten per match, one at a time, none started after twenty seconds. Paid and part-paid invoices are left alone. What is left over is sent the next time the contact is matched or the invoice is sent again.
 - **Remove match** changes nothing in QuickBooks. The next time the contact is synced, an existing customer with the same email is looked up first, and a new one is created if there is none.
