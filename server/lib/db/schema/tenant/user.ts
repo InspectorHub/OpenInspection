@@ -41,10 +41,10 @@ export const users = sqliteTable('users', {
     role: text('role', { enum: ROLES }).notNull().default(ROLE.MANAGER),
     // Sparse map of one-time UI flags — an ABSENT key means "not done yet", so
     // a NULL column is simply a fresh account and nothing has to backfill it.
-    // Written only by the three /auth profile endpoints (skip-setup → `skipped`,
-    // checklist/dismiss and onboarding/flag → `checklistDismissed`,
-    // allowlisted); shipped on /auth/me and read by the inspections loader to
-    // hide its prompt.
+    // Written only by `POST /auth/checklist/dismiss` (→ `checklistDismissed`);
+    // shipped on /auth/me and read by the inspections loader to hide its
+    // prompt. Rows written earlier may still carry other keys; readers must
+    // ignore keys they do not know.
     onboardingState: text('onboarding_state', { mode: 'json' }).$type<Record<string, boolean>>(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     // Spec 4A — TOTP 2FA. All fields are per-user opt-in; nullable until enabled.

@@ -113,5 +113,22 @@
   "contacts_archived_empty_title": "Sin contactos archivados",
   "contacts_archived_empty_desc": "Los contactos que archive aparecen aquí y se pueden restaurar.",
   "contacts_roles_action_deactivate": "Desactivar",
-  "contacts_roles_action_reactivate": "Reactivar"
+  "contacts_roles_action_reactivate": "Reactivar",
+  "contact_qbo_heading": "QuickBooks",
+  "contact_qbo_not_matched": "Aún no vinculado",
+  "contact_qbo_not_matched_desc": "Este contacto aún no está vinculado con un cliente de QuickBooks. La próxima vez que se sincronice, OpenInspection busca un cliente de QuickBooks con el mismo correo electrónico y crea uno si no existe.",
+  "contact_qbo_matched": "Vinculado con {customer}",
+  "contact_qbo_matched_unnamed": "Vinculado (nombre no registrado)",
+  "contact_qbo_matched_id": "ID de cliente de QuickBooks que termina en {suffix}",
+  "contact_qbo_attention_one": "1 elemento requiere atención",
+  "contact_qbo_attention_many": "{count} elementos requieren atención",
+  "contact_qbo_match_button": "Vincular con un cliente de QuickBooks",
+  "contact_qbo_change_button": "Cambiar vínculo",
+  "contact_qbo_remove_button": "Eliminar vínculo",
+  "contact_qbo_archived_note": "Este contacto está archivado, por lo que no se puede vincular. Restáurelo para vincularlo con un cliente de QuickBooks.",
+  "contact_qbo_remove_title": "¿Eliminar este vínculo?",
+  "contact_qbo_remove_body": "Eliminar el vínculo no cambia nada en QuickBooks. La próxima vez que se sincronice este contacto, OpenInspection primero busca un cliente de QuickBooks existente con el mismo correo electrónico y, si no lo encuentra, crea uno nuevo.",
+  "contact_qbo_remove_confirm": "Eliminar vínculo",
+  "contact_qbo_remove_keep": "Conservar vínculo",
+  "contact_qbo_remove_failed": "No se pudo eliminar el vínculo. No se cambió nada. Inténtelo de nuevo."
 }

@@ -116,7 +116,7 @@ export const Errors = {
     Forbidden: (msg: string = 'Action forbidden') => new AppError(403, ErrorCode.FORBIDDEN, msg),
     NotFound: (msg: string = 'Resource not found') => new AppError(404, ErrorCode.NOT_FOUND, msg),
     Validation: (details: unknown) => new AppError(400, ErrorCode.VALIDATION_ERROR, 'Validation failed', details),
-    Conflict: (msg: string) => new AppError(409, ErrorCode.CONFLICT, msg),
+    Conflict: (msg: string, details?: unknown) => new AppError(409, ErrorCode.CONFLICT, msg, details),
     UnprocessableEntity: (msg: string, details?: unknown) =>
         new AppError(422, ErrorCode.UNPROCESSABLE_ENTITY, msg, details),
     RateLimited: (msg: string = 'Too many attempts. Please try again later.') => new AppError(429, ErrorCode.RATE_LIMITED, msg),

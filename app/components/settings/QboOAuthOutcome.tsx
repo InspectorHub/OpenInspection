@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Banner } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -37,7 +39,7 @@ function qboOAuthErrorMessage(code: string): string {
       return m.settings_qbo_oauth_error_access_denied();
     case "realm_already_connected":
       // Not a failure of the OAuth round trip — Intuit said yes. One
-      // QuickBooks company may only be bound to one workspace, because the
+      // QuickBooks company may only be bound to one OpenInspection company, because the
       // webhook resolves its tenant by realm id and nothing else.
       return m.settings_qbo_oauth_error_realm_already_connected();
     default:
@@ -46,29 +48,34 @@ function qboOAuthErrorMessage(code: string): string {
 }
 
 /**
- * Not a transient flash: a failure the tenant has to act on must still be on
- * screen when they look back at it.
+ * Not a transient flash: a failure the person has to act on must still be on
+ * screen when they look back at it, so only the success banner can be closed.
+ * A failure has no Dismiss on purpose -- fixing the cause and connecting again
+ * is what clears it.
  */
 export function QboOAuthOutcomeBanner({ outcome }: { outcome: QboOAuthOutcome }) {
+  const [dismissed, setDismissed] = useState(false);
   if (outcome.connected) {
+    if (dismissed) return null;
     return (
-      <div
-        role="status"
-        className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium"
+      <Banner
+        tone="success"
+        actions={
+          <button
+            type="button"
+            onClick={() => setDismissed(true)}
+            className="px-2 py-1 text-[12px] font-bold underline"
+          >
+            {m.settings_qbo_error_dismiss()}
+          </button>
+        }
       >
         {m.settings_qbo_oauth_connected()}
-      </div>
+      </Banner>
     );
   }
   if (outcome.error) {
-    return (
-      <div
-        role="alert"
-        className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium"
-      >
-        {qboOAuthErrorMessage(outcome.error)}
-      </div>
-    );
+    return <Banner tone="danger">{qboOAuthErrorMessage(outcome.error)}</Banner>;
   }
   return null;
 }

@@ -1,112 +1,313 @@
+import { useEffect, useState } from "react";
 import { Form } from "react-router";
+import { SegmentedControl, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { SecretField } from "~/components/SecretField";
-import { m } from "~/paraglide/messages";
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { QboRegistrationUrls } from "~/components/settings/QboRegistrationUrls";
+import {
+  QboCheckButton,
+  QboCheckResult,
+  qboCheckMissing,
+  useQboCredentialCheck,
+} from "~/components/settings/QboCredentialCheck";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
+import { m } from "~/paraglide/messages";
+import type { QboEnvironment, QboRegistration } from "~/lib/qbo-settings-loader";
+import type { QBOCredentialOrigin, QBOCredentialSource } from "../../../server/services/qbo/api-base";
 
-/** The three names that can live either in the Worker env or in the tenant's row. */
+/** The three credentials, as the settings API masks them. `QBO_ENV` is not one: it has its own control. */
 export interface QboCredentialTriple {
   QBO_CLIENT_ID: string;
   QBO_CLIENT_SECRET: string;
   QBO_WEBHOOK_SECRET: string;
-  /** Not a credential. It rides along because a self-hoster's own Intuit app
-   *  is either a Development app or a Production one, and that is a property
-   *  of their app rather than of this deployment. */
-  QBO_ENV: string;
-}
-
-/** Which of the three the deployment already supplies. Booleans, never values. */
-export interface QboCredentialProvenance {
-  QBO_CLIENT_ID: boolean;
-  QBO_CLIENT_SECRET: boolean;
-  QBO_WEBHOOK_SECRET: boolean;
-  QBO_ENV: boolean;
 }
 
 /**
- * An empty field means "unset" only when the deployment isn't already
- * supplying that key. When it is, the field is an override slot, not a gap —
- * and calling it "Not configured" is how a working integration got read as a
- * broken one. Resolution is the same in every deployment mode: the Worker env
- * wins, the tenant's stored value is the self-host fallback.
+ * Everything the connect link needs before it can possibly succeed. The webhook
+ * token is not on the list: connecting does not use it.
+ *
+ * The environment is judged by the VALUE in force, not by where it comes from: a
+ * deployment that sets it to something other than "sandbox" or "production" has
+ * supplied a setting that cannot be used, and the callback would refuse it.
  */
-function envProvidedProps(fromEnv: boolean) {
-  return fromEnv
-    ? {
-        emptyPlaceholder: m.settings_qbo_env_provided(),
-        emptyBadge: m.settings_qbo_env_provided_badge(),
-      }
-    : {};
+export function qboReadyToConnect(source: QBOCredentialSource, environment: QboEnvironment | null): boolean {
+  return source.clientId !== "missing" && source.clientSecret !== "missing" && environment !== null;
 }
 
+/** True while any of the four settings is still missing: the section opens on its own. */
+export function qboNeedsSetup(source: QBOCredentialSource, environment: QboEnvironment | null): boolean {
+  return !qboReadyToConnect(source, environment) || source.webhookToken === "missing";
+}
+
+const isMissing = (o: QBOCredentialOrigin) => o === "missing";
+
+/** A setting the environment already supplies is a row with an explicit Override, not an empty input. */
+function BuiltInRow({ labelId, label, value, onOverride }: { labelId: string; label: string; value?: string; onOverride: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-ih-border bg-ih-bg-muted px-3 py-2">
+      <div className="min-w-0">
+        <span id={labelId} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">
+          {label}
+        </span>
+        <span className="text-[13px] text-ih-fg-2">{value ?? m.settings_qbo_builtin()}</span>
+      </div>
+      <button
+        type="button"
+        aria-describedby={labelId}
+        onClick={onOverride}
+        className="px-3 py-1.5 text-[12px] font-bold text-ih-fg-2 bg-ih-bg-card border border-ih-border rounded-md hover:bg-ih-bg-muted transition-colors"
+      >
+        {m.settings_qbo_override()}
+      </button>
+    </div>
+  );
+}
+
+function CredentialField({
+  name, label, hint, value, origin, onTyped,
+}: { name: string; label: string; hint: string; value: string; origin: QBOCredentialOrigin; onTyped: (typed: string) => void }) {
+  const [overriding, setOverriding] = useState(false);
+  const fromEnv = origin === "env";
+  if (fromEnv && !overriding && !value) {
+    return <BuiltInRow labelId={`qbo-row-${name}`} label={label} onOverride={() => setOverriding(true)} />;
+  }
+  return (
+    <SecretField
+      name={name}
+      label={label}
+      value={value}
+      hint={hint}
+      onChange={onTyped}
+      {...(fromEnv
+        ? { emptyPlaceholder: m.settings_qbo_env_provided(), emptyBadge: m.settings_qbo_env_provided_badge() }
+        : {})}
+    />
+  );
+}
+
+const envLabel = (e: QboEnvironment) =>
+  e === "sandbox" ? m.settings_qbo_env_sandbox() : m.settings_qbo_env_production();
+
+/**
+ * The Intuit environment as a two-way control that can say "neither".
+ *
+ * `QBO_ENV` has no default anywhere in the product, so this must be able to
+ * show that it is unset, and must not write a value the person did not choose.
+ * The hidden field therefore stays empty until a segment is pressed, even when a
+ * value is already shown as selected: an untouched control submits nothing, and
+ * the action drops empty values, so "Save credentials" cannot quietly set it.
+ */
+function EnvironmentField({
+  known, origin, choice, onChoose,
+}: { known: QboEnvironment | null; origin: QBOCredentialOrigin; choice: QboEnvironment | ""; onChoose: (e: QboEnvironment) => void }) {
+  const [overriding, setOverriding] = useState(false);
+  // A value the deployment supplies is shown as built in only when it is one we
+  // can use; an unusable one falls through to the control, which says it is unset.
+  if (origin === "env" && known && !overriding && !choice) {
+    return (
+      <BuiltInRow
+        labelId="qbo-row-QBO_ENV"
+        label={m.settings_qbo_env_label()}
+        value={known ? envLabel(known) : undefined}
+        onOverride={() => setOverriding(true)}
+      />
+    );
+  }
+  const selected = choice || known || "";
+  return (
+    <div className="space-y-1.5">
+      <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">
+        {m.settings_qbo_env_label()}
+      </span>
+      <SegmentedControl
+        size="md"
+        ariaLabel={m.settings_qbo_env_label()}
+        value={selected}
+        onChange={(v) => onChoose(v as QboEnvironment)}
+        options={[
+          { value: "sandbox", label: m.settings_qbo_env_sandbox() },
+          { value: "production", label: m.settings_qbo_env_production() },
+        ]}
+      />
+      <p className="text-[11px] text-ih-fg-3">
+        {m.settings_qbo_env_hint()}
+        {!selected && <> {m.settings_qbo_env_unset_hint()}</>}
+      </p>
+    </div>
+  );
+}
+
+function summarySentence(source: QBOCredentialSource): string {
+  if (source.clientId === "env" && source.clientSecret === "env" && source.webhookToken === "env") {
+    return m.settings_qbo_app_summary_all_builtin();
+  }
+  const missing: string[] = [];
+  if (isMissing(source.clientId)) missing.push(m.settings_qbo_client_id_label());
+  if (isMissing(source.clientSecret)) missing.push(m.settings_qbo_client_secret_label());
+  if (isMissing(source.webhookToken)) missing.push(m.settings_qbo_webhook_label());
+  return missing.length === 0
+    ? m.settings_qbo_app_summary_all_set()
+    : m.settings_qbo_app_summary_missing({ list: missing.join(", ") });
+}
+
+/**
+ * "Your Intuit app": the Client ID, secret, webhook token and environment of
+ * the Intuit app an operator brings themselves, plus the three addresses to
+ * register on it.
+ *
+ * Only rendered where the operator owns the app. It is folded to one summary
+ * line when everything is in place and open when something is missing, so a
+ * working integration is not buried under four fields nobody needs to touch.
+ *
+ * Whatever the environment already supplies stays overridable, behind an
+ * explicit Override: a value stored here is the documented fallback path, and
+ * hiding it would have removed a capability.
+ */
 export function QboCredentialsForm({
-  secrets,
-  envProvided,
-  saving,
+  secrets, credentialSource, environment, registration, saving, open, onOpenChange, defaultOpen,
 }: {
-  /** Masked values from the tenant's own row; "" when nothing is stored. */
+  /** Masked values from the company's own row; "" when nothing is stored. */
   secrets: QboCredentialTriple;
-  envProvided: QboCredentialProvenance;
+  credentialSource: QBOCredentialSource;
+  /** The environment in force, or null when none is set. */
+  environment: QboEnvironment | null;
+  registration: QboRegistration | null;
   saving: boolean;
+  /** Controlled open state; leave undefined to let the section manage itself. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  defaultOpen?: boolean;
 }) {
   const latch = useSubmitLatch();
+  const check = useQboCredentialCheck();
+  const checkMissing = qboCheckMissing(credentialSource, registration);
+  const [innerOpen, setInnerOpen] = useState(defaultOpen ?? qboNeedsSetup(credentialSource, environment));
+  const isOpen = open ?? innerOpen;
+  const setOpen = (next: boolean) => {
+    // Folding the section unmounts the inputs, and the text typed in them goes
+    // with them: what counts as pending has to go too.
+    if (!next) setTyped({});
+    setInnerOpen(next);
+    onOpenChange?.(next);
+  };
+  const [envChoice, setEnvChoice] = useState<QboEnvironment | "">("");
+  // What has been typed and not saved yet, by field. A save changes the stored
+  // values the loader hands back, which is when the edits stop being pending.
+  const [typed, setTyped] = useState<Record<string, string>>({});
+  // Picking the environment already in force changes nothing, so it is not pending.
+  const unsaved = (envChoice !== "" && envChoice !== environment) || Object.values(typed).some((v) => v.trim() !== "");
+  useEffect(() => {
+    setTyped({});
+    setEnvChoice("");
+  }, [secrets.QBO_CLIENT_ID, secrets.QBO_CLIENT_SECRET, secrets.QBO_WEBHOOK_SECRET, environment]);
+  const onTyped = (name: string) => (value: string) => setTyped((prev) => ({ ...prev, [name]: value }));
+
   return (
-    <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
-      <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">
-        {m.settings_qbo_api_credentials_heading()}
-      </h3>
-      <p className="text-[13px] text-ih-fg-3">
-        {m.settings_qbo_credentials_desc_before()}{" "}
-        <a
-          href="https://developer.intuit.com/app/developer/appdetail"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-ih-primary-text hover:underline"
-        >
-          {m.settings_qbo_credentials_link()}
-        </a>
-        .
-      </p>
-      <Form method="post" className="space-y-4 max-w-xl" onSubmit={latch()}>
-        <input type="hidden" name="intent" value="save-qbo-secrets" />
-        <SecretField
-          name="QBO_CLIENT_ID"
-          label={m.settings_qbo_client_id_label()}
-          value={secrets.QBO_CLIENT_ID}
-          hint={m.settings_qbo_client_id_hint()}
-          {...envProvidedProps(envProvided.QBO_CLIENT_ID)}
-        />
-        <SecretField
-          name="QBO_CLIENT_SECRET"
-          label={m.settings_qbo_client_secret_label()}
-          value={secrets.QBO_CLIENT_SECRET}
-          hint={m.settings_qbo_client_secret_hint()}
-          {...envProvidedProps(envProvided.QBO_CLIENT_SECRET)}
-        />
-        <SecretField
-          name="QBO_WEBHOOK_SECRET"
-          label={m.settings_qbo_webhook_label()}
-          value={secrets.QBO_WEBHOOK_SECRET}
-          hint={m.settings_qbo_webhook_hint()}
-          {...envProvidedProps(envProvided.QBO_WEBHOOK_SECRET)}
-        />
-        <SecretField
-          name="QBO_ENV"
-          label={m.settings_qbo_env_label()}
-          value={secrets.QBO_ENV}
-          hint={m.settings_qbo_env_hint()}
-          {...envProvidedProps(envProvided.QBO_ENV)}
-        />
-        <div className="flex justify-end pt-2 border-t border-ih-border">
+    <section
+      id="qbo-app"
+      className="scroll-mt-4 bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5"
+      aria-labelledby="qbo-app-heading"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 id="qbo-app-heading" className="text-[15px] font-bold text-ih-fg-1">
+            {m.settings_qbo_app_heading()}
+          </h2>
+          <p className="text-[12.5px] text-ih-fg-3">
+            <span>
+              {environment
+                ? m.settings_qbo_app_summary_env({ env: envLabel(environment) })
+                : m.settings_qbo_app_summary_env_unset()}
+            </span>
+            {" · "}
+            <span>{summarySentence(credentialSource)}</span>
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {!isOpen && <QboCheckButton missing={checkMissing} busy={check.busy} onRun={check.run} unsaved={unsaved} />}
           <button
-            type="submit"
-            {...pendingProps(saving)}
-            className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed ${PENDING_CLASS}`}
+            type="button"
+            aria-expanded={isOpen}
+            aria-controls="qbo-app-body"
+            onClick={() => setOpen(!isOpen)}
+            className="px-3 py-1.5 text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-md transition-colors"
           >
-            {saving ? m.common_saving() : m.settings_qbo_save_credentials()}
+            {isOpen ? m.settings_qbo_app_hide() : m.settings_qbo_app_show()}
           </button>
         </div>
-      </Form>
+      </div>
+
+      {!isOpen && <QboCheckResult outcome={check.outcome} />}
+
+      {isOpen && (
+        <div id="qbo-app-body" className="space-y-6">
+          <p className="text-[13px] text-ih-fg-3">
+            {m.settings_qbo_credentials_desc_before()}{" "}
+            <a
+              href="https://developer.intuit.com/app/developer/appdetail"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-ih-primary-text hover:underline"
+            >
+              {m.settings_qbo_credentials_link()}
+            </a>
+            .
+          </p>
+          <Form method="post" className="space-y-4 max-w-xl" onChange={check.clear} onSubmit={latch(check.clear)}>
+            <input type="hidden" name="intent" value="save-qbo-secrets" />
+            <input type="hidden" name="QBO_ENV" value={envChoice} />
+            <CredentialField
+              name="QBO_CLIENT_ID"
+              label={m.settings_qbo_client_id_label()}
+              value={secrets.QBO_CLIENT_ID}
+              hint={m.settings_qbo_client_id_hint()}
+              origin={credentialSource.clientId}
+              onTyped={onTyped("QBO_CLIENT_ID")}
+            />
+            <CredentialField
+              name="QBO_CLIENT_SECRET"
+              label={m.settings_qbo_client_secret_label()}
+              value={secrets.QBO_CLIENT_SECRET}
+              hint={m.settings_qbo_client_secret_hint()}
+              origin={credentialSource.clientSecret}
+              onTyped={onTyped("QBO_CLIENT_SECRET")}
+            />
+            <CredentialField
+              name="QBO_WEBHOOK_SECRET"
+              label={m.settings_qbo_webhook_label()}
+              value={secrets.QBO_WEBHOOK_SECRET}
+              hint={m.settings_qbo_webhook_hint()}
+              origin={credentialSource.webhookToken}
+              onTyped={onTyped("QBO_WEBHOOK_SECRET")}
+            />
+            <EnvironmentField
+              known={environment}
+              origin={credentialSource.environment}
+              choice={envChoice}
+              onChoose={(e) => {
+                setEnvChoice(e);
+                check.clear();
+              }}
+            />
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-ih-border">
+              <QboCheckButton missing={checkMissing} busy={check.busy} onRun={check.run} unsaved={unsaved} />
+              <button
+                type="submit"
+                {...pendingProps(saving)}
+                className={`h-9 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed ${PENDING_CLASS}`}
+              >
+                {saving ? m.common_saving() : m.settings_qbo_save_credentials()}
+              </button>
+            </div>
+          </Form>
+          <QboCheckResult outcome={check.outcome} />
+
+          <div className="space-y-2">
+            <h3 className="text-[14px] font-bold text-ih-fg-1">{m.settings_qbo_urls_heading()}</h3>
+            <p className="text-[12.5px] text-ih-fg-3 max-w-[62ch]">{m.settings_qbo_urls_desc()}</p>
+            <QboRegistrationUrls registration={registration} />
+          </div>
+        </div>
+      )}
     </section>
   );
 }

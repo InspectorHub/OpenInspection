@@ -71,24 +71,27 @@ describe('signedByClient + dashboard truth read from the envelope (Track I-a Tas
         expect(inspection.signedByClient).toBe(false);
     });
 
-    it('dashboard buckets agreementSigned flag reads from signed envelopes', async () => {
-        // Date today so the inspection surfaces in the `today` bucket (a signed
-        // envelope keeps it OUT of needsAttention, so it must be a dated bucket).
+    it('a signed envelope keeps an old inspection out of needsAttention; an unsigned one does not', async () => {
+        // Dated today so it surfaces in the `today` bucket. createdAt is older than
+        // the agreement-unsigned threshold, so only the envelope decides attention.
         const todayStr = new Date().toISOString().slice(0, 10);
-        await db.update(schema.inspections).set({ date: todayStr, status: 'confirmed' })
+        await db.update(schema.inspections)
+            .set({ date: todayStr, status: 'confirmed', createdAt: new Date(Date.now() - 10 * 86_400_000) })
             .where(eq(schema.inspections.id, INSP_ID));
-        await db.insert(schema.agreementRequests).values({
-            id: 'req-signed-2', tenantId: TENANT_ID, inspectionId: INSP_ID, agreementId: AGR_ID,
-            clientEmail: 'jane@test.com', clientName: 'Jane', token: crypto.randomUUID(),
-            status: 'signed', completionPolicy: 'all', createdAt: new Date(),
-        } as any);
-
         const svc = new InspectionService({} as D1Database);
-        const buckets = await svc.getDashboardBuckets(TENANT_ID) as Record<string, any>;
-        const all = ['needsAttention', 'today', 'thisWeek', 'later', 'recentReports', 'cancelled']
-            .flatMap((k) => (Array.isArray(buckets[k]) ? buckets[k] : []));
-        const row = all.find((r: any) => r.id === INSP_ID);
-        expect(row).toBeTruthy();
-        expect((row as any).statusFlags.agreementSigned).toBe(true);
+
+        await db.insert(schema.agreementRequests).values({
+            id: 'req-sent-2', tenantId: TENANT_ID, inspectionId: INSP_ID, agreementId: AGR_ID,
+            clientEmail: 'jane@test.com', clientName: 'Jane', token: crypto.randomUUID(),
+            status: 'sent', completionPolicy: 'all', createdAt: new Date(),
+        } as any);
+        const before = await svc.getDashboardBuckets(TENANT_ID) as Record<string, any>;
+        expect(before.needsAttention.some((r: any) => r.id === INSP_ID)).toBe(true);
+
+        await db.update(schema.agreementRequests).set({ status: 'signed' })
+            .where(eq(schema.agreementRequests.id, 'req-sent-2'));
+        const after = await svc.getDashboardBuckets(TENANT_ID) as Record<string, any>;
+        expect(after.needsAttention.some((r: any) => r.id === INSP_ID)).toBe(false);
+        expect(after.today.some((r: any) => r.id === INSP_ID)).toBe(true);
     });
 });

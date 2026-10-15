@@ -1,10 +1,8 @@
 // Profile / onboarding sub-router.
 //
-// Behavior-preserving extraction from auth.ts — handler bodies + route
-// definitions are byte-identical to the original (only their location changed).
 // Covers the authenticated user's self-service surface: account read (/me),
-// profile edit (/profile), logout, and the onboarding-flag writes (skip wizard,
-// dismiss checklist, generic flag). Logout's cookie deletion keeps its exact
+// profile edit (/profile), logout, and the one onboarding-flag write that
+// remains (dismiss checklist). Logout's cookie deletion keeps its exact
 // `__Host-` attributes; no JWT signing happens here.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
@@ -18,25 +16,6 @@ import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/valida
 import { resolvedCapabilitySchema } from '../../lib/validations/admin/compliance';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
-
-const skipSetupRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/setup/skip',
-    operationId: 'skipOnboardingWizard',
-    summary: 'Skip the onboarding wizard',
-    description: 'Marks the in-app onboarding wizard as skipped for the current user. Does not affect tenant-level setup or any system configuration.',
-    tags: ['auth'],
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    responses: {
-        200: {
-            content: {
-                'application/json': { schema: SuccessResponseSchema }
-            },
-            description: 'Onboarding marked as skipped'
-        },
-        401: { description: 'Unauthorized' }
-    }
-}, { scopes: [], tier: 'excluded' }));
 
 const dismissChecklistRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -53,42 +32,6 @@ const dismissChecklistRoute = createRoute(withMcpMetadata({
             },
             description: 'Checklist marked as dismissed'
         },
-        401: { description: 'Unauthorized' }
-    }
-}, { scopes: [], tier: 'excluded' }));
-
-// Allowlist of boolean flags that can be set via the generic onboarding-flag endpoint.
-// Adding a new flag here is the only server-side change needed for new one-time UI states.
-const ONBOARDING_FLAG_ALLOWLIST = ['checklistDismissed'] as const;
-type OnboardingFlag = typeof ONBOARDING_FLAG_ALLOWLIST[number];
-
-const markOnboardingFlagRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/onboarding/flag',
-    operationId: 'markOnboardingFlag',
-    summary: 'Mark a one-time onboarding flag as seen',
-    description: 'Sets a boolean flag in the current user\'s onboardingState. Allowlisted flags only: checklistDismissed. Idempotent.',
-    tags: ['auth'],
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: {
-        body: {
-            content: {
-                'application/json': {
-                    schema: z.object({
-                        flag: z.enum(ONBOARDING_FLAG_ALLOWLIST).describe('The onboarding flag to mark as true.'),
-                    })
-                }
-            }
-        }
-    },
-    responses: {
-        200: {
-            content: {
-                'application/json': { schema: SuccessResponseSchema.describe('Flag marked') }
-            },
-            description: 'Onboarding flag set'
-        },
-        400: { description: 'Unknown flag' },
         401: { description: 'Unauthorized' }
     }
 }, { scopes: [], tier: 'excluded' }));
@@ -176,19 +119,6 @@ const logoutRoute = createRoute(withMcpMetadata({
 }, { scopes: [], tier: 'excluded' }));
 
 const profileRoutes = createApiRouter()
-    .openapi(skipSetupRoute, async (c) => {
-        const user = c.get('user');
-        if (!user?.sub) throw Errors.Unauthorized('Not signed in');
-
-        const db = getDrizzle(c);
-        const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
-        const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
-        onboardingState.skipped = true;
-
-        await db.update(users).set({ onboardingState }).where(eq(users.id, user.sub));
-
-        return c.json({ success: true, data: { skipped: true } }, 200);
-    })
     .openapi(dismissChecklistRoute, async (c) => {
         const user = c.get('user');
         if (!user?.sub) throw Errors.Unauthorized('Not signed in');
@@ -201,21 +131,6 @@ const profileRoutes = createApiRouter()
         await db.update(users).set({ onboardingState }).where(eq(users.id, user.sub));
 
         return c.json({ success: true, data: { checklistDismissed: true } }, 200);
-    })
-    .openapi(markOnboardingFlagRoute, async (c) => {
-        const user = c.get('user');
-        if (!user?.sub) throw Errors.Unauthorized('Not signed in');
-
-        const { flag } = c.req.valid('json') as { flag: OnboardingFlag };
-
-        const db = getDrizzle(c);
-        const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
-        const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
-        onboardingState[flag] = true;
-
-        await db.update(users).set({ onboardingState }).where(eq(users.id, user.sub));
-
-        return c.json({ success: true, data: { [flag]: true } }, 200);
     })
     .openapi(meRoute, async (c) => {
         const user = c.get('user');

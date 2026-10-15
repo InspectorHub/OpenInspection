@@ -1,4 +1,6 @@
+import { pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { attentionLabel } from "~/components/settings/QboSyncStatus";
 import { formatCurrency } from "~/lib/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { QBO_VOIDED_IN_QBO } from "../../../server/lib/qbo-discrepancy";
@@ -58,6 +60,7 @@ export function QboBooksHealth({
   heldDepositCount,
   onDismissError,
   dismissingId,
+  onMatchContact,
 }: {
   openErrors: QBOSyncErrorSummary[];
   discrepancies: QboDiscrepancy[];
@@ -66,13 +69,17 @@ export function QboBooksHealth({
   onDismissError: (id: string) => void;
   /** The row currently being closed, so only its own button reads as busy. */
   dismissingId: string | null;
+  /** Opens the matching dialog for a failed CONTACT row. Invoice and refund rows have no such action. */
+  onMatchContact: (error: QBOSyncErrorSummary) => void;
 }) {
   const locale = useDisplayLocale();
+  // One press, one request, even if a second lands before the busy state renders.
+  const latch = useActionLatch(dismissingId !== null);
 
   return (
     <>
       {openErrors.length > 0 && (
-        <div className="bg-ih-bg-card border border-ih-bad rounded-lg p-6">
+        <div id="health" className="scroll-mt-4 bg-ih-bg-card border border-ih-bad rounded-lg p-6">
           <h3 className="font-bold text-[14px] text-ih-fg-1 mb-2 flex items-center gap-2">
             <svg className="w-4 h-4 text-ih-bad-fg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -82,7 +89,7 @@ export function QboBooksHealth({
                 d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            {m.settings_qbo_sync_errors({ count: openErrors.length })}
+            {attentionLabel(openErrors.length)}
           </h3>
           <p className="text-[12px] text-ih-fg-3 mb-3">{m.settings_qbo_sync_errors_desc()}</p>
           <ul className="space-y-3">
@@ -97,7 +104,15 @@ export function QboBooksHealth({
                       probe writes the sentinel oi_id 'bootstrap', so a link here
                       would be dead for one real row out of the set. */}
                   <p className="text-[12px] text-ih-fg-3">
-                    {m.settings_qbo_error_entity({ entity: e.oiType, id: e.oiId.slice(0, 8) })}
+                    {/* A contact row leads with the person's name when it is known;
+                        the short id stays for every row and for a deleted contact. */}
+                    {e.oiType === "contact" && e.contactName && (
+                      <>
+                        <span className="font-bold text-ih-fg-1">{e.contactName}</span>
+                        {" · "}
+                      </>
+                    )}
+                    {m.settings_qbo_error_entity({ entity: e.oiType, id: e.oiId === 'bootstrap' ? e.oiId : e.oiId.slice(0, 8) })}
                     {" · "}
                     {e.retries > 1
                       ? m.settings_qbo_error_seen_times({ count: e.retries })
@@ -108,15 +123,25 @@ export function QboBooksHealth({
                       push the card wider than the page. */}
                   <p className="text-[12px] text-ih-fg-2 mt-1 break-words">{e.message}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onDismissError(e.id)}
-                  disabled={dismissingId !== null}
-                  aria-busy={dismissingId === e.id || undefined}
-                  className="shrink-0 px-3 py-1.5 text-[12px] font-bold text-ih-fg-2 bg-ih-bg-muted rounded-md hover:bg-ih-bg-muted transition-colors disabled:opacity-50"
-                >
-                  {m.settings_qbo_error_dismiss()}
-                </button>
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  {e.oiType === "contact" && (
+                    <button
+                      type="button"
+                      onClick={() => onMatchContact(e)}
+                      className="px-3 py-1.5 text-[12px] font-bold text-ih-fg-1 bg-ih-bg-muted rounded-md hover:bg-ih-bg-muted transition-colors"
+                    >
+                      {m.settings_qbo_match_button()}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    {...pendingProps<HTMLButtonElement>(dismissingId !== null, () => latch(() => onDismissError(e.id)))}
+                    aria-busy={dismissingId === e.id || undefined}
+                    className={`px-3 py-1.5 text-[12px] font-bold text-ih-fg-2 bg-ih-bg-muted rounded-md hover:bg-ih-bg-muted transition-colors ${PENDING_CLASS}`}
+                  >
+                    {m.settings_qbo_error_dismiss()}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

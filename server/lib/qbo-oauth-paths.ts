@@ -20,3 +20,27 @@ export const QBO_CALLBACK_PATH = `${QBO_OAUTH_MOUNT}/callback`;
 export function qboRedirectUri(appBaseUrl: string): string {
     return `${appBaseUrl}${QBO_CALLBACK_PATH}`;
 }
+
+/** Intuit's "Disconnect URL": the public page QuickBooks sends a user to after they disconnect from their side. */
+export const QBO_DISCONNECT_PAGE_PATH = '/integrations/quickbooks/disconnected';
+
+/** Where Intuit delivers data-change notifications (mounted at the top level, never under /api/). */
+export const QBO_WEBHOOK_PATH = '/webhooks/quickbooks';
+
+/**
+ * The three addresses an operator registers in their own Intuit app, for a
+ * given public origin. They are different paths on purpose, and the settings
+ * page shows them with a copy button each, so they come from here rather than
+ * being typed a second time in a component.
+ */
+export function qboRegistrationUrls(appBaseUrl: string): {
+    redirectUri: string;
+    disconnectUrl: string;
+    webhookUrl: string;
+} {
+    return {
+        redirectUri: qboRedirectUri(appBaseUrl),
+        disconnectUrl: `${appBaseUrl}${QBO_DISCONNECT_PAGE_PATH}`,
+        webhookUrl: `${appBaseUrl}${QBO_WEBHOOK_PATH}`,
+    };
+}

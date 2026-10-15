@@ -3,13 +3,9 @@
  *
  * Spec: voided invoices are excluded from all readers.
  *
- * Covers the two analytics query paths that were NOT updated when
- * invoices.voided_at was introduced:
- *
- *   1. paidIdSet  (feeds statusFlags.paid)  — a paid+voided invoice must NOT
- *      light the "paid" indicator on the dashboard row.
- *   2. overdueSet (feeds statusFlags.flagged) — a voided unpaid past-due invoice
- *      must NOT appear as overdue/flagged.
+ * Covers the analytics query path that must ignore voided invoices:
+ * overdueSet feeds the needsAttention bucket — a voided unpaid past-due invoice
+ * must NOT put its inspection into needsAttention.
  *
  * Task TDD: RED (before isNull(voidedAt) predicate) → GREEN (after fix).
  */
@@ -75,61 +71,7 @@ describe('InspectionAnalyticsService — voided invoice exclusion', () => {
         });
     });
 
-    it('paid+voided invoice does NOT set statusFlags.paid (discriminating: would be true without isNull(voidedAt))', async () => {
-        // Seed a paid invoice that is also voided — must be excluded from paidIdSet.
-        await testDb.insert(schema.invoices).values({
-            id: 'inv-paid-voided', tenantId: TENANT, inspectionId: INSP_A,
-            amountCents: 50000,
-            lineItems: [{ description: 'Inspection', amountCents: 50000 }],
-            paidAt:   new Date('2026-06-10'),
-            voidedAt: new Date('2026-06-11'),
-            createdAt: new Date(),
-        } as never);
-
-        const result = await svc.getDashboardBuckets(TENANT);
-
-        // Find INSP_A in any bucket that decorates rows with statusFlags
-        const allDecorated = [
-            ...result.recentReports,
-            ...result.needsAttention,
-            ...result.today,
-            ...result.thisWeek,
-            ...result.later,
-            ...result.cancelled,
-        ];
-        const row = allDecorated.find(r => r.id === INSP_A);
-        // The inspection should appear in recentReports (completed + published-ish)
-        // If it does not appear in a bucket at all, the flag defaults to false anyway —
-        // either way the paid signal must be false.
-        expect(row?.statusFlags.paid ?? false).toBe(false);
-    });
-
-    it('non-voided paid invoice DOES set statusFlags.paid (baseline sanity)', async () => {
-        // Seed a paid invoice that is NOT voided — must appear in paidIdSet.
-        await testDb.insert(schema.invoices).values({
-            id: 'inv-paid-live', tenantId: TENANT, inspectionId: INSP_A,
-            amountCents: 50000,
-            lineItems: [{ description: 'Inspection', amountCents: 50000 }],
-            paidAt: new Date('2026-06-10'),
-            createdAt: new Date(),
-        } as never);
-
-        const result = await svc.getDashboardBuckets(TENANT);
-
-        const allDecorated = [
-            ...result.recentReports,
-            ...result.needsAttention,
-            ...result.today,
-            ...result.thisWeek,
-            ...result.later,
-            ...result.cancelled,
-        ];
-        const row = allDecorated.find(r => r.id === INSP_A);
-        // A real paid invoice must set the flag — confirms the predicate didn't break the happy path.
-        expect(row?.statusFlags.paid).toBe(true);
-    });
-
-    it('voided unpaid past-due invoice does NOT set statusFlags.flagged (discriminating: would be true without isNull(voidedAt))', async () => {
+    it('voided unpaid past-due invoice does NOT put the inspection in needsAttention (discriminating: would be true without isNull(voidedAt))', async () => {
         // Seed an unpaid invoice with a past due date AND voidedAt set.
         // dueDate 30 days ago — well past any overdue threshold (default 72h).
         const pastDue = new Date(Date.now() - 30 * 24 * 3600 * 1000);
@@ -146,19 +88,11 @@ describe('InspectionAnalyticsService — voided invoice exclusion', () => {
 
         const result = await svc.getDashboardBuckets(TENANT);
 
-        const allDecorated = [
-            ...result.recentReports,
-            ...result.needsAttention,
-            ...result.today,
-            ...result.thisWeek,
-            ...result.later,
-            ...result.cancelled,
-        ];
-        const row = allDecorated.find(r => r.id === INSP_B);
-        expect(row?.statusFlags.flagged ?? false).toBe(false);
+        const row = result.needsAttention.find(r => r.id === INSP_B);
+        expect(row).toBeUndefined();
     });
 
-    it('non-voided unpaid past-due invoice DOES set statusFlags.flagged (baseline sanity)', async () => {
+    it('non-voided unpaid past-due invoice DOES put the inspection in needsAttention (baseline sanity)', async () => {
         const pastDue = new Date(Date.now() - 30 * 24 * 3600 * 1000);
         const pastDueStr = pastDue.toISOString().slice(0, 10);
 
@@ -172,16 +106,8 @@ describe('InspectionAnalyticsService — voided invoice exclusion', () => {
 
         const result = await svc.getDashboardBuckets(TENANT);
 
-        const allDecorated = [
-            ...result.recentReports,
-            ...result.needsAttention,
-            ...result.today,
-            ...result.thisWeek,
-            ...result.later,
-            ...result.cancelled,
-        ];
-        const row = allDecorated.find(r => r.id === INSP_B);
+        const row = result.needsAttention.find(r => r.id === INSP_B);
         // A real overdue invoice must flag the row — confirms the predicate didn't break the happy path.
-        expect(row?.statusFlags.flagged).toBe(true);
+        expect(row).toBeDefined();
     });
 });

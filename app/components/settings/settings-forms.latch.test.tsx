@@ -112,9 +112,12 @@ const CASES: Array<{ name: string; intent: string; ui: () => ReactElement }> = [
         intent: "save-qbo-secrets",
         ui: () => (
             <QboCredentialsForm
-                secrets={{ QBO_CLIENT_ID: "", QBO_CLIENT_SECRET: "", QBO_WEBHOOK_SECRET: "", QBO_ENV: "" }}
-                envProvided={{ QBO_CLIENT_ID: false, QBO_CLIENT_SECRET: false, QBO_WEBHOOK_SECRET: false, QBO_ENV: false }}
+                secrets={{ QBO_CLIENT_ID: "", QBO_CLIENT_SECRET: "", QBO_WEBHOOK_SECRET: "" }}
+                credentialSource={{ clientId: "missing", clientSecret: "missing", webhookToken: "missing", environment: "missing" }}
+                environment={null}
+                registration={null}
                 saving={false}
+                defaultOpen
             />
         ),
     },

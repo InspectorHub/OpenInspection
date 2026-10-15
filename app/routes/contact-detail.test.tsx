@@ -47,7 +47,11 @@ function renderDetail(loaderData: Record<string, unknown>) {
     {
       path: "/contacts/:id",
       Component: ContactDetailPage,
-      loader: () => loaderData,
+      // QuickBooks is covered by ContactQboCard / contact-qbo.server tests; here it is simply not connected.
+      loader: () => ({
+        qbo: { connected: false, link: { linked: false, qboCustomerId: null, displayName: null, openErrorCount: 0 } },
+        ...loaderData,
+      }),
     },
   ]);
   return render(<Stub initialEntries={["/contacts/fx-contact-agent"]} />);

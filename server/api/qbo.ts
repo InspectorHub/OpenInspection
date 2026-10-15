@@ -2,9 +2,19 @@ import { Hono } from 'hono';
 import type { HonoConfig } from '../types/hono';
 import { getCookie } from 'hono/cookie';
 import { verifyJwt } from '../lib/jwt-keyring';
+import { bearerToken } from '../lib/auth-helpers';
 import { requireRole } from '../lib/middleware/rbac';
 import { logger } from '../lib/logger';
-import { QBOLinkCustomerBodySchema } from '../lib/validations/qbo.schema';
+import { checkRateLimit } from '../lib/rate-limit';
+import { fireAndForget } from '../lib/fire-and-forget';
+import { Errors, AppError } from '../lib/errors';
+import { mapQboLookupFailure } from '../services/qbo/connection-link';
+import { resyncInvoicesForContact } from '../services/qbo/resync';
+import { describeCredentialSource } from '../services/qbo/credential-source';
+import { checkIntuitCredentials } from '../services/qbo/credential-check';
+import { qboRedirectUri } from '../lib/qbo-oauth-paths';
+import { qboEnvironmentName, type QBOConnectionStatus } from '../services/qbo/api-base';
+import { QBOCustomerSearchQuerySchema, QBOLinkCustomerBodySchema } from '../lib/validations/qbo.schema';
 
 const api = new Hono<HonoConfig>();
 
@@ -13,7 +23,10 @@ const api = new Hono<HonoConfig>();
 // present, so we enforce auth here and respond 401 (not redirect) so the
 // fetch caller sees a structured failure.
 api.use('*', async (c, next) => {
-    const token = getCookie(c, '__Host-inspector_token') ?? getCookie(c, 'inspector_token');
+    // A Bearer token is honoured as well as the cookie, as the global middleware
+    // in front of this router does: the settings page reached through Intuit's
+    // cross-site redirect has no usable cookie and sends the token this way.
+    const token = bearerToken(c) ?? getCookie(c, '__Host-inspector_token') ?? getCookie(c, 'inspector_token');
     if (!token) return c.json({ success: false, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
     try {
         const keyring = await c.var.keyringPromise!;
@@ -57,7 +70,15 @@ api.use('*', async (c, next) => {
 api.use('*', requireRole('owner', 'manager'));
 
 api.get('/status', async (c) => {
-    const status = await c.var.services.qbo.getConnectionStatus(c.get('tenantId'));
+    const state = await c.var.services.qbo.getConnectionStatus(c.get('tenantId'));
+    if (!state) return c.json({ success: true, data: null });
+    // Assembled here because only this request knows it: the service is built
+    // from the already-merged env, which no longer says which side a value
+    // came from. Origins only; the values never leave the server.
+    const status: QBOConnectionStatus = {
+        ...state,
+        credentialSource: describeCredentialSource(c.env, c.get('tenantSecretKeys') ?? []),
+    };
     return c.json({ success: true, data: status });
 });
 
@@ -72,25 +93,43 @@ api.post('/pause', async (c) => {
     return c.json({ success: true, data: { syncEnabled: result } });
 });
 
+/**
+ * "Sync now": checks QuickBooks for invoice payments and waits for the answer.
+ *
+ * It used to hand the scan to `waitUntil` and answer "started" at once, so the
+ * page re-read its status before the scan had written `last_sync_at` and had no
+ * way to learn that the scan failed. One scan is a bounded number of page
+ * queries, so it is awaited here and its outcome is the response.
+ */
 api.post('/sync', async (c) => {
     const tenantId = c.get('tenantId');
     const svc = c.var.services.qbo;
     const invoiceSvc = c.var.services.invoice;
-    c.executionCtx.waitUntil(
-        svc.runCDCSync(
-            tenantId,
-            // Inbound: the row appended is dropped on purpose — QuickBooks is
-            // where this figure came from, so it must not be pushed back.
-            async (invoiceId, tid) => { await invoiceSvc.markPaid(invoiceId, tid, 'qbo'); },
-            async (invoiceId, amountPaidCents, tid) => { await invoiceSvc.markPartial(invoiceId, tid, 'qbo', amountPaidCents); },
-        // The response has already been sent by the time this settles, so a
-        // rejection here has no caller to reach — without this catch it is an
-        // unhandled rejection and the sweep fails with no trace at all.
-        ).catch((e: unknown) => {
-            logger.error('QBO CDC sweep failed', { tenantId }, e instanceof Error ? e : undefined);
-        }),
+    const result = await svc.runCDCSync(
+        tenantId,
+        // Inbound: the row appended is dropped on purpose — QuickBooks is
+        // where this figure came from, so it must not be pushed back.
+        async (invoiceId, tid) => { await invoiceSvc.markPaid(invoiceId, tid, 'qbo'); },
+        async (invoiceId, amountPaidCents, tid) => { await invoiceSvc.markPartial(invoiceId, tid, 'qbo', amountPaidCents); },
     );
-    return c.json({ success: true, data: { message: 'Sync started' } });
+    switch (result.outcome) {
+        case 'not_connected':
+            throw Errors.Conflict('QuickBooks is not connected', { reason: 'qbo_not_connected' });
+        case 'paused':
+            throw Errors.Conflict('Automatic sync is turned off', { reason: 'qbo_sync_paused' });
+        case 'incomplete': {
+            const mapped = mapQboLookupFailure(result.cause);
+            // Anything the mapper does not recognise is still an upstream failure here.
+            throw mapped instanceof AppError
+                ? mapped
+                : Errors.ServiceUnavailable('QuickBooks is not responding', { reason: 'qbo_unavailable' });
+        }
+        case 'completed':
+            return c.json({
+                success: true,
+                data: { processed: result.processed, checkedAt: Math.floor(Date.now() / 1000) },
+            });
+    }
 });
 
 /**
@@ -108,11 +147,122 @@ api.post('/errors/:id/dismiss', async (c) => {
     return c.json({ success: true });
 });
 
+/**
+ * Find the QuickBooks customer a contact should be matched to. Read-only, but
+ * every call is an Intuit API call made under this company's credentials, so it
+ * is rate limited per company (not per caller address) and the search text is
+ * bounded by the schema before any call is made.
+ */
+api.get('/customers', async (c) => {
+    const parsed = QBOCustomerSearchQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) return c.json({ success: false, error: { code: 'validation_error', message: 'Invalid query' } }, 400);
+    const tenantId = c.get('tenantId');
+    await checkRateLimit(c, 'qbo-customer-search', tenantId);
+    const found = await c.var.services.qbo.searchCustomers(tenantId, parsed.data.q, parsed.data.startPosition, parsed.data.limit);
+    // Spelled out field by field: the browser gets exactly these and nothing a
+    // future change to the service row might add.
+    const customers = found.customers.map((r) => ({
+        id: r.id,
+        displayName: r.displayName,
+        companyName: r.companyName,
+        email: r.email,
+        phone: r.phone,
+        active: r.active,
+        linkedContactId: r.linkedContactId,
+        linkedContactName: r.linkedContactName,
+    }));
+    return c.json({ success: true, data: { customers, nextStartPosition: found.nextStartPosition } });
+});
+
+/**
+ * Are the Client ID and Client Secret this deployment will use a matching pair
+ * for one Intuit app? Nothing is connected or stored.
+ *
+ * The credentials are whatever `c.env` holds: the request middleware has
+ * already merged a company's stored values into it for the keys the deployment
+ * left empty, so this is the same environment-first, company-fallback answer the
+ * connect flow uses. They are never read from the request, and the response
+ * carries the verdict only.
+ */
+api.post('/credentials/check', async (c) => {
+    const missing = (['QBO_CLIENT_ID', 'QBO_CLIENT_SECRET'] as const).filter((k) => !c.env[k]);
+    if (missing.length > 0) {
+        return c.json({ success: false, error: { code: 'credentials_missing', message: 'Client ID and Client Secret are both required', details: missing } }, 400);
+    }
+    if (!c.env.APP_BASE_URL) {
+        return c.json({ success: false, error: { code: 'app_base_url_missing', message: 'APP_BASE_URL is not set' } }, 400);
+    }
+    // Each check is a call to Intuit under this company's app. The shared limiter
+    // allows 10 per minute per key; keyed by company, not caller address.
+    await checkRateLimit(c, 'qbo-credential-check', c.get('tenantId'));
+    const { result } = await checkIntuitCredentials(
+        { fetch: (input, init) => fetch(input, init) },
+        {
+            clientId: c.env.QBO_CLIENT_ID!,
+            clientSecret: c.env.QBO_CLIENT_SECRET!,
+            redirectUri: qboRedirectUri(c.env.APP_BASE_URL),
+        },
+    );
+    return c.json({
+        success: true,
+        data: {
+            result,
+            environment: qboEnvironmentName(c.env.QBO_ENV),
+            checkedAt: Math.floor(Date.now() / 1000),
+        },
+    });
+});
+
+api.get('/contacts/:contactId/link', async (c) => {
+    const link = await c.var.services.qbo.getContactLink(c.get('tenantId'), c.req.param('contactId'));
+    return c.json({
+        success: true,
+        data: {
+            linked: link.linked,
+            qboCustomerId: link.qboCustomerId,
+            displayName: link.displayName,
+            openErrorCount: link.openErrorCount,
+        },
+    });
+});
+
+// Safe to repeat: matching a contact to the customer it already holds rewrites
+// the same row and reports replacedQboCustomerId: null.
 api.post('/contacts/:contactId/link', async (c) => {
     const parsed = QBOLinkCustomerBodySchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ success: false, error: { code: 'validation_error', message: 'Invalid body' } }, 400);
-    await c.var.services.qbo.linkExistingCustomer(c.get('tenantId'), c.req.param('contactId'), parsed.data.qboCustomerId);
-    return c.json({ success: true });
+    // The actor is recorded in the audit trail, so a request with no verified
+    // user behind it is refused rather than written as an anonymous match.
+    const actorUserId = c.get('user')?.sub;
+    if (!actorUserId) return c.json({ success: false, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
+    const tenantId = c.get('tenantId');
+    const contactId = c.req.param('contactId');
+    const svc = c.var.services.qbo;
+    const result = await svc.linkExistingCustomer(tenantId, contactId, parsed.data.qboCustomerId, actorUserId);
+    // The match is done and is the answer. Pushing the invoices that were waiting
+    // for it is slow (calls to QuickBooks), so it runs after the response, capped
+    // at RESYNC_INVOICE_LIMIT; a failure there is logged and never undoes the match.
+    fireAndForget(c, resyncInvoicesForContact(svc, tenantId, contactId).then((r) => {
+        logger.info('QBO re-sync after match finished', { tenantId, contactId, ...r });
+    }), 'QBO re-sync after match', { tenantId, contactId });
+    return c.json({
+        success: true,
+        data: {
+            qboCustomerId: result.qboCustomerId,
+            displayName: result.displayName,
+            replacedQboCustomerId: result.replacedQboCustomerId,
+            resolvedErrorCount: result.resolvedErrorCount,
+        },
+    });
+});
+
+// Safe to repeat: removing a match that is already gone answers removed: false.
+// Nothing is sent to QuickBooks.
+api.delete('/contacts/:contactId/link', async (c) => {
+    const actorUserId = c.get('user')?.sub;
+    if (!actorUserId) return c.json({ success: false, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
+    const result = await c.var.services.qbo.unlinkCustomer(c.get('tenantId'), c.req.param('contactId'), actorUserId);
+    return c.json({ success: true, data: { removed: result.removed } });
 });
 
 export default api;

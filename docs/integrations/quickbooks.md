@@ -19,6 +19,8 @@ Four settings. Three are credentials from your Intuit app; the fourth says which
 
 Set them either as Worker secrets (`wrangler secret put`) or in the app under **Settings → Integrations → QuickBooks Online**. **The Worker environment wins**; a stored value is the fallback, which is what makes the settings form useful on a deployment you cannot easily redeploy.
 
+On that page the section **Your Intuit app** holds the four settings and the three addresses to register in your Intuit app (redirect URI, disconnect URL, webhook endpoint), each with a copy button. It opens by itself while a setting is missing and folds to one line once everything is set. A setting the Worker environment supplies is listed as built in, with an **Override** for storing a value of your own as the fallback; the Intuit environment is a two-way control that stays unselected until you choose, and saving credentials never writes it for you.
+
 `APP_BASE_URL` must also be set, and must be the exact public origin your deployment answers on. It is what the redirect URI is built from.
 
 ### `QBO_ENV` is not optional and has no default
@@ -65,11 +67,50 @@ If it is unset, the connect flow stops and the settings page says so explicitly 
 
 Every outcome of the handshake is reported on that page, including the failures — a missing credential, an unset `QBO_ENV`, an expired attempt, or a declined authorization.
 
-### One QuickBooks company, one workspace
+### One QuickBooks company, one OpenInspection company
 
-A QuickBooks company (its *realm*) can be connected to exactly one workspace. Connecting one that another workspace already holds is refused, and the page says so: disconnect it there first.
+A QuickBooks company (its *realm*) can be connected to exactly one OpenInspection company. Connecting one that another OpenInspection company already holds is refused, and the page says so: disconnect it there first.
 
-The reason is the webhook. It is a single unauthenticated endpoint shared by every connection — the path carries no workspace — so after verifying the Intuit signature the only thing that says whose books an event belongs to is the realm id inside the verified payload. Two workspaces claiming the same realm would make that answer ambiguous, and an ambiguous answer would post one company's payments into whichever workspace happened to be found first. Rather than guess, such an event is skipped and logged with both claimants named.
+The reason is the webhook. It is a single unauthenticated endpoint shared by every connection — the path names no company — so after verifying the Intuit signature the only thing that says whose books an event belongs to is the realm id inside the verified payload. Two OpenInspection companies claiming the same realm would make that answer ambiguous, and an ambiguous answer would post one company's payments into whichever OpenInspection company happened to be found first. Rather than guess, such an event is skipped and logged with both claimants named.
+
+---
+
+## Checking the Intuit app's keys
+
+**Settings → Integrations → QuickBooks Online → Your Intuit app → Check credentials** tells you whether the Client ID and Client Secret in force are a matching pair, without connecting anything. It posts an authorization-code exchange with a made-up code to Intuit's token endpoint: Intuit authenticates the client before it looks at the code, so a matching pair is answered with `invalid_grant` and a wrong ID or secret with `invalid_client`. Nothing is created or consumed either way.
+
+What the check does **not** tell you:
+
+- **Development or Production keys.** The token endpoint is shared by both and accepts both. A Development key set only reaches sandbox companies; see `QBO_ENV` above.
+- **Whether the Redirect URI is registered.** The made-up code fails before the redirect address is compared.
+
+Only an explicit `invalid_client` is reported as rejected. A timeout, a server error, a rate limit or an answer that is not Intuit's JSON is reported as "could not reach Intuit", because none of those says anything about the keys. The result carries a verdict and a time, never a credential. The check is limited to 10 requests per minute per company, and it is disabled while a field holds text that has not been saved yet, so it never reports on values the page is not using.
+
+---
+
+## What Sync now does
+
+**Sync now** checks QuickBooks for invoices that changed since the last check and records any payments against the matching OpenInspection invoices. It waits for QuickBooks to answer, then says how many invoices were updated, and the page shows when it last checked. If QuickBooks cannot be reached, or automatic sync is switched off, it says so and the last-checked time does not move.
+
+It does not send anything to QuickBooks. Contacts and invoices are sent when you create or update them (and invoices that were waiting on a match are sent again once you match the contact).
+
+## Matching contacts to QuickBooks customers
+
+A contact is matched to a QuickBooks customer the first time it is synced: by the email address when one matches, otherwise a new customer is created. When that cannot work, you can match by hand.
+
+- **From an item that needs attention.** A contact that could not be sent shows **Match to a QuickBooks customer** on the QuickBooks settings page.
+- **From the contact's page.** Owners and managers see a **QuickBooks** card once QuickBooks is connected, with **Match to a QuickBooks customer**, or **Change match** and **Remove match** when the contact is already matched.
+
+The dialog searches active QuickBooks customers by display name, or by exact email when the text contains `@`. Searching happens when you press Enter or **Search** (at least two characters), not as you type, because searches are rate limited per company. A customer already matched to another contact is shown greyed out with that contact's name. An inactive customer cannot be matched.
+
+Things to know:
+
+- `%` and `_` in the search text act as wildcards for any characters. QuickBooks does not honour escapes inside its name search, so a search containing them returns a superset of what was typed.
+- After a match, a contact's edits here update that QuickBooks customer's name, email and phone.
+- Invoices of that contact that failed for lack of a customer are sent again in the background: at most ten per match, one at a time, none started after twenty seconds. Paid and part-paid invoices are left alone. What is left over is sent the next time the contact is matched or the invoice is sent again.
+- **Remove match** changes nothing in QuickBooks. The next time the contact is synced, an existing customer with the same email is looked up first, and a new one is created if there is none.
+- Archiving a contact keeps its match, and the customer stays unavailable to other contacts. An archived contact cannot be matched or changed, but its match can be removed from its page. Deleting a contact for good removes its match.
+- Only owners and managers can match or remove a match.
 
 ---
 
@@ -91,7 +132,7 @@ Mappings are cleared on purpose. Reconnecting can land on a **different** QuickB
 - QuickBooks **Online** only. The REST API this integration uses does not cover QuickBooks Desktop or Self-Employed.
 - Intuit throttles per app **and** company: 500 requests per minute per company, and at most 10 concurrent requests to the same company.
 - Two things are read back FROM QuickBooks: payment status, and whether an invoice was voided there. Everything else flows one way, out of OpenInspection.
-- A void in QuickBooks is **recorded, not mirrored**. OpenInspection files it under Sync Errors and leaves the invoice as it was, because voiding here resets the inspection's payment gate and can retract a published report — a decision, not something a poll should make for you. If the void was intended, void it here too.
+- A void in QuickBooks is **recorded, not mirrored**. OpenInspection lists it under the items that need attention and leaves the invoice as it was, because voiding here resets the inspection's payment gate and can retract a published report — a decision, not something a poll should make for you. If the void was intended, void it here too.
 - QuickBooks rejects a colon in a customer's name, so the name sent over is the contact's with any colons removed. The contact's record here is unchanged.
 
 ---

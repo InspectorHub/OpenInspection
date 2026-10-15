@@ -230,7 +230,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
   if (intent === "dismiss-checklist") {
     // IA-12: write checklistDismissed: true into onboardingState.
-    // Mirrors the skipSetupRoute pattern in auth.ts (same table/field shape).
     // TODO(C-10): same hono/client collapse as auth.me — localized cast.
     const dismissPost = api.auth.checklist.dismiss.$post as unknown as (args?: unknown) => Promise<Response>;
     const res = await dismissPost().catch(() => null);

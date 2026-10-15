@@ -1,5 +1,5 @@
 import { eq, and } from 'drizzle-orm';
-import { qboEntityMap } from '../../lib/db/schema/qbo';
+import { qboConnections, qboEntityMap } from '../../lib/db/schema/qbo';
 import { logger } from '../../lib/logger';
 import type { Constructor, QBOServiceBase } from './api-base';
 import { describeQboError } from './api-base';
@@ -86,6 +86,16 @@ export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base
             contact: CustomerSyncContact,
         ): Promise<void> {
             const db = this.getDrizzle();
+
+            // Credentials can be configured before any company is connected, and
+            // that is the only reason this runs with no connection. Nothing here
+            // is a failure: there is no one to sync to yet, and the first
+            // connection starts from a clean error list instead of one entry
+            // per contact saved in the meantime.
+            const connected = await db.select({ tenantId: qboConnections.tenantId }).from(qboConnections)
+                .where(eq(qboConnections.tenantId, tenantId)).get();
+            if (!connected) return;
+
             const { firstName, lastName } = splitName(contact.name);
 
             const buildPayload = (displayName: string) =>

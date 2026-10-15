@@ -1,5 +1,6 @@
-import { eq, and, inArray, isNull } from 'drizzle-orm';
+import { eq, and, count, inArray, isNull } from 'drizzle-orm';
 import { qboConnections, qboEntityMap, qboSyncErrors } from '../../lib/db/schema/qbo';
+import { contacts } from '../../lib/db/schema/contact';
 import { invoices } from '../../lib/db/schema/invoice';
 import { orderPayments } from '../../lib/db/schema/order-payment';
 import { encryptToken } from '../../lib/qbo-crypto';
@@ -7,15 +8,20 @@ import { Errors } from '../../lib/errors';
 import { QBO_PAYMENT_DISCREPANCY, decodePaymentDiscrepancy } from '../../lib/qbo-discrepancy';
 import {
     ACCESS_TOKEN_TTL_SEC,
+    qboEnvironmentName,
     type Constructor,
-    type QBOConnectionStatus,
+    type QBOConnectionState,
     type QBOPaymentDiscrepancy,
     type QBOServiceBase,
 } from './api-base';
 import { withToken } from './token';
+import { withCustomerLink } from './connection-link';
+
+/** Ids per name lookup: D1 binds at most 100 parameters, and the company id takes one. */
+const NAME_LOOKUP_CHUNK = 90;
 
 export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
-    return class extends withToken(Base) {
+    return class extends withCustomerLink(withToken(Base)) {
         async saveConnection(input: {
             tenantId: string;
             realmId: string;
@@ -95,7 +101,7 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                 .where(and(eq(qboSyncErrors.id, errorId), eq(qboSyncErrors.tenantId, tenantId)));
         }
 
-        async getConnectionStatus(tenantId: string): Promise<QBOConnectionStatus | null> {
+        async getConnectionStatus(tenantId: string): Promise<QBOConnectionState | null> {
             const db = this.getDrizzle();
             const row = await db.select().from(qboConnections)
                 .where(eq(qboConnections.tenantId, tenantId)).get();
@@ -115,6 +121,25 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                     inArray(invoices.id, discrepancyRows.map(r => r.oiId)),
                 )).all();
             const currencyOf = new Map(currencies.map(c => [c.id, c.currency]));
+
+            // The name of each contact an open row is about, in ONE query. Tenant
+            // filtered, so a contact id from another company resolves to nothing;
+            // archived contacts are deliberately included, a deleted one is absent.
+            const contactIds = [...new Set(errorRows
+                .filter(r => r.errorCode !== QBO_PAYMENT_DISCREPANCY && r.oiType === 'contact')
+                .map(r => r.oiId))];
+            // D1 allows 100 bound parameters per statement and open rows are not
+            // capped (one per failed contact), so the ids go in groups; the usual
+            // case is still a single query.
+            const nameOf = new Map<string, string>();
+            for (let i = 0; i < contactIds.length; i += NAME_LOOKUP_CHUNK) {
+                const found = await db
+                    .select({ id: contacts.id, name: contacts.name })
+                    .from(contacts)
+                    .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, contactIds.slice(i, i + NAME_LOOKUP_CHUNK))))
+                    .all();
+                for (const c of found) nameOf.set(c.id, c.name);
+            }
 
             const paymentDiscrepancies: QBOPaymentDiscrepancy[] = [];
             for (const row of discrepancyRows) {
@@ -141,6 +166,18 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                     isNull(orderPayments.invoiceId),
                 )).all();
 
+            // What a disconnect would throw away, per kind. One grouped query;
+            // refund twins fall in neither bucket, and the tenant filter is the
+            // whole isolation story, so it is on the query and not on the result.
+            const mapCounts = await db.select({ oiType: qboEntityMap.oiType, n: count() })
+                .from(qboEntityMap)
+                .where(and(
+                    eq(qboEntityMap.tenantId, tenantId),
+                    inArray(qboEntityMap.oiType, ['contact', 'invoice']),
+                ))
+                .groupBy(qboEntityMap.oiType).all();
+            const matched = (oiType: string) => mapCounts.find((r) => r.oiType === oiType)?.n ?? 0;
+
             return {
                 realmId:               row.realmId,
                 companyName:           row.companyName,
@@ -162,6 +199,7 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                         id:         r.id,
                         oiType:     r.oiType,
                         oiId:       r.oiId,
+                        contactName: r.oiType === 'contact' ? (nameOf.get(r.oiId) ?? null) : null,
                         errorCode:  r.errorCode,
                         message:    r.errorMsg,
                         retries:    r.retries,
@@ -170,6 +208,10 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                 paymentDiscrepancies,
                 heldDepositCount:      heldDeposits.length,
                 refreshTokenExpiresAt: Math.floor(row.refreshTokenExpiresAt.getTime() / 1000),
+                connectedAt:           Math.floor(row.createdAt.getTime() / 1000),
+                environment:           qboEnvironmentName(this.qboEnv),
+                mappedCustomers:       matched('contact'),
+                mappedInvoices:        matched('invoice'),
             };
         }
 
@@ -181,61 +223,6 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
             // These two used to delete different sets of rows, and the drift was
             // invisible because each looked complete on its own.
             await this.retireConnection(tenantId);
-        }
-
-        async linkExistingCustomer(tenantId: string, contactId: string, qboCustomerId: string): Promise<void> {
-            const db = this.getDrizzle();
-
-            // The reverse unique index (tenant, qboType, qboId) is NOT the
-            // conflict target below, so a second contact pointed at the same
-            // customer used to surface as a raw `UNIQUE constraint failed`.
-            // Whoever picked the customer reads this; it has to name the holder.
-            const takenBy = await db.select().from(qboEntityMap).where(and(
-                eq(qboEntityMap.tenantId, tenantId),
-                eq(qboEntityMap.qboType, 'Customer'),
-                eq(qboEntityMap.qboId, qboCustomerId),
-            )).get();
-            if (takenBy && takenBy.oiId !== contactId) {
-                // 409, not 500: the caller picked a customer someone else holds,
-                // which is a decision to revisit rather than a fault to report.
-                // A readable message that still arrives as a server error tells
-                // the operator the product broke when it did not.
-                throw Errors.Conflict(
-                    `QuickBooks customer ${qboCustomerId} is already linked to contact ${takenBy.oiId}`,
-                );
-            }
-
-            // Ask QuickBooks where this customer currently stands rather than
-            // assuming. '0' is only true of a customer never edited, and on a
-            // re-point the row kept the PREVIOUS customer's counter — either way
-            // the next update sends a token for the wrong entity and 400s.
-            //
-            // This makes linking able to fail on an API error, which it could
-            // not before. That is the intended trade: a mapping carrying an
-            // invented token fails later instead, on an invoice push, where
-            // nothing points back at the link that caused it.
-            const fetched = await this.apiCall<{ Customer: { Id: string; SyncToken: string } }>(
-                tenantId, 'GET', `customer/${qboCustomerId}`,
-            );
-
-            const now = new Date();
-            await db.insert(qboEntityMap).values({
-                id:           crypto.randomUUID(),
-                tenantId,
-                oiType:       'contact',
-                oiId:         contactId,
-                qboType:      'Customer',
-                qboId:        qboCustomerId,
-                qboSyncToken: fetched.Customer.SyncToken,
-                syncedAt:     now,
-            }).onConflictDoUpdate({
-                target: [qboEntityMap.tenantId, qboEntityMap.oiType, qboEntityMap.oiId],
-                set:    {
-                    qboId:        qboCustomerId,
-                    qboSyncToken: fetched.Customer.SyncToken,
-                    syncedAt:     now,
-                },
-            });
         }
     };
 }

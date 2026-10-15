@@ -24,6 +24,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { asD1Db } from '../helpers/test-db';
+import { seedDefaultEventTypes } from '../helpers/seed-event-types';
 
 const TENANT = '00000000-0000-0000-0000-000000000098';
 const CLIENT = 'contact-client-rr';
@@ -86,7 +87,7 @@ describe('EventService — event.results_received', () => {
         await new PeopleService({ DB: {} as D1Database })
             .addPerson(TENANT, INSP, CLIENT, roleProfileId('client'));
 
-        await svc.bulkSeed(TENANT);
+        await seedDefaultEventTypes(testDb, TENANT);
         eventTypeId = (await svc.listEventTypes(TENANT))[0].id as string;
 
         // Both rules exist up front, so "did not fire" below is a statement

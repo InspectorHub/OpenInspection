@@ -241,6 +241,8 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'recommendation.created': { family: 'recommendation', label: 'audit_action_recommendation_created', meta: { name: 'name', severity: 'name' }, status: { kind: 'live' } },
     'recommendation.deleted': { family: 'recommendation', label: 'audit_action_recommendation_deleted', meta: {}, status: { kind: 'live' } },
     'recommendation.updated': { family: 'recommendation', label: 'audit_action_recommendation_updated', meta: {}, status: { kind: 'live' } },
+    'qbo.customer.linked': { family: 'contact', label: 'audit_action_qbo_customer_linked', meta: { contactId: 'id', qboCustomerId: 'id', replacedQboCustomerId: 'id' }, status: { kind: 'live' } },
+    'qbo.customer.unlinked': { family: 'contact', label: 'audit_action_qbo_customer_unlinked', meta: { contactId: 'id', qboCustomerId: 'id' }, status: { kind: 'live' } },
     'role_profile.capabilities_updated': { family: 'contact_role_profile', label: 'audit_action_role_profile_capabilities_updated', meta: {}, status: { kind: 'live' } },
     'signing_key.rotate': { family: 'signing_key', label: 'audit_action_signing_key_rotate', meta: { fingerprint: 'id', retired: 'flag' }, status: { kind: 'live' } },
     'sms.compliance.provision': { family: 'tenant', label: 'audit_action_sms_compliance_provision', meta: { channel: 'name' }, status: { kind: 'live' } },

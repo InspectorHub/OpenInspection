@@ -99,7 +99,6 @@ export default [
   route("agent-accept-terms", "routes/agent/accept-terms.tsx"),
   // Error / utility pages (bare, outside auth)
   route("not-found", "routes/not-found.tsx"),
-  route("feature-disabled", "routes/feature-disabled.tsx"),
   // API docs (Swagger UI) — was hono GET /ui; OpenAPI JSON still served at /doc
   route("ui", "routes/docs.tsx"),
   // BFF resource routes (no UI) — Token-Relay endpoints for editor hooks

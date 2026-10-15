@@ -18,6 +18,8 @@ import type { HonoConfig } from '../../../server/types/hono';
 const ROOT = join(__dirname, '..', '..', '..');
 const index = readFileSync(join(ROOT, 'server', 'index.ts'), 'utf8');
 const page = readFileSync(join(ROOT, 'app', 'routes', 'settings-integrations-qbo.tsx'), 'utf8');
+// The base path lives in the one module the page calls the API through.
+const client = readFileSync(join(ROOT, 'app', 'lib', 'qbo-api.server.ts'), 'utf8');
 
 describe('the QBO in-process API is addressed as an API', () => {
     it('mounts qboRoutes under /api/integrations/qbo', () => {
@@ -29,8 +31,11 @@ describe('the QBO in-process API is addressed as an API', () => {
     });
 
     it('has the settings page call the new base', () => {
-        expect(page).toContain('/api/integrations/qbo');
-        expect(page).not.toContain('${apiBase}/settings/integrations/qbo');
+        expect(client).toContain('/api/integrations/qbo');
+        expect(client).not.toContain('${apiBase}/settings/integrations/qbo');
+        // Positive control: the page goes through that module and builds no URL of its own.
+        expect(page).toContain('qbo-api.server');
+        expect(page).not.toContain('/settings/integrations/qbo/');
     });
 
     it('leaves the Intuit redirect URI untouched', () => {

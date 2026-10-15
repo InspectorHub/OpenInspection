@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { qboConnections } from '../../lib/db/schema/qbo';
 import { logger } from '../../lib/logger';
 import {
@@ -14,6 +14,16 @@ import { withInvoiceSync } from './invoice-sync';
 import type { CustomerSyncSurface } from './customer-sync';
 
 // Same inherited bound as `withWebhook` — see the note there.
+/**
+ * How a sweep ended. The scheduled caller reads only `processed`; "Sync now"
+ * reads `outcome` so it can tell a finished check from one that could not run.
+ * `cause` is the error that stopped an `incomplete` sweep.
+ */
+export type CdcSweepResult =
+    | { processed: number; outcome: 'completed' }
+    | { processed: number; outcome: 'not_connected' | 'paused' }
+    | { processed: number; outcome: 'incomplete'; cause: unknown };
+
 export function withCdc<
     TBase extends Constructor<QBOServiceBase & CustomerSyncSurface>,
 >(Base: TBase) {
@@ -26,17 +36,19 @@ export function withCdc<
             tenantId: string,
             markPaid: MarkPaidFn,
             markPartial: MarkPartialFn,
-        ): Promise<{ processed: number }> {
+        ): Promise<CdcSweepResult> {
             const db = this.getDrizzle();
             const conn = await db.select().from(qboConnections)
-                .where(and(eq(qboConnections.tenantId, tenantId), eq(qboConnections.syncEnabled, true))).get();
-            if (!conn) return { processed: 0 };
+                .where(eq(qboConnections.tenantId, tenantId)).get();
+            if (!conn) return { processed: 0, outcome: 'not_connected' };
+            if (!conn.syncEnabled) return { processed: 0, outcome: 'paused' };
 
             const sinceIso = this.toIso8601(conn.lastSyncAt ?? conn.createdAt);
             let processed = 0;
             let startPosition = 1;
 
             let sweepComplete = false;
+            let cause: unknown;
 
             while (true) {
                 const query = `SELECT * FROM Invoice WHERE MetaData.LastUpdatedTime > '${sinceIso}' STARTPOSITION ${startPosition} MAXRESULTS ${CDC_PAGE_SIZE}`;
@@ -45,6 +57,7 @@ export function withCdc<
                     result = await this.qboQuery(tenantId, query);
                 } catch (e) {
                     logger.error('QBO CDC query failed', { tenantId, startPosition, qbo: describeQboError(e) }, e instanceof Error ? e : undefined);
+                    cause = e;
                     break;
                 }
 
@@ -73,7 +86,9 @@ export function withCdc<
                     .where(eq(qboConnections.tenantId, tenantId));
             }
 
-            return { processed };
+            return sweepComplete
+                ? { processed, outcome: 'completed' }
+                : { processed, outcome: 'incomplete', cause };
         }
     };
 }

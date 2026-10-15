@@ -9,6 +9,7 @@ import { safeISODate } from '../lib/date';
 import { normalizeLocale } from '../lib/i18n/contact-locale';
 import { tenantConfigs } from '../lib/db/schema';
 import { logger } from '../lib/logger';
+import { qboEntityMap } from '../lib/db/schema/qbo';
 
 export class ContactService {
     /**
@@ -144,6 +145,15 @@ export class ContactService {
             .where(and(eq(inspectionPeople.tenantId, tenantId), eq(inspectionPeople.contactId, id)))
             .get();
         if (!ref) {
+            // A hard-deleted contact must not leave its QuickBooks match behind:
+            // the row would keep that QuickBooks customer "taken" by a contact
+            // that no longer exists, and nothing could ever undo it. An ARCHIVED
+            // contact keeps its match on purpose (it can be undone from the page).
+            await db.delete(qboEntityMap).where(and(
+                eq(qboEntityMap.tenantId, tenantId),
+                eq(qboEntityMap.oiType, 'contact'),
+                eq(qboEntityMap.oiId, id),
+            ));
             await db.delete(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
             return;
         }

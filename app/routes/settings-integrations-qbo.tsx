@@ -1,23 +1,41 @@
 import { useState, useEffect } from "react";
 import { useLoaderData, useActionData, useNavigation } from "react-router";
+import { Banner, PageHeader } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-integrations-qbo";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { getApiUrl } from "~/lib/api.server";
+import { qboApiFetch, qboCaller } from "~/lib/qbo-api.server";
+import { runCredentialCheck } from "~/lib/qbo-credential-check.server";
+import { runCustomerMatchIntent } from "~/lib/qbo-customer-match.server";
+import { runQboSync } from "~/lib/qbo-sync.server";
+import { QboSyncResult } from "~/components/settings/QboSyncResult";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 import { QboConnectionPanel } from "~/components/settings/QboConnectionPanel";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
-import { QboCredentialsForm } from "~/components/settings/QboCredentialsForm";
+import { QboDisconnectDialog } from "~/components/settings/QboDisconnectDialog";
+import {
+  QboCredentialsForm,
+  qboNeedsSetup,
+  qboReadyToConnect,
+  type QboCredentialTriple,
+} from "~/components/settings/QboCredentialsForm";
 import { QboConnectCard } from "~/components/settings/QboConnectCard";
 import {
   QboOAuthOutcomeBanner,
   type QboOAuthOutcome,
 } from "~/components/settings/QboOAuthOutcome";
-import type { QBOConnectionStatus } from "../../server/services/qbo/api-base";
+import {
+  buildRegistration,
+  deriveUnconnectedCredentialSource,
+  qboAccessFrom,
+  resolveQboEnvironment,
+  type QboEnvironment,
+  type QboRegistration,
+} from "~/lib/qbo-settings-loader";
+import type { QBOConnectionStatus, QBOCredentialSource } from "../../server/services/qbo/api-base";
 
 /**
  * The connection is represented by presence, not by a flag: `/status` answers
@@ -30,49 +48,37 @@ import type { QBOConnectionStatus } from "../../server/services/qbo/api-base";
  * divergence is a compile error rather than a blank page.
  */
 export interface QboLoaderData {
-  status: QBOConnectionStatus | null;
-  secrets: {
-    QBO_CLIENT_ID: string;
-    QBO_CLIENT_SECRET: string;
-    QBO_WEBHOOK_SECRET: string;
-    QBO_ENV: string;
-  };
   /**
-   * Whether this tenant supplies their own Intuit app.
-   *
-   * On a platform deployment they never do, and the credential form is not a
-   * thing we hide from them — it is a question they are never asked, because
-   * one published app serves everyone. A self-hosted deploy answers on its own
-   * domain, and Intuit matches a redirect URI byte for byte, so the platform's
-   * app cannot work there whatever anyone prefers.
-   *
-   * Read from the deployment profile's capability, never from an APP_MODE
-   * string compare.
+   * Whether the API let this person in. The management routes answer 403 to
+   * anyone who is not an owner or manager, and without this the page would
+   * read both calls failing as "not connected" and offer a Connect button that
+   * can only fail.
+   */
+  access: "ok" | "forbidden";
+  status: QBOConnectionStatus | null;
+  /** The company's own stored credentials, masked. `QBO_ENV` is not among them: see `environment`. */
+  secrets: QboCredentialTriple;
+  /**
+   * Whether the operator supplies their own Intuit app. When one app serves
+   * everyone, the credential section is not hidden from them -- it is a
+   * question they are never asked. Read from the deployment profile's
+   * capability, never from an APP_MODE string compare.
    */
   selfHosted: boolean;
   /**
-   * Which of the three the deployment already supplies through its Worker env.
-   * Booleans only — the values themselves never leave the server.
-   *
-   * The stored-secret form above can only show what is in the tenant's own
-   * row, so on a deployment that configures QuickBooks centrally all three
-   * read empty while the integration works. Without this the page told a
-   * working tenant they had configured nothing.
+   * Where each setting comes from, the same answer whether or not a company is
+   * connected: `/status` supplies it once connected, and until then it is
+   * derived from the Worker env and the stored values by the same rule.
+   * Origins only -- no value leaves the server.
    */
-  envProvided: {
-    QBO_CLIENT_ID: boolean;
-    QBO_CLIENT_SECRET: boolean;
-    QBO_WEBHOOK_SECRET: boolean;
-    QBO_ENV: boolean;
-  };
+  credentialSource: QBOCredentialSource;
+  /** The environment in force, or null when none is set. Never defaulted. */
+  environment: QboEnvironment | null;
+  /** The three addresses to register with Intuit, or null without a public origin. */
+  registration: QboRegistration | null;
   /**
    * How the OAuth handshake ended, read off the query string that
-   * `api/qbo-oauth.ts` redirects back with. Both halves of that flow report
-   * exclusively this way — `?connected=1`, or `?error=<code>` for a missing
-   * credential, a missing/expired `state`, an unset `QBO_ENV`, a refused token
-   * exchange, or a user who declined at Intuit. Nothing used to read any of
-   * it, so every one of those outcomes returned the user to an unchanged page
-   * with no explanation, successes included.
+   * `api/qbo-oauth.ts` redirects back with: `?connected=1`, or `?error=<code>`.
    */
   oauth: QboOAuthOutcome;
 }
@@ -81,32 +87,13 @@ export function meta() {
   return [{ title: m.settings_qbo_meta_title() }];
 }
 
-async function qboApiFetch(
-  context: Route.LoaderArgs["context"],
-  cookie: string,
-  path: string,
-  method = "GET",
-): Promise<Response | null> {
-  try {
-    const env = getCloudflareEnv(context);
-    const apiBase = getApiUrl(context);
-    const req = new Request(`${apiBase}/api/integrations/qbo${path}`, {
-      method,
-      headers: { Cookie: cookie },
-    });
-    return env.API_WORKER ? env.API_WORKER.fetch(req) : fetch(req);
-  } catch {
-    return null;
-  }
-}
-
 export async function loader({ request, context }: Route.LoaderArgs): Promise<QboLoaderData> {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  const cookie = request.headers.get("Cookie") ?? "";
+  const caller = qboCaller(request, token);
 
   const [qboRes, secretsRes] = await Promise.all([
-    qboApiFetch(context, cookie, "/status"),
+    qboApiFetch(context, caller, "/status"),
     api.secrets.secrets.$get().catch(() => null),
   ]);
 
@@ -118,27 +105,46 @@ export async function loader({ request, context }: Route.LoaderArgs): Promise<Qb
   }
 
   const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
-  const secrets = (secretsBody.data ?? {}) as Record<string, string>;
+  const stored = (secretsBody.data ?? {}) as Record<string, string>;
+  const masked = {
+    QBO_CLIENT_ID: stored.QBO_CLIENT_ID || "",
+    QBO_CLIENT_SECRET: stored.QBO_CLIENT_SECRET || "",
+    QBO_WEBHOOK_SECRET: stored.QBO_WEBHOOK_SECRET || "",
+    QBO_ENV: stored.QBO_ENV || "",
+  };
 
   const env = getCloudflareEnv(context);
   const url = new URL(request.url);
   const rawError = url.searchParams.get("error");
+  const credentialSource =
+    status?.credentialSource ??
+    deriveUnconnectedCredentialSource(
+      {
+        QBO_CLIENT_ID: env.QBO_CLIENT_ID,
+        QBO_CLIENT_SECRET: env.QBO_CLIENT_SECRET,
+        QBO_WEBHOOK_SECRET: env.QBO_WEBHOOK_SECRET,
+        QBO_ENV: env.QBO_ENV,
+      },
+      masked,
+    );
 
   return {
+    access: qboAccessFrom(qboRes),
     status,
     secrets: {
-      QBO_CLIENT_ID: secrets.QBO_CLIENT_ID || "",
-      QBO_CLIENT_SECRET: secrets.QBO_CLIENT_SECRET || "",
-      QBO_WEBHOOK_SECRET: secrets.QBO_WEBHOOK_SECRET || "",
-      QBO_ENV: secrets.QBO_ENV || "",
+      QBO_CLIENT_ID: masked.QBO_CLIENT_ID,
+      QBO_CLIENT_SECRET: masked.QBO_CLIENT_SECRET,
+      QBO_WEBHOOK_SECRET: masked.QBO_WEBHOOK_SECRET,
     },
     selfHosted: !getDeploymentProfile(env).qboAppManaged,
-    envProvided: {
-      QBO_CLIENT_ID: Boolean(env.QBO_CLIENT_ID),
-      QBO_CLIENT_SECRET: Boolean(env.QBO_CLIENT_SECRET),
-      QBO_WEBHOOK_SECRET: Boolean(env.QBO_WEBHOOK_SECRET),
-      QBO_ENV: Boolean(env.QBO_ENV),
-    },
+    credentialSource,
+    environment: resolveQboEnvironment({
+      connected: status?.environment,
+      envValue: env.QBO_ENV,
+      // A stored value only counts when it is the one in force.
+      masked: credentialSource.environment === "tenant" ? masked.QBO_ENV : "",
+    }),
+    registration: buildRegistration(env.APP_BASE_URL),
     oauth: {
       connected: url.searchParams.get("connected") === "1",
       // Bounded before it reaches the page: this value arrives from a
@@ -149,13 +155,25 @@ export async function loader({ request, context }: Route.LoaderArgs): Promise<Qb
   };
 }
 
+/** What a failed fetcher action says, in words about the thing the person pressed. */
+function actionFailure(intent: string): string {
+  switch (intent) {
+    case "qbo-pause": return m.settings_qbo_action_failed_pause();
+    case "qbo-disconnect": return m.settings_qbo_action_failed_disconnect();
+    default: return m.settings_qbo_action_failed_dismiss();
+  }
+}
+
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
   const fd = await request.formData();
   const intent = fd.get("intent") as string | null;
-  const cookie = request.headers.get("Cookie") ?? "";
+  const caller = qboCaller(request, token);
 
   if (intent === "save-qbo-secrets") {
+    // Only a value that was typed or chosen is sent. An empty field means
+    // "leave it as it is" -- including QBO_ENV, which has no default to fall
+    // back on and must never be written by a save that did not touch it.
     const body: Record<string, string> = {};
     for (const key of ["QBO_CLIENT_ID", "QBO_CLIENT_SECRET", "QBO_WEBHOOK_SECRET", "QBO_ENV"] as const) {
       const val = fd.get(key);
@@ -181,25 +199,38 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   // Closing one open row. Kept out of the switch below because it is the only
   // QBO action that names a specific record, and the id must be validated here
-  // rather than pasted into a path — this builds a URL.
+  // rather than pasted into a path -- this builds a URL.
   if (intent === "qbo-dismiss-error") {
     const errorId = String(fd.get("errorId") ?? "");
     if (!errorId) {
       return { success: false, intent, error: m.settings_unknown_action(), syncEnabled: undefined };
     }
     const res = await qboApiFetch(
-      context, cookie, `/errors/${encodeURIComponent(errorId)}/dismiss`, "POST",
+      context, caller, `/errors/${encodeURIComponent(errorId)}/dismiss`, "POST",
     );
-    if (!res?.ok) return { success: false, intent, error: m.settings_qbo_action_failed({ intent }), syncEnabled: undefined, errorId: undefined };
+    if (!res?.ok) return { success: false, intent, error: actionFailure(intent), syncEnabled: undefined, errorId: undefined };
     // The id travels back so the page can drop exactly the row the server
     // closed, rather than re-deriving it from client state.
     return { success: true, intent, error: null, syncEnabled: undefined, errorId };
   }
 
-  if (intent === "qbo-sync" || intent === "qbo-pause" || intent === "qbo-disconnect") {
-    const path = intent === "qbo-sync" ? "/sync" : intent === "qbo-pause" ? "/pause" : "/disconnect";
-    const res = await qboApiFetch(context, cookie, path, "POST");
-    if (!res?.ok) return { success: false, intent, error: m.settings_qbo_action_failed({ intent }), syncEnabled: undefined };
+  const match = await runCustomerMatchIntent(context, caller, intent, fd);
+  if (match) return match;
+
+  // Tests the credentials the server already holds. No body goes out and none
+  // comes back: the result is a small closed set, drawn by the credentials form.
+  if (intent === "qbo-check-credentials") {
+    const check = await runCredentialCheck(context, caller);
+    const answered = check.kind === "paired" || check.kind === "rejected" || check.kind === "unreachable";
+    return { success: answered, intent, error: null, syncEnabled: undefined, check };
+  }
+
+  if (intent === "qbo-sync") return runQboSync(context, caller);
+
+  if (intent === "qbo-pause" || intent === "qbo-disconnect") {
+    const path = intent === "qbo-pause" ? "/pause" : "/disconnect";
+    const res = await qboApiFetch(context, caller, path, "POST");
+    if (!res?.ok) return { success: false, intent, error: actionFailure(intent), syncEnabled: undefined };
 
     if (intent === "qbo-pause") {
       const body = await res.json() as { data?: { syncEnabled?: boolean } };
@@ -212,15 +243,20 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function SettingsIntegrationsQbo() {
-  const { status: initial, secrets, envProvided, oauth, selfHosted } = useLoaderData<typeof loader>();
+  const {
+    access, status: initial, secrets, selfHosted, credentialSource, environment, registration, oauth,
+  } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const [status, setStatus] = useState<QBOConnectionStatus | null>(initial);
+  // The loader revalidates after every fetcher action; take its answer so the
+  // last-sync line and the counts move on after a sync instead of waiting for a reload.
+  useEffect(() => setStatus(initial), [initial]);
 
   const savingSecrets =
     nav.state !== "idle" && nav.formData?.get("intent") === "save-qbo-secrets";
 
-  // Transient success flash — visible for 4s after a save round-trip.
+  // Transient success flash -- visible for 4s after a save round-trip.
   const [flashVisible, setFlashVisible] = useState(false);
   useEffect(() => {
     if (actionData?.success && actionData.intent === "save-qbo-secrets") {
@@ -235,23 +271,20 @@ export default function SettingsIntegrationsQbo() {
       intent?: string | null;
       error: string | null;
       syncEnabled?: boolean;
-      /** Set only by `qbo-dismiss-error` — which row the server closed. */
+      /** Set only by `qbo-dismiss-error` -- which row the server closed. */
       errorId?: string;
+      /** Set only by a finished `qbo-sync`. */
+      sync?: { processed: number; checkedAt: number };
     }>();
 
-  const discrepancies = status?.paymentDiscrepancies ?? [];
   const syncing = qboBusy && qboFetcher.formData?.get("intent") === "qbo-sync";
-  const expiryWarning =
-    status?.refreshTokenExpiresAt &&
-    status.refreshTokenExpiresAt <
-      Math.floor(Date.now() / 1000) + 30 * 24 * 3600;
 
   useEffect(() => {
     const d = qboFetcher.data;
     if (!d?.success) return;
     if (d.intent === "qbo-pause") {
       // Only when the action reported the new state. A pause whose response
-      // omitted it leaves the badge showing what we last knew, rather than
+      // omitted it leaves the switch showing what we last knew, rather than
       // flipping it to a value nobody confirmed.
       const next = d.syncEnabled;
       if (typeof next === "boolean") setStatus((s) => (s ? { ...s, syncEnabled: next } : s));
@@ -267,19 +300,10 @@ export default function SettingsIntegrationsQbo() {
     }
   }, [qboFetcher.data]);
 
-  function triggerSync() {
-    submitQbo({ intent: "qbo-sync" }, { method: "POST" });
-  }
-
-  function togglePause() {
-    submitQbo({ intent: "qbo-pause" }, { method: "POST" });
-  }
-
   // Disconnect asks first. One click used to end the connection AND delete every
-  // entity mapping — irreversible in the sense that matters: reconnecting does
-  // not restore the links, so previously-synced records can be pushed again as
-  // new ones. A custom dialog rather than `window.confirm`, which this codebase
-  // does not use.
+  // entity mapping -- reconnecting does not restore them, so previously-synced
+  // records can be pushed again as new ones. A custom dialog rather than
+  // `window.confirm`, which this codebase does not use.
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   function disconnect() {
     setConfirmDisconnect(false);
@@ -287,17 +311,15 @@ export default function SettingsIntegrationsQbo() {
   }
 
   // Which row is being closed, so only its own button reads as busy. Cleared on
-  // the fetcher settling — including a FAILED dismiss, or the row would sit
+  // the fetcher settling -- including a FAILED dismiss, or the row would sit
   // disabled forever with no way to retry it.
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   useEffect(() => {
     if (qboFetcher.state === "idle") setDismissingId(null);
   }, [qboFetcher.state]);
 
-  function dismissError(errorId: string) {
-    setDismissingId(errorId);
-    submitQbo({ intent: "qbo-dismiss-error", errorId }, { method: "POST" });
-  }
+  const [credentialsOpen, setCredentialsOpen] = useState(() => qboNeedsSetup(credentialSource, environment));
+  const fetcherError = qboFetcher.data && !qboFetcher.data.success ? qboFetcher.data.error : null;
 
   return (
     <div className="space-y-ih-list">
@@ -308,86 +330,68 @@ export default function SettingsIntegrationsQbo() {
           { label: m.settings_qbo_crumb() },
         ]}
       />
+      <PageHeader title={m.settings_qbo_page_title()} meta={m.settings_qbo_page_subtitle()} />
 
-      {/* Flash */}
-      {flashVisible && actionData?.success && (
-        <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-          {m.settings_qbo_flash_saved()}
-        </div>
-      )}
-      {actionData?.error && (
-        <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
-          {actionData.error}
-        </div>
-      )}
+      {access === "forbidden" ? (
+        <Banner tone="warn">{m.settings_qbo_forbidden()}</Banner>
+      ) : (
+        <>
+          {flashVisible && actionData?.success && <Banner tone="success">{m.settings_qbo_flash_saved()}</Banner>}
+          {actionData?.error && <Banner tone="danger">{actionData.error}</Banner>}
+          {/* A failed sync, switch, dismiss or disconnect comes back on the fetcher,
+              not on the route's action data, and used to be shown nowhere. */}
+          {fetcherError && <Banner tone="danger">{fetcherError}</Banner>}
+          <QboSyncResult data={qboFetcher.data} />
 
-      <QboOAuthOutcomeBanner outcome={oauth} />
+          <QboOAuthOutcomeBanner outcome={oauth} />
 
-      {/* Only where the tenant owns the Intuit app. On a platform deployment
-          these fields would be four questions with no right answer. */}
-      {selfHosted && (
-        <QboCredentialsForm
-          secrets={secrets}
-          envProvided={envProvided}
-          saving={savingSecrets}
-        />
-      )}
-
-      {/* Expiry warning */}
-      {status && expiryWarning && (
-        <div className="flex items-start gap-3 p-4 bg-ih-watch-bg border border-ih-watch-fg/20 rounded-lg text-ih-watch-fg text-[13px]">
-          <svg
-            className="w-5 h-5 flex-shrink-0 mt-0.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          {status ? (
+            <QboConnectionPanel
+              status={status}
+              busy={qboBusy}
+              syncing={syncing}
+              dismissingId={dismissingId}
+              onSync={() => submitQbo({ intent: "qbo-sync" }, { method: "POST" })}
+              onToggleAuto={() => submitQbo({ intent: "qbo-pause" }, { method: "POST" })}
+              onRequestDisconnect={() => setConfirmDisconnect(true)}
+              onDismissError={(errorId) => {
+                setDismissingId(errorId);
+                submitQbo({ intent: "qbo-dismiss-error", errorId }, { method: "POST" });
+              }}
             />
-          </svg>
-          <span>
-            {m.settings_qbo_expiry_warning()}{" "}
-            {/* /api/*, not a child of this page's path: only API-prefixed paths
-                reach the Hono app (workers/app.ts allow-list). A link under
-                /settings/** lands on React Router, which has no such route. */}
-            <a href="/api/integrations/qbo/connect" className="underline font-semibold">
-              {m.settings_qbo_reconnect_link()}
-            </a>
-          </span>
-        </div>
+          ) : (
+            <QboConnectCard
+              ready={!selfHosted || qboReadyToConnect(credentialSource, environment)}
+              onNeedCredentials={() => setCredentialsOpen(true)}
+            />
+          )}
+
+          {/* Only where the operator owns the Intuit app. */}
+          {selfHosted && (
+            <QboCredentialsForm
+              secrets={secrets}
+              credentialSource={credentialSource}
+              environment={environment}
+              registration={registration}
+              saving={savingSecrets}
+              open={credentialsOpen}
+              onOpenChange={setCredentialsOpen}
+            />
+          )}
+
+          {status && (
+            <QboDisconnectDialog
+              open={confirmDisconnect}
+              companyName={status.companyName}
+              mappedCustomers={status.mappedCustomers}
+              mappedInvoices={status.mappedInvoices}
+              busy={qboBusy}
+              onConfirm={disconnect}
+              onCancel={() => setConfirmDisconnect(false)}
+            />
+          )}
+        </>
       )}
-
-      {/* Not connected */}
-      {!status && <QboConnectCard />}
-
-      {/* Connected */}
-      {status && (
-        <QboConnectionPanel
-          status={status}
-          discrepancies={discrepancies}
-          busy={qboBusy}
-          syncing={syncing}
-          dismissingId={dismissingId}
-          onSync={triggerSync}
-          onTogglePause={togglePause}
-          onRequestDisconnect={() => setConfirmDisconnect(true)}
-          onDismissError={dismissError}
-        />
-      )}
-
-      <ConfirmDialog
-        open={confirmDisconnect}
-        title={m.settings_qbo_disconnect_confirm_title()}
-        message={m.settings_qbo_disconnect_confirm_body()}
-        confirmLabel={m.settings_qbo_disconnect_confirm_action()}
-        busy={qboBusy}
-        onConfirm={disconnect}
-        onCancel={() => setConfirmDisconnect(false)}
-      />
     </div>
   );
 }

@@ -1,27 +1,20 @@
-import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
-import { QboBooksHealth, type QboDiscrepancy } from "~/components/settings/QboBooksHealth";
+import { formatDate } from "~/lib/format";
+import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { QboBooksHealth } from "~/components/settings/QboBooksHealth";
+import { useQboContactMatch } from "~/components/settings/useQboContactMatch";
+import { QboCopyButton } from "~/components/settings/QboCopyButton";
+import { QboEnvironmentBadge } from "~/components/settings/QboEnvironmentBadge";
+import { QboSyncStatus } from "~/components/settings/QboSyncStatus";
+import { QboStatusPill, qboConnectionState, qboNeedsReconnect } from "~/components/settings/QboStatusPill";
 import type { QBOConnectionStatus } from "../../../server/services/qbo/api-base";
 
-/** "3 hours ago" / "just now" / "never", from an epoch-SECONDS instant. */
-function timeSince(ts: number | null | undefined): string {
-  if (!ts) return m.settings_qbo_time_never();
-  const diff = Math.floor(Date.now() / 1000) - ts;
-  if (diff < 60) return m.settings_qbo_time_just_now();
-  if (diff < 3600) return m.settings_qbo_time_minutes_ago({ minutes: Math.floor(diff / 60) });
-  return m.settings_qbo_time_hours_ago({ hours: Math.floor(diff / 3600) });
-}
-
 /**
- * Everything the page shows once a QuickBooks company is connected: which
- * company and when it last synced, the three actions, and the books-health
- * cards below them.
- *
- * Split out of the route because the route had grown past the 400-line ceiling,
- * and this is the seam the file already used — `QboConnectCard`,
- * `QboCredentialsForm` and `QboBooksHealth` were extracted the same way. The
- * route keeps the loader, the action, and the state the actions mutate; this
- * keeps the markup.
+ * Everything the page shows once a QuickBooks company is connected: the
+ * connection card (who, which environment, whether it is working, when it
+ * stops being valid), the sync controls, and below it the items that need
+ * attention and the contact matching summary.
  *
  * It takes callbacks rather than a fetcher: whether an action is permitted and
  * what it submits are the route's business, and a component that submitted on
@@ -29,86 +22,135 @@ function timeSince(ts: number | null | undefined): string {
  */
 export function QboConnectionPanel({
   status,
-  discrepancies,
   busy,
   syncing,
   dismissingId,
   onSync,
-  onTogglePause,
+  onToggleAuto,
   onRequestDisconnect,
   onDismissError,
 }: {
   status: QBOConnectionStatus;
-  discrepancies: QboDiscrepancy[];
-  /** Any QBO action is in flight — every button disables together. */
+  /** Any QBO action is in flight -- every control disables together. */
   busy: boolean;
   /** The in-flight action is specifically the sync, which gets its own label. */
   syncing: boolean;
   dismissingId: string | null;
   onSync: () => void;
-  onTogglePause: () => void;
+  onToggleAuto: () => void;
   /** Opens the confirmation. Disconnecting is not a one-click action. */
   onRequestDisconnect: () => void;
   onDismissError: (id: string) => void;
 }) {
+  const locale = useDisplayLocale();
+  const match = useQboContactMatch();
+  const timeZone = useDisplayTimeZone();
+  const now = Math.floor(Date.now() / 1000);
+  const openErrors = status.openErrors ?? [];
+  const reconnect = qboNeedsReconnect(status.refreshTokenExpiresAt, now);
+  const expired = status.refreshTokenExpiresAt > 0 && status.refreshTokenExpiresAt < now;
+  const state = qboConnectionState({
+    refreshTokenExpiresAt: status.refreshTokenExpiresAt,
+    openErrorCount: openErrors.length,
+    syncEnabled: status.syncEnabled,
+    nowSeconds: now,
+  });
+  const day = (seconds: number) => formatDate(seconds * 1000, { locale, timeZone });
+
   return (
     <div className="space-y-4">
-      <div className="bg-ih-bg-card border border-ih-border rounded-lg p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <p className="font-bold text-[14px] text-ih-fg-1">
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-6 space-y-5" aria-labelledby="qbo-conn-heading">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#2CA01C]/10" aria-hidden="true">
+              <span className="text-[14px] font-extrabold text-[#2CA01C]">QB</span>
+            </div>
+            <h2 id="qbo-conn-heading" className="min-w-0 break-words text-[20px] font-bold text-ih-fg-1">
               {status.companyName ?? m.settings_qbo_connected_fallback()}
-            </p>
-            <p className="text-[12px] text-ih-fg-3 mt-0.5">
-              {m.settings_qbo_last_synced({ time: timeSince(status.lastSyncAt) })}
-            </p>
+            </h2>
+            <QboEnvironmentBadge environment={status.environment} />
           </div>
-          <span
-            className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${
-              status.syncEnabled ? "bg-ih-ok-bg text-ih-ok-fg" : "bg-ih-bg-muted text-ih-fg-2"
-            }`}
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${status.syncEnabled ? "bg-ih-ok" : "bg-ih-fg-4"}`}
-            />
-            {status.syncEnabled ? m.settings_qbo_status_active() : m.settings_qbo_status_paused()}
+          <QboStatusPill state={state} />
+        </div>
+
+        <div className="flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-ih-fg-3">
+          <span className="inline-flex items-center gap-1">
+            {m.settings_qbo_meta_realm()}{" "}
+            <b className="font-mono font-medium text-ih-fg-1">{status.realmId}</b>
+            <QboCopyButton value={status.realmId} label={m.settings_qbo_copy_realm_label()} />
+          </span>
+          <span>
+            {m.settings_qbo_meta_connected()} <b className="text-ih-fg-1">{day(status.connectedAt)}</b>
+          </span>
+          <span>
+            {m.settings_qbo_meta_valid_until()} <b className="text-ih-fg-1">{day(status.refreshTokenExpiresAt)}</b>
           </span>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            {...pendingProps(busy, onSync)}
-            aria-busy={syncing || undefined}
-            className={`px-4 py-2 text-[12px] font-bold bg-ih-primary-tint text-ih-primary-text rounded-md hover:bg-ih-primary-tint transition-colors disabled:opacity-50 ${PENDING_CLASS}`}
-          >
-            {syncing ? m.settings_qbo_syncing() : m.settings_qbo_sync_now()}
-          </button>
-          <button
-            {...pendingProps(busy, onTogglePause)}
-            aria-busy={busy || undefined}
-            className={`px-4 py-2 text-[12px] font-bold bg-ih-bg-muted text-ih-fg-2 rounded-md hover:bg-ih-bg-muted transition-colors disabled:opacity-50 ${PENDING_CLASS}`}
-          >
-            {status.syncEnabled ? m.settings_qbo_pause_sync() : m.settings_qbo_resume_sync()}
-          </button>
-          <button
-            // Pending, not native disabled: the confirm closes in the batch busy flips and focus must return here.
-            {...pendingProps(busy, onRequestDisconnect)}
-            aria-busy={busy || undefined}
-            className={`px-4 py-2 text-[12px] font-bold text-ih-bad-fg hover:bg-ih-bad-bg rounded-md transition-colors ${PENDING_CLASS}`}
-          >
-            {m.settings_qbo_disconnect()}
-          </button>
-        </div>
-      </div>
 
-      {/* Failed pushes, disagreements and what is never sent — see
+        {reconnect && (
+          <div className="flex items-start gap-3 rounded-lg border border-ih-watch-fg/20 bg-ih-watch-bg p-4 text-[13px] text-ih-watch-fg">
+            <svg className="mt-0.5 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>
+              {expired ? m.settings_qbo_expired_warning() : m.settings_qbo_expiry_warning()}{" "}
+              {/* /api/*, not a child of this page's path: only API-prefixed paths
+                  reach the Hono app (workers/app.ts allow-list). A link under
+                  /settings/** lands on React Router, which has no such route. */}
+              <a href="/api/integrations/qbo/connect" className="font-semibold underline">
+                {expired ? m.settings_qbo_reconnect_now() : m.settings_qbo_reconnect_link()}
+              </a>
+            </span>
+          </div>
+        )}
+
+        <hr className="border-ih-border" />
+
+        <QboSyncStatus
+          lastSyncAt={status.lastSyncAt}
+          openErrorCount={openErrors.length}
+          syncEnabled={status.syncEnabled}
+          syncing={syncing}
+          busy={busy}
+          mappedCustomers={status.mappedCustomers}
+          mappedInvoices={status.mappedInvoices}
+          onSync={onSync}
+          onToggleAuto={onToggleAuto}
+        />
+
+        <hr className="border-ih-border" />
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="max-w-[56ch] text-[12.5px] text-ih-fg-3">{m.settings_qbo_disconnect_note()}</p>
+          {/* Quiet on purpose: ending the connection is rare and not the page's job. */}
+          <Button variant="danger-link" size="sm" pending={busy} onClick={onRequestDisconnect}>
+            {m.settings_qbo_disconnect()}
+          </Button>
+        </div>
+      </section>
+
+      {/* Failed pushes, disagreements and what is never sent -- see
           QboBooksHealth for why a discrepancy shows both figures. */}
       <QboBooksHealth
-        openErrors={status.openErrors ?? []}
-        discrepancies={discrepancies}
+        openErrors={openErrors}
+        discrepancies={status.paymentDiscrepancies ?? []}
         heldDepositCount={status.heldDepositCount ?? 0}
         onDismissError={onDismissError}
         dismissingId={dismissingId}
+        onMatchContact={match.open}
       />
+      {match.dialog}
+
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-6" aria-labelledby="qbo-matching-heading">
+        <h2 id="qbo-matching-heading" className="text-[15px] font-bold text-ih-fg-1">
+          {m.settings_qbo_matching_heading()}
+        </h2>
+        <p className="mt-1.5 max-w-[64ch] text-[13px] text-ih-fg-3">{m.settings_qbo_matching_desc()}</p>
+        <div className="mt-4 inline-flex min-w-[200px] flex-col gap-0.5 rounded-lg border border-ih-border px-4 py-3.5">
+          <span className="text-[24px] font-bold leading-tight tracking-tight text-ih-fg-1">{status.mappedCustomers}</span>
+          <span className="text-[12.5px] text-ih-fg-3">{m.settings_qbo_matching_count()}</span>
+        </div>
+      </section>
     </div>
   );
 }

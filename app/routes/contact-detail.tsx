@@ -10,6 +10,8 @@ import { humanizeStatus, capitalize } from "~/lib/status";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import type { RoleKind } from "../../server/lib/people/role-kinds";
 import { ReportAccessPanel, type AccessRow } from "~/components/contacts/ReportAccessPanel";
+import { ContactQboSection } from "~/components/contacts/ContactQboSection";
+import { loadContactQbo, runContactQboIntent } from "~/lib/contact-qbo.server";
 import { PageHeader, Card, Pill, EmptyState } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
@@ -83,6 +85,8 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   // the request failed tells the operator the opposite of what may be true —
   // the dangerous direction on this particular panel. Empty and unknown are
   // different answers and the page says which one it has.
+  // QuickBooks (owners and managers only; never rejects) runs alongside it.
+  const qboPending = loadContactQbo(context, request, token, id);
   let access: AccessRow[] = [];
   let accessFailed = false;
   try {
@@ -97,7 +101,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     accessFailed = true;
   }
 
-  return { detail, access, accessFailed };
+  return { detail, access, accessFailed, qbo: await qboPending };
 }
 
 export async function action({ request, params, context }: Route.ActionArgs) {
@@ -105,6 +109,9 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const api = createApi(context, { token });
   const fd = await request.formData();
   const id = params.id as string;
+
+  const qboResult = await runContactQboIntent(context, request, token, id, fd.get("intent"), fd);
+  if (qboResult) return qboResult;
 
   if (fd.get("intent") === "revoke-access") {
     // A single id revokes one row; its absence revokes everything. Same shape
@@ -127,7 +134,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function ContactDetailPage() {
-  const { detail, access, accessFailed } = useLoaderData<typeof loader>();
+  const { detail, access, accessFailed, qbo } = useLoaderData<typeof loader>();
   const { contact, inspections, stats } = detail;
   const displayTz = useDisplayTimeZone();
   const fmt = useInspectionDateTimeFormat();
@@ -258,6 +265,8 @@ export default function ContactDetailPage() {
           </div>
         </Card>
       </div>
+
+      <ContactQboSection qbo={qbo} contact={{ id: contact.id, name: contact.name, archived }} />
 
       <ReportAccessPanel access={access} accessFailed={accessFailed} />
 

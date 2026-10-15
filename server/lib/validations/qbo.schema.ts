@@ -84,4 +84,22 @@ export const QBOLinkCustomerBodySchema = z.object({
         .describe('Id of an existing QuickBooks customer to map this contact onto, instead of creating a new one. The customer is fetched before the mapping is written, so the stored SyncToken belongs to that customer rather than being assumed.'),
 });
 
+/**
+ * Query string of the QuickBooks customer search behind the "match to an
+ * existing customer" picker.
+ *
+ * The bounds are not cosmetic: `q` is placed inside a query sent to Intuit under
+ * this company's credentials, so its length is capped and a blank or one-letter
+ * search (which would list the whole directory) is refused before any call.
+ */
+export const QBOCustomerSearchQuerySchema = z.object({
+    q: z.string().trim().min(2).max(100)
+        .refine((v) => ![...v].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127), 'Search text cannot contain control characters')
+        .describe('What to look for: part of a customer\'s display name, or a full email address. Trimmed; 2 to 100 characters, so a blank or single-letter search cannot list every customer.'),
+    startPosition: z.coerce.number().int().min(1).max(100000).default(1)
+        .describe('1-based position of the first result, as QuickBooks counts. Pass the previous response\'s nextStartPosition to read the next page.'),
+    limit: z.coerce.number().int().min(1).max(20).default(20)
+        .describe('Most results to return (1 to 20).'),
+});
+
 export type QBOCloudEvent = z.infer<typeof QBOCloudEventSchema>;

@@ -1,5 +1,5 @@
 // Agreement signing envelope sub-router: create + email a signing request,
-// check signed status, fetch the on-site signing surface, and submit an
+// fetch the on-site signing surface, and submit an
 // on-site signature. Split out of publish.ts so each file stays under the size
 // ceiling. Behavior-preserving extraction from inspections.ts — handler bodies
 // + route definitions are byte-identical to the original.
@@ -159,22 +159,6 @@ const agreementsRoutes = createApiRouter()
                 addedSigners: env.addedSignerIds.length,
             },
         }, 200);
-    })
-    .get('/:id/sign-status', async (c) => {
-        const id = c.req.param('id') as string;
-        const tenantId = c.get('tenantId');
-        const db = getDrizzle(c);
-
-        // Track I-a — signed truth rides the envelope: a signed agreement_requests
-        // row for this inspection (any channel — emailed OR on-site) lights it.
-        const existing = await db.select({ id: agreementRequests.id }).from(agreementRequests)
-            .where(and(
-                eq(agreementRequests.inspectionId, id),
-                eq(agreementRequests.tenantId, tenantId),
-                eq(agreementRequests.status, 'signed'),
-            )).limit(1).get();
-
-        return c.json({ success: true, data: { signed: !!existing } }, 200);
     })
     .get('/:id/agreement', async (c) => {
         const id = c.req.param('id') as string;

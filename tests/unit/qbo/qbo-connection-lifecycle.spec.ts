@@ -61,6 +61,19 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db as unknown as BetterSQLite3Database<typeof schema>;
     await setupSchema(fixture.sqlite);
+    // The better-sqlite3 driver has no `batch`; D1 does, and it is atomic. This
+    // stand-in gives the same all-or-nothing behaviour for the link write.
+    (db as unknown as { batch: (stmts: Array<{ run: () => unknown }>) => Promise<unknown[]> }).batch = async (stmts) => {
+        fixture.sqlite.exec('BEGIN');
+        try {
+            const out = stmts.map((st) => st.run());
+            fixture.sqlite.exec('COMMIT');
+            return out;
+        } catch (err) {
+            fixture.sqlite.exec('ROLLBACK');
+            throw err;
+        }
+    };
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
 
     // `linkExistingCustomer` asks QuickBooks for the customer's own SyncToken,
@@ -196,9 +209,15 @@ describe('disconnect revokes, clears the mapping, and drops the connection', () 
     beforeEach(async () => {
         await connect(TENANT);
         await connect(OTHER);
-        await svc.linkExistingCustomer(TENANT, 'contact-1', '11');
-        await svc.linkExistingCustomer(TENANT, 'contact-2', '12');
-        await svc.linkExistingCustomer(OTHER, 'contact-9', '99');
+        // Seeded directly: this block is about what disconnect deletes, and
+        // going through the link would drag the contacts table into it.
+        await db.insert(schema.qboEntityMap).values([
+            ['m1', TENANT, 'contact-1', '11'],
+            ['m2', TENANT, 'contact-2', '12'],
+            ['m3', OTHER, 'contact-9', '99'],
+        ].map(([id, tenantId, oiId, qboId]) => ({
+            id, tenantId, oiType: 'contact', oiId, qboType: 'Customer', qboId, qboSyncToken: '0', syncedAt: T0,
+        })));
     });
 
     it('does all three things', async () => {
@@ -233,8 +252,7 @@ describe('disconnect revokes, clears the mapping, and drops the connection', () 
     });
 
     it('is a no-op for a tenant that was never connected', async () => {
-        // The link calls in beforeEach each read a customer from QuickBooks, so
-        // the count before is the baseline this disconnect must not move.
+        // The count before is the baseline this disconnect must not move.
         const callsBefore = fetchMock.mock.calls.length;
 
         await svc.disconnect('00000000-0000-0000-0000-000000000003');
@@ -361,7 +379,25 @@ describe('linkExistingCustomer maps a contact onto a QuickBooks customer', () =>
     beforeEach(async () => {
         await connect(TENANT);
         await connect(OTHER);
+        // The link refuses a contact that is not a live row of the workspace, so
+        // the contacts have to exist (ids are global, hence the second tenant's own).
+        for (const [id, slug] of [[TENANT, 'acme'], [OTHER, 'other']] as const) {
+            await db.insert(schema.tenants).values({
+                id, slug, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: T0,
+            });
+        }
+        for (const [id, tenantId, name] of [
+            ['contact-1', TENANT, 'Alice Adams'],
+            ['contact-2', TENANT, 'Bob Brown'],
+            ['contact-1-other', OTHER, 'Alice Elsewhere'],
+        ] as const) {
+            await db.insert(schema.contacts).values({
+                id, tenantId, type: 'client', name, email: `${id}@example.com`, createdAt: T0,
+            } as never);
+        }
     });
+
+    const ACTOR = 'user-owner-1';
 
     const mapping = (tenantId: string, oiId: string) => db.select().from(schema.qboEntityMap)
         .where(and(eq(schema.qboEntityMap.tenantId, tenantId), eq(schema.qboEntityMap.oiId, oiId))).get();
@@ -369,7 +405,7 @@ describe('linkExistingCustomer maps a contact onto a QuickBooks customer', () =>
     it('writes the mapping with the QuickBooks-side names Intuit uses', async () => {
         qboReports('58', '3');
 
-        await svc.linkExistingCustomer(TENANT, 'contact-1', '58');
+        await svc.linkExistingCustomer(TENANT, 'contact-1', '58', ACTOR);
 
         // The token is QuickBooks' answer about customer 58, not a constant we
         // chose. '0' is only correct for a customer that has never been edited.
@@ -380,11 +416,11 @@ describe('linkExistingCustomer maps a contact onto a QuickBooks customer', () =>
     });
 
     it('OVERWRITES an existing mapping for the same contact', async () => {
-        await svc.linkExistingCustomer(TENANT, 'contact-1', '58');
+        await svc.linkExistingCustomer(TENANT, 'contact-1', '58', ACTOR);
         const first = mapping(TENANT, 'contact-1')!;
         qboReports('59', '4');
 
-        await svc.linkExistingCustomer(TENANT, 'contact-1', '59');
+        await svc.linkExistingCustomer(TENANT, 'contact-1', '59', ACTOR);
 
         const second = mapping(TENANT, 'contact-1')!;
         expect(db.select().from(schema.qboEntityMap).all()).toHaveLength(1);
@@ -396,13 +432,13 @@ describe('linkExistingCustomer maps a contact onto a QuickBooks customer', () =>
     });
 
     it('takes the SyncToken QuickBooks reports when a link is re-pointed', async () => {
-        await svc.linkExistingCustomer(TENANT, 'contact-1', '58');
+        await svc.linkExistingCustomer(TENANT, 'contact-1', '58', ACTOR);
         // Stand in for syncs having happened against customer 58.
         await db.update(schema.qboEntityMap).set({ qboSyncToken: '7' })
             .where(eq(schema.qboEntityMap.oiId, 'contact-1'));
         qboReports('59', '2');
 
-        await svc.linkExistingCustomer(TENANT, 'contact-1', '59');
+        await svc.linkExistingCustomer(TENANT, 'contact-1', '59', ACTOR);
 
         // Not 7, and not 0 either: 7 is customer 58's counter and 0 is a guess.
         // Only QuickBooks knows where customer 59 currently stands.
@@ -410,23 +446,24 @@ describe('linkExistingCustomer maps a contact onto a QuickBooks customer', () =>
     });
 
     it('allows re-linking a contact to the customer it already points at', async () => {
-        await svc.linkExistingCustomer(TENANT, 'contact-1', '58');
+        await svc.linkExistingCustomer(TENANT, 'contact-1', '58', ACTOR);
 
         // The claim guard must not fire on the row it is about to update, or a
         // re-link that changes nothing becomes an error the operator has to read.
-        await expect(svc.linkExistingCustomer(TENANT, 'contact-1', '58')).resolves.toBeUndefined();
+        await expect(svc.linkExistingCustomer(TENANT, 'contact-1', '58', ACTOR))
+            .resolves.toMatchObject({ qboCustomerId: '58' });
         expect(db.select().from(schema.qboEntityMap).all()).toHaveLength(1);
     });
 
     it('REFUSES to point a second contact at a customer already claimed, in words', async () => {
-        await svc.linkExistingCustomer(TENANT, 'contact-1', '58');
+        await svc.linkExistingCustomer(TENANT, 'contact-1', '58', ACTOR);
 
         // The reverse unique key (tenant, qboType, qboId) is not the conflict
         // target, so this used to surface as a raw `UNIQUE constraint failed`.
         // Whoever picked the customer is the one who reads this message; it has
         // to say which contact already holds it.
-        await expect(svc.linkExistingCustomer(TENANT, 'contact-2', '58'))
-            .rejects.toThrow(/already linked to contact contact-1/i);
+        await expect(svc.linkExistingCustomer(TENANT, 'contact-2', '58', ACTOR))
+            .rejects.toThrow(/already matched to Alice Adams/i);
         expect(db.select().from(schema.qboEntityMap).all()).toHaveLength(1);
     });
 
@@ -437,20 +474,20 @@ describe('linkExistingCustomer maps a contact onto a QuickBooks customer', () =>
         // where before it could only fail on a constraint. That is the intended
         // trade: a mapping carrying an invented token fails later instead, on
         // someone else's invoice push, where nothing points back to this link.
-        await expect(svc.linkExistingCustomer(TENANT, 'contact-1', '58')).rejects.toThrow(/404/);
+        await expect(svc.linkExistingCustomer(TENANT, 'contact-1', '58', ACTOR)).rejects.toMatchObject({ details: { reason: 'qbo_customer_not_found' } });
         expect(db.select().from(schema.qboEntityMap).all()).toHaveLength(0);
     });
 
-    it('is scoped to the tenant — the same contact id in another tenant is a separate mapping', async () => {
-        await svc.linkExistingCustomer(TENANT, 'contact-1', '58');
+    it('is scoped to the tenant — the same QuickBooks id in another tenant is a separate mapping', async () => {
+        await svc.linkExistingCustomer(TENANT, 'contact-1', '58', ACTOR);
         // Deliberately the SAME QuickBooks id: two tenants' companies number
         // their customers independently, so the claim guard is per tenant.
-        await svc.linkExistingCustomer(OTHER, 'contact-1', '58');
+        await svc.linkExistingCustomer(OTHER, 'contact-1-other', '58', ACTOR);
 
         expect(mapping(TENANT, 'contact-1')!.qboId).toBe('58');
-        expect(mapping(OTHER, 'contact-1')!.qboId).toBe('58');
+        expect(mapping(OTHER, 'contact-1-other')!.qboId).toBe('58');
 
-        await svc.linkExistingCustomer(TENANT, 'contact-1', '60');
-        expect(mapping(OTHER, 'contact-1')!.qboId).toBe('58');
+        await svc.linkExistingCustomer(TENANT, 'contact-1', '60', ACTOR);
+        expect(mapping(OTHER, 'contact-1-other')!.qboId).toBe('58');
     });
 });

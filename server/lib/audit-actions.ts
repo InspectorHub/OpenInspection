@@ -186,4 +186,9 @@ export type AuditAction =
     // Two-layer role model — a role profile's capability overrides changed.
     // Metadata carries the RESOLVED before/after sets, so "who widened this,
     // and when" is answerable without replaying kind baselines by hand.
-    | 'role_profile.capabilities_updated';
+    | 'role_profile.capabilities_updated'
+    // A contact was pointed at an existing QuickBooks customer by hand, and the
+    // reverse. Audited because the pointer decides which customer's books later
+    // invoices land in. Metadata carries ids only, never a token or a name.
+    | 'qbo.customer.linked'
+    | 'qbo.customer.unlinked';
