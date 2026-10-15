@@ -13,7 +13,7 @@ import { ResetTwoFactorDialog, type ResetTwoFactorTarget } from "~/components/mo
 import { RemoveMemberDialog } from "~/components/modals/RemoveMemberDialog";
 import { useRemoveMember } from "~/components/modals/useRemoveMember";
 import { resolveRole } from "~/lib/access.server";
-import { relayedApiError } from "~/lib/relayed-api-error";
+import { removeMember as removeMemberAction } from "./team.remove-member.server";
 import { resetMemberTwoFactor } from "./team.reset-two-factor.server";
 import { useDisplayLocale, useSessionContext } from "~/hooks/useSessionContext";
 import { importEntryHref } from "~/lib/import-entry-points";
@@ -95,8 +95,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { ok: res.ok, resent: res.ok };
   }
   if (intent === "remove-member") {
-    const res = await api.team.members[":id"].$delete({ param: { id } });
-    return res.ok ? { ok: true } : { ok: false, error: await relayedApiError(res) };
+    return removeMemberAction(api, form);
   }
   if (intent === "reset-two-factor") return resetMemberTwoFactor(api, id);
   return { ok: false };
@@ -117,7 +116,7 @@ export default function TeamPage() {
   // a reset that silently rode a cancel's in-flight guard would be dropped.
   const { submit: submitResetTwoFactor, busy: resetTwoFactorBusy } = useGuardedSubmit<{ ok?: boolean }>();
   const [pendingReset, setPendingReset] = useState<ResetTwoFactorTarget | null>(null);
-  const removeMember = useRemoveMember();
+  const removeMember = useRemoveMember(members);
   const resendFetcher = useFetcher<{ ok?: boolean; resent?: boolean }>();
   const resendLatch = useSubmitLatch(resendFetcher.state);
   const [pendingCancel, setPendingCancel] = useState<{ token: string; email: string } | null>(null);

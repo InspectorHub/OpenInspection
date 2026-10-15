@@ -129,6 +129,22 @@ stays on for inspectors so fixing a typo does not need an owner. `templateDelete
 is off by default because its repair cost is rebuild-from-scratch; it also
 refuses at every reference.
 
+The same three verbs guard the comment (repair item) library. Adding an entry
+needs `templateCreate`, changing one needs `templateEdit`, and deleting one needs
+`templateDelete`; reading the library needs only a staff role, because the editor
+uses it. With the defaults above, an inspector can add and edit library entries
+but cannot delete them unless an owner switches `templateDelete` on for them.
+
+Removing a team member asks what becomes of their open inspections (requested,
+scheduled or confirmed, with the report not yet published). `DELETE
+/api/team/members/:id` takes `reassignTo=<user id>` (an active owner, manager or
+inspector of the same company) or `unassign=true`; with neither, and open
+inspections present, it answers `409 MEMBER_HAS_OPEN_INSPECTIONS` with
+`details.openInspections` and changes nothing. The reassignment and the removal
+are applied together or not at all. Completed, cancelled and published
+inspections keep their original inspector, and no inspection is ever deleted.
+The removal is recorded as a `user.removed` audit entry with the counts.
+
 Pick a role and you are ~90% configured; the toggles cover the rest.
 
 > Gating on "is an admin" when you mean "may manage contacts" is how a per-user

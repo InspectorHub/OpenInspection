@@ -200,7 +200,7 @@ describe('AI quota + metering', () => {
             // call it cannot record, and a case that omitted it would stop
             // saying anything about the METER (see provenance.spec.ts).
             return new AIService(
-                {} as D1Database, 'a-key', 'saas', 'a-model', meter,
+                {} as D1Database, 'a-key', 'saas', meter,
                 { source: 'byo', tenantKeyAttested: true },
                 { record: async () => 'ai-call-row' },
                 undefined,
@@ -267,7 +267,7 @@ describe('AI quota + metering', () => {
             record: (kind: Kind) => Promise<void> = async () => {},
         ) {
             return new AIService(
-                {} as D1Database, 'a-key', 'saas', 'a-model', { record },
+                {} as D1Database, 'a-key', 'saas', { record },
                 { source: 'byo', tenantKeyAttested: true },
                 { record: async () => 'ai-call-row' },
                 quota,

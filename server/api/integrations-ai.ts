@@ -5,7 +5,7 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { requireRole } from '../lib/middleware/rbac';
 import { AiConfigBodySchema, AiConnectionTestBodySchema, AiConnectionTestResultSchema } from '../lib/validations/integrations.schema';
 import { testAiConnection } from '../lib/ai/connection-test';
-import { keyForProbe, readAiConfig, saveAiConfig } from '../lib/ai/config-write';
+import { aiConfigGap, keyForProbe, readAiConfig, saveAiConfig } from '../lib/ai/config-write';
 import { loadTenantEmailConfig } from '../lib/email/build-email-service';
 import { recordIntegrationTest } from '../lib/integration-test-results';
 
@@ -59,13 +59,16 @@ const aiConfigRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ ok: z.literal(true) }) }) } }, description: 'Stored' },
+        422: { description: 'Incomplete: the model or endpoint is blank and the deployment has no value to fall back on' },
     },
     operationId: 'saveAiConfig',
     description: [
         'Blank values mean UNSET and are stored as null, which is how a workspace',
         'clears a destination. Turning the switch off keeps the endpoint and model —',
         'the control says so, and this is what makes that true. Every save bumps a',
-        'version so anything holding a resolved endpoint can tell it is stale.',
+        'version so anything holding a resolved endpoint can tell it is stale. A save that',
+        'enables AI while the model or endpoint is blank, with nothing to fall back on, is',
+        'refused with 422 naming the field.',
     ].join(' '),
 }, { scopes: ['admin'], tier: 'extended' }));
 
@@ -117,7 +120,13 @@ const integrationsAiRoutes = createApiRouter()
     })
     .openapi(aiConfigRoute, async (c) => {
         const body = c.req.valid('json');
-        await saveAiConfig(getDrizzle(c), c.get('tenantId'), body);
+        const tenantId = c.get('tenantId');
+        const hasKey = Boolean((await loadTenantEmailConfig(c.env, tenantId)).dbSecrets.geminiApiKey);
+        const gap = aiConfigGap(body, c.env, hasKey);
+        if (gap) {
+            return c.json({ success: false as const, error: { code: 'AI_CONFIG_INCOMPLETE', message: gap.message, field: gap.field } }, 422);
+        }
+        await saveAiConfig(getDrizzle(c), tenantId, body);
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
     })
     .openapi(aiConfigGetRoute, async (c) => {

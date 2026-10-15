@@ -70,9 +70,9 @@ describe('the provenance sink writes one fully-populated row', () => {
     it('records tenant, capability, provider, mode, model, prompt version and time', async () => {
         const before = Date.now();
         const sink = buildAiProvenanceSink({
-            db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'a-configured-model',
+            db: {} as D1Database, tenantId: TENANT, source: 'byo',
         });
-        const returnedId = await sink!.record({ capability: 'assist', promptVersion: 'professional-comment.v1', provider: 'api.example.test', endpoint: 'https://api.example.test/v1' });
+        const returnedId = await sink!.record({ capability: 'assist', promptVersion: 'professional-comment.v1', provider: 'api.example.test', endpoint: 'https://api.example.test/v1', model: 'a-configured-model' });
 
         const all = rows();
         expect(all).toHaveLength(1);
@@ -98,9 +98,9 @@ describe('the provenance sink writes one fully-populated row', () => {
 
     it('carries the managed/byo mode it was built with, not a re-derived one', async () => {
         const sink = buildAiProvenanceSink({
-            db: {} as D1Database, tenantId: TENANT, source: 'managed', model: 'm',
+            db: {} as D1Database, tenantId: TENANT, source: 'managed',
         });
-        await sink!.record({ capability: 'translate', promptVersion: 'x.v1', provider: 'api.example.test', endpoint: 'https://api.example.test/v1' });
+        await sink!.record({ capability: 'translate', promptVersion: 'x.v1', provider: 'api.example.test', endpoint: 'https://api.example.test/v1', model: 'a-configured-model' });
         expect(rows()[0]!.mode).toBe('managed');
         expect(rows()[0]!.capability).toBe('translate');
     });
@@ -109,7 +109,7 @@ describe('the provenance sink writes one fully-populated row', () => {
         // `tenant_id` is NOT NULL and every row must belong to exactly one
         // workspace. No tenant means no row — and, at the chokepoint, no call.
         expect(buildAiProvenanceSink({
-            db: {} as D1Database, tenantId: null, source: 'byo', model: 'm',
+            db: {} as D1Database, tenantId: null, source: 'byo',
         })).toBeUndefined();
     });
 });
@@ -133,7 +133,7 @@ describe('the chokepoint records every AI call', () => {
     afterEach(() => { globalThis.fetch = originalFetch; });
 
     const service = (provenance?: AiProvenanceSink) => new AIService(
-        {} as D1Database, 'a-key', 'saas', 'a-model', undefined, OWN_CONFIRMED_KEY, provenance,
+        {} as D1Database, 'a-key', 'saas', undefined, OWN_CONFIRMED_KEY, provenance,
         undefined, ADAPTER(),
     );
 
@@ -146,6 +146,8 @@ describe('the chokepoint records every AI call', () => {
             // exhaustively like every other field: an entry checked field by
             // field except one is an entry that field can go missing from.
             endpoint: 'https://api.example.test/v1',
+            // The model the adapter was built with, read off the adapter.
+            model: 'a-model',
         });
     });
 
@@ -161,6 +163,8 @@ describe('the chokepoint records every AI call', () => {
             // exhaustively like every other field: an entry checked field by
             // field except one is an entry that field can go missing from.
             endpoint: 'https://api.example.test/v1',
+            // The model the adapter was built with, read off the adapter.
+            model: 'a-model',
         });
     });
 
@@ -173,6 +177,8 @@ describe('the chokepoint records every AI call', () => {
             // exhaustively like every other field: an entry checked field by
             // field except one is an entry that field can go missing from.
             endpoint: 'https://api.example.test/v1',
+            // The model the adapter was built with, read off the adapter.
+            model: 'a-model',
         });
     });
 
@@ -200,7 +206,7 @@ describe('the chokepoint records every AI call', () => {
         // Nothing was sent, so there is nothing to have provenance OF. The gate
         // sits ahead of the record for the same reason it sits ahead of the
         // meter.
-        const svc = new AIService({} as D1Database, 'a-key', 'saas', 'a-model', undefined, MANAGED, sink);
+        const svc = new AIService({} as D1Database, 'a-key', 'saas', undefined, MANAGED, sink);
         await expect(svc.generateProfessionalComment('rough note')).rejects.toMatchObject({ code: 'ai_not_configured' });
         expect(record).not.toHaveBeenCalled();
         expect(fetchMock).not.toHaveBeenCalled();
@@ -239,7 +245,7 @@ describe('the chokepoint hands the provenance row id to its caller', () => {
     afterEach(() => { globalThis.fetch = originalFetch; });
 
     const service = (mode: 'standalone' | 'saas' = 'saas', apiKey = 'a-key') => new AIService(
-        {} as D1Database, apiKey, mode, 'a-model', undefined, OWN_CONFIRMED_KEY, sink,
+        {} as D1Database, apiKey, mode, undefined, OWN_CONFIRMED_KEY, sink,
         undefined, ADAPTER(),
     );
 
@@ -360,9 +366,9 @@ describe('no prompt text is ever stored', () => {
         // real one is, and none of it may reach the ledger — the row is
         // metadata about a call, never a copy of what was said in it.
         const sink = buildAiProvenanceSink({
-            db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'a-model',
+            db: {} as D1Database, tenantId: TENANT, source: 'byo',
         });
-        const svc = new AIService({} as D1Database, 'a-key', 'saas', 'a-model', undefined, OWN_CONFIRMED_KEY, sink, undefined, ADAPTER());
+        const svc = new AIService({} as D1Database, 'a-key', 'saas', undefined, OWN_CONFIRMED_KEY, sink, undefined, ADAPTER());
         await svc.generateProfessionalComment('Jane Q. Client at 123 Oak St: cracked flashing');
 
         const all = rows();
@@ -381,13 +387,14 @@ describe('endpoint — the destination the row was missing', () => {
 
     it('stores where the adapter that ran actually sends', async () => {
         const sink = buildAiProvenanceSink({
-            db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'a-model',
+            db: {} as D1Database, tenantId: TENANT, source: 'byo',
         })!;
         await sink.record({
             capability: 'assist',
             promptVersion: 'v1',
             provider: 'api.example.test',
             endpoint: 'https://api.example.test/v1',
+            model: 'a-model',
         });
         const row = rows().at(-1)!;
         expect(row.endpoint).toBe('https://api.example.test/v1');
@@ -404,11 +411,11 @@ describe('the assurance export carries the destination', () => {
         // the table and not to this list is a record of "what the automated
         // system did on the tenant's behalf" that is missing where it went.
         const sink = buildAiProvenanceSink({
-            db: {} as D1Database, tenantId: TENANT, source: 'byo', model: 'a-model',
+            db: {} as D1Database, tenantId: TENANT, source: 'byo',
         })!;
         await sink.record({
             capability: 'assist', promptVersion: 'v1',
-            provider: 'h', endpoint: 'https://h/v1',
+            provider: 'h', endpoint: 'https://h/v1', model: 'a-model',
         });
         const { readAiAssurance } = await import('../../../server/lib/compliance/assurance-records');
         const out = await readAiAssurance(db as never, { tenantId: TENANT });

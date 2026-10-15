@@ -42,6 +42,31 @@ function orNull(value: string): string | null {
 }
 
 /**
+ * Whether a save would leave this company looking configured while real calls
+ * fail: it has started configuring its own AI (a stored key, or any field typed)
+ * but the model or endpoint is blank and the deployment has no fallback for it.
+ * An untouched, all-blank form is honest as it stands and is not refused, nor is
+ * a save that switches AI off. The runtime rule is the same one: a blank company
+ * value falls back to the deployment's, and with neither the call fails closed.
+ */
+export function aiConfigGap(
+    input: AiConfigInput,
+    deployment: { AI_MODEL?: string; AI_BASE_URL?: string },
+    hasStoredKey: boolean,
+): { field: 'aiModel' | 'aiBaseUrl'; message: string } | null {
+    const model = input.aiModel.trim();
+    const baseUrl = input.aiBaseUrl.trim();
+    if (!input.aiEnabled || (!hasStoredKey && model === '' && baseUrl === '')) return null;
+    if (model === '' && !deployment.AI_MODEL) {
+        return { field: 'aiModel', message: 'Enter the model name your AI account uses.' };
+    }
+    if (baseUrl === '' && !deployment.AI_BASE_URL) {
+        return { field: 'aiBaseUrl', message: 'Enter the endpoint address of your AI account.' };
+    }
+    return null;
+}
+
+/**
  * Store a workspace's AI provider configuration.
  *
  * The version bump is the reason this is a function rather than an inline

@@ -27,6 +27,7 @@ import { logger } from '../../logger';
 import { isAccessTokenSource, type AiCredential } from '../credential';
 import type { AiProvider, AiRequest, AiResponse } from '../provider';
 import { normaliseEndpoint } from '../endpoint';
+import { AiUnknownModelError } from '../configuration-gap';
 
 /** Status codes that mean "your credentials or your account", not "try again".
  *  These must reach the caller as a REFUSAL: on a workspace's own key it is
@@ -89,7 +90,8 @@ export interface OpenAiCompatibleCredentials {
 
 export class OpenAiCompatibleProvider implements AiProvider {
     readonly id: string;
-    /** Where this instance sends. Computed once, from the same `creds.baseUrl`
+    readonly model: string;
+    /** Where this instance sends. Empty when no base URL is configured. Computed once, from the same `creds.baseUrl`
      *  every request goes to, so the recorded destination cannot drift from the
      *  actual one. */
     readonly endpoint: string;
@@ -102,7 +104,10 @@ export class OpenAiCompatibleProvider implements AiProvider {
         this.id = isAccessTokenSource(creds.apiKey)
             ? creds.apiKey.providerId
             : deriveProviderId(creds.baseUrl, creds.model);
-        this.endpoint = normaliseEndpoint(creds.baseUrl);
+        this.model = creds.model;
+        // Blank stays blank: `normaliseEndpoint` would call it 'unparseable',
+        // which reads as a configured-but-broken address and hides the gap.
+        this.endpoint = creds.baseUrl.trim() === '' ? '' : normaliseEndpoint(creds.baseUrl);
     }
 
     /**
@@ -143,7 +148,16 @@ export class OpenAiCompatibleProvider implements AiProvider {
     async complete(input: AiRequest): Promise<AiResponse> {
         if (!this.creds.model) {
             throw Errors.AINotConfigured(
-                'AI is unavailable: no AI model is configured. Set AI_MODEL for this deployment.',
+                'AI is unavailable: no AI model is configured.',
+                AI_REFUSAL_REASON.NOT_CONFIGURED,
+            );
+        }
+        // Without this, `chatCompletionsUrl('')` is the relative `/chat/completions`
+        // and fetch fails with a generic Error that callers read as a runtime
+        // failure rather than as missing configuration.
+        if (this.creds.baseUrl.trim() === '') {
+            throw Errors.AINotConfigured(
+                'AI is unavailable: no AI endpoint is configured.',
                 AI_REFUSAL_REASON.NOT_CONFIGURED,
             );
         }
@@ -200,6 +214,9 @@ export class OpenAiCompatibleProvider implements AiProvider {
                     AI_REFUSAL_REASON.UPSTREAM_CREDENTIAL,
                 );
             }
+            // The same pair connection-test.ts treats as "unknown model". Typed
+            // so the service can say whose model it was.
+            if (res.status === 400 || res.status === 404) throw new AiUnknownModelError(this.creds.model);
             // A plain Error, so the caller's runtime-failure degrade applies.
             throw new Error('Failed to generate content from AI');
         }

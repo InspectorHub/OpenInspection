@@ -5,6 +5,7 @@ import { AppError, ErrorCode, Errors } from '../lib/errors';
 import { AI_REFUSAL_REASON } from '../lib/ai/refusal-reason';
 import { devRewrittenComment, devSuggestedComments } from '../lib/ai/dev-mock';
 import type { AiProvider } from '../lib/ai/provider';
+import { AiUnknownModelError, assertProviderConfigured, unknownModelRefusal } from '../lib/ai/configuration-gap';
 import { checkAiCapability, type AiCredentialPicture } from '../lib/ai/capability-policy';
 import {
     AI_PROMPTS,
@@ -59,9 +60,6 @@ export class AIService {
         private db: D1Database,
         private apiKey: string,
         private appMode?: 'standalone' | 'saas',
-        /** Model id from deployment configuration (`AI_MODEL`). Empty = not
-         *  configured, which is an error rather than a cue to pick one. */
-        private model: string = '',
         /** The ONE metering hook for AI, injected the same way the email
          *  pipeline injects its meter. Every AI feature funnels through
          *  `callGemini`, so one `record` there is the whole meter — a second
@@ -116,20 +114,17 @@ export class AIService {
     }
 
     /**
-     * Fail closed on an unconfigured model.
+     * Fail closed when the SELECTED provider has no model or endpoint.
      *
-     * Deliberately NOT folded into the dev-mock branch: the mock exists for a
-     * self-hoster who has no key yet, and widening it to cover a missing model
-     * would write `[DEV] …` placeholder prose into a real report for someone
-     * whose key works fine. A missing model is a configuration error at every
-     * deployment mode, so it always throws.
+     * Asked of the provider the resolver built, never of the deployment's
+     * environment: a company's own model and endpoint win there, so they must
+     * count here (`lib/ai/configuration-gap.ts`). Deliberately NOT folded into
+     * the dev-mock branch: widening the mock to a missing model would write
+     * `[DEV] …` placeholder prose into a real report for someone whose key
+     * works fine. A missing provider is refused by `callGemini` itself.
      */
-    private assertModelConfigured(): void {
-        if (!this.model) {
-            throw Errors.AINotConfigured(
-                'AI is unavailable: no AI model is configured. Set AI_MODEL for this deployment.',
-            );
-        }
+    private assertConfigured(): void {
+        if (this.provider) assertProviderConfigured(this.provider, this.credentials.source);
     }
 
     private getDrizzle() {
@@ -191,10 +186,8 @@ export class AIService {
         if (!decision.allowed) throw Errors.AINotConfigured(decision.message);
 
         // Hoisted from the adapter so a call that cannot possibly run does not
-        // first write a provenance row claiming it was made. Same error, same
-        // message — the adapter still checks, for callers that reach it another
-        // way — asked one step earlier so the ledger only holds real sends.
-        this.assertModelConfigured();
+        // first write a provenance row claiming it was made.
+        this.assertConfigured();
 
         // The allowance, BEFORE the send and before any row claims a call was
         // made. Read-only: the counter moves at `meter.record` below, so a
@@ -238,8 +231,12 @@ export class AIService {
             promptVersion: prompt.version,
             provider: provider.id,
             endpoint: provider.endpoint, // same instance as `provider`, called on the next line
+            model: provider.model, // the model that is sent, not the deployment's
         });
-        const { text } = await provider.complete({ prompt: prompt.render(args) });
+        const { text } = await provider.complete({ prompt: prompt.render(args) }).catch((err: unknown) => {
+            // The provider does not know whose model it was; this service does.
+            throw err instanceof AiUnknownModelError ? unknownModelRefusal(err.model, this.credentials.source) : err;
+        });
         // Meter AFTER success, never before — a model call that failed must not
         // consume an allowance it did not spend. The swallowed rejection
         // matches the send sites: a metering failure must never fail the
@@ -334,7 +331,7 @@ export class AIService {
                 AI_REFUSAL_REASON.NOT_CONFIGURED,
             );
         }
-        this.assertModelConfigured();
+        this.assertConfigured();
 
         const { text, aiCallId } = await this.callGemini(AI_PROMPTS.rewriteComment, input);
         // Strip wrapping quotes / markdown the model sometimes adds.
@@ -364,7 +361,7 @@ export class AIService {
         // Outside the try/catch below on purpose: that catch turns RUNTIME
         // failures into an empty suggestion list, and a configuration error
         // must not disappear into "no suggestions today".
-        this.assertModelConfigured();
+        this.assertConfigured();
 
         try {
             const { text, aiCallId } = await this.callGemini(AI_PROMPTS.suggestComment, params);
@@ -376,7 +373,7 @@ export class AIService {
             if (!match) return { suggestions: [], aiCallId: null };
             return { suggestions: JSON.parse(match[0]) as string[], aiCallId };
         } catch (err) {
-            // Same rule as `assertModelConfigured` above, applied to the two
+            // Same rule as `assertConfigured` above, applied to the two
             // refusals that can only be raised from INSIDE this try: the
             // capability gate and the allowance pre-flight in `callGemini`. A
             // runtime model failure degrades to "no suggestions"; a capability

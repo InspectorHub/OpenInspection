@@ -5118,7 +5118,7 @@
       }
     },
     "summary": "Create recommendation for current tenant",
-    "description": "Adds a recommendation to the company library: a name, a severity, a repair-scope summary and optionally a category and suggested contractor type. Stored alongside the canned-comment library. Owner, manager or inspector. Writes an audit entry (recommendation.created). Returns the created recommendation."
+    "description": "Adds a recommendation to the company library: a name, a severity, a repair-scope summary and optionally a category and suggested contractor type. Stored alongside the canned-comment library. Owner, manager or inspector with the template create capability. Writes an audit entry (recommendation.created). Returns the created recommendation."
   },
   {
     "operationId": "createReinspection",
@@ -6436,7 +6436,7 @@
       "body": null
     },
     "summary": "Delete recommendation for current tenant",
-    "description": "Permanently deletes a recommendation from the company library. Owner, manager or inspector. Writes an audit entry (recommendation.deleted)."
+    "description": "Permanently deletes a recommendation from the company library. Owner, manager or inspector with the template delete capability. Writes an audit entry (recommendation.deleted)."
   },
   {
     "operationId": "deleteRoleProfile",
@@ -6656,12 +6656,37 @@
             "minLength": 1,
             "description": "User id of the member to remove."
           }
+        },
+        {
+          "name": "reassignTo",
+          "in": "query",
+          "required": false,
+          "description": "User id of an active owner, manager or inspector who takes over the open inspections of the member being removed.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "User id of an active owner, manager or inspector who takes over the open inspections of the member being removed."
+          }
+        },
+        {
+          "name": "unassign",
+          "in": "query",
+          "required": false,
+          "description": "Pass true to leave the open inspections of the member being removed unassigned instead of reassigning them. One of: true, false.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "description": "Pass true to leave the open inspections of the member being removed unassigned instead of reassigning them. One of: true, false."
+          }
         }
       ],
       "body": null
     },
     "summary": "Remove a team member",
-    "description": "Remove a member from the team. The user is soft-deleted rather than erased, so inspections attributed to them and their report history stay intact, and the same email can be invited again later. Their live sessions and any MCP access grants are revoked immediately, and a user.deleted event is queued for the sync outbox when one is configured. Returns 400 when you try to remove yourself or the last owner, 404 for an unknown or already removed member, and 403 when the target is an owner and the caller is not. Restricted to owners and managers."
+    "description": "Remove a member from the team. The user is soft-deleted rather than erased, so inspections attributed to them and their report history stay intact, and the same email can be invited again later. Their live sessions and any MCP access grants are revoked immediately, and a user.deleted event is queued for the sync outbox when one is configured. Inspections that are not finished (requested, scheduled or confirmed, report not yet published) need a decision: pass reassignTo with the id of an active owner, manager or inspector of the company, or unassign=true to leave them without an inspector; with neither, the answer is 409 MEMBER_HAS_OPEN_INSPECTIONS with details.openInspections, and nothing changes. Completed, cancelled and published inspections keep their original inspector and are never rewritten; no inspection is deleted. The reassignment and the removal are applied together or not at all, and a user.removed audit entry records the counts. Returns 400 when you try to remove yourself or the last owner, when reassignTo is not an active assignable member of this company, or when both options are given; 404 for an unknown or already removed member, and 403 when the target is an owner and the caller is not. Restricted to owners and managers."
   },
   {
     "operationId": "deleteTenantAgreement",
@@ -17718,7 +17743,7 @@
       }
     },
     "summary": "Replace recommendation for current tenant",
-    "description": "Update a recommendation in the company library. Despite the PUT verb it is a partial update: only the fields sent change. Returns 404 when the id is unknown or belongs to an ordinary canned comment with no repair summary. Writes a recommendation.updated audit entry and marks the entry as edited, since recommendations share storage with the canned-comment library. Owner, manager or inspector."
+    "description": "Update a recommendation in the company library. Despite the PUT verb it is a partial update: only the fields sent change. Returns 404 when the id is unknown or belongs to an ordinary canned comment with no repair summary. Writes a recommendation.updated audit entry and marks the entry as edited, since recommendations share storage with the canned-comment library. Owner, manager or inspector with the template edit capability."
   },
   {
     "operationId": "replaceService",

@@ -38,7 +38,9 @@ interface BuildAiServiceArgs {
      *  A long-lived key, or one that refreshes itself — resolved upstream so
      *  the runtime and the provisioning read cannot answer it differently. */
     managedKey: AiCredential | null;
-    /** `AI_MODEL`. Empty fails closed at the service, never with a default. */
+    /** `AI_MODEL`. The deployment's model, used only where the selected source
+     *  takes it (see `resolve-provider.ts`). Empty there fails closed at the
+     *  service, never with a default. */
     model: string;
     /** The tenant's commercial standing, or null when it was not read. Null is
      *  not an entitlement. */
@@ -109,10 +111,9 @@ export function buildTenantAiService(args: BuildAiServiceArgs): AIService {
         // credential a call runs on — that lives inside the adapter below.
         tenantKey ?? '',
         profile.aiDevMockFallback ? 'standalone' : 'saas',
-        model,
         buildAiMeter({ db, tenantId, source }),
         { source, tenantKeyAttested: args.tenantKeyAttested },
-        buildAiProvenanceSink({ db, tenantId, source, model }),
+        buildAiProvenanceSink({ db, tenantId, source }),
         buildAiQuotaPreflight({ guard: args.quotaGuard, tenantId, source, plan }),
         isRefusal(resolved) ? undefined : resolved.provider,
     );

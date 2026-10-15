@@ -191,7 +191,8 @@ export async function action({ request, context }: Route.ActionArgs) {
       },
     });
     if (!cfgRes.ok) {
-      return { intent, success: false, error: m.settings_advanced_ai_save_error(), field: "aiBaseUrl", test: null };
+      const cfgErr = (await cfgRes.json().catch(() => null)) as { error?: { message?: string; field?: string } } | null;
+      return { intent, success: false, error: cfgErr?.error?.message ?? m.settings_advanced_ai_save_error(), field: cfgErr?.error?.field ?? "aiBaseUrl", test: null };
     }
     return { intent, success: true, error: null, field: null, test: null };
   }

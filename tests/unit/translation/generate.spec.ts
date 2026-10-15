@@ -118,7 +118,7 @@ beforeEach(async () => {
 /** A service wired to a recorder that replies with `spanCount` segments. */
 function aiWith(recorder: RecordingAiProvider): AIService {
     return new AIService(
-        {} as D1Database, 'test-key', 'saas', 'test-model', undefined,
+        {} as D1Database, 'test-key', 'saas', undefined,
         OWN_CONFIRMED_KEY, PROVENANCE, undefined, recorder,
     );
 }
@@ -261,7 +261,7 @@ describe('credential refusals', () => {
         // workspace's own key, which bills them for something they were told
         // was covered.
         const noAdapter = new AIService(
-            {} as D1Database, '', 'saas', 'test-model', undefined,
+            {} as D1Database, '', 'saas', undefined,
             { source: 'managed', tenantKeyAttested: false }, PROVENANCE, undefined, undefined,
         );
         await expect(generateCourtesyTranslation(

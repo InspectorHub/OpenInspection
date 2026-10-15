@@ -4,7 +4,7 @@
     "Counts sequential top-level awaits per route module. A PROXY for round-trip depth, not a measurement of it.",
     "Growth means someone added an await that waits on the one before it. If it does not depend on it, batch it."
   ],
-  "total": 221,
+  "total": 222,
   "files": {
     "app/routes/agent-layout.tsx": 1,
     "app/routes/agent/accept-terms.tsx": 4,
@@ -84,6 +84,7 @@
     "app/routes/settings-usage.tsx": 2,
     "app/routes/settings-workspace.tsx": 5,
     "app/routes/setup.tsx": 2,
+    "app/routes/team.remove-member.server.ts": 1,
     "app/routes/team.tsx": 3,
     "app/routes/template-edit.tsx": 6,
     "app/routes/templates.tsx": 3

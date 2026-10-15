@@ -6,7 +6,7 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 147,
+    "files": 148,
     "dollarMethods": 565,
     "apiWorker": 9
   },
@@ -579,12 +579,16 @@
       "dollarMethods": 2,
       "apiWorker": 0
     },
+    "app/routes/team.remove-member.server.ts": {
+      "dollarMethods": 1,
+      "apiWorker": 0
+    },
     "app/routes/team.reset-two-factor.server.ts": {
       "dollarMethods": 1,
       "apiWorker": 0
     },
     "app/routes/team.tsx": {
-      "dollarMethods": 4,
+      "dollarMethods": 3,
       "apiWorker": 0
     },
     "app/routes/template-edit.tsx": {

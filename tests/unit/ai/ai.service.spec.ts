@@ -35,7 +35,7 @@ describe('AIService.rewriteComment', () => {
     const withReply = (text: string) => {
         recorder = new RecordingAiProvider([text]);
         return new AIService(
-            {} as D1Database, 'test-key', 'saas', 'test-model', undefined,
+            {} as D1Database, 'test-key', 'saas', undefined,
             OWN_CONFIRMED_KEY, PROVENANCE, undefined, recorder,
         );
     };
@@ -119,9 +119,9 @@ describe('AIService.rewriteComment', () => {
         // worse than an error toast. WHICH statuses become which kind of
         // failure is the adapter's decision, asserted in its own spec.
         const svc = new AIService(
-            {} as D1Database, 'test-key', 'saas', 'test-model', undefined,
+            {} as D1Database, 'test-key', 'saas', undefined,
             OWN_CONFIRMED_KEY, PROVENANCE, undefined,
-            { id: 'x', endpoint: 'https://stub.test/v1', complete: async () => { throw new Error('Failed to generate content from AI'); } },
+            { id: 'x', model: 'test-model', endpoint: 'https://stub.test/v1', complete: async () => { throw new Error('Failed to generate content from AI'); } },
         );
         await expect(svc.rewriteComment({
             itemLabel: 'Roof', sectionTitle: 'Roof', tab: 'defects',
@@ -145,12 +145,11 @@ describe('suggestComment — refusals reach the inspector, failures degrade', ()
         {} as D1Database,
         'test-key',
         'saas',
-        'test-model',
         undefined,
         OWN_CONFIRMED_KEY,
         PROVENANCE,
         undefined,
-        { id: 'test', endpoint: 'https://stub.test/v1', complete: async () => { throw err; } },
+        { id: 'test', model: 'test-model', endpoint: 'https://stub.test/v1', complete: async () => { throw err; } },
     );
 
     it('re-throws an upstream credential refusal instead of returning no suggestions', async () => {
@@ -179,9 +178,9 @@ describe('suggestComment — refusals reach the inspector, failures degrade', ()
         // this stub, and would reach a real network instead.
         const calls: string[] = [];
         const svc = new AIService(
-            {} as D1Database, 'test-key', 'saas', 'test-model', undefined,
+            {} as D1Database, 'test-key', 'saas', undefined,
             OWN_CONFIRMED_KEY, PROVENANCE, undefined,
-            { id: 'injected', endpoint: 'https://stub.test/v1', complete: async (r) => { calls.push(r.prompt); return { text: '["a"]' }; } },
+            { id: 'injected', model: 'test-model', endpoint: 'https://stub.test/v1', complete: async (r) => { calls.push(r.prompt); return { text: '["a"]' }; } },
         );
         const out = await svc.suggestComment({ itemName: 'Roof', sectionName: 'Exterior' });
         expect(calls).toHaveLength(1);
@@ -194,7 +193,7 @@ describe('suggestComment — refusals reach the inspector, failures degrade', ()
         // decision made for it, and inventing one here would be a second
         // answer to a question `resolve-provider.ts` owns.
         const svc = new AIService(
-            {} as D1Database, 'test-key', 'saas', 'test-model', undefined,
+            {} as D1Database, 'test-key', 'saas', undefined,
             OWN_CONFIRMED_KEY, PROVENANCE,
         );
         const err = await svc.suggestComment({ itemName: 'Roof', sectionName: 'Exterior' }).catch(e => e);

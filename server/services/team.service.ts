@@ -11,6 +11,7 @@ import { getCapabilities, TOGGLEABLE, type Capability, type PermissionOverrides 
 import { revokeAllUserGrants } from '../lib/mcp/grants';
 import { CREDENTIAL_MARKER_TTL_S } from '../lib/auth/credential-marker';
 import { resetMemberTwoFactor } from './team/reset-two-factor';
+import { planReassignment, runAtomically, type RemovalChoice } from './team/open-assignments';
 
 /**
  * Loose shape accepted from the validated invite body. Zod under
@@ -308,7 +309,7 @@ export class TeamService {
         return { id: userId, role: nextRole, permissionOverrides };
     }
 
-    async removeMember(tenantId: string, userId: string, requesterId: string, requesterRole: UserRole) {
+    async removeMember(tenantId: string, userId: string, requesterId: string, requesterRole: UserRole, choice: RemovalChoice = {}) {
         if (userId === requesterId) {
             throw Errors.BadRequest('Cannot remove yourself');
         }
@@ -322,24 +323,22 @@ export class TeamService {
         // A workspace with no owner cannot be administered by anyone. Same
         // rule as updateMember's role change (a backstop: only an owner gets here).
         if (user.role === 'owner') {
-            const otherOwners = await db.select({ id: users.id }).from(users)
-                .where(and(
-                    eq(users.tenantId, tenantId),
-                    eq(users.role, 'owner'),
-                    ne(users.id, userId),
-                    isNull(users.deletedAt),
-                )).limit(1);
+            const otherOwners = await db.select({ id: users.id }).from(users).where(and(
+                eq(users.tenantId, tenantId), eq(users.role, 'owner'), ne(users.id, userId), isNull(users.deletedAt),
+            )).limit(1);
             if (otherOwners.length === 0) throw Errors.BadRequest('Cannot remove the last owner');
         }
 
-        // Soft-delete rather than hard-delete: `inspections.inspector_id`
-        // FK-references `users.id`, so a member with inspections can't be
-        // hard-deleted under D1 FK enforcement, and hard-deleting would orphan
-        // report attribution. `deletedAt` gives deactivate/reactivate
-        // semantics (see AuthService.joinTeam reactivation) while keeping the
-        // row — and any inspections it is attributed to — intact.
-        await db.update(users).set({ deletedAt: new Date() })
+        // Throws the typed 409 BEFORE any write when open inspections need a choice.
+        const plan = await planReassignment(db, tenantId, userId, choice);
+
+        // Soft-delete, not hard-delete: finished inspections keep their
+        // inspector for the record, and `deletedAt` allows reactivation (see
+        // AuthService.joinTeam). The reassignment and the soft-delete share ONE
+        // batch, so there is no state with half the inspections moved.
+        const softDelete = db.update(users).set({ deletedAt: new Date() })
             .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+        await runAtomically(db, [...plan.statements, softDelete]);
 
         // Invalidate the removed member's live sessions immediately, and do
         // it BEFORE the (unguarded) outbox append below. jwtAuthMiddleware
@@ -381,7 +380,8 @@ export class TeamService {
             });
         }
 
-        return user;
+        const moved = choice.reassignTo ? plan.openInspections : 0;
+        return { ...user, reassigned: moved, unassigned: plan.openInspections - moved, keptForRecord: plan.keptForRecord };
     }
 
     /**

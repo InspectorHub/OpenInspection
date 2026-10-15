@@ -152,20 +152,29 @@ const removeTeamMemberRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('manager', 'owner')],
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('User id of the member to remove.') }),
+        query: z.object({
+            reassignTo: z.string().trim().min(1).optional().describe('User id of an active owner, manager or inspector who takes over the open inspections of the member being removed.'),
+            unassign: z.enum(['true', 'false']).optional().describe('Pass true to leave the open inspections of the member being removed unassigned instead of reassigning them.'),
+        }),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ removed: z.boolean() })),
+                    schema: createApiResponseSchema(z.object({
+                        removed: z.boolean(),
+                        reassigned: z.number().describe('Open inspections handed to the reassignTo member.'),
+                        unassigned: z.number().describe('Open inspections left without an inspector.'),
+                    })),
                 },
             },
             description: 'Member removed',
         },
         403: { description: 'Caller is not an owner but the member is' },
+        409: { description: 'MEMBER_HAS_OPEN_INSPECTIONS: the member has open inspections and neither reassignTo nor unassign=true was given; details.openInspections is the count' },
     },
     operationId: "deleteTeamMember",
-    description: "Remove a member from the team. The user is soft-deleted rather than erased, so inspections attributed to them and their report history stay intact, and the same email can be invited again later. Their live sessions and any MCP access grants are revoked immediately, and a user.deleted event is queued for the sync outbox when one is configured. Returns 400 when you try to remove yourself or the last owner, 404 for an unknown or already removed member, and 403 when the target is an owner and the caller is not. Restricted to owners and managers."
+    description: "Remove a member from the team. The user is soft-deleted rather than erased, so inspections attributed to them and their report history stay intact, and the same email can be invited again later. Their live sessions and any MCP access grants are revoked immediately, and a user.deleted event is queued for the sync outbox when one is configured. Inspections that are not finished (requested, scheduled or confirmed, report not yet published) need a decision: pass reassignTo with the id of an active owner, manager or inspector of the company, or unassign=true to leave them without an inspector; with neither, the answer is 409 MEMBER_HAS_OPEN_INSPECTIONS with details.openInspections, and nothing changes. Completed, cancelled and published inspections keep their original inspector and are never rewritten; no inspection is deleted. The reassignment and the removal are applied together or not at all, and a user.removed audit entry records the counts. Returns 400 when you try to remove yourself or the last owner, when reassignTo is not an active assignable member of this company, or when both options are given; 404 for an unknown or already removed member, and 403 when the target is an owner and the caller is not. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -326,12 +335,17 @@ const teamRoutes = createApiRouter()
         const teamService = c.var.services.team;
         const authService = c.var.services.auth;
 
-        await teamService.removeMember(tenantId, memberId, requesterId, c.get('userRole'));
+        const { reassignTo, unassign } = c.req.valid('query');
+        const result = await teamService.removeMember(tenantId, memberId, requesterId, c.get('userRole'), { reassignTo, unassign: unassign === 'true' });
+        auditFromContext(c, 'user.removed', 'user', {
+            entityId: memberId,
+            metadata: { reassigned: result.reassigned, unassigned: result.unassigned, keptForRecord: result.keptForRecord, reassignedTo: reassignTo ?? null },
+        });
 
         // Invalidate the deleted user's sessions so their cookie becomes invalid immediately
         await authService.invalidateUserSessions(memberId);
 
-        return c.json({ success: true, data: { removed: true } }, 200);
+        return c.json({ success: true, data: { removed: true, reassigned: result.reassigned, unassigned: result.unassigned } }, 200);
     })
     .openapi(cancelInviteRoute, async (c) => {
         const tenantId = c.get('tenantId');

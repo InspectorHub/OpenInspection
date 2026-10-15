@@ -18,7 +18,7 @@ export interface AssignmentOpts {
  * is the whole point of resolving it in one place: a rule applied at every
  * read is a rule that eventually gets applied differently at one of them.
  */
-function buildSyncStatements(
+export function buildSyncStatements(
     db: DrizzleD1Database,
     tenantId: string,
     inspectionId: string,

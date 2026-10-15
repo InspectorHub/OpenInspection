@@ -89,6 +89,10 @@ export enum ErrorCode {
     // future (422): the device clock is wrong, and a package dated ahead would
     // never age out. Nothing was written. `details.maxFutureSkewDays` carries the limit.
     PACKAGE_FROM_THE_FUTURE = 'PACKAGE_FROM_THE_FUTURE',
+    // Removing a team member who still has open inspections assigned to them. The
+    // caller must say what becomes of those inspections (reassign or unassign);
+    // `details.openInspections` carries the count so a UI can prompt.
+    MEMBER_HAS_OPEN_INSPECTIONS = 'MEMBER_HAS_OPEN_INSPECTIONS',
 }
 
 /**
@@ -135,6 +139,13 @@ export const Errors = {
             details,
         ),
     Internal: (msg: string = 'Internal server error') => new AppError(500, ErrorCode.INTERNAL_ERROR, msg),
+    MemberHasOpenInspections: (openInspections: number) =>
+        new AppError(
+            409,
+            ErrorCode.MEMBER_HAS_OPEN_INSPECTIONS,
+            `This member still has ${openInspections} open inspection${openInspections === 1 ? '' : 's'}. Choose another team member to take them over, or leave them unassigned.`,
+            { openInspections },
+        ),
     ServiceUnavailable: (msg: string, details?: unknown) => new AppError(503, ErrorCode.SERVICE_UNAVAILABLE, msg, details),
     /**
      * The one shape for "this AI call cannot run" — 503 + AI_NOT_CONFIGURED,

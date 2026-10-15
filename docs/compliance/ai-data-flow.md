@@ -56,8 +56,8 @@ Before anything leaves, in this order (**E2**):
 1. **The capability gate** (`server/lib/ai/capability-policy.ts` reading the
    posture table in `server/lib/ai/output-classification.ts`) decides whether
    this product generates this kind of output on these credentials at all.
-2. **The model check** — an unconfigured `AI_MODEL` fails closed; there is no
-   compiled-in default.
+2. **The model check** — when no model, or no endpoint, resolved for this call
+   it fails closed; there is no compiled-in default.
 3. **The allowance pre-flight** — read-only, and only for platform-funded calls.
 4. **The provenance write** — a row in `ai_call_provenance` recording provider,
    credential source, model, prompt version and the workspace's AI configuration

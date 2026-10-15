@@ -69,6 +69,10 @@ export type AuditAction =
     | 'user.invite'
     | 'user.join'
     | 'user.password_change'
+    // A member taken off the team. Carries how many of their open inspections
+    // were handed to someone else or left unassigned, so the record answers
+    // "where did their work go".
+    | 'user.removed'
     // An owner clearing ANOTHER member's second factor. Its own action rather
     // than a generic update, because it is the only one that lowers somebody
     // else's authentication requirement and it leaves no other trace: the
