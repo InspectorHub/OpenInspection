@@ -16,6 +16,9 @@ import type { CapabilitySet } from './capabilities';
  * — which in TypeScript surfaces as a field ending in `Cents`, plus the legacy
  * `price` column that predates the rule.
  *
+ * The write half of the capability, and the response helper handlers call, are in
+ * ./money-access.ts.
+ *
  * Redaction DELETES the key rather than zeroing it. A zero is a lie an operator
  * could act on; an absent field is the truth ("you may not see this"), and the
  * schemas mark these fields optional so the compiler forces the UI to handle it.

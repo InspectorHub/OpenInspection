@@ -101,3 +101,13 @@ describe("ReviewPanel — what it says when it has nothing to say", () => {
         expect(screen.getByText("You")).toBeTruthy();
     });
 });
+
+describe("ReviewPanel — hidden prices", () => {
+    it("shows the service names without an amount when the total is unknown", () => {
+        renderPanel({ ...FULL, services: { names: ["Full Home Inspection"], totalCents: null } });
+        const text = document.body.textContent ?? "";
+        expect(text).toContain("Full Home Inspection");
+        expect(text).not.toContain("$0.00");
+        expect(text).not.toContain("Full Home Inspection ·");
+    });
+});

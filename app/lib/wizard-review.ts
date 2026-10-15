@@ -56,7 +56,8 @@ export interface NewInspectionSummary {
     client: string | null;
     agent: string | null;
     /** Null when no service was selected — an empty list and a skipped step read the same otherwise. */
-    services: { names: string[]; totalCents: number } | null;
+    /** `totalCents` is null when the catalogue carries no prices (the viewer lacks the financial capability). */
+    services: { names: string[]; totalCents: number | null } | null;
     /** Null means "whoever is creating this" — naming the caller back to themselves adds nothing. */
     assignee: string | null;
 }
@@ -81,10 +82,9 @@ export function summariseNewInspection(input: NewInspectionSummaryInput): NewIns
             names: picked.map((s) => s.name),
             // The price that will actually be charged: an override replaces the
             // catalog price, it does not add to it.
-            totalCents: picked.reduce(
-                (sum, s) => sum + (input.priceOverrides.get(s.id) ?? s.price ?? 0),
-                0,
-            ),
+            totalCents: picked.every((s) => typeof s.price !== "number")
+                ? null
+                : picked.reduce((sum, s) => sum + (input.priceOverrides.get(s.id) ?? s.price ?? 0), 0),
         }
         : null;
 

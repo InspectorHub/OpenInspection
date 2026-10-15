@@ -11,6 +11,9 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
+import { capabilitiesFor } from '../../lib/middleware/require-capability';
+import { moneyView } from '../../lib/auth/money-access';
+import { Errors } from '../../lib/errors';
 import { CancelInspectionSchema } from '../../lib/validations/inspection.schema';
 import { SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { CANCELLATION_REASONS } from '../../lib/cancellation-reason';
@@ -34,6 +37,21 @@ const CancellationQuoteSchema = z.object({
     policyConfigured: z.boolean().describe('False when the workspace has configured no ladder; nothing is ever charged.'),
 }).openapi('CancellationQuote');
 
+// What a caller WITHOUT the financial capability gets from the quote: no figure
+// at all. `moneyInvolved` is a yes/no, not an amount - it lets the dialog offer
+// a plain cancellation when nothing was collected or charged, and say who may
+// cancel when something was.
+const RestrictedQuoteSchema = z.object({
+    requiresFinancial: z.literal(true).describe('The caller lacks the financial capability, so no amount is returned.'),
+    moneyInvolved: z.boolean().describe('True when a fee, a refund or a collected payment is attached to this cancellation.'),
+}).openapi('CancellationQuoteRestricted');
+
+// The cancel answer as a caller without the financial capability receives it:
+// the same outcome with every amount absent.
+const CancellationOutcomeSchema = CancellationQuoteSchema.partial({
+    feeCents: true, refundCents: true, priceCents: true, paidCents: true, retainedProcessingFeeCents: true,
+}).openapi('CancellationOutcome');
+
 const quoteRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/cancellation-quote',
@@ -50,9 +68,9 @@ const quoteRoute = createRoute(withMcpMetadata({
         200: {
             content: { 'application/json': { schema: z.object({
                 success: z.literal(true),
-                data: CancellationQuoteSchema,
+                data: z.union([CancellationQuoteSchema, RestrictedQuoteSchema]),
             }) } },
-            description: 'The computed outcome. Read-only — nothing is cancelled and no money moves.',
+            description: 'The computed outcome, or only requiresFinancial and moneyInvolved for a caller without the financial capability. Read-only — nothing is cancelled and no money moves.',
         },
     },
     operationId: 'getCancellationQuote',
@@ -74,7 +92,7 @@ const cancelRoute = createRoute(withMcpMetadata({
             content: { 'application/json': { schema: z.object({
                 success: z.literal(true),
                 data: z.object({
-                    outcome: CancellationQuoteSchema,
+                    outcome: CancellationOutcomeSchema,
                     refundPaymentId: z.string().nullable()
                         .describe('Ledger row id of the refund appended, or null when nothing was refunded. An external book of record keys its credit memo on THIS, not on the invoice.'),
                 }),
@@ -130,12 +148,19 @@ const flatten = (q: Awaited<ReturnType<typeof quoteCancellation>>) => ({
     policyConfigured: q.policyConfigured,
 });
 
+// A cancellation touches money when anything was collected or would be charged or returned.
+const involvesMoney = (q: Awaited<ReturnType<typeof quoteCancellation>>) =>
+    q.paidCents > 0 || q.outcome.feeCents > 0 || q.outcome.refundCents > 0;
+
 const cancellationRoutes = createApiRouter()
     .openapi(quoteRoute, async (c) => {
         const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');
         const { reason } = c.req.valid('query');
         const quote = await quoteCancellation(getDrizzle(c), tenantId, id, reason);
+        if (!(await capabilitiesFor(c)).financial) {
+            return c.json({ success: true as const, data: { requiresFinancial: true as const, moneyInvolved: involvesMoney(quote) } }, 200);
+        }
         return c.json({ success: true as const, data: flatten(quote) }, 200);
     })
     .openapi(cancelRoute, async (c) => {
@@ -148,6 +173,12 @@ const cancellationRoutes = createApiRouter()
         // against the scheduled instant and the outcome must describe the state
         // the caller was looking at.
         const quote = await quoteCancellation(db, tenantId, id, reason);
+
+        // Committing a fee or a refund is a money decision. The refusal carries no
+        // figure, and it comes before the fee confirmation, which would show one.
+        if (involvesMoney(quote) && !(await capabilitiesFor(c)).financial) {
+            throw Errors.FinancialRequired('cancellation');
+        }
 
         // A cancellation that silently charges 50% is a chargeback. Making the
         // acknowledgement a SERVER rule rather than a UI convention is what
@@ -220,7 +251,7 @@ const cancellationRoutes = createApiRouter()
 
         return c.json({
             success: true as const,
-            data: { outcome: flatten(quote), refundPaymentId: refund?.row.id ?? null },
+            data: await moneyView(c, { outcome: flatten(quote), refundPaymentId: refund?.row.id ?? null }),
         }, 200);
     })
     .openapi(uncancelRoute, async (c) => {

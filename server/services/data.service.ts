@@ -26,7 +26,12 @@ export class DataService {
 
     // ── Export ─────────────────────────────────────────────────────────────────
 
-    async exportInspectionsCSV(tenantId: string): Promise<string> {
+    /**
+     * `includeMoney: false` drops the price column from the header AND from every
+     * row. The route passes the caller's `financial` capability; the default keeps
+     * the full file for callers that already hold it.
+     */
+    async exportInspectionsCSV(tenantId: string, includeMoney = true): Promise<string> {
         const db = this.getDrizzle();
         // Task 9c (people-role-profiles) — client_name/client_email/client_phone
         // are sourced from the inspection_people primary-client join, not the
@@ -75,13 +80,19 @@ export class DataService {
             .where(eq(inspections.tenantId, tenantId))
             .orderBy(inspections.date);
 
-        const header = csvRow([
+        // Built as field arrays so the price column can be removed by position
+        // before quoting (a quoted cell may itself contain commas or newlines).
+        const headerFields = [
             'id', 'date', 'property_address', 'unit', 'client_name', 'client_email', 'client_phone',
             'status', 'payment_status', 'price_cents', 'year_built', 'sqft', 'foundation_type',
             'bedrooms', 'bathrooms', 'county', 'inspector_id', 'referred_by_agent_id',
             'confirmed_at', 'cancel_reason', 'internal_notes', 'created_at',
-        ]);
-        const dataRows = rows.map(({ inspection: r, primaryClientName, primaryClientEmail, primaryClientPhone, buyerAgentContactId }) => csvRow([
+        ];
+        const priceAt = headerFields.indexOf('price_cents');
+        const project = (fields: (string | number | boolean | null | undefined)[]) =>
+            csvRow(includeMoney ? fields : fields.filter((_, i) => i !== priceAt));
+        const header = project(headerFields);
+        const dataRows = rows.map(({ inspection: r, primaryClientName, primaryClientEmail, primaryClientPhone, buyerAgentContactId }) => project([
             r.id, r.date, r.propertyAddress, r.unit, primaryClientName, primaryClientEmail, primaryClientPhone,
             r.status, r.paymentStatus, r.price,
             r.yearBuilt, r.sqft, r.foundationType, r.bedrooms, r.bathrooms, r.county,

@@ -89,6 +89,9 @@ export enum ErrorCode {
     // future (422): the device clock is wrong, and a package dated ahead would
     // never age out. Nothing was written. `details.maxFutureSkewDays` carries the limit.
     PACKAGE_FROM_THE_FUTURE = 'PACKAGE_FROM_THE_FUTURE',
+    // A write would set or change a money field and the caller lacks the
+    // `financial` capability. `details.field` names the first field refused.
+    FINANCIAL_REQUIRED = 'FINANCIAL_REQUIRED',
 }
 
 /**
@@ -114,6 +117,8 @@ export const Errors = {
     BadRequest: (msg: string, details?: unknown) => new AppError(400, ErrorCode.BAD_REQUEST, msg, details),
     Unauthorized: (msg: string = 'Unauthorized access') => new AppError(401, ErrorCode.UNAUTHORIZED, msg),
     Forbidden: (msg: string = 'Action forbidden') => new AppError(403, ErrorCode.FORBIDDEN, msg),
+    FinancialRequired: (field: string) =>
+        new AppError(403, ErrorCode.FINANCIAL_REQUIRED, `Changing '${field}' requires the 'financial' capability`, { field }),
     NotFound: (msg: string = 'Resource not found') => new AppError(404, ErrorCode.NOT_FOUND, msg),
     Validation: (details: unknown) => new AppError(400, ErrorCode.VALIDATION_ERROR, 'Validation failed', details),
     Conflict: (msg: string, details?: unknown) => new AppError(409, ErrorCode.CONFLICT, msg, details),

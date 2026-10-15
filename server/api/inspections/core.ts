@@ -28,6 +28,8 @@ import { getDrizzle } from '../../lib/route-helpers';
 import { patchRevisionReport } from './patch-revision-report';
 import { createInspectionRoute } from './core-create-route';
 import { completeReplayedCreate } from './create-replay';
+import { moneyView, assertMoneyWriteAllowed } from '../../lib/auth/money-access';
+import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { fireQuotaThresholdNotice, recordCreateAudit, resolveCreateInput } from './create-support';
 
 /**
@@ -191,7 +193,9 @@ const coreRoutes = createApiRouter()
         const result = await service.getInspection(id, c.get('tenantId'));
         return c.json({
             success: true,
-            data: result
+            // Only the inspection row is projected: `template` is customer-authored
+            // schema JSON and may legitimately contain a field called `price`.
+            data: { ...result, inspection: await moneyView(c, result.inspection) },
         }, 200);
     })
     .openapi(deleteInspectionRoute, async (c) => {
@@ -217,6 +221,10 @@ const coreRoutes = createApiRouter()
         const db = getDrizzle(c);
 
         const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
+
+        // Money fields need `financial`, but only a CHANGE is refused: the settings
+        // form forwards its whole form, price included. Before anything else runs.
+        assertMoneyWriteAllowed(await capabilitiesFor(c), body, inspection as Record<string, unknown>);
 
         // Every soft reference this patch can dangle, plus the two status moves
         // it may not make: INTO `cancelled` (#78) and OUT of it (#81). Both live
@@ -287,12 +295,13 @@ const coreRoutes = createApiRouter()
         const body = c.req.valid('json');
         const tenantId = c.get('tenantId');
         const service = c.var.services.inspection;
+        assertMoneyWriteAllowed(await capabilitiesFor(c), body, null);
 
         // A replay of a create that named its own id (an offline device after the Idempotency-Key window):
         // answer with the existing inspection, finishing whatever the first attempt did not reach (./create-replay).
         if (body.id) {
             const existing = await service.findInspectionById(tenantId, body.id);
-            if (existing) return c.json({ success: true, data: { inspection: await completeReplayedCreate(c, existing, body) } }, 200);
+            if (existing) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, existing, body)) } }, 200);
         }
 
         const civilDate = String(body.date ?? '').slice(0, 10);
@@ -314,13 +323,13 @@ const coreRoutes = createApiRouter()
         });
         // A concurrent request with the same client id won the insert: this one is a
         // replay, so it answers like one and repeats none of the side effects below.
-        if (!created) return c.json({ success: true, data: { inspection: await completeReplayedCreate(c, inspection, body) } }, 200);
+        if (!created) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, inspection, body)) } }, 200);
 
         fireQuotaThresholdNotice(c, tenantId);
 
         return c.json({
             success: true,
-            data: { inspection }
+            data: { inspection: await moneyView(c, inspection) },
         }, 201);
     })
     .openapi(cloneInspectionRoute, async (c) => {
@@ -334,7 +343,7 @@ const coreRoutes = createApiRouter()
             metadata: { clonedFrom: id, propertyAddress: clone.propertyAddress },
         });
         fireQuotaThresholdNotice(c, tenantId);
-        return c.json({ success: true, data: { inspection: clone } }, 201);
+        return c.json({ success: true, data: { inspection: await moneyView(c, clone) } }, 201);
     })
     .openapi(createFromWizardRoute, async (c) => {
         const input    = c.req.valid('json');

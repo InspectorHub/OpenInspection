@@ -4,6 +4,7 @@ import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
 import { Errors } from '../lib/errors';
+import { moneyView, guardMoneyWrite } from '../lib/auth/money-access';
 
 const TypeBody = z.object({
     name:               z.string().min(1).describe('Display name of the event type, shown when scheduling a visit and on the calendar.'),
@@ -38,29 +39,31 @@ const EventStatusBody = z.object({
 const eventsRoutes = createApiRouter()
     .get('/event-types', requireRole('owner', 'manager', 'inspector'), async (c) => {
         const data = await c.var.services.event.listEventTypes(c.get('tenantId'));
-        return c.json({ success: true, data });
+        return c.json({ success: true, data: await moneyView(c, data) });
     })
     .post('/event-types', requireRole('owner', 'manager'), async (c) => {
-        const parsed = TypeBody.safeParse(await c.req.json());
+        // Checked on the RAW body: the schema's default of 0 would otherwise make
+        // every create look like it sets a price.
+        const parsed = TypeBody.safeParse(await guardMoneyWrite(c, await c.req.json(), null));
         if (!parsed.success) throw Errors.BadRequest('Invalid event type', parsed.error.flatten().fieldErrors);
         const row = await c.var.services.event.createEventType(c.get('tenantId'), parsed.data);
-        return c.json({ success: true, data: row }, 201);
+        return c.json({ success: true, data: await moneyView(c, row) }, 201);
     })
     // ---- Inspection events ----
     .get('/inspections/:inspectionId/events', requireRole('owner', 'manager', 'inspector'), async (c) => {
         const inspectionId = c.req.param('inspectionId') as string;
         const data = await c.var.services.event.listInspectionEvents(c.get('tenantId'), inspectionId);
-        return c.json({ success: true, data });
+        return c.json({ success: true, data: await moneyView(c, data) });
     })
     .post('/inspections/:inspectionId/events', requireRole('owner', 'manager', 'inspector'), async (c) => {
         const inspectionId = c.req.param('inspectionId') as string;
-        const parsed = EventBody.safeParse(await c.req.json());
+        const parsed = EventBody.safeParse(await guardMoneyWrite(c, await c.req.json(), null));
         if (!parsed.success) throw Errors.BadRequest('Invalid event', parsed.error.flatten().fieldErrors);
         const row = await c.var.services.event.createEvent(c.get('tenantId'), inspectionId, {
             ...parsed.data,
             scheduledAt: new Date(parsed.data.scheduledAt),
         });
-        return c.json({ success: true, data: row }, 201);
+        return c.json({ success: true, data: await moneyView(c, row) }, 201);
     })
     .put('/events/:id', requireRole('owner', 'manager', 'inspector'), async (c) => {
         const id = c.req.param('id') as string;

@@ -75,6 +75,21 @@ beforeEach(() => {
 });
 
 describe("cancellation quote loader", () => {
+    describe("for a caller without the financial capability", () => {
+        it("offers a zero-figure quote when no money is attached, so a free cancellation can proceed", async () => {
+            quoteGet.mockResolvedValue(json({ success: true, data: { requiresFinancial: true, moneyInvolved: false } }));
+            const res = await get({ id: "insp-1", reason: "client_cancelled" });
+            expect(res).toMatchObject({ ok: true, quote: { feeCents: 0, refundCents: 0, paidCents: 0, policyConfigured: false } });
+        });
+
+        it("offers no quote, and says who may cancel, when money is attached", async () => {
+            quoteGet.mockResolvedValue(json({ success: true, data: { requiresFinancial: true, moneyInvolved: true } }));
+            const res = await get({ id: "insp-1", reason: "client_cancelled" });
+            expect(res.ok).toBe(false);
+            expect(res).toMatchObject({ error: expect.stringMatching(/financial/i) });
+        });
+    });
+
     it("returns the priced outcome for the reason asked about", async () => {
         quoteGet.mockResolvedValue(json({ success: true, data: QUOTE }));
         const res = await get({ id: "insp-1", reason: "client_cancelled" });

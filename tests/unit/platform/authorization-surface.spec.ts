@@ -53,6 +53,16 @@ function mountedGuards(): Map<string, string> {
     return out;
 }
 
+/**
+ * Routers that are plain Hono apps (no OpenAPI document entry) but mount a
+ * capability guard. The QuickBooks router is cookie-authenticated and
+ * hand-rolled, so its guard cannot be declared as `x-capability`.
+ */
+const HAND_ROLLED_MOUNTS: Record<string, string> = {
+    'ALL /api/integrations/qbo/*': 'financial',
+    'GET /api/integrations/qbo/connect': 'financial',
+};
+
 describe('authorization surface', { timeout: 30_000 }, () => {
     it('walks real, non-empty route tables', () => {
         // If either walk's shape ever changes, the assertions below could pass
@@ -77,6 +87,10 @@ describe('authorization surface', { timeout: 30_000 }, () => {
         const declared = declaredOps();
         const broken: string[] = [];
         for (const [key, cap] of mountedGuards()) {
+            // Hand-rolled routers have no OpenAPI entry to declare on; each is
+            // named here with the capability it must mount, and the next test
+            // proves the entry is still live.
+            if (HAND_ROLLED_MOUNTS[key] === cap) continue;
             if (!declared.has(key)) {
                 broken.push(`${key} mounts '${cap}' but is not in the OpenAPI document`);
             } else if (declared.get(key) !== cap) {
@@ -84,5 +98,12 @@ describe('authorization surface', { timeout: 30_000 }, () => {
             }
         }
         expect(broken, broken.join('\n')).toEqual([]);
+    });
+
+    it('every hand-rolled mount named above is still mounted (the allowlist cannot go stale silently)', () => {
+        const mounted = mountedGuards();
+        const stale = Object.entries(HAND_ROLLED_MOUNTS).filter(([key, cap]) => mounted.get(key) !== cap).map(([key]) => key);
+        expect(stale).toEqual([]);
+        expect(Object.keys(HAND_ROLLED_MOUNTS).length).toBeGreaterThan(0);
     });
 });

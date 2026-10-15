@@ -24,6 +24,7 @@ import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { eq, inArray, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
+import { moneyView } from '../../lib/auth/money-access';
 import { safeISODate } from '../../lib/date';
 
 /**
@@ -240,7 +241,7 @@ const bulkRoutes = createApiRouter()
         }
         return c.json({
             success: true,
-            data: {
+            data: await moneyView(c, {
                 ...buckets,
                 needsAttention: toWireDates(buckets.needsAttention),
                 today:          toWireDates(buckets.today),
@@ -249,7 +250,7 @@ const bulkRoutes = createApiRouter()
                 recentReports:  toWireDates(buckets.recentReports),
                 cancelled:      toWireDates(buckets.cancelled),
                 conciergePending,
-            },
+            }),
         });
     })
     .openapi(listInspectionsRoute, async (c) => {

@@ -27,6 +27,7 @@ import { InspectorAuditLogSchema } from '../../lib/validations/audit-log-write.s
 import { erasureLog } from '../../lib/db/schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { getDrizzle } from '../../lib/route-helpers';
+import { moneyView } from '../../lib/auth/money-access';
 import { AppError } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 
@@ -262,7 +263,6 @@ const erasureLogRoute = createRoute(withMcpMetadata({
     description: 'Returns the tenant-scoped append-only erasure accountability record (Track I-a). Newest first, capped at 50. Exposes subject_email + status + counts + parsed decisions only.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-
 const adminDataRoutes = createApiRouter()
     .openapi(exportDataRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -270,8 +270,8 @@ const adminDataRoutes = createApiRouter()
         const data = await adminService.getExport(tenantId);
 
         auditFromContext(c, 'data.export', 'bulk_export');
-
-        return c.json({ success: true, data: { exportedAt: new Date().toISOString(), tenantId, ...data } }, 200);
+        // Only inspection rows carry company money; templates are customer JSON.
+        return c.json({ success: true, data: { exportedAt: new Date().toISOString(), tenantId, ...data, inspections: await moneyView(c, data.inspections) } }, 200);
     })
     .openapi(inviteMemberRoute, async (c) => {
         const tenantId = c.get('tenantId');
