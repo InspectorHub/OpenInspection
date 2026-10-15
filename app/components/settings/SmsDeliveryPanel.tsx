@@ -1,8 +1,9 @@
 import { Form } from "react-router";
-import { RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button } from "@core/shared-ui";
 import type { useFetcher } from "react-router";
 import { SmsSecretsPanel } from "~/components/settings/SmsSecretsPanel";
-import type { action } from "~/routes/settings-communication";
+import { FoldedAccountDetails } from "~/components/settings/integrations/FoldedAccountDetails";
+import type { action } from "~/routes/settings-integrations-sms";
 import type { ManagedComplianceData } from "~/components/settings/ManagedComplianceWizard";
 import type { ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import { m } from "~/paraglide/messages";
@@ -10,16 +11,7 @@ import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 
 type SmsTestFetcher = ReturnType<typeof useFetcher<typeof action>>;
 
-type ComplianceStatus =
-  | "not_started"
-  | "profile_pending"
-  | "brand_pending"
-  | "campaign_pending"
-  | "tfv_pending"
-  | "approved"
-  | "rejected";
-
-export type SmsModeValue = "own" | "managed_shared" | "managed_dedicated";
+type ComplianceStatus = ManagedComplianceData["complianceStatus"];
 
 /**
  * Maps a complianceStatus value to a short human-readable label.
@@ -39,26 +31,23 @@ function complianceLabel(status: ComplianceStatus | null): string {
 }
 
 /**
- * Settings → Communication: "SMS delivery" section (Track L). Presentational —
- * owns the section wrapper, mode/company-phone form, and renders the Twilio
- * secrets + inbound + test sub-panel inside the same <section>. Self-host gating
- * (`isSaas`) is threaded verbatim from the route.
+ * Integrations -> SMS, below the connection card and the source choice:
+ * the company phone, the registration status of the company's own number, and
+ * the account details (provider, keys, inbound address, test message).
  *
- * SaaS tenants select from three modes:
- *   - "own" (BYO Twilio/Telnyx) — fully wired end-to-end
- *   - "managed_shared" — managed shared number (default; send path in later plan)
- *   - "managed_dedicated" — dedicated local number, gated/disabled upgrade
- * "platform" is a legacy/first-party value stored in DB; it is never offered as
- * a tenant choice — the server rejects it if submitted.
- * Standalone deployments show only the BYO option (mode is forced to "own").
+ * Whose account sends the SMS is chosen above this panel; nothing here changes
+ * it. The account details are shown while "Your own" is the question and folded
+ * once they are complete. When Built-in is selected they stay saved, out of
+ * sight, and this panel says so.
  */
 export function SmsDeliveryPanel({
-  isSaas,
-  smsMode,
-  setSmsMode,
-  smsConfig,
+  effectiveSource,
   companyPhone,
   savingSmsConfig,
+  byoProvider,
+  compliance,
+  showAccountDetails,
+  accountComplete,
   secrets,
   secretFieldError,
   secretFormError,
@@ -66,21 +55,16 @@ export function SmsDeliveryPanel({
   showInboundUrl,
   inboundUrl,
   smsTestFetcher,
-  compliance,
-  byoProvider,
   testResults = [],
 }: {
-  isSaas: boolean;
-  smsMode: SmsModeValue;
-  setSmsMode: (m: SmsModeValue) => void;
-  // `effectiveSource` includes `managed` (F58): the managed tiers resolve from a
-  // platform API-key triple + Messaging Service SID, which is a different
-  // credential set from the one `own`/`platform` describe. A deployment that
-  // never configured that pool resolves to `none` WHILE the tenant sits on a
-  // managed mode — the one case where the missing credentials are not theirs.
-  smsConfig: { mode: "platform" | "own" | "managed_shared" | "managed_dedicated"; effectiveSource: "platform" | "own" | "managed" | "none" };
+  /** Whose number the SMS goes out on now. */
+  effectiveSource: "platform" | "own" | "managed" | "none";
   companyPhone: string;
   savingSmsConfig: boolean;
+  byoProvider: "twilio" | "telnyx";
+  compliance: ManagedComplianceData;
+  showAccountDetails: boolean;
+  accountComplete: boolean;
   secrets: {
     TWILIO_ACCOUNT_SID: string;
     TWILIO_AUTH_TOKEN: string;
@@ -95,154 +79,74 @@ export function SmsDeliveryPanel({
   showInboundUrl: boolean;
   inboundUrl: string;
   smsTestFetcher: SmsTestFetcher;
-  compliance: ManagedComplianceData;
-  byoProvider?: "twilio" | "telnyx";
   /** Persisted "Test connection" history (shared loader list, filtered to sms). */
   testResults?: ConnectionTestResult[];
 }) {
-  // Toll-free verification is Twilio-specific; Telnyx has a different inbound/
-  // compliance flow, so the compliance block below is gated to Twilio.
-  const smsProviderLabel = byoProvider === "telnyx" ? m.settings_sms_provider_telnyx() : m.settings_sms_provider_twilio();
   const latch = useSubmitLatch();
+  // Toll-free verification is Twilio-specific; Telnyx has a different inbound/
+  // compliance flow, so the status below is shown for Twilio only.
+  const showVerification = effectiveSource === "own" && byoProvider !== "telnyx";
   return (
-      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
-        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_smsdelivery_heading()}</h3>
-        <p className="text-[13px] text-ih-fg-3">
-          {m.settings_smsdelivery_desc()}
-        </p>
-
-        {/* Mode + company phone */}
-        <Form method="post" className="space-y-4" onSubmit={latch()}>
-          <input type="hidden" name="intent" value="save-sms-config" />
-          <input type="hidden" name="smsMode" value={smsMode} />
-
-          {/* Mode switch — SaaS only. Self-host is BYO-only; the mode is
-              forced to "own" (the hidden smsMode input above) and the selector
-              is hidden. "platform" is a first-party-only value that is never
-              presented as a tenant option. */}
-          {isSaas && (
-            <RadioCardGroup
-              name="_smsModeRadio"
-              value={smsMode}
-              onChange={(v) => setSmsMode(v as SmsModeValue)}
-              options={[
-                {
-                  value: "own",
-                  title: m.settings_smsdelivery_byo_label(),
-                  description: m.settings_smsdelivery_byo_desc(),
-                },
-                {
-                  value: "managed_shared",
-                  title: m.settings_smsdelivery_shared_label(),
-                  badge: m.settings_smsdelivery_included(),
-                  description: m.settings_smsdelivery_shared_desc(),
-                },
-                {
-                  value: "managed_dedicated",
-                  title: m.settings_smsdelivery_dedicated_label(),
-                  description: m.settings_smsdelivery_dedicated_desc(),
-                },
-              ]}
-            />
+    <section className="space-y-ih-list">
+      {showVerification && (
+        <div className="space-y-1" data-testid="sms-verification">
+          <p className="text-xs text-ih-fg-3">
+            {m.settings_smsdelivery_tfv_label()}{" "}
+            <span
+              className={`font-bold ${
+                compliance.complianceStatus === "approved"
+                  ? "text-ih-ok-fg"
+                  : compliance.complianceStatus === "rejected"
+                    ? "text-ih-bad-fg"
+                    : "text-ih-fg-2"
+              }`}
+            >
+              {complianceLabel(compliance.complianceStatus)}
+            </span>
+          </p>
+          {compliance.complianceStatus === "rejected" && compliance.rejectionReason && (
+            <p className="text-xs text-ih-bad-fg">{compliance.rejectionReason}</p>
           )}
-          {!isSaas && (
-            <p className="text-[13px] text-ih-fg-2 bg-ih-bg-muted border border-ih-border rounded-md p-3">
-              {m.settings_smsdelivery_selfhost_note()}
-            </p>
-          )}
-          {/* F59 — all three states used to share one class, `text-ih-ok-fg`.
-              "SMS not configured" was drawn in the same success green as "using
-              your provider": a blocking configuration gap rendered as a healthy
-              one. Configured states stay ok; the two unconfigured ones take the
-              `watch` semantic, which is what the token set has for "needs
-              attention" (never a raw hex — `lint:ds` and `lint:contrast` both
-              read this line).
+        </div>
+      )}
 
-              F58 — and there are TWO unconfigured states, not one. A tenant on a
-              managed tier is missing nothing of their own: the deployment has no
-              managed pool, the credential panel below is not even rendered in
-              that mode, and "set your provider credentials below" was therefore
-              pointing at the wrong party AND at nothing. */}
-          {(() => {
-            const configured =
-              smsConfig.effectiveSource === "own" ||
-              smsConfig.effectiveSource === "platform" ||
-              smsConfig.effectiveSource === "managed";
-            const managedMode =
-              smsConfig.mode === "managed_shared" || smsConfig.mode === "managed_dedicated";
-            return (
-              <p
-                data-testid="sms-effective-source"
-                className={`text-[11px] font-bold ${configured ? "text-ih-ok-fg" : "text-ih-watch-fg"}`}
-              >
-                {smsConfig.effectiveSource === "own"
-                  ? m.settings_smsdelivery_using_your({ provider: smsProviderLabel })
-                  : smsConfig.effectiveSource === "platform"
-                    ? m.settings_smsdelivery_using_platform()
-                    : smsConfig.effectiveSource === "managed"
-                      ? m.settings_smsdelivery_using_managed()
-                      : managedMode
-                        ? m.settings_smsdelivery_managed_unavailable()
-                        : m.settings_smsdelivery_not_configured()}
-              </p>
-            );
-          })()}
-
-          {/* BYO compliance status — toll-free verification is Twilio-specific,
-              so this is gated to own-mode tenants on Twilio. */}
-          {smsConfig.effectiveSource === "own" && byoProvider !== "telnyx" && (
-            <div className="space-y-1">
-              <p className="text-[11px] text-ih-fg-3">
-                {m.settings_smsdelivery_tfv_label()}{" "}
-                <span
-                  className={`font-bold ${
-                    compliance.complianceStatus === "approved"
-                      ? "text-ih-ok-fg"
-                      : compliance.complianceStatus === "rejected"
-                        ? "text-ih-bad-fg"
-                        : "text-ih-fg-2"
-                  }`}
-                >
-                  {complianceLabel(compliance.complianceStatus)}
-                </span>
-              </p>
-              {compliance.complianceStatus === "rejected" && compliance.rejectionReason && (
-                <p className="text-[11px] text-ih-bad-fg">{compliance.rejectionReason}</p>
-              )}
-            </div>
-          )}
-
-          <div>
-            <label htmlFor="companyPhone" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_smsdelivery_company_phone_label()}</label>
-            <input
-              type="tel" name="companyPhone" id="companyPhone" defaultValue={companyPhone}
-              placeholder="+1 555 123 4567"
-              className="w-full md:w-1/2 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
-            />
-            <p className="text-[11px] text-ih-fg-3 mt-1">{m.settings_smsdelivery_phone_note_prefix()}<code>{"{{company_phone}}"}</code>{m.settings_smsdelivery_phone_note_suffix()}</p>
-          </div>
-
-          <div className="flex justify-end pt-3 border-t border-ih-border">
-            <button type="submit" {...pendingProps(savingSmsConfig)}
-              className={`h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 ${PENDING_CLASS}`}>
-              {savingSmsConfig ? m.common_saving() : m.settings_smsdelivery_save()}
-            </button>
-          </div>
-        </Form>
-
-        {(!isSaas || smsMode === "own") && (
-          <SmsSecretsPanel
-            secrets={secrets}
-            secretFieldError={secretFieldError}
-            secretFormError={secretFormError}
-            savingSmsSecrets={savingSmsSecrets}
-            showInboundUrl={showInboundUrl}
-            inboundUrl={inboundUrl}
-            smsTestFetcher={smsTestFetcher}
-            initialProvider={byoProvider ?? "twilio"}
-            testResults={testResults}
+      <Form method="post" onSubmit={latch()} className="bg-ih-bg-card border border-ih-border rounded-ih-card p-5 space-y-3">
+        <input type="hidden" name="intent" value="save-sms-config" />
+        <div>
+          <label htmlFor="companyPhone" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_smsdelivery_company_phone_label()}</label>
+          <input
+            type="tel" name="companyPhone" id="companyPhone" defaultValue={companyPhone}
+            placeholder="+1 555 123 4567"
+            className="w-full md:w-1/2 h-9 px-3 rounded-ih-button border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
           />
-        )}
-      </section>
+          <p className="text-xs text-ih-fg-3 mt-1">{m.settings_smsdelivery_phone_note_prefix()}<code>{"{{company_phone}}"}</code>{m.settings_smsdelivery_phone_note_suffix()}</p>
+        </div>
+        <div className="flex justify-end">
+          <Button type="submit" variant="primary" pending={savingSmsConfig}>
+            {savingSmsConfig ? m.common_saving() : m.settings_smsdelivery_save()}
+          </Button>
+        </div>
+      </Form>
+
+      {showAccountDetails ? (
+        <FoldedAccountDetails complete={accountComplete}>
+          <div className="bg-ih-bg-card border border-ih-border rounded-ih-card p-5 space-y-4">
+            <SmsSecretsPanel
+              secrets={secrets}
+              secretFieldError={secretFieldError}
+              secretFormError={secretFormError}
+              savingSmsSecrets={savingSmsSecrets}
+              showInboundUrl={showInboundUrl}
+              inboundUrl={inboundUrl}
+              smsTestFetcher={smsTestFetcher}
+              initialProvider={byoProvider}
+              testResults={testResults}
+            />
+          </div>
+        </FoldedAccountDetails>
+      ) : (
+        <p className="text-xs text-ih-fg-3">{m.integrations_delivery_keys_kept()}</p>
+      )}
+    </section>
   );
 }

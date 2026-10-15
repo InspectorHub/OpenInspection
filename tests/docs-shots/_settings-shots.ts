@@ -47,7 +47,7 @@ export function resetSettingsGuides(entries: readonly SettingsShot[]): void {
  * px tall, so one `fullPage: true` picture is displayed at ~0.65x in a 672px
  * column and read by nobody. The mechanism to fix that exists — `shot.sections`
  * in `_harness.ts`, element-scoped, and those two pages already carry the stable
- * containers it needs (`#email-delivery`, `#sms-delivery`, `#email-templates`,
+ * containers it needs (`#email-delivery`, `#delivery-accounts`, `#email-templates`,
  * `#google-calendar`, guarded by settings-communication-nav.spec.ts).
  *
  * What blocks it is the join, not the capture: the publisher matches `<id>.png`

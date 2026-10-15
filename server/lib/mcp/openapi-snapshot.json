@@ -11874,6 +11874,22 @@
     "description": "Returns the ZIP prefixes this inspector will travel to. An empty list means they serve every area."
   },
   {
+    "operationId": "listIntegrationSources",
+    "method": "GET",
+    "pathTemplate": "/api/admin/integration-sources",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Which source each service runs on",
+    "description": "Returns, for email, SMS and AI, the sources the company can choose between (Built-in, Your own), the choice it saved, the source in use, whether it works, and whether its own account details are complete. Keys are never returned, only whether they are complete."
+  },
+  {
     "operationId": "listIntegrationStatus",
     "method": "GET",
     "pathTemplate": "/api/integrations/status",
@@ -18534,6 +18550,24 @@
     },
     "summary": "Save email template override",
     "description": "Saves a tenant override for an editable email template. Required templates cannot be disabled. Only known block keys are accepted."
+  },
+  {
+    "operationId": "saveIntegrationSource",
+    "method": "PUT",
+    "pathTemplate": "/api/admin/integration-sources",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/IntegrationSourceChange"
+      }
+    },
+    "summary": "Choose Built-in or Your own for a service",
+    "description": "Records whether a service (email, SMS or AI) runs on the built-in account or the company's own. Your own is refused until the company's own account details are complete, and Built-in is refused where none is offered. Saves only the choice: no key is accepted, read or changed, so switching back and forth keeps the company's keys."
   },
   {
     "operationId": "saveNotificationPreference",

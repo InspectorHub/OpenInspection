@@ -4,7 +4,7 @@ import { RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import type { useFetcher } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
-import type { action } from "~/routes/settings-communication";
+import type { action } from "~/routes/settings-integrations-sms";
 import { m } from "~/paraglide/messages";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 

@@ -55,6 +55,9 @@ describe('card list shape', () => {
         // the Stripe keys and the video backend are still panels on the Integrations page itself
         expect(card(cards, 'stripe').detailPath).toBe('/settings/integrations#stripe');
         expect(card(cards, 'video').detailPath).toBe('/settings/integrations#video');
+        // email and SMS delivery have a page of their own; Communication holds no keys
+        expect(card(cards, 'email').detailPath).toBe('/settings/integrations/email');
+        expect(card(cards, 'sms').detailPath).toBe('/settings/integrations/sms');
     });
 });
 

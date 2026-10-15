@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLoaderData, useActionData, useNavigation, useFetcher } from "react-router";
+import { Link, useLoaderData, useActionData, useNavigation } from "react-router";
 import { Icon } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { useForm } from "@conform-to/react";
@@ -9,19 +9,17 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { useFlash } from "~/hooks/useFlash";
 import { makeCommunicationEmailSchema } from "~/lib/forms/settings-config.schema";
-import { ownEmailProviderConfigured } from "~/lib/email-provider-config";
+import { ownEmailProviderConfigured, type EmailByoProvider } from "~/lib/email-provider-config";
+import { pickSecretFields, saveSecrets } from "~/lib/secret-intents.server";
+import { secretErrorReaders } from "~/lib/secret-action-errors";
 import { TemplateList } from "~/components/email-template/TemplateList";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { EmailDeliveryPanel } from "~/components/settings/EmailDeliveryPanel";
-import { EmailSecretsPanel } from "~/components/settings/EmailSecretsPanel";
-import { runEmailTestStepIntent } from "~/lib/test-step.server";
-import { SmsDeliveryPanel, type SmsModeValue } from "~/components/settings/SmsDeliveryPanel";
+import { DeliveryAccountsRow } from "~/components/settings/DeliveryAccountsRow";
 import { GoogleCalendarPanel } from "~/components/settings/GoogleCalendarPanel";
-import { ManagedComplianceWizard, type ManagedComplianceData } from "~/components/settings/ManagedComplianceWizard";
 import { SectionNav } from "~/components/settings/SectionNav";
-import { parseTestResults } from "~/lib/connection-test";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { getDeploymentProfile } from "../../server/lib/deployment-profile";
@@ -37,25 +35,28 @@ interface CommConfig {
   emailMode: "platform" | "own";
   senderDisplayName: string | null;
   companyName: string | null;
-  /** Registered legal entity, already resolved by getBrand — do NOT re-apply the fallback. */
-  legalName: string;
   pointOfContact: "inspector" | "company";
 }
 
+const EMAIL_PROVIDERS = ["resend", "sendgrid", "postmark", "mailgun"] as const;
+
+/**
+ * Communication is how messages read and when they go out: sender name and
+ * address, reply-to, templates. The accounts and keys that send them are in
+ * Integrations, so no email or SMS key reaches this page. The one fact it needs
+ * about them, "the saved email provider is complete", is computed here and sent
+ * as a yes/no.
+ */
 export async function loader({ request, context }: Route.LoaderArgs) {
   const { forbidden, token } = await requireAdminLoader(context, request);
   if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
 
-  // Fetch communication config + secrets + email templates + SMS config/tenant-config/compliance in parallel
-  const [commRes, secretsRes, tplRes, smsCfgRes, tenantCfgRes, smsComplianceRes, testResultsRes] = await Promise.all([
+  const [commRes, secretsRes, tplRes, tenantCfgRes] = await Promise.all([
     api.admin.communication.$get().catch(() => null),
     api.secrets.secrets.$get().catch(() => null),
     api.emailTemplates["email-templates"].$get().catch(() => null),
-    api.smsAdmin.sms.config.$get().catch(() => null),
     api.admin["tenant-config"].$get().catch(() => null),
-    api.smsAdmin.sms.compliance.$get().catch(() => null),
-    api.integrations["test-results"].$get().catch(() => null),
   ]);
 
   const commBody = commRes?.ok ? ((await commRes.json()) as Record<string, unknown>) : {};
@@ -67,135 +68,41 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const tplBody = tplRes?.ok ? ((await tplRes.json()) as Record<string, unknown>) : {};
   const emailTemplates = (Array.isArray(tplBody.data) ? tplBody.data : []) as Array<{ trigger: string; name: string; category: string; required: boolean; enabled: boolean; isCustomized: boolean; subject: string }>;
 
-  // Track L — SMS effective source (no secrets leaked) + tenant SMS config flags.
-  const smsCfgBody = smsCfgRes?.ok ? ((await smsCfgRes.json()) as { data?: { mode?: "platform" | "own" | "managed_shared" | "managed_dedicated"; effectiveSource?: "platform" | "own" | "none" } }) : null;
-  const smsConfig = {
-    mode: smsCfgBody?.data?.mode ?? "platform",
-    effectiveSource: smsCfgBody?.data?.effectiveSource ?? "none",
-  };
-  const tenantCfgBody = tenantCfgRes?.ok ? ((await tenantCfgRes.json()) as { data?: { smsMode?: "platform" | "own" | "managed_shared" | "managed_dedicated"; companyPhone?: string | null; smsByoProvider?: "twilio" | "telnyx" | null; managedProvider?: "twilio" | "telnyx" | null; emailByoProvider?: "resend" | "sendgrid" | "postmark" | "mailgun" | null } }) : null;
-  const companyPhone = tenantCfgBody?.data?.companyPhone ?? "";
-  const byoProvider: "twilio" | "telnyx" = tenantCfgBody?.data?.smsByoProvider === "telnyx" ? "telnyx" : "twilio";
-  // managedProvider: which carrier runs MANAGED compliance (managed_dedicated mode).
-  // Separate from smsByoProvider (the BYO send provider shown in 'own' mode).
-  const managedProvider: "twilio" | "telnyx" = tenantCfgBody?.data?.managedProvider === "telnyx" ? "telnyx" : "twilio";
-  const emailByoProvider: "resend" | "sendgrid" | "postmark" | "mailgun" =
-    (["resend", "sendgrid", "postmark", "mailgun"] as const).includes(
-      tenantCfgBody?.data?.emailByoProvider as "resend" | "sendgrid" | "postmark" | "mailgun"
-    )
-      ? (tenantCfgBody!.data!.emailByoProvider as "resend" | "sendgrid" | "postmark" | "mailgun")
-      : "resend";
+  const tenantCfg = tenantCfgRes?.ok ? ((await tenantCfgRes.json()) as { data?: { emailByoProvider?: string | null } }).data : null;
+  const saved = tenantCfg?.emailByoProvider ?? "";
+  const emailByoProvider: EmailByoProvider = (EMAIL_PROVIDERS as readonly string[]).includes(saved) ? (saved as EmailByoProvider) : "resend";
 
-  // SMS compliance status (BYO Twilio toll-free verification + managed sub-statuses).
-  // Fails gracefully to not_started so the UI always has a defined value to render.
-  type ComplianceStatus = "not_started" | "profile_pending" | "brand_pending" | "campaign_pending" | "tfv_pending" | "approved" | "rejected";
-  const smsComplianceBody = smsComplianceRes?.ok
-    ? ((await smsComplianceRes.json()) as {
-        data?: {
-          complianceStatus?: ComplianceStatus | null;
-          rejectionReason?: string | null;
-          customerProfileStatus?: string | null;
-          brandStatus?: string | null;
-          campaignStatus?: string | null;
-          tfvStatus?: string | null;
-          messagingServiceSid?: string | null;
-          provisionedNumber?: string | null;
-        };
-      })
-    : null;
-  const compliance: ManagedComplianceData = {
-    complianceStatus: (smsComplianceBody?.data?.complianceStatus ?? "not_started") as ComplianceStatus,
-    rejectionReason: smsComplianceBody?.data?.rejectionReason ?? null,
-    customerProfileStatus: smsComplianceBody?.data?.customerProfileStatus ?? null,
-    brandStatus: smsComplianceBody?.data?.brandStatus ?? null,
-    campaignStatus: smsComplianceBody?.data?.campaignStatus ?? null,
-    tfvStatus: smsComplianceBody?.data?.tfvStatus ?? null,
-    messagingServiceSid: smsComplianceBody?.data?.messagingServiceSid ?? null,
-    provisionedNumber: smsComplianceBody?.data?.provisionedNumber ?? null,
+  const config: CommConfig = {
+    senderEmail: (d?.senderEmail as string) || null,
+    replyTo: (d?.replyTo as string) || null,
+    resendConfigured: Boolean(d?.resendConfigured),
+    emailMode: (d?.emailMode as "platform" | "own") || "platform",
+    senderDisplayName: (d?.senderDisplayName as string) || null,
+    companyName: (d?.companyName as string) || null,
+    pointOfContact: (d?.pointOfContact as string) === "inspector" ? "inspector" : "company",
   };
-
-  // Persisted "Test connection" history (≤5 per integration). Shared by the SMS
-  // + email panels here; the same endpoint feeds the integrations/advanced pages.
-  const testResults = await parseTestResults(testResultsRes);
 
   return {
-    config: {
-      senderEmail: (d?.senderEmail as string) || null,
-      replyTo: (d?.replyTo as string) || null,
-      resendConfigured: Boolean(d?.resendConfigured),
-      emailMode: (d?.emailMode as "platform" | "own") || "platform",
-      senderDisplayName: (d?.senderDisplayName as string) || null,
-      companyName: (d?.companyName as string) || null,
-      legalName: (d?.legalName as string) || "",
-      pointOfContact: ((d?.pointOfContact as string) === "inspector" ? "inspector" : "company") as "inspector" | "company",
-    } as CommConfig,
+    config,
+    // A deployment that supplies no sender of its own leaves the company only its
+    // own account, whatever the stored value says. Capability, not mode.
+    effectiveEmailMode: getDeploymentProfile(getCloudflareEnv(context)).providesEmailSource ? config.emailMode : ("own" as const),
     emailTemplates,
     googleOAuthConfigured: Boolean(d?.googleOAuthConfigured),
     googleOAuthMode: (d?.googleOAuthMode as "platform" | "own") || "platform",
-    secrets: {
+    emailByoProvider,
+    ownEmailConfigured: ownEmailProviderConfigured(emailByoProvider, {
       RESEND_API_KEY: secrets.RESEND_API_KEY || "",
       SENDGRID_API_KEY: secrets.SENDGRID_API_KEY || "",
       POSTMARK_SERVER_TOKEN: secrets.POSTMARK_SERVER_TOKEN || "",
       MAILGUN_API_KEY: secrets.MAILGUN_API_KEY || "",
       MAILGUN_DOMAIN: secrets.MAILGUN_DOMAIN || "",
-      // WH-3 — per-provider inbound webhook verification secrets.
-      RESEND_WEBHOOK_SECRET: secrets.RESEND_WEBHOOK_SECRET || "",
-      SENDGRID_WEBHOOK_PUBLIC_KEY: secrets.SENDGRID_WEBHOOK_PUBLIC_KEY || "",
-      POSTMARK_WEBHOOK_TOKEN: secrets.POSTMARK_WEBHOOK_TOKEN || "",
-      MAILGUN_SIGNING_KEY: secrets.MAILGUN_SIGNING_KEY || "",
+    }),
+    secrets: {
       GOOGLE_CLIENT_ID: secrets.GOOGLE_CLIENT_ID || "",
       GOOGLE_CLIENT_SECRET: secrets.GOOGLE_CLIENT_SECRET || "",
-      TWILIO_ACCOUNT_SID: secrets.TWILIO_ACCOUNT_SID || "",
-      TWILIO_AUTH_TOKEN: secrets.TWILIO_AUTH_TOKEN || "",
-      TWILIO_FROM_NUMBER: secrets.TWILIO_FROM_NUMBER || "",
-      TELNYX_API_KEY: secrets.TELNYX_API_KEY || "",
-      TELNYX_FROM_NUMBER: secrets.TELNYX_FROM_NUMBER || "",
-      TELNYX_PUBLIC_KEY: secrets.TELNYX_PUBLIC_KEY || "",
     },
-    smsConfig,
-    companyPhone,
-    byoProvider,
-    emailByoProvider,
-    compliance,
-    managedProvider,
-    testResults,
   };
-}
-
-type SecretActionResult = {
-  intent: string;
-  ok: boolean;
-  error: string | null;
-  field: string | null;
-  test: null;
-};
-
-// Shared persistence for the "paste API keys" intents: PUT the (already
-// filtered) secret body, then return the uniform action-result shape. An empty
-// body is a no-op success — the user submitted the form without changing keys.
-async function saveSecrets(
-  api: ReturnType<typeof createApi>,
-  intent: string,
-  body: Record<string, string>,
-  fallbackError: string,
-): Promise<SecretActionResult> {
-  if (Object.keys(body).length === 0) {
-    return { intent, ok: true, error: null, field: null, test: null };
-  }
-  const res = await api.secrets.secrets.$put({ json: body });
-  if (!res.ok) {
-    const errBody = (await res.json().catch(() => null)) as
-      | { error?: { message?: string; field?: string } }
-      | null;
-    return {
-      intent,
-      ok: false,
-      error: errBody?.error?.message ?? fallbackError,
-      field: errBody?.error?.field ?? null,
-      test: null,
-    };
-  }
-  return { intent, ok: true, error: null, field: null, test: null };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -227,66 +134,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { intent: "save-email", ok: true, error: null };
   }
 
-  if (intent === "save-email-secrets") {
-    const VALID_EMAIL_PROVIDERS = ["resend", "sendgrid", "postmark", "mailgun"] as const;
-    type EmailByoProvider = typeof VALID_EMAIL_PROVIDERS[number];
-    const rawProvider = form.get("email_byo_provider");
-    const emailByoProvider: EmailByoProvider = (VALID_EMAIL_PROVIDERS as ReadonlyArray<string>).includes(rawProvider as string)
-      ? (rawProvider as EmailByoProvider)
-      : "resend";
-    const body: Record<string, string> = {};
-    // Collect only the non-empty secret fields relevant to email providers — the
-    // sending credentials AND the per-provider inbound webhook verification
-    // secret (WH-3). Empty/masked values are skipped by the secrets endpoint.
-    for (const key of [
-      "RESEND_API_KEY", "SENDGRID_API_KEY", "POSTMARK_SERVER_TOKEN", "MAILGUN_API_KEY", "MAILGUN_DOMAIN",
-      "RESEND_WEBHOOK_SECRET", "SENDGRID_WEBHOOK_PUBLIC_KEY", "POSTMARK_WEBHOOK_TOKEN", "MAILGUN_SIGNING_KEY",
-    ]) {
-      const v = form.get(key);
-      if (v && typeof v === "string" && v.trim()) body[key] = v.trim();
-    }
-    // Persist the provider selection on the tenant config first, then save secrets.
-    const cfgRes = await api.admin["tenant-config"].$patch({
-      json: { emailByoProvider },
-    }).catch(() => null);
-    if (cfgRes && !cfgRes.ok) {
-      return { intent, ok: false, error: m.settings_comms_provider_save_error(), field: null, test: null };
-    }
-    return saveSecrets(api, intent, body, m.settings_comms_email_secrets_save_error());
-  }
-
-  if (intent === "test-email-step") return runEmailTestStepIntent(api, intent, form.get("step"));
-
-  if (intent === "validate-email-provider") {
-    const VALID_PROVIDERS = ["resend", "sendgrid", "postmark", "mailgun"] as const;
-    type EmailProvider = typeof VALID_PROVIDERS[number];
-    const rawProvider = form.get("provider");
-    if (!rawProvider || !(VALID_PROVIDERS as ReadonlyArray<string>).includes(rawProvider as string)) {
-      return { intent, ok: false, error: m.settings_comms_unknown_provider(), field: null, test: null };
-    }
-    const provider = rawProvider as EmailProvider;
-    const res = await api.integrations.email.validate.$post({ json: { provider } });
-    const body = (await res.json().catch(() => null)) as
-      | { data?: { ok: boolean }; error?: { message?: string } }
-      | null;
-    if (!res.ok || !body?.data?.ok) {
-      return {
-        intent,
-        ok: false,
-        error: body?.error?.message ?? m.settings_comms_credential_validation_failed(),
-        field: null,
-        test: null,
-      };
-    }
-    return { intent, ok: true, error: null, field: null, test: null };
-  }
-
   if (intent === "save-calendar-secrets") {
-    const body: Record<string, string> = {};
-    const clientId = form.get("GOOGLE_CLIENT_ID");
-    const clientSecret = form.get("GOOGLE_CLIENT_SECRET");
-    if (clientId && typeof clientId === "string" && clientId.trim()) body.GOOGLE_CLIENT_ID = clientId;
-    if (clientSecret && typeof clientSecret === "string" && clientSecret.trim()) body.GOOGLE_CLIENT_SECRET = clientSecret;
+    const body = pickSecretFields(form, ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]);
     return saveSecrets(api, intent, body, m.settings_comms_calendar_secrets_save_error());
   }
 
@@ -314,125 +163,6 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { intent, ok: true, error: null, field: null, test: null };
   }
 
-  // ─── Track L — SMS settings ───────────────────────────────────────────────
-  if (intent === "save-sms-config") {
-    // Pass through the three valid tenant modes; never submit "platform" (first-party only).
-    const rawMode = form.get("smsMode");
-    const VALID_TENANT_MODES = ["own", "managed_shared", "managed_dedicated"] as const;
-    type TenantSmsMode = typeof VALID_TENANT_MODES[number];
-    const smsMode: TenantSmsMode = (VALID_TENANT_MODES as ReadonlyArray<string>).includes(rawMode as string)
-      ? (rawMode as TenantSmsMode)
-      : "own";
-    const companyPhone = String(form.get("companyPhone") ?? "").trim();
-    const res = await api.admin["tenant-config"].$patch({
-      json: { smsMode, companyPhone: companyPhone || null },
-    });
-    if (!res.ok) return { intent, ok: false, error: m.settings_comms_sms_settings_save_error(), field: null, test: null };
-    return { intent, ok: true, error: null, field: null, test: null };
-  }
-
-  if (intent === "save-sms-secrets") {
-    const rawProvider = form.get("sms_byo_provider");
-    const byoProvider: "twilio" | "telnyx" =
-      rawProvider === "telnyx" ? "telnyx" : "twilio";
-    const body: Record<string, string> = {};
-    if (byoProvider === "twilio") {
-      for (const key of ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER"]) {
-        const v = form.get(key);
-        if (v && typeof v === "string" && v.trim()) body[key] = v.trim();
-      }
-    } else {
-      for (const key of ["TELNYX_API_KEY", "TELNYX_FROM_NUMBER", "TELNYX_PUBLIC_KEY"]) {
-        const v = form.get(key);
-        if (v && typeof v === "string" && v.trim()) body[key] = v.trim();
-      }
-    }
-    // Persist sms_byo_provider on the tenant config alongside the secrets save.
-    const cfgRes = await api.admin["tenant-config"].$patch({
-      json: { smsByoProvider: byoProvider },
-    }).catch(() => null);
-    if (cfgRes && !cfgRes.ok) {
-      return { intent, ok: false, error: m.settings_comms_provider_save_error(), field: null, test: null };
-    }
-    return saveSecrets(api, intent, body, m.settings_comms_sms_credentials_save_error());
-  }
-
-  if (intent === "test-sms") {
-    const to = String(form.get("to") ?? "").trim();
-    const res = await api.smsAdmin.sms.test.$post({ json: { to } });
-    const body = (await res.json().catch(() => null)) as { success?: boolean; error?: string } | null;
-    if (!res.ok || !body?.success) {
-      return { intent, ok: false, error: body?.error ?? m.settings_comms_test_sms_failed(), field: null, test: null };
-    }
-    return { intent, ok: true, error: null, field: null, test: { sent: true } };
-  }
-
-  // ─── Managed SMS compliance provisioning (platform-operated) ──────────────
-  if (intent === "sms-compliance-provision" || intent === "sms-compliance-resubmit") {
-    // Gate: a platform must exist to file the 10DLC brand/campaign on the
-    // operator's behalf. The API endpoint also enforces this (403 otherwise),
-    // but we short-circuit a direct POST here. Capability, not mode (OI #308).
-    const profile = getDeploymentProfile(getCloudflareEnv(context));
-    if (!profile.hasManagedCompliance) {
-      return { intent, ok: false as const, error: m.settings_comms_managed_saas_only(), field: null, test: null };
-    }
-
-    // Validate required business-info fields.
-    const legalName = String(form.get("legalName") ?? "").trim();
-    const address = String(form.get("address") ?? "").trim();
-    const repName = String(form.get("repName") ?? "").trim();
-    const email = String(form.get("email") ?? "").trim();
-    const areaCode = String(form.get("areaCode") ?? "").trim();
-    const rawChannel = form.get("channel");
-    const channel: "sp10dlc" | "tollfree" = rawChannel === "tollfree" ? "tollfree" : "sp10dlc";
-
-    if (!legalName) return { intent, ok: false as const, error: m.settings_comms_legal_name_required(), field: "legalName", test: null };
-    if (!address) return { intent, ok: false as const, error: m.settings_comms_business_address_required(), field: "address", test: null };
-    if (!repName) return { intent, ok: false as const, error: m.settings_comms_rep_name_required(), field: "repName", test: null };
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return { intent, ok: false as const, error: m.settings_comms_email_invalid(), field: "email", test: null };
-    }
-
-    const businessInfo = {
-      legalName,
-      address,
-      repName,
-      ...(email ? { email } : {}),
-      ...(areaCode ? { areaCode } : {}),
-    };
-
-    const endpoint = intent === "sms-compliance-provision"
-      ? api.smsAdmin.sms.compliance.provision.$post({ json: { businessInfo, channel } })
-      : api.smsAdmin.sms.compliance.resubmit.$post({ json: { businessInfo, channel } });
-
-    const res = await endpoint;
-    if (!res.ok) {
-      const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
-      const msg = errBody?.error === "managed_provision_unavailable"
-        ? m.settings_comms_managed_provision_unavailable()
-        : errBody?.error === "managed_not_configured"
-          ? m.settings_comms_managed_not_configured()
-          : errBody?.error ?? (intent === "sms-compliance-provision"
-            ? m.settings_comms_provision_start_failed()
-            : m.settings_comms_resubmit_failed());
-      return { intent, ok: false as const, error: msg, field: null, test: null };
-    }
-    return { intent, ok: true as const, error: null, field: null, test: null };
-  }
-
-  // ─── Managed compliance provider selector (Task 5) ───────────────────────
-  if (intent === "save-managed-provider") {
-    const rawProvider = form.get("managedProvider");
-    const managedProvider: "twilio" | "telnyx" = rawProvider === "telnyx" ? "telnyx" : "twilio";
-    const res = await api.admin["tenant-config"].$patch({
-      json: { managedProvider },
-    }).catch(() => null);
-    if (!res || !res.ok) {
-      return { intent, ok: false as const, error: m.settings_comms_managed_provider_save_error(), field: null, test: null };
-    }
-    return { intent, ok: true as const, error: null, field: null, test: null };
-  }
-
   if (intent === "toggle-template") {
     const trigger = String(form.get("trigger") || "");
     const enabled = form.get("enabled") === "true";
@@ -455,41 +185,20 @@ export default function SettingsCommunication() {
   const EMPTY_CONFIG: CommConfig = {
     senderEmail: null, replyTo: null, resendConfigured: false, emailMode: "platform",
     senderDisplayName: null, companyName: null, pointOfContact: "company",
-    legalName: "",
   };
   const config = denied ? EMPTY_CONFIG : loaderResult.config;
   const emailTemplates = denied ? [] : loaderResult.emailTemplates;
   const googleOAuthConfigured = denied ? false : loaderResult.googleOAuthConfigured;
   const googleOAuthMode = denied ? ("platform" as const) : loaderResult.googleOAuthMode;
-  const testResults = denied ? [] : loaderResult.testResults;
-  const secrets = denied
-    ? { RESEND_API_KEY: "", SENDGRID_API_KEY: "", POSTMARK_SERVER_TOKEN: "", MAILGUN_API_KEY: "", MAILGUN_DOMAIN: "", RESEND_WEBHOOK_SECRET: "", SENDGRID_WEBHOOK_PUBLIC_KEY: "", POSTMARK_WEBHOOK_TOKEN: "", MAILGUN_SIGNING_KEY: "", GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", TWILIO_ACCOUNT_SID: "", TWILIO_AUTH_TOKEN: "", TWILIO_FROM_NUMBER: "", TELNYX_API_KEY: "", TELNYX_FROM_NUMBER: "", TELNYX_PUBLIC_KEY: "" }
-    : loaderResult.secrets;
-  const smsConfig = denied ? { mode: "platform" as const, effectiveSource: "none" as const } : loaderResult.smsConfig as { mode: "platform" | "own" | "managed_shared" | "managed_dedicated"; effectiveSource: "platform" | "own" | "none" };
-  const companyPhone = denied ? "" : loaderResult.companyPhone;
-  const byoProvider = denied ? ("twilio" as const) : loaderResult.byoProvider;
+  const secrets = denied ? { GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "" } : loaderResult.secrets;
   const emailByoProvider = denied ? ("resend" as const) : loaderResult.emailByoProvider;
-  const managedProvider = denied ? ("twilio" as const) : loaderResult.managedProvider;
-  const compliance: ManagedComplianceData = denied
-    ? {
-        complianceStatus: "not_started" as const,
-        rejectionReason: null,
-        customerProfileStatus: null,
-        brandStatus: null,
-        campaignStatus: null,
-        tfvStatus: null,
-        messagingServiceSid: null,
-        provisionedNumber: null,
-      }
-    : loaderResult.compliance;
+  const ownEmailConfigured = denied ? false : loaderResult.ownEmailConfigured;
+  const mode: "platform" | "own" = denied ? "own" : loaderResult.effectiveEmailMode;
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
-  const emailValidateFetcher = useFetcher<typeof action>();
-  const smsTestFetcher = useFetcher<typeof action>();
   const session = useSessionContext();
-  // Self-host (standalone) deployments have no platform mailbox / SMS number —
-  // tenants MUST bring their own provider keys. Force `own` and hide the
-  // platform/own toggle entirely; SaaS is unchanged.
+  // Whether the Google client is the deployment's or the company's follows from
+  // who owns the app; the sending account is chosen in Integrations -> Email.
   const isSaas = session?.branding?.isSaas ?? false;
 
   // Only the `save-email` intent returns a Conform SubmissionResult; the
@@ -505,17 +214,6 @@ export default function SettingsCommunication() {
     shouldRevalidate: "onInput",
   });
 
-  const [mode, setMode] = useState<"platform" | "own">(isSaas ? config.emailMode : "own");
-  // SaaS default is managed_shared; standalone is always own (BYO-only).
-  // If the stored value is the legacy "platform" mode (first-party only), treat it
-  // as "managed_shared" for display purposes — tenants cannot select "platform".
-  const resolvedSmsMode: SmsModeValue =
-    !isSaas
-      ? "own"
-      : smsConfig.mode === "own" || smsConfig.mode === "managed_shared" || smsConfig.mode === "managed_dedicated"
-        ? smsConfig.mode
-        : "managed_shared";
-  const [smsMode, setSmsMode] = useState<SmsModeValue>(resolvedSmsMode);
   // Override toggle: ON when senderDisplayName is set AND differs from companyName.
   const [overrideName, setOverrideName] = useState<boolean>(
     !!config.senderDisplayName && config.senderDisplayName !== config.companyName
@@ -523,88 +221,25 @@ export default function SettingsCommunication() {
   // Track current PoC selection for the identity summary line.
   const [poc, setPoc] = useState<"inspector" | "company">(config.pointOfContact);
 
-  // Pending save state, per secret intent.
-  const savingEmailSecrets =
-    nav.state !== "idle" && nav.formData?.get("intent") === "save-email-secrets";
-  const savingCalendarSecrets =
-    nav.state !== "idle" && nav.formData?.get("intent") === "save-calendar-secrets";
-  const savingGoogleOAuthMode =
-    nav.state !== "idle" && nav.formData?.get("intent") === "save-google-oauth-mode";
-  const savingSmsSecrets =
-    nav.state !== "idle" && nav.formData?.get("intent") === "save-sms-secrets";
-  const savingSmsConfig =
-    nav.state !== "idle" && nav.formData?.get("intent") === "save-sms-config";
-  const savingCompliance =
-    nav.state !== "idle" &&
-    (nav.formData?.get("intent") === "sms-compliance-provision" ||
-      nav.formData?.get("intent") === "sms-compliance-resubmit");
-  const savingManagedProvider =
-    nav.state !== "idle" && nav.formData?.get("intent") === "save-managed-provider";
+  const savingCalendarSecrets = nav.state !== "idle" && nav.formData?.get("intent") === "save-calendar-secrets";
+  const savingGoogleOAuthMode = nav.state !== "idle" && nav.formData?.get("intent") === "save-google-oauth-mode";
 
-  // Inbound webhook URL: BYO tenants (own mode) and standalone deployments own STOP/START.
-  // Managed-number tenants don't set up their own inbound webhook.
-  const showInboundUrl = !session?.branding.isSaas || smsMode === "own";
-  const tenantSlug = session?.branding.tenantSlug ?? "";
-  const inboundUrl =
-    typeof window !== "undefined" && tenantSlug
-      ? `${window.location.origin}/webhooks/sms/inbound/${tenantSlug}`
-      : "";
-
-  // Transient success flash — visible for 4s after a secret save round-trip.
-  // Errors persist until the next attempt (no auto-dismiss).
+  // Transient success flash: visible for 4s after a save round-trip.
   const flashIntent = actionData && "intent" in actionData ? actionData.intent : null;
   const { flashVisible } = useFlash(
-    (flashIntent === "save-email-secrets" || flashIntent === "save-calendar-secrets" || flashIntent === "save-google-oauth-mode") &&
+    (flashIntent === "save-calendar-secrets" || flashIntent === "save-google-oauth-mode") &&
       !!actionData &&
       "ok" in actionData &&
       actionData.ok,
     actionData,
   );
-
-  // Map a server `field` error back onto the matching SecretField.
-  const secretFieldError = (name: string): string | undefined => {
-    if (
-      actionData &&
-      "field" in actionData &&
-      actionData.field === name &&
-      "ok" in actionData &&
-      !actionData.ok
-    ) {
-      return actionData.error ?? undefined;
-    }
-    return undefined;
-  };
-
-  // Form-level error for a given secret intent (no field, or generic message).
-  const secretFormError = (intent: string): string | null => {
-    if (
-      actionData &&
-      "intent" in actionData &&
-      actionData.intent === intent &&
-      "ok" in actionData &&
-      !actionData.ok
-    ) {
-      return actionData.error ?? null;
-    }
-    return null;
-  };
-
-
-  // Whether the tenant's OWN selected email provider has its credentials saved
-  // (drives the Email delivery panel's provider-aware guardrail + status copy).
-  const ownProviderConfigured = ownEmailProviderConfigured(emailByoProvider, secrets);
+  const { fieldError: secretFieldError, formError: secretFormError } = secretErrorReaders(actionData);
 
   if (denied) return <AccessDenied />;
 
   const navSections = [
     { id: "email-delivery", label: m.settings_emaildelivery_heading() },
-    { id: "email-secrets", label: m.settings_emailsecrets_heading(), visible: !isSaas || mode === "own" },
-    { id: "sms-delivery", label: m.settings_smsdelivery_heading() },
-    {
-      id: "managed-compliance",
-      label: m.settings_comms_nav_managed(),
-      visible: isSaas && (smsMode === "managed_dedicated" || smsMode === "managed_shared"),
-    },
+    { id: "delivery-accounts", label: m.settings_comms_delivery_heading() },
     { id: "email-templates", label: m.settings_comms_email_templates_heading() },
     { id: "google-calendar", label: m.settings_comms_nav_calendar() },
   ];
@@ -616,7 +251,6 @@ export default function SettingsCommunication() {
         {m.settings_comms_intro()}
       </p>
 
-      {/* Flash — transient success for secret saves */}
       {flashVisible && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           {m.settings_flash_saved()}
@@ -626,15 +260,13 @@ export default function SettingsCommunication() {
       {/* In-page section navigation (sticky; scroll-spy). Shows only when ≥3 sections visible. */}
       <SectionNav sections={navSections} />
 
-      {/* Email delivery config */}
+      {/* Sender name, sender address and reply-to */}
       <div id="email-delivery" className="scroll-mt-12">
         <EmailDeliveryPanel
           config={config}
-          isSaas={isSaas}
           emailByoProvider={emailByoProvider}
-          ownProviderConfigured={ownProviderConfigured}
+          ownProviderConfigured={ownEmailConfigured}
           mode={mode}
-          setMode={setMode}
           overrideName={overrideName}
           setOverrideName={setOverrideName}
           poc={poc}
@@ -645,88 +277,10 @@ export default function SettingsCommunication() {
         />
       </div>
 
-      {/* Email API keys — BYO only (hidden when SaaS platform email is selected) */}
-      {(!isSaas || mode === "own") && (
-        <div id="email-secrets" className="scroll-mt-12">
-          <EmailSecretsPanel
-            secrets={secrets}
-            secretFieldError={secretFieldError}
-            secretFormError={secretFormError}
-            savingEmailSecrets={savingEmailSecrets}
-            emailValidateFetcher={emailValidateFetcher}
-            initialProvider={emailByoProvider}
-            webhookBaseUrl={typeof window !== "undefined" ? window.location.origin : ""}
-            tenantSlug={tenantSlug}
-            testResults={testResults}
-          />
-        </div>
-      )}
-
-      {/* SMS delivery (Track L) */}
-      <div id="sms-delivery" className="scroll-mt-12">
-      <SmsDeliveryPanel
-        isSaas={isSaas}
-        smsMode={smsMode}
-        setSmsMode={setSmsMode}
-        smsConfig={smsConfig}
-        companyPhone={companyPhone}
-        savingSmsConfig={savingSmsConfig}
-        secrets={secrets}
-        secretFieldError={secretFieldError}
-        secretFormError={secretFormError}
-        savingSmsSecrets={savingSmsSecrets}
-        showInboundUrl={showInboundUrl}
-        inboundUrl={inboundUrl}
-        smsTestFetcher={smsTestFetcher}
-        compliance={compliance}
-        byoProvider={byoProvider}
-        testResults={testResults}
-      />
+      {/* Where the accounts and keys that send email and SMS are managed */}
+      <div id="delivery-accounts" className="scroll-mt-12">
+        <DeliveryAccountsRow />
       </div>
-
-      {/* Managed compliance (SaaS only) — dedicated wizard or shared-pool note */}
-      {isSaas && (smsMode === "managed_dedicated" || smsMode === "managed_shared") && (
-        <div id="managed-compliance" className="scroll-mt-12">
-          {/* Managed dedicated — onboarding wizard + status timeline */}
-          {smsMode === "managed_dedicated" && (
-            <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
-              <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_comms_dedicated_heading()}</h3>
-              <p className="text-[13px] text-ih-fg-3">
-                {m.settings_comms_dedicated_desc()}
-              </p>
-              <ManagedComplianceWizard
-                compliance={compliance}
-                legalName={config.legalName}
-                managedProvider={managedProvider}
-                savingManagedProvider={savingManagedProvider}
-                actionError={
-                  actionData &&
-                  "intent" in actionData &&
-                  (actionData.intent === "sms-compliance-provision" || actionData.intent === "sms-compliance-resubmit") &&
-                  "ok" in actionData &&
-                  !actionData.ok
-                    ? actionData.error ?? null
-                    : null
-                }
-                saving={savingCompliance}
-              />
-            </section>
-          )}
-
-          {/* Managed shared — minimal status note (no per-tenant form) */}
-          {smsMode === "managed_shared" && (
-            <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5">
-              <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3 mb-2">{m.settings_comms_shared_pool_heading()}</h3>
-              <p className="text-[13px] text-ih-fg-3">
-                {m.settings_comms_shared_pool_desc()}
-              </p>
-              {compliance.complianceStatus === "approved" && (
-                <p className="text-[12px] text-ih-ok-fg font-medium mt-2">{m.settings_comms_shared_pool_active()}</p>
-              )}
-            </section>
-          )}
-        </div>
-      )}
 
       {/* Email templates */}
       <section id="email-templates" className="space-y-4 scroll-mt-12">

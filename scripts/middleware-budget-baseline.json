@@ -6,8 +6,8 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 148,
-    "dollarMethods": 566,
+    "files": 152,
+    "dollarMethods": 577,
     "apiWorker": 9
   },
   "fanOut": {
@@ -67,6 +67,10 @@
       "dollarMethods": 2,
       "apiWorker": 0
     },
+    "app/lib/secret-intents.server.ts": {
+      "dollarMethods": 1,
+      "apiWorker": 0
+    },
     "app/lib/section-loaders.ts": {
       "dollarMethods": 4,
       "apiWorker": 0
@@ -89,6 +93,10 @@
     },
     "app/lib/settings/pay-rules.server.ts": {
       "dollarMethods": 4,
+      "apiWorker": 0
+    },
+    "app/lib/sms-compliance-intents.server.ts": {
+      "dollarMethods": 3,
       "apiWorker": 0
     },
     "app/lib/tenant-brand.server.ts": {
@@ -496,7 +504,7 @@
       "apiWorker": 0
     },
     "app/routes/settings-communication.tsx": {
-      "dollarMethods": 20,
+      "dollarMethods": 8,
       "apiWorker": 0
     },
     "app/routes/settings-compliance.tsx": {
@@ -539,8 +547,16 @@
       "dollarMethods": 6,
       "apiWorker": 0
     },
+    "app/routes/settings-integrations-email.tsx": {
+      "dollarMethods": 8,
+      "apiWorker": 0
+    },
     "app/routes/settings-integrations-qbo.tsx": {
       "dollarMethods": 2,
+      "apiWorker": 0
+    },
+    "app/routes/settings-integrations-sms.tsx": {
+      "dollarMethods": 11,
       "apiWorker": 0
     },
     "app/routes/settings-integrations.tsx": {

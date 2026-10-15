@@ -145,8 +145,8 @@
       "decision_type": "service_safeguard",
       "basis": "Selects which carrier path carries messages to the tenant's contacts, and whether a platform-funded sender is involved at all. A shared sender is a disclosure item in its own right.",
       "controller_override": "available",
-      "override_surface": "app/routes/settings-communication.tsx",
-      "note": "'platform' is reserved for first-party use and the admin settings schema REFUSES it when a tenant submits it, so this default is one a controller can move away from but not back to."
+      "override_surface": "server/lib/integrations/source-change.ts",
+      "note": "The controller makes this choice on the SMS page of Integrations (app/routes/settings-integrations-sms.tsx); server/lib/integrations/source-change.ts is the one place that writes it. 'platform' is reserved for first-party use and the admin settings schema REFUSES it when a tenant submits it, so this default is one a controller can move away from but not back to."
     },
     {
       "column": "managed_provider",
@@ -156,7 +156,7 @@
       "decision_type": "service_safeguard",
       "basis": "Which ISV runs managed compliance provisioning, sweep and webhook reception for a workspace — a sub-processor selection the Terms must name.",
       "controller_override": "available",
-      "override_surface": "app/routes/settings-communication.tsx",
+      "override_surface": "app/routes/settings-integrations-sms.tsx",
       "note": "Inert in standalone and in unconfigured SaaS: with no ISV credentials the resolver fails closed, so the default names a provider nothing yet calls."
     },
     {

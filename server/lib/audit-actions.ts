@@ -140,6 +140,8 @@ export type AuditAction =
     | 'comment.updated'
     | 'comment.deleted'
     | 'config.integration.update'
+    // Which source (Built-in or the company's own account) a service runs on. Carries the choice only, never a key.
+    | 'config.integration_source.update'
     | 'config.secrets.update'
     | 'config.attention_thresholds.update'
     | 'config.dashboard_columns.update'

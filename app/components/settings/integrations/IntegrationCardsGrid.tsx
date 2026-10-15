@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { Card, Pill, buttonClasses, type PillTone } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { sourceText } from "./source-text";
 import type { IntegrationCard, IntegrationCategory, IntegrationStatus } from "../../../../server/lib/integrations/overview";
 
 /** The order the page groups cards in. */
@@ -35,26 +36,6 @@ const STATUS: Record<IntegrationStatus, { tone: PillTone; label: () => string; a
   not_connected: { tone: "neutral", label: () => m.integrations_hub_status_not_connected(), action: () => m.integrations_hub_action_set_up() },
 };
 
-/** Whose account, in words. An unavailable source says why when there is a reason to give. */
-function sourceText(card: IntegrationCard, title: string): string {
-  if (card.source === "provided") return m.integrations_hub_source_provided();
-  if (card.source === "own") return m.integrations_hub_source_own();
-  switch (card.reasonKey) {
-    case "integrations_source_reason_not_offered":
-      return m.integrations_source_reason_not_offered({ service: title });
-    case "integrations_source_reason_provided_not_configured":
-      return m.integrations_source_reason_provided_not_configured({ service: title });
-    case "integrations_source_reason_provider_confirmation_pending":
-      return m.integrations_source_reason_provider_confirmation_pending();
-    // The missing details are named on the service's own page; here the card
-    // only says which account it will use once they are added.
-    case "integrations_source_reason_own_credentials_incomplete":
-      return m.integrations_hub_source_own();
-    default:
-      return m.integrations_hub_source_unavailable();
-  }
-}
-
 function ServiceCard({ card }: { card: IntegrationCard }) {
   const copy = COPY[card.id];
   if (!copy) return null;
@@ -76,7 +57,7 @@ function ServiceCard({ card }: { card: IntegrationCard }) {
           </span>
         </div>
         <p className="text-xs text-ih-fg-3">{copy.desc()}</p>
-        <p data-testid="integration-source" className="text-xs font-bold text-ih-fg-2">{sourceText(card, title)}</p>
+        <p data-testid="integration-source" className="text-xs font-bold text-ih-fg-2">{sourceText(card.source, card.reasonKey, title)}</p>
         <div className="mt-auto pt-1">
           <Link
             to={card.detailPath}

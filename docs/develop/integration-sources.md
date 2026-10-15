@@ -80,6 +80,17 @@ The per-service resolvers keep their credential and endpoint logic and ask this 
 
 `GET /api/integrations/overview` (owner or manager) serves the Integrations page. It returns one card per service, in page order: card payments, accounting, calendar, email, SMS, address suggestions, property facts, video and AI. Each card carries `status` (is it working), `source` (whose account), `canUseOwn` (the company may switch between Built-in and Your own), the settings page that manages it, and the message key that explains an unavailable source. Services the resolver covers take their source and state from it; the others are read from the same facts (keys the deployment holds, keys the company stored). A card never carries a key, only whether one is set. QuickBooks and Google Calendar also need a real sign-in before they read as connected. The builder is `server/lib/integrations/overview.ts` and is pure; `overview-data.ts` reads one company's rows.
 
+## Choosing a source: the API and the pages
+
+`GET /api/admin/integration-sources` and `PUT /api/admin/integration-sources` (owner or manager, enforced on the server) read and record the choice for email, SMS and AI. The company is the one on the verified session. The code is `server/api/admin/admin-integration-sources.ts` and `server/lib/integrations/source-change.ts`.
+
+- **GET** returns one row per service: whether the company is asked to choose at all (`choiceShown`, true only where a built-in source exists), the sources open right now (`available`), the stored choice, the source in use, the state, and whether the company's own account details are complete (`ownReady`). No key is returned.
+- **PUT** takes `{ service, source }` and nothing else; a body that carries any other field is refused. *Your own* is refused (409, `own_credentials_incomplete`) until the company's own details are complete, and a source that is not open is refused (409, `not_offered`), so a service is never left with no account.
+- **What it writes:** the choice, inside `integration_config.integrationSources`, and the older per-service column the send paths still read (`email_mode`, `sms_mode`) so the two cannot disagree. It never touches the encrypted keys. The merge happens on the server against the current row and is written only if that row is unchanged since it was read; otherwise it reads again.
+- **Audit:** every accepted change writes `config.integration_source.update` with the service and the source.
+
+The email and SMS delivery pages are `app/routes/settings-integrations-email.tsx` and `app/routes/settings-integrations-sms.tsx`. Each shows a connection card (status and source), the choice (only where `choiceShown`), and the account details, open while incomplete and folded once complete. Selecting *Built-in* only hides the details; they stay saved. Communication (`/settings/communication`) keeps the sender name, sender address, reply-to and templates, and links to these pages; it holds no key.
+
 ## The held-back shared SMS number
 
 The monthly allowance for sends on a deployment-provided number is `MANAGED_SMS_MONTHLY_ALLOWANCE` (an integer; default 1000 when absent or not a positive number). Manual sends and the automation cron both read it.

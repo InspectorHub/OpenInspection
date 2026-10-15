@@ -68,7 +68,8 @@ export interface OverviewInputs {
  * one and have the choice honoured everywhere the service is used. The others
  * join this list as their source is wired.
  */
-const SWITCHABLE: readonly IntegrationService[] = ['email', 'sms', 'ai'];
+export const SWITCHABLE_SERVICES = ['email', 'sms', 'ai'] as const satisfies readonly IntegrationService[];
+export type SwitchableService = (typeof SWITCHABLE_SERVICES)[number];
 
 const STRIPE_KEYS = ['STRIPE_PUBLISHABLE_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] as const;
 
@@ -94,7 +95,7 @@ function fromResolver(
         category,
         status,
         source: row.current,
-        canUseOwn: choice && SWITCHABLE.includes(service),
+        canUseOwn: choice && (SWITCHABLE_SERVICES as readonly IntegrationService[]).includes(service),
         detailPath,
         reasonKey: sourceReasonMessageKey({ service, source: row.current, reason: row.reason }),
     };
@@ -163,8 +164,8 @@ export function buildIntegrationOverview(inputs: OverviewInputs): IntegrationCar
         stripeCard(inputs),
         resolved('quickbooks', 'accounting', '/settings/integrations/qbo', 'quickbooks', inputs.quickbooksConnected),
         calendarCard(inputs),
-        resolved('email', 'messaging', '/settings/communication', 'email'),
-        resolved('sms', 'messaging', '/settings/communication', 'sms'),
+        resolved('email', 'messaging', '/settings/integrations/email', 'email'),
+        resolved('sms', 'messaging', '/settings/integrations/sms', 'sms'),
         keyCard('places', 'data', '/settings/advanced', 'GOOGLE_PLACES_API_KEY', inputs),
         keyCard('estated', 'data', '/settings/advanced', 'ESTATED_API_KEY', inputs),
         resolved('video', 'video', '/settings/integrations#video', 'video'),

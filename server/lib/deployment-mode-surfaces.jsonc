@@ -49,9 +49,9 @@
     },
     {
       "file": "app/routes/settings-communication.tsx",
-      "question": "Whose Twilio credentials and inbound webhook does this tenant use?",
-      "capability": "hasManagedCompliance",
-      "reason": "Reads the capability for the managed-provisioning controls. The remaining `isSaas` reads are about WHICH inbound URL to display, which follows from who owns the number rather than from a capability."
+      "question": "Is the Google client the deployment's or the company's own?",
+      "capability": null,
+      "reason": "Passes `isSaas` to the Google Calendar panel, whose client choice follows from who owns the Google app. The sending account no longer reads the mode: the loader answers it from the `providesEmailSource` capability, and the SMS controls moved to the SMS page."
     },
     {
       "file": "app/routes/settings-connected-apps.tsx",

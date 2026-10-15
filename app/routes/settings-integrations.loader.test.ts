@@ -21,7 +21,7 @@ import { loader } from "./settings-integrations";
 const API_URL = "https://mock-api.test";
 const CARD = {
   id: "email", category: "messaging", status: "not_connected", source: "own",
-  canUseOwn: true, detailPath: "/settings/communication", reasonKey: null,
+  canUseOwn: true, detailPath: "/settings/integrations/email", reasonKey: null,
 };
 
 function jsonResponse(status: number, body: unknown): Response {

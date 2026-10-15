@@ -68,12 +68,13 @@ function SmsHost() {
     const smsTestFetcher = useFetcher();
     return (
         <SmsDeliveryPanel
-            isSaas={false}
-            smsMode="own"
-            setSmsMode={() => {}}
-            smsConfig={{ mode: "own", effectiveSource: "none" }}
+            effectiveSource="none"
             companyPhone=""
             savingSmsConfig={false}
+            byoProvider="twilio"
+            compliance={COMPLIANCE}
+            showAccountDetails
+            accountComplete={false}
             secrets={SMS_SECRETS}
             secretFieldError={() => undefined}
             secretFormError={() => null}
@@ -81,7 +82,6 @@ function SmsHost() {
             showInboundUrl={false}
             inboundUrl=""
             smsTestFetcher={smsTestFetcher as never}
-            compliance={COMPLIANCE}
         />
     );
 }

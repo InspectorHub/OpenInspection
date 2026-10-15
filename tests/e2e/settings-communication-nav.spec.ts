@@ -35,13 +35,13 @@ test.describe.serial('Settings → Communication sticky section-nav (#250)', () 
     const nav = page.getByRole('navigation', { name: 'Section navigation' });
     await expect(nav).toBeVisible();
     await expect(nav.getByRole('button', { name: 'Email delivery', exact: true })).toBeVisible();
-    await expect(nav.getByRole('button', { name: 'SMS delivery', exact: true })).toBeVisible();
+    await expect(nav.getByRole('button', { name: 'Delivery accounts', exact: true })).toBeVisible();
     await expect(nav.getByRole('button', { name: 'Google Calendar', exact: true })).toBeVisible();
   });
 
   test('clicking a tab jumps to its section and scroll-spy highlights it', async ({ page }) => {
-    const smsTab = page.getByRole('navigation', { name: 'Section navigation' })
-      .getByRole('button', { name: 'SMS delivery', exact: true });
+    const deliveryTab = page.getByRole('navigation', { name: 'Section navigation' })
+      .getByRole('button', { name: 'Delivery accounts', exact: true });
 
     // On load the first section's tab is the active one.
     await expect(
@@ -49,10 +49,10 @@ test.describe.serial('Settings → Communication sticky section-nav (#250)', () 
         .getByRole('button', { name: 'Email delivery', exact: true }),
     ).toHaveClass(/text-ih-primary/);
 
-    // Click SMS delivery: its section jumps under the bar and its tab activates.
-    await smsTab.click();
-    await expect(page.locator('#sms-delivery')).toBeInViewport({ ratio: 0.2 });
-    await expect(smsTab).toHaveClass(/text-ih-primary/);
+    // Click Delivery accounts: its section jumps under the bar and its tab activates.
+    await deliveryTab.click();
+    await expect(page.locator('#delivery-accounts')).toBeInViewport({ ratio: 0.2 });
+    await expect(deliveryTab).toHaveClass(/text-ih-primary/);
   });
 
   test('sticky bar stays pinned to the viewport while scrolling', async ({ page }) => {

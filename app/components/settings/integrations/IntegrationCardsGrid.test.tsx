@@ -18,10 +18,10 @@ const CARDS: IntegrationCard[] = [
   { id: "stripe", category: "payments", status: "connected", source: "own", canUseOwn: false, detailPath: "/settings/integrations#stripe", reasonKey: null },
   { id: "quickbooks", category: "accounting", status: "attention", source: "provided", canUseOwn: false, detailPath: "/settings/integrations/qbo", reasonKey: null },
   { id: "googleCalendar", category: "calendar", status: "not_connected", source: "provided", canUseOwn: false, detailPath: "/settings/schedule", reasonKey: null },
-  { id: "email", category: "messaging", status: "not_connected", source: "own", canUseOwn: true, detailPath: "/settings/communication", reasonKey: null },
+  { id: "email", category: "messaging", status: "not_connected", source: "own", canUseOwn: true, detailPath: "/settings/integrations/email", reasonKey: null },
   {
     id: "sms", category: "messaging", status: "not_connected", source: "unavailable", canUseOwn: true,
-    detailPath: "/settings/communication", reasonKey: "integrations_source_reason_provider_confirmation_pending",
+    detailPath: "/settings/integrations/sms", reasonKey: "integrations_source_reason_provider_confirmation_pending",
   },
   { id: "places", category: "data", status: "connected", source: "provided", canUseOwn: false, detailPath: "/settings/advanced", reasonKey: null },
   { id: "estated", category: "data", status: "not_connected", source: "unavailable", canUseOwn: false, detailPath: "/settings/advanced", reasonKey: null },
@@ -88,7 +88,7 @@ describe("IntegrationCardsGrid", () => {
     expect(within(cardOf("Accounting")).getByTestId("integration-status").textContent).toBe("Needs attention");
     const manage = within(cardOf("Card payments")).getByRole("link", { name: "Manage: Card payments" });
     expect(manage.getAttribute("href")).toBe("/settings/integrations#stripe");
-    expect(within(cardOf("Email")).getByRole("link", { name: "Set up: Email" }).getAttribute("href")).toBe("/settings/communication");
+    expect(within(cardOf("Email")).getByRole("link", { name: "Set up: Email" }).getAttribute("href")).toBe("/settings/integrations/email");
     expect(within(cardOf("Accounting")).getByRole("link", { name: "Review items: Accounting" }).getAttribute("href")).toBe("/settings/integrations/qbo");
     // Google Calendar goes to Schedule, where each person signs in
     expect(within(cardOf("Calendar")).getByRole("link", { name: "Set up: Calendar" }).getAttribute("href")).toBe("/settings/schedule");
