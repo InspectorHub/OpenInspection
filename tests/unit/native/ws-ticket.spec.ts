@@ -212,7 +212,9 @@ describe('one-time WebSocket tickets (real app)', () => {
     const t = await setup();
     const ticket = await t.issued(MINE);
     const plain = await t.call(`/api/inspections/${MINE}/collab/ws?ticket=${ticket}`);
-    expect(plain.status).toBe(426);
+    // Without an upgrade the ticket is not an identity, so the default-deny rule answers 401;
+    // the assertion that matters is the next one: the ticket was not spent.
+    expect(plain.status).toBe(401);
     expect((await t.upgrade(`/api/inspections/${MINE}/collab/ws`, ticket)).status).toBe(200);
   });
 

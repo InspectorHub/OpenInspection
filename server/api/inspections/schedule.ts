@@ -8,15 +8,15 @@
 // is AUTHORITATIVE and the civil `date` column is derived from it in the tenant
 // timezone, so the two can never diverge.
 //
-// The guard is `requireCapability('scheduleOthers')`, not a role test. Deciding
-// where someone else's day goes is exactly the act that capability names, and
-// it is TOGGLEABLE: an inspector granted the override may dispatch, and a
-// manager whose override was revoked may not. A role tier cannot express either.
+// The guard is `guardScheduleMove`, not a role test. Reassigning, or moving an
+// inspection one does not work, is the act `scheduleOthers` names, and it is
+// TOGGLEABLE: an inspector granted the override may dispatch, and a manager whose
+// override was revoked may not. Anyone on the roster may move the date of their own job.
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, eq } from 'drizzle-orm';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
-import { requireCapability } from '../../lib/middleware/require-capability';
+import { guardScheduleMove } from './core-access';
 import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
 import { inspections as inspectionTable, tenantConfigs, users } from '../../lib/db/schema';
@@ -39,7 +39,7 @@ const scheduleRoute = createRoute(withMcpMetadata({
     path: '/{id}/schedule',
     tags: ['inspections'],
     summary: 'Reschedule and/or reassign one inspection',
-    description: 'Moves an inspection to a precise instant and optionally changes who works it. The epoch-millisecond start is authoritative; the civil date is derived from it in the tenant timezone. Returns 409 when the tenant booking_conflict_policy is "block" and the resulting assignment overlaps existing work.',
+    description: 'Moves an inspection to a precise instant and optionally changes who works it. Owner and manager, and inspectors granted the scheduleOthers capability, can move any inspection and reassign it; an inspector on the inspection (lead or helper) can move its date but not change who works it; other inspectors get 403. The epoch-millisecond start is authoritative; the civil date is derived from it in the tenant timezone. Returns 409 when the tenant booking_conflict_policy is "block" and the resulting assignment overlaps existing work.',
     request: {
         params: z.object({
             id: z.string().trim().min(1).describe('Inspection id to reschedule.'),
@@ -48,7 +48,7 @@ const scheduleRoute = createRoute(withMcpMetadata({
             content: { 'application/json': { schema: ReschedulePatchSchema } },
         },
     },
-    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('scheduleOthers')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardScheduleMove] as const,
     responses: {
         200: {
             content: { 'application/json': { schema: RescheduleResponseSchema } },
@@ -68,7 +68,7 @@ const scheduleRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: 'rescheduleInspection',
-}, { scopes: ['write'], tier: 'extended', capability: 'scheduleOthers' }));
+}, { scopes: ['write'], tier: 'extended' }));
 
 const toMs = (v: unknown): number | null =>
     v instanceof Date ? v.getTime() : v == null ? null : Number(v);

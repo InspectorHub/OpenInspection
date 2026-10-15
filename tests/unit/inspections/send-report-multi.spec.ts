@@ -21,6 +21,7 @@ import { PeopleService } from '../../../server/services/people.service';
 import { AppError, Errors } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 import { makeExecutionContext } from '../helpers/exec-ctx';
+import { seedSendGuardFixture, guardKv } from '../helpers/send-guard-fixture';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const CLIENT = 'contact-client-1';
@@ -113,7 +114,15 @@ describe('POST /api/inspections/:id/send-report-pdf — multi-recipient, role-ke
             { id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane Client', email: 'jane@example.com', phone: '+15551234567', createdAt: new Date() },
             { id: BUYER_AGENT, tenantId: TENANT, type: 'agent', name: 'Bob Agent', email: 'bob@brokerage.example.com', phone: '+15559876543', createdAt: new Date() },
             { id: NO_EMAIL_CONTACT, tenantId: TENANT, type: 'client', name: 'No Email Guy', email: null, phone: null, createdAt: new Date() },
+            { id: 'contact-oneoff-1', tenantId: TENANT, type: 'other', name: 'Olive Attorney', email: 'oneoff@example.com', phone: null, createdAt: new Date() },
         ]);
+        // The send guards read the inspection (published) and who is seated on it.
+        await seedSendGuardFixture(db, TENANT, INSP_ID, [
+            { contactId: CLIENT, roleKey: 'client' },
+            { contactId: NO_EMAIL_CONTACT, roleKey: 'co_client' },
+            { contactId: 'contact-oneoff-1', roleKey: 'attorney' },
+        ]);
+        (ENV as unknown as Record<string, unknown>).TENANT_CACHE = guardKv();
     });
 
     it('sends to two recipients (contactId + one-off email), renders the PDF once, mints per-recipient tokens, and audits each', async () => {
@@ -172,7 +181,7 @@ describe('POST /api/inspections/:id/send-report-pdf — multi-recipient, role-ke
         const app = buildApp({ propertyAddress: '1 Main St', inspectorId: null, id: INSP_ID });
         const res = await app.fetch(post({
             recipients: [
-                { email: 'weird@example.com', roleKey: 'not_a_real_role' },
+                { email: 'oneoff@example.com', roleKey: 'not_a_real_role' },
                 { contactId: CLIENT, roleKey: 'client' },
             ],
         }), ENV, CTX);

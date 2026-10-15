@@ -491,7 +491,7 @@
       }
     },
     "summary": "Apply an expiry to the report links that already exist",
-    "description": "Applies an expiry, expressed as a duration from now, to every report link across the tenant that is usable right now (not revoked, not already expired). The tenant reportLinkTtl policy alone only affects links minted after it changes; this is the explicit, count-reporting way to act on the existing backlog. Already-dead links are left dead — a bulk apply never resurrects one."
+    "description": "Applies an expiry, expressed as a duration from now, to every report link across the tenant that is usable right now (not revoked, not already expired). The tenant reportLinkTtl policy alone only affects links minted after it changes; this is the explicit, count-reporting way to act on the existing backlog. Already-dead links are left dead — a bulk apply never resurrects one. Available to owner and manager roles."
   },
   {
     "operationId": "approveInspection",
@@ -1815,7 +1815,7 @@
       "body": null
     },
     "summary": "Generate shareable agent view token",
-    "description": "Mint a read-only agent view link for an inspection report. Stores a new token that expires after 30 days and returns it with the full report URL (?view=agent&token=...). Nothing is sent: the caller delivers the link. Every call mints a new token and earlier tokens keep working until they expire. Returns 404 for an unknown inspection. Restricted to owners, managers and inspectors."
+    "description": "Mint a read-only agent view link for an inspection report. Stores a new token that expires after 30 days and returns it with the full report URL (?view=agent&token=...). Nothing is sent: the caller delivers the link. Every call mints a new token and earlier tokens keep working until they expire. Returns 404 for an unknown inspection. Restricted to owners and managers, and to inspectors assigned to the inspection or granted the scheduleOthers capability; the report must be published (409 NOT_PUBLISHED otherwise)."
   },
   {
     "operationId": "createInspectionAgreementRequest",
@@ -2240,7 +2240,7 @@
       }
     },
     "summary": "Send the inspection report to one or more role-keyed recipients",
-    "description": "Renders the report PDF once and sends it (or a text-only fallback if rendering fails) to every recipient in the request body, each with their own role-keyed portal link. Per-recipient failures (no resolvable email, unknown roleKey, send failure) are collected in the response and do not fail the whole request."
+    "description": "Renders the report PDF once and sends it (or a text-only fallback if rendering fails) to every recipient in the request body, each with their own role-keyed portal link. Per-recipient failures (no resolvable email, unknown roleKey, send failure) are collected in the response and do not fail the whole request. Available to owner and manager roles, and to inspectors assigned to the inspection or granted the scheduleOthers capability. The report must be published (409 NOT_PUBLISHED otherwise). At most 10 recipients per request, each a person already on the inspection (matched by contact id, or by that person's email); anything else is refused with 400. The same recipient is sent the same inspection at most 3 times per hour (429 after that)."
   },
   {
     "operationId": "createInspectionSendSms",
@@ -2270,7 +2270,7 @@
       }
     },
     "summary": "Send a manual SMS to people on the inspection",
-    "description": "Manual SMS via the shared sendOneSms core (TCPA consent, managed-send, quota). Recipients must be people already on the inspection who have a phone — no free-typed numbers."
+    "description": "Manual SMS via the shared sendOneSms core (TCPA consent, managed-send, quota). Recipients must be people already on the inspection who have a phone — no free-typed numbers. Owner and manager, and inspectors assigned to the inspection or granted the scheduleOthers capability; other inspectors get 403."
   },
   {
     "operationId": "createInspectionShareAgent",
@@ -2297,7 +2297,7 @@
       "body": null
     },
     "summary": "Email the report share link to the linked agent",
-    "description": "Email the report link to the inspection's buyer agent. Mints a new agent view token (valid 30 days), builds the agent view URL and sends it to the email on the buyer agent contact, with the inspector's signature appended, then writes an inspection.share_agent audit entry. Returns 400 when no buyer agent is linked to the inspection or that contact has no email, 404 for an unknown inspection and 500 if the email fails to send. Each call sends another email with a new token. Restricted to owners, managers and inspectors."
+    "description": "Email the report link to the inspection's buyer agent. Mints a new agent view token (valid 30 days), builds the agent view URL and sends it to the email on the buyer agent contact, with the inspector's signature appended, then writes an inspection.share_agent audit entry. Returns 400 when no buyer agent is linked to the inspection or that contact has no email, 404 for an unknown inspection and 500 if the email fails to send. Each call sends another email with a new token. Restricted to owners and managers, and to inspectors assigned to the inspection or granted the scheduleOthers capability; the report must be published (409 NOT_PUBLISHED otherwise)."
   },
   {
     "operationId": "createInspectionTemplates",
@@ -4844,7 +4844,7 @@
       }
     },
     "summary": "Send a message to a client (inspector)",
-    "description": "Creates an inspector-authored message on an inspection and notifies the client by email. Inspector-authenticated."
+    "description": "Creates an inspector-authored message on an inspection and notifies the client by email. Owner and manager, and inspectors assigned to the inspection or granted the scheduleOthers capability; other inspectors get 403."
   },
   {
     "operationId": "createMessageTemplate",
@@ -5998,7 +5998,7 @@
       "body": null
     },
     "summary": "Delete inspection for current tenant",
-    "description": "Permanently remove an inspection record. (DELETE /{id}, inspections domain)."
+    "description": "Permanently remove an inspection record. Owner and manager can delete any inspection; an inspector only one they lead, unless granted the scheduleOthers capability; helpers and other inspectors get 403."
   },
   {
     "operationId": "deleteInspectionCostItem",
@@ -8016,7 +8016,7 @@
       "body": null
     },
     "summary": "Get tenant inspection editor preferences",
-    "description": "Return the current tenant-level inspection editor preferences (clone defaults, auto-advance delay, pinned tag IDs), applying built-in defaults for any field not yet configured."
+    "description": "Return the current tenant-level inspection editor preferences (clone defaults, auto-advance delay, pinned tag IDs), applying built-in defaults for any field not yet configured. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "getInspectionPublishReadiness",
@@ -8344,7 +8344,7 @@
       "body": null
     },
     "summary": "Get inspection template for current tenant",
-    "description": "Retrieve a single template with full schema. (GET /templates/{id}, inspections domain)."
+    "description": "Retrieve a single template with its full schema. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "getInspectionVersion",
@@ -8506,7 +8506,7 @@
       "body": null
     },
     "summary": "List messages for an inspection (inspector view)",
-    "description": "Returns the message thread for an inspection (oldest first) and marks all client messages read. Inspector-authenticated."
+    "description": "Returns the message thread for an inspection (oldest first) and marks all client messages read, but only when the caller works the inspection (assigned, or granted scheduleOthers, or owner and manager); other inspectors can read the thread and leave the unread counts alone. Inspector-authenticated."
   },
   {
     "operationId": "getMessageThread",
@@ -9357,7 +9357,7 @@
       "body": null
     },
     "summary": "Detect same-day-hour assignment conflicts for an inspector",
-    "description": "IA-6 — advisory same-day-hour collision check counting lead and helper assignments. Callers render a warning; scheduling is never blocked."
+    "description": "IA-6 — advisory same-day-hour collision check counting lead and helper assignments, for the inspector named by inspectorId (default: the caller). Returns the colliding inspections' ids, property addresses and dates. Callers render a warning; scheduling is never blocked. Available to owner, manager and inspector roles; checking an inspector other than yourself requires owner or manager, or an inspector granted the scheduleOthers capability, and other inspectors get 403."
   },
   {
     "operationId": "getScheduleDaySlots",
@@ -9740,7 +9740,7 @@
       "body": null
     },
     "summary": "How many report links are usable right now",
-    "description": "Counts the report links across the tenant that would be affected by applying an expiry to the existing backlog. Rendered into the confirm control so the operator sees the blast radius before acting, not after."
+    "description": "Counts the report links across the tenant that would be affected by applying an expiry to the existing backlog. Rendered into the confirm control so the operator sees the blast radius before acting, not after. Available to owner and manager roles."
   },
   {
     "operationId": "getUsageSummary",
@@ -10172,7 +10172,7 @@
       "body": null
     },
     "summary": "Leaderboard agent for current tenant",
-    "description": "Ranks referral sources by how many of the company's inspections each referred, most first, with the contact's name, agency and email and the total. Counts every inspection of the company with a referring contact, with no date window and no status or archive filter; inspections without a referrer are left out. Not paginated. Read-only. Available to owner, manager, inspector and agent roles."
+    "description": "Ranks referral sources by how many of the company's inspections each referred, most first, with the contact's name, agency and email and the total. Counts every inspection of the company with a referring contact, with no date window and no status or archive filter; inspections without a referrer are left out. Not paginated. Read-only. Available to owner and manager roles; inspectors and agents get 403."
   },
   {
     "operationId": "listAgentInspectors",
@@ -10248,7 +10248,7 @@
       "body": null
     },
     "summary": "List agent my reports",
-    "description": "Lists the company's inspections on which a given agent contact is seated in a role that shows in the agent portal, as full inspection rows, with the agentId that was used. agentId is a contact id and defaults to the caller's own user id when omitted. Not paginated or explicitly ordered, and archived inspections are not filtered out. The handler itself only admits the manager role (owners and agents get 403), even though the operation is tagged with the agent scope. Read-only."
+    "description": "Lists the company's inspections on which a given agent contact is seated in a role that shows in the agent portal, as full inspection rows, with the agentId that was used. agentId is a contact id and defaults to the caller's own user id when omitted. Not paginated or explicitly ordered, and archived inspections are not filtered out. Available to owner and manager roles; the agent role gets 403, because agentId is a contact id and an agent's own data is served by the agent referral routes. Read-only."
   },
   {
     "operationId": "listAgentNotices",
@@ -11050,7 +11050,7 @@
       "body": null
     },
     "summary": "List inspection inspectors for current tenant",
-    "description": "Lists every user account of the company, not only users with the inspector role, for assignee pickers: id, email, role, creation time, and whether a calendar is connected and when it last synced. Owners, managers and inspectors are all included; pending invitations are not. Not paginated. Read-only. Available to owner, manager and inspector roles, so inspectors can see colleagues' email addresses."
+    "description": "Lists every user account of the company, not only users with the inspector role, for assignee pickers: id, email, role, creation time, and whether a calendar is connected and when it last synced. Owners, managers and inspectors are all included; pending invitations are not. Not paginated. Read-only. Available to owner and manager roles, and to inspectors who have been granted the scheduleOthers capability; other inspectors get 403."
   },
   {
     "operationId": "listInspectionMedia",
@@ -11635,7 +11635,7 @@
       "body": null
     },
     "summary": "List inspection templates (paginated)",
-    "description": "Paginated list of inspection templates for the tenant."
+    "description": "Paginated list of inspection templates for the tenant. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listInspectionTemplatesDuplicates",
@@ -12661,7 +12661,7 @@
       "body": null
     },
     "summary": "List team members and pending invites",
-    "description": "Lists the company's team: members (non-removed users) with id, name, email, role, permission overrides, whether two-factor sign-in is enabled (the flag only, never secrets), creation time and last active time; the pending invitations, each with its accept link (so anyone who can call this can see those links); and maxUsers, the seat cap (3 when the company has none recorded). Accepted, expired or cancelled invitations are not listed. Not paginated. Read-only. Available to owner, manager and inspector roles."
+    "description": "Lists the company's team: members (non-removed users) with id, name, email, role, permission overrides, whether two-factor sign-in is enabled (the flag only, never secrets), creation time and last active time; the pending invitations, each with its accept link, returned only to owner and manager callers (an inspector gets an empty invites list, because the accept link is a bearer credential for the invited role); and maxUsers, the seat cap (3 when the company has none recorded). Accepted, expired or cancelled invitations are not listed. Not paginated. Read-only. Available to owner, manager and inspector roles; invitations are included for owner and manager only."
   },
   {
     "operationId": "listTenantAgreements",
@@ -13501,7 +13501,7 @@
       }
     },
     "summary": "Patch inspection for current tenant",
-    "description": "Partially update an inspection record. (PATCH /{id}, inspections domain)."
+    "description": "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields."
   },
   {
     "operationId": "patchInspectionComplianceDocReviewItem",
@@ -17609,8 +17609,7 @@
           },
           "isDefault": {
             "type": "boolean",
-            "default": false,
-            "description": "Make this the company default; the flag is cleared on every other system. Defaults to false."
+            "description": "Make this the company default; the flag is cleared on every other system."
           },
           "levels": {
             "type": "array",
@@ -17870,7 +17869,7 @@
       }
     },
     "summary": "Reschedule and/or reassign one inspection",
-    "description": "Moves an inspection to a precise instant and optionally changes who works it. The epoch-millisecond start is authoritative; the civil date is derived from it in the tenant timezone. Returns 409 when the tenant booking_conflict_policy is \"block\" and the resulting assignment overlaps existing work."
+    "description": "Moves an inspection to a precise instant and optionally changes who works it. Owner and manager, and inspectors granted the scheduleOthers capability, can move any inspection and reassign it; an inspector on the inspection (lead or helper) can move its date but not change who works it; other inspectors get 403. The epoch-millisecond start is authoritative; the civil date is derived from it in the tenant timezone. Returns 409 when the tenant booking_conflict_policy is \"block\" and the resulting assignment overlaps existing work."
   },
   {
     "operationId": "resendTeamInvite",
@@ -18639,7 +18638,7 @@
       }
     },
     "summary": "Send into a contact thread, optionally mentioning an inspection",
-    "description": "Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet."
+    "description": "Owner and manager, and inspectors who work an inspection the contact is on or hold scheduleOthers (a contact on no inspection yet is open to all staff); other inspectors get 403. Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet."
   },
   {
     "operationId": "sendTenant",
@@ -18972,7 +18971,7 @@
       }
     },
     "summary": "Set when this inspection's report links stop working",
-    "description": "Applies an expiry to every report link already issued for THIS inspection, expressed as a duration from now. The tenant-wide reportLinkTtl policy only ever affects links minted after it changes; this endpoint is the explicit, per-inspection way to act on links that already exist."
+    "description": "Applies an expiry to every report link already issued for THIS inspection, expressed as a duration from now. The tenant-wide reportLinkTtl policy only ever affects links minted after it changes; this endpoint is the explicit, per-inspection way to act on links that already exist. Available to owner and manager roles, and to inspectors assigned to the inspection or granted the scheduleOthers capability."
   },
   {
     "operationId": "setInspectionVideoPoster",
@@ -20124,7 +20123,7 @@
       }
     },
     "summary": "Update tenant inspection editor preferences",
-    "description": "Partially update the tenant-level inspection editor preferences. Supplied fields are merged with existing values and the result is re-validated before persisting to the tenant config."
+    "description": "Partially update the tenant-level inspection editor preferences. Supplied fields are merged with existing values and the result is re-validated before persisting to the tenant config. Available to owner, manager and inspector roles, except that the company-wide external access policy fields (agentRepairAccess and reportLinkTtl) can be changed only by owner and manager; an inspector sending either gets 403."
   },
   {
     "operationId": "updateInspectionReportTranslation",
@@ -23232,7 +23231,7 @@
       "body": null
     },
     "summary": "Upload a message attachment (inspector)",
-    "description": "Streams a multipart file into R2 and returns the attachment descriptor to attach to a subsequent message. Inspector-authenticated."
+    "description": "Streams a multipart file into R2 and returns the attachment descriptor to attach to a subsequent message. Owner and manager, and inspectors assigned to the inspection or granted the scheduleOthers capability; other inspectors get 403."
   },
   {
     "operationId": "uploadMyProfilePhoto",

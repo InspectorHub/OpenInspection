@@ -375,7 +375,7 @@ Create a new inspection.
 #### `DELETE /api/inspections/:id`
 Delete an inspection and its associated results. The inspection must belong to the caller's tenant.
 
-**Roles:** `owner`, `manager`
+**Roles:** `owner`, `manager`, and `inspector` users who are the inspection's lead, or who have been granted the `scheduleOthers` capability. A helper on the inspection and any other inspector receive `403`.
 
 **Response:**
 ```json
@@ -389,9 +389,9 @@ Returns `404` if the inspection is not found or belongs to a different tenant.
 #### `PATCH /api/inspections/:id`
 Update editable metadata on an inspection. Only the fields included in the request body are changed.
 
-**Roles:** `owner`, `manager`, `inspector`
+**Roles:** `owner`, `manager`, `inspector`. Changing `inspectorId` requires the `scheduleOthers` capability. Changing `date` requires it too, unless the caller is on the inspection (lead or helper), who may move the date of their own job. Repeating the stored assignee or date is not a change. Anyone else receives `403` for such a change and can still edit the other fields.
 
-**Allowed fields:** `propertyAddress`, `clientName`, `clientEmail`, `date`, `inspectorId`, `price`, `status`
+**Allowed fields:** `propertyAddress`, `date`, `inspectorId`, `price`, `status`, `paymentRequired`, `agreementRequired`, `propertyType` and the other fields of the update schema (`UpdateInspectionSchema`). Client identity is managed through the People endpoints, not here.
 
 Valid `status` values: `draft`, `completed`, `delivered`
 
@@ -504,7 +504,7 @@ List all inspection templates for the tenant.
 #### `GET /api/inspections/inspectors`
 List all users (inspectors) in the tenant.
 
-**Roles:** `owner`, `manager`
+**Roles:** `owner`, `manager`, and `inspector` users who have been granted the `scheduleOthers` capability
 
 **Response:**
 ```json
@@ -514,6 +514,26 @@ List all users (inspectors) in the tenant.
   ]
 }
 ```
+
+#### `GET /api/tenant/inspection-prefs`
+Company inspection preferences (editor defaults, defect-field policy, external access policy).
+
+**Roles:** `owner`, `manager`, `inspector`
+
+#### `PATCH /api/tenant/inspection-prefs`
+Partially update the company inspection preferences. Fields not sent are left unchanged.
+
+**Roles:** `owner`, `manager`, `inspector`. The external access policy fields `agentRepairAccess` and `reportLinkTtl` can be changed only by `owner` and `manager`; an inspector sending either receives `403`.
+
+#### `GET /api/tenant/inspection-prefs/report-link-expiry`, `POST /api/tenant/inspection-prefs/report-link-expiry`
+Count the live report links, and apply an expiry to every existing one.
+
+**Roles:** `owner`, `manager`
+
+#### `GET /api/inspections/schedule-conflicts`
+Advisory same-day-hour collision check for one inspector. Returns the colliding inspections' ids, property addresses and dates. Query: `date` (required), `inspectorId` (defaults to the caller), `excludeId`.
+
+**Roles:** `owner`, `manager` and `inspector`. Checking an inspector other than yourself requires `owner` or `manager`, or an inspector granted the `scheduleOthers` capability; otherwise the response is 403. An inspector may always check their own schedule.
 
 ---
 
@@ -798,9 +818,9 @@ Returns `404` if the agreement does not exist or does not belong to the caller's
 ### Agent CRM
 
 #### `GET /api/agent/my-reports`
-List inspections referred by the calling agent. Admins and owners can pass `?agentId=<id>` to view any agent's reports.
+List inspections referred by the calling agent. Owners and managers can pass `?agentId=<contact id>` to view any agent contact's reports; the agent role is not admitted.
 
-**Roles:** `agent`, `owner`, `manager`
+**Roles:** `owner`, `manager`
 
 **Query params (admin/owner only):** `agentId`
 

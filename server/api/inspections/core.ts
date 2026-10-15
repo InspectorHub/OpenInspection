@@ -1,6 +1,5 @@
 // Core inspection CRUD + create/clone/wizard + offline-full + presence sub-router.
-// Behavior-preserving extraction from inspections.ts — handler bodies + route
-// definitions are byte-identical to the original (only their location changed).
+// Extracted from inspections.ts; handler bodies + route definitions are unchanged.
 //
 // The per-inspection results/editing routes (property facts, results, rating
 // system, recommendations, item-field patch, preflight) live alongside in
@@ -8,6 +7,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
+import { guardPatchReschedule, guardInspectionDelete } from './core-access';
 import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
@@ -71,13 +71,13 @@ const deleteInspectionRoute = createRoute(withMcpMetadata({
     path: '/{id}',
     tags: ["inspections"],
     summary: "Delete inspection for current tenant",
-    description: "Permanently remove an inspection record. (DELETE /{id}, inspections domain).",
+    description: "Permanently remove an inspection record. Owner and manager can delete any inspection; an inspector only one they lead, unless granted the scheduleOthers capability; helpers and other inspectors get 403.",
     request: {
         params: z.object({
             id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspection id.'),
         }),
     },
-    middleware: [requireRole('owner', 'manager', 'inspector')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardInspectionDelete],
     responses: {
         200: {
             content: {
@@ -99,7 +99,7 @@ const updateInspectionRoute = createRoute(withMcpMetadata({
     path: '/{id}',
     tags: ["inspections"],
     summary: "Patch inspection for current tenant",
-    description: "Partially update an inspection record. (PATCH /{id}, inspections domain).",
+    description: "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields.",
     request: {
         params: z.object({
             id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspection id.'),
@@ -112,7 +112,7 @@ const updateInspectionRoute = createRoute(withMcpMetadata({
             },
         },
     },
-    middleware: [requireRole('owner', 'manager', 'inspector')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardPatchReschedule],
     responses: {
         200: {
             content: {

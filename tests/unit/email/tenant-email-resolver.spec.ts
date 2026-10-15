@@ -55,11 +55,12 @@ async function runProbe(h: Harness, probe: Probe): Promise<void> {
     app.use('*', integrationSecretsMiddleware);
     app.use('*', diMiddleware);
     let failure: unknown;
-    app.get('/api/probe', async (c) => {
+    // A public-by-design path: an anonymous probe on a protected /api/ path is refused by default.
+    app.get('/api/public/probe', async (c) => {
         try { await probe(c.var.services); } catch (e) { failure = e; }
         return c.text('ok');
     });
-    const res = await app.request('/api/probe', {}, h.env, makeExecutionContext().ctx);
+    const res = await app.request('/api/public/probe', {}, h.env, makeExecutionContext().ctx);
     expect(res.status).toBe(200);
     if (failure) throw failure;
 }

@@ -181,7 +181,7 @@ export default function TeamPage() {
       <PageHeader
         title={m.settings_team_heading()}
         meta={`${activeMemberCount} ${activeMemberCount === 1 ? m.settings_team_member_singular() : m.settings_team_member_plural()}`}
-        actions={
+        actions={canManage ? (
           <div className="flex items-center gap-2">
             {/* Secondary first, primary second — the order /contacts and
                 /templates already use. The bulk entrance does NOT pre-judge
@@ -198,10 +198,10 @@ export default function TeamPage() {
               {m.settings_team_invite_button()}
             </Button>
           </div>
-        }
+        ) : undefined}
       />
 
-      <InviteSeatDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} />
+      {canManage && <InviteSeatDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} />}
       <EditMemberDrawer open={editMember !== null} onClose={() => setEditMember(null)} member={editMember} />
 
       <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />

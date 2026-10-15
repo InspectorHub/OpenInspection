@@ -14,7 +14,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app } from '../../../server/index';
 import { makeExecutionContext } from '../helpers/exec-ctx';
-import { createHarness, type Harness } from '../helpers/tenant-email-harness';
+import { createHarness, TENANT_ID, OWNER_ID, type Harness } from '../helpers/tenant-email-harness';
+import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import {
     NATIVE_NON_OPENAPI_CONTRACT,
     type NativeNonOpenApiEntry,
@@ -38,7 +39,12 @@ describe('native non-OpenAPI contract', () => {
         // The token-only upload routes answer 404 while native clients are off, so "routed" is
         // asked of a deployment that opted in. The control path below stays 404 either way.
         const env = { ...h.env, NATIVE_CLIENT_ENABLED: 'true' } as typeof h.env;
-        const res = await app.request(path, { method: method.toUpperCase() }, env, exec.ctx);
+        // Signed in as the owner: a request with no session now answers 401 on every protected
+        // /api/ path, which would make "routed" and "does not exist" indistinguishable.
+        const keyring = await buildKeyring(env as unknown as Record<string, string | undefined>);
+        const now = Math.floor(Date.now() / 1000);
+        const token = await signJwt({ sub: OWNER_ID, 'custom:tenantId': TENANT_ID, 'custom:userRole': 'owner', iat: now, exp: now + 3600 }, keyring);
+        const res = await app.request(path, { method: method.toUpperCase(), headers: { authorization: `Bearer ${token}` } }, env, exec.ctx);
         await exec.settle();
         return res.status;
     }

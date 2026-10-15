@@ -59,6 +59,29 @@ an owner, and it cannot promote a referral agent into staff. That guarantee is
 the whole reason the agent column exists here: an outside party holds a login to
 your workspace, and this is where the ceiling on that login is nailed down.
 
+### Requests without a session, and agent sessions
+
+Every path under `/api/` is refused without a session (`401`), in every deployment mode, unless it is public by design: booking, the token-link tracks (report, agreement, checkout, invoice, repair builder), sign-in and password flows, webhooks, status, and similar. The list lives in `server/lib/auth/public-paths.ts` and `server/lib/auth/api-access-policy.ts`, each exception with a one-line reason, and a spec walks every mounted route to prove a new one is either listed or refused. This matters most for a single-tenant deployment, where the tenant is resolved from configuration rather than from the session.
+
+An agent session is a global account with no company context. It may use only the agent surface (`/api/agent/…`, agent signup, account export and deletion, `/api/auth/me`, `/api/auth/logout` and `/api/session/…`) and receives `403` on every other `/api/` path. The referral leaderboard (`GET /api/agent/leaderboard`, which lists referring agents' names, agencies and emails) is limited to owner and manager.
+
+### Acting on an inspection that is not yours
+
+Several actions on an inspection depend on how the caller works it. "On the inspection" means the roster (lead or helper) or being the inspector named on it. Owner and manager always qualify.
+
+| Action | Who |
+|---|---|
+| Change the **date** (`PATCH /api/inspections/:id`, `PATCH /api/inspections/:id/schedule`) | anyone on the inspection; otherwise `scheduleOthers` |
+| Change **who works it** (assignee, lead or helpers) | `scheduleOthers` |
+| **Delete** it | its lead; helpers cannot; otherwise `scheduleOthers` |
+| Send the report (`send-report-pdf`), email or mint an agent link (`share-agent`, `agent-token`), change its report-link expiry, send a text (`send-sms`), message its client | anyone on the inspection; otherwise `scheduleOthers` |
+
+Sending or sharing a report additionally requires the report to be published, at most 10 recipients that are people already on the inspection (each listed once), and at most three sends of the same inspection to the same address per hour.
+
+**Reading is not narrowed.** Message threads, the thread list and message attachments remain readable by every staff role across the company, as do inspections themselves; opening a thread clears its unread counts only for the people who work it. Per-inspector read visibility is a separate decision and is not part of these rules.
+
+**The messaging rule is a speed bump, not a boundary.** An inspector can add a contact to an inspection they work and then message that contact, so the rule stops accidental and casual cross-messaging, not a determined colleague. Treat it as a guard against mistakes.
+
 ### Contact-role capabilities
 
 Five, keyed on `RoleKind` and overridable per role profile

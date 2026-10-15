@@ -11,7 +11,6 @@ import { createElement } from "react";
 import type { useFetcher } from "react-router";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
 import type { PersonRow } from "~/components/inspection/PeopleEditor";
-import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import type { action } from "~/routes/inspector-portal";
 
 afterEach(cleanup);
@@ -67,12 +66,6 @@ const people: PersonRow[] = [
   },
 ];
 
-const roleProfiles: RoleProfile[] = [
-  { id: "rp1", key: "client", label: "Client", kind: "client", emailTemplateId: null, smsTemplateId: null, isSystem: true, sortOrder: 0, active: true },
-  { id: "rp2", key: "buyer_agent", label: "Buyer Agent", kind: "agent", emailTemplateId: null, smsTemplateId: null, isSystem: true, sortOrder: 1, active: true },
-  { id: "rp3", key: "seller", label: "Seller", kind: "other", emailTemplateId: null, smsTemplateId: null, isSystem: false, sortOrder: 2, active: true },
-];
-
 function recipientsField(container: HTMLElement): Array<Record<string, unknown>> {
   const el = container.querySelector('input[name="recipients"]') as HTMLInputElement;
   return JSON.parse(el.value);
@@ -85,7 +78,7 @@ function submitButton() {
 /**
  * Un-tick everyone the dialog pre-selected.
  *
- * The tests below that are about the one-off recipient, or about the disabled
+ * The tests below that are about the disabled
  * submit, predate the pre-selection and are still about what they were about —
  * so they start from an empty selection EXPLICITLY rather than relying on the
  * dialog opening empty, which it no longer does.
@@ -100,7 +93,7 @@ function clearPreselected(container: HTMLElement) {
 describe("SendReportModal", () => {
   it("renders the inspection's people grouped by role; a person without an email is disabled", () => {
     const { container } = render(
-      <SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
+      <SendReportModal people={people} fetcher={makeFetcher()} onClose={vi.fn()} />,
     );
 
     expect(screen.getByTestId("people-group-client")).toBeTruthy();
@@ -118,7 +111,7 @@ describe("SendReportModal", () => {
 
   it("submit is disabled when nothing is selected or entered", () => {
     const { container } = render(
-      <SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
+      <SendReportModal people={people} fetcher={makeFetcher()} onClose={vi.fn()} />,
     );
     clearPreselected(container);
     expect(submitButton().disabled).toBe(true);
@@ -134,7 +127,7 @@ describe("SendReportModal", () => {
     // addresses — so the product asked the inspector to re-nominate the people
     // they had entered themselves.
     const { container } = render(
-      <SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
+      <SendReportModal people={people} fetcher={makeFetcher()} onClose={vi.fn()} />,
     );
     const box = (id: string) =>
       container.querySelector(`input[data-testid="send-report-person-${id}"]`) as HTMLInputElement;
@@ -157,7 +150,7 @@ describe("SendReportModal", () => {
     // email, so this pins the kind rule and the email rule at once; the
     // disabled-row assertion lives in the first test.)
     const { container } = render(
-      <SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
+      <SendReportModal people={people} fetcher={makeFetcher()} onClose={vi.fn()} />,
     );
     const carol = container.querySelector('input[data-testid="send-report-person-p3"]') as HTMLInputElement;
     expect(carol.checked).toBe(false);
@@ -169,7 +162,7 @@ describe("SendReportModal", () => {
       { ...people[1], id: "p9", contactId: "c9", name: "Dana Agent", email: null },
     ];
     const { container } = render(
-      <SendReportModal people={agentNoEmail} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
+      <SendReportModal people={agentNoEmail} fetcher={makeFetcher()} onClose={vi.fn()} />,
     );
     const box = container.querySelector('input[data-testid="send-report-person-p9"]') as HTMLInputElement;
     expect(box.checked).toBe(false);
@@ -179,7 +172,7 @@ describe("SendReportModal", () => {
 
   it("selecting two people serializes both as {contactId, roleKey} into the hidden recipients field", () => {
     const { container } = render(
-      <SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
+      <SendReportModal people={people} fetcher={makeFetcher()} onClose={vi.fn()} />,
     );
 
     // Ticked -> unticked -> ticked: the serialization is asserted on a selection
@@ -199,30 +192,13 @@ describe("SendReportModal", () => {
     expect(submitButton().disabled).toBe(false);
   });
 
-  it("filling the one-off email + role includes {email, roleKey} in recipients", () => {
+  it("offers no free-typed recipient: only people on the inspection, with a hint to add anyone missing", () => {
     const { container } = render(
-      <SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
+      <SendReportModal people={people} fetcher={makeFetcher()} onClose={vi.fn()} />,
     );
-
+    expect(screen.queryByPlaceholderText("name@example.com")).toBeNull();
+    expect(screen.getByText(/add them to this inspection first/i)).toBeTruthy();
     clearPreselected(container);
-    fireEvent.change(screen.getByPlaceholderText("name@example.com"), {
-      target: { value: "extra@example.com" },
-    });
-    fireEvent.change(screen.getByLabelText("Role"), { target: { value: "seller" } });
-
-    const recipients = recipientsField(container);
-    expect(recipients).toEqual([{ email: "extra@example.com", roleKey: "seller" }]);
-    expect(submitButton().disabled).toBe(false);
-  });
-
-  it("does not include a one-off recipient with an email but no role selected", () => {
-    const { container } = render(
-      <SendReportModal people={people} roleProfiles={roleProfiles} fetcher={makeFetcher()} onClose={vi.fn()} />,
-    );
-    clearPreselected(container);
-    fireEvent.change(screen.getByPlaceholderText("name@example.com"), {
-      target: { value: "extra@example.com" },
-    });
     expect(recipientsField(container)).toEqual([]);
     expect(submitButton().disabled).toBe(true);
   });
@@ -232,7 +208,6 @@ describe("SendReportModal", () => {
     const { rerender } = render(
       <SendReportModal
         people={people}
-        roleProfiles={roleProfiles}
         fetcher={makeFetcher({ state: "submitting", data: undefined })}
         onClose={onClose}
       />,
@@ -242,7 +217,6 @@ describe("SendReportModal", () => {
     rerender(
       <SendReportModal
         people={people}
-        roleProfiles={roleProfiles}
         fetcher={makeFetcher({
           state: "idle",
           data: { ok: true, intent: "send-report", error: undefined },
@@ -259,7 +233,6 @@ describe("SendReportModal", () => {
     render(
       <SendReportModal
         people={people}
-        roleProfiles={roleProfiles}
         fetcher={makeFetcher({
           state: "idle",
           data: { ok: false, intent: "send-report", error: "Could not send the report. Please try again." },

@@ -23,6 +23,7 @@ import { PeopleService } from '../../../server/services/people.service';
 import { AppError, Errors } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 import { makeExecutionContext } from '../helpers/exec-ctx';
+import { seedSendGuardFixture, guardKv } from '../helpers/send-guard-fixture';
 
 const TENANT = '00000000-0000-0000-0000-0000000000b1';
 const CLIENT = 'ct-msl-client';
@@ -100,7 +101,15 @@ describe('manual send logging (A2.2)', () => {
         await db.insert(schema.contacts).values([
             { id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane', email: 'jane@x.com', phone: null, createdAt: new Date() },
             { id: NO_EMAIL, tenantId: TENANT, type: 'client', name: 'No Email', email: null, phone: null, createdAt: new Date() },
+            { id: 'contact-oneoff', tenantId: TENANT, type: 'other', name: 'Olive Attorney', email: 'oneoff@example.com', phone: null, createdAt: new Date() },
         ]);
+        // The send guards read the inspection (published) and who is seated on it.
+        await seedSendGuardFixture(db, TENANT, INSP_ID, [
+            { contactId: CLIENT, roleKey: 'client' },
+            { contactId: NO_EMAIL, roleKey: 'co_client' },
+            { contactId: 'contact-oneoff', roleKey: 'attorney' },
+        ]);
+        (ENV as unknown as Record<string, unknown>).TENANT_CACHE = guardKv();
     });
 
     it('writes one ledger row per recipient with automation_id NULL and a SHARED sendAt', async () => {

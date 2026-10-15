@@ -4,7 +4,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
-import { requireCapability } from '../../lib/middleware/require-capability';
+import { requireCapability, capabilitiesFor } from '../../lib/middleware/require-capability';
 import { auditFromContext } from '../../lib/audit';
 import { logger } from '../../lib/logger';
 import { Errors } from '../../lib/errors';
@@ -100,7 +100,9 @@ const listInspectorsRoute = createRoute(withMcpMetadata({
     path: '/inspectors',
     tags: ["inspections"],
     summary: "List inspection inspectors for current tenant",
-    middleware: [requireRole('owner', 'manager', 'inspector')],
+    // The assignee picker's data source: it lists every account's email and role,
+    // so it is gated like the writes it feeds (bulk reassign, schedule).
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('scheduleOthers')],
     responses: {
         200: {
             content: {
@@ -121,8 +123,8 @@ const listInspectorsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listInspectionInspectors",
-    description: "Lists every user account of the company, not only users with the inspector role, for assignee pickers: id, email, role, creation time, and whether a calendar is connected and when it last synced. Owners, managers and inspectors are all included; pending invitations are not. Not paginated. Read-only. Available to owner, manager and inspector roles, so inspectors can see colleagues' email addresses."
-}, { scopes: ['read'], tier: 'extended' }));
+    description: "Lists every user account of the company, not only users with the inspector role, for assignee pickers: id, email, role, creation time, and whether a calendar is connected and when it last synced. Owners, managers and inspectors are all included; pending invitations are not. Not paginated. Read-only. Available to owner and manager roles, and to inspectors who have been granted the scheduleOthers capability; other inspectors get 403."
+}, { scopes: ['read'], tier: 'extended', capability: 'scheduleOthers' }));
 
 /**
  * PATCH /api/inspections/bulk
@@ -217,7 +219,7 @@ const scheduleConflictsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: 'getScheduleConflicts',
-    description: 'IA-6 — advisory same-day-hour collision check counting lead and helper assignments. Callers render a warning; scheduling is never blocked.',
+    description: "IA-6 — advisory same-day-hour collision check counting lead and helper assignments, for the inspector named by inspectorId (default: the caller). Returns the colliding inspections' ids, property addresses and dates. Callers render a warning; scheduling is never blocked. Available to owner, manager and inspector roles; checking an inspector other than yourself requires owner or manager, or an inspector granted the scheduleOthers capability, and other inspectors get 403.",
 }, { scopes: ['read'], tier: 'extended' }));
 
 const bulkRoutes = createApiRouter()
@@ -361,7 +363,14 @@ const bulkRoutes = createApiRouter()
         const db = getDrizzle(c);
         // Solo wizard flow sends no inspectorId — the inspection will be
         // assigned to the creator, so that is who we check against.
-        const targetId = inspectorId || c.get('user').sub;
+        const callerId = c.get('user').sub;
+        const targetId = inspectorId || callerId;
+        // Another inspector's schedule (their addresses and dates) is the same
+        // "act on others' bookings" verb the assignee picker and bulk reassign gate
+        // on. Checking yourself is the wizard's own flow and stays open to all.
+        if (targetId !== callerId && !(await capabilitiesFor(c)).scheduleOthers) {
+            throw Errors.Forbidden("Requires the 'scheduleOthers' capability to check another inspector's schedule");
+        }
         const conflicts = await findScheduleConflicts(db, tenantId, targetId, date, excludeId);
         return c.json({ success: true, data: { conflicts } }, 200);
     });

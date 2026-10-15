@@ -14,6 +14,7 @@
 // handler below closes this hole by re-resolving BOTH contactId and
 // roleProfileId via a tenant-scoped lookup before ever calling addPerson,
 // returning 404 if either isn't owned by the caller's tenant.
+import { guardLinkExpiry } from './report-send-guards';
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq, and } from 'drizzle-orm';
 import { createApiRouter } from '../../lib/openapi-router';
@@ -171,7 +172,7 @@ const reportLinkExpiryRoute = createRoute(withMcpMetadata({
     path: '/{id}/report-link-expiry',
     tags: ['inspections'],
     summary: 'Set when this inspection\'s report links stop working',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardLinkExpiry] as const,
     request: {
         params: ParamsId,
         body: { content: { 'application/json': { schema: z.object({ ttl: ReportLinkTtlSchema }) } } },
@@ -181,7 +182,7 @@ const reportLinkExpiryRoute = createRoute(withMcpMetadata({
         404: { content: { 'application/json': { schema: ErrorResponseSchema } }, description: 'Inspection not found' },
     },
     operationId: 'setInspectionReportLinkExpiry',
-    description: 'Applies an expiry to every report link already issued for THIS inspection, expressed as a duration from now. The tenant-wide reportLinkTtl policy only ever affects links minted after it changes; this endpoint is the explicit, per-inspection way to act on links that already exist.',
+    description: 'Applies an expiry to every report link already issued for THIS inspection, expressed as a duration from now. The tenant-wide reportLinkTtl policy only ever affects links minted after it changes; this endpoint is the explicit, per-inspection way to act on links that already exist. Available to owner and manager roles, and to inspectors assigned to the inspection or granted the scheduleOthers capability.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**

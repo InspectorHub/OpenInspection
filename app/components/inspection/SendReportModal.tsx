@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { useHumanGatedSubmit } from "~/components/OutboundVerification";
 import type { useFetcher } from "react-router";
-import { Modal, Button, Checkbox, Input, Select } from "@core/shared-ui";
+import { Modal, Button, Checkbox } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
 import type { PersonRow } from "./PeopleEditor";
-import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { m } from "~/paraglide/messages";
 // Grouped in vocabulary order — see the note in <PeopleEditor>.
 import { ROLE_KINDS } from "../../../server/lib/people/role-kinds";
@@ -50,8 +49,8 @@ interface Recipient {
 
 /**
  * "Send report" modal (Spec 2 Task 7). Lets the user pick people already on
- * the inspection (grouped by role, mirroring `PeopleEditor`) and/or add a
- * one-off email + role, then posts the picks as `recipients` on the hub
+ * the inspection (grouped by role, mirroring `PeopleEditor`), then posts the
+ * picks as `recipients` on the hub
  * action's "send-report" intent → `POST /{id}/send-report-pdf`, which mints
  * each recipient their own role-keyed tokenized report link + PDF.
  *
@@ -65,12 +64,10 @@ interface Recipient {
  */
 export function SendReportModal({
   people,
-  roleProfiles,
   fetcher,
   onClose,
 }: {
   people: PersonRow[];
-  roleProfiles: RoleProfile[];
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
   onClose: () => void;
 }) {
@@ -85,10 +82,6 @@ export function SendReportModal({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(people.filter((p) => p.email && PRECHECKED_KINDS.has(p.kind)).map((p) => p.id)),
   );
-  const [oneOffEmail, setOneOffEmail] = useState("");
-  const [oneOffRoleKey, setOneOffRoleKey] = useState("");
-
-  const activeRoles = roleProfiles.filter((r) => r.active);
 
   function toggle(personId: string) {
     setSelectedIds((prev) => {
@@ -103,11 +96,9 @@ export function SendReportModal({
     .filter((p) => selectedIds.has(p.id) && p.email)
     .map((p) => ({ contactId: p.contactId, roleKey: p.roleKey }));
 
-  const trimmedEmail = oneOffEmail.trim();
-  const oneOffRecipient: Recipient[] =
-    trimmedEmail && oneOffRoleKey ? [{ email: trimmedEmail, roleKey: oneOffRoleKey }] : [];
-
-  const recipients: Recipient[] = [...peopleRecipients, ...oneOffRecipient];
+  // Only people already on the inspection can be addressed: the API refuses any other
+  // address, so there is no free-typed recipient here. Someone missing is added first.
+  const recipients: Recipient[] = peopleRecipients;
 
   const submitting = fetcher.state !== "idle";
   const error =
@@ -228,29 +219,9 @@ export function SendReportModal({
           )}
         </div>
 
-        <div className="pt-3 border-t border-ih-border">
-          <p className="text-xs font-bold text-ih-fg-2 mb-2">
-            {m.inspections_hub_send_report_oneoff_title()}
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              type="email"
-              label={m.inspections_hub_send_report_oneoff_email_label()}
-              placeholder={m.inspections_hub_send_report_oneoff_email_ph()}
-              value={oneOffEmail}
-              onChange={(e) => setOneOffEmail(e.target.value)}
-            />
-            <Select
-              label={m.inspections_hub_send_report_oneoff_role_label()}
-              value={oneOffRoleKey}
-              onChange={(e) => setOneOffRoleKey(e.target.value)}
-              options={[
-                { value: "", label: m.inspections_hub_send_report_oneoff_role_placeholder(), disabled: true },
-                ...activeRoles.map((r) => ({ value: r.key, label: r.label })),
-              ]}
-            />
-          </div>
-        </div>
+        <p className="pt-3 border-t border-ih-border text-[12px] text-ih-fg-3">
+          {m.inspections_hub_send_report_add_person_hint()}
+        </p>
 
         {/* Channel — email only for now; the backend endpoint accepts no
             other channel value yet (server/lib/validations/send-report.schema.ts). */}

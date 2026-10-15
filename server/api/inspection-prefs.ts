@@ -8,6 +8,9 @@ import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../lib/db/schema/tenant';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
+import { requireRole } from '../lib/middleware/rbac';
+import { isAdminRole } from '../lib/auth/roles';
+import { Errors } from '../lib/errors';
 import { reportLinkExpiresAt } from '../lib/report-link-ttl';
 import { ReportLinkTtlSchema } from '../lib/validations/report-link-ttl.schema';
 import {
@@ -21,8 +24,9 @@ const getRoute = withMcpMetadata(createRoute({
     path: '/',
     tags: ['inspections'],
     operationId: 'getInspectionPrefs',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     summary: 'Get tenant inspection editor preferences',
-    description: 'Return the current tenant-level inspection editor preferences (clone defaults, auto-advance delay, pinned tag IDs), applying built-in defaults for any field not yet configured.',
+    description: 'Return the current tenant-level inspection editor preferences (clone defaults, auto-advance delay, pinned tag IDs), applying built-in defaults for any field not yet configured. Available to owner, manager and inspector roles.',
     responses: {
         200: {
             description: 'Current prefs (defaults applied where unset)',
@@ -36,8 +40,9 @@ const patchRoute = withMcpMetadata(createRoute({
     path: '/',
     tags: ['inspections'],
     operationId: 'updateInspectionPrefs',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     summary: 'Update tenant inspection editor preferences',
-    description: 'Partially update the tenant-level inspection editor preferences. Supplied fields are merged with existing values and the result is re-validated before persisting to the tenant config.',
+    description: 'Partially update the tenant-level inspection editor preferences. Supplied fields are merged with existing values and the result is re-validated before persisting to the tenant config. Available to owner, manager and inspector roles, except that the company-wide external access policy fields (agentRepairAccess and reportLinkTtl) can be changed only by owner and manager; an inspector sending either gets 403.',
     request: {
         body: { content: { 'application/json': { schema: InspectionPrefsPatchSchema } }, required: true },
     },
@@ -64,6 +69,7 @@ const patchRoute = withMcpMetadata(createRoute({
 const bulkExpiryRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/report-link-expiry',
+    middleware: [requireRole('owner', 'manager')] as const,
     tags: ['inspections'],
     summary: 'Apply an expiry to the report links that already exist',
     request: {
@@ -76,7 +82,7 @@ const bulkExpiryRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: 'applyTenantReportLinkExpiry',
-    description: 'Applies an expiry, expressed as a duration from now, to every report link across the tenant that is usable right now (not revoked, not already expired). The tenant reportLinkTtl policy alone only affects links minted after it changes; this is the explicit, count-reporting way to act on the existing backlog. Already-dead links are left dead — a bulk apply never resurrects one.',
+    description: 'Applies an expiry, expressed as a duration from now, to every report link across the tenant that is usable right now (not revoked, not already expired). The tenant reportLinkTtl policy alone only affects links minted after it changes; this is the explicit, count-reporting way to act on the existing backlog. Already-dead links are left dead — a bulk apply never resurrects one. Available to owner and manager roles.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -86,6 +92,7 @@ const bulkExpiryRoute = createRoute(withMcpMetadata({
 const liveLinkCountRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/report-link-expiry',
+    middleware: [requireRole('owner', 'manager')] as const,
     tags: ['inspections'],
     summary: 'How many report links are usable right now',
     responses: {
@@ -95,7 +102,7 @@ const liveLinkCountRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: 'getTenantLiveReportLinkCount',
-    description: 'Counts the report links across the tenant that would be affected by applying an expiry to the existing backlog. Rendered into the confirm control so the operator sees the blast radius before acting, not after.',
+    description: 'Counts the report links across the tenant that would be affected by applying an expiry to the existing backlog. Rendered into the confirm control so the operator sees the blast radius before acting, not after. Available to owner and manager roles.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 const inspectionPrefsRoutes = createApiRouter()
@@ -132,6 +139,11 @@ const inspectionPrefsRoutes = createApiRouter()
     .openapi(patchRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const patch = c.req.valid('json');
+        // The external access policy governs what clients and agents can open, so
+        // it is a company decision, not an editor preference.
+        if (('agentRepairAccess' in patch || 'reportLinkTtl' in patch) && !isAdminRole(c.get('userRole'))) {
+            throw Errors.Forbidden('Only an owner or manager can change the external access policy');
+        }
         const db = drizzle(c.env.DB as never);
         const existing = await db.select({
             prefs:               tenantConfigs.inspectionPrefs,

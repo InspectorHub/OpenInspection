@@ -3,9 +3,9 @@
 // agent view tokens, and the agent share-link email. The report review state
 // machine + publish + PDF render pipeline live in ./publish.ts; the agreement
 // signing envelope lives in ./agreements.ts.
-// Originally a behavior-preserving extraction from inspections.ts. The handler
-// bodies have been fixed in place since, so do not read this file as a copy of
-// anything — it is the only definition of these routes.
+// Extracted from inspections.ts, then fixed in place: not a copy of anything,
+// the only definition of these routes.
+import { guardSendReport, guardReportLink } from './report-send-guards';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
@@ -41,7 +41,7 @@ const sendReportPdfRoute = createRoute(withMcpMetadata({
     path: '/{id}/send-report-pdf',
     tags: ["inspections"],
     summary: 'Send the inspection report to one or more role-keyed recipients',
-    middleware: [requireRole('owner', 'manager', 'inspector')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardSendReport],
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('Inspection whose report is sent.') }),
         body: {
@@ -60,7 +60,7 @@ const sendReportPdfRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "createInspectionSendReportPdf",
-    description: "Renders the report PDF once and sends it (or a text-only fallback if rendering fails) to every recipient in the request body, each with their own role-keyed portal link. Per-recipient failures (no resolvable email, unknown roleKey, send failure) are collected in the response and do not fail the whole request."
+    description: "Renders the report PDF once and sends it (or a text-only fallback if rendering fails) to every recipient in the request body, each with their own role-keyed portal link. Per-recipient failures (no resolvable email, unknown roleKey, send failure) are collected in the response and do not fail the whole request. Available to owner and manager roles, and to inspectors assigned to the inspection or granted the scheduleOthers capability. The report must be published (409 NOT_PUBLISHED otherwise). At most 10 recipients per request, each a person already on the inspection (matched by contact id, or by that person's email); anything else is refused with 400. The same recipient is sent the same inspection at most 3 times per hour (429 after that)."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -533,7 +533,7 @@ const reportDeliveryRoutes = createApiRouter()
         method: 'post', path: '/{id}/agent-token',
         tags: ["inspections"],
         summary: 'Generate shareable agent view token',
-        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+        middleware: [requireRole('owner', 'manager', 'inspector'), guardReportLink] as const,
         request: { params: z.object({ id: z.string().describe('Inspection the agent view link is for.') }) },
         responses: {
             200: {
@@ -542,7 +542,7 @@ const reportDeliveryRoutes = createApiRouter()
             },
         },
         operationId: "createInspectionAgentToken",
-        description: "Mint a read-only agent view link for an inspection report. Stores a new token that expires after 30 days and returns it with the full report URL (?view=agent&token=...). Nothing is sent: the caller delivers the link. Every call mints a new token and earlier tokens keep working until they expire. Returns 404 for an unknown inspection. Restricted to owners, managers and inspectors."
+        description: "Mint a read-only agent view link for an inspection report. Stores a new token that expires after 30 days and returns it with the full report URL (?view=agent&token=...). Nothing is sent: the caller delivers the link. Every call mints a new token and earlier tokens keep working until they expire. Returns 404 for an unknown inspection. Restricted to owners and managers, and to inspectors assigned to the inspection or granted the scheduleOthers capability; the report must be published (409 NOT_PUBLISHED otherwise)."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId') as string;
         const { id } = c.req.valid('param');
@@ -555,7 +555,7 @@ const reportDeliveryRoutes = createApiRouter()
         method: 'post', path: '/{id}/share-agent',
         tags: ["inspections"],
         summary: 'Email the report share link to the linked agent',
-        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+        middleware: [requireRole('owner', 'manager', 'inspector'), guardReportLink] as const,
         request: { params: z.object({ id: z.string().describe('Inspection whose report link is emailed to the buyer agent.') }) },
         responses: {
             200: {
@@ -564,7 +564,7 @@ const reportDeliveryRoutes = createApiRouter()
             },
         },
         operationId: "createInspectionShareAgent",
-        description: "Email the report link to the inspection's buyer agent. Mints a new agent view token (valid 30 days), builds the agent view URL and sends it to the email on the buyer agent contact, with the inspector's signature appended, then writes an inspection.share_agent audit entry. Returns 400 when no buyer agent is linked to the inspection or that contact has no email, 404 for an unknown inspection and 500 if the email fails to send. Each call sends another email with a new token. Restricted to owners, managers and inspectors."
+        description: "Email the report link to the inspection's buyer agent. Mints a new agent view token (valid 30 days), builds the agent view URL and sends it to the email on the buyer agent contact, with the inspector's signature appended, then writes an inspection.share_agent audit entry. Returns 400 when no buyer agent is linked to the inspection or that contact has no email, 404 for an unknown inspection and 500 if the email fails to send. Each call sends another email with a new token. Restricted to owners and managers, and to inspectors assigned to the inspection or granted the scheduleOthers capability; the report must be published (409 NOT_PUBLISHED otherwise)."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');

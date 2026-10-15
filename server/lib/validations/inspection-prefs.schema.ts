@@ -44,8 +44,25 @@ export const InspectionPrefsSchema = z.object({
 
 export type InspectionPrefs = z.infer<typeof InspectionPrefsSchema>;
 
-/** All fields optional — used by PATCH to support partial updates. */
-export const InspectionPrefsPatchSchema = InspectionPrefsSchema.partial().openapi('InspectionPrefsPatch');
+/**
+ * All fields optional - used by PATCH to support partial updates.
+ *
+ * Built from the unwrapped fields, NOT from `.partial()`: zod keeps a field's
+ * `.default()` under `.partial()`, so an omitted field was parsed as present with
+ * its default. A PATCH that only touched `autoAdvance` therefore carried
+ * `agentRepairAccess: 'readwrite'` and `reportLinkTtl: 'never'` into the merge and
+ * silently reset the company's external access policy on every editor-pref save.
+ */
+const S = InspectionPrefsSchema.shape;
+export const InspectionPrefsPatchSchema = z.object({
+    cloneDefault:        S.cloneDefault.optional(),
+    autoAdvance:         S.autoAdvance.unwrap().optional(),
+    autoAdvanceDelayMs:  S.autoAdvanceDelayMs.optional(),
+    pinnedTagIds:        S.pinnedTagIds.optional(),
+    requireDefectFields: S.requireDefectFields.unwrap().optional(),
+    agentRepairAccess:   S.agentRepairAccess.unwrap().optional(),
+    reportLinkTtl:       S.reportLinkTtl.unwrap().optional(),
+}).openapi('InspectionPrefsPatch');
 
 export const DEFAULT_INSPECTION_PREFS: InspectionPrefs = {
     cloneDefault:       'rating_notes',

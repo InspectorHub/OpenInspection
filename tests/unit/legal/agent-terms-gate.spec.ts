@@ -338,8 +338,11 @@ describe('the agent-terms gate', () => {
             const app = buildApp();
             // The gate is keyed on the actor. An anonymous caller has no
             // acceptance either, and answering 428 to them would tell an
-            // unauthenticated stranger that this route belongs to agents.
-            expect((await app.request(PROTECTED)).status).toBe(200);
+            // unauthenticated stranger that this route belongs to agents. The
+            // default-deny rule answers 401 first, which says nothing about agents.
+            const res = await app.request(PROTECTED);
+            expect(res.status).toBe(401);
+            expect(res.status).not.toBe(428);
         });
     });
 

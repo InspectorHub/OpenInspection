@@ -22,7 +22,8 @@
  * part of the path. The client side authenticates via resolveClientActor
  * (shared with client-documents) — the messageToken keying is retired.
  */
-import { Hono } from 'hono';
+import { mayActOnInspection, assertMayActOnInspection } from '../lib/inspection/assignment-access';
+import { Hono, type Context, type Next } from 'hono';
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
@@ -65,7 +66,7 @@ const listRoute = createRoute(withMcpMetadata({
     },
     operationId: 'getMessageInspection',
     summary: 'List messages for an inspection (inspector view)',
-    description: 'Returns the message thread for an inspection (oldest first) and marks all client messages read. Inspector-authenticated.',
+    description: 'Returns the message thread for an inspection (oldest first) and marks all client messages read, but only when the caller works the inspection (assigned, or granted scheduleOthers, or owner and manager); other inspectors can read the thread and leave the unread counts alone. Inspector-authenticated.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 // POST /api/inspections/{inspectionId}/messages — send message as inspector
@@ -73,7 +74,7 @@ const sendRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{inspectionId}/messages',
     tags: ['messages'],
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardMessageSend] as const,
     request: {
         params: z.object({ inspectionId: z.string().describe('Inspection to post the message to.') }).describe('Path parameters.'),
         body: { content: { 'application/json': { schema: z.object({
@@ -88,7 +89,7 @@ const sendRoute = createRoute(withMcpMetadata({
     },
     operationId: 'createMessageInspection',
     summary: 'Send a message to a client (inspector)',
-    description: 'Creates an inspector-authored message on an inspection and notifies the client by email. Inspector-authenticated.',
+    description: 'Creates an inspector-authored message on an inspection and notifies the client by email. Owner and manager, and inspectors assigned to the inspection or granted the scheduleOthers capability; other inspectors get 403.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 // POST /api/inspections/{inspectionId}/messages/upload — attach a file (inspector)
@@ -96,7 +97,7 @@ const uploadRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{inspectionId}/messages/upload',
     tags: ['messages'],
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardMessageSend] as const,
     request: { params: z.object({ inspectionId: z.string().describe('Inspection the attachment belongs to.') }).describe('Path parameters.') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({
@@ -106,7 +107,7 @@ const uploadRoute = createRoute(withMcpMetadata({
     },
     operationId: 'uploadMessageInspection',
     summary: 'Upload a message attachment (inspector)',
-    description: 'Streams a multipart file into R2 and returns the attachment descriptor to attach to a subsequent message. Inspector-authenticated.',
+    description: 'Streams a multipart file into R2 and returns the attachment descriptor to attach to a subsequent message. Owner and manager, and inspectors assigned to the inspection or granted the scheduleOthers capability; other inspectors get 403.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 // GET /api/inspections/{inspectionId}/messages/attachments/{attachmentId}
@@ -185,6 +186,12 @@ function streamAttachment(
     return new Response(obj.body, { status: 200, headers });
 }
 
+/** Sending into an inspection's thread is the assignee's act (or `scheduleOthers`). */
+async function guardMessageSend(c: Context<HonoConfig>, next: Next) {
+    await assertMayActOnInspection(c, c.req.param('inspectionId') ?? '', 'message its client');
+    return next();
+}
+
 // ── Inspector router (typed client + MCP) ────────────────────────────────────
 
 export const inspectorMessageRoutes = createApiRouter()
@@ -196,7 +203,8 @@ export const inspectorMessageRoutes = createApiRouter()
         // The inspector opened the merged view: mark every counterparty-authored
         // message on the inspection read (all threads — this is the one surface
         // that shows them all).
-        await svc.markInspectionReadForStaff(inspectionId, tenantId);
+        // Reading stays company-wide; clearing the counts is the assignee's act.
+        if (await mayActOnInspection(c, inspectionId)) await svc.markInspectionReadForStaff(inspectionId, tenantId);
         return c.json({ success: true, data: messages }, 200);
     })
     .openapi(sendRoute, async (c) => {
