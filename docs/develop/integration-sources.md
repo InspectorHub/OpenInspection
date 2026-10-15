@@ -78,6 +78,8 @@ The per-service resolvers keep their credential and endpoint logic and ask this 
 
 `integrationSources(profile, companyConfig, env)` in `server/lib/integrations/source-overview.ts` returns, for each service, the sources available, the current one and a state, derived with no network call. A source that is `unavailable` reads as *Needs attention* when the person can finish it (half-entered keys) or the deployment lacks a credential it should provide, and as *Not connected* otherwise.
 
+`GET /api/integrations/overview` (owner or manager) serves the Integrations page. It returns one card per service, in page order: card payments, accounting, calendar, email, SMS, address suggestions, property facts, video and AI. Each card carries `status` (is it working), `source` (whose account), `canUseOwn` (the company may switch between Built-in and Your own), the settings page that manages it, and the message key that explains an unavailable source. Services the resolver covers take their source and state from it; the others are read from the same facts (keys the deployment holds, keys the company stored). A card never carries a key, only whether one is set. QuickBooks and Google Calendar also need a real sign-in before they read as connected. The builder is `server/lib/integrations/overview.ts` and is pure; `overview-data.ts` reads one company's rows.
+
 ## The held-back shared SMS number
 
 The monthly allowance for sends on a deployment-provided number is `MANAGED_SMS_MONTHLY_ALLOWANCE` (an integer; default 1000 when absent or not a positive number). Manual sends and the automation cron both read it.

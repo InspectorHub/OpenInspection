@@ -8411,6 +8411,22 @@
     "description": "Returns the full frozen snapshot captured when version n was published: the inspection record, its results data, its units, the inspectors credited at the time and the resolved report style. Reads the stored copy, so later edits to the live inspection do not change it. Returns 404 when no such version exists for the inspection in this company. Read-only. Available to owner, manager, inspector and agent roles."
   },
   {
+    "operationId": "getIntegrationOverview",
+    "method": "GET",
+    "pathTemplate": "/api/integrations/overview",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "integrations",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Overview of every outside service and its source",
+    "description": "Returns one card per outside service (card payments, accounting, calendar, email, SMS, address suggestions, property facts, video, AI) with its status (connected, needs attention, not connected), its source (built-in or the company's own account) and whether the company can switch between the two. Derived from stored settings and keys with no network call. Keys are never returned, only whether they are set."
+  },
+  {
     "operationId": "getIntegrationSecrets",
     "method": "GET",
     "pathTemplate": "/api/admin/secrets",

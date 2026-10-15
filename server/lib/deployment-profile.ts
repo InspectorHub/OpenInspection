@@ -136,6 +136,15 @@ export interface DeploymentProfile {
      *  quota capability to mean the same thing. */
     providesEmailSource: boolean;
 
+    /** Whether a key set in the deployment's environment counts as the company's
+     *  OWN key for a service the company would otherwise bring itself (address
+     *  lookup, property records, calendar sync, card payments). True in standalone:
+     *  the operator runs one company and their environment variables are that
+     *  company's credentials. False in saas: an environment key belongs to the
+     *  deployment and is offered to companies as Built-in, never read as theirs.
+     *  Read this instead of comparing the mode to a literal. */
+    envCredentialsAreCompanyOwn: boolean;
+
     /** Whether the anonymous-submission surfaces (public booking, agent signup)
      *  MUST carry a bot challenge.
      *
@@ -214,6 +223,7 @@ export const STANDALONE_PROFILE: DeploymentProfile = {
     hasManagedCompliance: false,
     qboAppManaged: false,
     providesEmailSource: false,
+    envCredentialsAreCompanyOwn: true,
     botProtectionMandatory: false,
     tenantRecordOwnedByPortal: false,
     hasPortalIntegrationApi: false,
@@ -236,6 +246,7 @@ export const SAAS_PROFILE: DeploymentProfile = {
     hasManagedCompliance: true,
     qboAppManaged: true,
     providesEmailSource: true,
+    envCredentialsAreCompanyOwn: false,
     botProtectionMandatory: true,
     tenantRecordOwnedByPortal: true,
     hasPortalIntegrationApi: true,

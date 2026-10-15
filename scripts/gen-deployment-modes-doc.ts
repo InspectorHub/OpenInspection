@@ -57,6 +57,8 @@ const DESCRIPTIONS: Record<keyof DeploymentProfile, string> = {
         'Whether a platform stores the authoritative tenant record and this worker reads a projection of it. Decides which admin provider is constructed; in standalone this deployment owns the row outright.',
     providesEmailSource:
         'The deployment supplies a shared email sender that a company can choose as its email source (shown as Built-in). Absent in standalone, where the only email source is the operator own account.',
+    envCredentialsAreCompanyOwn:
+        'A key set in the deployment environment counts as the company own key for a service the company would otherwise bring itself (address lookup, property records, calendar sync, card payments). True in standalone, where the operator environment is the one company credentials; false when the deployment hosts several companies, where an environment key is offered as Built-in.',
     hasPortalIntegrationApi:
         'Whether the portal machine-to-machine surface (`/api/platform/*`) is mounted. Standalone 404s the whole prefix rather than answering on an API nobody can authenticate to.',
     hasAssistedMigration:
