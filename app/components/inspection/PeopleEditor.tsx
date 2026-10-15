@@ -110,12 +110,18 @@ export function PeopleEditor({
   people,
   roleProfiles,
   isAdmin,
+  openAddSignal = 0,
 }: {
   people: PersonRow[];
   roleProfiles: RoleProfile[];
   isAdmin: boolean;
+  /** The page bumps this to ask for the add-person dialog (the Send report dialog's hand-off). 0 means nobody asked. */
+  openAddSignal?: number;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
+  useEffect(() => {
+    if (openAddSignal > 0) setModalOpen(true);
+  }, [openAddSignal]);
   const locale = useDisplayLocale();
   const timeZone = useDisplayTimeZone();
 

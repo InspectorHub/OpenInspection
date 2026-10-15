@@ -66,10 +66,13 @@ export function SendReportModal({
   people,
   fetcher,
   onClose,
+  onAddPerson,
 }: {
   people: PersonRow[];
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
   onClose: () => void;
+  /** Close this dialog and open the page's add-person dialog. */
+  onAddPerson?: () => void;
 }) {
   const gatedSubmit = useHumanGatedSubmit();
   // Computed in a lazy initializer, which holds only because this component is
@@ -219,9 +222,16 @@ export function SendReportModal({
           )}
         </div>
 
-        <p className="pt-3 border-t border-ih-border text-[12px] text-ih-fg-3">
-          {m.inspections_hub_send_report_add_person_hint()}
-        </p>
+        <div className="pt-3 border-t border-ih-border flex items-center justify-between gap-3">
+          <p className="text-[12px] text-ih-fg-3">
+            {m.inspections_hub_send_report_add_person_hint()}
+          </p>
+          {onAddPerson && (
+            <Button type="button" variant="secondary" size="sm" className="shrink-0 whitespace-nowrap" onClick={onAddPerson}>
+              {m.inspections_hub_people_add()}
+            </Button>
+          )}
+        </div>
 
         {/* Channel — email only for now; the backend endpoint accepts no
             other channel value yet (server/lib/validations/send-report.schema.ts). */}

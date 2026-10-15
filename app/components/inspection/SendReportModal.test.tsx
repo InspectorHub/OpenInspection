@@ -109,6 +109,22 @@ describe("SendReportModal", () => {
     expect(carolCheckbox.disabled).toBe(true);
   });
 
+  it("offers an Add person button that hands off to the page without sending anything", () => {
+    const onAddPerson = vi.fn();
+    const fetcher = makeFetcher({ submit: vi.fn() } as Partial<Fetcher>);
+    render(
+      <SendReportModal people={people} fetcher={fetcher} onClose={vi.fn()} onAddPerson={onAddPerson} />,
+    );
+
+    const add = screen.getByRole("button", { name: "Add person" }) as HTMLButtonElement;
+    // A button, not a submit: inside the form a submit-type control would send the report.
+    expect(add.type).toBe("button");
+    fireEvent.click(add);
+
+    expect(onAddPerson).toHaveBeenCalledTimes(1);
+    expect(fetcher.submit).not.toHaveBeenCalled();
+  });
+
   it("submit is disabled when nothing is selected or entered", () => {
     const { container } = render(
       <SendReportModal people={people} fetcher={makeFetcher()} onClose={vi.fn()} />,

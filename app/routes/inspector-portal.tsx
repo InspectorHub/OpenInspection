@@ -782,6 +782,8 @@ export default function InspectionHubPage() {
   // never share fetchers between mutations) and a local open flag; the modal
   // component itself derives submitting/error/auto-close from the fetcher.
   const [sendReportOpen, setSendReportOpen] = useState(false);
+  // Bumped by the Send report dialog's "Add person" button; PeopleEditor opens its own dialog on each change.
+  const [addPersonSignal, setAddPersonSignal] = useState(0);
   const sendReportFetcher = useFetcher<typeof action>();
   const [sendSmsOpen, setSendSmsOpen] = useState(false);
   const sendSmsFetcher = useFetcher<typeof action>();
@@ -940,6 +942,7 @@ export default function InspectionHubPage() {
             people={people}
             roleProfiles={roleProfiles}
             isAdmin={isAdmin}
+            openAddSignal={addPersonSignal}
           />
           {peopleCard.client && (
             <Card className="p-4" id="client-sms-consent">
@@ -1352,6 +1355,10 @@ export default function InspectionHubPage() {
           people={people}
           fetcher={sendReportFetcher}
           onClose={() => setSendReportOpen(false)}
+          onAddPerson={() => {
+            setSendReportOpen(false);
+            setAddPersonSignal((n) => n + 1);
+          }}
         />
       )}
 
