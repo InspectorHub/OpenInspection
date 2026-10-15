@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import type { CapabilitySet } from './capabilities';
-import { redactMoney } from './money-redaction';
+import { redactMoney, hasMoneyField } from './money-redaction';
 import { Errors } from '../errors';
 import { capabilitiesFor } from '../middleware/require-capability';
 import type { HonoConfig } from '../../types/hono';
@@ -29,6 +29,9 @@ const MONEY_WRITE_FIELDS: readonly string[] = [
 
 /** Project a response payload for the acting user's `financial` capability. */
 export async function moneyView<T>(c: Context<HonoConfig>, payload: T): Promise<T> {
+    // Nothing to redact means no capability lookup: every request replayed from an
+    // offline package pays for each lookup it makes.
+    if (!hasMoneyField(payload)) return payload;
     return redactMoney(payload, await capabilitiesFor(c));
 }
 
@@ -44,7 +47,7 @@ export async function guardMoneyWrite<T>(
     current: Record<string, unknown> | null,
     extraFields: readonly string[] = [],
 ): Promise<T> {
-    if (body !== null && typeof body === 'object' && !Array.isArray(body)) {
+    if (body !== null && typeof body === 'object' && !Array.isArray(body) && touchesMoney(body as Record<string, unknown>, extraFields)) {
         assertMoneyWriteAllowed(await capabilitiesFor(c), body as Record<string, unknown>, current, extraFields);
     }
     return body;
@@ -85,6 +88,12 @@ export function assertMoneyWriteAllowed(
         const nested = firstNestedMoneyKey(value, fields);
         if (nested) throw Errors.FinancialRequired(nested);
     }
+}
+
+/** Whether `body` mentions a money field at all, at any depth. Only then is the caller's capability worth reading. */
+function touchesMoney(body: Record<string, unknown>, extraFields: readonly string[]): boolean {
+    const fields = new Set([...MONEY_WRITE_FIELDS, ...extraFields]);
+    return Object.entries(body).some(([key, value]) => value !== undefined && (fields.has(key) || firstNestedMoneyKey(value, fields) !== null));
 }
 
 /** Strict equality, or equal JSON for the structured policy objects a settings form resends. */

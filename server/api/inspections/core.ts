@@ -28,8 +28,7 @@ import { getDrizzle } from '../../lib/route-helpers';
 import { patchRevisionReport } from './patch-revision-report';
 import { createInspectionRoute } from './core-create-route';
 import { completeReplayedCreate } from './create-replay';
-import { moneyView, assertMoneyWriteAllowed } from '../../lib/auth/money-access';
-import { capabilitiesFor } from '../../lib/middleware/require-capability';
+import { moneyView, guardMoneyWrite } from '../../lib/auth/money-access';
 import { fireQuotaThresholdNotice, recordCreateAudit, resolveCreateInput } from './create-support';
 
 /**
@@ -227,7 +226,7 @@ const coreRoutes = createApiRouter()
 
         // Money fields need `financial`, but only a CHANGE is refused: the settings
         // form forwards its whole form, price included. Before anything else runs.
-        assertMoneyWriteAllowed(await capabilitiesFor(c), body, inspection as Record<string, unknown>);
+        await guardMoneyWrite(c, body, inspection as Record<string, unknown>);
 
         // Every soft reference this patch can dangle, plus the two status moves
         // it may not make: INTO `cancelled` (#78) and OUT of it (#81). Both live
@@ -298,7 +297,7 @@ const coreRoutes = createApiRouter()
         const body = c.req.valid('json');
         const tenantId = c.get('tenantId');
         const service = c.var.services.inspection;
-        assertMoneyWriteAllowed(await capabilitiesFor(c), body, null);
+        await guardMoneyWrite(c, body, null);
 
         // A replay of a create that named its own id (an offline device after the Idempotency-Key window):
         // answer with the existing inspection, finishing whatever the first attempt did not reach (./create-replay).

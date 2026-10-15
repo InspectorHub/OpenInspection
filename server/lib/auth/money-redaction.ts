@@ -29,6 +29,13 @@ export function isMoneyField(key: string): boolean {
     return key === 'price' || /Cents$/.test(key);
 }
 
+/** True when `value` carries a money field anywhere. Lets a caller skip the capability lookup for a payload with nothing to redact. */
+export function hasMoneyField(value: unknown): boolean {
+    if (Array.isArray(value)) return value.some(hasMoneyField);
+    if (value === null || typeof value !== 'object' || value instanceof Date) return false;
+    return Object.entries(value as Record<string, unknown>).some(([key, v]) => isMoneyField(key) || hasMoneyField(v));
+}
+
 /**
  * Recursively drop money fields unless the caller may see financial data.
  * Returns the input untouched when `financial` is granted, so the permitted
