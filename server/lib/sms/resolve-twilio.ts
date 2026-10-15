@@ -4,6 +4,9 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import type { TwilioCreds } from '../messaging/twilio';
 import type { MessagingProvider } from '../messaging/provider';
+import { getDeploymentProfile, type DeploymentProfile } from '../deployment-profile';
+import { resolveIntegrationSource, type StoredIntegrationSources } from '../integrations/sources';
+import { parseStoredIntegrationSources } from '../integrations/stored-sources';
 
 export type { TwilioCreds } from '../messaging/twilio';
 
@@ -109,6 +112,12 @@ export function resolveTwilioSource(
 
 export interface TwilioLoaderEnv {
     DB: D1Database;
+    /** Tells a hosted deployment from a self-hosted one when a source choice is stored. */
+    APP_MODE?: string;
+    /** A profile the caller already resolved (a cron job that builds this env by hand); wins over APP_MODE. */
+    profile?: DeploymentProfile;
+    /** Hosted shared-number switch; absent means off. */
+    SMS_MANAGED_SHARED_ENABLED?: string;
     TENANT_CACHE: KVNamespace;
     JWT_SECRET: string;
     JWT_SECRET_PREVIOUS?: string;
@@ -227,6 +236,41 @@ export async function loadTwilioForTenant(env: TwilioLoaderEnv, tenantId: string
     );
 }
 
+/** The strict path for a company that stored an explicit SMS source. */
+async function loadChosenSmsProvider(
+    env: TwilioLoaderEnv,
+    tenantId: string,
+    c: { sources: StoredIntegrationSources; byoProvider: 'twilio' | 'telnyx' | null; dec: Record<string, string | undefined> },
+): Promise<ResolvedProvider | null> {
+    const res = resolveIntegrationSource('sms', (env.profile ?? getDeploymentProfile(env)), {
+        sources: c.sources, smsByoProvider: c.byoProvider, ownSecrets: c.dec,
+    }, env);
+    if (res.source === 'unavailable') return null;
+    const { resolveProvider } = await import('../messaging/resolve-provider');
+    if (res.source === 'provided') {
+        const managed = await buildManagedBag(env, 'managed_shared', tenantId);
+        const creds = resolveTwilio('managed_shared', {}, {}, managed);
+        return creds ? { provider: resolveProvider('twilio', creds), from: creds.from || null, messagingServiceSid: creds.messagingServiceSid ?? null } : null;
+    }
+    if (c.byoProvider === 'telnyx') {
+        return { provider: resolveProvider('telnyx', { apiKey: c.dec['TELNYX_API_KEY']!, from: c.dec['TELNYX_FROM_NUMBER']! }), from: null };
+    }
+    // Own Twilio: the company's three keys. Self-hosted, the operator's env is
+    // the company's own and stays as the fallback; hosted, the env is the
+    // deployment's and is never consulted.
+    const operatorEnv: CredBag = (env.profile ?? getDeploymentProfile(env)).hasManagedCompliance ? {} : {
+        TWILIO_ACCOUNT_SID: env.TWILIO_ACCOUNT_SID,
+        TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
+        TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER,
+    };
+    const creds = resolveTwilio('own', {
+        TWILIO_ACCOUNT_SID: c.dec['TWILIO_ACCOUNT_SID'],
+        TWILIO_AUTH_TOKEN: c.dec['TWILIO_AUTH_TOKEN'],
+        TWILIO_FROM_NUMBER: c.dec['TWILIO_FROM_NUMBER'],
+    }, operatorEnv);
+    return creds ? { provider: resolveProvider('twilio', creds), from: creds.from || null, messagingServiceSid: null } : null;
+}
+
 export interface ResolvedProvider {
     provider: MessagingProvider;
     /** The from-number to pass to sendMessage. Null for Telnyx (provider uses its own creds internally). */
@@ -252,7 +296,7 @@ export interface ResolvedProvider {
 export async function loadProviderForTenant(env: TwilioLoaderEnv, tenantId: string): Promise<ResolvedProvider | null> {
     const db = drizzle(env.DB);
     const cfg = await db
-        .select({ smsMode: tenantConfigs.smsMode, smsByoProvider: tenantConfigs.smsByoProvider })
+        .select({ smsMode: tenantConfigs.smsMode, smsByoProvider: tenantConfigs.smsByoProvider, integrationConfig: tenantConfigs.integrationConfig })
         .from(tenantConfigs)
         .where(eq(tenantConfigs.tenantId, tenantId))
         .get()
@@ -263,6 +307,12 @@ export async function loadProviderForTenant(env: TwilioLoaderEnv, tenantId: stri
     const dec = (await loadTenantSecrets(
         env.DB, env.TENANT_CACHE, tenantId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
     ).catch(() => null)) ?? {};
+
+    // A stored source choice is strict: 'own' uses only the company's keys and
+    // 'provided' only the deployment's pool, with no fallback either way. With
+    // no stored choice everything below is the long-standing behaviour.
+    const sources = parseStoredIntegrationSources(cfg?.integrationConfig);
+    if (sources.sms) return loadChosenSmsProvider(env, tenantId, { sources, byoProvider, dec });
 
     if (byoProvider === 'telnyx') {
         // Telnyx BYO path — only available in own mode with complete keys.

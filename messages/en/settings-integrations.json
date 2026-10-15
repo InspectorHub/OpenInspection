@@ -479,5 +479,9 @@
   "settings_qbo_match_error_inactive": "That QuickBooks customer is inactive. Make it active in QuickBooks, or go back and choose a different customer.",
   "settings_qbo_match_error_not_connected": "QuickBooks is not connected right now. Reconnect on this page and try again.",
   "settings_qbo_match_error_other": "The match could not be saved. Try again in a moment.",
-  "settings_qbo_match_this_contact": "this contact"
+  "settings_qbo_match_this_contact": "this contact",
+  "integrations_source_reason_not_offered": "This source is not available for {service} here. Choose another source.",
+  "integrations_source_reason_provided_not_configured": "Built-in {service} is not set up here yet. Use Your own account instead.",
+  "integrations_source_reason_own_credentials_incomplete": "Your own {service} account is missing: {missing}. Add the missing details to connect it.",
+  "integrations_source_reason_provider_confirmation_pending": "Built-in SMS is not available yet. Use Your own account to send SMS."
 }

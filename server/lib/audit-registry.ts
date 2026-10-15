@@ -148,7 +148,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'inspection.compliance.signoff_removed': { family: 'inspection', label: 'audit_action_inspection_compliance_signoff_removed', meta: { role: 'name' }, status: { kind: 'live' } },
     'inspection.conflicts_resolved': { family: 'inspection', label: 'audit_action_inspection_conflicts_resolved', meta: {}, status: { kind: 'superseded', by: 'inspection.sync_conflict_resolved' } },
     'inspection.create': { family: 'inspection', label: 'audit_action_inspection_create', meta: { clonedFrom: 'id', propertyAddress: 'name' }, status: { kind: 'live' } },
-    'inspection.delete': { family: 'inspection', label: 'audit_action_inspection_delete', meta: { propertyAddress: 'name' }, status: { kind: 'live' } },
+    'inspection.delete': { family: 'inspection', label: 'audit_action_inspection_delete', meta: { propertyAddress: 'name', status: 'name', reportPublished: 'flag', hadInvoice: 'flag' }, status: { kind: 'live' } },
     'inspection.inspector_signed': { family: 'agreement_request', label: 'audit_action_inspection_inspector_signed', meta: {}, status: { kind: 'superseded', by: 'agreement.inspector_signed' } },
     'inspection.media.attach': { family: 'inspection', label: 'audit_action_inspection_media_attach', meta: { itemId: 'id', poolId: 'id', sectionId: 'id' }, status: { kind: 'live' } },
     'inspection.media.video.delete': { family: 'inspection', label: 'audit_action_inspection_media_video_delete', meta: { videoRef: 'id' }, status: { kind: 'live' } },

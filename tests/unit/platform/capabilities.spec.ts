@@ -104,3 +104,16 @@ describe('the pinned columns hold for every capability', () => {
         expect(flipped, 'an inspector took none of the granting overrides').toEqual([...TOGGLEABLE]);
     });
 });
+
+describe('deleteInspection', () => {
+  it('defaults on for owner, manager and inspector, off for agent', () => {
+    for (const r of ['owner', 'manager', 'inspector'] as const) expect(getCapabilities(r, null).deleteInspection).toBe(true);
+    expect(getCapabilities('agent', null).deleteInspection).toBe(false);
+  });
+  it('can be turned off for manager and inspector, never on for agent, never off for owner', () => {
+    expect(getCapabilities('manager', { deleteInspection: false }).deleteInspection).toBe(false);
+    expect(getCapabilities('inspector', { deleteInspection: false }).deleteInspection).toBe(false);
+    expect(getCapabilities('agent', { deleteInspection: true }).deleteInspection).toBe(false);
+    expect(getCapabilities('owner', { deleteInspection: false }).deleteInspection).toBe(true);
+  });
+});

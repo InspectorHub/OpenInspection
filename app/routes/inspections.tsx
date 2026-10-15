@@ -11,7 +11,7 @@ import type { WizardTeamMember } from "~/components/NewInspectionWizard";
 import { OnboardingChecklist } from "~/components/dashboard/OnboardingChecklist";
 import { SeatBanner } from "~/components/SeatBanner";
 import { QuotaBanner } from "~/components/QuotaBanner";
-import { useSessionContext, useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { useSessionContext, useDisplayTimeZone, useCapability } from "~/hooks/useSessionContext";
 import { computeOnboardingSteps } from "~/lib/onboarding-progress";
 import { getScheduleSet } from "~/lib/schedule-onboarding.server";
 import { PageHeader, TabStrip, Pill, Card, Button, Icon } from "@core/shared-ui";
@@ -547,6 +547,7 @@ export default function InspectionsPage() {
   // F55 — a deleted inspection's field data used to survive on the device
   // indefinitely; the hook clears it once the server confirms the delete.
   const purgeOfflineData = useOfflinePurgeOnDelete(fetcher);
+  const canDelete = useCapability("deleteInspection");
 
   const batchDelete = () => {
     if (selectedIds.size === 0) return;
@@ -804,7 +805,7 @@ export default function InspectionsPage() {
           <span className="text-[13px] font-bold text-ih-primary-text">
             {m.inspections_list_batch_selected({ count: selectedIds.size })}
           </span>
-          <Button variant="danger" size="sm" onClick={batchDelete}>{m.common_delete()}</Button>
+          {canDelete && <Button variant="danger" size="sm" onClick={batchDelete}>{m.common_delete()}</Button>}
           <Button variant="ghost" size="sm" className="ml-auto" onClick={selectAll}>{m.inspections_list_batch_select_all()}</Button>
           <Button variant="ghost" size="sm" onClick={clearSelection}>{m.common_clear()}</Button>
         </div>

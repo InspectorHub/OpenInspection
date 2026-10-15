@@ -45,6 +45,7 @@ export const CAPABILITY_DESCRIPTIONS: Record<Capability, string> = {
     templateEdit:      'May change an existing inspection template, including through a template migration.',
     templateDelete:    'May delete an inspection template, directly or as part of a migration.',
     templateImport:    'May bring a template in from a Spectora export or the content marketplace.',
+    deleteInspection:  'May permanently delete an inspection, its report data and its media.',
 };
 
 /**

@@ -7,7 +7,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
-import { guardPatchReschedule, guardInspectionDelete } from './core-access';
+import { guardPatchReschedule, guardInspectionDelete, deleteFacts } from './core-access';
 import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
@@ -73,7 +73,7 @@ const deleteInspectionRoute = createRoute(withMcpMetadata({
     path: '/{id}',
     tags: ["inspections"],
     summary: "Delete inspection for current tenant",
-    description: "Permanently remove an inspection record. Owner and manager can delete any inspection; an inspector only one they lead, unless granted the scheduleOthers capability; helpers and other inspectors get 403.",
+    description: "Permanently remove an inspection record. Owner and manager can delete any inspection; an inspector only one they lead, unless granted the scheduleOthers capability; helpers and other inspectors get 403. Everyone also needs the deleteInspection capability (on by default; a company can turn it off per person).",
     request: {
         params: z.object({
             id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspection id.'),
@@ -204,13 +204,16 @@ const coreRoutes = createApiRouter()
         const service = c.var.services.inspection;
         const { inspection } = await service.getInspection(id, tenantId);
 
+        // Read before the cascade: the audit record describes what was deleted.
+        const facts = await deleteFacts(c, inspection, id);
+
         // Cascade-delete every inspection-scoped row + R2 asset (D1 does not honor
         // FK cascades at runtime). Ownership verified by getInspection above.
         await deleteInspectionCascade(getDrizzle(c), c.env.PHOTOS, tenantId, id);
 
         auditFromContext(c, 'inspection.delete', 'inspection', {
             entityId: id,
-            metadata: { propertyAddress: inspection.propertyAddress },
+            metadata: { propertyAddress: inspection.propertyAddress, status: facts.status, reportPublished: facts.reportPublished, hadInvoice: facts.hadInvoice },
         });
         return c.json({ success: true }, 200);
     })

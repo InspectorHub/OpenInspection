@@ -10,7 +10,8 @@
 import { and, eq, notInArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { qboConnections } from '../../lib/db/schema/qbo';
-import { tenants } from '../../lib/db/schema/tenant/core';
+import { tenants, tenantConfigs } from '../../lib/db/schema/tenant/core';
+import { parseStoredIntegrationSources } from '../../lib/integrations/stored-sources';
 import { logger } from '../../lib/logger';
 import { InvoiceService } from '../invoice.service';
 import { QBOService } from '../qbo.service';
@@ -19,6 +20,7 @@ import { resolveQboCredentialsForTenant } from './resolve-credentials';
 /** Only what this sweep reads. `scheduled.ts`'s `ScheduledEnv` satisfies it. */
 export interface QboCronEnv {
     DB: D1Database;
+    APP_MODE?: string;
     TENANT_CACHE?: KVNamespace;
     JWT_SECRET?: string;
     JWT_SECRET_PREVIOUS?: string;
@@ -69,7 +71,13 @@ export async function runQBOCDC(env: QboCronEnv): Promise<void> {
     )).all();
 
     for (const conn of connections) {
-        const { credentials, missing } = await resolveQboCredentialsForTenant(env, conn.tenantId);
+        // The company's stored source choice, if it made one. Scoped to the
+        // connection's own tenant, like every other read in this loop.
+        const choiceRow = await db.select({ integrationConfig: tenantConfigs.integrationConfig })
+            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, conn.tenantId)).get();
+        const { credentials, missing } = await resolveQboCredentialsForTenant(
+            env, conn.tenantId, parseStoredIntegrationSources(choiceRow?.integrationConfig),
+        );
         if (!credentials) {
             // Name the tenant and the keys. "QBO not configured" was the old
             // wording and it was false for exactly the operator it hurt: they

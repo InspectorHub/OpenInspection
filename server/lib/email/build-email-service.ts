@@ -22,6 +22,9 @@ import { RecordingEmailProvider } from './providers/recording';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../db/schema';
+import { selectEmailPath, platformResendKey } from '../integrations/email-source';
+import { parseStoredIntegrationSources } from '../integrations/stored-sources';
+import type { StoredIntegrationSources } from '../integrations/sources';
 import { readTenantAi } from '../ai/load-tenant-ai';
 import { isAiKeyAttestationOnFile } from '../ai/byo-attestation';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
@@ -79,6 +82,8 @@ export interface LoadedEmailConfig {
     emailOverrides?: Map<string, TemplateOverride> | undefined;
     /** Which email provider the tenant has selected for own-mode sends (see #195). Default 'resend'. */
     emailByoProvider?: EmailByoProvider | undefined;
+    /** The company's explicit source choices, when it has made any. */
+    integrationSources?: StoredIntegrationSources | undefined;
     /**
      * Whether a complete confirmation record is on file for the tenant's OWN AI
      * key. Loaded here — not in a loader of its own — because `dbSecrets.geminiApiKey`
@@ -136,10 +141,9 @@ export function assembleTenantEmailService(
         }
     })();
 
-    const ownReady =
-        emailIdentity?.mode === 'own' &&
-        !!emailIdentity.senderEmail &&
-        selectedProviderCredsPresent;
+    const legacyOwnReady = emailIdentity?.mode === 'own' && !!emailIdentity.senderEmail && selectedProviderCredsPresent;
+    const sendPath = selectEmailPath({ env, cfg, legacyOwnReady });
+    const ownReady = sendPath.kind === 'own';
 
     let provider;
     let apiKeySentinel: string;
@@ -168,19 +172,13 @@ export function assembleTenantEmailService(
         }
         fromAddress = emailIdentity!.senderEmail!;
     } else {
-        // A tenant who selected own-mode with a non-Resend provider but whose
-        // credentials are missing/incomplete silently falls back to the platform
-        // Resend path below (different From domain/deliverability). Surface it so
-        // operators can spot a half-finished provider switch in logs; the
-        // Settings validate-on-save flow already flags this at config time.
-        if (emailIdentity?.mode === 'own' && byoProvider !== 'resend' && !selectedProviderCredsPresent) {
-            logger.warn('[email] own-mode provider creds missing — falling back to platform Resend', { provider: byoProvider });
-        }
-        // Platform/default path — byte-for-byte identical to previous behavior.
-        const platformResendKey = env.RESEND_API_KEY || dbSecrets.resendApiKey || '';
-        provider = new ResendProvider({ apiKey: platformResendKey });
-        apiKeySentinel = platformResendKey;
-        fromAddress = env.SENDER_EMAIL || emailIdentity?.senderEmail || '';
+        // Own account chosen but unusable on a deployment that supplies a shared
+        // sender: send nothing rather than charge the deployment (see email-source.ts).
+        if (sendPath.kind === 'blocked') logger.warn('[email] own source not usable — not sending', { reason: sendPath.reason, provider: byoProvider });
+        const platformKey = platformResendKey(sendPath, env, dbSecrets.resendApiKey);
+        provider = new ResendProvider({ apiKey: platformKey });
+        apiKeySentinel = platformKey;
+        fromAddress = sendPath.kind === 'blocked' ? '' : env.SENDER_EMAIL || emailIdentity?.senderEmail || '';
     }
 
     const appName = emailIdentity?.companyName || env.APP_NAME || 'OpenInspection';
@@ -334,7 +332,7 @@ export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: stri
     const emailConfigReadPromise = (async () => {
         try {
             return await drizzle(env.DB)
-                .select({ emailByoProvider: tenantConfigs.emailByoProvider, reportViewCountingEnabled: tenantConfigs.reportViewCountingEnabled })
+                .select({ emailByoProvider: tenantConfigs.emailByoProvider, reportViewCountingEnabled: tenantConfigs.reportViewCountingEnabled, integrationConfig: tenantConfigs.integrationConfig })
                 .from(tenantConfigs)
                 .where(eq(tenantConfigs.tenantId, tenantId))
                 .get();
@@ -369,6 +367,7 @@ export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: stri
     const aiKeyAttested = isAiKeyAttestationOnFile(attestationRow);
     return {
         emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider, aiKeyAttested,
+        integrationSources: parseStoredIntegrationSources(configRow?.integrationConfig),
         // A missing row is a workspace that has not switched anything off, not
         // one that switched AI off — `?? true` rather than `?? false`, and the
         // opposite reading of the attestation above on purpose: one is a

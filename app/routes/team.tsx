@@ -138,7 +138,7 @@ export default function TeamPage() {
   // rather than freezing the locale at module import.
   const TABS = [
     { id: "active", label: m.settings_team_tab_active() },
-    { id: "pending", label: m.settings_team_tab_pending() },
+    ...(canManage ? [{ id: "pending", label: m.settings_team_tab_pending() }] : []), // invitations: managers only
   ];
 
   const filtered = members.filter((m) => {
@@ -204,7 +204,7 @@ export default function TeamPage() {
       {canManage && <InviteSeatDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} />}
       <EditMemberDrawer open={editMember !== null} onClose={() => setEditMember(null)} member={editMember} />
 
-      <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
+      {TABS.length > 1 && <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />}
 
       {filtered.length === 0 ? (
         <Card>
