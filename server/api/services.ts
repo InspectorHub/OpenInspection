@@ -2,7 +2,7 @@ import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from 'zod';
 import { requireRole } from '../lib/middleware/rbac';
-import { capabilitiesFor } from '../lib/middleware/require-capability';
+import { capabilitiesFor, requireCapability } from '../lib/middleware/require-capability';
 import { redactMoney } from '../lib/auth/money-redaction';
 import {
     CreateServiceSchema, UpdateServiceSchema, ServiceResponseSchema,
@@ -51,12 +51,12 @@ export const servicesRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/discount-codes',
         tags: ["services"], summary: "Create service discount codes",
-        middleware: [requireRole('owner', 'manager')] as const,
+        middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
         request: { body: { content: { 'application/json': { schema: CreateDiscountCodeSchema.describe('The new discount code and its limits.') } } } },
         responses: { 201: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Created' } },
         operationId: "createServiceDiscountCodes",
         description: "Create a discount code for the company. The code is stored in upper case, starts active with zero uses, and can carry a use limit and an expiry time. The response is only a success flag, so list the codes to read back the new id. Nothing is written to the audit log and each call creates another code. Restricted to owners and managers."
-    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
+    }, { scopes: ['write'], tier: 'extended', capability: 'financial' })), async (c) => {
         const tenantId = c.get('tenantId');
         const data = c.req.valid('json');
         await c.var.services.service.createDiscountCode(tenantId, data);
@@ -79,7 +79,7 @@ export const servicesRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
         method: 'put', path: '/discount-codes/{id}',
         tags: ["services"], summary: "Update service discount code",
-        middleware: [requireRole('owner', 'manager')] as const,
+        middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
         request: {
             params: z.object({ id: z.string().describe('Discount code to update.') }),
             body: { content: { 'application/json': { schema: UpdateDiscountCodeSchema.describe('The discount code fields to change; omitted fields are left as they are.') } } },
@@ -87,7 +87,7 @@ export const servicesRoutes = createApiRouter()
         responses: { 200: { content: { 'application/json': { schema: DiscountCodeResponseSchema } }, description: 'Updated' } },
         operationId: "updateServiceDiscountCode",
         description: "Update a discount code. Despite the PUT verb it is a partial update: only the fields sent change, and the updated code is returned. Setting active false retires a code without deleting it, null maxUses or expiresAt removes that limit, and the use count cannot be edited. The code text is stored as sent, unlike create which upper-cases it. Returns 404 for an unknown code. Restricted to owners and managers."
-    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
+    }, { scopes: ['write'], tier: 'extended', capability: 'financial' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         const data = c.req.valid('json');
@@ -98,12 +98,12 @@ export const servicesRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
         method: 'delete', path: '/discount-codes/{id}',
         tags: ["services"], summary: "Delete service discount code",
-        middleware: [requireRole('owner', 'manager')] as const,
+        middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
         request: { params: z.object({ id: z.string().describe('Discount code to delete.') }) },
         responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
         operationId: "deleteServiceDiscountCode",
         description: "Permanently delete a discount code (a hard delete, unlike deleting a service). To stop a code being accepted while keeping its record, update it with active false instead. Returns 404 for an unknown code and nothing is written to the audit log. Restricted to owners and managers."
-    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
+    }, { scopes: ['write'], tier: 'extended', capability: 'financial' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         await c.var.services.service.deleteDiscountCode(tenantId, id);
@@ -113,12 +113,12 @@ export const servicesRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/',
         tags: ["services"], summary: "Create service for current tenant",
-        middleware: [requireRole('owner', 'manager')] as const,
+        middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
         request: { body: { content: { 'application/json': { schema: CreateServiceSchema.describe('The new catalog service.') } } } },
         responses: { 201: { content: { 'application/json': { schema: ServiceResponseSchema } }, description: 'Created' } },
         operationId: "createService",
         description: "Creates an active service in the catalog. Owner or manager only. Price is integer cents; durationMinutes, template, agreement, sort order and a per-service deposit policy are optional. Returns the created service."
-    }, { scopes: ['write'], tier: 'primary' })), async (c) => {
+    }, { scopes: ['write'], tier: 'primary', capability: 'financial' })), async (c) => {
         const tenantId = c.get('tenantId');
         const data = c.req.valid('json');
         const row = await c.var.services.service.createService(tenantId, data);
@@ -177,14 +177,14 @@ export const servicesRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
         method: 'get', path: '/{id}/pay-rules',
         tags: ["services"], summary: "List pay rules for a service",
-        middleware: [requireRole('owner', 'manager')] as const,
+        middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
         request: { params: z.object({ id: z.string().describe('Service ID') }) },
         responses: {
             200: { content: { 'application/json': { schema: PayRuleListResponseSchema } }, description: 'OK — the service default first, then per-inspector rules' },
         },
         operationId: "listServicePayRules",
         description: "Returns what inspectors earn on this catalogue service. A rule with a null userId is the service default, applied to any inspector without one of their own. An empty list means pay splits are OFF for this service: nothing is populated when an inspection is assigned.",
-    }, { scopes: ['read'], tier: 'extended' })), async (c) => {
+    }, { scopes: ['read'], tier: 'extended', capability: 'financial' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         const rows = await c.var.services.service.listPayRules(tenantId, id);
@@ -194,7 +194,7 @@ export const servicesRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/{id}/pay-rules',
         tags: ["services"], summary: "Add a pay rule to a service",
-        middleware: [requireRole('owner', 'manager')] as const,
+        middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
         request: {
             params: z.object({ id: z.string().describe('Service ID') }),
             body: { content: { 'application/json': { schema: CreatePayRuleSchema } } },
@@ -205,7 +205,7 @@ export const servicesRoutes = createApiRouter()
         },
         operationId: "createServicePayRule",
         description: "Writes what an inspector earns on this service. Percentages are BASIS POINTS (percentBps: 6000 = 60%) and fixed amounts are integer cents (amountCents) — the field name carries the unit, and the payload is strict, so a rule written in the wrong unit is refused rather than stored a hundred times too small. Omit userId for the service default. At most one default and one rule per inspector exist per service; a duplicate is 409.",
-    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
+    }, { scopes: ['write'], tier: 'extended', capability: 'financial' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         const input = c.req.valid('json');
@@ -216,7 +216,7 @@ export const servicesRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
         method: 'put', path: '/{id}/pay-rules/{ruleId}',
         tags: ["services"], summary: "Replace the rate of a pay rule",
-        middleware: [requireRole('owner', 'manager')] as const,
+        middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
         request: {
             params: z.object({
                 id: z.string().describe('Service ID'),
@@ -229,7 +229,7 @@ export const servicesRoutes = createApiRouter()
         },
         operationId: "updateServicePayRule",
         description: "Changes the rate of an existing pay rule, including switching between the three types. The inspector the rule applies to is not editable here — that would move the rule into a different uniqueness slot, so it is a delete plus a create. Editing a rule never restates pay that was already recorded: splits are a frozen record, and an explicit refresh is what re-derives them.",
-    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
+    }, { scopes: ['write'], tier: 'extended', capability: 'financial' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id, ruleId } = c.req.valid('param');
         const input = c.req.valid('json');
@@ -240,7 +240,7 @@ export const servicesRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
         method: 'delete', path: '/{id}/pay-rules/{ruleId}',
         tags: ["services"], summary: "Delete a pay rule",
-        middleware: [requireRole('owner', 'manager')] as const,
+        middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
         request: {
             params: z.object({
                 id: z.string().describe('Service ID'),
@@ -252,7 +252,7 @@ export const servicesRoutes = createApiRouter()
         },
         operationId: "deleteServicePayRule",
         description: "Removes a pay rule. Deleting the last rule on a service turns pay splits off for it — future inspections populate nothing. Splits already recorded are left alone.",
-    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
+    }, { scopes: ['write'], tier: 'extended', capability: 'financial' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id, ruleId } = c.req.valid('param');
         await c.var.services.service.deletePayRule(tenantId, id, ruleId);
@@ -262,7 +262,7 @@ export const servicesRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
         method: 'put', path: '/{id}',
         tags: ["services"], summary: "Replace service for current tenant",
-        middleware: [requireRole('owner', 'manager')] as const,
+        middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
         request: {
             params: z.object({ id: z.string().describe('Service to update.') }),
             body: { content: { 'application/json': { schema: UpdateServiceSchema.describe('The service fields to change; omitted fields are left as they are.') } } },
@@ -270,7 +270,7 @@ export const servicesRoutes = createApiRouter()
         responses: { 200: { content: { 'application/json': { schema: ServiceResponseSchema } }, description: 'OK' } },
         operationId: "replaceService",
         description: "Update a catalog service. Despite the PUT verb it is a partial update: only the fields sent change, and the updated service is returned. Sending active true reactivates a service that was deleted. Returns 404 for an unknown id. Nothing is written to the audit log. Restricted to owners and managers."
-    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
+    }, { scopes: ['write'], tier: 'extended', capability: 'financial' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         const data = c.req.valid('json');
@@ -281,12 +281,12 @@ export const servicesRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
         method: 'delete', path: '/{id}',
         tags: ["services"], summary: "Delete service for current tenant",
-        middleware: [requireRole('owner', 'manager')] as const,
+        middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
         request: { params: z.object({ id: z.string().describe('Id of the service to deactivate.') }) },
         responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
         operationId: "deleteService",
         description: "Soft-deletes a service by marking it inactive: it disappears from the catalog list but existing inspections keep their snapshotted service lines. Owner or manager only. Fails with not found for an unknown id."
-    }, { scopes: ['write'], tier: 'primary' })), async (c) => {
+    }, { scopes: ['write'], tier: 'primary', capability: 'financial' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         await c.var.services.service.deleteService(tenantId, id);

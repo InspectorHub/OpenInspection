@@ -10,6 +10,7 @@ import {
     ContactDetailResponseSchema,
 } from '../lib/validations/contact.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { moneyView } from "../lib/auth/money-access";
 
 /**
  * `contacts.id` is a TEXT column holding an opaque identifier. Every writer
@@ -237,7 +238,7 @@ const contactRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const detail = await c.var.services.contact.getContactDetail(id, tenantId);
         if (!detail) return c.json({ success: false, error: { message: 'Contact not found', code: 'NOT_FOUND' } }, 404);
-        return c.json({ success: true as const, data: detail }, 200);
+        return c.json({ success: true as const, data: await moneyView(c, detail) }, 200);
     })
     .openapi(createContactRoute, async (c) => {
         const tenantId = c.get('tenantId');

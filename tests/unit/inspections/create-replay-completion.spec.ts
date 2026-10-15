@@ -42,6 +42,9 @@ describe('POST /api/inspections replay completes an interrupted create', () => {
 
   async function seed(): Promise<Harness> {
     const created = await createHarness('saas');
+    // The body carries a per-line price override, which only a caller with `financial` may send.
+    await created.db.update(schema.users).set({ permissionOverrides: { financial: true } })
+      .where(eq(schema.users.id, INSPECTOR_ID));
     await created.db.insert(schema.templates).values({
       id: TEMPLATE_ID, tenantId: TENANT_ID, name: 'Standard', schema: { sections: [] }, version: 1, createdAt: new Date(),
     } as typeof schema.templates.$inferInsert);

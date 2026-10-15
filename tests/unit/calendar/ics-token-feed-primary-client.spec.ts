@@ -89,7 +89,11 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
         expect(res.status).toBe(200);
         const body = await res.text();
         expect(body).toContain('BEGIN:VEVENT');
-        expect(body).toContain('DESCRIPTION:Client: Jane Client | Fee: $25000');
+        expect(body).toContain('DESCRIPTION:Client: Jane Client');
+        // The company feed is one URL for the whole company, so it cannot know who is
+        // reading it and therefore never carries the fee. The 25000 seed is
+        // present on the row, which keeps this from passing on an empty fee.
+        expect(body).not.toMatch(/Fee|25000/);
     });
 
     it('no primary client at all — DESCRIPTION renders an empty client name (no legacy-column fallback)', async () => {
@@ -99,6 +103,7 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
         const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: {} } as unknown as AppEnv, makeExecCtx());
         expect(res.status).toBe(200);
         const body = await res.text();
-        expect(body).toContain('DESCRIPTION:Client:  | Fee: $25000');
+        expect(body).toContain('DESCRIPTION:Client: ');
+        expect(body).not.toContain('Fee');
     });
 });

@@ -60,6 +60,44 @@ an owner, and it cannot promote a referral agent into staff. That guarantee is
 the whole reason the agent column exists here: an outside party holds a login to
 your workspace, and this is where the ceiling on that login is nailed down.
 
+### Money visibility
+
+The `financial` capability covers every place an amount is read or written, not
+only the invoice pages. The mechanism is the same everywhere
+(`server/lib/auth/money-access.ts`, `server/lib/auth/money-redaction.ts`).
+
+**Reads.** A caller without `financial` gets the same response with every money
+field **absent**: the key is deleted, never zeroed, because a zero would read as
+a true figure. A field counts as money when it is `price` or ends in `Cents`.
+This covers the inspection record, the dashboard rows, the hub, the contact
+detail (revenue and each inspection's price), inspection requests, the service
+catalogue, event types and visits, the company settings' cancellation and
+deposit policies, the full JSON export, and the inspections CSV export (the
+price column is omitted from the header and every row). The unauthenticated
+company calendar feed carries no fee for anyone, because one URL cannot tell who
+is reading it.
+
+**Writes.** A request body that sets or changes a money field is refused with
+`403` and the code `FINANCIAL_REQUIRED`. Only a change is refused: the settings
+form forwards every field it holds, so resending the stored price is accepted.
+Creating or clearing a value counts as a change. Pricing, invoice, payout,
+pay-rule, discount-code, service-line and Stripe Connect routes require
+`financial` outright, as does every QuickBooks route.
+
+**Cancelling.** A caller without `financial` can cancel an inspection that has
+no payment, fee or refund attached. When money is involved the cancel is refused
+with `FINANCIAL_REQUIRED` and the answer carries no amount; the quote endpoint
+returns only `requiresFinancial` and a yes/no `moneyInvolved`.
+
+**What is deliberately not hidden.** `paymentStatus` is a status, not an amount,
+and stays visible. Repair-estimate figures (cost items, repair requests) belong
+to the client's repair request rather than to company revenue and are not
+redacted. The client-facing token pages show a client their own invoice and are
+out of scope. Which endpoints carry money, and how each protects it, is
+registered in `tests/unit/platform/money-surface-registry.ts`; a spec walks the
+OpenAPI document and fails when an endpoint that can return money is missing
+from that list.
+
 ### Requests without a session, and agent sessions
 
 Every path under `/api/` is refused without a session (`401`), in every deployment mode, unless it is public by design: booking, the token-link tracks (report, agreement, checkout, invoice, repair builder), sign-in and password flows, webhooks, status, and similar. The list lives in `server/lib/auth/public-paths.ts` and `server/lib/auth/api-access-policy.ts`, each exception with a one-line reason, and a spec walks every mounted route to prove a new one is either listed or refused. This matters most for a single-tenant deployment, where the tenant is resolved from configuration rather than from the session.

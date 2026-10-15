@@ -210,6 +210,7 @@
   "inspections_hub_cancel_notes_ph": "Anything worth recording about this cancellation.",
   "inspections_hub_cancel_quote_heading": "What this cancellation does",
   "inspections_hub_cancel_quote_loading": "Working out what this cancellation costs…",
+  "inspections_hub_cancel_needs_financial": "A cancellation that involves a payment, a fee or a refund needs a team member with the financial permission. Ask the owner or a manager to cancel this inspection.",
   "inspections_hub_cancel_quote_failed": "Could not work out what this cancellation costs, so nothing was cancelled. Try again.",
   "inspections_hub_cancel_quote_fee": "Fee your company keeps: {amount}",
   "inspections_hub_cancel_quote_refund": "Refunded to the client: {amount}",

@@ -61,6 +61,22 @@ export interface CancellationQuoteView {
     policyConfigured: boolean;
 }
 
+/** What the API answers a caller without the financial capability: no amounts, only whether money is attached. */
+interface CancellationQuoteRestricted {
+    requiresFinancial: true;
+    moneyInvolved: boolean;
+}
+
+/** Narrows the API's answer: a caller without the capability gets this shape, with no figures. */
+const isRestricted = (q: CancellationQuoteView | CancellationQuoteRestricted): q is CancellationQuoteRestricted =>
+    "requiresFinancial" in q && q.requiresFinancial === true;
+
+/** The quote of a cancellation with nothing collected and nothing to charge. */
+const FREE_CANCELLATION: CancellationQuoteView = {
+    feeCents: 0, refundCents: 0, reason: "client_cancelled", cappedAtCollected: false,
+    priceCents: 0, paidCents: 0, currency: "USD", retainedProcessingFeeCents: 0, policyConfigured: false,
+};
+
 export type CancellationQuoteResult =
     | { ok: true; quote: CancellationQuoteView }
     | { ok: false; error: string };
@@ -120,7 +136,15 @@ export async function loader({ request, context }: Route.LoaderArgs): Promise<Ca
             { headers: { "x-token-relay": "1" } },
         );
         if (!res.ok) return { ok: false, error: await apiErrorMessage(res, failed) };
-        const body = (await res.json()) as { data?: CancellationQuoteView };
+        const body = (await res.json()) as { data?: CancellationQuoteView | CancellationQuoteRestricted };
+        // A caller without the financial capability gets no figures. With no money
+        // attached the cancellation is plainly free, so the confirm step is offered
+        // with zero figures; with money attached it is not theirs to commit.
+        if (body.data && isRestricted(body.data)) {
+            return body.data.moneyInvolved
+                ? { ok: false, error: m.inspections_hub_cancel_needs_financial() }
+                : { ok: true, quote: FREE_CANCELLATION };
+        }
         const quote = body.data;
         // A missing payload is not "a free cancellation" — treating it as one
         // would let the UI offer a confirm button over figures it never got.

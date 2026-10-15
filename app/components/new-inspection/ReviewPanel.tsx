@@ -88,7 +88,9 @@ export function ReviewPanel({
                 {summary.services && (
                     <ReviewRow
                         label={m.newinsp_review_services()}
-                        value={`${summary.services.names.join(", ")} · ${formatPriceCents(summary.services.totalCents)}`}
+                        value={summary.services.totalCents === null
+                            ? summary.services.names.join(", ")
+                            : `${summary.services.names.join(", ")} · ${formatPriceCents(summary.services.totalCents)}`}
                         {...row("services")}
                     />
                 )}

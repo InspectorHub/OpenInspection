@@ -1,13 +1,16 @@
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { DataService } from '../services/data.service';
+import { capabilitiesFor } from '../lib/middleware/require-capability';
 
 const dataRoutes = createApiRouter()
     // GET /api/data/export/inspections — CSV download
     .get('/export/inspections', requireRole('owner', 'manager'), async (c) => {
         const tenantId = c.get('tenantId');
         const svc = new DataService(c.env.DB);
-        const csv = await svc.exportInspectionsCSV(tenantId);
+        // A manager whose `financial` capability is switched off still exports the
+        // inspections, without the price column.
+        const csv = await svc.exportInspectionsCSV(tenantId, (await capabilitiesFor(c)).financial);
         const date = new Date().toISOString().slice(0, 10);
         return new Response(csv, {
             headers: {
