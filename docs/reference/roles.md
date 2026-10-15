@@ -52,6 +52,7 @@ Nine, flippable per person on top of the role default
 | `templateEdit` | ✅ | ✅ | ✅ | ❌ |
 | `templateDelete` | ✅ | ✅ | ❌ | ❌ |
 | `templateImport` | ✅ | ✅ | ✅ | ❌ |
+| `deleteInspection` — permanently delete an inspection (an inspector only one they lead) | ✅ | ✅ | ✅ | ❌ |
 
 **Owner is never reducible and Agent is never elevated.** Both columns are
 pinned in code (`FIXED`), not merely defaulted — an override row cannot demote

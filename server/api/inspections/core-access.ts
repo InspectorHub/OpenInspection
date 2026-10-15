@@ -9,12 +9,17 @@
  *   freely; changing the assigned inspector, or touching an inspection one is not
  *   on, requires `scheduleOthers`. A body that merely repeats the stored
  *   assignee/date is not a change - the settings sheet forwards its whole form.
- * - DELETE: owner, manager, the inspection's lead, or `scheduleOthers`. A helper
- *   can edit but cannot delete the lead's job.
+ * - DELETE: needs the `deleteInspection` capability, and then owner, manager, the
+ *   inspection's lead, or `scheduleOthers`. A helper can edit but cannot delete the
+ *   lead's job.
  */
+import { and, eq } from 'drizzle-orm';
 import type { Context, Next } from 'hono';
 import { Errors } from '../../lib/errors';
 import { mayChangeSchedule, mayDeleteInspection } from '../../lib/inspection/assignment-access';
+import { capabilitiesFor } from '../../lib/middleware/require-capability';
+import { getDrizzle } from '../../lib/route-helpers';
+import { invoices } from '../../lib/db/schema';
 import { safeISODate } from '../../lib/date';
 import type { HonoConfig } from '../../types/hono';
 
@@ -44,6 +49,9 @@ export async function guardPatchReschedule(c: Context<HonoConfig>, next: Next) {
 }
 
 export async function guardInspectionDelete(c: Context<HonoConfig>, next: Next) {
+    if (!(await capabilitiesFor(c)).deleteInspection) {
+        throw Errors.Forbidden("Requires the 'deleteInspection' capability");
+    }
     if (!(await mayDeleteInspection(c, c.req.param('id') ?? ''))) {
         throw Errors.Forbidden('Only the lead inspector of this inspection can delete it');
     }
@@ -58,4 +66,23 @@ export async function guardScheduleMove(c: Context<HonoConfig>, next: Next) {
         throw Errors.Forbidden("Requires the 'scheduleOthers' capability to reassign, or to move an inspection you do not work");
     }
     return next();
+}
+
+/**
+ * What the audit record of a delete says about the inspection that is gone: its
+ * state and whether a report or an invoice existed, and nothing about the people.
+ */
+export async function deleteAuditMetadata(
+    c: Context<HonoConfig>,
+    inspection: { propertyAddress: string; status: string; reportStatus?: string | null },
+    inspectionId: string,
+): Promise<Record<string, unknown>> {
+    const invoice = await getDrizzle(c).select({ id: invoices.id }).from(invoices)
+        .where(and(eq(invoices.tenantId, c.get('tenantId')), eq(invoices.inspectionId, inspectionId))).get();
+    return {
+        propertyAddress: inspection.propertyAddress,
+        status: inspection.status,
+        reportPublished: inspection.reportStatus === 'published',
+        hadInvoice: !!invoice,
+    };
 }

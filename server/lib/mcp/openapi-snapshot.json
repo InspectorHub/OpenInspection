@@ -5998,7 +5998,7 @@
       "body": null
     },
     "summary": "Delete inspection for current tenant",
-    "description": "Permanently remove an inspection record. Owner and manager can delete any inspection; an inspector only one they lead, unless granted the scheduleOthers capability; helpers and other inspectors get 403."
+    "description": "Permanently remove an inspection record. Owner and manager can delete any inspection; an inspector only one they lead, unless granted the scheduleOthers capability; helpers and other inspectors get 403. Everyone also needs the deleteInspection capability (on by default; a company can turn it off per person)."
   },
   {
     "operationId": "deleteInspectionCostItem",

@@ -18,7 +18,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/react";
-import { createRoutesStub } from "react-router";
+import { createRoutesStub, Outlet } from "react-router";
 
 // `vi.mock` is hoisted above every import, so the spy cannot be a module-scope
 // const here — `vi.hoisted` is the one place a variable can be built early
@@ -53,9 +53,18 @@ const ONE = {
 };
 
 function renderDashboard(deleteOk: boolean) {
+    // The batch Delete button is offered only with the capability, and the page
+    // reads it from the auth layout's context, so this stub supplies one.
+    const context = { branding: { defaultLocale: "en-US", defaultTimezone: "UTC" }, user: { capabilities: { deleteInspection: true } } };
     const Stub = createRoutesStub([
+      {
+        id: "routes/auth-layout",
+        path: "/",
+        loader: () => ({ context }),
+        Component: () => <Outlet />,
+        children: [
         {
-            path: "/inspections",
+            path: "inspections",
             Component: InspectionsPage,
             loader: () => ({
                 buckets: { ...EMPTY_BUCKETS, today: [ONE] },
@@ -75,6 +84,8 @@ function renderDashboard(deleteOk: boolean) {
             }),
             action: () => ({ ok: deleteOk, intent: "delete" }),
         },
+        ],
+      },
     ]);
     return render(<Stub initialEntries={["/inspections"]} />);
 }
