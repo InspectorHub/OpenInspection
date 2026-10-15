@@ -21,6 +21,7 @@ import {
   type SWRegistrarLike,
 } from "~/lib/sw-bootstrap";
 import { ErrorState } from "~/components/ErrorState";
+import { isNetworkFailure } from "~/lib/network-error";
 import { NavProgress } from "~/components/NavProgress";
 import { ToastPortal } from "~/components/Toast";
 // i18n Phase C — active UI locale for <html lang>. Resolved ONCE in the root
@@ -152,6 +153,18 @@ export default function Root() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  // Plain English like the rest of this boundary: it can render where the locale
+  // scope is gone. A failed request is the browser not reaching the server, so the
+  // way forward is trying again, not a link that needs the same connection.
+  if (isNetworkFailure(error)) {
+    return (
+      <ErrorState
+        title="Can't reach the server"
+        message="Check your internet connection and try again."
+        action={{ label: "Try again", onClick: () => window.location.reload() }}
+      />
+    );
+  }
   if (isRouteErrorResponse(error)) {
     const is404 = error.status === 404;
     return (

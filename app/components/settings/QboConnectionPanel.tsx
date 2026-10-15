@@ -59,7 +59,7 @@ export function QboConnectionPanel({
 
   return (
     <div className="space-y-4">
-      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-6 space-y-5" aria-labelledby="qbo-conn-heading">
+      <section className="bg-ih-bg-card border border-ih-border rounded-ih-card p-6 space-y-5" aria-labelledby="qbo-conn-heading">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#2CA01C]/10" aria-hidden="true">
@@ -88,7 +88,7 @@ export function QboConnectionPanel({
         </div>
 
         {reconnect && (
-          <div className="flex items-start gap-3 rounded-lg border border-ih-watch-fg/20 bg-ih-watch-bg p-4 text-[13px] text-ih-watch-fg">
+          <div className="flex items-start gap-3 rounded-ih-card border border-ih-watch bg-ih-watch-bg p-4 text-[13px] text-ih-watch-fg">
             <svg className="mt-0.5 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -121,7 +121,7 @@ export function QboConnectionPanel({
         <hr className="border-ih-border" />
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="max-w-[56ch] text-[12.5px] text-ih-fg-3">{m.settings_qbo_disconnect_note()}</p>
+          <p className="max-w-[56ch] text-xs text-ih-fg-3">{m.settings_qbo_disconnect_note()}</p>
           {/* Quiet on purpose: ending the connection is rare and not the page's job. */}
           <Button variant="danger-link" size="sm" pending={busy} onClick={onRequestDisconnect}>
             {m.settings_qbo_disconnect()}
@@ -141,14 +141,14 @@ export function QboConnectionPanel({
       />
       {match.dialog}
 
-      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-6" aria-labelledby="qbo-matching-heading">
+      <section className="bg-ih-bg-card border border-ih-border rounded-ih-card p-6" aria-labelledby="qbo-matching-heading">
         <h2 id="qbo-matching-heading" className="text-[15px] font-bold text-ih-fg-1">
           {m.settings_qbo_matching_heading()}
         </h2>
         <p className="mt-1.5 max-w-[64ch] text-[13px] text-ih-fg-3">{m.settings_qbo_matching_desc()}</p>
         <div className="mt-4 inline-flex min-w-[200px] flex-col gap-0.5 rounded-lg border border-ih-border px-4 py-3.5">
           <span className="text-[24px] font-bold leading-tight tracking-tight text-ih-fg-1">{status.mappedCustomers}</span>
-          <span className="text-[12.5px] text-ih-fg-3">{m.settings_qbo_matching_count()}</span>
+          <span className="text-xs text-ih-fg-3">{m.settings_qbo_matching_count()}</span>
         </div>
       </section>
     </div>

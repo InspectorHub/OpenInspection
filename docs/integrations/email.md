@@ -47,11 +47,13 @@ The email system has two modes, controlled by the `email_mode` field on the comp
 
 The active provider is `email_byo_provider`, which can be `resend`, `sendgrid`, `postmark`, or `mailgun` (default: `resend`). This field is only consulted when `email_mode` is `own`.
 
-**Fallback behavior:** if `email_mode` is `own` but the selected provider's credentials are missing or incomplete, the system falls back to the platform Resend path. A partially configured company continues to send email — it does not fail silently or stop sending.
+In Settings these appear as **Built-in** (`platform`) and **Your own** (`own`); see [Integration sources](../develop/integration-sources.md).
+
+**Fallback behavior:** on a standalone (self-hosted) deployment, if `email_mode` is `own` but the selected provider's credentials are missing or incomplete, the system falls back to the operator's Resend key. On a deployment that supplies a shared sender, a company set to its own account with incomplete keys sends nothing, and an explicit **Your own** choice never falls back to the deployment's account on any deployment.
 
 This means:
-- A brand-new company always sends via the platform Resend key until you explicitly configure your own.
-- Switching to `own` mode without completing the credentials form leaves email delivery unchanged (platform path stays active).
+- A brand-new company sends via the operator's Resend key until you explicitly configure your own.
+- On a standalone deployment, switching to `own` mode without completing the credentials form leaves email delivery unchanged (the operator's key stays active).
 
 ---
 

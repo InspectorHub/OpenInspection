@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useLoaderData, Link, isRouteErrorResponse, useRouteError, useFetcher, useNavigate, useRevalidator } from "react-router";
+import { useLoaderData, Link, useRouteError, useFetcher, useNavigate, useRevalidator } from "react-router";
 import type { Route } from "./+types/inspector-portal";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -34,6 +34,7 @@ import { PublishReportModal } from "~/components/inspector-portal/PublishReportM
 import { CreateReinspectionModal } from "~/components/inspector-portal/CreateReinspectionModal";
 import { PublishNotice } from "~/components/inspector-portal/PublishNotice";
 import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEditor";
+import { RouteErrorNotice } from "~/components/RouteErrorNotice";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
 import { SendSmsModal } from "~/components/inspection/SendSmsModal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
@@ -1393,24 +1394,11 @@ export default function InspectionHubPage() {
  * error as an actionable message with a route back, instead of a blank page.
  */
 export function ErrorBoundary() {
-  const error = useRouteError();
-  const status = isRouteErrorResponse(error) ? error.status : null;
-  const message =
-    status === 404
-      ? m.inspections_hub_eb_not_found()
-      : status === 403
-        ? m.inspections_hub_eb_forbidden()
-        : m.inspections_hub_eb_generic();
-
   return (
-    <div className="max-w-[1080px] mx-auto pt-16 px-9 flex flex-col items-center gap-3 text-center">
-      <p className="text-[15px] font-bold text-ih-fg-1">{message}</p>
-      <Link
-        to="/inspections"
-        className="h-9 px-4 inline-flex items-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600"
-      >
-        {m.inspections_hub_eb_back()}
-      </Link>
-    </div>
+    <RouteErrorNotice
+      error={useRouteError()}
+      messages={{ notFound: m.inspections_hub_eb_not_found(), forbidden: m.inspections_hub_eb_forbidden(), generic: m.inspections_hub_eb_generic() }}
+      back={{ to: "/inspections", label: m.inspections_hub_eb_back() }}
+    />
   );
 }

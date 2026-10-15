@@ -54,5 +54,7 @@
   "helper_booking_window_allday_label": "Todo el día",
   "helper_booking_window_allday_detail": "Horario flexible",
   "helper_booking_window_custom_label": "Personalizado",
-  "helper_booking_window_custom_detail": "Elija una hora específica"
+  "helper_booking_window_custom_detail": "Elija una hora específica",
+  "helper_network_unreachable": "No se pudo conectar con el servidor. Revise su conexión a internet e inténtelo de nuevo.",
+  "helper_network_retry": "Reintentar"
 }

@@ -2,7 +2,7 @@
 
 Appointment reminders, report-ready notices, and the opt-in confirmations the
 consent flow depends on. Two providers; a company brings its own account, or a
-SaaS deployment can supply a managed one.
+deployment that supplies a shared sender can offer a managed one.
 
 **Sending SMS in the United States is a regulated activity, not a technical
 one.** Carrier registration, the wording of your opt-in, and quiet hours are
@@ -25,19 +25,25 @@ check against — which is also why the field will accept a wrong paste without
 complaint, so confirm it against the Telnyx portal rather than the field's
 silence.
 
-## Own, platform, managed
+## Your own, built-in, managed
 
-Three modes, resolved in `server/lib/sms/resolve-twilio.ts`, mirroring the email
+In Settings the choice is **Your own** (the company's own account) or **Built-in** (the deployment's service), as described in [Integration sources](../develop/integration-sources.md). Underneath, three modes (`own`, `platform`, `managed`), resolved in `server/lib/sms/resolve-twilio.ts`, mirroring the email
 path's own-vs-platform logic:
 
-- **Own** takes effect only when the mode is set to own **and all three** of the
+- **Own** (Your own) takes effect only when the mode is set to own **and all three** of the
   tenant's keys are present. A half-finished switch does not half-apply.
-- **Platform** uses the deployment's env credentials.
-- **Managed** (SaaS only) uses the platform's ISV credential triple plus a
+- **Platform** (Built-in, self-hosted) uses the deployment's env credentials.
+- **Managed** (only where the deployment supplies one) uses the deployment's ISV credential triple plus a
   Messaging Service SID, shared or dedicated to the tenant. All four fields must
   be truthy for this branch to fire, so a standalone deployment with no ISV
   credentials never builds a managed bag — fail-closed by construction rather
   than by a flag.
+
+On a deployment that supplies a shared number, that number is offered as the
+Built-in source only when `SMS_MANAGED_SHARED_ENABLED` is `true` or `1`. It is
+off by default, and while it is off every send that is not on the company's
+own account is refused with a reason. See
+[Integration sources](../develop/integration-sources.md).
 
 ## Every message goes through one gate chain
 

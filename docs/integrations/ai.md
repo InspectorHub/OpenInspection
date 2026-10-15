@@ -13,7 +13,7 @@ deployment did not grant.
 | `GEMINI_API_KEY` | Settings → Advanced → AI (per company) | A company using its own key |
 | `AI_MANAGED_API_KEY` | Worker env, managed deployments only | A deployment funding AI for entitled companies |
 
-A company may override the endpoint and the model per workspace (Settings →
+A company may override the endpoint and the model per company (Settings →
 Advanced → AI); the worker env values are the deployment's defaults.
 
 ## One adapter, any OpenAI-compatible backend
@@ -71,15 +71,15 @@ Resolved per call in `server/lib/ai/resolve-provider.ts`:
 
 1. **The tenant's own stored key always wins.** A company that brought a key
    uses it, whatever the deployment provides.
-2. Otherwise, in `saas` mode only, the deployment's managed key — and only for
-   tenants the deployment grants managed access to. That grant is `isPaidPlan`
-   (`server/features/plan-quota/policy.ts`), the single predicate every
-   platform-funded capability reads.
+2. Otherwise, where the deployment supplies its own key (multi-company mode
+   only), that key — and only for companies the deployment has granted access
+   to. The deployment decides the grant; see
+   [Integration sources](../develop/integration-sources.md).
 3. In `standalone` there is no managed path at all. It is absent by
    construction, not disabled by a flag.
 
-An entitled tenant on a deployment that never provisioned `AI_MANAGED_API_KEY`
-gets the feature **off**, not a runtime credential error.
+A company that has been granted access on a deployment that never provisioned
+`AI_MANAGED_API_KEY` gets the feature **off**, not a runtime credential error.
 
 ## Metering, and why it is split
 

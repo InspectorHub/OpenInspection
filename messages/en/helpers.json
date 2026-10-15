@@ -54,5 +54,7 @@
   "helper_booking_window_allday_label": "All Day",
   "helper_booking_window_allday_detail": "Flexible timing",
   "helper_booking_window_custom_label": "Custom",
-  "helper_booking_window_custom_detail": "Pick a specific time"
+  "helper_booking_window_custom_detail": "Pick a specific time",
+  "helper_network_unreachable": "Can't reach the server. Check your internet connection and try again.",
+  "helper_network_retry": "Try again"
 }

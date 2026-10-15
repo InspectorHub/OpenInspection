@@ -60,7 +60,7 @@ Before anything leaves, in this order (**E2**):
    it fails closed; there is no compiled-in default.
 3. **The allowance pre-flight** — read-only, and only for platform-funded calls.
 4. **The provenance write** — a row in `ai_call_provenance` recording provider,
-   credential source, model, prompt version and the workspace's AI configuration
+   credential source, model, prompt version and the company's AI configuration
    version. It is awaited, so a sink that cannot write stops the send rather
    than letting content leave untracked. `provider` is read off the adapter
    instance that is about to run, so the row names the backend that actually
@@ -73,7 +73,7 @@ response, never before.
 
 ⚠️ **THE DESTINATION IS NOW CONFIGURABLE, AND THIS SECTION NO LONGER NAMES ONE
 VENDOR.** It used to describe a single hard-wired endpoint. It cannot any more:
-the operator sets `AI_BASE_URL`, and a workspace may override it for itself.
+the operator sets `AI_BASE_URL`, and a company may override it for itself.
 Answering "where does our inspection text go" therefore requires reading this
 deployment's configuration — the code alone cannot tell you.
 
@@ -88,8 +88,8 @@ Authorization: Bearer {apiKey}
 
 `{base}` is, in precedence order (`server/lib/ai/resolve-provider.ts`, **E2**):
 
-1. `tenant_configs.ai_base_url` — the workspace's own endpoint, read **only**
-   on the workspace's own key. A workspace with no key of its own cannot
+1. `tenant_configs.ai_base_url` — the company's own endpoint, read **only**
+   on the company's own key. A company with no key of its own cannot
    redirect a platform-funded call.
 2. `AI_BASE_URL` — the deployment default.
 
@@ -119,13 +119,13 @@ headers are added (**E2**):
   because a dashboard toggle can be changed back by anyone and nothing would
   report it. Metadata, token counts, cost and duration survive; the payload
   does not.
-- `cf-aig-metadata: {"tenant_id": …}`. A workspace identifier, so gateway cost
-  is attributable. **This is the one place a workspace identifier leaves the
+- `cf-aig-metadata: {"tenant_id": …}`. A company identifier, so gateway cost
+  is attributable. **This is the one place a company identifier leaves the
   process**, it goes only to that gateway, and it never accompanies a request
-  to a workspace's own provider.
+  to a company's own provider.
 
 The host test is anchored on the parsed hostname, so a look-alike domain does
-not receive either header. A direct connection — a workspace's own provider, or
+not receive either header. A direct connection — a company's own provider, or
 a self-hosted deployment's endpoint — carries neither, and does not involve any
 gateway at all.
 
@@ -172,12 +172,12 @@ configuration means, not what any deployment is set to.
 Credentials are resolved per call by `server/lib/ai/resolve-provider.ts`
 (**E2**):
 
-- A workspace's **own** stored key always wins, in every deployment mode.
-- A **deployment-provided** key (`AI_MANAGED_API_KEY`) may serve a workspace
-  where `profile.hasManagedAi` is true and the deployment grants that workspace
+- A company's **own** stored key always wins, in every deployment mode.
+- A **deployment-provided** key (`AI_MANAGED_API_KEY`) may serve a company
+  where `profile.hasManagedAi` is true and the deployment grants that company
   managed access. A deployment that never provisioned such a key resolves the
   feature OFF rather than raising a credential error mid-report.
-- A self-hosted deployment has no managed path at all — the workspace's own key
+- A self-hosted deployment has no managed path at all — the company's own key
   or nothing.
 
 A deployment-provided credential comes in **two shapes**, and which one is in
@@ -192,14 +192,14 @@ authenticated (**E2**):
   and never leaves the process; neither it, the assertion, nor the token is
   logged or included in any error message.
 
-A workspace never supplies a credential of the second shape — that is
+A company never supplies a credential of the second shape — that is
 deployment configuration. **A deployment credential that is missing or
 unusable resolves the feature OFF**, rather than raising an error partway
 through a report, and the refusal is reported as the deployment's to fix and
-never as a question about the workspace's own key.
+never as a question about the company's own key.
 
 The two paths are metered apart (`ai_*` versus `ai_*_byo`) so the volume a
-deployment funds is never confused with the volume a workspace funds.
+deployment funds is never confused with the volume a company funds.
 
 ## 3. What is in the text, prompt by prompt
 
@@ -291,7 +291,7 @@ been. Releasing it is an edit to that table, reviewed as a product decision.
 
 | field | source | free text? |
 |---|---|---|
-| `pages` | text extracted from a PDF the workspace uploaded, one string per page | **yes** |
+| `pages` | text extracted from a PDF the company uploaded, one string per page | **yes** |
 
 Three facts about that single field, because it is the whole prompt:
 
@@ -341,7 +341,7 @@ provider id, prompt version, timestamp. **The prompt text is not stored** — no
 truncated, not hashed, not the first line. The entry type has no field that
 could carry it, which is the enforcement rather than a policy. **E2.**
 
-`usage_counters` holds a count per workspace, per metric, per calendar month.
+`usage_counters` holds a count per company, per metric, per calendar month.
 Counts only, no content. **E2.**
 
 ## 5. The terms the endpoint is subject to
@@ -381,7 +381,7 @@ not imply it and neither does the model's behaviour.
 
 ### What the stored attestation is, and is not
 
-`tenant_configs.ai_key_attestation_*` records what the workspace **stated**
+`tenant_configs.ai_key_attestation_*` records what the company **stated**
 when it saved its own key: the provider, the endpoint, the model, the service
 tier, the intended use, and the `ai_config_version` those statements were made
 about.
@@ -397,7 +397,7 @@ speaks by observation: `provider` is read off the adapter instance that was
 about to be called, never off configuration. `config_version` joins the two, so
 a stored claim and the calls it was supposed to cover can be **compared** — an
 attestation whose `ai_key_attestation_config_version` trails
-`ai_config_version` is a workspace that changed its destination after
+`ai_config_version` is a company that changed its destination after
 attesting. Reading a row in either table as evidence of the other is the misuse
 to avoid.
 
@@ -407,9 +407,9 @@ before:
 1. **A deployment-provided key must be confirmed as paid-tier by a person**,
    once, before it is provisioned, and that confirmation recorded as evidence.
    No code path can re-check it later.
-2. **A workspace's own key is the workspace's own responsibility.** The
+2. **A company's own key is the company's own responsibility.** The
    deployment cannot see that key's tier either. This is why the
-   bring-your-own-key path asks a workspace to confirm what its own provider
+   bring-your-own-key path asks a company to confirm what its own provider
    account permits before the key may be used.
 3. **A key silently downgraded** — billing removed from the project — keeps
    working and starts falling under the unpaid terms, with nothing in this

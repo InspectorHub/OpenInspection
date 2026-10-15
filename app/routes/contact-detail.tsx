@@ -1,4 +1,4 @@
-import { useLoaderData, Link, isRouteErrorResponse, useRouteError } from "react-router";
+import { useLoaderData, Link, useRouteError } from "react-router";
 import type { Route } from "./+types/contact-detail";
 import { useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { requireToken } from "~/lib/session.server";
@@ -15,6 +15,7 @@ import { ContactQboSection } from "~/components/contacts/ContactQboSection";
 import { loadContactQbo, runContactQboIntent } from "~/lib/contact-qbo.server";
 import { PageHeader, Card, Pill, EmptyState } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { RouteErrorNotice } from "~/components/RouteErrorNotice";
 
 export function meta() {
   return [{ title: m.contacts_detail_meta_title() }];
@@ -332,24 +333,11 @@ function BlockHeading({ title }: { title: string }) {
  * as an actionable message with a route back, instead of a blank page.
  */
 export function ErrorBoundary() {
-  const error = useRouteError();
-  const status = isRouteErrorResponse(error) ? error.status : null;
-  const message =
-    status === 404
-      ? m.contacts_error_not_found()
-      : status === 403
-        ? m.contacts_error_forbidden()
-        : m.contacts_error_generic();
-
   return (
-    <div className="max-w-[1080px] mx-auto pt-16 px-9 flex flex-col items-center gap-3 text-center">
-      <p className="text-[15px] font-bold text-ih-fg-1">{message}</p>
-      <Link
-        to="/contacts"
-        className="h-9 px-4 inline-flex items-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600"
-      >
-        {m.contacts_detail_back()}
-      </Link>
-    </div>
+    <RouteErrorNotice
+      error={useRouteError()}
+      messages={{ notFound: m.contacts_error_not_found(), forbidden: m.contacts_error_forbidden(), generic: m.contacts_error_generic() }}
+      back={{ to: "/contacts", label: m.contacts_detail_back() }}
+    />
   );
 }
