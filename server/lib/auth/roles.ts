@@ -4,7 +4,7 @@
  * than re-declaring string literals, so a role add/rename/remove is a one-line
  * change with the compiler flagging every stale callsite.
  */
-export const ROLES = ['owner', 'manager', 'inspector', 'agent'] as const;
+export const ROLES = ['owner', 'manager', 'inspector', 'staff', 'agent'] as const;
 
 export type Role = typeof ROLES[number];
 
@@ -12,6 +12,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   owner:     'Owner',
   manager:   'Manager',
   inspector: 'Inspector',
+  staff:     'Staff',
   agent:     'Agent',
 };
 
@@ -25,6 +26,7 @@ export const ROLE = {
   OWNER:     'owner',
   MANAGER:   'manager',
   INSPECTOR: 'inspector',
+  STAFF:     'staff',
   AGENT:     'agent',
 } as const satisfies Record<string, Role>;
 
@@ -60,4 +62,40 @@ const ADMIN_ROLES: ReadonlySet<string> = new Set<Role>([ROLE.OWNER, ROLE.MANAGER
 
 export function isAdminRole(role: string | null | undefined): boolean {
   return role != null && ADMIN_ROLES.has(role);
+}
+
+/**
+ * The tier a role is evaluated as by `requireRole`. `staff` (office user who
+ * does not inspect) sits at the inspector tier, so every existing
+ * `requireRole('owner', 'manager', 'inspector')` gate admits it without being
+ * edited, and any gate that omits `inspector` keeps it out. The differences
+ * between staff and an inspector are expressed as capabilities
+ * (`editReports`, ...).
+ */
+export const ROLE_TIER: Record<Role, Role> = {
+  owner:     ROLE.OWNER,
+  manager:   ROLE.MANAGER,
+  inspector: ROLE.INSPECTOR,
+  staff:     ROLE.INSPECTOR,
+  agent:     ROLE.AGENT,
+};
+
+/** Roles that can be assigned as the inspector on a job (booking, availability, assignment). */
+export const FIELD_ROLES = [ROLE.OWNER, ROLE.MANAGER, ROLE.INSPECTOR] as const;
+
+/** Whether a stored role string names a role that can be the inspector on a job. */
+export function isFieldRole(role: string | null | undefined): boolean {
+  return role != null && (FIELD_ROLES as readonly string[]).includes(role);
+}
+
+/** Roles that may sign in to the offline-first native client: the field roles, plus staff. */
+export const NATIVE_APP_ROLES = [...FIELD_ROLES, ROLE.STAFF] as const;
+
+/**
+ * The one place that decides whether a role occupies a member seat. Staff are
+ * office users and do not; every other role does. Seat accounting reads this
+ * function and nothing else.
+ */
+export function countsTowardSeatQuota(role: Role): boolean {
+  return role !== ROLE.STAFF;
 }

@@ -184,4 +184,28 @@ describe('requireSeatAvailable middleware', () => {
         // Payload carries used/max/billingPortalUrl per middleware contract.
         expect(body.error.details).toMatchObject({ used: 10, max: 10 });
     });
+
+    describe('role of the person being invited', () => {
+        const post = (app: ReturnType<typeof makeApp>, body: string) =>
+            app.request('/invite', { method: 'POST', headers: { 'content-type': 'application/json' }, body }, { DB: {} } as never);
+        const FULL = { used: 10, members: 10, max: 10, remaining: 0, pendingInvites: 0 };
+
+        it('lets a staff invitation through at the limit without reading usage', async () => {
+            const res = await post(makeApp(SAAS_PROFILE), JSON.stringify({ email: 'a@b.test', role: 'staff' }));
+            expect(res.status).toBe(200);
+            expect(vi.mocked(getSeatUsage)).not.toHaveBeenCalled();
+        });
+
+        it('still refuses a manager invitation at the limit (control)', async () => {
+            vi.mocked(getSeatUsage).mockResolvedValueOnce(FULL);
+            const res = await post(makeApp(SAAS_PROFILE), JSON.stringify({ email: 'a@b.test', role: 'manager' }));
+            expect(res.status).toBe(402);
+        });
+
+        it('fails closed when the body cannot be read', async () => {
+            vi.mocked(getSeatUsage).mockResolvedValueOnce(FULL);
+            const res = await post(makeApp(SAAS_PROFILE), '{not json');
+            expect(res.status).toBe(402);
+        });
+    });
 });

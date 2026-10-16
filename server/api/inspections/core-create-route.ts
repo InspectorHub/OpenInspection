@@ -1,7 +1,7 @@
 // POST /api/inspections. Split out of core.ts at the file-size ceiling; the
 // handler stays beside its siblings in core.ts.
 import { createRoute, z } from '@hono/zod-openapi';
-import { requireRole } from '../../lib/middleware/rbac';
+import { requireRole, denyStaff } from '../../lib/middleware/rbac';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import { CreateInspectionSchema, InspectionSchema } from '../../lib/validations/inspection.schema';
@@ -24,7 +24,7 @@ export const createInspectionRoute = createRoute(withMcpMetadata({
             },
         },
     },
-    middleware: [requireRole('owner', 'manager', 'inspector')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff],
     responses: {
         200: {
             content: {

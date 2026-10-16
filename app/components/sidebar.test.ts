@@ -89,6 +89,37 @@ describe('Sidebar', () => {
     expect(hidden.some((i) => i.to === '/inspections')).toBe(true);
   });
 
+  it('hides Invoices without companyFinance: the invoice list is refused to anyone else', () => {
+    const invoices = WORKSPACE_ITEMS.find((i) => i.to === '/invoices');
+    expect(invoices?.capability).toBe('companyFinance');
+    expect(visibleNavItems(WORKSPACE_ITEMS, { companyFinance: false }, 'staff').some((i) => i.to === '/invoices')).toBe(false);
+    expect(visibleNavItems(WORKSPACE_ITEMS, { companyFinance: true }, 'owner').some((i) => i.to === '/invoices')).toBe(true);
+  });
+
+  it('hides Metrics from staff, who have no figures of their own, and keeps it for an inspector', () => {
+    const staff = visibleNavItems(WORKSPACE_ITEMS, { companyFinance: false }, 'staff');
+    expect(staff.some((i) => i.to === '/metrics')).toBe(false);
+    // An inspector without companyFinance still reads their own row, so Metrics stays.
+    const inspector = visibleNavItems(WORKSPACE_ITEMS, { companyFinance: false }, 'inspector');
+    expect(inspector.some((i) => i.to === '/metrics')).toBe(true);
+    // No role known (context missing) must not hide an entry the capability rules allow.
+    expect(visibleNavItems(WORKSPACE_ITEMS, {}, undefined).some((i) => i.to === '/metrics')).toBe(true);
+  });
+
+  it('keeps what staff do use: inspections, calendar, dispatch, messages, contacts', () => {
+    const staff = visibleNavItems(WORKSPACE_ITEMS, { scheduleOthers: true, companyFinance: false }, 'staff').map((i) => i.to);
+    for (const to of ['/inspections', '/calendar', '/calendar/dispatch', '/messages', '/contacts']) {
+      expect(staff).toContain(to);
+    }
+  });
+
+  it('both nav surfaces pass the role', async () => {
+    for (const mod of ['~/components/Sidebar?raw', '~/components/sidebar/MobileDrawer?raw']) {
+      const src = await import(/* @vite-ignore */ mod);
+      expect((src as unknown as { default: string }).default).toContain('visibleNavItems(WORKSPACE_ITEMS, capabilities, ctx?.user?.role)');
+    }
+  });
+
   it('fails CLOSED when the session context is missing', () => {
     for (const capabilities of [null, undefined, {}]) {
       const items = visibleNavItems(WORKSPACE_ITEMS, capabilities);

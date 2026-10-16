@@ -80,6 +80,7 @@
   "label_cap_template_delete": "Delete templates",
   "label_cap_template_import": "Import templates",
   "label_cap_delete_inspection": "Delete inspections",
+  "label_cap_edit_reports": "Edit report content",
   "label_doccategory_prior_reports": "Prior Reports",
   "label_doccategory_plans_drawings": "Plans & Drawings",
   "label_doccategory_environmental": "Environmental",

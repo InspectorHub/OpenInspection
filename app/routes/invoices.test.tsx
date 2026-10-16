@@ -218,3 +218,15 @@ describe("/invoices — IA-97", () => {
     expect(voidBtn).toHaveLength(1);
   });
 });
+
+describe("/invoices - viewer without the finance capability", () => {
+  it("shows the no-permission notice and no ledger controls", async () => {
+    const Stub = createRoutesStub([
+      { path: "/invoices", Component: InvoicesPage, loader: () => ({ invoices: [], inspections: [], payments: [], loadFailed: false, forbidden: true }) },
+    ]);
+    const { findByText, queryByText } = render(<Stub initialEntries={["/invoices"]} />);
+    expect(await findByText(/permission/i)).toBeTruthy();
+    expect(await findByText(/have access to this page/i)).toBeTruthy();
+    expect(queryByText("New Invoice")).toBeNull();
+  });
+});

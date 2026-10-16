@@ -9,7 +9,7 @@
 // definitions are byte-identical to the original (only their location changed).
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { requireRole } from '../../lib/middleware/rbac';
+import { requireRole, denyStaff } from '../../lib/middleware/rbac';
 import { requireCapability } from '../../lib/middleware/require-capability';
 import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, resolveTenantSlug } from '../../lib/url';
@@ -39,7 +39,7 @@ const completeInspectionRoute = createRoute(withMcpMetadata({
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('Inspection id.') }),
     },
-    middleware: [requireRole('owner', 'manager', 'inspector')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff],
     responses: {
         200: {
             content: {
@@ -52,7 +52,7 @@ const completeInspectionRoute = createRoute(withMcpMetadata({
         400: { description: 'The inspection is cancelled. Bring it back with POST /{id}/uncancel first (#81).' },
     },
     operationId: "completeInspection",
-    description: "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection."
+    description: "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection. Staff get 403."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -225,7 +225,7 @@ const reinspectRoute = createRoute(withMcpMetadata({
     path: '/{id}/reinspect',
     tags: ['inspections'],
     summary: 'Create a re-inspection from this (published) baseline report',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff] as const,
     request: {
         params: z.object({ id: z.string().describe('Baseline inspection id (original or a prior re-inspection; must be published).') }),
         body: { content: { 'application/json': { schema: CreateReinspectionSchema } } },
@@ -235,7 +235,7 @@ const reinspectRoute = createRoute(withMcpMetadata({
         400: { description: 'Baseline not published / invalid' },
     },
     operationId: 'createReinspection',
-    description: 'Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report.',
+    description: 'Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report. Staff get 403.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**

@@ -938,7 +938,7 @@
           "inspections"
         ],
         "summary": "Patch inspection for current tenant",
-        "description": "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields.",
+        "description": "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields. Staff may change only the date and the assigned inspector (scheduleOthers applies as for anyone); a body naming any other field gets 403.",
         "operationId": "patchInspection",
         "parameters": [
           {
@@ -1097,7 +1097,7 @@
         ],
         "summary": "Complete inspection for current tenant",
         "operationId": "completeInspection",
-        "description": "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection.",
+        "description": "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection. Staff get 403.",
         "parameters": [
           {
             "schema": {

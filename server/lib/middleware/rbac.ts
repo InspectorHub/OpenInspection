@@ -1,6 +1,6 @@
 import type { Context, Next } from 'hono';
 import { Errors } from '../errors';
-import type { Role } from '../auth/roles';
+import { ROLE_TIER, type Role } from '../auth/roles';
 import type { HonoConfig } from '../../types/hono';
 
 /**
@@ -22,9 +22,23 @@ export const requireRole = (...roles: Role[]) => {
   return async (c: Context<HonoConfig>, next: Next) => {
     const userRole = c.get('userRole');
     if (!userRole) throw Errors.Unauthorized('No role found in context');
-    if (!allowed.has(userRole)) {
+    // Staff is evaluated at the inspector tier. A role with no tier
+    // entry matches nothing, so it fails closed.
+    if (!allowed.has(userRole) && !allowed.has(ROLE_TIER[userRole])) {
       throw Errors.Forbidden(`Requires one of [${roles.join(', ')}]`);
     }
     return next();
   };
+};
+
+/**
+ * Refuse `staff` on a route that `requireRole('owner', 'manager', 'inspector')`
+ * would otherwise admit through the staff role's inspector tier. Staff is an
+ * office role: it moves and reassigns jobs, but it does not create, copy or
+ * delete them, and it does not edit their other fields. Put this AFTER
+ * `requireRole` in a route's middleware list.
+ */
+export const denyStaff = async (c: Context<HonoConfig>, next: Next) => {
+  if (c.get('userRole') === 'staff') throw Errors.Forbidden('Staff cannot do this');
+  return next();
 };

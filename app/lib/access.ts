@@ -27,6 +27,16 @@ export function isOwnerRole(role: string | null | undefined): boolean {
 }
 
 /**
+ * The office role: schedules, reassigns, manages contacts and messages and sends
+ * reports, but does not create inspections, change anything on one except its
+ * date and inspector, or see company finances. The server enforces each of
+ * those; this only lets a screen stop offering a control that would answer 403.
+ */
+export function isStaffRole(role: string | null | undefined): boolean {
+  return role === ROLE.STAFF;
+}
+
+/**
  * Loader-side guard: returns a serialisable flag a company-only route can
  * return from its loader. The route component renders <AccessDenied/> first
  * when `forbidden` is true. One helper, called by every guarded loader (DRY).

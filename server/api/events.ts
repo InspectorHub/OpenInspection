@@ -79,6 +79,11 @@ const eventsRoutes = createApiRouter()
         // it. `visitActions` (app/components/inspector-portal/VisitsCard.tsx)
         // declines to OFFER the verb; this is where it is ENFORCED, so a
         // hand-rolled request cannot walk around the UI.
+        // Staff are the office: they schedule visits but never change a visit's
+        // status (completing or cancelling one moves the job), whatever the value.
+        if (c.get('userRole') === 'staff') {
+            throw Errors.Forbidden('Staff cannot change the status of a visit');
+        }
         if (parsed.data.status === 'results_received' && !isAdminRole(c.get('userRole'))) {
             throw Errors.Forbidden('Requires one of [owner, manager]');
         }

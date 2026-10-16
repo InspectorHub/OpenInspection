@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/invoices";
 import { requireToken } from "~/lib/session.server";
+import { requireCapabilityLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, StatCard, Button, EmptyState, Table, Banner, Modal } from "@core/shared-ui";
 import { formatCurrency, formatDate } from "~/lib/format";
@@ -36,7 +38,9 @@ type InvoiceRow = {
 };
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  // Company finance: refuse instead of showing an empty ledger (reads as "nothing is owed").
+  const { forbidden, token } = await requireCapabilityLoader(context, request, "companyFinance");
+  if (forbidden) return { invoices: [] as InvoiceRow[], inspections: [] as InspectionOption[], payments: [] as PaymentRow[], loadFailed: false, forbidden: true as const };
   // `?payments=<invoiceId>` asks for one invoice's ledger as well as the list.
   // A query parameter rather than a second route: the modal needs the refreshed
   // BALANCE alongside the rows, and the balance lives on the invoice list.
@@ -66,6 +70,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       inspections,
       payments: (payBody.data ?? []) as PaymentRow[],
       loadFailed: false,
+      forbidden: false as const,
     };
   } catch {
     // IA-118 — an empty ledger says nothing is outstanding. That is a claim
@@ -75,6 +80,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       inspections: [] as InspectionOption[],
       payments: [] as PaymentRow[],
       loadFailed: true,
+      forbidden: false as const,
     };
   }
 }
@@ -200,7 +206,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function InvoicesPage() {
-  const { invoices, inspections, loadFailed } = useLoaderData<typeof loader>();
+  const { invoices, inspections, loadFailed, forbidden } = useLoaderData<typeof loader>();
   // #106 — mark-paid and void both change what an invoice says about money, so
   // they go out through the guard. `fetcher` is still read here for `formData`
   // (the optimistic row disable) and `data` (the failure banner).
@@ -262,6 +268,8 @@ export default function InvoicesPage() {
     if (!submit({ intent: "mark-paid", id, method }, { method: "post" })) return;
     setPickerFor(null);
   }
+
+  if (forbidden) return <AccessDenied title={m.access_denied_title_neutral()} />;
 
   return (
     <div className="space-y-ih-list">

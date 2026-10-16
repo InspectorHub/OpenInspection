@@ -2766,7 +2766,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
 | `tenant_id` | text | NN UQ IX FK→`tenants.id` |  |  | *Tenant isolation key. Every read and write must filter on it.* |
 | `email` | text | NN UQ |  |  |  |
-| `role` | text | NN | `'inspector'` | `owner, manager, inspector, agent` | The role the invitee GETS: `joinTeam` copies it straight onto users.role, for a brand-new row and for a reactivated soft-deleted one alike, and emits it on the `user.invited` outbox event that drives portal seat sync. |
+| `role` | text | NN | `'inspector'` | `owner, manager, inspector, staff, agent` | The role the invitee GETS: `joinTeam` copies it straight onto users.role, for a brand-new row and for a reactivated soft-deleted one alike, and emits it on the `user.invited` outbox event that drives portal seat sync. |
 | `status` | text | NN | `'pending'` | `pending, accepted` | Schema Rules: state-machine column declares its enum (type-layer only). |
 | `expires_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `permission_overrides` | text |  |  |  | `mentor_id` and `assigned_section_ids` were here, mirroring the columns of the same name on `users` so an invite could carry them through accept. **[more]** |
@@ -2933,7 +2933,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `default_signature_base64` | text |  |  |  | Spec 5H D2 — saved signature used for auto-sign on publish + Settings prefill. |
 | `is_signature_enabled` | integer | NN | `true` |  | 2026-06-14 — per-inspector opt-in for the business-card email footer (independent of Point of Contact). |
 | `slug` | text | UQ |  |  | FROZEN for inspectors (2026-06-06, DB-12/IA-26): the per-inspector booking slug is retired — /book/:tenant is the canonical public entry and no inspector-facing route writes this column anymore. **[more]** |
-| `role` | text | NN | `'manager'` | `owner, manager, inspector, agent` | DDL default is FROZEN (D1 cannot alter column defaults without a table rebuild and users is FK-referenced). |
+| `role` | text | NN | `'manager'` | `owner, manager, inspector, staff, agent` | DDL default is FROZEN (D1 cannot alter column defaults without a table rebuild and users is FK-referenced). |
 | `onboarding_state` | text |  |  |  | Sparse map of one-time UI flags — an ABSENT key means "not done yet", so a NULL column is simply a fresh account and nothing has to backfill it. |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
 | `totp_secret` | text |  |  |  | Spec 4A — TOTP 2FA. All fields are per-user opt-in; nullable until enabled. |

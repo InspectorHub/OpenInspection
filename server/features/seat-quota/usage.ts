@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, gt, isNull, ne } from 'drizzle-orm';
 import { tenantInvites, tenants, users } from '../../lib/db/schema';
-import { computeSeatsHeld } from '../../lib/middleware/seat-guard';
+import { computeSeatsHeld, computeSeatsUsed } from '../../lib/middleware/seat-guard';
 
 /**
  * Tenant seat-quota usage snapshot.
@@ -89,7 +89,7 @@ export async function getSeatUsage(
     // Every member counts as one seat. Defer to the shared pure helper so
     // settings-billing and the invite middleware all agree on "used".
     const rows = await drizzleDb
-        .select({ id: users.id })
+        .select({ id: users.id, role: users.role })
         .from(users)
         .where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt)));
 
@@ -106,11 +106,17 @@ export async function getSeatUsage(
         inviteConditions.push(ne(tenantInvites.id, opts.excludeInviteId));
     }
     const outstanding = await drizzleDb
-        .select({ id: tenantInvites.id })
+        .select({ id: tenantInvites.id, role: tenantInvites.role })
         .from(tenantInvites)
         .where(and(...inviteConditions));
 
     const used = computeSeatsHeld(rows, outstanding);
     const remaining = max === null ? Number.POSITIVE_INFINITY : Math.max(0, max - used);
-    return { used, members: rows.length, max, remaining, pendingInvites: outstanding.length };
+    return {
+        used,
+        members: computeSeatsUsed(rows),
+        max,
+        remaining,
+        pendingInvites: computeSeatsUsed(outstanding),
+    };
 }

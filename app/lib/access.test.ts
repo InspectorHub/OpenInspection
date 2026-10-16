@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { isAdminRole, assertAdminOrForbidden } from "~/lib/access";
+import { isAdminRole, isStaffRole, assertAdminOrForbidden } from "~/lib/access";
 
 describe("isAdminRole", () => {
   it("owner is admin", () => expect(isAdminRole("owner")).toBe(true));
@@ -21,5 +21,14 @@ describe("assertAdminOrForbidden", () => {
     expect(assertAdminOrForbidden("agent")).toEqual({ forbidden: true });
     expect(assertAdminOrForbidden(undefined)).toEqual({ forbidden: true });
     expect(assertAdminOrForbidden(null)).toEqual({ forbidden: true });
+  });
+});
+
+describe("isStaffRole", () => {
+  it("is true for staff only", () => {
+    expect(isStaffRole("staff")).toBe(true);
+    for (const role of ["owner", "manager", "inspector", "agent", "", undefined, null]) {
+      expect(isStaffRole(role)).toBe(false);
+    }
   });
 });

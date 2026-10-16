@@ -7,6 +7,7 @@ import { requireCapability } from '../lib/middleware/require-capability';
 import { exportPayroll } from '../services/pay-split.service';
 import { PayrollExportSchema, PayrollRunResponseSchema } from '../lib/validations/pay-split.schema';
 import { requireSeatAvailable } from '../features/seat-quota';
+import { assertSeatForRoleChange } from '../features/seat-quota/role-change-guard';
 import { inviteAcceptUrl } from '../lib/url';
 import { auditFromContext } from '../lib/audit';
 import { assertMayTouchOwner } from '../lib/auth/owner-guard';
@@ -122,7 +123,7 @@ const updateTeamMemberRoute = createRoute(withMcpMetadata({
     path: '/members/{id}',
     tags: ["team"],
     summary: 'Update a team member\'s role or permissions',
-    description: 'Changes role and/or capability overrides for an active member. A role change also invalidates the member\'s sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Only an owner may change an owner or promote anyone to owner.',
+    description: 'Changes role and/or capability overrides for an active member. A role change also invalidates the member\'s sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Only an owner may change an owner or promote anyone to owner. Moving a staff member to a role that holds a seat is refused (402) when no seat is free under the seat limit.',
     middleware: [requireRole('manager', 'owner')],
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('The member\'s user id.') }),
@@ -314,6 +315,14 @@ const teamRoutes = createApiRouter()
         const user = c.get('user');
         const { id: memberId } = c.req.valid('param');
         const body = c.req.valid('json');
+
+        // Moving staff onto a role that holds a seat takes a seat.
+        if (body.role) {
+            await assertSeatForRoleChange({
+                tenantId, userId: memberId, nextRole: body.role, db: c.env.DB,
+                seatQuota: { enforce: c.var.profile.hasSeatQuota, billingPortalUrl: c.var.profile.billingPortalUrl },
+            });
+        }
 
         await c.var.services.team.updateMember({
             tenantId,

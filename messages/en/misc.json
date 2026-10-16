@@ -166,6 +166,7 @@
   "template_combobox_clear": "--- Clear selection ---",
   "template_combobox_load_more": "Load more",
   "access_denied_title": "Admins only",
+  "access_denied_title_neutral": "You don’t have access to this page",
   "access_denied_body": "You don’t have permission to view this page.",
   "breadcrumb_aria": "Breadcrumb",
   "template_menu_template": "Template",

@@ -26,7 +26,8 @@ export class TeamService {
      * @param outbox Optional core->portal user-sync sink (SaaS-only; wired in
      *   di.ts when the portal binding is present, undefined in standalone). Used
      *   to emit `user.deleted` when a member is removed so the portal identity's
-     *   membership for this workspace is dropped. Guarded by `if (this.outbox)`,
+     *   membership for this workspace is dropped, and `user.role_changed` when a
+     *   member's role moves. Guarded by `if (this.outbox)`,
      *   so standalone never touches portal code.
      * @param kv Optional session-invalidation KV (same binding as
      *   AuthService's `TENANT_CACHE`). Used by `removeMember` to write a
@@ -304,6 +305,16 @@ export class TeamService {
                         error: err instanceof Error ? err.message : String(err),
                     });
                 }
+            }
+
+            // Mirror the new role to the other side of the seam, after the
+            // security-critical invalidation above. SaaS-only: no-op when the
+            // outbox is undefined. Sent only when the role moved.
+            if (this.outbox) {
+                await this.outbox.append({
+                    type: 'user.role_changed',
+                    payload: { tenantId, email: user.email, role: nextRole },
+                });
             }
         }
 

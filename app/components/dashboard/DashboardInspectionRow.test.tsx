@@ -38,7 +38,11 @@ const INSPECTION = {
   defectStats: { safety: 0, recommendation: 0, maintenance: 0 },
 } as unknown as Inspection;
 
-function renderRow(price: number | null, status = "requested") {
+function renderRow(
+  price: number | null,
+  status = "requested",
+  access: { canChangeStatus?: boolean; canOpenEditor?: boolean } = {},
+) {
   const Stub = createRoutesStub([
     {
       path: "/",
@@ -51,6 +55,7 @@ function renderRow(price: number | null, status = "requested") {
           toggleSelect={() => {}}
           transitionStatus={() => {}}
           timeZone="UTC"
+          {...access}
         />
       ),
     },
@@ -153,5 +158,45 @@ describe("DashboardInspectionRow — recovery is a control, not a status pick", 
     const { container } = renderRow(0, "cancelled");
     const button = restoreButton(container);
     expect(button?.closest(".opacity-0")).toBeNull();
+  });
+});
+
+/**
+ * An office user (staff) reschedules and reassigns; the server answers 403 to
+ * any status write and the editor is where report content is written. The row
+ * must not offer either, while an inspector (the defaults) still gets both.
+ */
+describe("DashboardInspectionRow - controls an office user is not offered", () => {
+  const editorLink = (container: HTMLElement) =>
+    container.querySelector('a[href="/inspections/i-1/edit"]');
+
+  it("renders no status dropdown when the viewer cannot change status", () => {
+    const { container } = renderRow(0, "scheduled", { canChangeStatus: false });
+    expect(container.querySelector("select")).toBeNull();
+  });
+
+  it("POSITIVE CONTROL - the default viewer (an inspector) still gets the dropdown", () => {
+    const { container } = renderRow(0, "scheduled");
+    expect(container.querySelector("select")).not.toBeNull();
+  });
+
+  it("still shows the status as a pill when the dropdown is withheld", () => {
+    const { getByText } = renderRow(0, "scheduled", { canChangeStatus: false });
+    expect(getByText("scheduled")).toBeTruthy();
+  });
+
+  it("renders no editor link when the viewer cannot write report content", () => {
+    expect(editorLink(renderRow(0, "scheduled", { canOpenEditor: false }).container)).toBeNull();
+  });
+
+  it("POSITIVE CONTROL - the default viewer still gets the editor link", () => {
+    expect(editorLink(renderRow(0, "scheduled").container)).not.toBeNull();
+  });
+
+  it("a cancelled row offers no Restore to a viewer who cannot change status (staff)", () => {
+    // POST /:id/uncancel answers 403 for staff; the status still shows.
+    const { container } = renderRow(0, "cancelled", { canChangeStatus: false });
+    expect(restoreButton(container)).toBeUndefined();
+    expect(container.querySelector("select")?.value).toBe("cancelled");
   });
 });

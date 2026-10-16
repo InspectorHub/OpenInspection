@@ -24,7 +24,8 @@ export function InspectionsEmptyState({
     totalAll: number;
     filters: ListFilterState;
     onClearFilters: () => void;
-    onCreate: () => void;
+    /** Absent for a viewer who cannot create inspections (staff): the empty state then offers no button. */
+    onCreate?: () => void;
 }) {
     const count = activeListFilters(filters).length;
 
@@ -51,11 +52,13 @@ export function InspectionsEmptyState({
         <EmptyState
             icon={<Icon name="check" size={32} />}
             title={m.inspections_list_empty_title()}
-            description={m.inspections_list_empty_desc()}
+            description={onCreate ? m.inspections_list_empty_desc() : undefined}
             action={
-                <Button variant="primary" size="sm" icon={<Icon name="plus" size={14} />} onClick={onCreate}>
-                    {m.inspections_list_action_new()}
-                </Button>
+                onCreate ? (
+                    <Button variant="primary" size="sm" icon={<Icon name="plus" size={14} />} onClick={onCreate}>
+                        {m.inspections_list_action_new()}
+                    </Button>
+                ) : undefined
             }
         />
     );

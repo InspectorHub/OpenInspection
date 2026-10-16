@@ -44,6 +44,7 @@ import { InspectionsFocusBar } from "~/components/dashboard/InspectionsFocusBar"
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useColumnPredicates } from "~/lib/dashboard-visible-columns";
 import { m } from "~/paraglide/messages";
+import { isStaffRole } from "~/lib/access";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 // Re-exported for unit tests (tests/web import these from ~/routes/inspections).
@@ -548,6 +549,11 @@ export default function InspectionsPage() {
   // indefinitely; the hook clears it once the server confirms the delete.
   const purgeOfflineData = useOfflinePurgeOnDelete(fetcher);
   const canDelete = useCapability("deleteInspection");
+  // Staff move and reassign jobs but do not create them; the server refuses the create either way.
+  const canCreate = !(sessionCtx !== null && isStaffRole(sessionCtx.user.role));
+  // Same rule for the row's status dropdown (a status PATCH is refused for staff) and the editor link (report content).
+  const canChangeStatus = canCreate;
+  const canOpenEditor = useCapability("editReports");
 
   const batchDelete = () => {
     if (selectedIds.size === 0) return;
@@ -676,6 +682,8 @@ export default function InspectionsPage() {
       toggleSelect={toggleSelect}
       transitionStatus={transitionStatus}
       timeZone={displayTz}
+      canChangeStatus={canChangeStatus}
+      canOpenEditor={canOpenEditor}
     />
   );
 
@@ -742,9 +750,7 @@ export default function InspectionsPage() {
                 {m.inspections_list_action_export()}
               </Button>
             )}
-            <Button variant="primary" size="sm" icon={<Icon name="plus" size={14} />} onClick={() => navigate("/inspections/new")}>
-              {m.inspections_list_action_new()}
-            </Button>
+            {canCreate && <Button variant="primary" size="sm" icon={<Icon name="plus" size={14} />} onClick={() => navigate("/inspections/new")}>{m.inspections_list_action_new()}</Button>}
           </>
         }
       />
@@ -753,7 +759,8 @@ export default function InspectionsPage() {
       {!listTooShortToNarrow && <InspectionsStatCards counts={counts} targets={STAT_TARGETS} />}
 
       {/* IA-12 — Onboarding checklist (hidden when dismissed or allDone) */}
-      <OnboardingChecklist
+      {/* Setup steps belong to whoever creates inspections; an office user has none to take. */}
+      {canCreate && <OnboardingChecklist
         steps={onboardingSteps}
         dismissed={checklistDismissed}
         onDismiss={() => {
@@ -764,7 +771,7 @@ export default function InspectionsPage() {
           );
         }}
         onOpenWizard={() => navigate("/inspections/new")}
-      />
+      />}
 
       {/* Everything that narrows a list, hidden while there is no list. */}
       {!listTooShortToNarrow && (<>
@@ -824,7 +831,7 @@ export default function InspectionsPage() {
             totalAll={allInspections.length}
             filters={listFilterState}
             onClearFilters={clearAllFilters}
-            onCreate={() => navigate("/inspections/new")}
+            onCreate={canCreate ? () => navigate("/inspections/new") : undefined}
           />
         </Card>
       ) : filteredBuckets ? (

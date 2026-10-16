@@ -27,6 +27,7 @@ export function OrderDetailsCard({
     referralSources,
     referredByContactId,
     referredByName,
+    canEdit = true,
 }: {
     closingDate: string | null;
     referenceNumber: string | null;
@@ -34,6 +35,8 @@ export function OrderDetailsCard({
     referralSources: string[];
     referredByContactId: string | null;
     referredByName: string | null;
+    /** False for a viewer the API refuses these fields (an office user): the facts show, the Edit button does not. */
+    canEdit?: boolean;
 }) {
     const [open, setOpen] = useState(false);
     // #106 - this writes the order's own fields. `searchFetcher` below stays a
@@ -105,9 +108,11 @@ export function OrderDetailsCard({
                 <Row label={m.inspections_hub_details_closing()} value={closingDate} />
             </dl>
             {error && <p className="text-[12px] text-ih-bad-fg mb-2">{error}</p>}
-            <Button variant="secondary" size="sm" onClick={() => setOpen(true)} pending={saving}>
-                {m.inspections_hub_details_edit()}
-            </Button>
+            {canEdit && (
+                <Button variant="secondary" size="sm" onClick={() => setOpen(true)} pending={saving}>
+                    {m.inspections_hub_details_edit()}
+                </Button>
+            )}
 
             <Modal open={open} onClose={() => setOpen(false)} title={m.inspections_hub_details_edit()}>
                 <form

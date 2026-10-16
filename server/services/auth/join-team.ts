@@ -109,7 +109,7 @@ export async function joinTeam(
     // Before the hash, before the acceptance statements, before the token
     // is burned — a refusal here must leave the invite reusable once a seat
     // is freed.
-    await assertSeatAvailableForJoin(invite.tenantId, deps.db, seatQuota, token);
+    await assertSeatAvailableForJoin(invite.tenantId, deps.db, seatQuota, token, invite.role);
 
     const passwordHash = await hashPassword(password);
     const trimmedName = name?.trim();

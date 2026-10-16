@@ -25,11 +25,18 @@ export function GateToggle({
     checked,
     label,
     testId,
+    canEdit = true,
 }: {
     field: "agreementRequired" | "paymentRequired";
     checked: boolean;
     label: string;
     testId?: string;
+    /**
+     * False for a viewer whose order edits the API refuses (an office user may
+     * change only the date and inspector). The switch is then not rendered: a
+     * read-only checkbox would still invite the click.
+     */
+    canEdit?: boolean;
 }) {
     // #106 — the toggle writes an order-level gate; it goes through the guard.
     // The checkbox ignores changes (aria-disabled) while in flight, so the guard
@@ -45,6 +52,8 @@ export function GateToggle({
             : checked;
 
     const failed = fetcher.state === "idle" && fetcher.data?.intent === "save-order" && !fetcher.data.ok;
+
+    if (!canEdit) return null;
 
     return (
         <div className="mt-4 pt-3 border-t border-ih-border">

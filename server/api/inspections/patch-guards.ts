@@ -36,9 +36,10 @@
  * none of them. `POST /:id/uncancel` does all three, so it is the one door back
  * and this one points at it.
  */
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users } from '../../lib/db/schema';
+import { FIELD_ROLES } from '../../lib/auth/roles';
 import {
     refuseCancelViaStatusWrite,
     refuseLeaveCancelledViaStatusWrite,
@@ -104,10 +105,12 @@ export async function findPatchRefusal(
                 eq(users.id, body.inspectorId),
                 eq(users.tenantId, tenantId),
                 isNull(users.deletedAt),
+                // Staff work the office, not the field.
+                inArray(users.role, [...FIELD_ROLES]),
             ))
             .limit(1).get();
         if (!member) {
-            return { code: 'INVALID_INSPECTOR', message: 'inspectorId is not a member of this tenant' };
+            return { code: 'INVALID_INSPECTOR', message: 'inspectorId is not a member of this tenant who can inspect' };
         }
     }
 

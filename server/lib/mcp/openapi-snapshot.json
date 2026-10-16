@@ -920,7 +920,7 @@
       }
     },
     "summary": "Cancel inspection for current tenant",
-    "description": "Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged."
+    "description": "Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged. Available to owner, manager and inspector roles; staff get 403."
   },
   {
     "operationId": "cancelTeamInvite",
@@ -1040,7 +1040,7 @@
       "body": null
     },
     "summary": "Clone inspection for current tenant",
-    "description": "Creates a new inspection as a copy of an existing one. The copy gets a new id, today's date and time, status draft and payment status unpaid; every other column of the source record is carried over as stored, and the source's client and agent links and its lead and helper assignments are copied onto it. Findings, photos and reports are not copied by this route. Counts as one new inspection against the company's plan quota, and a quota-threshold notice may be sent when the limit is approached. Records an inspection.create audit entry noting the source id. Not idempotent: each call makes another copy. Responds 404 if the source is missing. Available to owner, manager and inspector roles."
+    "description": "Creates a new inspection as a copy of an existing one. The copy gets a new id, today's date and time, status draft and payment status unpaid; every other column of the source record is carried over as stored, and the source's client and agent links and its lead and helper assignments are copied onto it. Findings, photos and reports are not copied by this route. Counts as one new inspection against the company's plan quota, and a quota-threshold notice may be sent when the limit is approached. Records an inspection.create audit entry noting the source id. Not idempotent: each call makes another copy. Responds 404 if the source is missing. Available to owner, manager and inspector roles; staff get 403."
   },
   {
     "operationId": "cloneRatingSystem",
@@ -1116,7 +1116,7 @@
       "body": null
     },
     "summary": "Complete inspection for current tenant",
-    "description": "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection."
+    "description": "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection. Staff get 403."
   },
   {
     "operationId": "completeTwoFactorLogin",
@@ -4530,7 +4530,7 @@
       "body": null
     },
     "summary": "Bring a cancelled inspection back to scheduled",
-    "description": "Returns a mistakenly-cancelled inspection to `scheduled`, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
+    "description": "Returns a mistakenly-cancelled inspection to `scheduled`, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. Staff get 403. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
   },
   {
     "operationId": "createInspectionUnits",
@@ -4649,7 +4649,7 @@
       }
     },
     "summary": "Create an inspection from the 4-step NewInspectionWizard",
-    "description": "Creates an inspection from the new-inspection wizard payload (property, services, schedule and team) and returns the new inspection id. The signed-in user becomes the inspector and the scheduled date and start time are combined into the inspection date. The client is not collected here: the inspection is created with the placeholder client name Private Client and no contact details, so attach a client afterwards. The services list is validated but this route does not use it to create anything. Property type and commercial subtype (only honoured for commercial) are applied after creation. When team mode is on, the lead defaults to the signed-in user and the helpers are assigned; when it is off, any lead or helpers sent are ignored and the creator is the sole assignee. Counts against the company's plan quota. Unlike the plain create route it responds 200, not 201. Available to owner, manager and inspector roles."
+    "description": "Creates an inspection from the new-inspection wizard payload (property, services, schedule and team) and returns the new inspection id. The signed-in user becomes the inspector, unless their role cannot inspect (staff), in which case the inspection starts unassigned unless team mode names a lead; a named lead or helper must be a member who can inspect (400 otherwise). The scheduled date and start time are combined into the inspection date. The client is not collected here: the inspection is created with the placeholder client name Private Client and no contact details, so attach a client afterwards. The services list is validated but this route does not use it to create anything. Property type and commercial subtype (only honoured for commercial) are applied after creation. When team mode is on, the lead defaults to the signed-in user and the helpers are assigned; when it is off, any lead or helpers sent are ignored and the creator is the sole assignee. Counts against the company's plan quota. Unlike the plain create route it responds 200, not 201. Available to owner, manager and inspector roles; staff get 403."
   },
   {
     "operationId": "createInspectorCredential",
@@ -5147,7 +5147,7 @@
       }
     },
     "summary": "Create a re-inspection from this (published) baseline report",
-    "description": "Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report."
+    "description": "Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report. Staff get 403."
   },
   {
     "operationId": "createRepairList",
@@ -5998,7 +5998,7 @@
       "body": null
     },
     "summary": "Delete inspection for current tenant",
-    "description": "Permanently remove an inspection record. Owner and manager can delete any inspection; an inspector only one they lead, unless granted the scheduleOthers capability; helpers and other inspectors get 403. Everyone also needs the deleteInspection capability (on by default; a company can turn it off per person)."
+    "description": "Permanently remove an inspection record. Owner and manager can delete any inspection; an inspector only one they lead, unless granted the scheduleOthers capability; helpers and other inspectors get 403. Everyone also needs the deleteInspection capability (on by default; a company can turn it off per person). Staff always get 403."
   },
   {
     "operationId": "deleteInspectionCostItem",
@@ -11091,7 +11091,7 @@
       "body": null
     },
     "summary": "List inspection inspectors for current tenant",
-    "description": "Lists every user account of the company, not only users with the inspector role, for assignee pickers: id, email, role, creation time, and whether a calendar is connected and when it last synced. Owners, managers and inspectors are all included; pending invitations are not. Not paginated. Read-only. Available to owner and manager roles, and to inspectors who have been granted the scheduleOthers capability; other inspectors get 403."
+    "description": "Lists the user accounts of the company who can be assigned as an inspector, for assignee pickers: id, email, role, creation time, and whether a calendar is connected and when it last synced. Owners, managers and inspectors are included; staff accounts and pending invitations are not. Not paginated. Read-only. Available to owner and manager roles, and to inspectors who have been granted the scheduleOthers capability; other inspectors get 403."
   },
   {
     "operationId": "listInspectionMedia",
@@ -13558,7 +13558,7 @@
       }
     },
     "summary": "Patch inspection for current tenant",
-    "description": "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields."
+    "description": "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields. Staff may change only the date and the assigned inspector (scheduleOthers applies as for anyone); a body naming any other field gets 403."
   },
   {
     "operationId": "patchInspectionComplianceDocReviewItem",
@@ -17926,7 +17926,7 @@
       }
     },
     "summary": "Reschedule and/or reassign one inspection",
-    "description": "Moves an inspection to a precise instant and optionally changes who works it. Owner and manager, and inspectors granted the scheduleOthers capability, can move any inspection and reassign it; an inspector on the inspection (lead or helper) can move its date but not change who works it; other inspectors get 403. The epoch-millisecond start is authoritative; the civil date is derived from it in the tenant timezone. Returns 409 when the tenant booking_conflict_policy is \"block\" and the resulting assignment overlaps existing work."
+    "description": "Moves an inspection to a precise instant and optionally changes who works it. Owner and manager, and inspectors granted the scheduleOthers capability, can move any inspection and reassign it; an inspector on the inspection (lead or helper) can move its date but not change who works it; other inspectors get 403. Staff move and reassign with scheduleOthers, which they hold by default. The epoch-millisecond start is authoritative; the civil date is derived from it in the tenant timezone. Returns 409 when the tenant booking_conflict_policy is \"block\" and the resulting assignment overlaps existing work."
   },
   {
     "operationId": "resendTeamInvite",
@@ -23022,7 +23022,7 @@
       }
     },
     "summary": "Update a team member's role or permissions",
-    "description": "Changes role and/or capability overrides for an active member. A role change also invalidates the member's sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Only an owner may change an owner or promote anyone to owner."
+    "description": "Changes role and/or capability overrides for an active member. A role change also invalidates the member's sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Only an owner may change an owner or promote anyone to owner. Moving a staff member to a role that holds a seat is refused (402) when no seat is free under the seat limit."
   },
   {
     "operationId": "updateTenantAgreement",

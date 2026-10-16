@@ -236,3 +236,19 @@ describe("MetricsPage service mix", () => {
     await findByText(/No service data yet/i);
   });
 });
+
+describe("MetricsPage - viewer with no figures (staff)", () => {
+  it("shows the no-permission notice instead of an empty dashboard", async () => {
+    const Stub = createRoutesStub([
+      {
+        path: "/metrics",
+        Component: MetricsPage,
+        loader: () => ({ data: null, findings: null, range: { from: "2026-04-29", to: "2026-07-29" }, forbidden: true }),
+      },
+    ]);
+    const { findByText, queryByRole } = render(<Stub initialEntries={["/metrics"]} />);
+    expect(await findByText(/permission/i)).toBeTruthy();
+    expect(await findByText(/have access to this page/i)).toBeTruthy();
+    expect(queryByRole("heading", { name: "Metrics" })).toBeNull();
+  });
+});

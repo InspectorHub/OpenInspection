@@ -13,6 +13,7 @@ import { webhookIngressGuard } from './lib/middleware/webhook-ingress';
 import { enforceTenantActive } from './lib/middleware/tenant-status-guard';
 import { inspectorPaletteMiddleware } from './lib/middleware/inspector-palette';
 import { touchLastActiveMiddleware } from './lib/middleware/touch-last-active';
+import { registerReportAuthoringGuard } from './lib/inspection/report-authoring-guard';
 import { tenantRouter } from './features/tenant-routing';
 import { diMiddleware } from './lib/middleware/di';
 import { checkRateLimit } from './lib/rate-limit';
@@ -275,7 +276,6 @@ app.use('*', agentTermsGate);
 export const idempotencyGuard = idempotencyMiddleware();
 app.use('*', idempotencyGuard);
 
-
 // Secrets UI — load encrypted integration secrets from DB and merge into
 // c.env. Tenant comes from the JWT (authed API) or tenantRouter (standalone /
 // public slug paths) — see the ORDERING note above. Worker env vars take
@@ -297,6 +297,7 @@ app.use('*', inspectorPaletteMiddleware);
 // so TeamStrip's "last active Nm ago" pill stays accurate without hammering
 // D1 on every fetch.
 app.use('/api/*', touchLastActiveMiddleware);
+registerReportAuthoringGuard(app);
 
 // API Routes
 
@@ -537,7 +538,6 @@ app.get('/doc', async (c) => {
     c.header('Cache-Control', 'public, max-age=3600');
     return c.json(openApiDocument);
 });
-
 
 // Swagger UI moved to a React Router route (GET /ui -> app/routes/docs.tsx) so hono
 // renders no browser pages. The OpenAPI document is still served here at /doc above.

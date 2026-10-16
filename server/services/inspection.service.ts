@@ -190,7 +190,7 @@ export class InspectionService {
      */
     async createFromWizard(
         tenantId: string,
-        creatorUserId: string,
+        creatorUserId: string | null,
         input: import('../lib/validations/wizard.schema').CreateInspectionFromWizardInput,
     ): Promise<{ id: string }> {
         return this.core.createFromWizard(tenantId, creatorUserId, input);

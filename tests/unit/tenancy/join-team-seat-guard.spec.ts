@@ -78,9 +78,9 @@ describe('joinTeam seat guard', () => {
         });
     }
 
-    async function seedInvite(token: string, email: string) {
+    async function seedInvite(token: string, email: string, role: 'inspector' | 'staff' | 'manager' = 'inspector') {
         await testDb.insert(tenantInvites).values({
-            id: token, tenantId: 't1', email, role: 'inspector',
+            id: token, tenantId: 't1', email, role,
             status: 'pending', expiresAt: new Date(Date.now() + 1_000_000), invitedBy: 'u1',
         } as any);
     }
@@ -154,6 +154,23 @@ describe('joinTeam seat guard', () => {
         // exclusion is one invitation wide and not a disabled check.
         await expect(auth.joinTeam('tok-self', 'password123', { seatQuota: ENFORCED }))
             .resolves.toBeTruthy();
+    });
+
+    it('admits a staff invitation at the cap, because staff hold no seat', async () => {
+        await seedMember('u1');
+        await seedMember('u2');           // max_users = 2, both active -> full
+        await seedInvite('tok-staff', 'office@example.com', 'staff');
+
+        await expect(auth.joinTeam('tok-staff', 'password123', { seatQuota: ENFORCED })).resolves.toBeTruthy();
+    });
+
+    it('still refuses a manager invitation at the cap (control for the staff case)', async () => {
+        await seedMember('u1');
+        await seedMember('u2');
+        await seedInvite('tok-manager', 'boss@example.com', 'manager');
+
+        await expect(auth.joinTeam('tok-manager', 'password123', { seatQuota: ENFORCED }))
+            .rejects.toMatchObject({ code: ErrorCode.SEAT_LIMIT_REACHED });
     });
 
     it('admits the join when a seat is free', async () => {

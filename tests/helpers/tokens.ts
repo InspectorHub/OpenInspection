@@ -17,7 +17,7 @@ import { sign } from 'hono/jwt';
 const DEV_SECRET = process.env.JWT_SECRET ?? 'fallback_secret_for_local_dev';
 
 export interface TokenPayload {
-  role?: 'admin' | 'inspector' | 'viewer' | 'agent';
+  role?: 'admin' | 'inspector' | 'agent';
   tenantId?: string;
   sub?: string;
   exp?: number; // unix seconds

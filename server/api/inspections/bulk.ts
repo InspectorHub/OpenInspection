@@ -16,7 +16,8 @@ import {
     InspectionCountsSchema,
     DashboardResponseSchema,
 } from '../../lib/validations/inspection.schema';
-import { inspections as inspectionTable } from '../../lib/db/schema';
+import { inspections as inspectionTable, users } from '../../lib/db/schema';
+import { FIELD_ROLES, isFieldRole } from '../../lib/auth/roles';
 import { syncInspectionAssignmentsBatch } from '../../lib/db/assignment-links';
 import { findScheduleConflicts } from '../../lib/schedule-conflicts';
 import { refuseCancelViaStatusWrite, refuseLeaveCancelledViaStatusWrite } from './cancel-write-path';
@@ -124,7 +125,7 @@ const listInspectorsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listInspectionInspectors",
-    description: "Lists every user account of the company, not only users with the inspector role, for assignee pickers: id, email, role, creation time, and whether a calendar is connected and when it last synced. Owners, managers and inspectors are all included; pending invitations are not. Not paginated. Read-only. Available to owner and manager roles, and to inspectors who have been granted the scheduleOthers capability; other inspectors get 403."
+    description: "Lists the user accounts of the company who can be assigned as an inspector, for assignee pickers: id, email, role, creation time, and whether a calendar is connected and when it last synced. Owners, managers and inspectors are included; staff accounts and pending invitations are not. Not paginated. Read-only. Available to owner and manager roles, and to inspectors who have been granted the scheduleOthers capability; other inspectors get 403."
 }, { scopes: ['read'], tier: 'extended', capability: 'scheduleOthers' }));
 
 /**
@@ -283,15 +284,26 @@ const bulkRoutes = createApiRouter()
     .openapi(listInspectorsRoute, async (c) => {
         const service = c.var.services.admin;
         const { members } = await service.getMembers(c.get('tenantId'));
-        return c.json({ success: true, data: members }, 200);
+        // The picker offers people who can be assigned; staff cannot.
+        return c.json({ success: true, data: members.filter((m) => isFieldRole(m.role)) }, 200);
     })
     .openapi(bulkUpdateRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
         const db = getDrizzle(c);
 
+        // Staff reassign (a schedule act, gated by scheduleOthers above) but do not
+        // change the status of an inspection.
+        if (c.get('userRole') === 'staff' && body.action !== 'assignInspector') {
+            throw Errors.Forbidden('Staff can reassign inspections but cannot change their status');
+        }
+
         if (body.action === 'assignInspector') {
             if (!body.inspectorId) throw Errors.BadRequest('inspectorId is required for assignInspector.');
+            const assignee = await db.select({ id: users.id }).from(users)
+                .where(and(eq(users.id, body.inspectorId), eq(users.tenantId, tenantId), inArray(users.role, [...FIELD_ROLES])))
+                .limit(1).get();
+            if (!assignee) throw Errors.BadRequest('inspectorId is not a member of this tenant who can inspect.');
             // DB-8: fetch team fields BEFORE the update so the link-table mirror
             // carries the ids being reassigned.
             const affected = await db.select({

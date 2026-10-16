@@ -20,6 +20,16 @@ interface DashboardInspectionRowProps {
   /** Viewer's effective zone (useDisplayTimeZone in the owning route). Required:
    *  an omitted zone renders scheduled times in whatever zone the browser is in. */
   timeZone: string;
+  /**
+   * Whether the viewer may write the inspection's status. False for an office
+   * user (staff), whose only writes on an inspection are its date and inspector:
+   * the API answers 403 to a status PATCH, a restore or a cancel, so neither the
+   * dropdown nor Restore is offered.
+   * Defaults to true so a caller that does not say keeps today's behaviour.
+   */
+  canChangeStatus?: boolean;
+  /** Whether the viewer may write report content (`editReports`); false hides the editor link. */
+  canOpenEditor?: boolean;
 }
 
 /* ---- Render inspection row ---- */
@@ -34,6 +44,8 @@ export function DashboardInspectionRow({
   toggleSelect,
   transitionStatus,
   timeZone,
+  canChangeStatus = true,
+  canOpenEditor = true,
 }: DashboardInspectionRowProps) {
   const locale = useDisplayLocale();
   const currency = useDisplayCurrency();
@@ -120,15 +132,17 @@ export function DashboardInspectionRow({
       </Link>
       {/* Hover actions: open editor + status transition (visible on hover) */}
       <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity shrink-0 flex items-center gap-1.5">
-        <Link
-          to={`/inspections/${insp.id}/edit`}
-          aria-label={m.dashboard_row_open_editor()}
-          title={m.dashboard_row_open_editor()}
-          onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center justify-center h-6 w-6 rounded text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
-        >
-          <Icon name="edit" size={14} />
-        </Link>
+        {canOpenEditor && (
+          <Link
+            to={`/inspections/${insp.id}/edit`}
+            aria-label={m.dashboard_row_open_editor()}
+            title={m.dashboard_row_open_editor()}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center justify-center h-6 w-6 rounded text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
+          >
+            <Icon name="edit" size={14} />
+          </Link>
+        )}
         {/* #111: deep-link into the public report (Published tab, delivered/published only) */}
         {showReportLink && (
           <Link
@@ -157,7 +171,7 @@ export function DashboardInspectionRow({
             entry. That endpoint is the one door now and this write refuses, so
             the cancelled cluster below shows the status and offers the button
             instead of four options the server would reject. */}
-        {!cancelled && (
+        {!cancelled && canChangeStatus && (
           <select
             value={insp.status}
             onChange={(e) => transitionStatus(insp.id, e.target.value)}
@@ -188,11 +202,13 @@ export function DashboardInspectionRow({
           >
             <option value="cancelled">{m.dashboard_row_status_cancelled()}</option>
           </select>
-          <RestoreInspectionAction
-            inspectionId={insp.id}
-            variant="ghost"
-            className="h-6 px-1.5 text-[10px]"
-          />
+          {canChangeStatus && (
+            <RestoreInspectionAction
+              inspectionId={insp.id}
+              variant="ghost"
+              className="h-6 px-1.5 text-[10px]"
+            />
+          )}
         </div>
       )}
     </div>

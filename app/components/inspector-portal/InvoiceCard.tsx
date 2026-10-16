@@ -30,6 +30,7 @@ export function InvoiceCard({
     paymentRequired,
     basePriceCents,
     canManagePrice,
+    canEditGate = true,
     onRequestPayment,
 }: {
     /** `detail` carries the one-line money sentence a pill has no room for. */
@@ -46,6 +47,8 @@ export function InvoiceCard({
     /** IA-95 — undefined when money is redacted. */
     basePriceCents: number | undefined;
     canManagePrice: boolean;
+    /** False for a viewer the API refuses order edits (an office user): the payment-required switch is not rendered. */
+    canEditGate?: boolean;
     onRequestPayment: () => void;
 }) {
     const [priceOpen, setPriceOpen] = useState(false);
@@ -132,6 +135,7 @@ export function InvoiceCard({
                     checked={paymentRequired}
                     label={m.inspections_hub_gate_payment()}
                     testId="hub-gate-payment"
+                    canEdit={canEditGate}
                 />
             )}
 

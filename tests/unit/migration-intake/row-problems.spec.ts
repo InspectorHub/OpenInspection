@@ -76,7 +76,7 @@ describe('describeRowProblem — members', () => {
     it('names the staff roles when the role is not one of them', () => {
         const problem = describeRowProblem('member', { email: 'a@example.test', role: 'wizard' });
         expect(problem?.field).toBe('role');
-        expect(problem?.reason).toMatch(/owner, manager, inspector/);
+        expect(problem?.reason).toMatch(/owner, manager, inspector, staff/);
         expect(problem?.suggestion).toBe('inspector');
     });
 });

@@ -2,9 +2,9 @@
 
 The role model, and how to map a Spectora or ISN setup onto it.
 
-## The four roles
+## The five roles
 
-`owner`, `manager`, `inspector`, `agent` — defined once in
+`owner`, `manager`, `inspector`, `staff`, `agent` — defined once in
 `server/lib/auth/roles.ts`, which every Zod enum, Drizzle column, guard and UI
 label derives from. There is **no "Admin" role**; the administrator tier is
 Owner + Manager (`isAdminRole`).
@@ -14,7 +14,19 @@ Owner + Manager (`isAdminRole`).
 | **Owner** | Account holder — everything, plus billing on a `saas` deployment. |
 | **Manager** | Back-office: team management, settings, scheduling, all inspections. |
 | **Inspector** | Conducts inspections, edits and publishes reports. |
+| **Staff** | Office role: reschedules and reassigns inspections, manages contacts and messages, publishes and sends reports. Does not create, copy or delete inspections, does not edit an inspection's other fields, does not write report content, and cannot be assigned as the inspector on a job. May use the native app. |
 | **Agent** | External real-estate agent — their own orders, read-only. |
+
+`staff` is evaluated at the inspector tier by `requireRole`, so every gate that
+admits an inspector admits staff and every gate that does not keeps staff out;
+what differs is expressed as capabilities and as a few explicit refusals.
+Staff may change the date and the assigned inspector of an inspection (the
+`scheduleOthers` capability, on for staff by default, still applies), but a
+staff member is refused creating, copying or deleting an inspection and editing
+any of its other fields. Staff are never offered as an inspector (booking,
+availability, the assignee picker, service qualification, pay rules).
+Seat accounting is decided in one function, `countsTowardSeatQuota`
+(`server/lib/auth/roles.ts`); staff do not hold a seat.
 
 Large or commercial jobs needing more than one inspector are handled by
 **assigning multiple inspectors to one inspection** (the assignment axis, `lead`
@@ -38,22 +50,31 @@ it is not, it is just scored on the other axis.
 
 ### Staff capabilities
 
-Eleven, flippable per person on top of the role default
+Twelve, flippable per person on top of the role default
 (`TOGGLEABLE` in `server/lib/auth/capabilities.ts`):
 
-| Capability | Owner | Manager | Inspector | Agent |
-|---|:--:|:--:|:--:|:--:|
-| `publish` — publish a report to the client | ✅ | ✅ | ✅ | ❌ |
-| `scheduleOthers` — book or reassign for other inspectors | ✅ | ✅ | ❌ | ❌ |
-| `inspectionFees` — the money on one inspection: price, deposit, service lines, cancellation fee | ✅ | ✅ | ✅ | ❌ |
-| `companyFinance` — company-wide money: invoices and payments, price lists and pay rules, earnings, Stripe, QuickBooks, fee policies | ✅ | ✅ | ❌ | ❌ |
-| `manageContacts` — add/edit/delete clients and agents | ✅ | ✅ | ❌ | ❌ |
-| `viewCommunication` — see what was sent to whom | ✅ | ✅ | ✅ | ❌ |
-| `templateCreate` | ✅ | ✅ | ✅ | ❌ |
-| `templateEdit` | ✅ | ✅ | ✅ | ❌ |
-| `templateDelete` | ✅ | ✅ | ❌ | ❌ |
-| `templateImport` | ✅ | ✅ | ✅ | ❌ |
-| `deleteInspection` — permanently delete an inspection (an inspector only one they lead) | ✅ | ✅ | ✅ | ❌ |
+| Capability | Owner | Manager | Inspector | Staff | Agent |
+|---|:--:|:--:|:--:|:--:|:--:|
+| `publish` — publish a report to the client | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `scheduleOthers` — book or reassign for other inspectors | ✅ | ✅ | ❌ | ✅ | ❌ |
+| `inspectionFees` — the money on one inspection: price, deposit, service lines, cancellation fee | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `companyFinance` — company-wide money: invoices and payments, price lists and pay rules, earnings, Stripe, QuickBooks, fee policies | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `manageContacts` — add/edit/delete clients and agents | ✅ | ✅ | ❌ | ✅ | ❌ |
+| `viewCommunication` — see what was sent to whom | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `templateCreate` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `templateEdit` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `templateDelete` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `templateImport` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `deleteInspection` — permanently delete an inspection (an inspector only one they lead) | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `editReports` — write report content: results, media, units, compliance and statutory inputs, cost items | ✅ | ✅ | ✅ | ❌ | ❌ |
+
+`editReports` is enforced by one path-scoped guard (`server/lib/inspection/report-authoring-guard.ts`)
+that refuses every write to a report-authoring route, the live collaborative
+editor and the offline package import without the capability. Reading the same
+data, publishing and sending are not affected, so a staff member can still open
+a report to publish or send it. A spec fails when a mutating route under an
+inspection is neither guarded nor listed as not report content. Withdrawing the
+capability does not close a collaborative-editing socket that is already open.
 
 **Owner is never reducible and Agent is never elevated.** Both columns are
 pinned in code (`FIXED`), not merely defaulted — an override row cannot demote
@@ -69,8 +90,8 @@ invoice pages. The mechanism is the same everywhere
 
 | Capability | What it covers | Default |
 |---|---|---|
-| `inspectionFees` | The money on an inspection you can open: its price, deposit, service lines, the price list used to price a line, and the cancellation fee. | Owner, manager and inspector on; agent off |
-| `companyFinance` | Money that spans inspections or belongs to the company: invoices and payment records, writing the price list and pay rules, pay splits and the payroll export, earnings and the metrics aggregates, Stripe and QuickBooks, a contact's lifetime revenue, the cancellation and deposit policies, and the data exports. | Owner and manager on; inspector and agent off |
+| `inspectionFees` | The money on an inspection you can open: its price, deposit, service lines, the price list used to price a line, and the cancellation fee. | Owner, manager, inspector and staff on (staff read only: a staff member can change only the date and the inspector of an inspection); agent off |
+| `companyFinance` | Money that spans inspections or belongs to the company: invoices and payment records, writing the price list and pay rules, pay splits and the payroll export, earnings and the metrics aggregates, Stripe and QuickBooks, a contact's lifetime revenue, the cancellation and deposit policies, and the data exports. | Owner and manager on; inspector, staff and agent off |
 
 The rule of thumb: a figure on one inspection you can open is `inspectionFees`;
 anything summed across inspections, any price list or rule, the ledger, the

@@ -1,23 +1,37 @@
 /**
  * Unified seat-quota helpers.
  *
- * Every member counts as one seat against `tenants.max_users`. These pure
+ * Seat accounting is decided in one function, `countsTowardSeatQuota`
+ * (`auth/roles`); every other member counts as one seat against
+ * `tenants.max_users`. These pure
  * helpers can be unit-tested without a DB; the route-mounted middleware in
  * `server/features/seat-quota/middleware` composes `getSeatUsage` (which
  * defers to `computeSeatsUsed`) with the profile gate.
  */
 
+import { countsTowardSeatQuota, isRole } from '../auth/roles';
+
 /** Local to this file since `summariseSeats` stopped taking rows — the only
  *  caller of `computeSeatsUsed` is now `getSeatUsage`, which owns the query. */
 interface SeatUser {
     id: string;
+    role: string;
 }
 
 /**
- * Count the seats held by `users`. Every member counts once.
+ * True when a person with this stored role holds a seat. A role this build does
+ * not know counts, so an unrecognised value can never shrink the bill.
+ */
+export function holdsSeat(role: string): boolean {
+    return !isRole(role) || countsTowardSeatQuota(role);
+}
+
+/**
+ * Count the seats held by `users`. Every member counts once, except the roles
+ * `countsTowardSeatQuota` excludes.
  */
 export function computeSeatsUsed(users: SeatUser[]): number {
-    return users.length;
+    return users.filter((u) => holdsSeat(u.role)).length;
 }
 
 /**
@@ -30,7 +44,7 @@ export function computeSeatsUsed(users: SeatUser[]): number {
  * against every seat that can still be claimed without anything noticing.
  */
 export function computeSeatsHeld(activeUsers: SeatUser[], outstandingInvites: SeatUser[]): number {
-    return computeSeatsUsed(activeUsers) + outstandingInvites.length;
+    return computeSeatsUsed(activeUsers) + computeSeatsUsed(outstandingInvites);
 }
 
 /**

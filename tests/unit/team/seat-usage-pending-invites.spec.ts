@@ -53,13 +53,13 @@ describe('getSeatUsage', () => {
         vi.clearAllMocks();
     });
 
-    async function seedMember(id: string, opts: { deleted?: boolean; tenantId?: string } = {}) {
+    async function seedMember(id: string, opts: { deleted?: boolean; tenantId?: string; role?: 'owner' | 'manager' | 'inspector' | 'staff' } = {}) {
         await db.insert(schema.users).values({
             id,
             tenantId: opts.tenantId ?? TENANT,
             email: `${id}@example.test`,
             passwordHash: 'x',
-            role: 'inspector',
+            role: opts.role ?? 'inspector',
             createdAt: new Date(),
             ...(opts.deleted ? { deletedAt: new Date() } : {}),
         });
@@ -67,13 +67,13 @@ describe('getSeatUsage', () => {
 
     async function seedInvite(
         id: string,
-        opts: { status?: 'pending' | 'accepted'; expiresAt?: Date; tenantId?: string } = {},
+        opts: { status?: 'pending' | 'accepted'; expiresAt?: Date; tenantId?: string; role?: 'manager' | 'inspector' | 'staff' } = {},
     ) {
         await db.insert(schema.tenantInvites).values({
             id,
             tenantId: opts.tenantId ?? TENANT,
             email: `${id}@example.test`,
-            role: 'inspector',
+            role: opts.role ?? 'inspector',
             status: opts.status ?? 'pending',
             expiresAt: opts.expiresAt ?? FUTURE(),
         });
@@ -86,6 +86,26 @@ describe('getSeatUsage', () => {
         const usage = await getSeatUsage(TENANT, {} as D1Database);
 
         expect(usage).toEqual({ used: 2, members: 1, max: 3, remaining: 1, pendingInvites: 1 });
+    });
+
+    it('staff do not hold a seat, as members or as outstanding invites', async () => {
+        await seedMember('u1');
+        await seedMember('office', { role: 'staff' });
+        await seedInvite('i-staff', { role: 'staff' });
+
+        const usage = await getSeatUsage(TENANT, {} as D1Database);
+
+        expect(usage).toEqual({ used: 1, members: 1, max: 3, remaining: 2, pendingInvites: 0 });
+    });
+
+    it('managers hold a seat, member and invite alike (control for the staff case)', async () => {
+        await seedMember('u1');
+        await seedMember('boss', { role: 'manager' });
+        await seedInvite('i-manager', { role: 'manager' });
+
+        const usage = await getSeatUsage(TENANT, {} as D1Database);
+
+        expect(usage).toEqual({ used: 3, members: 2, max: 3, remaining: 0, pendingInvites: 1 });
     });
 
     it('positive control: with no invites the held count is the member count', async () => {

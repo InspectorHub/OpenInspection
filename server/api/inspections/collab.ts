@@ -39,6 +39,7 @@ import { tenantConfigs } from '../../lib/db/schema';
 import { parseReinspectionStatuses } from '../../lib/reinspection-status';
 import { forwardCollabImport } from '../../lib/collab/import-route';
 import { authorizeCollab, collabStub } from '../../lib/collab/authorize';
+import { mayEditReports } from '../../lib/inspection/report-authoring-guard';
 
 const issueCollabTicketRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/collab/ticket', operationId: 'issueCollabTicket', tags: ['client'],
@@ -79,6 +80,9 @@ const collabRoutes = createApiRouter()
 
         const auth = await authorizeCollab(c);
         if (!auth.ok) return auth.response;
+        // The socket is the live editor: opening it needs `editReports`. A socket
+        // that is already open is not closed when the capability is withdrawn.
+        if (!(await mayEditReports(c))) return new Response('forbidden', { status: 403 });
 
         // ── Forward the WS upgrade to the INSPECTION_DOC Durable Object ────────
         const stub = collabStub(c, auth.tenantId, auth.reportId);

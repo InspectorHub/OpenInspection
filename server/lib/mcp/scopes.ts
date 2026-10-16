@@ -5,6 +5,7 @@ const CAPS: Record<Role, Kind[]> = {
   owner:     ['read','write','admin'],
   manager:   ['read','write','admin'],
   inspector: ['read','write'],
+  staff:     ['read','write'],
   agent:     ['read','agent'],
 };
 export function roleAllowedScopeKinds(role: Role): Kind[] { return CAPS[role] ?? ['read']; }

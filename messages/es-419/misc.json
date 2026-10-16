@@ -166,6 +166,7 @@
   "template_combobox_clear": "--- Borrar la selección ---",
   "template_combobox_load_more": "Cargar más",
   "access_denied_title": "Solo administradores",
+  "access_denied_title_neutral": "No tiene acceso a esta página",
   "access_denied_body": "Usted no tiene permiso para ver esta página.",
   "breadcrumb_aria": "Ruta de navegación",
   "template_menu_template": "Plantilla",

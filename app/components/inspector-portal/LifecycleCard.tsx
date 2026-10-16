@@ -29,22 +29,27 @@ import { m } from "~/paraglide/messages";
  * moves along — the one that says the visit will not happen. It is offered only
  * in the `actionable` state: the two terminal states are already the answer.
  *
- * No role gate on the control. `POST /:id/cancel` mounts
- * `requireRole('owner','manager','inspector')`, so an inspector standing at a
- * door nobody answered may cancel, and hiding the button from them would be
- * this page holding a second, stricter opinion than the endpoint that enforces
- * it.
+ * No role gate on the control beyond the one the endpoints have. `POST
+ * /:id/cancel` mounts `requireRole('owner','manager','inspector')`, so an
+ * inspector standing at a door nobody answered may cancel, and hiding the button
+ * from them would be this page holding a second, stricter opinion than the
+ * endpoint that enforces it. The endpoints (complete, cancel, uncancel) do refuse
+ * office users (staff), so `canChangeStatus` is false for them and the card shows
+ * the status without any verb.
  */
 export function LifecycleCard({
     status,
     inspectionId,
     fetcher,
+    canChangeStatus = true,
 }: {
     status: string;
     /** The order being cancelled — the quote and the cancel are both keyed on it. */
     inspectionId: string;
     /** The hub's complete-fieldwork fetcher, so the button reflects its state. */
     fetcher: ReturnType<typeof useFetcher>;
+    /** False for a viewer the API refuses to complete, cancel or restore an inspection (staff). */
+    canChangeStatus?: boolean;
 }) {
     const state = lifecycleState(status);
     const marking = fetcher.state !== "idle";
@@ -56,7 +61,7 @@ export function LifecycleCard({
                 title={m.inspections_hub_lifecycle_title()}
                 pill={{ tone: statusTone(status), label: humanizeStatus(status) }}
             />
-            {state === "actionable" ? (
+            {!canChangeStatus ? null : state === "actionable" ? (
                 <>
                     <p className="text-[12px] text-ih-fg-3 mb-3">{m.inspections_hub_lifecycle_hint()}</p>
                     {/* Secondary, and the shared Button rather than a hand-rolled

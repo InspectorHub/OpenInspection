@@ -4,7 +4,7 @@ import type { Route } from "./+types/inspector-portal";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
-import { useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
+import { useCapability, useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import {
   deriveBlockStates,
   formatCents,
@@ -73,7 +73,7 @@ import { ReportGateUnlock } from "~/components/inspector-portal/ReportGateUnlock
 import { CommunicationSection } from "~/components/inspector-portal/CommunicationSection";
 import { resolveReferralSources } from "../../server/lib/referral-sources";
 import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspector-portal-helpers";
-import { isAdminRole } from "~/lib/access";
+import { isAdminRole, isStaffRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { useModalFetcher } from "~/hooks/useModalFetcher";
@@ -650,6 +650,11 @@ export default function InspectionHubPage() {
   const displayTz = useDisplayTimeZone();
   const fmt = useInspectionDateTimeFormat();
   const blocks = deriveBlockStates(hub);
+  // An office user may move a job and reassign it, and change nothing else on it
+  // (PATCH /api/inspections/:id answers 403 to any other field), and writes no
+  // report content (`editReports`). The controls below stand down for them.
+  const canEditOrder = !isStaffRole(role);
+  const canEditReports = useCapability("editReports");
   const navigate = useNavigate();
   const revalidator = useRevalidator();
 
@@ -888,12 +893,14 @@ export default function InspectionHubPage() {
           <>
             {/* The theme control that used to sit here was standing in for the
                 sidebar's user menu, which this page did not have. It does now. */}
-            <Link
-              to={`/inspections/${inspection.id}/edit`}
-              className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600"
-            >
-              {m.inspections_hub_action_open_editor()}
-            </Link>
+            {canEditReports && (
+              <Link
+                to={`/inspections/${inspection.id}/edit`}
+                className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600"
+              >
+                {m.inspections_hub_action_open_editor()}
+              </Link>
+            )}
             {reportShipped && (
               <Link
                 to={`/report-view/${tenantSlug}/${inspection.id}`}
@@ -1003,12 +1010,13 @@ export default function InspectionHubPage() {
             checked={inspection.agreementRequired}
             label={m.inspections_hub_gate_agreement()}
             testId="hub-gate-agreement"
+            canEdit={canEditOrder}
           />
         </Card>
 
         {/* 5. Inspection status — the visit itself. Independent of report
             publishing. */}
-        <LifecycleCard status={inspection.status} inspectionId={inspection.id} fetcher={completeInspection} />
+        <LifecycleCard status={inspection.status} inspectionId={inspection.id} fetcher={completeInspection} canChangeStatus={canEditOrder} />
 
         {/* 5b. Communication — what has been said, and what we sent. The
             client already had a Messages tab; this is the inspector's first
@@ -1047,13 +1055,15 @@ export default function InspectionHubPage() {
                   : m.inspections_hub_report_published()}
               </p>
               <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => reinspectModal.setOpen(true)}
-                >
-                  {m.inspections_hub_report_create_reinspection()}
-                </Button>
+                {canEditOrder && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => reinspectModal.setOpen(true)}
+                  >
+                    {m.inspections_hub_report_create_reinspection()}
+                  </Button>
+                )}
                 {canPublishCap && (
                   <Button
                     variant="secondary"
@@ -1117,7 +1127,7 @@ export default function InspectionHubPage() {
                   {m.inspections_hub_report_blockers({ count: hub.publishReadiness.blockingCount })}
                 </p>
               )}
-              {(reportActionList.length > 0 || reportBlockersPending) && (
+              {(reportActionList.length > 0 || (reportBlockersPending && canEditReports)) && (
               <div className="flex items-center gap-2 flex-wrap">
                 {reportActionList.includes('publish') && (
                   <Button
@@ -1152,7 +1162,7 @@ export default function InspectionHubPage() {
                     </button>
                   </returnReport.Form>
                 )}
-                {reportBlockersPending && (
+                {reportBlockersPending && canEditReports && (
                   <Link
                     to={`/inspections/${inspection.id}/edit`}
                     className="text-[12px] font-bold text-ih-primary-text hover:underline"
@@ -1237,6 +1247,7 @@ export default function InspectionHubPage() {
           paymentRequired={inspection.paymentRequired}
           basePriceCents={inspection.price}
           canManagePrice={isAdmin && canSeeMoney}
+          canEditGate={canEditOrder}
           onRequestPayment={() => paymentModal.setOpen(true)}
         />
 
@@ -1249,6 +1260,7 @@ export default function InspectionHubPage() {
           referralSources={referralSources}
           referredByContactId={inspection.referredByContactId ?? null}
           referredByName={inspection.referredByName ?? null}
+          canEdit={canEditOrder}
         />
 
       </div>

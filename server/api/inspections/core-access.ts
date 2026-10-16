@@ -36,8 +36,15 @@ function sameMoment(stored: unknown, submitted: string): boolean {
     return a.length > 10 && Date.parse(a) === Date.parse(submitted);
 }
 
+/** The only body fields of `PATCH /:id` a staff user may send: when, and who. */
+const STAFF_PATCH_FIELDS: ReadonlySet<string> = new Set(['date', 'inspectorId']);
+
 export async function guardPatchReschedule(c: Context<HonoConfig>, next: Next) {
     const body = (await c.req.json().catch(() => null)) as { inspectorId?: unknown; date?: unknown } | null;
+    // Staff may move a job and reassign it, and nothing else on it.
+    if (body && c.get('userRole') === 'staff' && Object.keys(body).some((k) => !STAFF_PATCH_FIELDS.has(k))) {
+        throw Errors.Forbidden('Staff can change only the date and the assigned inspector of an inspection');
+    }
     if (!body || (!('inspectorId' in body) && typeof body.date !== 'string')) return next();
 
     const { inspection } = await c.var.services.inspection.getInspection(c.req.param('id') ?? '', c.get('tenantId'));

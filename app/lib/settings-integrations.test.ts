@@ -36,6 +36,7 @@ vi.mock('~/lib/api-client.server', () => ({
                 test: { $post: postStripeTest },
             },
             'test-results': { $get: () => Promise.resolve({ ok: true, json: async () => ({ success: true, data: [] }) }) },
+            overview: { $get: () => Promise.resolve({ ok: false, json: async () => ({}) }) },
         },
         admin: {
             config: { $get: getAdminConfig, $post: postAdminConfig },

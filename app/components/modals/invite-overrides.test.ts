@@ -5,7 +5,7 @@
  * disclosure is Chrome-verified.
  */
 import { describe, it, expect } from "vitest";
-import { computeOverrideDiff, CAP_LABELS, CAP_GROUPS } from "~/components/modals/InviteSeatDrawer";
+import { computeOverrideDiff, CAP_LABELS, CAP_GROUPS, ROLE_OPTIONS, isCapabilityLocked, toDrawerRole } from "~/components/modals/InviteSeatDrawer";
 import { getCapabilities, TOGGLEABLE } from "../../../server/lib/auth/capabilities";
 
 describe("CAP_LABELS — the advanced-permission toggles", () => {
@@ -23,6 +23,7 @@ describe("CAP_LABELS — the advanced-permission toggles", () => {
         expect(CAP_LABELS.templateDelete).toBe("Delete templates");
         expect(CAP_LABELS.templateImport).toBe("Import templates");
         expect(CAP_LABELS.deleteInspection).toBe("Delete inspections");
+        expect(CAP_LABELS.editReports).toBe("Edit report content");
     });
 });
 
@@ -54,6 +55,7 @@ describe("the disclosure initial state reflects the role template", () => {
             templateCreate: true, templateEdit: true, templateDelete: false, templateImport: true,
             // Deleting is on for everyone who could already do it.
             deleteInspection: true,
+            editReports: true,
         });
     });
     it("manager defaults: every capability on", () => {
@@ -61,6 +63,7 @@ describe("the disclosure initial state reflects the role template", () => {
         expect(caps).toEqual({
             publish: true, scheduleOthers: true, inspectionFees: true, companyFinance: true, manageContacts: true, viewCommunication: true,
             templateCreate: true, templateEdit: true, templateDelete: true, templateImport: true, deleteInspection: true,
+            editReports: true,
         });
     });
 });
@@ -97,5 +100,31 @@ describe("computeOverrideDiff never emits the retired financial key", () => {
         const diff = computeOverrideDiff("inspector", caps);
         expect(diff).toEqual({ companyFinance: true });
         expect(Object.keys(diff)).not.toContain("financial");
+    });
+});
+
+describe("the role select offers staff", () => {
+    it("lists every invitable role exactly once, each with a label and a description", () => {
+        expect(ROLE_OPTIONS.map((o) => o.value)).toEqual(["manager", "inspector", "staff"]);
+        for (const o of ROLE_OPTIONS) {
+            expect(o.label().length).toBeGreaterThan(0);
+            expect(o.desc().length).toBeGreaterThan(0);
+        }
+        expect(ROLE_OPTIONS.find((o) => o.value === "staff")?.label()).toBe("Staff");
+    });
+
+    it("maps a stored role onto the drawer, falling back to inspector for roles it cannot offer", () => {
+        expect(toDrawerRole("staff")).toBe("staff");
+        expect(toDrawerRole("agent")).toBe("inspector");
+        expect(toDrawerRole("manager")).toBe("manager");
+        expect(toDrawerRole("owner")).toBe("inspector");
+    });
+});
+
+describe("fixed switches show as locked", () => {
+    it("locks nothing for staff, inspector or manager (none of them has a pinned switch)", () => {
+        for (const role of ["staff", "inspector", "manager"] as const) {
+            expect(TOGGLEABLE.filter((cap) => isCapabilityLocked(role, cap))).toEqual([]);
+        }
     });
 });

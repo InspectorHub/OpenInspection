@@ -251,6 +251,8 @@
   "settings_team_role_manager_desc": "Administración interna: equipo, configuración, programación y todas las inspecciones.",
   "settings_team_role_inspector_name": "Inspector",
   "settings_team_role_inspector_desc": "Realiza inspecciones; edita y publica informes.",
+  "settings_team_role_staff_name": "Personal de oficina",
+  "settings_team_role_staff_desc": "Rol de oficina: programa, gestiona contactos y mensajes, publica y envía informes. No edita el contenido de los informes y no se le puede asignar como inspector.",
   "settings_team_role_agent_name": "Agente",
   "settings_team_role_agent_desc": "No es un miembro del equipo ni ocupa una licencia. A los agentes se les da acceso a inspecciones individuales desde la sección Personas de esa inspección, y leen el informe mediante un enlace que no requiere cuenta.",
   "settings_team_cancel_invite": "Cancelar invitación",

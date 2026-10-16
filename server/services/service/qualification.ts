@@ -10,9 +10,10 @@
  * Takes `db` rather than reading it off a class, matching the other helpers
  * extracted from that file.
  */
-import { and, eq, inArray, ne, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { services, serviceInspectors, users } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
+import { FIELD_ROLES } from '../../lib/auth/roles';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = any;
@@ -37,7 +38,7 @@ export async function getServiceInspectors(db: Db, tenantId: string, serviceId: 
     /**
      * Full-replace the inspector restriction list for a service.
      * Empty userIds = clear all rows (back to "all staff qualified").
-     * Validates that every provided userId is a non-deleted, non-agent tenant member.
+     * Validates that every provided userId is a non-deleted tenant member who can be an inspector (FIELD_ROLES: not an agent or staff).
      * Throws 404 if the service is not found in the tenant; 400 on invalid userIds.
      */
 export async function setServiceInspectors(db: Db, tenantId: string, serviceId: string, userIds: string[]): Promise<number> {
@@ -49,12 +50,12 @@ export async function setServiceInspectors(db: Db, tenantId: string, serviceId: 
         if (!svc) throw Errors.NotFound('Service not found');
 
         if (userIds.length > 0) {
-            // Validate: every userId must be a non-deleted, non-agent member of the tenant.
+            // Validate: every userId must be a non-deleted member of the tenant with a field role.
             const validMembers = await db.select({ id: users.id }).from(users)
                 .where(and(
                     eq(users.tenantId, tenantId),
                     isNull(users.deletedAt),
-                    ne(users.role, 'agent'),
+                    inArray(users.role, [...FIELD_ROLES]),
                     inArray(users.id, userIds),
                 ))
                 .all();

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import { Drawer, PENDING_CLASS, pendingProps } from "@core/shared-ui";
-import { getCapabilities, TOGGLEABLE, type Capability, type CapabilitySet, type PermissionOverrides } from "../../../server/lib/auth/capabilities";
+import { getCapabilities, pinnedCapabilities, TOGGLEABLE, type Capability, type CapabilitySet, type PermissionOverrides } from "../../../server/lib/auth/capabilities";
 // TOGGLEABLE is still the source of truth for computeOverrideDiff below; the
 // RENDERING now walks CAP_GROUPS so the two drawers cannot group differently.
 import { SeatLimitPanel } from "./SeatLimitPanel";
@@ -9,19 +9,29 @@ import { m } from "~/paraglide/messages";
 
 const FORM_ID = "invite-seat-form";
 
-// Only the roles this drawer can actually offer. `owner` and `agent` were
-// carried here long after the select stopped listing them (IA-101 removed
-// agent; owner was never selectable), leaving two unreachable branches in
-// ROLE_DESC below — one of which advertised an "ownership transfer" feature
-// that does not exist anywhere in the product (IA-125).
-type Role = "manager" | "inspector";
+// Only the roles this drawer can actually offer. `owner` is never selectable
+// here (ownership transfer is not a Team-page action) and `agent` is granted per
+// inspection from the People section, never as a seat (IA-101).
+export type Role = "manager" | "inspector" | "staff";
 
-// Thunks (not eager strings) so each description resolves at render inside the
-// paraglide request scope, not once at module import.
-const ROLE_DESC: Record<Role, () => string> = {
- manager: () => m.modal_invite_role_desc_manager(),
- inspector: () => m.modal_invite_role_desc_inspector(),
-};
+// Thunks (not eager strings) so each label and description resolves at render
+// inside the paraglide request scope, not once at module import. One list feeds
+// both drawers' selects, so they cannot offer different roles.
+export const ROLE_OPTIONS: ReadonlyArray<{ value: Role; label: () => string; desc: () => string }> = [
+ { value: "manager", label: () => m.modal_invite_role_manager(), desc: () => m.modal_invite_role_desc_manager() },
+ { value: "inspector", label: () => m.modal_invite_role_inspector(), desc: () => m.modal_invite_role_desc_inspector() },
+ { value: "staff", label: () => m.modal_invite_role_staff(), desc: () => m.modal_invite_role_desc_staff() },
+];
+
+/** The drawer role a stored role maps to; anything not offered here (owner, agent, unknown) falls back to inspector. */
+export function toDrawerRole(stored: string): Role {
+ return ROLE_OPTIONS.find((o) => o.value === stored)?.value ?? "inspector";
+}
+
+/** True when the role template fixes this switch, so the form shows it greyed out instead of letting it be changed. */
+export function isCapabilityLocked(role: Role, cap: Capability): boolean {
+ return pinnedCapabilities(role).includes(cap);
+}
 
 /**
  * Advanced-permissions toggle labels, in TOGGLEABLE order. Exposed as getters so each
@@ -39,6 +49,7 @@ export const CAP_LABELS: Record<Capability, string> = {
  get templateDelete() { return m.label_cap_template_delete(); },
  get templateImport() { return m.label_cap_template_import(); },
  get deleteInspection() { return m.label_cap_delete_inspection(); },
+ get editReports() { return m.label_cap_edit_reports(); },
 };
 
 /**
@@ -54,7 +65,7 @@ export const CAP_GROUPS: ReadonlyArray<{ id: string; label: () => string; caps: 
  {
   id: "general",
   label: () => m.modal_invite_cap_group_general(),
-  caps: ["publish", "scheduleOthers", "inspectionFees", "companyFinance", "manageContacts", "viewCommunication", "deleteInspection"],
+  caps: ["publish", "scheduleOthers", "inspectionFees", "companyFinance", "manageContacts", "viewCommunication", "deleteInspection", "editReports"],
  },
  {
   id: "templates",
@@ -195,8 +206,7 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
  <label className="block">
  <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.modal_invite_role_label()}</span>
  <select className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1" value={role} onChange={(e) => setRole(e.target.value as Role)}>
- <option value="manager">{m.modal_invite_role_manager()}</option>
- <option value="inspector">{m.modal_invite_role_inspector()}</option>
+ {ROLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label()}</option>)}
  {/* IA-101 — no agent option. An agent reaches an inspection through a
  per-inspection access token that works with no account at all, so
  inviting one to a SEAT was a second, contradictory way to become an
@@ -205,7 +215,7 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
  People section; the API refuses the role here too. */}
  </select>
  </label>
- <p className="text-xs text-ih-fg-3">{ROLE_DESC[role]()}</p>
+ <p className="text-xs text-ih-fg-3">{ROLE_OPTIONS.find((o) => o.value === role)?.desc()}</p>
 
  <div className="border-t border-ih-border pt-3">
  <button
@@ -227,6 +237,8 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
  <input
  type="checkbox"
  checked={caps[cap]}
+ disabled={isCapabilityLocked(role, cap)}
+ title={isCapabilityLocked(role, cap) ? m.modal_invite_cap_pinned_read_only() : undefined}
  onChange={(e) => setCaps((prev) => ({ ...prev, [cap]: e.target.checked }))}
  />
  {CAP_LABELS[cap]}

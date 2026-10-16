@@ -10,7 +10,7 @@
 // of #81.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { requireRole } from '../../lib/middleware/rbac';
+import { requireRole, denyStaff } from '../../lib/middleware/rbac';
 import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { moneyView } from '../../lib/auth/money-access';
 import { Errors } from '../../lib/errors';
@@ -82,7 +82,7 @@ const cancelRoute = createRoute(withMcpMetadata({
     path: '/{id}/cancel',
     tags: ['inspections'],
     summary: 'Cancel inspection for current tenant',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff] as const,
     request: {
         params: z.object({ id: z.string().describe('Inspection id.') }),
         body: { content: { 'application/json': { schema: CancelInspectionSchema } } },
@@ -112,7 +112,7 @@ const cancelRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: 'cancelInspection',
-    description: 'Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged.',
+    description: 'Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged. Available to owner, manager and inspector roles; staff get 403.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 // THE ONE DOOR BACK (#81). This endpoint shipped complete and unwired: the
@@ -129,14 +129,14 @@ const cancelRoute = createRoute(withMcpMetadata({
 const uncancelRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/uncancel',
     tags: ["inspections"], summary: "Bring a cancelled inspection back to scheduled",
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff] as const,
     request: { params: z.object({ id: z.string().describe('The cancelled inspection to bring back.') }).describe('Path parameters.') },
     responses: {
         200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('Recovered.') } }, description: 'Uncancelled' },
         400: { description: 'The inspection is not cancelled, so there is nothing to recover.' },
     },
     operationId: "createInspectionUncancel",
-    description: "Returns a mistakenly-cancelled inspection to `scheduled`, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
+    description: "Returns a mistakenly-cancelled inspection to `scheduled`, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. Staff get 403. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const flatten = (q: Awaited<ReturnType<typeof quoteCancellation>>) => ({

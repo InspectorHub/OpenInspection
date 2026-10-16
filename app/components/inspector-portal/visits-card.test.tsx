@@ -100,6 +100,14 @@ describe("visitActions", () => {
         expect(visitActions("owner", "completed")).toContain("results");
         expect(visitActions("manager", "completed")).toContain("results");
     });
+    it("offers staff no visit verb at all: the API refuses them any status change", () => {
+        for (const status of ["scheduled", "completed", "results_received", "cancelled"] as const) {
+            expect(visitActions("staff", status)).toEqual([]);
+        }
+        // POSITIVE CONTROL: the field and office verbs are untouched for everyone else.
+        expect(visitActions("inspector", "scheduled")).toContain("complete");
+        expect(visitActions("owner", "completed")).toContain("results");
+    });
     it("offers nothing on a terminal visit", () => {
         expect(visitActions("owner", "results_received")).toEqual([]);
         expect(visitActions("owner", "cancelled")).toEqual([]);

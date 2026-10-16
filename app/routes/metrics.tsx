@@ -1,6 +1,7 @@
 import { useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/metrics";
-import { requireToken } from "~/lib/session.server";
+import { requireNotStaffLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Table } from "@core/shared-ui";
 import { formatDollars } from "~/lib/money";
@@ -49,7 +50,10 @@ interface MetricsData {
 
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  // An office user does not inspect, so the only figures this endpoint would hand
+  // them (their own row) are empty; the page says so instead of rendering zeros.
+  const { forbidden, token } = await requireNotStaffLoader(context, request);
+  if (forbidden) return { data: null, findings: null, range: normaliseRange(null, null, civilToday("UTC")), forbidden: true as const };
   const url = new URL(request.url);
   // The window is whatever the URL says, resolved rather than validated: a
   // hand-edited or stale query string must still render a page. The server
@@ -86,11 +90,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     findings = null;
   }
 
-  return { data, findings, range };
+  return { data, findings, range, forbidden: false as const };
 }
 
 export default function MetricsPage() {
-  const { data, findings, range } = useLoaderData<typeof loader>();
+  const { data, findings, range, forbidden } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const locale = useDisplayLocale();
   const currency = useDisplayCurrency();
@@ -135,6 +139,8 @@ export default function MetricsPage() {
   // else. Rendering the company cards as a wall of dashes would be worse than
   // not rendering them: it advertises figures they cannot have.
   const companyView = data?.scope !== "self";
+
+  if (forbidden) return <AccessDenied title={m.access_denied_title_neutral()} />;
 
   return (
     <div className="space-y-ih-list">

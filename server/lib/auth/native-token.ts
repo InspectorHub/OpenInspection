@@ -3,11 +3,12 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { users } from '../db/schema';
 import { nativeClientEnabled } from '../mcp/flag';
 import { memoOnce } from '../request-scope';
+import { NATIVE_APP_ROLES } from './roles';
 
 /** The scope a native client requests and the consent page grants. */
 export const NATIVE_SCOPE = 'native';
 
-const NATIVE_ROLES = ['owner', 'manager', 'inspector'] as const;
+const NATIVE_ROLES = NATIVE_APP_ROLES;
 export type NativeRole = (typeof NATIVE_ROLES)[number];
 
 /** Grant props written by the consent page for a native client. */

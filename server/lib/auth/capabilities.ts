@@ -18,6 +18,11 @@ export const TOGGLEABLE = [
   // default for everyone who could already do it; the roster rule (an inspector
   // deletes only an inspection they lead) is separate and still applies.
   'deleteInspection',
+  // Writing report content: results, media, units, collaborative editing,
+  // statutory and compliance inputs, cost items. Reading the same data is not
+  // affected, and neither is publishing. On by default for every role that could
+  // already author; staff default to off.
+  'editReports',
 ] as const;
 
 /** The declared shape of every staff bit. All boolean today; see capability-overrides.ts. */
@@ -29,26 +34,47 @@ export type PermissionOverrides = Partial<CapabilitySet>;
 
 const ROLE_DEFAULTS: Record<Role, CapabilitySet> = {
   owner:     { publish: true,  scheduleOthers: true,  inspectionFees: true,  companyFinance: true,  manageContacts: true,  viewCommunication: true,
-               templateCreate: true,  templateEdit: true,  templateDelete: true,  templateImport: true, deleteInspection: true },
+               templateCreate: true,  templateEdit: true,  templateDelete: true,  templateImport: true, deleteInspection: true,
+               editReports: true },
   manager:   { publish: true,  scheduleOthers: true,  inspectionFees: true,  companyFinance: true,  manageContacts: true,  viewCommunication: true,
-               templateCreate: true,  templateEdit: true,  templateDelete: true,  templateImport: true, deleteInspection: true },
+               templateCreate: true,  templateEdit: true,  templateDelete: true,  templateImport: true, deleteInspection: true,
+               editReports: true },
   // An inspector needs to know whether their own report reached the buyer's agent.
   // They also author the templates they inspect against, so create/edit/import
   // stay on; only DELETE is off, whose repair cost is rebuild-from-scratch.
   inspector: { publish: true,  scheduleOthers: false, inspectionFees: true,  companyFinance: false, manageContacts: false, viewCommunication: true,
-               templateCreate: true,  templateEdit: true,  templateDelete: false, templateImport: true, deleteInspection: true },
+               templateCreate: true,  templateEdit: true,  templateDelete: false, templateImport: true, deleteInspection: true,
+               editReports: true },
+  // Office user: schedules, reschedules and reassigns, manages contacts and
+  // messages, publishes and sends reports, and sees inspection prices (read
+  // only: staff cannot edit any inspection field except date and inspector).
+  // Does not write report content or author templates and sees no company
+  // finances. Nothing is pinned, so a company can widen or narrow any of it per
+  // person or through a permission template.
+  staff:     { publish: true,  scheduleOthers: true,  inspectionFees: true,  companyFinance: false, manageContacts: true,  viewCommunication: true,
+               templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false,
+               editReports: false },
   agent:     { publish: false, scheduleOthers: false, inspectionFees: false, companyFinance: false, manageContacts: false, viewCommunication: false,
-               templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false },
+               templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false,
+               editReports: false },
 };
 /** owner is never reducible by overrides; agent is never elevated by them.
- *  A capability MISSING from either map silently opts out of that guarantee,
- *  which is why both are restated in full rather than spread from the defaults. */
+ *  A capability MISSING from any entry silently opts out of that guarantee,
+ *  which is why each is restated in full rather than spread from the defaults. */
 const FIXED: Partial<Record<Role, Partial<CapabilitySet>>> = {
   owner: { publish: true, scheduleOthers: true, inspectionFees: true, companyFinance: true, manageContacts: true, viewCommunication: true,
-           templateCreate: true, templateEdit: true, templateDelete: true, templateImport: true, deleteInspection: true },
+           templateCreate: true, templateEdit: true, templateDelete: true, templateImport: true, deleteInspection: true,
+           editReports: true },
   agent: { publish: false, scheduleOthers: false, inspectionFees: false, companyFinance: false, manageContacts: false, viewCommunication: false,
-           templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false },
+           templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false,
+           editReports: false },
 };
+
+/** The capabilities an override cannot change for `role`. A form uses this to show those switches as fixed. */
+export function pinnedCapabilities(role: Role): readonly Capability[] {
+  const pinned = FIXED[role];
+  return pinned ? TOGGLEABLE.filter((cap) => typeof pinned[cap] === 'boolean') : [];
+}
 
 export function getCapabilities(role: Role, overrides: PermissionOverrides | null): CapabilitySet {
   const base = { ...ROLE_DEFAULTS[role] };

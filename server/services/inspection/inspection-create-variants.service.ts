@@ -5,6 +5,7 @@ import { safeISODate } from '../../lib/date';
 import { logger } from '../../lib/logger';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { getInspectionRoster } from '../../lib/inspection/roster';
+import { assertFieldRoleMembers } from '../../lib/inspection/field-role-members';
 import type { Inspection, CreateInspectionData } from './shared';
 import type { ScopedDB } from '../../lib/db/scoped';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
@@ -58,9 +59,16 @@ export class InspectionCreateVariantsService extends InspectionSubService {
      */
     async createFromWizard(
         tenantId: string,
-        creatorUserId: string,
+        creatorUserId: string | null,
         input: import('../../lib/validations/wizard.schema').CreateInspectionFromWizardInput,
     ): Promise<{ id: string }> {
+        // `creatorUserId` is null when the creator cannot inspect (an office user):
+        // the job is then left unassigned unless team mode names a lead.
+        // A named lead or helper must be someone who can inspect.
+        if (input.teamMode) {
+            await assertFieldRoleMembers(this.getDrizzle(), tenantId, [input.leadInspectorId, ...(input.helperInspectorIds ?? [])]);
+        }
+
         // Build the base CreateInspectionData shape consumed by createInspection.
         // The wizard's schedule.startTime is appended to the ISO date so the
         // existing `date` column carries both — the editor's calendar pane
@@ -68,7 +76,7 @@ export class InspectionCreateVariantsService extends InspectionSubService {
         const dateTime = `${input.schedule.date}T${input.schedule.startTime}:00`;
 
         const created = await this.core.createInspection(tenantId, {
-            inspectorId:     creatorUserId,
+            ...(creatorUserId ? { inspectorId: creatorUserId } : {}),
             propertyAddress: input.property.address,
             clientName:      'Private Client',  // wizard MVP — client picker is step-extension follow-up
             clientEmail:     null,

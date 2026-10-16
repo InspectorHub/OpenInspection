@@ -8,7 +8,7 @@
  * fail closed only because no tenant was present. This module makes both modes
  * fail closed by rule instead of by accident.
  *
- * Two rules, both on `/api/` paths only (pages are rendered by the SSR layer,
+ * Two rules, all on `/api/` paths only (pages are rendered by the SSR layer,
  * which forwards the visitor's cookie to the API on their behalf):
  *
  *   1. ANONYMOUS: a request with no identity is refused (401) unless the path
@@ -65,7 +65,7 @@ export function matchesRule(rules: readonly PathRule[], path: string): boolean {
 }
 
 /**
- * Throws 401 for an identity-less request to a protected API path, and 403 for
+ * Throws 401 for an identity-less request to a protected API path and 403 for
  * an agent principal on a staff path. No-op for non-API paths and public ones.
  */
 export function enforceApiAccess(path: string, role: string | undefined): void {

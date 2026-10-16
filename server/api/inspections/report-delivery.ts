@@ -13,7 +13,7 @@ import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { redactMoney } from '../../lib/auth/money-redaction';
 import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, getBaseUrl, resolveTenantSlug } from '../../lib/url';
-import { reportUrl as buildReportUrl, buildRenderReportUrl, paymentUrl } from '../../lib/public-urls';
+import { reportUrl as buildReportUrl, buildRenderReportUrl } from '../../lib/public-urls';
 import { buildPortalUrl } from '../../lib/portal-urls';
 import { Errors, AppError } from '../../lib/errors';
 import { logger } from '../../lib/logger';
@@ -35,6 +35,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { resolveRoleEmailTemplate } from '../../lib/people/role-template';
 import { interpolate } from '../../services/automation/shared';
 import { resolveReportTier } from '../../lib/report-tier';
+import { hubPayUrl } from '../../lib/inspection/hub-pay-url';
 
 const sendReportPdfRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -504,23 +505,7 @@ const reportDeliveryRoutes = createApiRouter()
         const data = await c.var.services.inspection.getInspectionHub(id, tenantId, tenantSlug);
         if (!data) return c.json({ success: false, error: 'Inspection not found' }, 404);
 
-        // IA-34 — the public pay page now refuses a bare `/invoice/:id`, so the hub's
-        // "copy pay link" action must hand out the SAME tokenized URL the send path
-        // emails. Minted here (route layer) rather than in the service so the
-        // aggregate query stays free of the portal-access dependency; `issueToken`
-        // is idempotent and reconstructs the existing plaintext instead of rotating,
-        // so re-reading the hub never invalidates a link already in a client's inbox.
-        // Only for a SENT invoice: a draft has no recipient bound yet.
-        let payUrl: string | null = null;
-        if (data.invoice && (data.invoice.status === 'sent' || data.invoice.status === 'partial')) {
-            const primaryClient = await c.var.services.people.getPrimaryClient(tenantId, id);
-            if (primaryClient?.email) {
-                const payToken = await c.var.services.portalAccess.issueToken({
-                    tenantId, inspectionId: id, recipientEmail: primaryClient.email,
-                });
-                payUrl = paymentUrl(getBookingHost(c), id, payToken);
-            }
-        }
+        const payUrl = await hubPayUrl(c, tenantId, id, data.invoice);
         const hub = { ...data, invoice: data.invoice ? { ...data.invoice, payUrl } : null };
         // IA-95 — two kinds of money in one aggregate, projected field by field: this
         // inspection's price lines (`inspectionFees`) and the invoice block (`companyFinance`).
