@@ -1,11 +1,11 @@
 /**
- * Staff move and reassign inspections, and do nothing else to them.
+ * Staff run the booking: schedule, assign and edit order fields; the inspection side stays closed.
  *
  * `staff` is evaluated at the inspector tier, so every `requireRole('owner',
- * 'manager', 'inspector')` gate admits it. These specs pin the two actions staff
- * keep (reschedule the date/time, reassign the inspector or roster) and the
- * refusals around them (create, copy, delete, any other field of the
- * inspection). They run against the real routes through `app.request`, so a
+ * 'manager', 'inspector')` gate admits it. These specs pin the schedule actions
+ * staff keep (reschedule the date/time, reassign the inspector or roster), the order
+ * fields they may write, and the refusals around them (the inspection-side fields,
+ * the wizard, delete, completing a visit). They run against the real routes through `app.request`, so a
  * regression in route wiring goes red, not only one in a helper.
  *
  * Both allowed actions stay behind the `scheduleOthers` capability, which staff
@@ -154,35 +154,53 @@ describe('staff on the inspection routes', () => {
         });
     });
 
-    describe('everything else on an inspection is refused to staff', () => {
-        it('PATCH /:id refuses any other field, even next to an allowed one, and writes nothing', async () => {
+    describe('the inspection side stays closed to staff, the order side is open', () => {
+        const INSPECTION_SIDE = ['coverPhotoId', 'profileOverride', 'badgeLayoutOverride', 'reportPhotoColumns', 'requireDefectFieldsOverride', 'autoSignOnPublish'];
+
+        it('PATCH /:id lets staff change the address, and writes it', async () => {
+            const res = await send(buildApp('staff'), 'PATCH', `/${INSP_ID}`, { propertyAddress: '99 Elm Street' });
+            expect(res.status).toBe(200);
+            expect((await readRow())?.propertyAddress).toBe('99 Elm Street');
+        });
+
+        it('PATCH /:id refuses an inspection-side field next to an allowed one, and writes nothing', async () => {
             const app = buildApp('staff');
-            expect((await send(app, 'PATCH', `/${INSP_ID}`, { propertyAddress: '99 Elm Street' })).status).toBe(403);
-            expect((await send(app, 'PATCH', `/${INSP_ID}`, { date: '2026-06-09', propertyAddress: '99 Elm Street' })).status).toBe(403);
+            expect((await send(app, 'PATCH', `/${INSP_ID}`, { autoSignOnPublish: true })).status).toBe(403);
+            expect((await send(app, 'PATCH', `/${INSP_ID}`, { date: '2026-06-09', autoSignOnPublish: true })).status).toBe(403);
             const row = await readRow();
-            expect(row?.propertyAddress).toBe('1 Main St');
+            expect(row?.autoSignOnPublish).toBe(false);
             expect(row?.date.slice(0, 10)).toBe('2026-06-01');
         });
 
-        it('PATCH /:id refuses staff every field the schema accepts except date and inspectorId, one at a time', async () => {
-            const fields = Object.keys(UpdateInspectionSchema.shape).filter((k) => k !== 'date' && k !== 'inspectorId');
-            // A schema that lost its fields would turn this into a loop over nothing.
-            expect(fields.length).toBeGreaterThan(10);
+        it('PATCH /:id refuses staff every inspection-side field the schema accepts, and lets every other field through', async () => {
+            const fields = Object.keys(UpdateInspectionSchema.shape);
+            // A value that DIFFERS from the stored one for each key: a repeated value is not a change, so null would pass everywhere.
+            const sample: Record<string, unknown> = {
+                propertyAddress: '55 Oak Avenue', date: '2026-06-09', inspectorId: LEAD_B, price: 100, depositRequiredCents: 50,
+                status: 'confirmed', paymentRequired: true, agreementRequired: true, closingDate: '2026-07-15',
+                referenceNumber: 'R-1', referralSource: 'Realtor', referredByContactId: 'no-such-contact',
+                propertyType: 'commercial', yearBuilt: 1990, sqft: 1000, foundationType: 'slab', bedrooms: 3, bathrooms: 2,
+                lotSize: '1 acre', unit: '2B', county: 'Kent', templateId: 'tpl-1',
+                profileOverride: 'meridian', badgeLayoutOverride: 'inline', reportPhotoColumns: 2, coverPhotoId: 'photo-key',
+                requireDefectFieldsOverride: 'both', autoSignOnPublish: true,
+            };
+            expect(Object.keys(sample).sort()).toEqual([...fields].sort());
+            expect(INSPECTION_SIDE.every((k) => fields.includes(k))).toBe(true);
             const app = buildApp('staff');
-            const allowed: string[] = [];
+            const wrong: string[] = [];
             for (const field of fields) {
-                const res = await send(app, 'PATCH', `/${INSP_ID}`, { [field]: null });
-                if (res.status !== 403) allowed.push(`${field}:${res.status}`);
+                const res = await send(app, 'PATCH', `/${INSP_ID}`, { [field]: sample[field] });
+                const refused = res.status === 403;
+                if (refused !== INSPECTION_SIDE.includes(field)) wrong.push(`${field}:${res.status}`);
             }
-            expect(allowed).toEqual([]);
-            const row = await readRow();
-            expect(row?.propertyAddress).toBe('1 Main St');
+            expect(wrong).toEqual([]);
+            expect((await readRow())?.autoSignOnPublish).toBe(false);
         });
 
-        it('control: the same fields are not refused for an inspector (the loop above is not a blanket 403)', async () => {
-            const app = buildApp('inspector');
-            const res = await send(app, 'PATCH', `/${INSP_ID}`, { propertyAddress: '2 Oak Street' });
+        it('control: an inspector is not refused the same inspection-side field', async () => {
+            const res = await send(buildApp('inspector'), 'PATCH', `/${INSP_ID}`, { autoSignOnPublish: true });
             expect(res.status).toBe(200);
+            expect((await readRow())?.autoSignOnPublish).toBe(true);
         });
 
         it('control: an inspector on the same inspection can still edit another field', async () => {
@@ -191,15 +209,15 @@ describe('staff on the inspection routes', () => {
             expect((await readRow())?.propertyAddress).toBe('99 Elm Street');
         });
 
-        it('creating an inspection is refused (plain create and the wizard); an inspector reaches validation', async () => {
-            expect((await send(buildApp('staff'), 'POST', '', {})).status).toBe(403);
+        it('creating an inspection is open to staff (they reach validation); only the wizard stays closed to them', async () => {
+            expect((await send(buildApp('staff'), 'POST', '', {})).status).toBe(400);
             expect((await send(buildApp('staff'), 'POST', '/wizard', {})).status).toBe(403);
             expect((await send(buildApp('inspector'), 'POST', '', {})).status).toBe(400);
             expect((await send(buildApp('inspector'), 'POST', '/wizard', {})).status).toBe(400);
         });
 
-        it('copying an inspection is refused; an inspector reaches the handler', async () => {
-            expect((await send(buildApp('staff'), 'POST', `/${INSP_ID}/clone`)).status).toBe(403);
+        it('copying an inspection is open to staff: they reach the handler, as an inspector does', async () => {
+            expect((await send(buildApp('staff'), 'POST', `/${INSP_ID}/clone`)).status).toBe(404);
             expect((await send(buildApp('inspector'), 'POST', `/${INSP_ID}/clone`)).status).toBe(404);
         });
 
@@ -217,21 +235,14 @@ describe('staff on the inspection routes', () => {
             expect((await readRow())?.status).toBe(INSPECTION_STATUS.SCHEDULED);
         });
 
-        it('cancelling, restoring, completing and re-inspecting are refused to staff (a status or money change, or a new inspection)', async () => {
+        it('marking a visit complete stays refused to staff (a status write that belongs to the inspector); cancel, restore and re-inspect are open (rules in staff-cancel-rules.spec.ts)', async () => {
             const staff = buildApp('staff', { scheduleOthers: true });
-            const cases: Array<[string, unknown]> = [
-                ['cancel', { reason: 'client_request' }],
-                ['uncancel', undefined],
-                ['complete', undefined],
-                ['reinspect', { selectedItemIds: ['x'] }],
-            ];
-            for (const [action, body] of cases) {
-                expect((await send(staff, 'POST', `/${INSP_ID}/${action}`, body)).status, action).toBe(403);
-            }
+            expect((await send(staff, 'POST', `/${INSP_ID}/complete`)).status).toBe(403);
+            expect((await send(staff, 'POST', `/${INSP_ID}/reinspect`, { selectedItemIds: ['x'] })).status).not.toBe(403);
             expect((await readRow())?.status).toBe(INSPECTION_STATUS.SCHEDULED);
         });
 
-        it('control: an inspector is not refused on those four (they reach validation or the handler)', async () => {
+        it('control: an inspector is not refused on complete, cancel, restore or re-inspect (they reach validation or the handler)', async () => {
             const inspector = buildApp('inspector');
             for (const action of ['cancel', 'uncancel', 'complete', 'reinspect']) {
                 expect((await send(inspector, 'POST', `/${INSP_ID}/${action}`, {})).status, action).not.toBe(403);

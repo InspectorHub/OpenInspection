@@ -5,8 +5,7 @@
 // people, hub, send-pdf, agent share) lives in ./report-delivery.ts; the
 // agreement signing envelope lives in ./agreements.ts; the cancellation axis in
 // both directions (cancel / uncancel / quote) lives in ./cancellation.ts.
-// Behavior-preserving extraction from inspections.ts — handler bodies + route
-// definitions are byte-identical to the original (only their location changed).
+// Handler bodies and route definitions moved here from inspections.ts unchanged.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole, denyStaff } from '../../lib/middleware/rbac';
@@ -23,6 +22,7 @@ import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation } from '../../services/inspection/shared';
 import { refuseLeaveCancelledViaStatusWrite } from './cancel-write-path';
+import { guardStaffConfirm } from './staff-status-guards';
 import { eq, and } from 'drizzle-orm';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { translateOnPublishForRequest } from '../../lib/translation/on-publish';
@@ -225,7 +225,7 @@ const reinspectRoute = createRoute(withMcpMetadata({
     path: '/{id}/reinspect',
     tags: ['inspections'],
     summary: 'Create a re-inspection from this (published) baseline report',
-    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({ id: z.string().describe('Baseline inspection id (original or a prior re-inspection; must be published).') }),
         body: { content: { 'application/json': { schema: CreateReinspectionSchema } } },
@@ -235,7 +235,7 @@ const reinspectRoute = createRoute(withMcpMetadata({
         400: { description: 'Baseline not published / invalid' },
     },
     operationId: 'createReinspection',
-    description: 'Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report. Staff get 403.',
+    description: 'Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report. A named inspector must be a member who can inspect (400 otherwise). Available to owner, manager, inspector and staff roles.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -343,11 +343,11 @@ const publishRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/{id}/confirm',
         tags: ["inspections"], summary: "Confirm inspection for current tenant",
-        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+        middleware: [requireRole('owner', 'manager', 'inspector'), guardStaffConfirm] as const,
         request: { params: z.object({ id: z.string().describe('Inspection to confirm.') }) },
         responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Confirmed' } },
         operationId: "confirmInspection",
-        description: "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers and inspectors."
+        description: "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers, inspectors and staff; staff cannot confirm a completed inspection and need scheduleOthers or a place on the inspection."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');

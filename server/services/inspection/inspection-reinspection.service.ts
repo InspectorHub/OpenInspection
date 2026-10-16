@@ -1,5 +1,6 @@
 import { eq, and, desc } from 'drizzle-orm';
-import { inspections, inspectionResults, users, tenantConfigs, reportVersions } from '../../lib/db/schema';
+import { assertFieldRoleMembers } from '../../lib/inspection/field-role-members';
+import { inspections, inspectionResults, tenantConfigs, reportVersions } from '../../lib/db/schema';
 import { PeopleService } from '../people.service';
 import { getRatingBucket, type RatingLevel } from '../../lib/report-utils';
 import { mapRatingSystemLevels } from '../../lib/map-rating-levels';
@@ -141,15 +142,10 @@ export class InspectionReinspectionService extends InspectionSubService {
             .orderBy(desc(reportVersions.versionNumber)).limit(1).get();
         if (!latestVersion) throw new Error('Cannot re-inspect an unpublished baseline');
 
-        // When an explicit inspectorId is supplied, it MUST resolve to a user in
-        // this tenant. inspector_id has a DB FK to users.id; a foreign-tenant or
-        // bogus id would either violate the FK at runtime or assign the round to
-        // another tenant's user. Validate before use; omitted → baseline fallback.
-        if (opts.inspectorId) {
-            const owner = await db.select({ id: users.id }).from(users)
-                .where(and(eq(users.id, opts.inspectorId), eq(users.tenantId, tenantId))).get();
-            if (!owner) throw new Error('Inspector not found in this workspace');
-        }
+        // A named inspector must be a member of this tenant who works in the field. inspector_id
+        // has a DB FK to users.id, so a bogus or foreign id would break the FK or assign the round
+        // to another tenant's user, and an office user cannot inspect. Omitted → baseline fallback.
+        await assertFieldRoleMembers(db, tenantId, [opts.inspectorId]);
 
         const rootId = baseline.rootInspectionId ?? baseline.id;
         const existingRounds = await db.select().from(inspections)

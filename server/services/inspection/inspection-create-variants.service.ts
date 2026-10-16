@@ -1,8 +1,9 @@
 import { eq, and } from 'drizzle-orm';
 import { inspections } from '../../lib/db/schema';
 import { PeopleService } from '../people.service';
-import { safeISODate } from '../../lib/date';
 import { logger } from '../../lib/logger';
+import { Errors } from '../../lib/errors';
+import { cloneInsertValues } from './clone-columns';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { getInspectionRoster } from '../../lib/inspection/roster';
 import { assertFieldRoleMembers } from '../../lib/inspection/field-role-members';
@@ -142,39 +143,19 @@ export class InspectionCreateVariantsService extends InspectionSubService {
     }
 
     /**
-     * Clones an existing inspection.
+     * Clones an existing inspection: a new job at the same property with the same booking
+     * terms. Which columns come across is decided by `cloneInsertValues`.
      */
     async cloneInspection(id: string, tenantId: string): Promise<Inspection> {
-        // getInspection throws NotFound for a bad id — that precondition check
-        // must run BEFORE quota is consumed, so cloning a nonexistent
-        // inspection never burns a free tenant's lifetime slot.
-        const { inspection: source } = await this.core.getInspection(id, tenantId);
+        // A bad id must throw NotFound BEFORE quota is consumed, so cloning a
+        // nonexistent inspection never burns a free tenant's lifetime slot.
+        const source = await this.getDrizzle().select().from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId))).get();
+        if (!source) throw Errors.NotFound('Inspection not found');
         await this.planQuota?.consumeInspection(tenantId);
 
-        const clone = {
-            ...source,
-            id: crypto.randomUUID(),
-            tenantId,
-            date: new Date().toISOString(),
-            status: 'draft' as const,
-            paymentStatus: 'unpaid' as const,
-            createdAt: new Date(),
-        };
-        delete (clone as { signedByClient?: boolean }).signedByClient; // Remove ephemeral field
-
-        // Task 13 — clientName/clientEmail/clientPhone on `source` are
-        // resolved via PeopleService inside getInspection (not raw DB
-        // columns; clientContactId/referredByAgentId/sellingAgentId are gone
-        // entirely now that the columns are dropped). Strip them from the
-        // insert payload — they'd otherwise be dead keys on an object the
-        // schema no longer recognizes. The inspection_people copy below is
-        // the only carry-forward of WHO.
-        const { clientName: _clientName, clientEmail: _clientEmail, clientPhone: _clientPhone, ...cloneDbValues } =
-            clone as typeof clone & { clientName?: unknown; clientEmail?: unknown; clientPhone?: unknown };
-        void _clientName; void _clientEmail; void _clientPhone;
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await this.getDrizzle().insert(inspections).values(cloneDbValues as any);
+        const clone = cloneInsertValues(source, { id: crypto.randomUUID(), tenantId, date: new Date().toISOString(), createdAt: new Date() });
+        await this.getDrizzle().insert(inspections).values(clone);
 
         // Task 7c (people-role-profiles fix) — copy the source inspection's
         // inspection_people rows (client + any agents) onto the clone.
@@ -198,7 +179,7 @@ export class InspectionCreateVariantsService extends InspectionSubService {
         try {
             const sourceRoster = await getInspectionRoster(this.getDrizzle(), tenantId, id);
             await syncInspectionAssignments(this.getDrizzle(), tenantId, clone.id, {
-                inspectorId:        (clone as { inspectorId?: string | null }).inspectorId ?? null,
+                inspectorId:        clone.inspectorId ?? null,
                 leadInspectorId:    sourceRoster.lead?.id ?? null,
                 helperInspectorIds: sourceRoster.helpers.map(h => h.id),
             });
@@ -206,9 +187,6 @@ export class InspectionCreateVariantsService extends InspectionSubService {
             logger.error('inspection.clone-sync.failed', { inspectionId: clone.id }, e instanceof Error ? e : undefined);
         }
 
-        return {
-            ...clone,
-            createdAt: safeISODate(clone.createdAt)
-        };
+        return (await this.core.getInspection(clone.id, tenantId)).inspection;
     }
 }

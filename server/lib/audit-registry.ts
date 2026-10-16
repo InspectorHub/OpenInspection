@@ -139,6 +139,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'defect_category.deleted': { family: 'defect_category', label: 'audit_action_defect_category_deleted', meta: {}, status: { kind: 'live' } },
     'defect_category.updated': { family: 'defect_category', label: 'audit_action_defect_category_updated', meta: {}, status: { kind: 'live' } },
     'inspection.bulk_assign': { family: 'inspection', label: 'audit_action_inspection_bulk_assign', meta: { ids: 'id', inspectorId: 'person' }, status: { kind: 'live' } },
+    'inspection.order_updated': { family: 'inspection', label: 'audit_action_inspection_order_updated', meta: { count: 'count', fields: 'name' }, status: { kind: 'live' } },
     'inspection.bulk_status': { family: 'inspection', label: 'audit_action_inspection_bulk_status', meta: { ids: 'id', status: 'to' }, status: { kind: 'live' } },
     'inspection.complete': { family: 'inspection', label: 'audit_action_inspection_complete', meta: { propertyAddress: 'name' }, status: { kind: 'live' } },
     'inspection.compliance.doc_review_seeded': { family: 'inspection', label: 'audit_action_inspection_compliance_doc_review_seeded', meta: {}, status: { kind: 'live' } },

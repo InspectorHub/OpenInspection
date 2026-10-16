@@ -920,7 +920,7 @@
       }
     },
     "summary": "Cancel inspection for current tenant",
-    "description": "Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged. Available to owner, manager and inspector roles; staff get 403."
+    "description": "Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged. Available to owner, manager and inspector roles. Staff may cancel only an unpaid inspection that has not started, and need scheduleOthers or a place on the inspection; otherwise they get 403."
   },
   {
     "operationId": "cancelTeamInvite",
@@ -1040,7 +1040,7 @@
       "body": null
     },
     "summary": "Clone inspection for current tenant",
-    "description": "Creates a new inspection as a copy of an existing one. The copy gets a new id, today's date and time, status draft and payment status unpaid; every other column of the source record is carried over as stored, and the source's client and agent links and its lead and helper assignments are copied onto it. Findings, photos and reports are not copied by this route. Counts as one new inspection against the company's plan quota, and a quota-threshold notice may be sent when the limit is approached. Records an inspection.create audit entry noting the source id. Not idempotent: each call makes another copy. Responds 404 if the source is missing. Available to owner, manager and inspector roles; staff get 403."
+    "description": "Creates a new inspection as a copy of an existing one. The copy gets a new id, today's date and time, status requested, payment status unpaid and an in-progress report. The booking and property details, price and requirements are carried over; report state, signature settings, cover photo, cancellation and unlock records, and re-inspection links are not. The source's client and agent links and its lead and helper assignments are copied onto it. Findings, photos and reports are not copied by this route. Counts as one new inspection against the company's plan quota, and a quota-threshold notice may be sent when the limit is approached. Records an inspection.create audit entry noting the source id. Not idempotent: each call makes another copy. Responds 404 if the source is missing. Available to owner, manager, inspector and staff roles."
   },
   {
     "operationId": "cloneRatingSystem",
@@ -1195,7 +1195,7 @@
       "body": null
     },
     "summary": "Confirm inspection for current tenant",
-    "description": "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers and inspectors."
+    "description": "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers, inspectors and staff; staff cannot confirm a completed inspection and need scheduleOthers or a place on the inspection."
   },
   {
     "operationId": "confirmSmsOptin",
@@ -1788,7 +1788,7 @@
       }
     },
     "summary": "Create inspection for current tenant",
-    "description": "Initialize a new inspection for a property. (POST /, inspections domain)."
+    "description": "Initialize a new inspection for a property. Available to owner, manager, inspector and staff roles; a named inspector must be a member who can inspect (400 otherwise), and a job booked by staff without one starts unassigned."
   },
   {
     "operationId": "createInspectionAgentToken",
@@ -4529,8 +4529,8 @@
       ],
       "body": null
     },
-    "summary": "Bring a cancelled inspection back to scheduled",
-    "description": "Returns a mistakenly-cancelled inspection to `scheduled`, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. Staff get 403. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
+    "summary": "Bring a cancelled inspection back",
+    "description": "Returns a mistakenly-cancelled inspection to the status it had before it was cancelled, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. The report status is not changed. Staff need scheduleOthers or a place on the inspection, and get 403 for an inspection that was completed when it was cancelled. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
   },
   {
     "operationId": "createInspectionUnits",
@@ -5147,7 +5147,7 @@
       }
     },
     "summary": "Create a re-inspection from this (published) baseline report",
-    "description": "Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report. Staff get 403."
+    "description": "Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report. A named inspector must be a member who can inspect (400 otherwise). Available to owner, manager, inspector and staff roles."
   },
   {
     "operationId": "createRepairList",
@@ -13558,7 +13558,7 @@
       }
     },
     "summary": "Patch inspection for current tenant",
-    "description": "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields. Staff may change only the date and the assigned inspector (scheduleOthers applies as for anyone); a body naming any other field gets 403."
+    "description": "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields. Staff may change the order fields (date, assigned inspector, price, address, reference and referral fields, closing date, payment and agreement requirements, and a status of requested, scheduled or confirmed). They may switch the payment and agreement requirements on but not off, may not change the status of a completed inspection, and may change the property details only before the inspection starts. A body changing any report setting or other inspection field gets 403, and so do changes to the inspector, address or date after the inspection has started. Staff writes need scheduleOthers or being on the inspection."
   },
   {
     "operationId": "patchInspectionComplianceDocReviewItem",

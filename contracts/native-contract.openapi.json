@@ -676,7 +676,7 @@
           "inspections"
         ],
         "summary": "Create inspection for current tenant",
-        "description": "Initialize a new inspection for a property. (POST /, inspections domain).",
+        "description": "Initialize a new inspection for a property. Available to owner, manager, inspector and staff roles; a named inspector must be a member who can inspect (400 otherwise), and a job booked by staff without one starts unassigned.",
         "operationId": "createInspection",
         "requestBody": {
           "content": {
@@ -938,7 +938,7 @@
           "inspections"
         ],
         "summary": "Patch inspection for current tenant",
-        "description": "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields. Staff may change only the date and the assigned inspector (scheduleOthers applies as for anyone); a body naming any other field gets 403.",
+        "description": "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields. Staff may change the order fields (date, assigned inspector, price, address, reference and referral fields, closing date, payment and agreement requirements, and a status of requested, scheduled or confirmed). They may switch the payment and agreement requirements on but not off, may not change the status of a completed inspection, and may change the property details only before the inspection starts. A body changing any report setting or other inspection field gets 403, and so do changes to the inspector, address or date after the inspection has started. Staff writes need scheduleOthers or being on the inspection.",
         "operationId": "patchInspection",
         "parameters": [
           {

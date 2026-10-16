@@ -101,7 +101,7 @@ const updateInspectionRoute = createRoute(withMcpMetadata({
     path: '/{id}',
     tags: ["inspections"],
     summary: "Patch inspection for current tenant",
-    description: "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields. Staff may change only the date and the assigned inspector (scheduleOthers applies as for anyone); a body naming any other field gets 403.",
+    description: "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields. Staff may change the order fields (date, assigned inspector, price, address, reference and referral fields, closing date, payment and agreement requirements, and a status of requested, scheduled or confirmed). They may switch the payment and agreement requirements on but not off, may not change the status of a completed inspection, and may change the property details only before the inspection starts. A body changing any report setting or other inspection field gets 403, and so do changes to the inspector, address or date after the inspection has started. Staff writes need scheduleOthers or being on the inspection.",
     request: {
         params: z.object({
             id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspection id.'),
@@ -140,7 +140,7 @@ const cloneInspectionRoute = createRoute(withMcpMetadata({
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection to copy.') }),
     },
-    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff],
+    middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {
         201: {
             content: {
@@ -152,7 +152,7 @@ const cloneInspectionRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "cloneInspection",
-    description: "Creates a new inspection as a copy of an existing one. The copy gets a new id, today's date and time, status draft and payment status unpaid; every other column of the source record is carried over as stored, and the source's client and agent links and its lead and helper assignments are copied onto it. Findings, photos and reports are not copied by this route. Counts as one new inspection against the company's plan quota, and a quota-threshold notice may be sent when the limit is approached. Records an inspection.create audit entry noting the source id. Not idempotent: each call makes another copy. Responds 404 if the source is missing. Available to owner, manager and inspector roles; staff get 403."
+    description: "Creates a new inspection as a copy of an existing one. The copy gets a new id, today's date and time, status requested, payment status unpaid and an in-progress report. The booking and property details, price and requirements are carried over; report state, signature settings, cover photo, cancellation and unlock records, and re-inspection links are not. The source's client and agent links and its lead and helper assignments are copied onto it. Findings, photos and reports are not copied by this route. Counts as one new inspection against the company's plan quota, and a quota-threshold notice may be sent when the limit is approached. Records an inspection.create audit entry noting the source id. Not idempotent: each call makes another copy. Responds 404 if the source is missing. Available to owner, manager, inspector and staff roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // -----------------------------------------------------------------------------

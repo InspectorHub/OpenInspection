@@ -175,7 +175,16 @@ describe('InspectionService.createReinspection (#119)', () => {
     it('rejects an inspectorId that does not belong to the tenant', async () => {
         await expect(svc.createReinspection(TENANT, ORIGINAL, {
             selectedItemIds: ['item-a'], inspectorId: 'ghost-user',
-        })).rejects.toThrow(/inspector/i);
+        })).rejects.toThrow(/who can inspect/i);
+    });
+
+    it('rejects a member of the tenant who works in the office (cannot inspect)', async () => {
+        await testDb.insert(schema.users).values({
+            id: 'user-office', tenantId: TENANT, email: 'office@example.com', passwordHash: 'x', name: 'Office', role: 'staff', createdAt: new Date(),
+        });
+        await expect(svc.createReinspection(TENANT, ORIGINAL, {
+            selectedItemIds: ['item-a'], inspectorId: 'user-office', scheduledDate: DAY,
+        })).rejects.toThrow(/who can inspect/i);
     });
 
     it('accepts a valid seeded tenant user as inspectorId', async () => {

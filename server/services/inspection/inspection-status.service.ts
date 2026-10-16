@@ -2,7 +2,8 @@ import { eq, and } from 'drizzle-orm';
 import { inspections } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { fireAutomation } from './shared';
-import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
+import { INSPECTION_STATUS, type InspectionStatus } from '../../lib/status/inspection-status';
+import { statusBeforeCancel } from '../../lib/inspection/cancel-restore';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { InspectionSubService } from './base';
 import type { CancellationReason } from '../../lib/cancellation-reason';
@@ -34,14 +35,16 @@ export class InspectionStatusService extends InspectionSubService {
         await fireAutomation(this.db, tenantId, id, 'inspection.confirmed');
     }
 
-    async cancelInspection(tenantId: string, id: string, reason: CancellationReason, notes?: string): Promise<void> {
-        const { db } = await this.fetchForStatusChange(tenantId, id);
+    /** Cancels, and returns the status the inspection had, which the caller records so a restore can bring it back. */
+    async cancelInspection(tenantId: string, id: string, reason: CancellationReason, notes?: string): Promise<InspectionStatus> {
+        const { db, inspection } = await this.fetchForStatusChange(tenantId, id);
         await db.update(inspections).set({
             status:       INSPECTION_STATUS.CANCELLED,
             cancelReason: reason,
             cancelNotes:  notes ?? null,
         }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
         await fireAutomation(this.db, tenantId, id, 'inspection.cancelled');
+        return inspection.status;
     }
 
     /**
@@ -51,20 +54,27 @@ export class InspectionStatusService extends InspectionSubService {
      * cancellation that no longer stands, and a live inspection carrying
      * "no_show" is a lie that outlives the mistake.
      *
+     * The inspection returns to the status it had before it was cancelled (see
+     * `statusBeforeCancel`), so a cancelled completed job does not come back as a
+     * scheduled one. The report status is not touched, and neither are the agreement
+     * and signing records.
+     *
      * The MONEY does not come back. A kept fee and an issued refund are ledger
      * facts, reversed by an invoice adjustment, not by re-scheduling the job.
      * No automation fires either — there is no `inspection.uncancelled` trigger
      * to fire, and re-sending the client a "your inspection is booked" notice
      * off a correction is not what any of the existing rules mean.
      */
-    async uncancelInspection(tenantId: string, id: string): Promise<void> {
+    async uncancelInspection(tenantId: string, id: string): Promise<InspectionStatus> {
         const { db, inspection } = await this.fetchForStatusChange(tenantId, id);
         if (inspection.status !== INSPECTION_STATUS.CANCELLED) throw Errors.BadRequest('Inspection is not cancelled');
+        const restored = await statusBeforeCancel(db, tenantId, inspection);
         await db.update(inspections).set({
-            status:       INSPECTION_STATUS.SCHEDULED,
+            status:       restored,
             cancelReason: null,
             cancelNotes:  null,
         }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
+        return restored;
     }
 
     /**

@@ -15,6 +15,8 @@ import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/ema
 import type { CreateInspectionData } from '../../services/inspection/shared';
 import type { HonoConfig } from '../../types/hono';
 import { isFieldRole } from '../../lib/auth/roles';
+import { assertFieldRoleMembers } from '../../lib/inspection/field-role-members';
+import { getDrizzle } from '../../lib/route-helpers';
 
 /**
  * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
@@ -79,6 +81,8 @@ export async function resolveCreateInput(
 ): Promise<CreateInspectionData & { inspectorId?: string | undefined; clientContactId?: string }> {
     const tenantId = c.get('tenantId');
     const contactService = c.var.services.contact;
+    // A named inspector must work in the field and belong to this company; nothing after this looks at the id again.
+    await assertFieldRoleMembers(getDrizzle(c), tenantId, [body.inspectorId]);
 
     // IA-1: Resolve client contact before creating the inspection.
     let clientContactId: string | undefined;

@@ -13,6 +13,9 @@
  *    `inspector_id` also counts: it is written with the row, while the roster is
  *    written moments later, and a retry that races its own first attempt must not
  *    be told the id is taken.
+ *    The person who created it may always replay it. That matters for an office
+ *    user's job, which starts with nobody assigned and so is on no roster: the
+ *    create's own audit row (id derived from the inspection) says who made it.
  *  - It is complete. The first attempt may have died anywhere after writing the
  *    inspection. The create pipeline (`services/inspection/create-pipeline`) ends
  *    with the primary report, so a missing report means it did not finish, and the
@@ -25,6 +28,7 @@
  *    nothing, and the quota and the discount are never spent again.
  */
 
+import { and, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { AppError, ErrorCode } from '../../lib/errors';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
@@ -32,9 +36,17 @@ import { getInspectionRoster } from '../../lib/inspection/roster';
 import { ensurePrimaryReportAndResults } from '../../lib/inspection/primary-report';
 import { resolvePrimaryReportId } from '../../lib/inspection/reports';
 import { getDrizzle } from '../../lib/route-helpers';
+import { auditLogs } from '../../lib/db/schema';
 import type { CreateInspectionData, Inspection } from '../../services/inspection/shared';
 import type { HonoConfig } from '../../types/hono';
 import { fireQuotaThresholdNotice, recordCreateAudit, resolveCreateInput } from './create-support';
+
+/** Did this user make the inspection? The create's audit row is written ahead of the report, under a derived id. */
+async function createdBy(c: Context<HonoConfig>, inspectionId: string, userId: string): Promise<boolean> {
+    const row = await getDrizzle(c).select({ userId: auditLogs.userId }).from(auditLogs)
+        .where(and(eq(auditLogs.tenantId, c.get('tenantId')), eq(auditLogs.id, `inspection.create:${inspectionId}`))).get();
+    return row?.userId === userId;
+}
 
 export async function completeReplayedCreate(c: Context<HonoConfig>, existing: Inspection, body: CreateInspectionData): Promise<Inspection> {
     const tenantId = c.get('tenantId');
@@ -42,7 +54,9 @@ export async function completeReplayedCreate(c: Context<HonoConfig>, existing: I
     const db = getDrizzle(c);
     const roster = userId ? await getInspectionRoster(db, tenantId, existing.id) : null;
     const may = !!userId && !!roster
-        && (existing.inspectorId === userId || canAccessInspectionCollab(roster, { id: userId, role: c.get('userRole') ?? '' }));
+        && (existing.inspectorId === userId
+            || canAccessInspectionCollab(roster, { id: userId, role: c.get('userRole') ?? '' })
+            || await createdBy(c, existing.id, userId));
     if (!may) throw new AppError(409, ErrorCode.ID_CONFLICT, 'That inspection id is already in use.');
 
     if (!await resolvePrimaryReportId(db, tenantId, existing.id)) {

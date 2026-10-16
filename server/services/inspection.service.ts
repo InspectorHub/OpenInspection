@@ -640,11 +640,11 @@ export class InspectionService {
         return this.status.confirmInspection(tenantId, id);
     }
 
-    async cancelInspection(tenantId: string, id: string, reason: CancellationReason, notes?: string): Promise<void> {
+    async cancelInspection(tenantId: string, id: string, reason: CancellationReason, notes?: string): ReturnType<InspectionStatusService['cancelInspection']> {
         return this.status.cancelInspection(tenantId, id, reason, notes);
     }
 
-    async uncancelInspection(tenantId: string, id: string): Promise<void> {
+    async uncancelInspection(tenantId: string, id: string): ReturnType<InspectionStatusService['uncancelInspection']> {
         return this.status.uncancelInspection(tenantId, id);
     }
 

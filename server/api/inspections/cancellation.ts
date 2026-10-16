@@ -10,7 +10,8 @@
 // of #81.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { requireRole, denyStaff } from '../../lib/middleware/rbac';
+import { requireRole } from '../../lib/middleware/rbac';
+import { assertStaffMayCancel, guardStaffUncancel } from './staff-status-guards';
 import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { moneyView } from '../../lib/auth/money-access';
 import { Errors } from '../../lib/errors';
@@ -82,7 +83,7 @@ const cancelRoute = createRoute(withMcpMetadata({
     path: '/{id}/cancel',
     tags: ['inspections'],
     summary: 'Cancel inspection for current tenant',
-    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({ id: z.string().describe('Inspection id.') }),
         body: { content: { 'application/json': { schema: CancelInspectionSchema } } },
@@ -112,7 +113,7 @@ const cancelRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: 'cancelInspection',
-    description: 'Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged. Available to owner, manager and inspector roles; staff get 403.',
+    description: 'Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged. Available to owner, manager and inspector roles. Staff may cancel only an unpaid inspection that has not started, and need scheduleOthers or a place on the inspection; otherwise they get 403.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 // THE ONE DOOR BACK (#81). This endpoint shipped complete and unwired: the
@@ -128,15 +129,15 @@ const cancelRoute = createRoute(withMcpMetadata({
 // they cannot undo.
 const uncancelRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/uncancel',
-    tags: ["inspections"], summary: "Bring a cancelled inspection back to scheduled",
-    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff] as const,
+    tags: ["inspections"], summary: "Bring a cancelled inspection back",
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardStaffUncancel] as const,
     request: { params: z.object({ id: z.string().describe('The cancelled inspection to bring back.') }).describe('Path parameters.') },
     responses: {
         200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('Recovered.') } }, description: 'Uncancelled' },
         400: { description: 'The inspection is not cancelled, so there is nothing to recover.' },
     },
     operationId: "createInspectionUncancel",
-    description: "Returns a mistakenly-cancelled inspection to `scheduled`, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. Staff get 403. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
+    description: "Returns a mistakenly-cancelled inspection to the status it had before it was cancelled, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. The report status is not changed. Staff need scheduleOthers or a place on the inspection, and get 403 for an inspection that was completed when it was cancelled. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const flatten = (q: Awaited<ReturnType<typeof quoteCancellation>>) => ({
@@ -174,6 +175,9 @@ const cancellationRoutes = createApiRouter()
         // the caller was looking at.
         const quote = await quoteCancellation(db, tenantId, id, reason);
 
+        // Staff cancel only what nothing has been collected on and the inspector has not started.
+        await assertStaffMayCancel(c, id, quote.paidCents);
+
         // Committing a fee or a refund is a money decision. The refusal carries no
         // figure, and it comes before the fee confirmation, which would show one.
         if (involvesMoney(quote) && !(await capabilitiesFor(c)).inspectionFees) {
@@ -195,7 +199,7 @@ const cancellationRoutes = createApiRouter()
             }, 409);
         }
 
-        await c.var.services.inspection.cancelInspection(tenantId, id, reason, notes);
+        const from = await c.var.services.inspection.cancelInspection(tenantId, id, reason, notes);
 
         const userId = (c.get('user') as { sub?: string } | undefined)?.sub ?? null;
         const refund = await applyCancellationRefund(db, tenantId, quote, userId);
@@ -215,6 +219,7 @@ const cancellationRoutes = createApiRouter()
         auditFromContext(c, 'inspection.status_change', 'inspection', {
             entityId: id,
             metadata: {
+                from,
                 to: 'cancelled',
                 reason,
                 feeCents: quote.outcome.feeCents,
@@ -257,7 +262,7 @@ const cancellationRoutes = createApiRouter()
     .openapi(uncancelRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
-        await c.var.services.inspection.uncancelInspection(tenantId, id);
+        const restored = await c.var.services.inspection.uncancelInspection(tenantId, id);
 
         // Both of these are what the dropdown's PATCH did and this did not.
         // The calendar entry was REMOVED by the cancel — pushInspectionToGoogle
@@ -265,7 +270,7 @@ const cancellationRoutes = createApiRouter()
         pushInspectionAfterResponse(c, tenantId, id);
         auditFromContext(c, 'inspection.status_change', 'inspection', {
             entityId: id,
-            metadata: { from: INSPECTION_STATUS.CANCELLED, to: INSPECTION_STATUS.SCHEDULED },
+            metadata: { from: INSPECTION_STATUS.CANCELLED, to: restored },
         });
         return c.json({ success: true });
     });

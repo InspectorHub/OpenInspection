@@ -42,6 +42,9 @@ export type AuditAction =
     | 'inspection.send_sms'
     | 'inspection.rescheduled'
     | 'inspection.bulk_assign'
+    // An office user edited order fields (address, price, requirements, ...). Names the
+    // fields that changed and never their values.
+    | 'inspection.order_updated'
     | 'inspection.bulk_status'
     | 'inspection.template_upgraded'
     // The inspector's drawn signature stored on a report. Audited with the actor

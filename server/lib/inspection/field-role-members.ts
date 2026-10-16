@@ -20,6 +20,6 @@ export async function assertFieldRoleMembers(
         .where(and(eq(users.tenantId, tenantId), inArray(users.id, wanted), inArray(users.role, [...FIELD_ROLES])))
         .all();
     if (found.length !== wanted.length) {
-        throw Errors.BadRequest('An assignee is not a member of this tenant who can inspect');
+        throw Errors.BadRequest('An assignee is not a member of this company who can inspect');
     }
 }
